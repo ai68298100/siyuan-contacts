@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-09-26T17:22:58.647Z",
+  "sessionId": "sess_84e096e0-bfee-40a3-b7cf-946f2d8500b1",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "scripts/spike/av-spike.mjs",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 11,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}
