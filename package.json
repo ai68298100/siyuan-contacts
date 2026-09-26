@@ -1,0 +1,45 @@
+{
+  "name": "siyuan-contacts",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "小驴人脉：在思源笔记里管理人脉与人际关系（一人一文档 + 数据库主干）",
+  "repository": "https://github.com/ai68298100/siyuan-contacts",
+  "homepage": "https://github.com/ai68298100/siyuan-contacts",
+  "author": "ai68298100",
+  "license": "MIT",
+  "packageManager": "pnpm@12.3.4",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "cross-env NODE_ENV=development VITE_SOURCEMAP=inline vite build --watch",
+    "build": "run-s clean build:app",
+    "build:app": "cross-env NODE_ENV=production vite build",
+    "check": "run-s check:types check:svelte",
+    "check:types": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "check:svelte": "svelte-check --tsconfig ./tsconfig.json",
+    "clean": "node scripts/clean.js",
+    "make-link": "node scripts/make_dev_link.js",
+    "make-install": "pnpm run build && node --no-warnings ./scripts/make_install.js",
+    "update-version": "node --no-warnings ./scripts/update_version.js",
+    "test": "node --test tests/model.test.ts tests/architecture.test.ts",
+    "spike": "node scripts/spike/av-spike.mjs"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "@types/livereload": "^0.9.5",
+    "@types/node": "^26.4.0",
+    "cross-env": "^10.1.0",
+    "fast-glob": "^3.3.3",
+    "livereload": "^0.9.3",
+    "npm-run-all": "^4.1.5",
+    "sass": "^1.103.1",
+    "siyuan": "1.2.7",
+    "svelte": "^5.57.0",
+    "svelte-check": "^4.7.6",
+    "typescript": "^6.0.3",
+    "vite": "^8.2.2",
+    "vite-plugin-static-copy": "^4.1.1",
+    "vite-plugin-zip-pack": "^1.2.4"
+  }
+}

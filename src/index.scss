@@ -1,0 +1,165 @@
+/* 小驴人脉样式：视觉融合思源（一律 b3 变量，亮暗主题自动适配），类名前缀 lvct-。 */
+
+.lvct-tab-root,
+.lvct-dialog-root {
+    overflow: auto;
+}
+
+/* ---------- 工作台 ---------- */
+
+.lvct-workbench {
+    height: 100%;
+    padding: 8px 12px;
+    box-sizing: border-box;
+}
+
+.lvct-workbench__nav {
+    gap: 4px;
+    border-bottom: 1px solid var(--b3-border-color);
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+}
+
+.lvct-workbench__nav-item {
+    border: none;
+    background: transparent;
+    color: var(--b3-theme-on-background);
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+
+    &:hover {
+        background: var(--b3-list-hover);
+    }
+
+    &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+
+    &--active {
+        background: var(--b3-theme-primary-lightest);
+        color: var(--b3-theme-primary);
+        font-weight: 500;
+    }
+}
+
+.lvct-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--b3-theme-on-surface);
+    font-size: 14px;
+}
+
+/* ---------- 首页 ---------- */
+
+.lvct-home {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 10px;
+}
+
+.lvct-home__card {
+    background: var(--b3-theme-surface);
+    border: 1px solid var(--b3-border-color);
+    border-radius: 8px;
+    padding: 12px 14px;
+
+    h3 {
+        margin: 0 0 8px;
+        font-size: 14px;
+    }
+}
+
+.lvct-home__row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 13px;
+}
+
+.lvct-home__actions {
+    margin-top: 10px;
+}
+
+/* ---------- 向导 ---------- */
+
+.lvct-wizard {
+    max-width: 520px;
+    margin: 8vh auto;
+    padding: 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.lvct-wizard__header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    h2 {
+        margin: 0 0 4px;
+        font-size: 18px;
+    }
+
+    p {
+        margin: 0;
+        font-size: 13px;
+    }
+}
+
+.lvct-wizard__logo {
+    width: 44px;
+    height: 44px;
+    fill: var(--b3-theme-primary);
+    flex-shrink: 0;
+}
+
+.lvct-wizard__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+}
+
+.lvct-wizard__error {
+    border: 1px solid var(--b3-card-error-border-color, var(--b3-border-color));
+    background: var(--b3-card-error-background, var(--b3-theme-surface));
+    color: var(--b3-card-error-color, var(--b3-theme-error));
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    word-break: break-all;
+}
+
+.lvct-wizard__log {
+    font-family: var(--b3-font-family-code, monospace);
+    font-size: 12px;
+    color: var(--b3-theme-on-surface);
+    background: var(--b3-theme-surface);
+    border: 1px solid var(--b3-border-color);
+    border-radius: 6px;
+    padding: 8px 12px;
+    max-height: 200px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* ---------- 移动端 ---------- */
+
+@media (max-width: 640px) {
+    .lvct-home {
+        grid-template-columns: 1fr;
+    }
+
+    .lvct-workbench {
+        padding: 8px;
+    }
+}

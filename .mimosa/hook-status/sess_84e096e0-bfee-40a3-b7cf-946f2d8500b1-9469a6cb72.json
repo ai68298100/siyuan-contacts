@@ -1,14 +1,14 @@
 {
   "schemaVersion": "mimosa-hook-status/v1",
-  "recordedAt": "2026-09-26T17:22:58.647Z",
+  "recordedAt": "2026-09-26T17:54:26.269Z",
   "sessionId": "sess_84e096e0-bfee-40a3-b7cf-946f2d8500b1",
   "event": "PostToolUse",
   "toolName": "Edit",
-  "file": "scripts/spike/av-spike.mjs",
+  "file": "src/components/WorkbenchRoot.svelte",
   "outcome": "clear",
   "coverage": "complete",
   "findingCount": 0,
-  "durationMs": 11,
+  "durationMs": 12,
   "hostState": "hook_complete",
   "reportHint": ".mimosa/reports/"
 }

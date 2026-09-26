@@ -1,5 +1,5 @@
-.spike-workspace/
 node_modules/
+dev/
 dist/
-*.zip
-.DS_Store
+package.zip
+*.tsbuildinfo
