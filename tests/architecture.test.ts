@@ -25,13 +25,16 @@ function listFiles(dir, ext) {
 }
 
 function importsOf(file) {
-    const content = fs.readFileSync(file, "utf8");
+    // `import type` 是编译期擦除的，不构成运行时依赖，从扫描中剔除（逐行过滤）
+    const raw = fs.readFileSync(file, "utf8");
+    const content = raw
+        .split(/\r?\n/)
+        .filter((line) => !line.trimStart().startsWith("import type "))
+        .join("\n");
     const imports = [];
     const re = /(?:import|from)\s+["']([^"']+)["']/g;
-    let match = re.exec(content);
-    while (match !== null) {
+    for (const match of content.matchAll(re)) {
         imports.push(match[1]);
-        match = re.exec(content);
     }
     return imports;
 }

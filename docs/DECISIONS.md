@@ -32,6 +32,24 @@ i18n parity 测试）。plugin.json 的 displayName/description 双语从第一�
 单一 relation 字段存边成本最低且原生可 rollup；关系类型（同事/家人/引荐人）的严谨建模需要
 "行=关系"的独立库，MVP 用「分组列着色图谱 + 文档双链区块」过渡，二期一键升级，不做半吊子中间态。
 
+## D-0007（2026-09-27）新建联系人的防重与收编语义
+
+`createDocWithMd` 对同路径**会再建新文档**（不是幂等返回原 ID，E2E 实证）。因此：
+1. 防重判据 = 按姓名查 `renderAttributeView`（query=姓名）中的精确名匹配，与文档 ID 无关；
+2. 通过防重后，若目标文档已存在但未绑定行（用户手建的文档），直接收编（补绑行+写字段）；
+3. 已绑定的同名联系人 → 抛错由 UI 呈现。
+
+## D-0008（2026-09-27）渲染值的 select 选项用 content，列定义 options 用 name
+
+写入与回读的单元格值 `mSelect[].content`；仅 `view.columns[].options[].name` 是列元数据。
+api/av.ts 以两个类型显式区分（AvValueOption / AvColumnOption），防止混用。
+
+## D-0009（2026-09-27）关系数据以 itemID 为边、文档 ID 为节点
+
+relation 字段的 blockIDs 存的是行 itemID；卡片跳转与图谱节点用 docId。
+ContactSummary 同时携带两者（itemId/docId/relatedItemIds），换算只在服务层做一次，
+组件层禁止再触碰映射端点。
+
 ## D-0006（2026-09-27）锚点 ID 信任链：设置固化，绝不反查
 
 notebookId/hostDocId/dbBlockId/avId/fieldMap 全部在初始化时固化为插件设置；

@@ -17,6 +17,7 @@
         isMobile={facade.isMobile}
         onOpenHostDoc={() => facade.openHostDoc()}
         onOpenSettings={() => facade.openSettings()}
+        onOpenPersonDoc={(docId) => facade.openPersonDoc(docId)}
     />
 {:else}
     <InitWizard facade={facade} onInitialized={(value) => (settings = value)} />

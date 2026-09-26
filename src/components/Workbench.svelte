@@ -1,8 +1,8 @@
 <script lang="ts">
     /**
-     * 主工作台：M1 提供 首页(初始化状态总览) + 占位视图骨架；
-     * M2 起各视图逐个填充为真实功能。
+     * 主工作台：首页(工作空间总览) + 联系人(卡片/表格) + 图谱(M3)。
      */
+    import PeopleView from "./people/PeopleView.svelte";
     import type { ContactsSettings } from "../domain/model";
     import { detectCheckinBridge } from "../bridge/checkin";
 
@@ -11,18 +11,20 @@
         isMobile,
         onOpenHostDoc,
         onOpenSettings,
+        onOpenPersonDoc,
     }: {
         settings: ContactsSettings;
         isMobile: boolean;
         onOpenHostDoc: () => void;
         onOpenSettings: () => void;
+        onOpenPersonDoc: (docId: string) => void;
     } = $props();
 
     type ViewId = "home" | "people" | "graph";
 
     const views: readonly { id: ViewId; label: string; enabled: boolean }[] = [
         { id: "home", label: "首页", enabled: true },
-        { id: "people", label: "联系人", enabled: false },
+        { id: "people", label: "联系人", enabled: true },
         { id: "graph", label: "关系图谱", enabled: false },
     ];
 
@@ -79,10 +81,12 @@
                 <div class="lvct-home__card">
                     <h3>路线图</h3>
                     <p class="ft__smaller ft__on-surface">
-                        联系人卡片与表格视图（M2）· 关系图谱（M3）· 生日提醒与仪表盘（M4）· 移动端深度适配（M5）
+                        关系图谱（M3）· 生日提醒与仪表盘（M4）· 移动端深度适配（M5）
                     </p>
                 </div>
             </section>
+        {:else if current === "people"}
+            <PeopleView {settings} {onOpenPersonDoc} />
         {:else}
             <div class="lvct-placeholder">该视图在后续里程碑中开放。</div>
         {/if}

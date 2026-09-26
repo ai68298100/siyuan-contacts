@@ -9,5 +9,7 @@ export interface ContactsPluginFacade {
     /** 执行工作空间初始化并向导日志回调进度；失败抛错 */
     initialize(notebookName: string, onProgress: (message: string) => void): Promise<ContactsSettings>;
     openHostDoc(): void;
+    /** 打开人物文档（联系人详情页 = 人物文档） */
+    openPersonDoc(docId: string): void;
     openSettings(): void;
 }

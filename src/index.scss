@@ -152,6 +152,206 @@
     gap: 2px;
 }
 
+/* ---------- 联系人视图 ---------- */
+
+.lvct-people {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.lvct-people__toolbar {
+    gap: 8px;
+    align-items: center;
+}
+
+.lvct-people__cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 10px;
+    align-content: start;
+    overflow: auto;
+    flex: 1;
+}
+
+.lvct-person-card {
+    display: flex;
+    gap: 10px;
+    background: var(--b3-theme-surface);
+    border: 1px solid var(--b3-border-color);
+    border-radius: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+
+    &:hover {
+        border-color: var(--b3-theme-primary-lighter, var(--b3-theme-primary));
+    }
+}
+
+.lvct-person-card__avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--b3-theme-primary-lightest, var(--b3-theme-primary-light));
+    color: var(--b3-theme-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    flex-shrink: 0;
+}
+
+.lvct-person-card__main {
+    min-width: 0;
+    flex: 1;
+}
+
+.lvct-person-card__name {
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.lvct-person-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    margin-top: 3px;
+
+    a {
+        color: var(--b3-theme-on-surface);
+
+        &:hover {
+            color: var(--b3-theme-primary);
+        }
+    }
+}
+
+.lvct-chip {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--b3-theme-surface-lighter, var(--b3-list-hover));
+    color: var(--b3-theme-on-surface);
+    font-weight: 400;
+}
+
+.lvct-chip--group {
+    background: var(--b3-theme-primary-lightest, var(--b3-list-hover));
+    color: var(--b3-theme-primary);
+}
+
+.lvct-people__table-wrap {
+    overflow: auto;
+    flex: 1;
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+
+        th,
+        td {
+            text-align: left;
+            padding: 6px 10px;
+            border-bottom: 1px solid var(--b3-border-color);
+            white-space: nowrap;
+        }
+
+        th {
+            color: var(--b3-theme-on-surface);
+            font-weight: 500;
+        }
+
+        tbody tr {
+            cursor: pointer;
+
+            &:hover {
+                background: var(--b3-list-hover);
+            }
+        }
+    }
+}
+
+/* ---------- 表单与轻量弹窗 ---------- */
+
+.lvct-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 2px;
+}
+
+.lvct-form__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.lvct-form__item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+
+    &--inline {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        padding-top: 22px;
+    }
+}
+
+.lvct-form__error {
+    border: 1px solid var(--b3-card-error-border-color, var(--b3-border-color));
+    background: var(--b3-card-error-background, var(--b3-theme-surface));
+    color: var(--b3-card-error-color, var(--b3-theme-error));
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    word-break: break-all;
+}
+
+.lvct-form__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.lvct-form__hint {
+    margin: 0;
+}
+
+.lvct-dialog-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.lvct-dialog-panel {
+    background: var(--b3-theme-background);
+    border: 1px solid var(--b3-border-color);
+    border-radius: 10px;
+    box-shadow: var(--b3-dialog-shadow, 0 4px 20px rgba(0, 0, 0, 0.2));
+    width: min(560px, 92vw);
+    max-height: 90vh;
+    overflow: auto;
+    padding: 14px 16px;
+}
+
+.lvct-dialog-panel__title {
+    margin: 0 0 10px;
+    font-size: 15px;
+}
+
 /* ---------- 移动端 ---------- */
 
 @media (max-width: 640px) {
@@ -162,4 +362,17 @@
     .lvct-workbench {
         padding: 8px;
     }
+
+    .lvct-form__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .lvct-form__item--inline {
+        padding-top: 0;
+    }
+
+    .lvct-people__cards {
+        grid-template-columns: 1fr;
+    }
 }
+

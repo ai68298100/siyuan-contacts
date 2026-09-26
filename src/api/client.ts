@@ -56,7 +56,6 @@ export async function createNotebook(name: string): Promise<NotebookMeta> {
     const existing = (await listNotebooks()).find((notebook) => notebook.name === name);
     if (existing) throw new Error(`已存在同名笔记本「${name}」`);
     await kernelPost<unknown>("/api/notebook/createNotebook", { name });
-    await kernelPost<unknown>("/api/notebook/refreshNotebooks", {});
     const created = (await listNotebooks()).find((notebook) => notebook.name === name);
     if (!created) throw new Error(`笔记本「${name}」创建后未在列表中出现`);
     return created;

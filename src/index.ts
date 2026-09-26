@@ -111,6 +111,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         openTab({ app: this.app, doc: { id: this.settings.hostDocId } });
     }
 
+    openPersonDoc(docId: string) {
+        if (!docId) return;
+        openTab({ app: this.app, doc: { id: docId } });
+    }
+
     openSettings() {
         showMessage("设置面板在后续里程碑开放", 2500);
     }

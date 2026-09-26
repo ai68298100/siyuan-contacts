@@ -11,8 +11,15 @@ import type { AvFieldType, FieldSpec } from "../domain/fields";
 
 /* ---------- 类型（渲染响应的最小切片） ---------- */
 
-export interface AvSelectOption {
+/** 列定义里的选项元数据（renderAttributeView 的 columns[].options） */
+export interface AvColumnOption {
     name: string;
+    color?: string;
+}
+
+/** 单元格值里的选项（写入与回读都用 content，spike ⑤ 实证） */
+export interface AvValueOption {
+    content: string;
     color?: string;
 }
 
@@ -20,7 +27,7 @@ export interface AvColumn {
     id: string;
     name: string;
     type: string;
-    options?: AvSelectOption[];
+    options?: AvColumnOption[];
 }
 
 export interface AvValueBlock {
@@ -38,7 +45,7 @@ export type AvValue = {
     email?: { content: string };
     url?: { content: string };
     date?: { content: number; isNotEmpty: boolean; isNotTime?: boolean };
-    mSelect?: AvSelectOption[];
+    mSelect?: AvValueOption[];
     checkbox?: { checked: boolean };
     relation?: { blockIDs: string[] };
 };
@@ -166,8 +173,8 @@ export type CellValue =
     | { type: "email"; value: { email: { content: string } } }
     | { type: "url"; value: { url: { content: string } } }
     | { type: "date"; value: { date: { content: number; isNotEmpty: boolean; isNotTime?: boolean } } }
-    | { type: "select"; value: { mSelect: AvSelectOption[] } }
-    | { type: "mSelect"; value: { mSelect: AvSelectOption[] } }
+    | { type: "select"; value: { mSelect: AvValueOption[] } }
+    | { type: "mSelect"; value: { mSelect: AvValueOption[] } }
     | { type: "checkbox"; value: { checkbox: { checked: boolean } } }
     | { type: "relation"; value: { relation: { blockIDs: string[] } } };
 
