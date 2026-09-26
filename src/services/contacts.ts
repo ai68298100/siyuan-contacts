@@ -120,6 +120,37 @@ async function writeDraftCells(settings: ContactsSettings, itemId: string, draft
 
 export { PRESET_GROUPS };
 
+/**
+ * 编辑资料：全字段更新（含清空语义）。
+ * 空字符串/空数组的写入即清空对应单元格——编辑弹窗依赖此语义。
+ */
+export async function updateContactFields(settings: ContactsSettings, itemId: string, draft: ContactDraft): Promise<void> {
+    const key = (field: FieldKey) => settings.fieldMap[field];
+    const text = (value: string) => value.trim();
+    const writes: Promise<unknown>[] = [
+        setCell(settings.avId, key("phone"), itemId, { type: "phone", value: { phone: { content: text(draft.phone) } } }),
+        setCell(settings.avId, key("email"), itemId, { type: "email", value: { email: { content: text(draft.email) } } }),
+        setCell(settings.avId, key("wechat"), itemId, { type: "text", value: { text: { content: text(draft.wechat) } } }),
+        setCell(settings.avId, key("website"), itemId, { type: "url", value: { url: { content: text(draft.website) } } }),
+        setCell(settings.avId, key("lunarBirthday"), itemId, { type: "checkbox", value: { checkbox: { checked: draft.isLunar } } }),
+        setCell(settings.avId, key("group"), itemId, {
+            type: "select",
+            value: { mSelect: draft.group.trim() ? [{ content: draft.group.trim(), color: "1" }] : [] },
+        }),
+        setCell(settings.avId, key("tags"), itemId, {
+            type: "mSelect",
+            value: { mSelect: draft.tags.filter((tag) => tag.trim()).map((tag, index) => ({ content: tag.trim(), color: String((index % 9) + 1) })) },
+        }),
+    ];
+    const birthdayMs = draft.birthday ? birthdayToMs(draft.birthday) : null;
+    writes.push(setCell(settings.avId, key("birthday"), itemId, {
+        type: "date",
+        value: { date: birthdayMs !== null ? { content: birthdayMs, isNotEmpty: true, isNotTime: true } : { content: 0, isNotEmpty: false } },
+    }));
+    await Promise.all(writes);
+    invalidateRoster();
+}
+
 /* ---------- 存量文档收编（需求②：把已有"人名"文档批量转为联系人） ---------- */
 
 export interface ImportCandidate {

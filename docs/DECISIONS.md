@@ -50,6 +50,12 @@ relation 字段的 blockIDs 存的是行 itemID；卡片跳转与图谱节点用
 ContactSummary 同时携带两者（itemId/docId/relatedItemIds），换算只在服务层做一次，
 组件层禁止再触碰映射端点。
 
+## D-0010（2026-09-27）语言策略修订：zh-CN 为主语言，en 保持键级一致
+
+M5 发布门禁从"完整双语"修订为"zh-CN 全量 + en 键级一致（parity 测试守门）"：
+目标用户中文优先，en 首版只覆盖插件级文案；完整英文翻译放 v0.2。
+parity 测试（tests/i18n.test.ts）保证以后补翻译时不会漏键。
+
 ## D-0006（2026-09-27）锚点 ID 信任链：设置固化，绝不反查
 
 notebookId/hostDocId/dbBlockId/avId/fieldMap 全部在初始化时固化为插件设置；

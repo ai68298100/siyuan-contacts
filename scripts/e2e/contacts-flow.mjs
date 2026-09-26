@@ -191,6 +191,28 @@ async function main() {
         record("双向关联回链生效", (backCell?.value.relation?.blockIDs ?? []).includes(zhang.itemId),
             `back=[${(backCell?.value.relation?.blockIDs ?? []).join(",")}]`);
 
+        // 相关人物双链区块：插入带 custom-lvct-related 标记的段落（services/doc-section.ts 同序列）
+        const ATTR = "custom-lvct-related";
+        const sectionMd = `**相关人物**：[李四](siyuan://blocks/${li.docId})\n{: ${ATTR}="1"}`;
+        const inserted = await api("/api/block/insertBlock", {dataType: "markdown", parentID: zhang.docId, data: sectionMd});
+        if (inserted.code !== 0) throw new Error(`区块插入失败: ${inserted.msg}`);
+        const sectionBlockId = (inserted.data?.[0]?.doOperations ?? inserted.data?.[0]?.operations)?.[0]?.id;
+        await apiChecked("/api/sqlite/flushTransaction");
+        const found = await apiChecked("/api/query/sql", {
+            stmt: `SELECT id, markdown, ial FROM blocks WHERE root_id = '${zhang.docId}' AND ial LIKE '%${ATTR}="%' LIMIT 1`,
+        });
+        record("相关人物区块可按属性检索",
+            found.length === 1 && (found[0].markdown || "").includes(`siyuan://blocks/${li.docId}`) && (found[0].ial || "").includes(ATTR),
+            `blocks=${found.length} ial=${(found[0]?.ial || "").slice(0, 80)}`);
+
+        // 关系清空 → 区块删除
+        await api("/api/block/deleteBlock", {id: sectionBlockId});
+        await apiChecked("/api/sqlite/flushTransaction");
+        const afterRemove = await apiChecked("/api/query/sql", {
+            stmt: `SELECT id FROM blocks WHERE root_id = '${zhang.docId}' AND ial LIKE '%${ATTR}="%' LIMIT 1`,
+        });
+        record("区块移除干净", afterRemove.length === 0, `left=${afterRemove.length}`);
+
         const failures = results.filter((r) => !r.ok);
         exitCode = failures.length > 0 ? 1 : 0;
         console.log(`\n== 联系人流程验证：${results.length - failures.length}/${results.length} 通过 ==`);

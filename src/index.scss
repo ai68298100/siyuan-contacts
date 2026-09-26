@@ -396,6 +396,33 @@
     }
 }
 
+/* ---------- 人物文档档案条 ---------- */
+
+.lvct-doc-strip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0 8px;
+    padding: 6px 12px;
+    background: var(--b3-theme-surface);
+    border: 1px solid var(--b3-border-color);
+    border-radius: 8px;
+    flex-wrap: wrap;
+}
+
+.lvct-strip__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+}
+
+.lvct-strip__actions {
+    flex-shrink: 0;
+}
+
 /* ---------- 人物详情 ---------- */
 
 .lvct-detail {

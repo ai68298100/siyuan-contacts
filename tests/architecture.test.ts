@@ -67,25 +67,34 @@ test("domain 层运行时相对导入必须带 .ts 扩展名（node --test 直�
     }
 });
 
-test("api/data/services/bridge 层不得依赖组件层或 svelte", () => {
-    for (const dir of ["api", "data", "services", "bridge"]) {
+test("api/data/domain/bridge/services 层不得依赖组件层、panels 或 svelte", () => {
+    for (const dir of ["api", "data", "domain", "bridge"]) {
         for (const file of listFiles(path.join(SRC, dir), ".ts")) {
             for (const imported of importsOf(file)) {
-                const hitsComponents = imported.includes("components");
-                const hitsSvelte = imported.startsWith("svelte");
-                assert.ok(
-                    !hitsComponents && !hitsSvelte,
-                    `${file} 违规依赖了 ${imported}`,
-                );
+                const forbidden =
+                    imported.includes("components") ||
+                    imported.includes("panels") ||
+                    imported.startsWith("svelte") ||
+                    imported.startsWith("siyuan") && dir === "domain";
+                assert.ok(!forbidden, `${file} 违规依赖了 ${imported}`);
             }
+        }
+    }
+    // services 层允许 siyuan（Plugin 类型）与 api/data/domain，但禁止组件与 panels
+    for (const file of listFiles(path.join(SRC, "services"), ".ts")) {
+        for (const imported of importsOf(file)) {
+            const forbidden = imported.includes("components") || imported.includes("panels") || imported.startsWith("svelte");
+            assert.ok(!forbidden, `${file} 违规依赖了 ${imported}`);
         }
     }
 });
 
 test("组件不得直接发内核请求（必须经 api/ 层）", () => {
-    for (const file of listFiles(SRC, ".svelte")) {
-        const content = fs.readFileSync(file, "utf8");
-        const directFetch = content.includes("fetchPost") || content.includes("fetchSync") || content.includes("/api/");
-        assert.ok(!directFetch, `${file} 直接发内核请求，必须经 api/ 层`);
+    for (const ext of [".svelte"]) {
+        for (const file of listFiles(SRC, ext)) {
+            const content = fs.readFileSync(file, "utf8");
+            const directFetch = content.includes("fetchPost") || content.includes("fetchSync") || content.includes("/api/");
+            assert.ok(!directFetch, `${file} 直接发内核请求，必须经 api/ 层`);
+        }
     }
 });

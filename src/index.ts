@@ -11,6 +11,7 @@ import WorkbenchRoot from "./components/WorkbenchRoot.svelte";
 import { initializeWorkspace, loadSettings } from "./services/init";
 import { loadDashboard, DEFAULT_DASHBOARD_OPTIONS } from "./services/dashboard";
 import { recordInteraction } from "./data/interactions";
+import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
 import type { ContactsSettings } from "./domain/model";
 import type { ContactsPluginFacade } from "./types";
 
@@ -60,6 +61,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
             langKey: "openWorkbench",
             callback: () => this.openWorkbench(),
         });
+
+        // 人物文档档案条：文档加载/切换时按 rootID 判定是否注入
+        this.eventBus.on("loaded-protyle-static", this.onProtyleEvent);
+        this.eventBus.on("loaded-protyle-dynamic", this.onProtyleEvent);
+        this.eventBus.on("switch-protyle", this.onProtyleEvent);
     }
 
     onLayoutReady() {
@@ -72,9 +78,17 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     async onunload() {
+        this.eventBus.off("loaded-protyle-static", this.onProtyleEvent);
+        this.eventBus.off("loaded-protyle-dynamic", this.onProtyleEvent);
+        this.eventBus.off("switch-protyle", this.onProtyleEvent);
         this.workbenchDialog?.destroy();
         this.workbenchDialog = null;
     }
+
+    private readonly onProtyleEvent = (event: { detail?: { protyle?: { element: HTMLElement; block?: { rootID?: string } } } }): void => {
+        const context: PanelContext = { plugin: this, settings: this.settings };
+        handleProtyleEvent(context, event);
+    };
 
     /**
      * 覆写 onDataChanged：不覆写时宿主在同步 dataChange 后会整插件重载（打卡库 D-222）。

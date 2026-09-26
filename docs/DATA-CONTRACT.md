@@ -126,4 +126,9 @@
 - `addAttributeViewKey`：`keyIcon` **必填**（文档称可选）。
 - `/api/transactions`：请求体顶层必须带 `reqId`。
 - `appendAttributeViewDetachedBlocksWithValues`：`blocksValues` 是**数组的数组**（每行直接是值数组），无 id 包装。
-- `createNotebook` 返回值不保证是 ID：创建后统一 `refreshNotebooks` + 重新列表获取。
+- `createNotebook` 返回值不保证是 ID：创建后重新列表获取；`refreshNotebooks` 端点在 3.8.5 **不存在**。
+- **块属性存储**：自定义属性存于 `blocks.ial` 列（kramdown IAL 文本，形如 `custom-x="1"`），
+  旧 `attributes` 表已弃用；按属性查块用 `ial LIKE '%<attr>="%'`。
+- **IAL 语法**：markdown 中 IAL 必须**独占一行**跟在块后（`内容\n{: custom-x="1"}`）；
+  写在行尾不会被解析为属性、原样留在正文（scripts/spike/ial-probe.mjs 实证）。
+- 数据库**没有 SQL 表**：`av_table.go` 系渲染逻辑；数据库读取一律 `renderAttributeView`。
