@@ -1,5 +1,5 @@
 <script lang="ts">
-    /** 联系人视图：搜索 + 分组筛选 + 卡片/表格双形态 */
+    /** 联系人视图：搜索 + 分组筛选 + 卡片/表格双形态；详情弹窗由 Workbench 统一承载 */
     import { listContacts } from "../../services/contacts";
     import type { ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
@@ -9,9 +9,11 @@
     let {
         settings,
         onOpenPersonDoc,
+        onOpenDetail,
     }: {
         settings: ContactsSettings;
         onOpenPersonDoc: (docId: string) => void;
+        onOpenDetail: (person: ContactSummary) => void;
     } = $props();
 
     let people: ContactSummary[] = $state([]);
@@ -65,7 +67,7 @@
             bind:value={searchText}
             oninput={onSearchInput}
         />
-        <select class="b3-select" bind:value={groupFilter} onchange={() => {}}>
+        <select class="b3-select" bind:value={groupFilter}>
             <option value="">全部分组</option>
             {#each groups as group (group)}
                 <option value={group}>{group}</option>
@@ -92,7 +94,7 @@
     {:else if viewMode === "cards"}
         <div class="lvct-people__cards">
             {#each filtered as person (person.itemId)}
-                <PersonCard {person} onOpen={(p) => onOpenPersonDoc(p.docId)} />
+                <PersonCard {person} onOpen={onOpenDetail} />
             {/each}
         </div>
     {:else}

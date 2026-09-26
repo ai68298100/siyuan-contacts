@@ -1,9 +1,13 @@
 <script lang="ts">
     /**
-     * 主工作台：首页(工作空间总览) + 联系人(卡片/表格) + 图谱(M3)。
+     * 主工作台：首页(工作空间总览) + 联系人(卡片/表格) + 关系图谱。
+     * 人物详情弹窗在此层统一承载，两个视图共用。
      */
     import PeopleView from "./people/PeopleView.svelte";
+    import PersonDetail from "./people/PersonDetail.svelte";
+    import RelationGraph from "./graph/RelationGraph.svelte";
     import type { ContactsSettings } from "../domain/model";
+    import type { ContactSummary } from "../domain/person";
     import { detectCheckinBridge } from "../bridge/checkin";
 
     let {
@@ -25,11 +29,12 @@
     const views: readonly { id: ViewId; label: string; enabled: boolean }[] = [
         { id: "home", label: "首页", enabled: true },
         { id: "people", label: "联系人", enabled: true },
-        { id: "graph", label: "关系图谱", enabled: false },
+        { id: "graph", label: "关系图谱", enabled: true },
     ];
 
     let current: ViewId = $state("home");
     let bridge = $state(detectCheckinBridge());
+    let detailPerson: ContactSummary | null = $state(null);
 
     const fieldCount = $derived(Object.keys(settings.fieldMap).length);
 </script>
@@ -40,8 +45,6 @@
             <button
                 class="lvct-workbench__nav-item"
                 class:lvct-workbench__nav-item--active={current === view.id}
-                disabled={!view.enabled}
-                title={view.enabled ? "" : "即将到来"}
                 onclick={() => (current = view.id)}
             >
                 {view.label}
@@ -81,14 +84,21 @@
                 <div class="lvct-home__card">
                     <h3>路线图</h3>
                     <p class="ft__smaller ft__on-surface">
-                        关系图谱（M3）· 生日提醒与仪表盘（M4）· 移动端深度适配（M5）
+                        生日提醒与仪表盘（M4）· 移动端深度适配与发布（M5）
                     </p>
                 </div>
             </section>
         {:else if current === "people"}
-            <PeopleView {settings} {onOpenPersonDoc} />
-        {:else}
-            <div class="lvct-placeholder">该视图在后续里程碑中开放。</div>
+            <PeopleView
+                {settings}
+                {onOpenPersonDoc}
+                onOpenDetail={(person) => (detailPerson = person)}
+            />
+        {:else if current === "graph"}
+            <RelationGraph
+                {settings}
+                onOpenDetail={(person) => (detailPerson = person)}
+            />
         {/if}
     </div>
 
@@ -96,3 +106,17 @@
         <div class="lvct-workbench__mobile-hint ft__smaller ft__on-surface">小屏模式：点击联系人文档名可直接跳转原文档。</div>
     {/if}
 </div>
+
+{#if detailPerson}
+    <div class="lvct-dialog-mask" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) detailPerson = null; }}>
+        <div class="lvct-dialog-panel">
+            <PersonDetail
+                {settings}
+                person={detailPerson}
+                {onOpenPersonDoc}
+                onChanged={() => {}}
+                onClose={() => (detailPerson = null)}
+            />
+        </div>
+    </div>
+{/if}

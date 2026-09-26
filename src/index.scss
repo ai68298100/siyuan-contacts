@@ -352,6 +352,146 @@
     font-size: 15px;
 }
 
+/* ---------- 关系图谱 ---------- */
+
+.lvct-graph-view {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.lvct-graph-view__canvas {
+    flex: 1;
+    min-height: 320px;
+    border: 1px solid var(--b3-border-color);
+    border-radius: 8px;
+    background: var(--b3-theme-surface);
+}
+
+.lvct-graph-legend {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.lvct-graph-legend__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+
+    i {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+}
+
+/* ---------- 人物详情 ---------- */
+
+.lvct-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.lvct-detail__header {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+
+    h3 {
+        margin: 0 0 2px;
+    }
+}
+
+.lvct-detail__fields {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    div {
+        display: flex;
+        gap: 10px;
+        font-size: 13px;
+    }
+
+    dt {
+        width: 3.5em;
+        color: var(--b3-theme-on-surface);
+        flex-shrink: 0;
+    }
+
+    dd {
+        margin: 0;
+        word-break: break-all;
+
+        a {
+            color: var(--b3-theme-primary);
+        }
+    }
+}
+
+.lvct-detail__section {
+    h4 {
+        margin: 0 0 6px;
+        font-size: 13px;
+    }
+
+    p {
+        margin: 4px 0;
+    }
+}
+
+.lvct-detail__relations {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.lvct-detail__relation {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--b3-border-color);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.lvct-detail__relation-name {
+    border: none;
+    background: transparent;
+    color: var(--b3-theme-primary);
+    padding: 3px 8px;
+    cursor: pointer;
+    font-size: 13px;
+
+    &:hover {
+        background: var(--b3-list-hover);
+    }
+}
+
+.lvct-detail__relation-remove {
+    border: none;
+    border-left: 1px solid var(--b3-border-color);
+    background: transparent;
+    color: var(--b3-theme-on-surface);
+    padding: 3px 7px;
+    cursor: pointer;
+    font-size: 13px;
+
+    &:hover {
+        background: var(--b3-card-error-background, var(--b3-list-hover));
+        color: var(--b3-theme-error);
+    }
+}
+
+.lvct-detail__add {
+    gap: 8px;
+    margin-top: 8px;
+}
+
 /* ---------- 移动端 ---------- */
 
 @media (max-width: 640px) {
