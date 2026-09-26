@@ -2,7 +2,7 @@
     /** 关系图谱：cytoscape 力导向布局，节点=联系人，边=related 关系，点击节点开文档 */
     import cytoscape from "cytoscape";
     import { listContacts } from "../../services/contacts";
-    import { buildGraph, groupColor } from "../../domain/graph";
+    import { buildGraph, capGraph, GRAPH_MAX_NODES, groupColor } from "../../domain/graph";
     import type { ContactsSettings } from "../../domain/model";
     import type { ContactSummary } from "../../domain/person";
 
@@ -18,6 +18,7 @@
     let people: ContactSummary[] = $state([]);
     let loading: boolean = $state(true);
     let errorText: string = $state("");
+    let truncated: boolean = $state(false);
 
     /** cytoscape 无法用 CSS 变量，挂载时从主题运行时取值 */
     function themeColors(): { text: string; edge: string } {
@@ -33,7 +34,7 @@
         loading = true;
         errorText = "";
         try {
-            people = await listContacts(settings, "");
+            people = await listContacts(settings);
         } catch (error) {
             errorText = error instanceof Error ? error.message : String(error);
         } finally {
@@ -43,14 +44,15 @@
 
     $effect(() => {
         if (!container || people.length === 0) return;
-        const graph = buildGraph(people);
-        if (graph.nodes.length === 0) return;
+        const capped = capGraph(buildGraph(people));
+        truncated = capped.truncated;
+        if (capped.graph.nodes.length === 0) return;
         const palette = themeColors();
 
         const instance = cytoscape({
             container,
             elements: [
-                ...graph.nodes.map((node) => ({
+                ...capped.graph.nodes.map((node) => ({
                     data: {
                         id: node.id,
                         label: node.label,
@@ -58,7 +60,7 @@
                         color: groupColor(node.group),
                     },
                 })),
-                ...graph.edges.map((edge) => ({
+                ...capped.graph.edges.map((edge) => ({
                     data: { source: edge.source, target: edge.target },
                 })),
             ],
@@ -112,6 +114,12 @@
         <span class="fn__flex-1"></span>
         <button class="b3-button b3-button--outline" onclick={refresh}>刷新</button>
     </div>
+
+    {#if truncated}
+        <div class="ft__smaller ft__on-surface lvct-graph-note">
+            联系人超过 {GRAPH_MAX_NODES}，当前只展示关系最多的 {GRAPH_MAX_NODES} 人（用分组筛选或搜索缩小范围可看全）。
+        </div>
+    {/if}
 
     {#if errorText}
         <div class="lvct-form__error">加载失败：{errorText}</div>

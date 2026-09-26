@@ -90,6 +90,24 @@ export async function renderView(avId: string, dbBlockId: string, query: string 
     });
 }
 
+/** 分页参数（性能预算见 DATA-CONTRACT §4：列表热路径禁止 -1 全量渲染；当前视图均走名册缓存，本接口供大规模演进预案使用） */
+export interface RenderPageOptions {
+    query?: string;
+    page?: number;
+    pageSize?: number;
+}
+
+export async function renderViewPage(avId: string, dbBlockId: string, options: RenderPageOptions = {}): Promise<AvRenderResult> {
+    return kernelPost<AvRenderResult>("/api/av/renderAttributeView", {
+        id: avId,
+        blockID: dbBlockId,
+        query: options.query ?? "",
+        page: options.page ?? 1,
+        pageSize: options.pageSize ?? 200,
+        createIfNotExist: false,
+    });
+}
+
 /** v3.8.5 实测 keyIcon 必填（官方文档漏写），永远显式传空串 */
 export async function addField(avId: string, spec: FieldSpec, displayName: string, previousKeyId: string): Promise<string> {
     const keyId = newNodeId();

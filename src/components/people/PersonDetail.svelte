@@ -42,7 +42,7 @@
     );
 
     async function loadOthers() {
-        const people = await listContacts(settings, "");
+        const people = await listContacts(settings);
         others = people;
         const fresh = people.find((item) => item.itemId === current.itemId);
         if (fresh) current = fresh;

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildGraph, groupColor } from "../src/domain/graph.ts";
+import { buildGraph, capGraph, groupColor } from "../src/domain/graph.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
 
 function person(partial: Partial<ContactSummary> & { itemId: string; docId: string; name: string }): ContactSummary {
@@ -37,4 +37,26 @@ test("buildGraph：重复边按无向去重", () => {
 test("groupColor：预设分组有颜色，未知分组回退灰", () => {
     assert.equal(groupColor("家人"), "#e05a5a");
     assert.equal(groupColor("不存在的组"), "#8f8f8f");
+});
+
+test("capGraph：超限时按度数保留头部节点，只留两端存活的边", () => {
+    const people = [
+        person({ itemId: "i-hub", docId: "d-hub", name: "hub", relatedItemIds: ["i-1", "i-2", "i-3"] }),
+        person({ itemId: "i-1", docId: "d-1", name: "1" }),
+        person({ itemId: "i-2", docId: "d-2", name: "2" }),
+        person({ itemId: "i-3", docId: "d-3", name: "3", relatedItemIds: ["i-4"] }),
+        person({ itemId: "i-4", docId: "d-4", name: "4" }),
+    ];
+    const full = buildGraph(people);
+    const { graph, truncated } = capGraph(full, 3);
+    assert.equal(truncated, true);
+    assert.equal(graph.nodes.length, 3);
+    assert.ok(graph.nodes[0].degree >= graph.nodes[1].degree, "按度数降序保留");
+    for (const edge of graph.edges) {
+        assert.ok(
+            graph.nodes.some((node) => node.id === edge.source) && graph.nodes.some((node) => node.id === edge.target),
+            "边两端节点必须都存活",
+        );
+    }
+    assert.equal(capGraph(full, 10).truncated, false);
 });

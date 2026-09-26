@@ -57,6 +57,27 @@ export function buildGraph(people: readonly ContactSummary[]): PersonGraph {
     return { nodes, edges };
 }
 
+/** 图谱渲染规模上限（cytoscape 在千级节点交互明显劣化；见 DATA-CONTRACT §4） */
+export const GRAPH_MAX_NODES = 800;
+
+/**
+ * 规模上限：按度数降序保留前 maxNodes 个节点，丢弃两端都被裁掉的边。
+ * 返回裁剪说明，由 UI 提示"图太大，只展示关系最多的 N 人"。
+ */
+export function capGraph(graph: PersonGraph, maxNodes: number = GRAPH_MAX_NODES): { graph: PersonGraph; truncated: boolean } {
+    if (graph.nodes.length <= maxNodes) return { graph, truncated: false };
+    const keep = new Set(
+        [...graph.nodes].sort((a, b) => b.degree - a.degree).slice(0, maxNodes).map((node) => node.id),
+    );
+    return {
+        graph: {
+            nodes: graph.nodes.filter((node) => keep.has(node.id)),
+            edges: graph.edges.filter((edge) => keep.has(edge.source) && keep.has(edge.target)),
+        },
+        truncated: true,
+    };
+}
+
 /** 分组→固定色相（数据编码用固定色板；UI 底色仍走 b3 变量，见 D-0002 约定注释） */
 export const GROUP_COLORS: Readonly<Record<string, string>> = {
     "家人": "#e05a5a",

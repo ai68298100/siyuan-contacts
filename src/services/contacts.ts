@@ -4,23 +4,40 @@
  */
 import { createDocWithMd, listNotebooks, querySql } from "../api/client";
 import type { DocRow } from "../api/client";
-import { bindDocsAsRows, mapBoundDocIds, renderView, setCell } from "../api/av";
+import { bindDocsAsRows, mapBoundDocIds, setCell } from "../api/av";
+import { getRoster, invalidateRoster } from "./roster";
 import type { ContactsSettings } from "../domain/model";
-import {
-    birthdayToMs,
-    invertFieldMap,
-    summaryFromRow,
-    validateDraft,
-} from "../domain/person";
+import { birthdayToMs, validateDraft } from "../domain/person";
 import type { ContactDraft, ContactSummary } from "../domain/person";
 import type { FieldKey } from "../domain/fields";
 
 const PRESET_GROUPS = ["家人", "朋友", "同事", "同学", "其他"] as const;
 
-export async function listContacts(settings: ContactsSettings, query: string = ""): Promise<ContactSummary[]> {
-    const rendered = await renderView(settings.avId, settings.dbBlockId, query);
-    const keyToField = invertFieldMap(settings.fieldMap);
-    return (rendered.view?.rows ?? []).map((row) => summaryFromRow(row, keyToField));
+/** 分页大小（联系人列表客户端分页的块大小） */
+export const PAGE_SIZE = 200;
+
+/**
+ * 全量名册（缓存优先，30s TTL，写操作立即失效）。
+ * 搜索/筛选在名册上做客户端过滤——万级以内的字符串过滤远快于反复打内核。
+ */
+export function listContacts(settings: ContactsSettings): Promise<ContactSummary[]> {
+    return getRoster(settings);
+}
+
+/** 客户端过滤：搜索词匹配姓名/电话/微信/邮箱/标签 */
+export function filterContacts(people: readonly ContactSummary[], query: string, group: string = ""): ContactSummary[] {
+    const keyword = query.trim().toLowerCase();
+    return people.filter((person) => {
+        if (group && person.group !== group) return false;
+        if (!keyword) return true;
+        return (
+            person.name.toLowerCase().includes(keyword) ||
+            person.phone.includes(keyword) ||
+            person.wechat.toLowerCase().includes(keyword) ||
+            person.email.toLowerCase().includes(keyword) ||
+            person.tags.some((tag) => tag.toLowerCase().includes(keyword))
+        );
+    });
 }
 
 /**
@@ -32,7 +49,7 @@ export async function createContact(settings: ContactsSettings, draft: ContactDr
     if (errors.length > 0) throw new Error(errors.join("；"));
     const name = draft.name.trim();
 
-    const existing = await listContacts(settings, name);
+    const existing = await getRoster(settings);
     if (existing.some((item) => item.name === name)) {
         throw new Error(`联系人「${name}」已存在`);
     }
@@ -49,7 +66,8 @@ export async function createContact(settings: ContactsSettings, draft: ContactDr
     if (!itemId) throw new Error(`「${name}」绑定数据库失败（未获得行 ID）`);
 
     await writeDraftCells(settings, itemId, draft);
-    const summaries = await listContacts(settings, name);
+    invalidateRoster();
+    const summaries = await getRoster(settings);
     const created = summaries.find((item) => item.docId === docId);
     if (!created) throw new Error(`「${name}」已写入但回读失败，请刷新列表确认`);
     return created;
@@ -118,30 +136,52 @@ export async function listImportNotebooks(settings: ContactsSettings): Promise<{
         .map((notebook) => ({ id: notebook.id, name: notebook.name }));
 }
 
+/**
+ * 思源 /api/query/sql 只有 stmt 字符串参数、不支持绑定占位符（API 层限制）。
+ * 因此约定：SQL 组装只允许出现在本函数——进入语句的外部值只有"经严格格式校验的 ID"，
+ * 自由文本（关键字）一律不进 SQL，由客户端过滤兜底。
+ */
+function assertNodeId(value: string, label: string): string {
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(value)) throw new Error(`${label} 不是合法的思源 ID`);
+    return value;
+}
+
 /** 列出可收编候选：某笔记本下的文档，排除已绑定行、排除宿主文档与空名 */
 export async function discoverImportCandidates(settings: ContactsSettings, notebookId: string, keyword: string = ""): Promise<ImportCandidate[]> {
-    const keywordClause = keyword.trim() ? ` AND content LIKE '%${keyword.trim().replace(/'/g, "''")}%'` : "";
+    const box = assertNodeId(notebookId, "笔记本 ID");
     const rows = await querySql<DocRow>(
-        `SELECT id, content, hpath FROM blocks WHERE type='d' AND box='${notebookId}'${keywordClause} LIMIT 500`,
+        `SELECT id, content, hpath FROM blocks WHERE type='d' AND box='${box}' LIMIT 500`,
     );
     const excluded = new Set([settings.hostDocId]);
+    const needle = keyword.trim().toLowerCase();
     const docIds = rows
         .map((row) => row.id)
         .filter((id) => !excluded.has(id) && id.length > 0);
     const boundMap = await mapBoundDocIds(settings.avId, docIds);
     return rows
         .filter((row) => !excluded.has(row.id) && row.content.trim().length > 0 && !boundMap[row.id])
+        .filter((row) => !needle || row.content.toLowerCase().includes(needle) || row.hpath.toLowerCase().includes(needle))
         .map((row) => ({ docId: row.id, name: row.content.trim(), hpath: row.hpath }));
 }
 
-/** 批量收编：绑行为联系人（文档标题即主键显示名）。返回成功数 */
+/**
+ * 批量收编：绑行为联系人（文档标题即主键显示名）。返回成功数。
+ * 性能：先一次批量映射过滤已绑定，再按 200/批合并绑定——
+ * 500 篇文档 = 1 次映射 + 3 次绑定，而不是 1500 次逐个调用。
+ */
 export async function adoptDocs(settings: ContactsSettings, candidates: readonly ImportCandidate[]): Promise<number> {
-    let adopted = 0;
-    for (const candidate of candidates) {
-        const bound = await mapBoundDocIds(settings.avId, [candidate.docId]);
-        if (bound[candidate.docId]) continue; // 并发下已被绑定，跳过
-        await bindDocsAsRows(settings.avId, settings.dbBlockId, [{ id: candidate.docId, content: candidate.name }]);
-        adopted += 1;
+    if (candidates.length === 0) return 0;
+    const boundMap = await mapBoundDocIds(settings.avId, candidates.map((candidate) => candidate.docId));
+    const unbound = candidates.filter((candidate) => !boundMap[candidate.docId]);
+    const CHUNK = 200;
+    for (let start = 0; start < unbound.length; start += CHUNK) {
+        const chunk = unbound.slice(start, start + CHUNK);
+        await bindDocsAsRows(
+            settings.avId,
+            settings.dbBlockId,
+            chunk.map((candidate) => ({ id: candidate.docId, content: candidate.name })),
+        );
     }
-    return adopted;
+    invalidateRoster();
+    return unbound.length;
 }

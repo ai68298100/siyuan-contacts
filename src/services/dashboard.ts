@@ -40,7 +40,7 @@ export async function loadDashboard(
     options: DashboardOptions = DEFAULT_DASHBOARD_OPTIONS,
 ): Promise<DashboardData> {
     const [people, store] = await Promise.all([
-        listContacts(settings, ""),
+        listContacts(settings),
         loadInteractionStore(plugin),
     ]);
     const birthdays: UpcomingBirthday[] = upcomingBirthdays(people)

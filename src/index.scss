@@ -352,6 +352,10 @@
     font-size: 15px;
 }
 
+.lvct-people__more {
+    align-self: center;
+}
+
 /* ---------- 关系图谱 ---------- */
 
 .lvct-graph-view {
@@ -367,6 +371,10 @@
     border: 1px solid var(--b3-border-color);
     border-radius: 8px;
     background: var(--b3-theme-surface);
+}
+
+.lvct-graph-note {
+    padding: 4px 8px;
 }
 
 .lvct-graph-legend {
