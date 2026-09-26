@@ -67,6 +67,16 @@
 - [ ] 真机移动端验收（需真机）
 - [ ] ❙ 对外发布：GitHub 建仓 + Release + bazaar PR（等用户确认执行）
 
+## 从笔记捕获人脉 v0.2a（2026-09-27）
+
+- [x] refs 出链识别（kramdown 块引实证入索引）+ 确认弹窗（勾选参与者/新人名单/日期/地点/备注）
+- [x] 每人一条互动事件（externalRef=笔记 ID 同场身份，幂等）+ 笔记「参与人员」双链区块
+- [x] 入口：命令面板 captureFromNote + 编辑器右键"人脉：捕获本文人员"
+- [x] E2E 增至 10/10（refs 识别 + 参与人区块）
+- [x] 设计沉淀：v0.2b AI 抽取、v0.2c 跨插件桥（window.LvContacts + Agent 能力）→ ROADMAP；
+      D-0011 共同交集边界、D-0012 集成方向
+- [ ] SQL 收敛备注：查询组装全部收进 api/blocks.ts（refs/文档清单/单块/属性定位）
+
 ## 待启动
 
 - M4 提醒仪表盘：公/农历生日投影（移植打卡 lunar.ts+occasions 模型）、互动事件（source+externalRef 幂等+墓碑）、

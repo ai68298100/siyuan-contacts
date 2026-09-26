@@ -1,6 +1,7 @@
 {
   "openWorkbench": "Open Lv Contacts",
   "tabTitle": "Lv Contacts",
+  "captureFromNote": "Lv Contacts: capture people from this note",
   "helloPlugin": "Lv Contacts loaded",
   "byePlugin": "Lv Contacts unloaded"
 }

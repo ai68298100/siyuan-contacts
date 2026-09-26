@@ -45,6 +45,33 @@ export async function findBlockIdByCustomAttr(rootId: string, attrName: string):
     return rows[0]?.id;
 }
 
+/**
+ * 文档内所有出链指向的文档 ID（去重）——"从笔记捕获人脉"的确定性识别来源：
+ * 笔记里链接了谁（siyuan://blocks 双链/块引），refs 索引里就有谁。
+ */
+export async function findOutgoingLinkRoots(rootId: string): Promise<string[]> {
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(rootId)) throw new Error("rootId 不是合法的思源 ID");
+    const rows = await querySql<{ docId: string }>(
+        `SELECT DISTINCT def_block_root_id AS docId FROM refs WHERE root_id = '${rootId}' AND def_block_root_id != ''`,
+    );
+    return rows.map((row) => row.docId).filter((id) => /^\d{14}-[0-9a-z]{7}$/.test(id));
+}
+
+/** 某笔记本下的文档清单（收编候选的数据源，最多 limit 篇） */
+export async function listNotebookDocs(notebookId: string, limit: number = 500): Promise<Array<{ id: string; content: string; hpath: string }>> {
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(notebookId)) throw new Error("notebookId 不是合法的思源 ID");
+    return querySql(
+        `SELECT id, content, hpath FROM blocks WHERE type='d' AND box='${notebookId}' LIMIT ${Math.max(1, Math.min(limit, 1000))}`,
+    );
+}
+
+/** 单块简要信息（content；ID 严格校验） */
+export async function getBlockContent(blockId: string): Promise<string | undefined> {
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(blockId)) throw new Error("blockId 不是合法的思源 ID");
+    const rows = await querySql<{ content: string }>(`SELECT content FROM blocks WHERE id = '${blockId}' LIMIT 1`);
+    return rows[0]?.content;
+}
+
 /** 幂等写"带属性标记的单块"：有内容则更新/追加，无内容则删除。existingId 由调用方先查好（无查询则传 undefined）
  *  IAL 语法必须独占一行跟在块内容后（行尾式不会被解析为属性，spike/ial-probe 实证） */
 export async function upsertMarkedBlock(

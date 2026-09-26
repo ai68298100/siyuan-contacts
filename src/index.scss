@@ -396,6 +396,16 @@
     }
 }
 
+/* ---------- 捕获 ---------- */
+
+.lvct-capture__list {
+    max-height: 180px;
+    overflow: auto;
+    border: 1px solid var(--b3-border-color);
+    border-radius: 8px;
+    margin-top: 4px;
+}
+
 /* ---------- 人物文档档案条 ---------- */
 
 .lvct-doc-strip {

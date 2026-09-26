@@ -213,6 +213,29 @@ async function main() {
         });
         record("区块移除干净", afterRemove.length === 0, `left=${afterRemove.length}`);
 
+        // 从笔记捕获：会议文档块引张三/李四 → refs 索引识别 → 参与人区块写入
+        const meetingDoc = await apiChecked("/api/filetree/createDocWithMd", {
+            notebook: ctx.notebookId, path: "/会议记录", markdown: "# 产品发布会\n\n今天和张三、李四开会。\n\n",
+        });
+        const refMd = `参会：(((${zhang.docId} "张三")))、(((${li.docId} "李四")))`;
+        const refIns = await api("/api/block/insertBlock", {dataType: "markdown", parentID: meetingDoc, data: refMd});
+        if (refIns.code !== 0) throw new Error(`块引插入失败: ${refIns.msg}`);
+        await apiChecked("/api/sqlite/flushTransaction");
+        const linked = await apiChecked("/api/query/sql", {
+            stmt: `SELECT DISTINCT def_block_root_id AS docId FROM refs WHERE root_id = '${meetingDoc}' AND def_block_root_id != ''`,
+        });
+        const linkedSet = new Set(linked.map((row) => row.docId));
+        record("refs 识别出链联系人", linkedSet.has(zhang.docId) && linkedSet.has(li.docId), `found=${[...linkedSet].join(",")}`);
+
+        const attendeesMd = `**参与人员**（2026-09-27）：[张三](siyuan://blocks/${zhang.docId})、[李四](siyuan://blocks/${li.docId})\n{: ${"custom-lvct-attendees"}="1"}`;
+        await api("/api/block/insertBlock", {dataType: "markdown", parentID: meetingDoc, data: attendeesMd});
+        await apiChecked("/api/sqlite/flushTransaction");
+        const attendees = await apiChecked("/api/query/sql", {
+            stmt: `SELECT id, markdown FROM blocks WHERE root_id = '${meetingDoc}' AND ial LIKE '%custom-lvct-attendees="%' LIMIT 1`,
+        });
+        record("参与人员区块写入", attendees.length === 1 && (attendees[0].markdown || "").includes(`siyuan://blocks/${zhang.docId}`),
+            `blocks=${attendees.length}`);
+
         const failures = results.filter((r) => !r.ok);
         exitCode = failures.length > 0 ? 1 : 0;
         console.log(`\n== 联系人流程验证：${results.length - failures.length}/${results.length} 通过 ==`);

@@ -1,6 +1,7 @@
 {
   "openWorkbench": "打开小驴人脉",
   "tabTitle": "小驴人脉",
+  "captureFromNote": "人脉：捕获本文人员",
   "helloPlugin": "小驴人脉已加载",
   "byePlugin": "小驴人脉已卸载"
 }

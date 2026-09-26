@@ -3,15 +3,18 @@
  * 业务编排在 services/，内核交互在 api/，自管数据在 data/，纯函数在 domain/，
  * 组件只依赖 types.ts 的 facade 接口，不反向 import 本文件（避免循环）。
  */
-import { Plugin, getFrontend, openTab, showMessage, Dialog } from "siyuan";
+import { Plugin, getFrontend, openTab, showMessage, Dialog, getAllEditor } from "siyuan";
 import { mount, unmount } from "svelte";
 import "./index.scss";
 
 import WorkbenchRoot from "./components/WorkbenchRoot.svelte";
+import CaptureDialog from "./components/capture/CaptureDialog.svelte";
 import { initializeWorkspace, loadSettings } from "./services/init";
 import { loadDashboard, DEFAULT_DASHBOARD_OPTIONS } from "./services/dashboard";
 import { recordInteraction } from "./data/interactions";
+import { captureFromDoc, previewCapture } from "./services/capture";
 import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
+import { svelteDialog } from "./libs/dialog";
 import type { ContactsSettings } from "./domain/model";
 import type { ContactsPluginFacade } from "./types";
 
@@ -62,6 +65,14 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
             callback: () => this.openWorkbench(),
         });
 
+        this.addCommand({
+            langKey: "captureFromNote",
+            callback: () => this.captureFromCurrentNote(),
+        });
+
+        // 编辑器右键菜单：捕获本文人员
+        this.eventBus.on("open-menu-content", this.onMenuContent);
+
         // 人物文档档案条：文档加载/切换时按 rootID 判定是否注入
         this.eventBus.on("loaded-protyle-static", this.onProtyleEvent);
         this.eventBus.on("loaded-protyle-dynamic", this.onProtyleEvent);
@@ -78,6 +89,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     async onunload() {
+        this.eventBus.off("open-menu-content", this.onMenuContent);
         this.eventBus.off("loaded-protyle-static", this.onProtyleEvent);
         this.eventBus.off("loaded-protyle-dynamic", this.onProtyleEvent);
         this.eventBus.off("switch-protyle", this.onProtyleEvent);
@@ -89,6 +101,41 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const context: PanelContext = { plugin: this, settings: this.settings };
         handleProtyleEvent(context, event);
     };
+
+    private readonly onMenuContent = (event: { detail: { protyle?: { block?: { rootID?: string } }; menu: { addItem: (item: unknown) => void } } }): void => {
+        const rootId = event.detail.protyle?.block?.rootID;
+        if (!rootId) return;
+        event.detail.menu.addItem({
+            id: "lvct-capture",
+            iconHTML: "",
+            label: this.i18n.captureFromNote ?? "人脉：捕获本文人员",
+            click: () => this.openCaptureDialog(rootId),
+        });
+    };
+
+    /** 打开"从笔记捕获"：需当前有一篇打开的笔记 */
+    captureFromCurrentNote(): void {
+        const editor = getAllEditor().find((item) => item?.protyle?.block?.rootID);
+        const rootId = editor?.protyle?.block?.rootID;
+        if (!rootId) {
+            showMessage("请先打开一篇笔记再捕获人员", 3000);
+            return;
+        }
+        this.openCaptureDialog(rootId);
+    }
+
+    private openCaptureDialog(docId: string): void {
+        if (!this.settings) {
+            showMessage("请先完成人脉工作空间初始化", 3000);
+            return;
+        }
+        svelteDialog({
+            title: "从笔记捕获人脉",
+            width: "560px",
+            component: CaptureDialog,
+            props: { facade: this, docId },
+        });
+    }
 
     /**
      * 覆写 onDataChanged：不覆写时宿主在同步 dataChange 后会整插件重载（打卡库 D-222）。
@@ -129,6 +176,16 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     async recordInteraction(personDocId: string, note?: string): Promise<void> {
         await recordInteraction(this, { personDocId, note });
+    }
+
+    async previewCapture(docId: string) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return previewCapture(this.settings, docId);
+    }
+
+    async captureDoc(docId: string, options: Parameters<typeof captureFromDoc>[3]) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return captureFromDoc(this, this.settings, docId, options);
     }
 
     openHostDoc() {

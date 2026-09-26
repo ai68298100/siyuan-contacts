@@ -2,9 +2,9 @@
  * 联系人服务：新建（文档+绑行+写值）与列表查询。
  * 语义决策见 docs/DATA-CONTRACT.md §1.3 与 D-0007。
  */
-import { createDocWithMd, listNotebooks, querySql } from "../api/client";
-import type { DocRow } from "../api/client";
+import { createDocWithMd, listNotebooks } from "../api/client";
 import { bindDocsAsRows, mapBoundDocIds, setCell } from "../api/av";
+import { listNotebookDocs } from "../api/blocks";
 import { getRoster, invalidateRoster } from "./roster";
 import type { ContactsSettings } from "../domain/model";
 import { birthdayToMs, validateDraft } from "../domain/person";
@@ -167,22 +167,9 @@ export async function listImportNotebooks(settings: ContactsSettings): Promise<{
         .map((notebook) => ({ id: notebook.id, name: notebook.name }));
 }
 
-/**
- * 思源 /api/query/sql 只有 stmt 字符串参数、不支持绑定占位符（API 层限制）。
- * 因此约定：SQL 组装只允许出现在本函数——进入语句的外部值只有"经严格格式校验的 ID"，
- * 自由文本（关键字）一律不进 SQL，由客户端过滤兜底。
- */
-function assertNodeId(value: string, label: string): string {
-    if (!/^\d{14}-[0-9a-z]{7}$/.test(value)) throw new Error(`${label} 不是合法的思源 ID`);
-    return value;
-}
-
 /** 列出可收编候选：某笔记本下的文档，排除已绑定行、排除宿主文档与空名 */
 export async function discoverImportCandidates(settings: ContactsSettings, notebookId: string, keyword: string = ""): Promise<ImportCandidate[]> {
-    const box = assertNodeId(notebookId, "笔记本 ID");
-    const rows = await querySql<DocRow>(
-        `SELECT id, content, hpath FROM blocks WHERE type='d' AND box='${box}' LIMIT 500`,
-    );
+    const rows = await listNotebookDocs(notebookId);
     const excluded = new Set([settings.hostDocId]);
     const needle = keyword.trim().toLowerCase();
     const docIds = rows
