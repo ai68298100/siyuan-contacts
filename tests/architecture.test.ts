@@ -53,6 +53,20 @@ test("domain 层保持纯净（无 svelte / siyuan / 上层依赖）", () => {
     }
 });
 
+test("domain 层运行时相对导入必须带 .ts 扩展名（node --test 直跑约束）", () => {
+    const domainDir = path.join(SRC, "domain");
+    for (const file of listFiles(domainDir, ".ts")) {
+        for (const imported of importsOf(file)) {
+            const isRelativeSelf = imported.startsWith("./") || imported.startsWith("../domain");
+            const hasExtension = imported.endsWith(".ts");
+            assert.ok(
+                !isRelativeSelf || hasExtension,
+                `${file} 的运行时导入 ${imported} 缺少 .ts 扩展名（type-only 导入不受限）`,
+            );
+        }
+    }
+});
+
 test("api/data/services/bridge 层不得依赖组件层或 svelte", () => {
     for (const dir of ["api", "data", "services", "bridge"]) {
         for (const file of listFiles(path.join(SRC, dir), ".ts")) {

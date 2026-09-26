@@ -5,6 +5,7 @@
     import type { ContactsSettings } from "../../domain/model";
     import PersonCard from "./PersonCard.svelte";
     import AddPersonDialog from "./AddPersonDialog.svelte";
+    import ImportDialog from "./ImportDialog.svelte";
 
     let {
         settings,
@@ -23,6 +24,7 @@
     let groupFilter: string = $state("");
     let viewMode: "cards" | "table" = $state("cards");
     let adding: boolean = $state(false);
+    let importing: boolean = $state(false);
 
     let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -80,6 +82,7 @@
         >
             {viewMode === "cards" ? "表格" : "卡片"}
         </button>
+        <button class="b3-button b3-button--outline" onclick={() => (importing = true)}>导入已有文档</button>
         <button class="b3-button b3-button--text" onclick={() => (adding = true)}>新建联系人</button>
     </div>
 
@@ -128,6 +131,21 @@
                     {settings}
                     onCreated={() => refresh("")}
                     onClose={() => (adding = false)}
+                />
+            </div>
+        </div>
+    {/if}
+
+    {#if importing}
+        <div class="lvct-dialog-mask" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) importing = false; }}>
+            <div class="lvct-dialog-panel lvct-dialog-panel--wide">
+                <h3 class="lvct-dialog-panel__title">导入已有文档为联系人</h3>
+                <ImportDialog
+                    {settings}
+                    onImported={(count) => {
+                        if (count > 0) refresh("");
+                    }}
+                    onClose={() => (importing = false)}
                 />
             </div>
         </div>

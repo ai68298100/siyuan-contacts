@@ -65,6 +65,21 @@ export async function createDocWithMd(notebookId: string, hPath: string, markdow
     return kernelPost<string>("/api/filetree/createDocWithMd", { notebook: notebookId, path: hPath, markdown });
 }
 
+/* ---------- SQL（仅用于文档/块查询；数据库没有 SQL 表，见 DATA-CONTRACT §1.5） ---------- */
+
+export interface DocRow {
+    id: string;
+    content: string;
+    hpath: string;
+    box?: string;
+}
+
+/** 跑一条只读 SQL；思源索引异步刷新，写后立刻查可能短暂滞后 */
+export async function querySql<T = Record<string, unknown>>(stmt: string): Promise<T[]> {
+    const data = await kernelPost<T[]>("/api/query/sql", { stmt });
+    return Array.isArray(data) ? data : [];
+}
+
 /* ---------- block ---------- */
 
 interface DoOperation {

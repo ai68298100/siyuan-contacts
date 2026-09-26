@@ -9,6 +9,8 @@ import "./index.scss";
 
 import WorkbenchRoot from "./components/WorkbenchRoot.svelte";
 import { initializeWorkspace, loadSettings } from "./services/init";
+import { loadDashboard, DEFAULT_DASHBOARD_OPTIONS } from "./services/dashboard";
+import { recordInteraction } from "./data/interactions";
 import type { ContactsSettings } from "./domain/model";
 import type { ContactsPluginFacade } from "./types";
 
@@ -104,6 +106,15 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const settings = await initializeWorkspace(this, { notebookName }, onProgress);
         this.settings = settings;
         return settings;
+    }
+
+    async loadDashboard(options?: Partial<typeof DEFAULT_DASHBOARD_OPTIONS>) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return loadDashboard(this, this.settings, { ...DEFAULT_DASHBOARD_OPTIONS, ...options });
+    }
+
+    async recordInteraction(personDocId: string, note?: string): Promise<void> {
+        await recordInteraction(this, { personDocId, note });
     }
 
     openHostDoc() {

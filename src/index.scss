@@ -492,11 +492,181 @@
     margin-top: 8px;
 }
 
+/* ---------- 仪表盘 ---------- */
+
+.lvct-dash {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.lvct-dash__stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.lvct-dash__stat {
+    background: var(--b3-theme-surface);
+    border: 1px solid var(--b3-border-color);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+
+    b {
+        font-size: 20px;
+        color: var(--b3-theme-primary);
+    }
+
+    span {
+        font-size: 12px;
+        color: var(--b3-theme-on-surface);
+    }
+}
+
+.lvct-dash__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.lvct-dash__list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.lvct-dash__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    padding: 5px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--b3-theme-on-background);
+
+    &:hover {
+        background: var(--b3-list-hover);
+    }
+
+    b {
+        flex-shrink: 0;
+    }
+
+    span:nth-child(2) {
+        flex: 1;
+    }
+}
+
+.lvct-bucket {
+    flex-shrink: 0;
+    font-size: 11px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--b3-border-color);
+    color: var(--b3-theme-on-surface);
+
+    &--today {
+        background: var(--b3-theme-error);
+        border-color: var(--b3-theme-error);
+        color: var(--b3-theme-on-primary, #fff);
+    }
+
+    &--week {
+        border-color: var(--b3-theme-primary);
+        color: var(--b3-theme-primary);
+    }
+
+    &--month {
+        border-color: var(--b3-border-color);
+    }
+
+    &--stale {
+        border-color: var(--b3-theme-secondary, var(--b3-theme-primary));
+        color: var(--b3-theme-secondary, var(--b3-theme-primary));
+    }
+}
+
+/* ---------- 导入 ---------- */
+
+.lvct-dialog-panel--wide {
+    width: min(680px, 94vw);
+}
+
+.lvct-import {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.lvct-import__list {
+    max-height: 46vh;
+    overflow: auto;
+    border: 1px solid var(--b3-border-color);
+    border-radius: 8px;
+}
+
+.lvct-import__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--b3-border-color);
+
+    &:last-child {
+        border-bottom: none;
+    }
+
+    &:hover {
+        background: var(--b3-list-hover);
+    }
+
+    &--head {
+        position: sticky;
+        top: 0;
+        background: var(--b3-theme-background);
+        font-weight: 500;
+    }
+}
+
+.lvct-import__name {
+    flex-shrink: 0;
+}
+
+.lvct-import__path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------- 详情记互动 ---------- */
+
+.lvct-detail__record {
+    gap: 8px;
+}
+
 /* ---------- 移动端 ---------- */
 
 @media (max-width: 640px) {
     .lvct-home {
         grid-template-columns: 1fr;
+    }
+
+    .lvct-dash__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .lvct-dash__stats {
+        grid-template-columns: repeat(2, 1fr);
     }
 
     .lvct-workbench {

@@ -8,12 +8,15 @@
     let {
         settings,
         person,
+        onRecord,
         onOpenPersonDoc,
         onChanged,
         onClose,
     }: {
         settings: ContactsSettings;
         person: ContactSummary;
+        /** 记一笔互动（facade.recordInteraction） */
+        onRecord: (personDocId: string, note?: string) => Promise<void>;
         onOpenPersonDoc: (docId: string) => void;
         onChanged: () => void;
         onClose: () => void;
@@ -26,6 +29,8 @@
     let addChoice: string = $state("");
     let busy: boolean = $state(false);
     let errorText: string = $state("");
+    let noteText: string = $state("");
+    let recorded: boolean = $state(false);
 
     const relatedPeople = $derived(
         current.relatedItemIds
@@ -81,6 +86,30 @@
         {#if current.website}<div><dt>网站</dt><dd>{current.website}</dd></div>{/if}
         {#if current.tags.length > 0}<div><dt>标签</dt><dd>{current.tags.join(" · ")}</dd></div>{/if}
     </dl>
+
+    <section class="lvct-detail__section">
+        <h4>记一笔互动</h4>
+        <div class="lvct-detail__record fn__flex">
+            <input
+                class="b3-text-field fn__flex-1"
+                type="text"
+                placeholder="做了什么、聊了什么（可留空）"
+                bind:value={noteText}
+                disabled={busy}
+            />
+            <button
+                class="b3-button b3-button--text"
+                disabled={busy || recorded}
+                onclick={() =>
+                    mutate(async () => {
+                        await onRecord(current.docId, noteText.trim() || undefined);
+                        recorded = true;
+                        noteText = "";
+                    })}
+            >{recorded ? "已记录 ✓" : "记录"}</button>
+        </div>
+        <p class="ft__smaller ft__on-surface">记录后，首页"久未联系"会重新计时。</p>
+    </section>
 
     <section class="lvct-detail__section">
         <h4>相关人（{relatedPeople.length}）</h4>

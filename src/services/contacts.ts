@@ -2,7 +2,8 @@
  * 联系人服务：新建（文档+绑行+写值）与列表查询。
  * 语义决策见 docs/DATA-CONTRACT.md §1.3 与 D-0007。
  */
-import { createDocWithMd } from "../api/client";
+import { createDocWithMd, listNotebooks, querySql } from "../api/client";
+import type { DocRow } from "../api/client";
 import { bindDocsAsRows, mapBoundDocIds, renderView, setCell } from "../api/av";
 import type { ContactsSettings } from "../domain/model";
 import {
@@ -100,3 +101,47 @@ async function writeDraftCells(settings: ContactsSettings, itemId: string, draft
 }
 
 export { PRESET_GROUPS };
+
+/* ---------- 存量文档收编（需求②：把已有"人名"文档批量转为联系人） ---------- */
+
+export interface ImportCandidate {
+    docId: string;
+    name: string;
+    hpath: string;
+}
+
+/** 可选笔记本（排除人脉笔记本自己） */
+export async function listImportNotebooks(settings: ContactsSettings): Promise<{ id: string; name: string }[]> {
+    const notebooks = await listNotebooks();
+    return notebooks
+        .filter((notebook) => notebook.id !== settings.notebookId)
+        .map((notebook) => ({ id: notebook.id, name: notebook.name }));
+}
+
+/** 列出可收编候选：某笔记本下的文档，排除已绑定行、排除宿主文档与空名 */
+export async function discoverImportCandidates(settings: ContactsSettings, notebookId: string, keyword: string = ""): Promise<ImportCandidate[]> {
+    const keywordClause = keyword.trim() ? ` AND content LIKE '%${keyword.trim().replace(/'/g, "''")}%'` : "";
+    const rows = await querySql<DocRow>(
+        `SELECT id, content, hpath FROM blocks WHERE type='d' AND box='${notebookId}'${keywordClause} LIMIT 500`,
+    );
+    const excluded = new Set([settings.hostDocId]);
+    const docIds = rows
+        .map((row) => row.id)
+        .filter((id) => !excluded.has(id) && id.length > 0);
+    const boundMap = await mapBoundDocIds(settings.avId, docIds);
+    return rows
+        .filter((row) => !excluded.has(row.id) && row.content.trim().length > 0 && !boundMap[row.id])
+        .map((row) => ({ docId: row.id, name: row.content.trim(), hpath: row.hpath }));
+}
+
+/** 批量收编：绑行为联系人（文档标题即主键显示名）。返回成功数 */
+export async function adoptDocs(settings: ContactsSettings, candidates: readonly ImportCandidate[]): Promise<number> {
+    let adopted = 0;
+    for (const candidate of candidates) {
+        const bound = await mapBoundDocIds(settings.avId, [candidate.docId]);
+        if (bound[candidate.docId]) continue; // 并发下已被绑定，跳过
+        await bindDocsAsRows(settings.avId, settings.dbBlockId, [{ id: candidate.docId, content: candidate.name }]);
+        adopted += 1;
+    }
+    return adopted;
+}

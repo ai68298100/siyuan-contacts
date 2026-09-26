@@ -1,26 +1,25 @@
 <script lang="ts">
     /**
-     * 主工作台：首页(工作空间总览) + 联系人(卡片/表格) + 关系图谱。
-     * 人物详情弹窗在此层统一承载，两个视图共用。
+     * 主工作台：首页(仪表盘) + 联系人(卡片/表格) + 关系图谱。
+     * 人物详情弹窗在此层统一承载，各视图共用。
      */
     import PeopleView from "./people/PeopleView.svelte";
     import PersonDetail from "./people/PersonDetail.svelte";
     import RelationGraph from "./graph/RelationGraph.svelte";
+    import DashboardView from "./dashboard/DashboardView.svelte";
     import type { ContactsSettings } from "../domain/model";
     import type { ContactSummary } from "../domain/person";
-    import { detectCheckinBridge } from "../bridge/checkin";
+    import type { ContactsPluginFacade } from "../types";
 
     let {
+        facade,
         settings,
         isMobile,
-        onOpenHostDoc,
-        onOpenSettings,
         onOpenPersonDoc,
     }: {
+        facade: ContactsPluginFacade;
         settings: ContactsSettings;
         isMobile: boolean;
-        onOpenHostDoc: () => void;
-        onOpenSettings: () => void;
         onOpenPersonDoc: (docId: string) => void;
     } = $props();
 
@@ -33,10 +32,13 @@
     ];
 
     let current: ViewId = $state("home");
-    let bridge = $state(detectCheckinBridge());
     let detailPerson: ContactSummary | null = $state(null);
+    let detailKey = $state(0);
 
-    const fieldCount = $derived(Object.keys(settings.fieldMap).length);
+    function openDetail(person: ContactSummary) {
+        detailPerson = person;
+        detailKey += 1; // 同一人重复打开时重置内部状态
+    }
 </script>
 
 <div class="lvct-workbench fn__flex-column">
@@ -51,53 +53,22 @@
             </button>
         {/each}
         <span class="fn__flex-1"></span>
-        <button class="lvct-workbench__nav-item b3-button--small" title="打开插件设置" onclick={onOpenSettings}>设置</button>
+        <button class="lvct-workbench__nav-item b3-button--small" title="打开插件设置" onclick={() => facade.openSettings()}>设置</button>
     </nav>
 
     <div class="lvct-workbench__body fn__flex-1">
         {#if current === "home"}
-            <section class="lvct-home">
-                <div class="lvct-home__card">
-                    <h3>工作空间</h3>
-                    <div class="lvct-home__row"><span class="ft__on-surface">笔记本</span><b>{settings.notebookName}</b></div>
-                    <div class="lvct-home__row"><span class="ft__on-surface">数据库字段</span><b>{fieldCount} 个</b></div>
-                    <div class="lvct-home__row"><span class="ft__on-surface">初始化时间</span><b>{settings.initializedAt.slice(0, 10)}</b></div>
-                    <div class="lvct-home__actions">
-                        <button class="b3-button b3-button--outline" onclick={onOpenHostDoc}>打开联系人总表</button>
-                    </div>
-                </div>
-
-                <div class="lvct-home__card">
-                    <h3>小驴打卡联动</h3>
-                    {#if bridge.state === "ready"}
-                        <div class="lvct-home__row"><span class="ft__on-surface">状态</span><b>已连接（协议 v{bridge.protocol}）</b></div>
-                    {:else if bridge.state === "pending"}
-                        <div class="lvct-home__row"><span class="ft__on-surface">状态</span><b>检测到旧版打卡（协议 v{bridge.protocol ?? "?"}）</b></div>
-                    {:else if bridge.state === "failed"}
-                        <div class="lvct-home__row"><span class="ft__on-surface">状态</span><b>探测异常</b></div>
-                    {:else}
-                        <div class="lvct-home__row"><span class="ft__on-surface">状态</span><b>未检测到小驴打卡</b></div>
-                        <p class="ft__smaller ft__on-surface">安装小驴打卡后，生日与纪念日可同步为打卡事项提醒。</p>
-                    {/if}
-                </div>
-
-                <div class="lvct-home__card">
-                    <h3>路线图</h3>
-                    <p class="ft__smaller ft__on-surface">
-                        生日提醒与仪表盘（M4）· 移动端深度适配与发布（M5）
-                    </p>
-                </div>
-            </section>
+            <DashboardView {facade} onOpenDetail={openDetail} />
         {:else if current === "people"}
             <PeopleView
                 {settings}
                 {onOpenPersonDoc}
-                onOpenDetail={(person) => (detailPerson = person)}
+                onOpenDetail={openDetail}
             />
         {:else if current === "graph"}
             <RelationGraph
                 {settings}
-                onOpenDetail={(person) => (detailPerson = person)}
+                onOpenDetail={openDetail}
             />
         {/if}
     </div>
@@ -110,13 +81,16 @@
 {#if detailPerson}
     <div class="lvct-dialog-mask" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) detailPerson = null; }}>
         <div class="lvct-dialog-panel">
-            <PersonDetail
-                {settings}
-                person={detailPerson}
-                {onOpenPersonDoc}
-                onChanged={() => {}}
-                onClose={() => (detailPerson = null)}
-            />
+            {#key detailKey}
+                <PersonDetail
+                    {settings}
+                    person={detailPerson}
+                    onRecord={(personDocId, note) => facade.recordInteraction(personDocId, note)}
+                    {onOpenPersonDoc}
+                    onChanged={() => {}}
+                    onClose={() => (detailPerson = null)}
+                />
+            {/key}
         </div>
     </div>
 {/if}
