@@ -36,7 +36,7 @@ export async function previewCapture(settings: ContactsSettings, docId: string):
 export interface CaptureOptions {
     /** 确认要记录互动的已有联系人（文档 ID） */
     personDocIds: readonly string[];
-    /** 需要新建入库的新人姓名 */
+    /** 按名收编的参与者；已存在时复用联系人 */
     newNames: readonly string[];
     /** 场合日期 YYYY-MM-DD，默认今天 */
     date: string;
@@ -72,12 +72,11 @@ export async function captureFromDoc(
     const occurredAt = birthdayToMs(options.date);
     if (occurredAt === null) throw new Error("场合日期必须是有效的 YYYY-MM-DD 公历日期");
 
-    // 1. 新人入库（重名跳过并计入结果）
+    // 1. 新人入库（重名复用；仅实际创建者计入新建结果）
     const createdNames: string[] = [];
     const createdDocIds: string[] = [];
-    for (const rawName of options.newNames) {
-        const name = rawName.trim();
-        if (!name) continue;
+    const requestedNames = [...new Set(options.newNames.map((name) => name.trim()).filter(Boolean))];
+    for (const name of requestedNames) {
         const draft = { ...emptyDraft(), name };
         if (validateDraft(draft).length > 0) continue;
         try {
@@ -90,7 +89,7 @@ export async function captureFromDoc(
         }
     }
 
-    // 2. 解析目标（确认的已有联系人 + 刚创建的新人）
+    // 2. 解析目标（确认的联系人 + 按名收编或复用的参与者）
     invalidateRoster();
     const roster = await getRoster(settings);
     const byDoc = new Map(roster.map((person) => [person.docId, person]));
@@ -99,7 +98,7 @@ export async function captureFromDoc(
         const person = byDoc.get(targetDocId);
         if (person) targets.push(person);
     }
-    for (const name of createdNames) {
+    for (const name of requestedNames) {
         const person = roster.find((item) => item.name === name);
         if (person) targets.push(person);
     }

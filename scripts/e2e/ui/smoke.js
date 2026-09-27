@@ -516,6 +516,30 @@ await test("互动日期严格校验，非法日期在创建人物和写入前�
     }
 });
 
+await test("按名捕获复用已有联系人，不漏记互动或误报新建", async () => {
+    let saved;
+    let markdown = "";
+    const plugin = {
+        loadData: async () => saved === undefined ? null : JSON.parse(JSON.stringify(saved)),
+        saveData: async (_key, value) => { saved = JSON.parse(JSON.stringify(value)); },
+    };
+    kernel.handler = async (route, payload) => {
+        if (route === "/api/av/renderAttributeView") return renderResult();
+        if (route === "/api/query/sql") return [{ id: "20260927000000-section" }];
+        if (route === "/api/block/updateBlock") { markdown = payload.data; return null; }
+        throw new Error(`复用联系人不应请求 ${route}`);
+    };
+    const options = { personDocIds: [], newNames: [person.name, ` ${person.name} `, ""], date: "2026-09-27" };
+    const first = await captureFromDoc(plugin, settings, settings.hostDocId, options);
+    assert(first.createdNames.length === 0 && first.createdDocIds.length === 0, "已有联系人被误报为新建");
+    assert(first.interactions === 1 && first.attendeeBlockWritten, "已有姓名未被纳入参与者");
+    assert(markdown.split(`siyuan://blocks/${person.docId}`).length - 1 === 1, "同名参与者未去重");
+    const store = await loadInteractionStore(plugin);
+    assert(store.events.length === 1 && store.events[0].personDocId === person.docId, "没有复用正确的人物文档");
+    const repeat = await captureFromDoc(plugin, settings, settings.hostDocId, { ...options, personDocIds: [person.docId] });
+    assert(repeat.interactions === 0, "按姓名与文档重叠捕获重复计数");
+});
+
 await pause(100);
 results.push({ name: "无未处理异常及响应式循环", ok: runtimeErrors.length === 0, detail: runtimeErrors.join("\n") });
 document.querySelector("#results").textContent = JSON.stringify(results, null, 2);
