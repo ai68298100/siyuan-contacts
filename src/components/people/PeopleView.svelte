@@ -7,13 +7,15 @@
     import type { ContactsSettings } from "../../domain/model";
     import { DEFAULT_VIEW_PREFERENCES, normalizeTableColumns, PEOPLE_TABLE_COLUMNS } from "../../domain/preferences";
     import type { PeopleTableColumn, ViewPreferences } from "../../domain/preferences";
+    import { applyPeopleFilters, EMPTY_PEOPLE_FILTER, isExtraFilterActive, matchTags } from "../../domain/people-filters";
+    import type { PeopleFilterState } from "../../domain/people-filters";
     import PersonCard from "./PersonCard.svelte";
     import AddPersonDialog from "./AddPersonDialog.svelte";
     import ImportDialog from "./ImportDialog.svelte";
     import VCardDialog from "./VCardDialog.svelte";
     import LvctDialog from "../LvctDialog.svelte";
     import { useCloseGuard } from "../close-guard";
-    import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3 } from "@lucide/svelte";
+    import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
 
     let {
@@ -61,6 +63,9 @@
     $effect(() => { if (createRequested > 0) adding = true; });
     let groupFilter: string = $state("");
     let tagFilter: string[] = $state([]);
+    // svelte-ignore state_referenced_locally
+    let extraFilter: PeopleFilterState = $state({ ...EMPTY_PEOPLE_FILTER });
+    let moreOpen = $state(false);
     // svelte-ignore state_referenced_locally
     let sortMode: "name" | "group" | "birthday" | "recent" = $state(initialSort);
     let recent: Record<string, { occurredAt: number; localDate: string }> = $state({});
@@ -172,18 +177,69 @@
         const focus = new Set(focusIds);
         const result = filterContacts(people, searchText, groupFilter)
             .filter((person) => !focusLabel || focus.has(person.itemId))
-            .filter((person) => tagFilter.every((tag) => person.tags.includes(tag)));
-        const birthdayDays = new Map(result.map((person) => [person.itemId, nextBirthday(person.birthday, person.isLunar)?.daysUntil ?? Infinity]));
-        result.sort((a, b) => {
+            .filter((person) => matchTags(person, tagFilter, extraFilter.tagMatch));
+        const final = applyPeopleFilters(result, recent, extraFilter);
+        const birthdayDays = new Map(final.map((person) => [person.itemId, nextBirthday(person.birthday, person.isLunar)?.daysUntil ?? Infinity]));
+        final.sort((a, b) => {
             if (sortMode === "group") return a.group.localeCompare(b.group, "zh-CN") || a.name.localeCompare(b.name, "zh-CN");
             if (sortMode === "birthday") return (birthdayDays.get(a.itemId) ?? Infinity) - (birthdayDays.get(b.itemId) ?? Infinity) || a.name.localeCompare(b.name, "zh-CN");
             if (sortMode === "recent") return (recent[b.docId]?.occurredAt ?? -Infinity) - (recent[a.docId]?.occurredAt ?? -Infinity) || a.name.localeCompare(b.name, "zh-CN");
             return a.name.localeCompare(b.name, "zh-CN");
         });
-        return result;
+        return final;
     });
     const visible = $derived(filtered.slice(0, visibleCount));
     $effect(() => { onOrderChange?.(filtered); });
+
+    // 生效条件行（F03）：搜索/分组/标签与更多筛选的可视化，可单项清除
+    type ConditionChip = { key: string; label: string };
+    const conditionChips: ConditionChip[] = $derived.by(() => {
+        const chips: ConditionChip[] = [];
+        if (searchText.trim()) chips.push({ key: "search", label: `搜索「${searchText.trim()}」` });
+        if (groupFilter) chips.push({ key: "group", label: `分组：${groupFilter}` });
+        if (tagFilter.length > 0) chips.push({ key: "tags", label: `标签${extraFilter.tagMatch === "any" ? "（任一）" : ""}：${tagFilter.join(" / ")}` });
+        if (extraFilter.recentFrom || extraFilter.recentTo) chips.push({ key: "recentRange", label: `最近互动 ${extraFilter.recentFrom || "早期"} ~ ${extraFilter.recentTo || "至今"}` });
+        if (extraFilter.neverContacted) chips.push({ key: "neverContacted", label: "从未联系" });
+        return chips;
+    });
+
+    function clearCondition(key: string) {
+        if (key === "search") searchText = "";
+        else if (key === "group") groupFilter = "";
+        else if (key === "tags") tagFilter = [];
+        else if (key === "recentRange") extraFilter = { ...extraFilter, recentFrom: "", recentTo: "" };
+        else if (key === "neverContacted") extraFilter = { ...extraFilter, neverContacted: false };
+        visibleCount = PAGE_SIZE;
+    }
+
+    function clearAllConditions() {
+        searchText = "";
+        groupFilter = "";
+        tagFilter = [];
+        extraFilter = { ...EMPTY_PEOPLE_FILTER };
+        visibleCount = PAGE_SIZE;
+        onClearFocus?.();
+    }
+
+    // 更多筛选面板：点击面板外区域关闭
+    $effect(() => {
+        if (!moreOpen) return;
+        const close = (event: MouseEvent) => {
+            const panel = document.getElementById("lvct-people-moremenu");
+            if (panel && !panel.contains(event.target as Node)) moreOpen = false;
+        };
+        document.addEventListener("click", close);
+        return () => document.removeEventListener("click", close);
+    });
+
+    // 附加筛选变化时重置分页，避免停留在过大的页
+    $effect(() => {
+        void extraFilter.tagMatch;
+        void extraFilter.recentFrom;
+        void extraFilter.recentTo;
+        void extraFilter.neverContacted;
+        visibleCount = PAGE_SIZE;
+    });
     const selectedPeople = $derived(people.filter((person) => selectedIds.includes(person.itemId)));
     const allVisibleSelected = $derived(visible.length > 0 && visible.every((person) => selectedIds.includes(person.itemId)));
 
@@ -314,6 +370,38 @@
             <option value="birthday">{text("peopleSortBirthday", "按生日临近")}</option>
             <option value="recent">{text("peopleSortRecent", "按最近互动")}</option>
         </select>
+        <span id="lvct-people-moremenu" style="position:relative; display:inline-flex">
+            <button
+                class="b3-button b3-button--outline"
+                aria-expanded={moreOpen}
+                onclick={() => (moreOpen = !moreOpen)}
+            >
+                <SlidersHorizontal size={16}/>{text("peopleMoreFilters", "更多筛选")}{isExtraFilterActive(extraFilter) ? " ·" : ""}
+            </button>
+            {#if moreOpen}
+                <div class="lvct-people__moremenu" role="group" aria-label="组合筛选">
+                    <label class="lvct-form__item">
+                        <span>标签匹配（选中多个标签时）</span>
+                        <select class="b3-select fn__block" bind:value={extraFilter.tagMatch}>
+                            <option value="all">同时拥有全部所选标签</option>
+                            <option value="any">拥有任一所选标签</option>
+                        </select>
+                    </label>
+                    <div class="lvct-form__item">
+                        <span>最近互动日期</span>
+                        <div style="display:flex; gap:6px; align-items:center">
+                            <input type="date" class="b3-text-field fn__block" bind:value={extraFilter.recentFrom} aria-label="最近互动起始日期" />
+                            <span>~</span>
+                            <input type="date" class="b3-text-field fn__block" bind:value={extraFilter.recentTo} aria-label="最近互动截止日期" />
+                        </div>
+                    </div>
+                    <label class="lvct-people__moremenu-row">
+                        <input type="checkbox" bind:checked={extraFilter.neverContacted} />
+                        <span>只看从未联系的人</span>
+                    </label>
+                </div>
+            {/if}
+        </span>
         <span class="lvct-people__viewtoggle" style="position:relative; display:inline-flex">
             <button
                 class="b3-button b3-button--outline"
@@ -368,6 +456,20 @@
     </div>
     {#if recentError}<div class="lvct-form__error" role="alert">最近互动读取失败：{recentError}</div>{/if}
     {#if prefError}<div class="lvct-form__error" role="alert">显示偏好保存失败：{prefError}</div>{/if}
+
+    {#if conditionChips.length > 0}
+        <div class="lvct-people__conditions" aria-label="生效筛选条件">
+            <span class="ft__smaller ft__on-surface">生效条件：</span>
+            {#each conditionChips as chip (chip.key)}
+                <button type="button" class="lvct-people__condition" title="点击清除该条件" onclick={() => clearCondition(chip.key)}>
+                    {chip.label} ×
+                </button>
+            {/each}
+            <span class="ft__smaller ft__on-surface">· 共 {filtered.length} 人</span>
+            <span style="flex:1"></span>
+            <button type="button" class="lvct-people__filter-clear" onclick={clearAllConditions}>清除全部</button>
+        </div>
+    {/if}
 
     {#if tags.length > 0}
         <div class="lvct-people__filters" aria-label="标签筛选">

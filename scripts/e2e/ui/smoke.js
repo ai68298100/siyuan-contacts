@@ -552,6 +552,71 @@ await test("表格列显隐与顺序偏好持久化，姓名列固定，恢复�
     await until(() => !fixture.querySelector("table") && fixture.querySelector(".lvct-people__cards"), "恢复默认后未回到卡片视图");
 });
 
+await test("组合筛选数量与生效条件一致，单项清除与清除全部不遗留", async () => {
+    const row = (id, name, group, tags) => ({
+        id: `item-${id}`,
+        cells: [
+            { value: { type: "block", keyID: "name", block: { id: `doc-${id}`, content: name } } },
+            { value: { keyID: "group", mSelect: [{ content: group }] } },
+            { value: { keyID: "tags", mSelect: tags.map((tag) => ({ content: tag })) } },
+        ],
+    });
+    const rows = [
+        row("a", "甲", "朋友", ["球友", "家长群"]),
+        row("b", "乙", "同事", ["家长群"]),
+        row("c", "丙", "朋友", ["球友"]),
+    ];
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") return { view: { columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })), rows } };
+        throw new Error(`回归测试不允许请求 ${route}`);
+    };
+    mounted = mount(PeopleView, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        loadRecentInteractions: async () => ({
+            "doc-a": { occurredAt: 1, localDate: "2026-09-01" },
+            "doc-b": { occurredAt: 2, localDate: "2026-08-15" },
+        }),
+        revision: 0, initialSort: "name",
+        onOpenDetail() {}, onOpenPersonDoc() {},
+        onPreferencesChange: async (next) => next,
+    } });
+    const cards = () => fixture.querySelectorAll(".lvct-people__cards > *").length;
+    await until(() => cards() === 3, "初始名册未加载 3 人");
+    assert(!fixture.querySelector(".lvct-people__conditions"), "无条件时不应显示生效条件行");
+
+    [...fixture.querySelectorAll(".lvct-people__filter")].find((node) => node.textContent.trim() === "球友").click();
+    [...fixture.querySelectorAll(".lvct-people__filter")].find((node) => node.textContent.trim() === "家长群").click();
+    await until(() => fixture.textContent.includes("共 1 人"), "标签交集未生效");
+
+    button("更多筛选").click();
+    await tick();
+    const modeSelect = fixture.querySelector(".lvct-people__moremenu select");
+    modeSelect.value = "any";
+    modeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await until(() => fixture.textContent.includes("共 3 人"), "标签任一并集未生效");
+
+    const dateInputs = [...fixture.querySelectorAll('.lvct-people__moremenu input[type="date"]')];
+    input(dateInputs[0], "2026-08-01");
+    await until(() => fixture.textContent.includes("共 2 人"), "最近互动范围未排除无互动者");
+    input(dateInputs[1], "2026-08-31");
+    await until(() => fixture.textContent.includes("共 1 人"), "区间端点过滤错误");
+
+    fixture.querySelector('.lvct-people__moremenu input[type="checkbox"]').click();
+    await until(() => fixture.textContent.includes("共 0 人"), "从未联系与范围矛盾应为空");
+
+    [...fixture.querySelectorAll(".lvct-people__condition")].find((node) => node.textContent.includes("最近互动")).click();
+    await until(() => fixture.textContent.includes("共 1 人"), "单项清除未生效");
+    assert(!fixture.querySelector('.lvct-people__moremenu input[type="date"]'), "点击面板外应关闭更多筛选");
+
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "清除全部").click();
+    await until(() => cards() === 3, "清除全部后未恢复全量");
+    assert(!fixture.querySelector(".lvct-people__conditions"), "清除全部后条件行仍显示");
+    button("更多筛选").click();
+    await tick();
+    assert(!fixture.querySelector('.lvct-people__moremenu input[type="checkbox"]').checked, "清除全部后从未联系未重置");
+    assert(fixture.querySelector(".lvct-people__moremenu select").value === "all", "清除全部后标签匹配未重置");
+});
+
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {
     const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
         docId: settings.hostDocId,

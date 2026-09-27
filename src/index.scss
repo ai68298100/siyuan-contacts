@@ -298,8 +298,9 @@
 
 .lvct-people__viewtoggle > .b3-button { display: inline-flex; align-items: center; gap: 6px; }
 
-// F02 表格列设置面板：锚定在工具栏按钮下方，窄屏不越界
-.lvct-people__colmenu {
+// F02 列设置 / F03 组合筛选面板：锚定在工具栏按钮下方，窄屏不越界
+.lvct-people__colmenu,
+.lvct-people__moremenu {
     position: absolute;
     top: calc(100% + 4px);
     right: 0;
@@ -355,6 +356,35 @@
         border-top: 1px solid var(--lvct-border-subtle);
         text-align: right;
     }
+}
+
+// F03 更多筛选面板内的行
+.lvct-people__moremenu .lvct-people__moremenu-row {
+    display: flex;
+    align-items: center;
+    gap: var(--lvct-sp-2);
+    padding: 4px 6px;
+    font-size: var(--lvct-fs-body);
+}
+
+// F03 生效条件行
+.lvct-people__conditions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--lvct-sp-1) var(--lvct-sp-2);
+    margin-top: var(--lvct-sp-2);
+}
+
+.lvct-people__condition {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border: 1px solid var(--lvct-accent);
+    border-radius: var(--lvct-r-pill);
+    background: var(--lvct-accent-soft);
+    color: var(--lvct-accent);
+    font-size: var(--lvct-fs-caption);
 }
 
 .lvct-import .lvct-people__toolbar {
