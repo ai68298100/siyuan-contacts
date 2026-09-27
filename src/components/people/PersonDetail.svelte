@@ -17,6 +17,7 @@ import StatusNotice from "../StatusNotice.svelte";
     import { renderTemplate } from "../../domain/interaction-templates";
     import type { NoteTemplate } from "../../domain/interaction-templates";
     import TemplateManager from "./TemplateManager.svelte";
+    import { buildBriefingMarkdown } from "../../domain/briefing-export";
     import { addReviewDays, groupByMonth, inDateRange, onThisDay } from "../../domain/date-review";
     import { toLocalDateKey } from "../../domain/interactions";
 
@@ -261,6 +262,39 @@ import StatusNotice from "../StatusNotice.svelte";
         onChanged();
     }
 
+    // ---- 会面简报导出（F11） ----
+    let briefingExportOpen = $state(false);
+    let briefingLimit = $state(10);
+    let briefingGeneratedAt = $state("");
+    function openBriefingExport() {
+        const now = new Date();
+        const pad = (value: number) => String(value).padStart(2, "0");
+        briefingGeneratedAt = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        briefingExportOpen = true;
+    }
+    const briefingPreview = $derived.by(() => {
+        if (!briefingExportOpen) return "";
+        return buildBriefingMarkdown({
+            person: current,
+            timeline: insights?.timeline ?? [],
+            followUps: openFollowUps.map((item) => ({ title: item.title, dueDate: item.dueDate })),
+            relatedNames: relatedPeople.map((item) => item.name),
+            coAttendance: insights?.coAttendance ?? [],
+            limit: briefingLimit,
+            generatedAt: briefingGeneratedAt,
+        });
+    });
+    function downloadBriefing() {
+        const blob = new Blob([briefingPreview], { type: "text/markdown;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        const stamp = new Date().toISOString().slice(0, 10);
+        anchor.download = `小驴人脉_简报_${current.name}_${stamp}.md`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+    }
+
     async function confirmDelete() {
         if (deleting || busy) return;
         if (!window.confirm(`确定从人脉名册移除「${current.name}」吗？人物文档会保留。`)) return;
@@ -457,6 +491,11 @@ import StatusNotice from "../StatusNotice.svelte";
         {#if current.tags.length > 0}<div><dt>标签</dt><dd>{current.tags.join(" · ")}</dd></div>{/if}
         {#if birthday}<div><dt>下次生日</dt><dd>{birthday.date.toLocaleDateString("zh-CN")} · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}</dd></div>{/if}
     </dl>
+
+    <div class="lvct-detail__briefing-row">
+        <button class="b3-button b3-button--outline" onclick={openBriefingExport}>导出会面简报</button>
+        <span class="ft__smaller ft__on-surface">Markdown：资料 · 最近互动 · 未完成跟进 · 重要日期 · 相关人物 · 共同出席</span>
+    </div>
 
     <section class="lvct-detail__section">
         <h4>{text("detailRecordTitle", "记一笔互动")}</h4>
@@ -741,5 +780,27 @@ import StatusNotice from "../StatusNotice.svelte";
 {#if templateManagerOpen}
     <LvctDialog title="管理互动备注模板" onClose={() => (templateManagerOpen = false)}>
         <TemplateManager templates={templates} onSave={persistTemplates} onClose={() => (templateManagerOpen = false)} />
+    </LvctDialog>
+{/if}
+
+{#if briefingExportOpen}
+    <LvctDialog title={`导出会面简报 · ${current.name}`} wide onClose={() => (briefingExportOpen = false)}>
+        <div class="lvct-form">
+            <label class="lvct-form__item">
+                <span>互动条数范围</span>
+                <select class="b3-select fn__block" aria-label="互动条数范围" bind:value={briefingLimit}>
+                    <option value={5}>最近 5 条</option>
+                    <option value={10}>最近 10 条</option>
+                    <option value={20}>最近 20 条</option>
+                    <option value={0}>全部互动</option>
+                </select>
+            </label>
+            <pre class="lvct-briefing-preview">{briefingPreview}</pre>
+            <div class="lvct-form__actions">
+                <button class="b3-button b3-button--cancel" onclick={() => (briefingExportOpen = false)}>关闭</button>
+                <button class="b3-button b3-button--text" onclick={downloadBriefing}>下载 .md</button>
+            </div>
+            <p class="ft__smaller ft__on-surface">预览与下载内容一致；仅含本地记录的事实，交往次数不代表关系亲疏。</p>
+        </div>
     </LvctDialog>
 {/if}

@@ -1291,6 +1291,60 @@ await test("互动日期回顾：按月分组、日期范围与快捷项、历�
     await until(() => fixture.textContent.includes("七月的事"), "清除日期后未恢复全量");
 });
 
+await test("会面简报导出：预览与范围一致，特殊字符转义，下载 .md", async () => {
+    const pad = (value) => String(value).padStart(2, "0");
+    const now = new Date();
+    const dateKey = (days) => {
+        const date = new Date(now);
+        date.setDate(date.getDate() + days);
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    };
+    const mk = (localDate, note) => ({ eventId: `e-${localDate}-${note}`, localDate, source: "manual", note, groupSize: 1 });
+    const timeline = [
+        { eventId: "e1", localDate: "2026-09-01", source: "manual", note: "聊了*小天*入学", groupSize: 2 },
+        ...Array.from({ length: 7 }, (_, index) => mk(dateKey(-(index + 1)), `旧事${index + 1}`)),
+    ];
+    let downloads = 0;
+    let filename = "";
+    let blob;
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    const originalClick = HTMLAnchorElement.prototype.click;
+    URL.createObjectURL = (value) => { blob = value; return "blob:briefing-test"; };
+    URL.revokeObjectURL = () => {};
+    HTMLAnchorElement.prototype.click = function () { downloads += 1; filename = this.download; };
+    try {
+        mounted = mount(PersonDetail, { target: fixture, props: {
+            settings, person,
+            onRecord: async () => {},
+            onLoadInsights: async () => ({ timeline, coAttendance: [{ otherDocId: "doc-b", name: "周子昂", count: 3 }], totalEvents: timeline.length }),
+            onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+        } });
+        await until(() => fixture.textContent.includes("导出会面简报"), "导出入口未显示");
+        button("导出会面简报").click();
+        await until(() => fixture.querySelector(".lvct-briefing-preview"), "预览未出现");
+        const previewText = () => fixture.querySelector(".lvct-briefing-preview").textContent;
+        assert(previewText().includes("## 最近互动（8 条）"), "默认范围应为全部 8 条");
+        assert(previewText().includes("聊了\\*小天\\*入学"), "备注特殊字符未转义");
+        assert(previewText().includes("同场 3 次"), "共同出席缺失");
+        // 切换范围 → 预览同步（最近 5 条）
+        const rangeSelect = fixture.querySelector('select[aria-label="互动条数范围"]');
+        rangeSelect.value = "5";
+        rangeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        await until(() => previewText().includes("## 最近互动（5 条，共 8 条）"), "范围切换未同步预览");
+        assert(!previewText().includes("旧事7"), "范围外条目不应出现在预览");
+        // 下载
+        [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "下载 .md").click();
+        await until(() => downloads === 1, "下载未触发");
+        assert(filename.endsWith(".md") && filename.includes("回归测试甲"), "下载文件名错误");
+        assert((await blob.text()).includes("# 会面简报：回归测试甲"), "下载内容与预览不一致");
+    } finally {
+        URL.createObjectURL = originalCreate;
+        URL.revokeObjectURL = originalRevoke;
+        HTMLAnchorElement.prototype.click = originalClick;
+    }
+});
+
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {
     const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
         docId: settings.hostDocId,

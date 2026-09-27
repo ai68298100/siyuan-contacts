@@ -421,6 +421,27 @@
     margin-top: var(--lvct-sp-3);
 }
 
+// F11 会面简报
+.lvct-detail__briefing-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--lvct-sp-2);
+    margin: var(--lvct-sp-2) 0;
+}
+
+.lvct-briefing-preview {
+    max-height: 320px;
+    overflow: auto;
+    padding: var(--lvct-sp-2);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-md);
+    background: var(--lvct-bg-surface);
+    font-size: var(--lvct-fs-caption);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 // F09 互动备注模板
 .lvct-detail__template-row { margin-bottom: var(--lvct-sp-2); }
 
