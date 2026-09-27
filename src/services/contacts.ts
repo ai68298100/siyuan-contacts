@@ -10,6 +10,7 @@ import type { ContactsSettings } from "../domain/model";
 import { birthdayToMs, validateDraft } from "../domain/person";
 import type { ContactDraft, ContactSummary } from "../domain/person";
 import type { FieldKey } from "../domain/fields";
+import { matchesFolderPrefix } from "../domain/import";
 
 const PRESET_GROUPS = ["家人", "朋友", "同事", "同学", "其他"] as const;
 
@@ -199,6 +200,13 @@ export interface ImportCandidate {
     hpath: string;
 }
 
+export interface AdoptOptions {
+    /** 收编后统一写入的分组；空值表示不写入分组。 */
+    group?: string;
+    /** 收编后统一追加的标签；空数组表示不写入标签。 */
+    tags?: readonly string[];
+}
+
 /** 可选笔记本（排除人脉笔记本自己） */
 export async function listImportNotebooks(settings: ContactsSettings): Promise<{ id: string; name: string }[]> {
     const notebooks = await listNotebooks();
@@ -207,8 +215,13 @@ export async function listImportNotebooks(settings: ContactsSettings): Promise<{
         .map((notebook) => ({ id: notebook.id, name: notebook.name }));
 }
 
-/** 列出可收编候选：某笔记本下的文档，排除已绑定行、排除宿主文档与空名 */
-export async function discoverImportCandidates(settings: ContactsSettings, notebookId: string, keyword: string = ""): Promise<ImportCandidate[]> {
+/** 列出可收编候选：某笔记本下的文档，排除已绑定行、排除宿主文档与空名。 */
+export async function discoverImportCandidates(
+    settings: ContactsSettings,
+    notebookId: string,
+    keyword: string = "",
+    folderPrefix: string = "",
+): Promise<ImportCandidate[]> {
     const rows = await listNotebookDocs(notebookId);
     const excluded = new Set([settings.hostDocId]);
     const needle = keyword.trim().toLowerCase();
@@ -218,6 +231,7 @@ export async function discoverImportCandidates(settings: ContactsSettings, noteb
     const boundMap = await mapBoundDocIds(settings.avId, docIds);
     return rows
         .filter((row) => !excluded.has(row.id) && row.content.trim().length > 0 && !boundMap[row.id])
+        .filter((row) => matchesFolderPrefix(row.hpath, folderPrefix))
         .filter((row) => !needle || row.content.toLowerCase().includes(needle) || row.hpath.toLowerCase().includes(needle))
         .map((row) => ({ docId: row.id, name: row.content.trim(), hpath: row.hpath }));
 }
@@ -227,7 +241,11 @@ export async function discoverImportCandidates(settings: ContactsSettings, noteb
  * 性能：先一次批量映射过滤已绑定，再按 200/批合并绑定——
  * 500 篇文档 = 1 次映射 + 3 次绑定，而不是 1500 次逐个调用。
  */
-export async function adoptDocs(settings: ContactsSettings, candidates: readonly ImportCandidate[]): Promise<number> {
+export async function adoptDocs(
+    settings: ContactsSettings,
+    candidates: readonly ImportCandidate[],
+    options: AdoptOptions = {},
+): Promise<number> {
     if (candidates.length === 0) return 0;
     const boundMap = await mapBoundDocIds(settings.avId, candidates.map((candidate) => candidate.docId));
     const unbound = candidates.filter((candidate) => !boundMap[candidate.docId]);
@@ -238,6 +256,23 @@ export async function adoptDocs(settings: ContactsSettings, candidates: readonly
             settings.avId,
             settings.dbBlockId,
             chunk.map((candidate) => ({ id: candidate.docId, content: candidate.name })),
+        );
+    }
+    const group = options.group?.trim() ?? "";
+    const tags = [...new Set((options.tags ?? []).map((tag) => tag.trim()).filter(Boolean))];
+    if (unbound.length > 0 && (group || tags.length > 0)) {
+        // 绑定完成后再换算 itemID；一次映射覆盖整批，避免逐文档往返。
+        const itemIds = await mapBoundDocIds(settings.avId, unbound.map((candidate) => candidate.docId));
+        await batchUpdateContacts(
+            settings,
+            unbound
+                .map((candidate) => itemIds[candidate.docId])
+                .filter((itemId): itemId is string => Boolean(itemId))
+                .map((itemId) => ({
+                    itemId,
+                    ...(group ? { group } : {}),
+                    ...(tags.length > 0 ? { tags } : {}),
+                })),
         );
     }
     invalidateRoster();

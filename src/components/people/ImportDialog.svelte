@@ -1,10 +1,11 @@
 <script lang="ts">
     /** 存量文档收编：选笔记本 → 勾选"人名"文档 → 批量绑定为联系人 */
-    import { adoptDocs, discoverImportCandidates, listImportNotebooks } from "../../services/contacts";
+    import { adoptDocs, discoverImportCandidates, listImportNotebooks, PRESET_GROUPS } from "../../services/contacts";
     import type { ImportCandidate } from "../../services/contacts";
     import type { ContactsSettings } from "../../domain/model";
     import { onDestroy } from "svelte";
     import ViewState from "../ViewState.svelte";
+    import { normalizeImportTags } from "../../domain/import";
 
     let {
         settings,
@@ -21,6 +22,9 @@
     let notebooks: Notebook[] = $state([]);
     let notebookId: string = $state("");
     let keyword: string = $state("");
+    let folderPrefix: string = $state("");
+    let importGroup: string = $state("");
+    let importTagsText: string = $state("");
     let candidates: ImportCandidate[] = $state([]);
     let selected: Record<string, boolean> = $state({});
     let loading: boolean = $state(false);
@@ -63,7 +67,7 @@
         selected = {};
         errorText = "";
         try {
-            const result = await discoverImportCandidates(settings, notebookId, keyword);
+            const result = await discoverImportCandidates(settings, notebookId, keyword, folderPrefix);
             if (version !== searchVersion) return;
             candidates = result;
             loaded = true;
@@ -75,6 +79,14 @@
     }
 
     function onKeywordInput() {
+        clearTimeout(searchTimer);
+        searchVersion += 1;
+        selected = {};
+        loading = !!notebookId;
+        searchTimer = setTimeout(() => search(), 400);
+    }
+
+    function onFolderInput() {
         clearTimeout(searchTimer);
         searchVersion += 1;
         selected = {};
@@ -96,7 +108,11 @@
         errorText = "";
         try {
             const chosen = candidates.filter((candidate) => selected[candidate.docId]);
-            const count = await adoptDocs(settings, chosen);
+            const tags = normalizeImportTags(importTagsText);
+            const count = await adoptDocs(settings, chosen, {
+                group: importGroup || undefined,
+                tags,
+            });
             importedCount = count;
             onImported(count);
         } catch (error) {
@@ -124,6 +140,15 @@
             aria-label="按文档名过滤"
             bind:value={keyword}
             oninput={onKeywordInput}
+            disabled={importing || !notebookId}
+        />
+        <input
+            class="b3-text-field"
+            type="text"
+            placeholder="按文件夹前缀过滤…"
+            aria-label="按文件夹前缀过滤"
+            bind:value={folderPrefix}
+            oninput={onFolderInput}
             disabled={importing || !notebookId}
         />
     </div>
@@ -167,6 +192,19 @@
                     <span class="ft__smaller ft__on-surface lvct-import__path">{candidate.hpath}</span>
                 </label>
             {/each}
+        </div>
+        <div class="lvct-form__grid lvct-import__options">
+            <label class="lvct-form__item">
+                <span>收编后分组（可选）</span>
+                <select class="b3-select fn__block" bind:value={importGroup} disabled={importing}>
+                    <option value="">不设置分组</option>
+                    {#each PRESET_GROUPS as group (group)}<option value={group}>{group}</option>{/each}
+                </select>
+            </label>
+            <label class="lvct-form__item">
+                <span>收编后标签（可选）</span>
+                <input class="b3-text-field fn__block" type="text" bind:value={importTagsText} placeholder="客户 重点" disabled={importing} />
+            </label>
         </div>
     {/if}
 

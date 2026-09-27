@@ -271,6 +271,18 @@
     align-items: center;
 }
 
+.lvct-import .lvct-people__toolbar {
+    flex-wrap: wrap;
+}
+
+.lvct-import .lvct-people__toolbar > .b3-text-field {
+    min-width: 150px;
+}
+
+.lvct-import__options {
+    margin-top: var(--lvct-sp-3);
+}
+
 .lvct-people__batchbar {
     display: flex;
     align-items: center;
