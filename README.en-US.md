@@ -26,7 +26,7 @@ Lv Contacts makes **every contact a regular SiYuan document** (bidirectional lin
 ## ✨ Features
 
 - 🗂 **Contact management** — card & table views, instant search, groups and tags; batch-adopt existing notes as contacts
-- 🧑‍🤝‍🧑 **Relationships** — two-way `relation` fields (backlinks maintained by the kernel) + Cytoscape graph colored by group
+- 🧑‍🤝‍🧑 **Relationships** — two-way `relation` fields (backlinks maintained by the kernel) + Cytoscape graph colored by group, direct-neighbor highlighting and mutual-contact queries within the displayed graph
 - 📝 **Capture from notes** — link people in a meeting note, then capture attendees, shared occasion (date/place) and an attendees block with one click; optional AI extraction of unlinked names
 - 🎂 **Birthday reminders** — solar & lunar birthdays, upcoming-birthday and "haven't talked in a while" dashboard
 - 📄 **Person document strip** — open a contact's document to see and edit their profile inline

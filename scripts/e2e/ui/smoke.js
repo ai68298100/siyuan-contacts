@@ -156,6 +156,61 @@ if (window.innerWidth <= 640) {
     });
 }
 
+await test("图谱邻接高亮与共同联系人查询不重建画布，筛选清理失效选择", async () => {
+    const entries = [
+        { id: "a", name: "甲", related: ["c", "d"] },
+        { id: "b", name: "乙", related: ["c"] },
+        { id: "c", name: "共同人物", related: [] },
+        { id: "d", name: "独有关系", related: [] },
+        { id: "e", name: "孤立人物", related: [] },
+    ];
+    kernel.handler = async (route) => {
+        assert(route === "/api/av/renderAttributeView", "图谱查询不应写内核");
+        return { view: { columns: renderResult().view.columns, rows: entries.map((entry) => ({
+            id: entry.id, cells: [
+                { value: { type: "block", keyID: "name", block: { id: entry.id, content: entry.name } } },
+                { value: { type: "relation", keyID: "related", relation: { blockIDs: entry.related } } },
+            ],
+        })) } };
+    };
+    let opened;
+    mounted = mount(RelationGraph, { target: fixture, props: {
+        settings, onOpenDetail(value) { opened = value.docId; }, onOpenPeople() {},
+    } });
+    await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "图谱未挂载");
+    const cy = fixture.querySelector(".lvct-graph-view__canvas")._cyreg.cy;
+    const select = (label, value) => {
+        const node = fixture.querySelector(`select[aria-label="${label}"]`);
+        node.value = value;
+        node.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    select("关系中心", "a");
+    await until(() => fixture.textContent.includes("直接关系：2 人"), "直接关系计数错误");
+    assert(cy.getElementById("a").hasClass("lvct-graph-focus"), "中心未高亮");
+    assert(cy.getElementById("e").hasClass("lvct-graph-muted"), "无关人物未淡化");
+    assert(!cy.getElementById("c").hasClass("lvct-graph-muted"), "邻接人物被淡化");
+    select("对比人物", "b");
+    await until(() => fixture.textContent.includes("共同联系人：1 人"), "共同联系人计数错误");
+    assert(cy.getElementById("d").hasClass("lvct-graph-muted"), "独有关系未淡化");
+    button("共同人物", fixture.querySelector(".lvct-graph-query__results")).click();
+    assert(opened === "c", "结果未打开正确详情");
+    assert(!cy.destroyed(), "选人不应重建图谱");
+    select("对比人物", "e");
+    await until(() => fixture.textContent.includes("当前图内没有共同联系人"), "无共同联系人空态错误");
+    button("清除选择").click();
+    await until(() => cy.elements(".lvct-graph-muted").length === 0, "清除未恢复图谱");
+    select("关系中心", "e");
+    await until(() => fixture.textContent.includes("当前图内没有直接关系"), "孤立人物空态错误");
+    input(fixture.querySelector('input[type="search"]'), "共同人物");
+    await until(() => fixture.querySelector('select[aria-label="关系中心"]')?.value === "", "筛选后未清除失效中心");
+    assert(fixture.querySelector('select[aria-label="对比人物"]').disabled, "无中心不应允许对比");
+    const bounds = fixture.querySelector(".lvct-graph-query").getBoundingClientRect();
+    assert(bounds.right <= window.innerWidth + 1, "关系查询超出视口");
+    for (const control of fixture.querySelectorAll(".lvct-graph-query select")) {
+        assert(control.getBoundingClientRect().right <= window.innerWidth + 1, "选人控件超出视口");
+    }
+});
+
 await test("图谱稳定挂载，悬停卡保留人物，筛选清空后可恢复", async () => {
     let opened;
     mounted = mount(RelationGraph, { target: fixture, props: {

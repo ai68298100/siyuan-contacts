@@ -24,6 +24,28 @@ export interface PersonGraph {
     edges: GraphEdge[];
 }
 
+/** 只计算当前图内的显式无向关系，忽略悬空边、自环与重复边。 */
+export function queryGraphRelations(graph: PersonGraph, firstId: string, secondId = ""): {
+    neighborIds: string[]; commonIds: string[];
+} {
+    const ids = new Set(graph.nodes.map((node) => node.id));
+    const first = new Set<string>();
+    const second = new Set<string>();
+    if (!ids.has(firstId)) return { neighborIds: [], commonIds: [] };
+    for (const edge of graph.edges) {
+        if (edge.source === edge.target || !ids.has(edge.source) || !ids.has(edge.target)) continue;
+        if (edge.source === firstId) first.add(edge.target);
+        if (edge.target === firstId) first.add(edge.source);
+        if (edge.source === secondId) second.add(edge.target);
+        if (edge.target === secondId) second.add(edge.source);
+    }
+    return {
+        neighborIds: graph.nodes.filter((node) => first.has(node.id)).map((node) => node.id),
+        commonIds: firstId === secondId || !ids.has(secondId) ? [] : graph.nodes
+            .filter((node) => first.has(node.id) && second.has(node.id)).map((node) => node.id),
+    };
+}
+
 export function buildGraph(people: readonly ContactSummary[]): PersonGraph {
     const itemToDoc = new Map<string, string>();
     for (const person of people) {

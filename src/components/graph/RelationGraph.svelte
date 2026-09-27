@@ -3,7 +3,7 @@
     import cytoscape from "cytoscape";
     import ViewState from "../ViewState.svelte";
     import { listContacts } from "../../services/contacts";
-    import { buildGraph, capGraph, GRAPH_MAX_NODES, groupColor } from "../../domain/graph";
+    import { buildGraph, capGraph, GRAPH_MAX_NODES, groupColor, queryGraphRelations } from "../../domain/graph";
     import type { ContactsSettings } from "../../domain/model";
     import type { ContactSummary } from "../../domain/person";
     import type { PersonInsights } from "../../services/insights";
@@ -30,7 +30,9 @@
     let truncated: boolean = $state(false);
     let searchText: string = $state("");
     let groupFilter: string = $state("");
-    let graphInstance: cytoscape.Core | null = null;
+    let graphInstance: cytoscape.Core | null = $state.raw(null);
+    let focusId = $state("");
+    let compareId = $state("");
     let hoveredPerson: ContactSummary | null = $state(null);
     let hoverInsights: PersonInsights | null = $state(null);
     let hoverInsightsLoading = $state(false);
@@ -61,6 +63,41 @@
         });
     });
     const searchNeedle = $derived(searchText.trim().toLowerCase());
+    const displayed = $derived(capGraph(buildGraph(filteredPeople)));
+    const relations = $derived(queryGraphRelations(displayed.graph, focusId, compareId));
+    const resultIds = $derived(compareId ? relations.commonIds : relations.neighborIds);
+    const resultPeople = $derived(people.filter((person) => resultIds.includes(person.docId)));
+
+    $effect(() => {
+        const ids = new Set(displayed.graph.nodes.map((node) => node.id));
+        if (!ids.has(focusId)) focusId = "";
+        if (!focusId || !ids.has(compareId) || focusId === compareId) compareId = "";
+    });
+
+    $effect(() => {
+        const instance = graphInstance;
+        const selected = focusId;
+        const other = compareId;
+        const hits = resultIds;
+        if (!instance || instance.destroyed()) return;
+        instance.batch(() => {
+            instance.elements().removeClass("lvct-graph-muted lvct-graph-focus");
+            if (!selected) return;
+            const visible = new Set([selected, other, ...hits]);
+            const hitIds = new Set(hits);
+            instance.nodes().forEach((node) => {
+                if (!visible.has(node.id())) node.addClass("lvct-graph-muted");
+                if (node.id() === selected || node.id() === other) node.addClass("lvct-graph-focus");
+            });
+            instance.edges().forEach((edge) => {
+                const source = edge.source().id();
+                const target = edge.target().id();
+                const connectsHit = (hitIds.has(source) && (target === selected || target === other))
+                    || (hitIds.has(target) && (source === selected || source === other));
+                if (!connectsHit) edge.addClass("lvct-graph-muted");
+            });
+        });
+    });
 
     /** cytoscape 无法用 CSS 变量，挂载时从主题运行时取值 */
     function themeColors(): { text: string; edge: string } {
@@ -167,7 +204,7 @@
 
     $effect(() => {
         if (!container || people.length === 0) return;
-        const capped = capGraph(buildGraph(filteredPeople));
+        const capped = displayed;
         truncated = capped.truncated;
         if (capped.graph.nodes.length === 0) return;
         const palette = themeColors();
@@ -219,6 +256,8 @@
                         "curve-style": "bezier",
                     },
                 },
+                { selector: ".lvct-graph-muted", style: { opacity: 0.18 } },
+                { selector: ".lvct-graph-focus", style: { "border-color": palette.text, "border-width": 4 } },
             ],
         });
         graphInstance = instance;
@@ -279,6 +318,40 @@
         <span class="fn__flex-1"></span>
     </div>
 
+    {#if !loading && !errorText && displayed.graph.nodes.length > 0}
+        <div class="lvct-graph-query">
+            <label>关系中心
+                <select class="b3-select" bind:value={focusId} aria-label="关系中心">
+                    <option value="">未选择</option>
+                    {#each displayed.graph.nodes as node (node.id)}
+                        <option value={node.id}>{node.label}</option>
+                    {/each}
+                </select>
+            </label>
+            <label>对比人物
+                <select class="b3-select" bind:value={compareId} disabled={!focusId} aria-label="对比人物">
+                    <option value="">未选择</option>
+                    {#each displayed.graph.nodes.filter((node) => node.id !== focusId) as node (node.id)}
+                        <option value={node.id}>{node.label}</option>
+                    {/each}
+                </select>
+            </label>
+            {#if focusId}
+                <span class="ft__smaller ft__on-surface">{compareId ? "共同联系人" : "直接关系"}：{resultPeople.length} 人（当前图内）</span>
+                <button class="b3-button b3-button--text" onclick={() => { focusId = ""; compareId = ""; }}>清除选择</button>
+            {/if}
+        </div>
+        {#if focusId}
+            <div class="lvct-graph-query__results">
+                {#each resultPeople as person (person.docId)}
+                    <button class="b3-button b3-button--text" onclick={() => onOpenDetail(person)}>{person.name}</button>
+                {:else}
+                    <span class="ft__smaller ft__on-surface">{compareId ? "当前图内没有共同联系人" : "当前图内没有直接关系"}</span>
+                {/each}
+            </div>
+        {/if}
+    {/if}
+
     {#if truncated}
         <div class="ft__smaller ft__on-surface lvct-graph-note">
             联系人超过 {GRAPH_MAX_NODES}，当前只展示关系最多的 {GRAPH_MAX_NODES} 人（用分组筛选或搜索缩小范围可看全）。
@@ -326,7 +399,7 @@
                                 <span class="ft__smaller ft__on-surface">互动摘要暂时不可用</span>
                             {:else if hoverInsights}
                                 <span class="ft__smaller ft__on-surface">最近互动：{hoverInsights.timeline[0]?.localDate ?? "暂无记录"}</span>
-                                <span class="ft__smaller ft__on-surface">共同联系人：{hoverInsights.coAttendance.slice(0, 3).map((item) => item.name).join("、") || "暂无"}</span>
+                                <span class="ft__smaller ft__on-surface">共同出席：{hoverInsights.coAttendance.slice(0, 3).map((item) => item.name).join("、") || "暂无"}</span>
                             {/if}
                         </div>
                     {/if}

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildGraph, capGraph, groupColor } from "../src/domain/graph.ts";
+import { buildGraph, capGraph, groupColor, queryGraphRelations } from "../src/domain/graph.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
 
 function person(partial: Partial<ContactSummary> & { itemId: string; docId: string; name: string }): ContactSummary {
@@ -10,6 +10,24 @@ function person(partial: Partial<ContactSummary> & { itemId: string; docId: stri
         ...partial,
     };
 }
+
+test("关系查询：无向邻接与共同联系人按节点顺序去重，不修改原图", () => {
+    const graph = {
+        nodes: ["a", "b", "c", "d", "isolated"].map((id) => ({ id, label: id, group: "", degree: 0 })),
+        edges: [{ source: "a", target: "c" }, { source: "c", target: "b" },
+            { source: "c", target: "a" }, { source: "a", target: "b" },
+            { source: "a", target: "d" }, { source: "a", target: "a" },
+            { source: "a", target: "missing" }],
+    };
+    const original = structuredClone(graph);
+    assert.deepEqual(queryGraphRelations(graph, "a", "b"), { neighborIds: ["b", "c", "d"], commonIds: ["c"] });
+    assert.deepEqual(queryGraphRelations(graph, "b", "a"), { neighborIds: ["a", "c"], commonIds: ["c"] });
+    assert.deepEqual(queryGraphRelations(graph, "a", "a").commonIds, []);
+    assert.deepEqual(queryGraphRelations(graph, "a", "missing").commonIds, []);
+    assert.deepEqual(queryGraphRelations(graph, "missing"), { neighborIds: [], commonIds: [] });
+    assert.deepEqual(queryGraphRelations(graph, "isolated", "a"), { neighborIds: [], commonIds: [] });
+    assert.deepEqual(graph, original);
+});
 
 test("buildGraph：relatedItemIds(itemID) 换算为 docId 边，度数累计，自环与未知目标丢弃", () => {
     const a = person({ itemId: "i-a", docId: "d-a", name: "张三", group: "朋友", relatedItemIds: ["i-b", "i-c", "i-a"] });
