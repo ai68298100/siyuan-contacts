@@ -94,6 +94,12 @@
 - [x] `pnpm check:release` 发布门禁：版本一致性、dist 完整性、zip/icon/preview 体积限制
 - [x] 单测 36 项全绿（新增 insights：时间线倒序/同场聚合/共同出席计数）
 
+## v0.1.0 已发布 ✅（2026-09-27）
+
+- 仓库：https://github.com/ai68298100/siyuan-contacts（public，CI 首跑绿）
+- Release：https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.1.0（附 package.zip）
+- bazaar 上架：按用户要求暂缓，优化后由用户择机提交（清单见 docs/RELEASE.md §3）
+
 ## 待启动
 
 - M4 提醒仪表盘：公/农历生日投影（移植打卡 lunar.ts+occasions 模型）、互动事件（source+externalRef 幂等+墓碑）、
