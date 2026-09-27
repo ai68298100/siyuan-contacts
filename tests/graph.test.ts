@@ -2,7 +2,32 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildGraph, capGraph, groupColor, queryGraphRelations } from "../src/domain/graph.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
-import { shortestGraphPath } from "../src/domain/graph-path.ts";
+import { shortestGraphPath, secondDegreeGraphIds } from "../src/domain/graph-path.ts";
+
+test("二度邻接：排除中心与直接关系，循环与重复不放大结果", () => {
+    const graph = {
+        nodes: ["a", "b", "c", "d", "e", "isolated"].map((id) => ({ id, label: id, group: "", degree: 0 })),
+        edges: [{ source: "a", target: "b" }, { source: "b", target: "c" },
+            { source: "c", target: "a" }, { source: "b", target: "d" },
+            { source: "d", target: "c" }, { source: "b", target: "d" },
+            { source: "d", target: "e" }, { source: "a", target: "a" }, { source: "a", target: "missing" }],
+    };
+    const original = structuredClone(graph);
+    assert.deepEqual(secondDegreeGraphIds(graph, "a"), ["d"]);
+    assert.deepEqual(secondDegreeGraphIds(graph, "isolated"), []);
+    assert.deepEqual(secondDegreeGraphIds(graph, "missing"), []);
+    assert.deepEqual(secondDegreeGraphIds({ nodes: [], edges: [] }, "a"), []);
+    assert.deepEqual(graph, original);
+});
+
+test("无关系人物：有效入边也计关系，自环与悬空关系不计", () => {
+    const graph = buildGraph([
+        person({ itemId: "a", docId: "a", name: "a", relatedItemIds: ["b", "a", "missing"] }),
+        person({ itemId: "b", docId: "b", name: "b" }),
+        person({ itemId: "c", docId: "c", name: "c", relatedItemIds: ["missing", "c"] }),
+    ]);
+    assert.deepEqual(graph.nodes.filter((node) => node.degree === 0).map((node) => node.id), ["c"]);
+});
 
 test("最短路径：优先较短链路、支持反向关系且不改变输入", () => {
     const graph = {

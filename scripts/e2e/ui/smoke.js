@@ -189,6 +189,16 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
     assert(cy.getElementById("a").hasClass("lvct-graph-focus"), "中心未高亮");
     assert(cy.getElementById("e").hasClass("lvct-graph-muted"), "无关人物未淡化");
     assert(!cy.getElementById("c").hasClass("lvct-graph-muted"), "邻接人物被淡化");
+    select("关系层级", "second");
+    await until(() => fixture.textContent.includes("二度关系：1 人"), "二度关系计数错误");
+    assert([...fixture.querySelectorAll(".lvct-graph-query__results button")].map((node) => node.textContent).join(",") === "乙", "二度结果混入直接关系或中心");
+    assert(!cy.getElementById("b").hasClass("lvct-graph-muted"), "二度人物未显示");
+    assert(!cy.getElementById("c").hasClass("lvct-graph-muted"), "中间关系被淡化");
+    assert(cy.edges().filter((edge) => !edge.hasClass("lvct-graph-muted")).length === 3, "二度连线高亮错误");
+    assert(!cy.destroyed(), "二度切换不应重建画布");
+    button("乙", fixture.querySelector(".lvct-graph-query__results")).click();
+    assert(opened === "b", "二度结果未打开人物");
+    select("关系层级", "direct");
     select("对比人物", "b");
     await until(() => fixture.textContent.includes("共同联系人：1 人"), "共同联系人计数错误");
     assert(cy.getElementById("d").hasClass("lvct-graph-muted"), "独有关系未淡化");
@@ -223,6 +233,19 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
     for (const control of fixture.querySelectorAll(".lvct-graph-query select")) {
         assert(control.getBoundingClientRect().right <= window.innerWidth + 1, "选人控件超出视口");
     }
+    fixture.querySelector(".lvct-graph-isolated input").click();
+    await until(() => fixture.textContent.includes("没有匹配的节点"), "隐藏关系对端后不应将共同人物误判为孤立");
+    button("清除筛选").click();
+    await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy?.nodes().length === 5, "清除筛选未恢复全图");
+    assert(!fixture.querySelector(".lvct-graph-isolated input").checked, "清除筛选未重置无关系筛选");
+    fixture.querySelector(".lvct-graph-isolated input").click();
+    await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy?.nodes().length === 1, "未只显示孤立人物");
+    const isolatedCy = fixture.querySelector(".lvct-graph-view__canvas")._cyreg.cy;
+    assert(isolatedCy.nodes()[0].id() === "e", "孤立筛选人物错误");
+    select("关系中心", "e");
+    await tick();
+    select("关系层级", "second");
+    await until(() => fixture.textContent.includes("当前图内没有二度关系"), "孤立人物二度空态错误");
 });
 
 await test("图谱稳定挂载，悬停卡保留人物，筛选清空后可恢复", async () => {

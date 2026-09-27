@@ -4,7 +4,7 @@
     import ViewState from "../ViewState.svelte";
     import { listContacts } from "../../services/contacts";
     import { buildGraph, capGraph, GRAPH_MAX_NODES, groupColor, queryGraphRelations } from "../../domain/graph";
-    import { shortestGraphPath } from "../../domain/graph-path";
+    import { shortestGraphPath, secondDegreeGraphIds } from "../../domain/graph-path";
     import type { ContactsSettings } from "../../domain/model";
     import type { ContactSummary } from "../../domain/person";
     import type { PersonInsights } from "../../services/insights";
@@ -31,6 +31,8 @@
     let truncated: boolean = $state(false);
     let searchText: string = $state("");
     let groupFilter: string = $state("");
+    let isolatedOnly = $state(false);
+    let relationDepth = $state("direct");
     let graphInstance: cytoscape.Core | null = $state.raw(null);
     let focusId = $state("");
     let compareId = $state("");
@@ -53,6 +55,8 @@
     ] as const;
 
     const groups = $derived.by(() => [...new Set(people.map((person) => person.group).filter(Boolean))].sort());
+    const fullGraph = $derived(buildGraph(people));
+    const isolatedIds = $derived(new Set(fullGraph.nodes.filter((node) => node.degree === 0).map((node) => node.id)));
     const filteredPeople = $derived.by(() => {
         const needle = searchText.trim().toLowerCase();
         return people.filter((person) => {
@@ -61,13 +65,15 @@
                 .join(" ")
                 .toLowerCase()
                 .includes(needle);
-            return matchesGroup && matchesSearch;
+            return matchesGroup && matchesSearch && (!isolatedOnly || isolatedIds.has(person.docId));
         });
     });
     const searchNeedle = $derived(searchText.trim().toLowerCase());
     const displayed = $derived(capGraph(buildGraph(filteredPeople)));
     const relations = $derived(queryGraphRelations(displayed.graph, focusId, compareId));
-    const resultIds = $derived(compareId ? relations.commonIds : relations.neighborIds);
+    const secondMode = $derived.by(() => !compareId && relationDepth === "second");
+    const secondIds = $derived(secondMode ? secondDegreeGraphIds(displayed.graph, focusId) : []);
+    const resultIds = $derived(compareId ? relations.commonIds : secondMode ? secondIds : relations.neighborIds);
     const resultPeople = $derived(people.filter((person) => resultIds.includes(person.docId)));
     const pathMode = $derived.by(() => Boolean(compareId) && queryMode === "path");
     const pathIds = $derived(pathMode ? shortestGraphPath(displayed.graph, focusId, compareId) : []);
@@ -85,12 +91,15 @@
         const other = compareId;
         const hits = pathMode ? pathIds : resultIds;
         const path = pathMode ? pathIds : null;
+        const bridges = secondMode ? relations.neighborIds : [];
+        const expandSecond = secondMode;
         if (!instance || instance.destroyed()) return;
         instance.batch(() => {
             instance.elements().removeClass("lvct-graph-muted lvct-graph-focus");
             if (!selected) return;
-            const visible = new Set([selected, other, ...hits]);
+            const visible = new Set([selected, other, ...hits, ...bridges]);
             const hitIds = new Set(hits);
+            const bridgeIds = new Set(bridges);
             const nextOnPath = new Map((path ?? []).slice(0, -1).map((id, index) => [id, path![index + 1]]));
             instance.nodes().forEach((node) => {
                 if (!visible.has(node.id())) node.addClass("lvct-graph-muted");
@@ -101,6 +110,9 @@
                 const target = edge.target().id();
                 const connectsHit = path !== null
                     ? nextOnPath.get(source) === target || nextOnPath.get(target) === source
+                    : expandSecond
+                    ? (source === selected && bridgeIds.has(target)) || (target === selected && bridgeIds.has(source))
+                        || (bridgeIds.has(source) && hitIds.has(target)) || (bridgeIds.has(target) && hitIds.has(source))
                     : (hitIds.has(source) && (target === selected || target === other))
                         || (hitIds.has(target) && (source === selected || source === other));
                 if (!connectsHit) edge.addClass("lvct-graph-muted");
@@ -314,6 +326,7 @@
                 <option value={group}>{group}</option>
             {/each}
         </select>
+        <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={isolatedOnly} />仅无关系人物（{isolatedIds.size}）</label>
         <button class="b3-button b3-button--outline" onclick={() => graphInstance?.fit()}>适应</button>
         <button class="b3-button b3-button--outline" onclick={() => zoomBy(1.2)}>放大</button>
         <button class="b3-button b3-button--outline" onclick={() => zoomBy(1 / 1.2)}>缩小</button>
@@ -345,6 +358,12 @@
                     {/each}
                 </select>
             </label>
+            {#if focusId && !compareId}
+                <select class="b3-select" bind:value={relationDepth} aria-label="关系层级">
+                    <option value="direct">直接关系</option>
+                    <option value="second">二度关系</option>
+                </select>
+            {/if}
             {#if compareId}
                 <select class="b3-select" bind:value={queryMode} aria-label="关系查询模式">
                     <option value="common">共同联系人</option>
@@ -355,7 +374,7 @@
                 {#if pathMode}
                     <span class="ft__smaller ft__on-surface">最短路径：{pathIds.length > 0 ? `${pathIds.length - 1} 段关系` : "无连接"}（当前图内）</span>
                 {:else}
-                    <span class="ft__smaller ft__on-surface">{compareId ? "共同联系人" : "直接关系"}：{resultPeople.length} 人（当前图内）</span>
+                    <span class="ft__smaller ft__on-surface">{compareId ? "共同联系人" : secondMode ? "二度关系" : "直接关系"}：{resultPeople.length} 人（当前图内）</span>
                 {/if}
                 <button class="b3-button b3-button--text" onclick={() => { focusId = ""; compareId = ""; }}>清除选择</button>
             {/if}
@@ -373,7 +392,7 @@
                 {#each resultPeople as person (person.docId)}
                     <button class="b3-button b3-button--text" onclick={() => onOpenDetail(person)}>{person.name}</button>
                 {:else}
-                    <span class="ft__smaller ft__on-surface">{compareId ? "当前图内没有共同联系人" : "当前图内没有直接关系"}</span>
+                    <span class="ft__smaller ft__on-surface">{compareId ? "当前图内没有共同联系人" : secondMode ? "当前图内没有二度关系" : "当前图内没有直接关系"}</span>
                 {/each}
                 {/if}
             </div>
@@ -396,7 +415,7 @@
         <ViewState title={people.length === 0 ? "还没有联系人" : "没有匹配的节点"}
             description={people.length === 0 ? "创建或导入联系人后，在人物详情中建立关系。" : "试试清除关键词和分组筛选。"}>
             {#if people.length > 0}
-                <button class="b3-button b3-button--outline" onclick={() => { searchText = ""; groupFilter = ""; }}>清除筛选</button>
+                <button class="b3-button b3-button--outline" onclick={() => { searchText = ""; groupFilter = ""; isolatedOnly = false; }}>清除筛选</button>
             {/if}
             <button class="b3-button b3-button--text" onclick={onOpenPeople}>前往联系人</button>
         </ViewState>
