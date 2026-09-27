@@ -11,9 +11,11 @@
     import StatusNotice from "../StatusNotice.svelte";
     import LvctDialog from "../LvctDialog.svelte";
     import ReviewReportDialog from "./ReviewReportDialog.svelte";
+    import { translateText } from "../../domain/translation";
 
     let {
         facade,
+        i18n,
         preferences,
         revision = 0,
         onOpenDetail,
@@ -22,6 +24,7 @@
         onPreferencesChange,
     }: {
         facade: ContactsPluginFacade;
+        i18n?: Readonly<Record<string, string>>;
         preferences: ViewPreferences;
         revision?: number;
         onOpenDetail: (person: ContactSummary) => void;
@@ -30,6 +33,8 @@
         /** 摘要忽略等偏好写入（F08）；未接线时「当日不再展示」退化为本次隐藏 */
         onPreferencesChange?: (preferences: ViewPreferences) => Promise<ViewPreferences>;
     } = $props();
+    const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
+        translateText(i18n, key, fallback, values));
 
     let data: DashboardData | null = $state(null);
     let errorText: string = $state("");
@@ -48,12 +53,12 @@
     let fuError = $state("");
     let fuMessage = $state("");
 
-    const greeting = (() => {
+    const greetingKey = (() => {
         const hour = new Date().getHours();
-        if (hour < 6) return "夜深了";
-        if (hour < 12) return "早上好";
-        if (hour < 18) return "下午好";
-        return "晚上好";
+        if (hour < 6) return "dashGreetingNight";
+        if (hour < 12) return "dashGreetingMorning";
+        if (hour < 18) return "dashGreetingAfternoon";
+        return "dashGreetingEvening";
     })();
     const todayLabel = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(new Date());
     const todayBirthdays = $derived.by(() => data?.birthdays.filter((item) => item.bucket === "today") ?? []);
@@ -220,70 +225,70 @@
 
 <div class="lvct-dash">
     {#if errorText}
-        <ViewState compact error title="仪表盘加载失败" description={errorText}>
-            <button class="b3-button b3-button--outline" onclick={refresh}>重新加载</button>
+        <ViewState compact error title={text("dashLoadFailTitle", "仪表盘加载失败")} description={errorText}>
+            <button class="b3-button b3-button--outline" onclick={refresh}>{text("dashReload", "重新加载")}</button>
         </ViewState>
     {/if}
     {#if !data && !errorText}
-        <div class="lvct-dash__skeleton" aria-busy="true" aria-label="仪表盘加载中">
+        <div class="lvct-dash__skeleton" aria-busy="true" aria-label={text("dashSkeletonLabel", "仪表盘加载中")}>
             {#each Array(4) as _, index (index)}<span class="lvct-skeleton"></span>{/each}
             <span class="lvct-skeleton lvct-dash__skeleton-block"></span>
             <span class="lvct-skeleton lvct-dash__skeleton-block"></span>
         </div>
     {:else if data}
         {#if summaryVisible}
-            <div class="lvct-dash__summary" role="region" aria-label="今日关注摘要">
+            <div class="lvct-dash__summary" role="region" aria-label={text("dashSummaryLabel", "今日关注摘要")}>
                 <div class="lvct-dash__summary-main">
-                    <b>今天有 {summary.total} 件值得处理的事</b>
+                    <b>{text("dashSummaryTitle", "今天有 {n} 件值得处理的事", { n: summary.total })}</b>
                     <span class="lvct-dash__summary-chips">
-                        {#if summary.overdue > 0}<span class="lvct-action-chip lvct-action-chip--overdue">逾期跟进 {summary.overdue}</span>{/if}
-                        {#if summary.birthdaysToday > 0}<span class="lvct-action-chip lvct-action-chip--today">今天生日 {summary.birthdaysToday}</span>{/if}
-                        {#if summary.stale > 0}<span class="lvct-action-chip lvct-action-chip--stale">久未联系 {summary.stale}</span>{/if}
+                        {#if summary.overdue > 0}<span class="lvct-action-chip lvct-action-chip--overdue">{text("dashSummaryOverdue", "逾期跟进 {n}", { n: summary.overdue })}</span>{/if}
+                        {#if summary.birthdaysToday > 0}<span class="lvct-action-chip lvct-action-chip--today">{text("dashSummaryBirthdays", "今天生日 {n}", { n: summary.birthdaysToday })}</span>{/if}
+                        {#if summary.stale > 0}<span class="lvct-action-chip lvct-action-chip--stale">{text("dashSummaryStale", "久未联系 {n}", { n: summary.stale })}</span>{/if}
                     </span>
                 </div>
                 <div class="lvct-dash__summary-actions">
-                    <button class="b3-button b3-button--text" onclick={() => (summaryHiddenThisSession = true)}>收起</button>
-                    <button class="b3-button b3-button--outline" disabled={summaryBusy} onclick={dismissSummaryToday}>今日不再展示</button>
+                    <button class="b3-button b3-button--text" onclick={() => (summaryHiddenThisSession = true)}>{text("dashCollapse", "收起")}</button>
+                    <button class="b3-button b3-button--outline" disabled={summaryBusy} onclick={dismissSummaryToday}>{text("dashDismissToday", "今日不再展示")}</button>
                 </div>
             </div>
         {/if}
         <div class="lvct-dash__welcome">
             <div>
-                <p class="lvct-dash__greeting">{greeting}，今天先联系谁？</p>
+                <p class="lvct-dash__greeting">{text(greetingKey, "早上好")}，{text("dashGreetingLine", "今天先联系谁？")}</p>
                 <span class="ft__smaller ft__on-surface">{todayLabel}</span>
             </div>
             {#if todayBirthdays.length > 0}
                 <button class="lvct-dash__birthday-banner" onclick={openBirthdayPeople} aria-label="查看今天过生日的联系人">
                     <span aria-hidden="true">🎂</span>
-                    <span><b>今天生日</b> · {todayBirthdays.slice(0, 3).map((item) => item.person.name).join("、")}{todayBirthdays.length > 3 ? ` 等 ${todayBirthdays.length} 人` : ""}</span>
+                    <span><b>{text("dashBannerToday", "今天生日")}</b> · {todayBirthdays.slice(0, 3).map((item) => item.person.name).join("、")}{todayBirthdays.length > 3 ? ` 等 ${todayBirthdays.length} 人` : ""}</span>
                     <span aria-hidden="true">›</span>
                 </button>
             {/if}
         </div>
         <div class="lvct-dash__stats">
-            <button class="lvct-dash__stat" onclick={() => onOpenPeople()}><b>{data.people}</b><span>联系人</span></button>
-            <button class="lvct-dash__stat" onclick={onOpenGraph}><b>{data.relations}</b><span>关系</span></button>
-            <button class="lvct-dash__stat" onclick={openBirthdayPeople}><b>{data.birthdaysThisWeek}</b><span>本周生日</span></button>
-            <button class="lvct-dash__stat" onclick={openNeverContactedPeople}><b>{data.neverContacted}</b><span>从未互动</span></button>
+            <button class="lvct-dash__stat" onclick={() => onOpenPeople()}><b>{data.people}</b><span>{text("dashStatPeople", "联系人")}</span></button>
+            <button class="lvct-dash__stat" onclick={onOpenGraph}><b>{data.relations}</b><span>{text("dashStatRelations", "关系")}</span></button>
+            <button class="lvct-dash__stat" onclick={openBirthdayPeople}><b>{data.birthdaysThisWeek}</b><span>{text("dashStatBirthdaysWeek", "本周生日")}</span></button>
+            <button class="lvct-dash__stat" onclick={openNeverContactedPeople}><b>{data.neverContacted}</b><span>{text("dashStatNever", "从未互动")}</span></button>
         </div>
 
         <div class="lvct-home__card lvct-dash__actions">
             <div class="lvct-dash__actions-head">
-                <h3>今日行动</h3>
-                <span class="ft__smaller ft__on-surface">生日 · 联系节奏 · 跟进事项</span>
+                <h3>{text("dashActionsTitle", "今日行动")}</h3>
+                <span class="ft__smaller ft__on-surface">{text("dashActionsSub", "生日 · 联系节奏 · 跟进事项")}</span>
                 <span style="flex:1"></span>
-                <button class="b3-button b3-button--outline" onclick={() => (reviewOpen = true)}>交往回顾</button>
+                <button class="b3-button b3-button--outline" onclick={() => (reviewOpen = true)}>{text("dashReview", "交往回顾")}</button>
                 {#if overdueCount > 0}
                     <button class="b3-button b3-button--outline" onclick={postponeOverdueToToday} disabled={alBusy}>
-                        {alBusy ? "顺延中…" : `把 ${overdueCount} 条逾期跟进顺延到今天`}
+                        {alBusy ? text("dashPostponing", "顺延中…") : text("dashPostponeOverdue", "把 {n} 条逾期跟进顺延到今天", { n: overdueCount })}
                     </button>
                 {/if}
             </div>
-            <StatusNotice message={alError ? `操作失败：${alError}` : ""} error />
+            <StatusNotice message={alError ? text("dashOpFailed", "操作失败：{msg}", { msg: alError }) : ""} error />
             <StatusNotice message={alMessage} onDismiss={() => (alMessage = "")} />
             {#if actions.length === 0}
-                <ViewState compact icon="✅" title="今天没有需要处理的事" description="生日、联系节奏和跟进计划都安顿好了。">
-                    <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>浏览联系人</button>
+                <ViewState compact icon="✅" title={text("dashActionsEmptyTitle", "今天没有需要处理的事")} description={text("dashActionsEmptyDesc", "生日、联系节奏和跟进计划都安顿好了。")}>
+                    <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>{text("dashBrowsePeople", "浏览联系人")}</button>
                 </ViewState>
             {:else}
                 <div class="lvct-dash__list">
@@ -298,7 +303,7 @@
                                 </span>
                             </button>
                             <button class="b3-button b3-button--outline lvct-dash__quick-button" onclick={() => onOpenDetail(card.person)}>
-                                {card.bucket === "stale" ? "去看看" : "处理"}
+                                {card.bucket === "stale" ? text("dashTakeALook", "去看看") : text("dashProcess", "处理")}
                             </button>
                         </div>
                     {/each}
@@ -320,7 +325,7 @@
                                 <b>{item.person.name}</b>
                                 <span class="ft__smaller ft__on-surface">{item.projection.label}{item.person.isLunar ? "（农历）" : ""}</span>
                                 <span class="lvct-bucket {bucketStyles[item.bucket]}">
-                                    {item.projection.daysUntil === 0 ? "今天" : `${item.projection.daysUntil}天`}
+                                    {item.projection.daysUntil === 0 ? text("dashFuToday", "今天") : text("dashDaysUntilN", "{n}天", { n: item.projection.daysUntil })}
                                 </span>
                             </button>
                         {/each}
@@ -329,13 +334,13 @@
             </div>
 
             <div class="lvct-home__card">
-                <h3>久未联系</h3>
-                <StatusNotice message={quickError ? `记录失败：${quickError}` : ""} error />
+                <h3>{text("dashStaleTitle", "久未联系")}</h3>
+                <StatusNotice message={quickError ? text("dashRecordFail", "记录失败：{msg}", { msg: quickError }) : ""} error />
                 <StatusNotice message={quickMessage} onDismiss={() => (quickMessage = "")} />
                 {#if data.stale.length === 0}
-                    <ViewState compact icon="✓" title={data.people === 0 ? "先添加一位联系人" : "暂无久未联系的人"}
-                        description={data.people === 0 ? "创建或导入联系人后，就能开始记录互动。" : "可以继续在联系人档案中记录新的互动。"}>
-                        <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>前往联系人</button>
+                    <ViewState compact icon="✓" title={data.people === 0 ? text("dashStaleEmptyNoPeopleTitle", "先添加一位联系人") : text("dashStaleEmptyTitle", "暂无久未联系的人")}
+                        description={data.people === 0 ? text("dashStaleEmptyNoPeopleDesc", "创建或导入联系人后，就能开始记录互动。") : text("dashStaleEmptyDesc", "可以继续在联系人档案中记录新的互动。")}>
+                        <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>{text("dashGoContacts", "前往联系人")}</button>
                     </ViewState>
                 {:else}
                     <div class="lvct-dash__list">
@@ -344,19 +349,19 @@
                                 <button class="lvct-dash__row-main" onclick={() => onOpenDetail(item.person)}>
                                     <b>{item.person.name}</b>
                                     <span class="ft__smaller ft__on-surface">
-                                        {item.lastDaysAgo === undefined ? "从未互动" : `${item.lastDaysAgo} 天前`}
+                                        {item.lastDaysAgo === undefined ? text("dashNeverContacted", "从未互动") : text("dashDaysAgo", "{n} 天前", { n: item.lastDaysAgo })}
                                     </span>
-                                    <span class="lvct-bucket lvct-bucket--stale">联系一下</span>
+                                    <span class="lvct-bucket lvct-bucket--stale">{text("dashReachOut", "联系一下")}</span>
                                 </button>
                                 {#if quickPersonId === item.person.itemId}
                                     <div class="lvct-dash__quick-form">
-                                        <input class="b3-text-field" type="text" aria-label={`与${item.person.name}互动的备注`} placeholder="备注（可选）" bind:value={quickNote} disabled={quickBusy} />
-                                        <button class="b3-button b3-button--text" onclick={() => recordQuick(item.person)} disabled={quickBusy}>{quickBusy ? "记录中…" : "记录"}</button>
-                                        <button class="b3-button b3-button--cancel" onclick={() => { quickPersonId = ""; quickError = ""; }} disabled={quickBusy}>取消</button>
+                                        <input class="b3-text-field" type="text" aria-label={text("dashQuickNoteLabel", "与{name}互动的备注", { name: item.person.name })} placeholder={text("dashQuickNotePlaceholder", "备注（可选）")} bind:value={quickNote} disabled={quickBusy} />
+                                        <button class="b3-button b3-button--text" onclick={() => recordQuick(item.person)} disabled={quickBusy}>{quickBusy ? text("dashRecording", "记录中…") : text("dashRecord", "记录")}</button>
+                                        <button class="b3-button b3-button--cancel" onclick={() => { quickPersonId = ""; quickError = ""; }} disabled={quickBusy}>{text("dashCancel", "取消")}</button>
                                     </div>
                                 {:else}
                                     <button class="b3-button b3-button--outline lvct-dash__quick-button" onclick={() => { quickPersonId = item.person.itemId; quickNote = ""; }} disabled={quickBusy || quickDoneId === item.person.itemId}>
-                                        {quickDoneId === item.person.itemId ? "已记录 ✓" : "记一笔"}
+                                        {quickDoneId === item.person.itemId ? text("dashRecordedDone", "已记录 ✓") : text("dashQuickRecord", "记一笔")}
                                     </button>
                                 {/if}
                             </div>
@@ -366,74 +371,74 @@
             </div>
 
             <div class="lvct-home__card">
-                <h3>待办跟进</h3>
-                <StatusNotice message={fuError ? `操作失败：${fuError}` : ""} error />
+                <h3>{text("dashFollowupsTitle", "待办跟进")}</h3>
+                <StatusNotice message={fuError ? text("dashOpFailed", "操作失败：{msg}", { msg: fuError }) : ""} error />
                 <StatusNotice message={fuMessage} onDismiss={() => (fuMessage = "")} />
                 {#if (data.followUps ?? []).length === 0}
-                    <ViewState compact icon="🗓" title="没有待办的跟进计划"
-                        description="在联系人详情里可以安排日期型联系计划，到期会出现在这里。">
-                        <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>前往联系人</button>
+                    <ViewState compact icon="🗓" title={text("dashFuEmptyTitle", "没有待办的跟进计划")}
+                        description={text("dashFuEmptyDesc", "在联系人详情里可以安排日期型联系计划，到期会出现在这里。")}>
+                        <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>{text("dashGoContacts", "前往联系人")}</button>
                     </ViewState>
                 {:else}
                     <div class="lvct-dash__list">
                         {#each data.followUps ?? [] as card (card.item.id)}
                             <div class="lvct-dash__row">
                                 <button class="lvct-dash__row-main" disabled={!card.reachable || fuBusy}
-                                    title={card.reachable ? undefined : "人物文档不可达（可能已解绑），仍可推迟或跳过"}
+                                    title={card.reachable ? undefined : text("dashFuUnreachableTitle", "人物文档不可达（可能已解绑），仍可推迟或跳过")}
                                     onclick={() => card.person && onOpenDetail(card.person)}>
-                                    <b>{card.item.title || "保持联系"}</b>
-                                    <span class="ft__smaller ft__on-surface">{card.person?.name ?? "人物文档不可达"} · {card.item.dueDate}</span>
+                                    <b>{card.item.title || text("dashKeepInTouch", "保持联系")}</b>
+                                    <span class="ft__smaller ft__on-surface">{card.person?.name ?? text("dashFuUnreachable", "人物文档不可达")} · {card.item.dueDate}</span>
                                     <span class="lvct-bucket {card.bucket === "overdue" ? "lvct-bucket--stale" : card.bucket === "today" ? "lvct-bucket--today" : "lvct-bucket--week"}">
-                                        {card.bucket === "overdue" ? "已逾期" : card.bucket === "today" ? "今天" : "近期"}
+                                        {card.bucket === "overdue" ? text("dashFuOverdue", "已逾期") : card.bucket === "today" ? text("dashFuToday", "今天") : text("dashFuUpcoming", "近期")}
                                     </span>
                                 </button>
                                 {#if fuSnoozeForId === card.item.id}
                                     <div class="lvct-dash__quick-form">
-                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "tomorrow", "明天", card.item.title || "保持联系")}>明天</button>
-                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "threeDays", "三天后", card.item.title || "保持联系")}>三天后</button>
-                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "nextMonday", "下周一", card.item.title || "保持联系")}>下周一</button>
-                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "nextMonth", "一个月后", card.item.title || "保持联系")}>一个月后</button>
-                                        <input type="date" class="b3-text-field" aria-label="指定推迟日期" bind:value={fuCustomDate} disabled={fuBusy} />
-                                        <button class="b3-button b3-button--text" disabled={fuBusy || !fuCustomDate} onclick={() => snoozeFollowUpCustom(card.item.id, card.item.title || "保持联系")}>按日期</button>
-                                        <button class="b3-button b3-button--cancel" onclick={() => { fuSnoozeForId = ""; fuCustomDate = ""; }} disabled={fuBusy}>收起</button>
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "tomorrow", text("dashSnoozeTomorrow", "明天"), card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashSnoozeTomorrow", "明天")}</button>
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "threeDays", text("dashSnoozeThreeDays", "三天后"), card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashSnoozeThreeDays", "三天后")}</button>
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "nextMonday", text("dashSnoozeNextMonday", "下周一"), card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashSnoozeNextMonday", "下周一")}</button>
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "nextMonth", text("dashSnoozeNextMonth", "一个月后"), card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashSnoozeNextMonth", "一个月后")}</button>
+                                        <input type="date" class="b3-text-field" aria-label={text("dashSnoozeDateLabel", "指定推迟日期")} bind:value={fuCustomDate} disabled={fuBusy} />
+                                        <button class="b3-button b3-button--text" disabled={fuBusy || !fuCustomDate} onclick={() => snoozeFollowUpCustom(card.item.id, card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashSnoozeByDate", "按日期")}</button>
+                                        <button class="b3-button b3-button--cancel" onclick={() => { fuSnoozeForId = ""; fuCustomDate = ""; }} disabled={fuBusy}>{text("dashCollapse", "收起")}</button>
                                     </div>
                                 {:else}
                                     <div class="lvct-dash__fu-actions">
                                         {#if card.reachable}
-                                            <button class="b3-button b3-button--text" disabled={fuBusy} onclick={() => card.person && onOpenDetail(card.person)}>处理</button>
+                                            <button class="b3-button b3-button--text" disabled={fuBusy} onclick={() => card.person && onOpenDetail(card.person)}>{text("dashFuProcess", "处理")}</button>
                                         {/if}
-                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => { fuSnoozeForId = fuSnoozeForId === card.item.id ? "" : card.item.id; fuCustomDate = ""; }} aria-expanded={fuSnoozeForId === card.item.id}>推迟</button>
-                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => completeFollowUp(card.item.id, card.item.title || "保持联系")}>完成</button>
-                                        <button class="b3-button b3-button--cancel" disabled={fuBusy} onclick={() => skipFollowUp(card.item.id, card.item.title || "保持联系")}>跳过</button>
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => { fuSnoozeForId = fuSnoozeForId === card.item.id ? "" : card.item.id; fuCustomDate = ""; }} aria-expanded={fuSnoozeForId === card.item.id}>{text("dashFuPostpone", "推迟")}</button>
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => completeFollowUp(card.item.id, card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashFuComplete", "完成")}</button>
+                                        <button class="b3-button b3-button--cancel" disabled={fuBusy} onclick={() => skipFollowUp(card.item.id, card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashFuSkip", "跳过")}</button>
                                     </div>
                                 {/if}
                             </div>
                         {/each}
                     </div>
-                    <p class="ft__smaller ft__on-surface">完成或跳过不会自动记录互动；计划在人物详情里可重新打开。</p>
+                    <p class="ft__smaller ft__on-surface">{text("dashFuScopeNote", "完成或跳过不会自动记录互动；计划在人物详情里可重新打开。")}</p>
                 {/if}
             </div>
         </div>
 
         <div class="lvct-dash__grid">
             <div class="lvct-home__card">
-                <h3>工作空间</h3>
-                <div class="lvct-home__row"><span class="ft__on-surface">笔记本</span><b>{facade.settings?.notebookName ?? "—"}</b></div>
+                <h3>{text("dashWorkspaceTitle", "工作空间")}</h3>
+                <div class="lvct-home__row"><span class="ft__on-surface">{text("dashNotebookLabel", "笔记本")}</span><b>{facade.settings?.notebookName ?? "—"}</b></div>
                 <div class="lvct-home__actions">
-                    <button class="b3-button b3-button--outline" onclick={() => facade.openHostDoc()}>打开联系人总表</button>
+                    <button class="b3-button b3-button--outline" onclick={() => facade.openHostDoc()}>{text("dashOpenHostDoc", "打开联系人总表")}</button>
                 </div>
             </div>
 
             <div class="lvct-home__card">
-                <h3>小驴打卡联动</h3>
+                <h3>{text("dashBridgeTitle", "小驴打卡联动")}</h3>
                 {#if bridge.state === "ready"}
-                    <div class="lvct-home__row"><span class="ft__on-surface">状态</span><b>已连接（协议 v{bridge.protocol}）</b></div>
+                    <div class="lvct-home__row"><span class="ft__on-surface">{text("dashBridgeStateLabel", "状态")}</span><b>已连接（协议 v{bridge.protocol}）</b></div>
                 {:else if bridge.state === "pending"}
-                    <div class="lvct-home__row"><span class="ft__on-surface">状态</span><b>检测到旧版打卡（协议 v{bridge.protocol ?? "?"}）</b></div>
+                    <div class="lvct-home__row"><span class="ft__on-surface">{text("dashBridgeStateLabel", "状态")}</span><b>检测到旧版打卡（协议 v{bridge.protocol ?? "?"}）</b></div>
                 {:else if bridge.state === "failed"}
-                    <div class="lvct-home__row"><span class="ft__on-surface">状态</span><b>探测异常</b></div>
+                    <div class="lvct-home__row"><span class="ft__on-surface">{text("dashBridgeStateLabel", "状态")}</span><b>探测异常</b></div>
                 {:else}
-                    <div class="lvct-home__row"><span class="ft__on-surface">状态</span><b>未检测到小驴打卡</b></div>
+                    <div class="lvct-home__row"><span class="ft__on-surface">{text("dashBridgeStateLabel", "状态")}</span><b>未检测到小驴打卡</b></div>
                     <p class="ft__smaller ft__on-surface">安装小驴打卡后，生日可同步为打卡事项提醒。</p>
                 {/if}
             </div>
