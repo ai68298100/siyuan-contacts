@@ -10,6 +10,8 @@ import SettingsView from "../../../src/components/SettingsView.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
 import { invalidateRoster } from "../../../src/services/roster";
 import { recordInteraction, loadInteractionStore } from "../../../src/data/interactions";
+import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
+import { captureFromDoc } from "../../../src/services/capture";
 import { FIELD_SPECS } from "../../../src/domain/fields";
 import { DEFAULT_VIEW_PREFERENCES } from "../../../src/domain/preferences";
 import { kernel } from "./siyuan-mock.js";
@@ -430,6 +432,54 @@ await test("多人互动通过真实存储服务写入并回读，重复记录�
     const store = await loadInteractionStore(plugin);
     assert(store.events.length === 3, `多人同场只保存了 ${store.events.length} 条互动`);
     assert(new Set(store.events.map((event) => event.personDocId)).size === 3, "参与者记录不完整");
+});
+
+await test("外部联动重复及并发调用只计实际新增，写入失败不报成功", async () => {
+    let saved;
+    const plugin = {
+        loadData: async () => saved === undefined ? null : JSON.parse(JSON.stringify(saved)),
+        saveData: async (_key, value) => { saved = JSON.parse(JSON.stringify(value)); },
+    };
+    initExternalBridge(plugin, () => settings);
+    try {
+        const api = window.LvContacts;
+        const first = await api.recordInteraction(["甲", "乙", "甲"], { ref: "会议" });
+        assert(first.recorded === 2, "重复人员被计为新增");
+        assert((await api.recordInteraction(["乙", "甲"], { ref: "会议" })).recorded === 0, "重复调用误报新增");
+        const concurrent = await Promise.all([
+            api.recordInteraction(["丙"], { ref: "会议" }),
+            api.recordInteraction(["丙"], { ref: "会议" }),
+        ]);
+        assert(concurrent.reduce((sum, result) => sum + result.recorded, 0) === 1, "并发调用重复计数");
+        assert((await loadInteractionStore(plugin)).events.length === 3, "并发保存丢失参与者");
+        plugin.saveData = async () => {};
+        let rejected = false;
+        try { await api.recordInteraction(["丁"], { ref: "会议" }); } catch { rejected = true; }
+        assert(rejected, "写后回读失败仍返回成功");
+    } finally {
+        disposeExternalBridge();
+    }
+});
+
+await test("笔记捕获去重参与人员，重复捕获返回零新增", async () => {
+    let saved;
+    let markdown = "";
+    const plugin = {
+        loadData: async () => saved === undefined ? null : JSON.parse(JSON.stringify(saved)),
+        saveData: async (_key, value) => { saved = JSON.parse(JSON.stringify(value)); },
+    };
+    kernel.handler = async (route, payload) => {
+        if (route === "/api/av/renderAttributeView") return renderResult();
+        if (route === "/api/query/sql") return [{ id: "20260927000000-section" }];
+        if (route === "/api/block/updateBlock") { markdown = payload.data; return null; }
+        throw new Error(`捕获回归不允许请求 ${route}`);
+    };
+    const options = { personDocIds: [person.docId, person.docId], newNames: [], date: "2026-09-27" };
+    const first = await captureFromDoc(plugin, settings, settings.hostDocId, options);
+    assert(first.interactions === 1, "重复选择人员导致新增计数错误");
+    assert(markdown.split(`siyuan://blocks/${person.docId}`).length - 1 === 1, "参与人员区块重复列出同一人");
+    const repeat = await captureFromDoc(plugin, settings, settings.hostDocId, options);
+    assert(repeat.interactions === 0, "重复捕获误报新增");
 });
 
 await pause(100);

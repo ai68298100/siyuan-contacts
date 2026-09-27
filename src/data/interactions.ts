@@ -24,6 +24,14 @@ export interface RecordInteractionInput {
 
 /** 追加一条互动事件；幂等（同人物+source+externalRef 或同 id 静默跳过）。 */
 export async function recordInteraction(plugin: Plugin, input: RecordInteractionInput): Promise<InteractionStore> {
+    return (await recordInteractionWithResult(plugin, input)).store;
+}
+
+/** 新增状态与写入在同一排他锁内确定，避免调用方先读后写导致计数竞态。 */
+export async function recordInteractionWithResult(
+    plugin: Plugin,
+    input: RecordInteractionInput,
+): Promise<{ store: InteractionStore; recorded: boolean }> {
     return withStoreLock(INTERACTION_STORAGE_KEY, async () => {
         const store = await loadInteractionStore(plugin);
         const occurredAt = input.occurredAt ?? Date.now();
@@ -40,7 +48,7 @@ export async function recordInteraction(plugin: Plugin, input: RecordInteraction
         if (next !== store) {
             await saveJsonVerified(plugin, INTERACTION_STORAGE_KEY, next);
         }
-        return next;
+        return { store: next, recorded: next !== store };
     });
 }
 

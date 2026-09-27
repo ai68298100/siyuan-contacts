@@ -6,7 +6,7 @@
  */
 import type { Plugin } from "siyuan";
 import { createContact, filterContacts, listContacts } from "../services/contacts";
-import { recordInteraction } from "../data/interactions";
+import { recordInteractionWithResult } from "../data/interactions";
 import { toLocalDateKey, defaultBridgeRef } from "../domain/interactions";
 import { emptyDraft } from "../domain/person";
 import type { ContactsSettings } from "../domain/model";
@@ -97,7 +97,7 @@ export function initExternalBridge(plugin: Plugin, getSettings: () => ContactsSe
 
         async recordInteraction(personDocIds, meta = {}) {
             requireSettings();
-            const docIds = [...personDocIds].filter((id) => typeof id === "string" && id);
+            const docIds = [...new Set([...personDocIds].filter((id) => typeof id === "string" && id))];
             if (docIds.length === 0) return { recorded: 0 };
             const occurredAt = meta.date ? Date.parse(`${meta.date}T00:00:00`) || Date.now() : Date.now();
             const externalRef = meta.ref?.trim() || defaultBridgeRef(docIds, toLocalDateKey(new Date(occurredAt)));
@@ -106,14 +106,14 @@ export function initExternalBridge(plugin: Plugin, getSettings: () => ContactsSe
             );
             let recorded = 0;
             for (const personDocId of docIds) {
-                const store = await recordInteraction(plugin, {
+                const result = await recordInteractionWithResult(plugin, {
                     personDocId,
                     source: "api",
                     externalRef,
                     occurredAt,
                     note: noteParts.length > 0 ? noteParts.join(" ") : undefined,
                 });
-                if (store.events.some((event) => event.personDocId === personDocId && event.externalRef === externalRef)) {
+                if (result.recorded) {
                     recorded += 1;
                 }
             }

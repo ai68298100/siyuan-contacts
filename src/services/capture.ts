@@ -9,7 +9,7 @@ import type { ContactSummary } from "../domain/person";
 import { toLocalDateKey } from "../domain/interactions";
 import { createContact } from "./contacts";
 import { getRoster, invalidateRoster } from "./roster";
-import { loadInteractionStore, recordInteraction } from "../data/interactions";
+import { recordInteractionWithResult } from "../data/interactions";
 import { findBlockIdByCustomAttr, findOutgoingLinkRoots, getBlockContent, upsertMarkedBlock } from "../api/blocks";
 import type { Plugin } from "siyuan";
 import type { ContactsSettings } from "../domain/model";
@@ -103,34 +103,30 @@ export async function captureFromDoc(
     }
 
     // 3. 每人一条互动事件：source=diary，externalRef=笔记 ID（同场身份）；已捕获过的人跳过
-    const store = await loadInteractionStore(plugin);
-    const capturedAlready = new Set(
-        store.events
-            .filter((event) => event.source === "diary" && event.externalRef === docId)
-            .map((event) => event.personDocId),
-    );
-    const freshTargets = targets.filter((person) => !capturedAlready.has(person.docId));
+    const uniqueTargets = [...new Map(targets.map((person) => [person.docId, person])).values()];
+    let interactions = 0;
     const occurredAt = birthdayToMs(options.date) ?? Date.now();
     const note = composeNote(options);
-    for (const person of freshTargets) {
-        await recordInteraction(plugin, {
+    for (const person of uniqueTargets) {
+        const result = await recordInteractionWithResult(plugin, {
             personDocId: person.docId,
             source: "diary",
             externalRef: docId,
             occurredAt,
             note,
         });
+        if (result.recorded) interactions += 1;
     }
 
     // 4. 笔记写入"参与人员"双链区块（同场人员 >=1 才写）
     let attendeeBlockWritten = false;
-    if (targets.length > 0) {
-        const links = targets.map((person) => `[${person.name}](siyuan://blocks/${person.docId})`).join("、");
+    if (uniqueTargets.length > 0) {
+        const links = uniqueTargets.map((person) => `[${person.name}](siyuan://blocks/${person.docId})`).join("、");
         const markdown = `**参与人员**（${toLocalDateKey(new Date(occurredAt))}）：${links}`;
         const existingId = await findBlockIdByCustomAttr(docId, ATTENDEES_SECTION_ATTR);
         await upsertMarkedBlock(docId, ATTENDEES_SECTION_ATTR, markdown, existingId);
         attendeeBlockWritten = true;
     }
     invalidateRoster();
-    return { createdNames, createdDocIds, interactions: freshTargets.length, attendeeBlockWritten };
+    return { createdNames, createdDocIds, interactions, attendeeBlockWritten };
 }
