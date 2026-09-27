@@ -9,6 +9,7 @@ import DashboardView from "../../../src/components/dashboard/DashboardView.svelt
 import SettingsView from "../../../src/components/SettingsView.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
 import { invalidateRoster } from "../../../src/services/roster";
+import { recordInteraction, loadInteractionStore } from "../../../src/data/interactions";
 import { FIELD_SPECS } from "../../../src/domain/fields";
 import { DEFAULT_VIEW_PREFERENCES } from "../../../src/domain/preferences";
 import { kernel } from "./siyuan-mock.js";
@@ -415,6 +416,20 @@ await test("人物档案条会前简报展示真实互动事实", async () => {
     assert(briefing.textContent.includes("最近互动"), "会前简报缺少最近互动标签");
     assert(briefing.textContent.includes("确认下周合作安排"), "会前简报缺少互动备注");
     assert(!briefing.textContent.includes("预留"), "会前简报仍显示占位内容");
+});
+
+await test("多人互动通过真实存储服务写入并回读，重复记录保持幂等", async () => {
+    let saved;
+    const plugin = {
+        loadData: async () => saved === undefined ? null : JSON.parse(JSON.stringify(saved)),
+        saveData: async (_key, value) => { saved = JSON.parse(JSON.stringify(value)); },
+    };
+    for (const personDocId of ["甲", "乙", "丙", "乙"]) {
+        await recordInteraction(plugin, { personDocId, source: "diary", externalRef: "同场回归" });
+    }
+    const store = await loadInteractionStore(plugin);
+    assert(store.events.length === 3, `多人同场只保存了 ${store.events.length} 条互动`);
+    assert(new Set(store.events.map((event) => event.personDocId)).size === 3, "参与者记录不完整");
 });
 
 await pause(100);

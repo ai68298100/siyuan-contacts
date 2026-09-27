@@ -80,8 +80,12 @@
 |---|---|---|
 | `contacts-settings.json` | 1 | 四锚点 ID + fieldMap + 初始化时间 |
 | `view-preferences.json` | 1 | 工作台默认页面、联系人默认排序、启动行为、生日窗口、久未联系阈值、AI 入口开关 |
-| `interaction-events.json` | （M4） | 互动事件（只追加）：`{id, personDocId, occurredAt, localDate, source, externalRef?, note}`；`source+externalRef` 幂等；删除写墓碑 |
+| `interaction-events.json` | （M4） | 互动事件（只追加）：`{id, personDocId, occurredAt, localDate, source, externalRef?, note}`；`personDocId+source+externalRef` 幂等；删除写墓碑 |
 | `bridge-state.json` | （M4） | 打卡联动状态机（unsupported/pending/ready/failed） |
+
+同一场合允许每位参与者各有一条互动事件；`source+externalRef` 表示共同场合，
+只有人物 ID 也相同时才判定重复。事件 ID 在全库唯一，归一化同时按事件 ID 去重。
+此修正保留 schemaVersion 1，不改变存储结构；旧版本已经跳过或丢弃的参与者事件无法自动恢复。
 
 设置页的「导出互动事件 JSON」生成一次性导出包：
 `{schemaVersion: 1, exportedAt, events, tombstones}`。导出包不回写插件存储，

@@ -22,7 +22,7 @@ export interface RecordInteractionInput {
     occurredAt?: number;
 }
 
-/** 追加一条互动事件；幂等（重复 source+externalRef 或同 id 静默跳过） */
+/** 追加一条互动事件；幂等（同人物+source+externalRef 或同 id 静默跳过）。 */
 export async function recordInteraction(plugin: Plugin, input: RecordInteractionInput): Promise<InteractionStore> {
     return withStoreLock(INTERACTION_STORAGE_KEY, async () => {
         const store = await loadInteractionStore(plugin);

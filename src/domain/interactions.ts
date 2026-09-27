@@ -1,7 +1,7 @@
 /**
  * 互动事件投影（纯函数）：谁最近联系过、"久未联系"筛选。
  * 数据契约见 docs/DATA-CONTRACT.md §3：事件只追加、删除写墓碑、
- * source+externalRef 构成幂等身份。
+ * personDocId+source+externalRef 构成幂等身份。
  */
 import type { ContactSummary } from "./person";
 
@@ -15,7 +15,7 @@ export interface InteractionEvent {
     /** 用户本地日 YYYY-MM-DD（全库日期契约，禁止用毫秒差取整推算） */
     localDate: string;
     source: InteractionSource;
-    /** 跨窗口/跨来源幂等键（与 source 配合） */
+    /** 场合标识（与人物 ID、source 配合构成幂等身份） */
     externalRef?: string;
     note?: string;
 }
@@ -46,11 +46,16 @@ export function normalizeInteractionStore(raw: unknown): InteractionStore {
           })
         : [];
     const seenTombstones = new Set(tombstones);
+    const seenIds = new Set<string>();
     const deduped = new Map<string, InteractionEvent>();
     for (const event of events) {
         if (seenTombstones.has(event.id)) continue;
-        const identity = event.externalRef ? `${event.source}:${event.externalRef}` : event.id;
+        if (seenIds.has(event.id)) continue;
+        const identity = event.externalRef !== undefined
+            ? JSON.stringify([event.personDocId, event.source, event.externalRef])
+            : JSON.stringify([event.id]);
         if (deduped.has(identity)) continue;
+        seenIds.add(event.id);
         deduped.set(identity, event);
     }
     return { schemaVersion: INTERACTION_STORE_VERSION, events: [...deduped.values()], tombstones };
@@ -60,13 +65,14 @@ export function emptyStore(): InteractionStore {
     return { schemaVersion: INTERACTION_STORE_VERSION, events: [], tombstones: [] };
 }
 
-/** 幂等判定：同 id 或同 source+externalRef 视为同一条 */
+/** 幂等判定：同 id 或同人物+source+externalRef 视为同一条。 */
 export function isDuplicateEvent(store: InteractionStore, event: InteractionEvent): boolean {
     if (store.tombstones.includes(event.id)) return true;
     return store.events.some(
         (existing) =>
             existing.id === event.id ||
-            (event.externalRef !== undefined && existing.source === event.source && existing.externalRef === event.externalRef),
+            (event.externalRef !== undefined && existing.personDocId === event.personDocId &&
+                existing.source === event.source && existing.externalRef === event.externalRef),
     );
 }
 

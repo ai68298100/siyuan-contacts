@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
     appendEvent,
+    buildCoAttendance,
+    buildTimeline,
     isDuplicateEvent,
     lastInteractionByPerson,
     normalizeInteractionStore,
@@ -31,7 +33,7 @@ test("toLocalDateKey：本地日格式", () => {
     assert.equal(toLocalDateKey(new Date(2026, 0, 5)), "2026-01-05");
 });
 
-test("appendEvent：追加与幂等（同 id / 同 source+externalRef / 墓碑）", () => {
+test("appendEvent：追加与幂等（同 id / 同人物+source+externalRef / 墓碑）", () => {
     let store: InteractionStore = normalizeInteractionStore(undefined);
     const e1 = event({ id: "e1" });
     store = appendEvent(store, e1);
@@ -39,7 +41,7 @@ test("appendEvent：追加与幂等（同 id / 同 source+externalRef / 墓碑�
     // 同 id 重复
     store = appendEvent(store, event({ id: "e1" }));
     assert.equal(store.events.length, 1);
-    // 同 source+externalRef
+    // 同人物+source+externalRef
     store = appendEvent(store, event({ id: "e2", externalRef: "x1", source: "diary" }));
     assert.equal(store.events.length, 2);
     store = appendEvent(store, event({ id: "e3", externalRef: "x1", source: "diary" }));
@@ -68,6 +70,35 @@ test("normalize：脏数据降级为空库，合法数据过虑保留", () => {
     });
     assert.equal(store.events.length, 1);
     assert.deepEqual(store.tombstones, ["t1"]);
+});
+
+test("多人同场：各人记录保留，重复捕获幂等，回读后共同出席可计算", () => {
+    let store = normalizeInteractionStore(null);
+    for (const [index, personDocId] of ["甲", "乙", "丙"].entries()) {
+        store = appendEvent(store, event({ id: `meeting-${index}`, personDocId, source: "diary", externalRef: "会议" }));
+    }
+    store = appendEvent(store, event({ id: "repeat", personDocId: "乙", source: "diary", externalRef: "会议" }));
+    const reread = normalizeInteractionStore(JSON.parse(JSON.stringify(store)));
+    assert.equal(reread.events.length, 3);
+    assert.equal(buildTimeline(reread.events, "甲")[0].groupSize, 3);
+    assert.deepEqual(buildCoAttendance(reread.events, "甲"), [
+        { otherDocId: "乙", count: 1 }, { otherDocId: "丙", count: 1 },
+    ]);
+});
+
+test("归一化：事件 ID 全局去重，不同来源及空场合标识与追加规则一致", () => {
+    const events = [
+        event({ id: "a", source: "diary", externalRef: "" }),
+        event({ id: "b", source: "diary", externalRef: "" }),
+        event({ id: "b", personDocId: "另一人", source: "diary", externalRef: "另一场合" }),
+        event({ id: "c", source: "api", externalRef: "" }),
+        event({ id: "c", personDocId: "另一人", source: "api", externalRef: "另一场合" }),
+    ];
+    let appended = normalizeInteractionStore(null);
+    for (const item of events) appended = appendEvent(appended, item);
+    const normalized = normalizeInteractionStore({ schemaVersion: 1, events, tombstones: [] });
+    assert.deepEqual(normalized.events, appended.events);
+    assert.equal(normalized.events.length, 3);
 });
 
 test("lastInteractionByPerson / staleContacts：最近互动与久未联系排序", () => {
