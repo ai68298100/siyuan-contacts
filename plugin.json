@@ -2,10 +2,12 @@
   "name": "siyuan-contacts",
   "author": "ai68298100",
   "url": "https://github.com/ai68298100/siyuan-contacts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minAppVersion": "3.8.5",
   "disabledInPublish": false,
-  "backends": ["all"],
+  "backends": [
+    "all"
+  ],
   "frontends": [
     "desktop",
     "mobile",

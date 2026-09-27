@@ -8,6 +8,7 @@
     import { SlidersHorizontal, Database, Bell, Sparkles, Plug, Info } from "@lucide/svelte";
     import { translateText } from "../domain/translation";
     import { DEFAULT_VIEW_PREFERENCES } from "../domain/preferences";
+    import pluginManifest from "../../plugin.json";
     import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "../services/settings-health";
     import type { ExportSummary } from "../services/export-center";
     import type { InteractionImportDiff } from "../domain/interaction-backup";
@@ -720,7 +721,7 @@
 
                     <div class="lvct-settings__row">
                         <div><b>小驴人脉</b><small>数据主权：一人一文档，数据库作主干</small></div>
-                        <span class="lvct-settings__status">v0.1.0</span>
+                        <span class="lvct-settings__status">v{pluginManifest.version}</span>
                     </div>
                     <p class="lvct-settings__inline-hint">
                         <a href="https://github.com/ai68298100/siyuan-contacts" target="_blank" rel="noreferrer">项目主页</a>

@@ -25,15 +25,18 @@ Lv Contacts makes **every contact a regular SiYuan document** (bidirectional lin
 
 ## ✨ Features
 
-- 🗂 **Contact management** — card & table views, instant search, groups and tags; batch-adopt existing notes as contacts
-- 🧑‍🤝‍🧑 **Relationships** — two-way `relation` fields (backlinks maintained by the kernel) + Cytoscape graph with direct/second-degree highlighting, mutual-contact and shortest-path queries within the displayed graph; filter people with no valid relationships in the full roster
+- 🗂 **Contact management** — card & table views, instant search, groups and tags; batch-adopt existing notes as contacts; per-view table column visibility/order preferences (name column fixed); suspected-duplicate candidates (advisory only, no silent merging)
+- 🔍 **Combined filters & saved views** — tag match all/any, interaction date ranges, never-contacted; visible active conditions clearable one by one; save frequently used conditions as named views, re-evaluated against the current roster on apply
+- 🧑‍🤝‍🧑 **Relationships** — two-way `relation` fields (backlinks maintained by the kernel) + Cytoscape graph with direct/second-degree highlighting, mutual-contact and shortest-path queries within the displayed graph; chain-style path rendering with Markdown export; filter people with no valid relationships in the full roster
 - 📝 **Capture from notes** — link people in a meeting note, then capture attendees, shared occasion (date/place) and an attendees block with one click; optional AI extraction of unlinked names
-- 🎂 **Birthday reminders** — solar & lunar birthdays, upcoming-birthday and "haven't talked in a while" dashboard
-- 📄 **Person document strip** — open a contact's document to see and edit their profile inline
+- 🎂 **Birthday reminders** — solar & lunar birthdays, upcoming-birthday and "haven't talked in a while" dashboard; per-person cadence overrides or pause
+- ✅ **Follow-ups & action list** — dated contact plans (snooze with semantic options / complete / cancel / reopen) surfaced in a today action list that merges birthdays, cadences and follow-ups per person, with bulk postpone-overdue-to-today; an opening summary banner is dismissible for the day
+- 📄 **Person document strip** — open a contact's document to see and edit their profile inline; export a meeting briefing as Markdown (profile / recent interactions / open follow-ups / key dates / related people / shared occasions)
+- 📊 **Interaction review report** — interaction counts, shared-occasion counts, contacted people and source distribution per month or custom range; Top rankings and previous-period comparison with explainable metrics
 - 🔌 **People service bridge** — other plugins get `window.LvContacts` to search/create people and record shared interactions ([protocol docs](docs/BRIDGE.md))
-- vCard import/export, including batch adoption with folder, group and tag options.
-- Interaction history: 20 per page, search, source filters and confirmed per-person deletion that preserves other participants.
-- Settings backup: raw JSON value snapshots and previewed, confirmed merge restoration; deletion markers prevent resurrection. These are not byte-for-byte file backups.
+- 📝 **Interaction history & templates** — 20 per page, search, source filters, date ranges, month grouping and "on this day"; confirmed per-person deletion that preserves other participants; reusable note templates with local variables
+- 🛟 **Backup & restore** — JSON snapshots for interactions and follow-ups; preview per-event diff (added / skipped / deletion effects) before a confirmed merge; an export center in Settings; these are not byte-for-byte file backups
+- vCard import/export with per-item import reports (imported / skipped / failed / needs-review) and roster-checked retry
 - 📱 Responsive layouts and fullscreen dialogs have mobile viewport regression coverage; real-device touch and keyboard acceptance is still pending.
 
 ## 📦 Install
@@ -43,7 +46,7 @@ Lv Contacts makes **every contact a regular SiYuan document** (bidirectional lin
 3. Restart SiYuan → Settings → Marketplace → Download → enable **Lv Contacts**
 - Requires **SiYuan ≥ 3.8.5**. Marketplace submission is deferred.
 
-The source includes enhancements after the initial release, while the version remains `0.1.0` pending the next release decision. Published packages may not include unreleased changes. Workspace navigation, view headings and the person-detail dialog heading/close label now use the host-provided language resources. Feature content is still primarily Chinese; a full English UI is not yet delivered.
+The source is a **v0.2.0 candidate**: on top of v0.1.0 it adds 16 incremental features — an export center, display preferences and saved views, combined filters, follow-ups, per-person cadences, a today action list, an opening summary banner, note templates, interaction date review, briefing export, an interaction review report, duplicate checking and import diagnosis. Workspace navigation, view headings and the person-detail dialog heading/close label use the host-provided language resources. Feature content is still primarily Chinese; a full English UI is not yet delivered.
 
 ## 🚀 Quick start
 
