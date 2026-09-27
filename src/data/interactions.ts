@@ -3,7 +3,7 @@
  * 键：interaction-events.json（契约见 docs/DATA-CONTRACT.md §3）。
  */
 import type { Plugin } from "siyuan";
-import { loadJson, saveJsonVerified, withStoreLock } from "./storage";
+import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage";
 import { appendEvent, emptyStore, normalizeInteractionStore, toLocalDateKey } from "../domain/interactions";
 import type { InteractionEvent, InteractionStore } from "../domain/interactions";
 import { newNodeId } from "../api/client";
@@ -33,7 +33,7 @@ export async function recordInteractionWithResult(
     input: RecordInteractionInput,
 ): Promise<{ store: InteractionStore; recorded: boolean }> {
     return withStoreLock(INTERACTION_STORAGE_KEY, async () => {
-        const store = await loadInteractionStore(plugin);
+        const store = normalizeInteractionStore(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY));
         const occurredAt = input.occurredAt ?? Date.now();
         const event: InteractionEvent = {
             id: newNodeId(),
@@ -55,7 +55,7 @@ export async function recordInteractionWithResult(
 /** 墓碑删除 */
 export async function deleteInteraction(plugin: Plugin, eventId: string): Promise<InteractionStore> {
     return withStoreLock(INTERACTION_STORAGE_KEY, async () => {
-        const store = await loadInteractionStore(plugin);
+        const store = normalizeInteractionStore(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY));
         const { removeEvent } = await import("../domain/interactions");
         const next = removeEvent(store, eventId);
         if (next !== store) {

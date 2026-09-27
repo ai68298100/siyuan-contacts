@@ -7,11 +7,19 @@
  */
 import type { Plugin } from "siyuan";
 
+/** 写操作的前置读取：读取异常必须传递，不能按空库覆盖已有数据。 */
+export async function loadJsonStrict(plugin: Plugin, key: string): Promise<unknown | null> {
+    try {
+        return (await plugin.loadData(key)) ?? null;
+    } catch (cause) {
+        throw new Error(`存储读取失败，操作已停止: ${key}`, { cause });
+    }
+}
+
 /** 读原始 JSON；键不存在或读取失败一律返回 null，绝不阻断启动 */
 export async function loadJson(plugin: Plugin, key: string): Promise<unknown | null> {
     try {
-        const data = await plugin.loadData(key);
-        return data ?? null;
+        return await loadJsonStrict(plugin, key);
     } catch {
         return null;
     }

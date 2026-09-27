@@ -9,7 +9,7 @@ import DashboardView from "../../../src/components/dashboard/DashboardView.svelt
 import SettingsView from "../../../src/components/SettingsView.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
-import { recordInteraction, loadInteractionStore } from "../../../src/data/interactions";
+import { recordInteraction, deleteInteraction, loadInteractionStore } from "../../../src/data/interactions";
 import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
 import { captureFromDoc } from "../../../src/services/capture";
 import { FIELD_SPECS } from "../../../src/domain/fields";
@@ -570,6 +570,38 @@ await test("名册并发查询合并，失效后的旧请求不能回填缓存�
     assert(failed, "查询失败未传递给调用方");
     kernel.handler = async () => renderResult();
     assert((await getRoster(settings))[0].name === person.name, "失败后无法重新查询");
+});
+
+await test("互动读取失败阻止新增与删除，恢复后保留旧记录", async () => {
+    let saved;
+    let writes = 0;
+    let failRead = false;
+    const plugin = {
+        loadData: async () => {
+            if (failRead) throw new Error("模拟存储暂时不可读");
+            return saved === undefined ? null : JSON.parse(JSON.stringify(saved));
+        },
+        saveData: async (_key, value) => { writes += 1; saved = JSON.parse(JSON.stringify(value)); },
+    };
+    const first = await recordInteraction(plugin, { personDocId: "甲", source: "api", externalRef: "旧记录" });
+    const snapshot = JSON.stringify(saved);
+    const before = writes;
+    failRead = true;
+    assert((await loadInteractionStore(plugin)).events.length === 0, "展示读取未保持容错");
+    for (const action of [
+        () => recordInteraction(plugin, { personDocId: "乙", source: "api", externalRef: "新记录" }),
+        () => deleteInteraction(plugin, first.events[0].id),
+    ]) {
+        let message = "";
+        try { await action(); } catch (error) { message = error.message; }
+        assert(message.includes("存储读取失败"), "读取失败未阻止修改");
+    }
+    assert(writes === before && JSON.stringify(saved) === snapshot, "读取失败覆盖了已有记录");
+    failRead = false;
+    const recovered = await recordInteraction(plugin, { personDocId: "乙", source: "api", externalRef: "新记录" });
+    assert(recovered.events.length === 2 && recovered.events.some((event) => event.id === first.events[0].id), "恢复后旧记录丢失");
+    const deleted = await deleteInteraction(plugin, first.events[0].id);
+    assert(deleted.events.length === 1 && deleted.tombstones.includes(first.events[0].id), "恢复后删除未正常写墓碑");
 });
 
 await pause(100);
