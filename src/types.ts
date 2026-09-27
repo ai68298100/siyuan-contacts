@@ -7,6 +7,7 @@ import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "./servi
 import type { ViewPreferences } from "./domain/preferences";
 import type { InteractionImportSummary } from "./domain/interaction-backup";
 import type { FollowUpItem, SnoozeOption } from "./domain/followups";
+import type { PersonCadence } from "./domain/cadence";
 import type { FollowUpImportPreview } from "./services/followups";
 import type { ExportSummary } from "./services/export-center";
 
@@ -50,6 +51,9 @@ export interface ContactsPluginFacade {
     exportFollowUpsJson(): Promise<string>;
     previewFollowUpsImport(text: string): Promise<FollowUpImportPreview>;
     importFollowUpsJson(text: string): Promise<FollowUpImportPreview>;
+    /** 联系节奏（F06）：按人覆盖久未联系阈值或暂停；未登记返回 null（跟随全局），保存 null 清除覆盖 */
+    getPersonCadence(personDocId: string): Promise<PersonCadence | null>;
+    savePersonCadence(personDocId: string, cadence: PersonCadence | null): Promise<void>;
     /** 导出中心摘要：名册人数与活跃互动条数（展示用，容错读取） */
     loadExportSummary(): Promise<ExportSummary>;
     /** 导出全量名册为 vCard 3.0 文本（联系人页选中导出外的设置页统一入口） */

@@ -2,9 +2,10 @@
     /** 人物详情 Peek：档案字段、互动与关系列表（增删，内核自动维护双向回链） */
     import { listContacts, removeContact } from "../../services/contacts";
     import { addRelation, removeRelation, refreshPerson } from "../../services/relations";
-    import LvctDialog from "../LvctDialog.svelte";
-    import PersonEditDialog from "./PersonEditDialog.svelte";
-    import ViewState from "../ViewState.svelte";
+import LvctDialog from "../LvctDialog.svelte";
+import PersonEditDialog from "./PersonEditDialog.svelte";
+import ViewState from "../ViewState.svelte";
+import StatusNotice from "../StatusNotice.svelte";
     import type { ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
     import { nextBirthday } from "../../domain/occasions";
@@ -12,6 +13,7 @@
     import { translateText } from "../../domain/translation";
     import { dueLabel } from "../../domain/followups";
     import type { FollowUpItem, SnoozeOption } from "../../domain/followups";
+    import type { PersonCadence } from "../../domain/cadence";
     import { toLocalDateKey } from "../../domain/interactions";
 
     let {
@@ -31,6 +33,8 @@
         onCreateFollowUp,
         onSetFollowUpStatus,
         onSnoozeFollowUp,
+        onGetCadence,
+        onSaveCadence,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
@@ -51,6 +55,9 @@
         onCreateFollowUp?: (personDocId: string, title: string, dueDate: string) => Promise<FollowUpItem>;
         onSetFollowUpStatus?: (id: string, status: "open" | "done" | "cancelled") => Promise<void>;
         onSnoozeFollowUp?: (id: string, option: SnoozeOption, customDate?: string) => Promise<void>;
+        /** 联系节奏（F06，可选：未接线时隐藏该区） */
+        onGetCadence?: (personDocId: string) => Promise<PersonCadence | null>;
+        onSaveCadence?: (personDocId: string, cadence: PersonCadence | null) => Promise<void>;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string) => translateText(i18n, key, fallback));
 
@@ -290,6 +297,54 @@
             followUpBusy = false;
         }
     }
+
+    // ---- 联系节奏（F06） ----
+    const cadenceSupported = $derived(Boolean(onGetCadence && onSaveCadence));
+    let cadenceLoaded = $state(false);
+    let cadenceMode: "global" | "custom" | "paused" = $state("global");
+    let cadenceDays = $state(14);
+    let cadenceSaving = $state(false);
+    let cadenceMessage = $state("");
+    let cadenceError = $state("");
+    const lastContactLabel = $derived.by(() => {
+        const first = insights?.timeline?.[0];
+        return first?.localDate ?? "";
+    });
+
+    async function loadCadence() {
+        if (!onGetCadence) return;
+        try {
+            const cadence = await onGetCadence(current.docId);
+            cadenceMode = cadence?.paused ? "paused" : cadence ? "custom" : "global";
+            if (cadence) cadenceDays = cadence.days;
+            cadenceLoaded = true;
+        } catch (error) {
+            cadenceError = error instanceof Error ? error.message : String(error);
+        }
+    }
+    loadCadence();
+
+    async function saveCadence() {
+        if (cadenceSaving || !onSaveCadence) return;
+        cadenceSaving = true;
+        cadenceError = "";
+        cadenceMessage = "";
+        try {
+            const days = Math.max(1, Math.min(365, Math.round(cadenceDays || 14)));
+            const next: PersonCadence | null = cadenceMode === "global" ? null : { days, paused: cadenceMode === "paused" };
+            await onSaveCadence(current.docId, next);
+            cadenceMessage = cadenceMode === "global"
+                ? "已清除覆盖，跟随全局阈值"
+                : cadenceMode === "paused"
+                    ? "已暂停对该人的联系提醒"
+                    : `已设为每 ${days} 天联系一次`;
+            onChanged();
+        } catch (error) {
+            cadenceError = error instanceof Error ? error.message : String(error);
+        } finally {
+            cadenceSaving = false;
+        }
+    }
 </script>
 
 <div class="lvct-detail">
@@ -410,6 +465,36 @@
                 </button>
             </div>
             <p class="ft__smaller ft__on-surface">到期的计划会出现在首页待办；完成计划不会自动记为互动。</p>
+        {/if}
+    </section>
+    {/if}
+
+    {#if cadenceSupported}
+    <section class="lvct-detail__section">
+        <h4>联系节奏</h4>
+        {#if cadenceError}<div class="lvct-form__error" role="alert">{cadenceError}</div>{/if}
+        {#if !cadenceLoaded}
+            <ViewState compact loading title="正在读取联系节奏" />
+        {:else}
+            <p class="ft__smaller ft__on-surface">
+                上次互动：{lastContactLabel || "还没有互动记录"} · 当前：
+                {cadenceMode === "paused" ? "已暂停提醒" : cadenceMode === "custom" ? `自定义 ${cadenceDays} 天` : "跟随全局阈值"}
+            </p>
+            <div class="lvct-detail__record fn__flex">
+                <select class="b3-select fn__flex-1" aria-label="联系节奏模式" bind:value={cadenceMode} disabled={cadenceSaving}>
+                    <option value="global">跟随全局阈值</option>
+                    <option value="custom">自定义天数</option>
+                    <option value="paused">暂停提醒</option>
+                </select>
+                {#if cadenceMode === "custom"}
+                    <input type="number" class="b3-text-field" min="1" max="365" aria-label="自定义天数" bind:value={cadenceDays} disabled={cadenceSaving} />
+                {/if}
+                <button class="b3-button b3-button--text" onclick={saveCadence} disabled={cadenceSaving}>
+                    {cadenceSaving ? "保存中…" : "保存节奏"}
+                </button>
+            </div>
+            <StatusNotice message={cadenceMessage} onDismiss={() => (cadenceMessage = "")} />
+            <p class="ft__smaller ft__on-surface">仅影响首页「久未联系」提醒，不写入联系人的数据库字段。</p>
         {/if}
     </section>
     {/if}

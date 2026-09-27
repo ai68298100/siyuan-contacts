@@ -6,6 +6,7 @@ import type { Plugin } from "siyuan";
 import { listContacts } from "./contacts";
 import { loadInteractionStore } from "../data/interactions";
 import { loadFollowUpStore } from "../data/followups";
+import { loadCadenceMap } from "../data/cadences";
 import { projectOpenFollowUps } from "../domain/followups";
 import type { FollowUpBucket, FollowUpItem } from "../domain/followups";
 import { staleContacts } from "../domain/interactions";
@@ -51,14 +52,15 @@ export async function loadDashboard(
     settings: ContactsSettings,
     options: DashboardOptions = DEFAULT_DASHBOARD_OPTIONS,
 ): Promise<DashboardData> {
-    const [people, store, followUpStore] = await Promise.all([
+    const [people, store, followUpStore, cadences] = await Promise.all([
         listContacts(settings),
         loadInteractionStore(plugin),
         loadFollowUpStore(plugin),
+        loadCadenceMap(plugin),
     ]);
     const birthdays: UpcomingBirthday[] = upcomingBirthdays(people)
         .filter((item) => item.projection.daysUntil <= options.birthdayWindowDays);
-    const staleAll = staleContacts(store, people, options.staleThresholdDays);
+    const staleAll = staleContacts(store, people, options.staleThresholdDays, new Date(), cadences);
     const neverContactedPeople = staleAll.filter((item) => item.lastDaysAgo === undefined);
 
     const today = toLocalDateKey(new Date());

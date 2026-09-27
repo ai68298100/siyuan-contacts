@@ -16,6 +16,8 @@ import { captureFromDoc } from "../../../src/services/capture";
 import { exportInteractionJson } from "../../../src/services/interaction-export";
 import { createFollowUp, exportFollowUpsJson, importFollowUpsJson, previewFollowUpsImport } from "../../../src/services/followups";
 import { loadFollowUpStore } from "../../../src/data/followups";
+import { loadDashboard } from "../../../src/services/dashboard";
+import { loadPersonCadence, savePersonCadence } from "../../../src/data/cadences";
 import { importInteractionJson, previewInteractionImport } from "../../../src/services/interaction-import";
 import { FIELD_SPECS } from "../../../src/domain/fields";
 import { buildTimeline, buildCoAttendance } from "../../../src/domain/interactions";
@@ -899,6 +901,85 @@ await test("跟进备份：预览零写入，合并现状优先幂等，损坏�
     rejected = false;
     try { await exportFollowUpsJson(plugin); } catch { rejected = true; }
     assert(rejected, "导出读取失败未抛错");
+});
+
+await test("联系节奏：覆盖阈值进入久未联系，暂停隐藏，清除回退全局，补录不覆盖较新记录", async () => {
+    // 名册：单人（resetKernel 提供）；互动与节奏存于对象式插件替身（首次未创建为空串）
+    const store = { interactions: "", cadences: "" };
+    const plugin = {
+        loadData: async (key) => (key === "interaction-events.json" ? structuredClone(store.interactions)
+            : key === "person-cadences.json" ? structuredClone(store.cadences) : null),
+        saveData: async (key, value) => {
+            if (key === "interaction-events.json") store.interactions = JSON.parse(JSON.stringify(value));
+            else if (key === "person-cadences.json") store.cadences = JSON.parse(JSON.stringify(value));
+        },
+    };
+    const options = { staleThresholdDays: 30, birthdayWindowDays: 30 };
+    const staleIds = async () => (await loadDashboard(plugin, settings, options)).stale.map((info) => info.person.docId);
+    const assertIds = (list, expected, message) => assert(JSON.stringify(list) === JSON.stringify(expected), `${message}（实际：${JSON.stringify(list)}）`);
+    const docId = person.docId;
+
+    // 初始：从未互动 → 在久未联系
+    assertIds(await staleIds(), [docId], "从未互动应进入久未联系");
+    // 记录 20 天前互动 → 全局 30 天下不再久未联系
+    const daysAgoMs = (days) => Date.now() - days * 86400000;
+    await recordInteraction(plugin, { personDocId: docId, occurredAt: daysAgoMs(20) });
+    assertIds(await staleIds(), [], "20 天前互动不应在全局 30 天阈值内告警");
+    // 覆盖为 14 天 → 进入；补录 40 天前的旧互动，最近互动仍取 20 天那次
+    await savePersonCadence(plugin, docId, { days: 14, paused: false });
+    let stale = (await loadDashboard(plugin, settings, options)).stale;
+    assertIds(stale.map((info) => info.person.docId), [docId], "自定义 14 天阈值未生效");
+    assert(stale[0].lastDaysAgo >= 19 && stale[0].lastDaysAgo <= 21, "最近互动天数异常");
+    await recordInteraction(plugin, { personDocId: docId, occurredAt: daysAgoMs(40) });
+    stale = (await loadDashboard(plugin, settings, options)).stale;
+    assert(stale[0].lastDaysAgo >= 19 && stale[0].lastDaysAgo <= 21, "补录旧互动错误覆盖了较新记录");
+    // 暂停 → 整体隐藏（含从未互动；该人已有互动）
+    await savePersonCadence(plugin, docId, { days: 14, paused: true });
+    assertIds(await staleIds(), [], "暂停未隐藏久未联系");
+    // 清除覆盖 → 回退全局
+    await savePersonCadence(plugin, docId, null);
+    assertIds(await staleIds(), [], "清除覆盖后未回退全局阈值");
+    assert((await loadPersonCadence(plugin, docId)) === null, "清除后仍读到覆盖项");
+});
+
+await test("人物联系节奏设置：显示当前规则，自定义/暂停/清除并持久化", async () => {
+    let savedCadence;
+    let savedDocId;
+    let cadence = null;
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async () => {},
+        onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+        onGetCadence: async () => cadence,
+        onSaveCadence: async (docId, value) => { savedDocId = docId; savedCadence = value; cadence = value; },
+    } });
+    await until(() => fixture.textContent.includes("联系节奏"), "联系节奏区未显示");
+    await until(() => fixture.textContent.includes("跟随全局阈值"), "初始规则未显示");
+
+    const modeSelect = fixture.querySelector('select[aria-label="联系节奏模式"]');
+    modeSelect.value = "custom";
+    modeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    const daysInput = fixture.querySelector('input[aria-label="自定义天数"]');
+    assert(daysInput, "自定义模式下未出现天数输入");
+    input(daysInput, "14");
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "保存节奏").click();
+    await until(() => savedCadence?.days === 14 && savedCadence?.paused === false, "自定义节奏未保存");
+    await until(() => fixture.textContent.includes("已设为每 14 天联系一次"), "保存成功提示未显示");
+
+    modeSelect.value = "paused";
+    modeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "保存节奏").click();
+    await until(() => savedCadence?.paused === true, "暂停未保存");
+
+    modeSelect.value = "global";
+    modeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "保存节奏").click();
+    await until(() => savedCadence === null && savedDocId === person.docId, "清除覆盖未保存 null");
+    await until(() => fixture.textContent.includes("已清除覆盖"), "清除提示未显示");
 });
 
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {

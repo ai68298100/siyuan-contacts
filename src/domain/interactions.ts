@@ -148,16 +148,24 @@ export function lastInteractionByPerson(
     return result;
 }
 
-/** 久未联系筛选：超过 thresholdDays 未互动（含从未互动），按最久优先排序 */
+/** 久未联系筛选：超过 thresholdDays 未互动（含从未互动），按最久优先排序。
+ * cadences（F06）：按人覆盖阈值或暂停——paused 直接排除，自定义天数替换该人的阈值；
+ * 从未互动不受自定义天数影响（仍算久未联系），暂停则一并隐藏。 */
 export function staleContacts(
     store: InteractionStore,
     people: readonly ContactSummary[],
     thresholdDays: number,
     now: Date = new Date(),
+    cadences: Readonly<Record<string, { days: number; paused: boolean }>> = {},
 ): StalenessInfo[] {
     const infos = [...lastInteractionByPerson(store, people, now).values()];
     return infos
-        .filter((info) => info.lastDaysAgo === undefined || info.lastDaysAgo >= thresholdDays)
+        .filter((info) => {
+            const cadence = cadences[info.person.docId];
+            if (cadence?.paused) return false;
+            const threshold = cadence?.days ?? thresholdDays;
+            return info.lastDaysAgo === undefined || info.lastDaysAgo >= threshold;
+        })
         .sort((a, b) => (b.lastDaysAgo ?? Number.MAX_SAFE_INTEGER) - (a.lastDaysAgo ?? Number.MAX_SAFE_INTEGER));
 }
 

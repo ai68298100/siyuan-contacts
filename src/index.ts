@@ -30,6 +30,8 @@ import {
     snoozeFollowUp,
 } from "./services/followups";
 import type { SnoozeOption } from "./domain/followups";
+import { loadPersonCadence, savePersonCadence } from "./data/cadences";
+import type { PersonCadence } from "./domain/cadence";
 import { importInteractionJson, previewInteractionImport } from "./services/interaction-import";
 import { initExternalBridge, disposeExternalBridge } from "./bridge/external-bridge";
 import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
@@ -298,6 +300,14 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     async importFollowUpsJson(text: string) {
         return importFollowUpsJson(this, text);
+    }
+
+    async getPersonCadence(personDocId: string) {
+        return loadPersonCadence(this, personDocId);
+    }
+
+    async savePersonCadence(personDocId: string, cadence: PersonCadence | null) {
+        await savePersonCadence(this, personDocId, cadence);
     }
 
     async loadExportSummary() {

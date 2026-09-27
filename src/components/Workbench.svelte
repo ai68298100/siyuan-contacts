@@ -238,6 +238,8 @@
             onCreateFollowUp={(docId, title, dueDate) => facade.createFollowUp(docId, title, dueDate)}
             onSetFollowUpStatus={(id, status) => facade.setFollowUpStatus(id, status)}
             onSnoozeFollowUp={(id, option, customDate) => facade.snoozeFollowUp(id, option, customDate)}
+            onGetCadence={(docId) => facade.getPersonCadence(docId)}
+            onSaveCadence={(docId, cadence) => facade.savePersonCadence(docId, cadence)}
             {onOpenPersonDoc}
             onNavigate={openDetail}
             navigationOrder={current === "people" ? peopleOrder : undefined}
