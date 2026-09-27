@@ -87,6 +87,7 @@
 | `interaction-events.json` | （M4） | 互动事件（只追加）：`{id, personDocId, occurredAt, localDate, source, externalRef?, note}`；`personDocId+source+externalRef` 幂等；删除写墓碑 |
 | `follow-ups.json` | 1 | 跟进事项（F05）：`{id, personDocId, title, dueDate, status, createdAt, updatedAt, closedAt?}`。`dueDate` 为 `YYYY-MM-DD`（严格校验：格式错误或不存在的日期拒绝创建/改期，不顺延回退）；`status ∈ open/done/cancelled`，完成或取消写 `closedAt`，重新打开清除 `closedAt`——**完成跟进不自动写互动事件，记录互动也不悄悄完成跟进**（两类数据独立）。人物按 `personDocId` 关联：人物解绑后事项保留并显示「不可达」，仍可推迟/取消，不指向他人。展示读取容错降级；新增与状态变更在存储锁内严格读取，损坏或未知版本拒绝写入不覆盖原文件。导出为 `{schemaVersion, exportedAt, storageKey, rawStore, items}` 快照（与互动导出同纪律：锁内严格读取，失败不生成空备份）；合并导入按 `id` 现状优先，新增其余条目，预览零写入，确认时锁内重读重算 |
 | `person-cadences.json` | 1 | 按人物联系节奏（F06）：`{schemaVersion, cadences: {"<personDocId>": {days, paused}}}`。仅存覆盖项，未登记的人物跟随全局久未联系阈值；`days` 为 1–365 整数（写入时钳制），`paused: true` 表示对该人暂停提醒（久未联系与从未互动均不再出现）。键必须是通过 `^\d{14}-[0-9a-z]{7}$` 校验的人物文档 ID，非法键或非法值条目在归一化时丢弃；补录过去互动不影响（最近互动一律取最大 `occurredAt`）。展示读取容错；写入在存储锁内严格读取，损坏拒绝不覆盖。删除键即清除覆盖回退全局 |
+| `interaction-templates.json` | 1 | 互动备注模板（F09）：`{schemaVersion, templates: [{id, name, content}]}`。归一化丢弃缺 id 或 name/content 非字符串的条目，name/content 去首尾空白，按 id 去重，上限 50 条。存储为空时展示内置默认三个模板（见面/电话/聚会，来自代码常量不落盘）；任何增改删即全量落盘，此后以存储为准（删除内置模板即永久移除）。模板内容支持 `{{姓名}}`/`{{日期}}`/`{{上次互动}}` 占位符，应用时纯本地字符串替换，未知占位符原样保留；模板文本不发送 AI，应用模板不自动提交、不悄悄覆盖已有草稿 |
 | `bridge-state.json` | （M4） | 打卡联动状态机（unsupported/pending/ready/failed） |
 
 同一场合允许每位参与者各有一条互动事件；`source+externalRef` 表示共同场合，

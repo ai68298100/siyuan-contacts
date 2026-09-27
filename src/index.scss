@@ -421,6 +421,27 @@
     margin-top: var(--lvct-sp-3);
 }
 
+// F09 互动备注模板
+.lvct-detail__template-row { margin-bottom: var(--lvct-sp-2); }
+
+.lvct-templates__item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-1);
+    padding: var(--lvct-sp-2) 0;
+    border-bottom: 1px solid var(--lvct-border-subtle);
+
+    .lvct-templates__item-head {
+        display: flex;
+        align-items: center;
+        gap: var(--lvct-sp-2);
+
+        input { flex: 1; }
+    }
+
+    .lvct-templates__content { resize: vertical; }
+}
+
 // F08 打开工作台时的关注摘要
 .lvct-dash__summary {
     display: flex;

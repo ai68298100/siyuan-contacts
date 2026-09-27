@@ -246,6 +246,8 @@
             onSnoozeFollowUp={(id, option, customDate) => facade.snoozeFollowUp(id, option, customDate)}
             onGetCadence={(docId) => facade.getPersonCadence(docId)}
             onSaveCadence={(docId, cadence) => facade.savePersonCadence(docId, cadence)}
+            onListTemplates={() => facade.listTemplates()}
+            onSaveTemplates={(templates) => facade.saveTemplates(templates)}
             {onOpenPersonDoc}
             onNavigate={openDetail}
             navigationOrder={current === "people" ? peopleOrder : undefined}

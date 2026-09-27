@@ -14,6 +14,9 @@ import StatusNotice from "../StatusNotice.svelte";
     import { dueLabel } from "../../domain/followups";
     import type { FollowUpItem, SnoozeOption } from "../../domain/followups";
     import type { PersonCadence } from "../../domain/cadence";
+    import { renderTemplate } from "../../domain/interaction-templates";
+    import type { NoteTemplate } from "../../domain/interaction-templates";
+    import TemplateManager from "./TemplateManager.svelte";
     import { toLocalDateKey } from "../../domain/interactions";
 
     let {
@@ -35,6 +38,8 @@ import StatusNotice from "../StatusNotice.svelte";
         onSnoozeFollowUp,
         onGetCadence,
         onSaveCadence,
+        onListTemplates,
+        onSaveTemplates,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
@@ -58,6 +63,9 @@ import StatusNotice from "../StatusNotice.svelte";
         /** 联系节奏（F06，可选：未接线时隐藏该区） */
         onGetCadence?: (personDocId: string) => Promise<PersonCadence | null>;
         onSaveCadence?: (personDocId: string, cadence: PersonCadence | null) => Promise<void>;
+        /** 互动备注模板（F09，可选：未接线时隐藏选用入口） */
+        onListTemplates?: () => Promise<NoteTemplate[]>;
+        onSaveTemplates?: (templates: NoteTemplate[]) => Promise<NoteTemplate[]>;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string) => translateText(i18n, key, fallback));
 
@@ -134,6 +142,46 @@ import StatusNotice from "../StatusNotice.svelte";
     }
 
     loadInsights();
+
+    // ---- 互动备注模板（F09） ----
+    const templatesSupported = $derived(Boolean(onListTemplates && onSaveTemplates));
+    let templates: NoteTemplate[] = $state([]);
+    let templateChoice = $state("");
+    let templateManagerOpen = $state(false);
+
+    async function loadTemplates() {
+        if (!onListTemplates) return;
+        try {
+            templates = await onListTemplates();
+        } catch {
+            // 模板为辅助功能，加载失败静默隐藏选项
+            templates = [];
+        }
+    }
+    loadTemplates();
+
+    function applyTemplate() {
+        if (!templateChoice) return;
+        const template = templates.find((item) => item.id === templateChoice);
+        if (!template) return;
+        if (noteText.trim() && !window.confirm("应用模板将覆盖当前备注，继续吗？")) {
+            templateChoice = "";
+            return;
+        }
+        noteText = renderTemplate(template.content, {
+            name: current.name,
+            date: toLocalDateKey(new Date()),
+            lastInteraction: insights?.timeline?.[0]?.localDate ?? "无",
+        });
+        recorded = false;
+        templateChoice = "";
+    }
+
+    async function persistTemplates(list: NoteTemplate[]): Promise<NoteTemplate[]> {
+        const saved = await onSaveTemplates!(list);
+        templates = saved;
+        return saved;
+    }
 
     const relatedPeople = $derived(
         current.relatedItemIds
@@ -387,6 +435,15 @@ import StatusNotice from "../StatusNotice.svelte";
 
     <section class="lvct-detail__section">
         <h4>{text("detailRecordTitle", "记一笔互动")}</h4>
+        {#if templatesSupported}
+            <div class="lvct-detail__record fn__flex lvct-detail__template-row">
+                <select class="b3-select fn__flex-1" aria-label="选用备注模板" bind:value={templateChoice} onchange={applyTemplate} disabled={busy || templates.length === 0}>
+                    <option value="">{templates.length === 0 ? "暂无模板，点「管理模板」创建" : "选用模板…"}</option>
+                    {#each templates as template (template.id)}<option value={template.id}>{template.name}</option>{/each}
+                </select>
+                <button class="b3-button b3-button--outline" onclick={() => (templateManagerOpen = true)} disabled={busy}>管理模板</button>
+            </div>
+        {/if}
         <div class="lvct-detail__record fn__flex">
             <input
                 class="b3-text-field fn__flex-1"
@@ -629,5 +686,11 @@ import StatusNotice from "../StatusNotice.svelte";
             onSaved={refreshAfterEdit}
             onClose={() => (editing = false)}
         />
+    </LvctDialog>
+{/if}
+
+{#if templateManagerOpen}
+    <LvctDialog title="管理互动备注模板" onClose={() => (templateManagerOpen = false)}>
+        <TemplateManager templates={templates} onSave={persistTemplates} onClose={() => (templateManagerOpen = false)} />
     </LvctDialog>
 {/if}

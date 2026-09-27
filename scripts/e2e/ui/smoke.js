@@ -18,6 +18,8 @@ import { createFollowUp, exportFollowUpsJson, importFollowUpsJson, previewFollow
 import { loadFollowUpStore } from "../../../src/data/followups";
 import { loadDashboard } from "../../../src/services/dashboard";
 import { loadPersonCadence, savePersonCadence } from "../../../src/data/cadences";
+import { DEFAULT_TEMPLATES } from "../../../src/domain/interaction-templates";
+import { listTemplates, saveTemplates } from "../../../src/services/templates";
 import { importInteractionJson, previewInteractionImport } from "../../../src/services/interaction-import";
 import { FIELD_SPECS } from "../../../src/domain/fields";
 import { buildTimeline, buildCoAttendance } from "../../../src/domain/interactions";
@@ -1109,6 +1111,139 @@ await test("打开摘要：开关与当日忽略抑制、次日恢复、空清�
     assert(!fixture.textContent.includes("值得处理的事"), "空清单不应出横幅");
     await unmount(mountedViews.pop());
     fixture.replaceChildren();
+});
+
+await test("备注模板：空存储回退内置默认，增改删落盘且重开恢复，非法条目归一化", async () => {
+    let saved = "";
+    let writes = 0;
+    const plugin = {
+        loadData: async () => (saved === "" ? "" : JSON.parse(JSON.stringify(saved))),
+        saveData: async (_key, value) => { writes += 1; saved = JSON.parse(JSON.stringify(value)); },
+    };
+    // 空存储 → 内置默认（见面/电话/聚会），不落盘
+    assert(JSON.stringify((await listTemplates(plugin)).map((item) => item.name)) === JSON.stringify(["见面", "电话", "聚会"]), "空存储未回退内置默认");
+    assert(writes === 0, "回退默认不应写存储");
+    // 增改删全量保存
+    const next = [
+        { id: "tpl-meet", name: "见面", content: "和{{姓名}}见面，聊了……" },
+        { id: "tpl-call-2", name: "周一直呼", content: "{{姓名}}，关于……" },
+    ];
+    const savedList = await saveTemplates(plugin, next);
+    assert(writes === 1, "保存未写入");
+    assert(JSON.stringify(savedList.map((item) => item.name)) === JSON.stringify(["见面", "周一直呼"]), "保存内容错误");
+    // 重开恢复（存储为准，内置默认不再出现）
+    assert(JSON.stringify((await listTemplates(plugin)).map((item) => item.id)) === JSON.stringify(["tpl-meet", "tpl-call-2"]), "重开未按存储恢复");
+    // 非法条目归一化丢弃
+    const cleaned = await saveTemplates(plugin, [...next, { id: "", name: "坏" }, { id: "x", name: "  ", content: "c" }]);
+    assert(JSON.stringify(cleaned.map((item) => item.id)) === JSON.stringify(["tpl-meet", "tpl-call-2"]), "非法条目未归一化丢弃");
+});
+
+await test("Peek 备注模板：选用填入备注且变量替换，已有草稿需确认覆盖，管理弹窗增删保存", async () => {
+    let templates = [
+        { id: "tpl-meet", name: "见面", content: "和{{姓名}}见面（上次互动：{{上次互动}}）" },
+    ];
+    let savedLists = 0;
+    const originalConfirm = window.confirm;
+    let confirmAnswer = true;
+    window.confirm = () => confirmAnswer;
+    try {
+        mounted = mount(PersonDetail, { target: fixture, props: {
+            settings, person,
+            onRecord: async () => {},
+            onLoadInsights: async () => ({ timeline: [{ eventId: "e1", localDate: "2026-08-01", source: "manual", note: "上次", groupSize: 1 }], coAttendance: [], totalEvents: 1 }),
+            onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+            onListTemplates: async () => templates,
+            onSaveTemplates: async (list) => { savedLists += 1; templates = JSON.parse(JSON.stringify(list)); return templates; },
+        } });
+        await until(() => fixture.textContent.includes("记一笔互动"), "记录区未显示");
+        const templateSelect = fixture.querySelector('select[aria-label="选用备注模板"]');
+        assert(templateSelect, "模板选择器未显示");
+        await until(() => [...templateSelect.options].some((option) => option.value === "tpl-meet"), "模板选项未加载");
+
+        // 已有草稿 + 拒绝覆盖 → 备注不变
+        const noteInput = fixture.querySelector('input[placeholder*="做了什么"]');
+        input(noteInput, "我自己写的内容");
+        confirmAnswer = false;
+        templateSelect.value = "tpl-meet";
+        templateSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        await pause(30);
+        assert(noteInput.value === "我自己写的内容", "拒绝覆盖仍改写了备注");
+
+        // 允许覆盖 → 变量替换填入（上次互动取时间线最新一条）
+        confirmAnswer = true;
+        templateSelect.value = "tpl-meet";
+        templateSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        await until(() => noteInput.value.includes("和回归测试甲见面"), "模板变量替换未生效");
+        assert(noteInput.value.includes("2026-08-01"), "上次互动占位未替换");
+        assert(fixture.textContent.includes("管理模板"), "管理入口应存在");
+    } finally {
+        window.confirm = originalConfirm;
+    }
+});
+
+await test("管理模板弹窗：删除与新增保存落盘，取消不写入", async () => {
+    let templates = [
+        { id: "tpl-meet", name: "见面", content: "和{{姓名}}见面" },
+    ];
+    let savedLists = 0;
+    const originalConfirm = window.confirm;
+    let confirmAnswer = true;
+    window.confirm = () => confirmAnswer;
+    try {
+        mounted = mount(PersonDetail, { target: fixture, props: {
+            settings, person,
+            onRecord: async () => {},
+            onLoadInsights: async () => emptyInsights(),
+            onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+            onListTemplates: async () => templates,
+            onSaveTemplates: async (list) => { savedLists += 1; templates = JSON.parse(JSON.stringify(list)); return templates; },
+        } });
+        await until(() => fixture.querySelector('select[aria-label="选用备注模板"]'), "模板选择器未显示");
+        // 等模板列表加载完成（选项出现）再打开管理弹窗
+        await until(() => [...fixture.querySelector('select[aria-label="选用备注模板"]').options].some((option) => option.value === "tpl-meet"), "模板选项未加载");
+        [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "管理模板").click();
+        await pause(300);
+        if (!fixture.querySelector('button[title^="删除模板"]')) {
+            const buttons = [...fixture.querySelectorAll("button")].map((node) => node.textContent.trim() || node.getAttribute("aria-label")).join("|").slice(0, 500);
+            throw new Error(`管理弹窗未打开；当前按钮：${buttons}`);
+        }
+        // 取消删除 → 条目保留
+        confirmAnswer = false;
+        fixture.querySelector('button[title^="删除模板"]').click();
+        await pause(30);
+        assert(templates.length === 1 && savedLists === 0, "取消删除不应写存储");
+        // 放行删除
+        confirmAnswer = true;
+        fixture.querySelector('button[title^="删除模板"]').click();
+        await until(() => fixture.textContent.includes("还没有模板"), "删除后列表未更新");
+        // 新增并保存
+        [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "＋ 新增模板").click();
+        await until(() => fixture.querySelector('input[aria-label="模板 1 名称"]'), "新增模板行未出现");
+        input(fixture.querySelector('input[aria-label="模板 1 名称"]'), "约球");
+        [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "保存模板").click();
+        await until(() => savedLists === 1, "模板未保存");
+        assert(templates.length === 1 && templates[0].name === "约球", "新增保存结果错误");
+        await until(() => fixture.textContent.includes("模板已保存"), "保存成功提示未显示");
+    } finally {
+        window.confirm = originalConfirm;
+    }
+});
+
+await test("诊断模板弹窗", async () => {
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async () => {},
+        onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+        onListTemplates: async () => [{ id: "tpl-meet", name: "见面", content: "x" }],
+        onSaveTemplates: async (list) => list,
+    } });
+    await until(() => fixture.querySelector('select[aria-label="选用备注模板"]'), "模板选择器未显示");
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "管理模板").click();
+    await pause(300);
+    const buttons = [...fixture.querySelectorAll("button")].map((node) => node.textContent.trim() || node.getAttribute("aria-label")).join("|");
+    const dialogCount = fixture.querySelectorAll(".lvct-dialog-mask, .lvct-dialog, [class*=dialog]").length;
+    results.push({ name: "diag-tpl", ok: true, detail: `dialogNodes=${dialogCount}; buttons=${buttons.slice(0, 300)}` });
 });
 
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {
