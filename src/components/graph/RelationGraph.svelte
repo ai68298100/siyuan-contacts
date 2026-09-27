@@ -6,6 +6,7 @@
     import { listContacts } from "../../services/contacts";
     import { buildGraph, capGraph, GRAPH_MAX_NODES, groupColor, queryGraphRelations } from "../../domain/graph";
     import { shortestGraphPath, secondDegreeGraphIds } from "../../domain/graph-path";
+    import { renderGraphResultMarkdown } from "../../domain/graph-export";
     import type { ContactsSettings } from "../../domain/model";
     import type { ContactSummary } from "../../domain/person";
     import type { PersonInsights } from "../../services/insights";
@@ -79,6 +80,36 @@
     const pathMode = $derived.by(() => Boolean(compareId) && queryMode === "path");
     const pathIds = $derived(pathMode ? shortestGraphPath(displayed.graph, focusId, compareId) : []);
     const pathPeople = $derived(pathIds.map((id) => people.find((person) => person.docId === id)).filter((person) => person !== undefined));
+
+    // ---- 查询结果导出（F16） ----
+    let resultExportMessage = $state("");
+    function exportResultMarkdown() {
+        const center = people.find((person) => person.docId === focusId);
+        const compare = people.find((person) => person.docId === compareId);
+        const pad = (value: number) => String(value).padStart(2, "0");
+        const now = new Date();
+        const markdown = renderGraphResultMarkdown({
+            kind: pathMode ? "path" : compareId ? "common" : secondMode ? "second" : "direct",
+            centerName: center?.name ?? "（未知）",
+            ...(compare ? { compareName: compare.name } : {}),
+            pathNames: pathPeople.map((person) => person.name),
+            resultNames: resultPeople.map((person) => person.name),
+            nodeCount: displayed.graph.nodes.length,
+            edgeCount: displayed.graph.edges.length,
+            truncated,
+            filters: { search: searchText.trim(), group: groupFilter, isolatedOnly },
+            generatedAt: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
+        });
+        const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+        anchor.download = `小驴人脉_关系结果_${stamp}.md`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+        resultExportMessage = "结果说明已导出为 Markdown";
+    }
 
     $effect(() => {
         const ids = new Set(displayed.graph.nodes.map((node) => node.id));
@@ -397,9 +428,13 @@
                     <span class="ft__smaller ft__on-surface">{compareId ? "共同联系人" : secondMode ? "二度关系" : "直接关系"}：{resultPeople.length} 人（当前图内）</span>
                 {/if}
                 <button class="b3-button b3-button--text" onclick={() => { focusId = ""; compareId = ""; }}>清除选择</button>
+                <button class="b3-button b3-button--outline" title="导出查询结果说明（Markdown）" onclick={exportResultMarkdown}>导出结果说明</button>
             {/if}
         </div>
         {#if focusId}
+            {#if resultExportMessage}
+                <div class="ft__smaller ft__on-surface" role="status">{resultExportMessage}（结果仅限当前图内，不代表现实社交关系或引荐意愿。）</div>
+            {/if}
             <div class="lvct-graph-query__results">
                 {#if pathMode}
                     {#each pathPeople as person, index (person.docId)}

@@ -1531,6 +1531,83 @@ await test("备份差异明细：展开新增/跳过/删除标记影响，合计
     assert(fixture.textContent.includes("备份共 3 条事件（新增 2 + 跳过 1）"), "合计与摘要不一致");
 });
 
+await test("关系结果导出：路径链 Markdown、无路径兜底与图规模说明", async () => {
+    const makeEntries = (linked) => [
+        { id: "a", name: "甲", related: ["c"] },
+        { id: "b", name: "乙", related: linked ? ["c"] : [] },
+        { id: "c", name: "共同人物", related: [] },
+    ];
+    let downloads = 0;
+    let filename = "";
+    let blob;
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    const originalClick = HTMLAnchorElement.prototype.click;
+    URL.createObjectURL = (value) => { blob = value; return "blob:graph-export"; };
+    URL.revokeObjectURL = () => {};
+    HTMLAnchorElement.prototype.click = function () { downloads += 1; filename = this.download; };
+    const setupHandler = (linked) => {
+        const entries = makeEntries(linked);
+        kernel.handler = async (route) => {
+            assert(route === "/api/av/renderAttributeView", "导出流程不应写内核");
+            return { view: { columns: renderResult().view.columns, rows: entries.map((entry) => ({
+                id: entry.id, cells: [
+                    { value: { type: "block", keyID: "name", block: { id: entry.id, content: entry.name } } },
+                    { value: { type: "relation", keyID: "related", relation: { blockIDs: entry.related } } },
+                ],
+            })) } };
+        };
+    };
+    const select = (label, value) => {
+        const node = fixture.querySelector(`select[aria-label="${label}"]`);
+        assert(node, `未找到下拉：${label}`);
+        node.value = value;
+        node.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    try {
+        setupHandler(false);
+        mounted = mount(RelationGraph, { target: fixture, props: {
+            settings, onOpenDetail() {}, onOpenPeople() {},
+        } });
+        await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "图谱未挂载");
+        select("关系中心", "a");
+        select("对比人物", "b");
+        await until(() => fixture.querySelector('select[aria-label="关系查询模式"]'), "查询模式未显示");
+        select("关系查询模式", "path");
+        await until(() => fixture.textContent.includes("无连接"), "无路径兜底缺失");
+        button("导出结果说明").click();
+        await until(() => downloads === 1, "导出未触发");
+        assert(filename.endsWith(".md"), "导出文件名错误");
+        const text = await blob.text();
+        assert(text.includes("当前图内未找到 甲 与 乙 的连接"), "无路径兜底说明缺失");
+        assert(text.includes("可清除筛选后重试"), "清除筛选指引缺失");
+        assert(text.includes("节点 3 · 边 1"), "图规模缺失");
+        assert(text.includes("不代表现实社交关系、引荐意愿或关系强弱"), "范围免责缺失");
+        // 阶段二：乙连接共同人物 → 重新加载图谱后路径链出现
+        setupHandler(true);
+        invalidateRoster();
+        await unmount(mounted);
+        mounted = mount(RelationGraph, { target: fixture, props: {
+            settings, onOpenDetail() {}, onOpenPeople() {},
+        } });
+        await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "图谱重新挂载");
+        select("关系中心", "a");
+        select("对比人物", "b");
+        await until(() => fixture.querySelector('select[aria-label="关系查询模式"]'), "查询模式重新显示");
+        select("关系查询模式", "path");
+        await until(() => fixture.textContent.includes("2 段关系"), "路径链未更新");
+        button("导出结果说明").click();
+        await until(() => downloads === 2, "第二次导出未触发");
+        const text2 = await blob.text();
+        assert(text2.includes("甲 — 共同人物 — 乙"), "链式路径缺失");
+        assert(text2.includes("之间为 2 段关系（当前图内）"), "段数总结缺失");
+    } finally {
+        URL.createObjectURL = originalCreate;
+        URL.revokeObjectURL = originalRevoke;
+        HTMLAnchorElement.prototype.click = originalClick;
+    }
+});
+
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {
     const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
         docId: settings.hostDocId,
