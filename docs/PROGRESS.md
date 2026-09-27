@@ -77,6 +77,16 @@
       D-0011 共同交集边界、D-0012 集成方向
 - [ ] SQL 收敛备注：查询组装全部收进 api/blocks.ts（refs/文档清单/单块/属性定位）
 
+## v0.2b/c — AI 抽取 + 对外人员服务桥（2026-09-27）
+
+- [x] v0.2b AI 抽取：捕获弹窗"AI 分析本页"→ `/api/ai/chatGPT`（回复为纯文本）抽取未链接人名/日期/地点；
+      提示词与解析为域层纯函数（容错：围栏 JSON、混杂文本、去重去空、上限 20）；未配置 AI 可识别并提示；
+      名册对账输出 matched（直接勾选）/ unknownNames（预填收编框）；AI 只提名，落库必经用户确认
+- [x] v0.2c 对外人员服务桥：`window.LvContacts` protocol 1（searchPeople / getPerson / ensurePerson /
+      recordInteraction），幂等键 defaultBridgeRef（同批人员+同日）；协议文档 docs/BRIDGE.md
+      （含任务插件接入示例）；卸载时自动摘除
+- [x] 单测增至 33 项；E2E 10/10；加载验证通过
+
 ## 待启动
 
 - M4 提醒仪表盘：公/农历生日投影（移植打卡 lunar.ts+occasions 模型）、互动事件（source+externalRef 幂等+墓碑）、

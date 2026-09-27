@@ -1,6 +1,7 @@
 import type { ContactsSettings } from "./domain/model";
 import type { DashboardData, DashboardOptions } from "./services/dashboard";
 import type { CaptureOptions, CapturePreview, CaptureResult } from "./services/capture";
+import type { AiExtractOutcome } from "./services/ai-extract";
 
 /**
  * 插件实例暴露给组件层的结构化视图（避免组件 import 插件入口造成循环依赖）。
@@ -18,6 +19,8 @@ export interface ContactsPluginFacade {
     previewCapture(docId: string): Promise<CapturePreview>;
     /** 从笔记捕获：确认执行（互动事件 + 参与人区块 + 新人收编） */
     captureDoc(docId: string, options: CaptureOptions): Promise<CaptureResult>;
+    /** AI 抽取本页人名/日期/地点（需思源内置 AI；结果须经确认 UI） */
+    aiExtractFromDoc(docId: string): Promise<AiExtractOutcome>;
     openHostDoc(): void;
     /** 打开人物文档（联系人详情页 = 人物文档） */
     openPersonDoc(docId: string): void;

@@ -24,6 +24,9 @@
     let errorText: string = $state("");
     let result: CaptureResult | null = $state(null);
     let loadError: string = $state("");
+    let aiRunning: boolean = $state(false);
+    let aiError: string = $state("");
+    let aiDone: boolean = $state(false);
 
     const checkedIds = $derived(Object.entries(checked).filter(([, on]) => on).map(([id]) => id));
     const hasTarget = $derived(checkedIds.length > 0 || newNamesText.trim().length > 0);
@@ -40,6 +43,39 @@
     }
 
     load();
+
+    /** AI 只提名不做决定：抽取结果全部进表单，由用户确认后才落库 */
+    async function runAi() {
+        if (aiRunning) return;
+        aiRunning = true;
+        aiError = "";
+        try {
+            const outcome = await facade.aiExtractFromDoc(docId);
+            if (!outcome.extraction) {
+                aiError = outcome.likelyUnconfigured
+                    ? "思源 AI 可能未配置：请到 设置 → 人工智能 中配置模型后重试"
+                    : "AI 未返回有效结果，请重试或手工填写";
+                return;
+            }
+            for (const person of outcome.matched) {
+                checked[person.docId] = true;
+            }
+            const existing = new Set(
+                newNamesText.split(/[，,、\s]+/).map((name) => name.trim()).filter((name) => name.length > 0),
+            );
+            for (const name of outcome.unknownNames) {
+                existing.add(name);
+            }
+            newNamesText = [...existing].join(" ");
+            if (outcome.extraction.date && !date) date = outcome.extraction.date;
+            if (outcome.extraction.place && !place) place = outcome.extraction.place;
+            aiDone = true;
+        } catch (error) {
+            aiError = error instanceof Error ? error.message : String(error);
+        } finally {
+            aiRunning = false;
+        }
+    }
 
     async function submit() {
         if (running || !hasTarget) return;
@@ -98,6 +134,12 @@
                         </label>
                     {/each}
                 </div>
+            {/if}
+            <button class="b3-button b3-button--outline" style="margin-top: 6px;" onclick={runAi} disabled={aiRunning}>
+                {aiRunning ? "AI 分析中…" : aiDone ? "AI 已分析（可再次分析）" : "AI 分析本页（识别未链接的人名/日期/地点）"}
+            </button>
+            {#if aiError}
+                <p class="ft__smaller" style="color: var(--b3-theme-error);">{aiError}</p>
             {/if}
         </div>
 

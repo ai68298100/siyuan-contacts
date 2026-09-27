@@ -13,7 +13,8 @@ import { initializeWorkspace, loadSettings } from "./services/init";
 import { loadDashboard, DEFAULT_DASHBOARD_OPTIONS } from "./services/dashboard";
 import { recordInteraction } from "./data/interactions";
 import { captureFromDoc, previewCapture } from "./services/capture";
-import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
+import { extractFromDoc } from "./services/ai-extract";
+import { initExternalBridge, disposeExternalBridge } from "./bridge/external-bridge";import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
 import { svelteDialog } from "./libs/dialog";
 import type { ContactsSettings } from "./domain/model";
 import type { ContactsPluginFacade } from "./types";
@@ -77,6 +78,9 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         this.eventBus.on("loaded-protyle-static", this.onProtyleEvent);
         this.eventBus.on("loaded-protyle-dynamic", this.onProtyleEvent);
         this.eventBus.on("switch-protyle", this.onProtyleEvent);
+
+        // 对外人员服务桥（任务管理等插件经 window.LvContacts 查人/建人/记交集）
+        initExternalBridge(this, () => this.settings);
     }
 
     onLayoutReady() {
@@ -89,6 +93,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     async onunload() {
+        disposeExternalBridge();
         this.eventBus.off("open-menu-content", this.onMenuContent);
         this.eventBus.off("loaded-protyle-static", this.onProtyleEvent);
         this.eventBus.off("loaded-protyle-dynamic", this.onProtyleEvent);
@@ -186,6 +191,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     async captureDoc(docId: string, options: Parameters<typeof captureFromDoc>[3]) {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
         return captureFromDoc(this, this.settings, docId, options);
+    }
+
+    async aiExtractFromDoc(docId: string) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return extractFromDoc(this.settings, docId);
     }
 
     openHostDoc() {

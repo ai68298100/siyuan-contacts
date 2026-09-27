@@ -72,6 +72,13 @@ export async function getBlockContent(blockId: string): Promise<string | undefin
     return rows[0]?.content;
 }
 
+/** 导出文档全文 markdown（含子文档？不含，仅本文档内容；ID 严格校验） */
+export async function fetchDocMarkdown(docId: string): Promise<{ hPath: string; content: string }> {
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(docId)) throw new Error("docId 不是合法的思源 ID");
+    const data = await kernelPost<{ hPath: string; content: string }>("/api/export/exportMdContent", { id: docId });
+    return { hPath: data?.hPath ?? "", content: data?.content ?? "" };
+}
+
 /** 幂等写"带属性标记的单块"：有内容则更新/追加，无内容则删除。existingId 由调用方先查好（无查询则传 undefined）
  *  IAL 语法必须独占一行跟在块内容后（行尾式不会被解析为属性，spike/ial-probe 实证） */
 export async function upsertMarkedBlock(

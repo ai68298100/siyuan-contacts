@@ -154,3 +154,8 @@ export function toLocalDateKey(now: Date = new Date()): string {
     const pad = (value: number) => String(value).padStart(2, "0");
     return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
+
+/** 对外桥 recordInteraction 的确定性默认幂等键（同批人员+同日 → 同键，与人员顺序无关） */
+export function defaultBridgeRef(personDocIds: readonly string[], date: string): string {
+    return `bridge:${date}:${[...personDocIds].sort().join(",")}`;
+}
