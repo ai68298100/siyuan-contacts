@@ -796,6 +796,7 @@
     {#if importing}
         <LvctDialog title="导入已有文档为联系人" wide onClose={() => (importing = false)}>
             <ImportDialog
+                {i18n}
                 {settings}
                 onImported={(count) => {
                     if (count > 0) refresh();

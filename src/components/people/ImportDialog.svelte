@@ -7,16 +7,21 @@
     import ViewState from "../ViewState.svelte";
     import { normalizeImportTags } from "../../domain/import";
     import { useCloseGuard } from "../close-guard";
+    import { translateText } from "../../domain/translation";
 
     let {
         settings,
+        i18n,
         onImported,
         onClose,
     }: {
         settings: ContactsSettings;
+        i18n?: Readonly<Record<string, string>>;
         onImported: (count: number) => void;
         onClose: () => void;
     } = $props();
+    const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
+        translateText(i18n, key, fallback, values));
 
     type Notebook = { id: string; name: string };
 
@@ -133,7 +138,7 @@
 <div class="lvct-import">
     {#if importedCount === null}
     <div class="lvct-people__toolbar fn__flex">
-        <select class="b3-select" aria-label="选择待收编文档的笔记本" bind:value={notebookId} onchange={() => search()} disabled={importing || !loaded}>
+        <select class="b3-select" aria-label={text("importPickNotebook", "选择待收编文档的笔记本")} bind:value={notebookId} onchange={() => search()} disabled={importing || !loaded}>
             {#each notebooks as notebook (notebook.id)}
                 <option value={notebook.id}>{notebook.name}</option>
             {/each}
@@ -141,8 +146,8 @@
         <input
             class="b3-text-field fn__flex-1"
             type="text"
-            placeholder="按文档名过滤…"
-            aria-label="按文档名过滤"
+            placeholder={text("importFilterName", "按文档名过滤…")}
+            aria-label={text("importFilterNameAria", "按文档名过滤")}
             bind:value={keyword}
             oninput={onKeywordInput}
             disabled={importing || !notebookId}
@@ -150,8 +155,8 @@
         <input
             class="b3-text-field"
             type="text"
-            placeholder="按文件夹前缀过滤…"
-            aria-label="按文件夹前缀过滤"
+            placeholder={text("importFilterFolder", "按文件夹前缀过滤…")}
+            aria-label={text("importFilterFolderAria", "按文件夹前缀过滤")}
             bind:value={folderPrefix}
             oninput={onFolderInput}
             disabled={importing || !notebookId}
@@ -162,22 +167,22 @@
     {#if importedCount !== null}
         <div class="lvct-empty lvct-empty--compact">
             <div class="lvct-empty__icon" aria-hidden="true">✓</div>
-            <b>收编完成</b>
-            <p>已将 {importedCount} 篇文档绑定为联系人，原文档内容没有移动或修改。</p>
+            <b>{text("importDoneTitle", "收编完成")}</b>
+            <p>{text("importDoneDesc", "已将 {n} 篇文档绑定为联系人，原文档内容没有移动或修改。", { n: importedCount })}</p>
         </div>
     {:else if errorText}
-        <ViewState compact error title="文档收编未完成" description={errorText}>
-            <button class="b3-button b3-button--outline" onclick={() => notebookId ? search() : loadNotebooks()}>重新扫描</button>
+        <ViewState compact error title={text("importErrorTitle", "文档收编未完成")} description={errorText}>
+            <button class="b3-button b3-button--outline" onclick={() => notebookId ? search() : loadNotebooks()}>{text("importRescan", "重新扫描")}</button>
         </ViewState>
     {:else if loading || !loaded}
-        <ViewState compact loading title="正在扫描可收编的文档" />
+        <ViewState compact loading title={text("importScanning", "正在扫描可收编的文档")} />
     {:else if candidates.length === 0}
-        <ViewState compact title={notebooks.length === 0 ? "没有可扫描的笔记本" : "没有可收编的文档"}
-            description={keyword ? "当前关键词没有匹配文档，可以清除关键词后再试。" : "可以换一本笔记本，或先创建人物文档，再回来扫描。"}>
+        <ViewState compact title={notebooks.length === 0 ? text("importNoNotebooks", "没有可扫描的笔记本") : text("importNoDocs", "没有可收编的文档")}
+            description={keyword ? text("importNoMatchDesc", "当前关键词没有匹配文档，可以清除关键词后再试。") : text("importNoDocsDesc", "可以换一本笔记本，或先创建人物文档，再回来扫描。")}>
             {#if keyword}
-                <button class="b3-button b3-button--outline" onclick={() => { keyword = ""; void search(); }}>清除关键词</button>
+                <button class="b3-button b3-button--outline" onclick={() => { keyword = ""; void search(); }}>{text("importClearKeyword", "清除关键词")}</button>
             {/if}
-            <button class="b3-button b3-button--outline" onclick={loadNotebooks}>刷新笔记本</button>
+            <button class="b3-button b3-button--outline" onclick={loadNotebooks}>{text("importRefreshNotebooks", "刷新笔记本")}</button>
         </ViewState>
     {:else}
         <div class="lvct-import__list">
@@ -188,7 +193,7 @@
                     checked={selectedIds.length === candidates.length}
                     onchange={(event) => toggleAll((event.currentTarget as HTMLInputElement).checked)}
                 />
-                <span>全选（{candidates.length} 篇）</span>
+                <span>{text("importSelectAll", "全选（{n} 篇）", { n: candidates.length })}</span>
             </label>
             {#each candidates as candidate (candidate.docId)}
                 <label class="lvct-import__row">
@@ -200,30 +205,30 @@
         </div>
         <div class="lvct-form__grid lvct-import__options">
             <label class="lvct-form__item">
-                <span>收编后分组（可选）</span>
+                <span>{text("importGroupLabel", "收编后分组（可选）")}</span>
                 <select class="b3-select fn__block" bind:value={importGroup} disabled={importing}>
-                    <option value="">不设置分组</option>
+                    <option value="">{text("importNoGroup", "不设置分组")}</option>
                     {#each PRESET_GROUPS as group (group)}<option value={group}>{group}</option>{/each}
                 </select>
             </label>
             <label class="lvct-form__item">
-                <span>收编后标签（可选）</span>
-                <input class="b3-text-field fn__block" type="text" bind:value={importTagsText} placeholder="客户 重点" disabled={importing} />
+                <span>{text("importTagsLabel", "收编后标签（可选）")}</span>
+                <input class="b3-text-field fn__block" type="text" bind:value={importTagsText} placeholder={text("importTagsPlaceholder", "客户 重点")} disabled={importing} />
             </label>
         </div>
     {/if}
 
     <div class="lvct-form__actions">
         {#if importedCount !== null}
-            <button class="b3-button b3-button--text" onclick={onClose}>完成</button>
+            <button class="b3-button b3-button--text" onclick={onClose}>{text("importDone", "完成")}</button>
         {:else}
-            <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={importing}>取消</button>
+            <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={importing}>{text("importCancel", "取消")}</button>
             <button class="b3-button b3-button--text" onclick={runImport} disabled={importing || loading || !!errorText || selectedIds.length === 0}>
-                {importing ? "收编中…" : `收编为联系人（${selectedIds.length}）`}
+                {importing ? text("importAdopting", "收编中…") : text("importAdoptAs", "收编为联系人（{n}）", { n: selectedIds.length })}
             </button>
         {/if}
     </div>
     <p class="ft__smaller ft__on-surface lvct-form__hint">
-        收编不会移动或修改文档本身，只是把它绑定为数据库一行（文档标题即姓名）。
+        {text("importHint", "收编不会移动或修改文档本身，只是把它绑定为数据库一行（文档标题即姓名）。")}
     </p>
 </div>
