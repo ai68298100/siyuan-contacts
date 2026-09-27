@@ -56,6 +56,23 @@ export interface DashboardData {
 export function pickActions(data: DashboardData | null): ActionCard[] {
     return data?.actions ?? [];
 }
+
+export interface SummaryCounts {
+    total: number;
+    overdue: number;
+    birthdaysToday: number;
+    stale: number;
+}
+
+/** 供组件派生使用的取值函数：摘要计数与首页数据同源 */
+export function pickSummaryCounts(data: DashboardData | null, actions: readonly ActionCard[]): SummaryCounts {
+    return {
+        total: actions.length,
+        overdue: actions.filter((card) => card.bucket === "overdue").length,
+        birthdaysToday: (data?.birthdays ?? []).filter((item) => item.bucket === "today").length,
+        stale: data?.stale.length ?? 0,
+    };
+}
 export async function loadDashboard(
     plugin: Plugin,
     settings: ContactsSettings,

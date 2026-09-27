@@ -49,3 +49,18 @@ test("显示偏好：合法自定义顺序原样保留", () => {
     assert.equal(result.peopleView, "table");
     assert.deepEqual(result.tableColumns, ["birthday", "phone"]);
 });
+
+test("显示偏好：摘要开关与当日忽略标记归一化", () => {
+    const result = normalizeViewPreferences({
+        summaryEnabled: false,
+        summaryDismissedOn: "2026-09-28",
+    });
+    assert.equal(result.summaryEnabled, false);
+    assert.equal(result.summaryDismissedOn, "2026-09-28");
+    // 旧偏好缺字段：默认开启、未忽略
+    const legacy = normalizeViewPreferences({ peopleSort: "recent" });
+    assert.equal(legacy.summaryEnabled, true);
+    assert.equal(legacy.summaryDismissedOn, "");
+    // 非法日期串归一化为空串
+    assert.equal(normalizeViewPreferences({ summaryDismissedOn: "09/28" }).summaryDismissedOn, "");
+});

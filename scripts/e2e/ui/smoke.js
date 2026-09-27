@@ -1032,6 +1032,85 @@ await test("今日行动清单：多原因单卡徽标，逾期跟进批量顺�
     assert(opened.length === 0, "空态不应打开详情");
 });
 
+await test("打开摘要：开关与当日忽略抑制、次日恢复、空清单不出横幅，数量同源", async () => {
+    const pad = (value) => String(value).padStart(2, "0");
+    const now = new Date();
+    const dateKey = (days) => {
+        const date = new Date(now);
+        date.setDate(date.getDate() + days);
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    };
+    const personA = { ...person, docId: "doc-a", name: "摘要甲" };
+    const actionsData = [
+        { person: personA, bucket: "today", earliestDate: dateKey(0), reasons: [{ kind: "stale", bucket: "stale", label: "40 天未联系（阈值 30 天）" }] },
+        { person: { ...person, docId: "doc-b", name: "摘要乙" }, bucket: "today", earliestDate: dateKey(0), reasons: [{ kind: "stale", bucket: "stale", label: "从未互动" }] },
+    ];
+    const mountedViews = [];
+    const mountDash = (prefs, withActions = true) => {
+        const view = mount(DashboardView, { target: fixture, props: {
+            preferences: prefs,
+            onOpenDetail() {}, onOpenPeople() {}, onOpenGraph() {},
+            onPreferencesChange: async (next) => { savedPrefs = next; return next; },
+            facade: { settings, loadDashboard: async () => ({
+                people: 2, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+                stale: [], neverContacted: 0, neverContactedItemIds: [],
+                followUps: [], actions: withActions ? actionsData : [],
+            }) },
+        } });
+        mountedViews.push(view);
+        return view;
+    };
+    let savedPrefs = null;
+    // 数据就绪的标志：问候语渲染（data 已非空）
+    const dataReady = () => fixture.textContent.includes("今天先联系谁");
+
+    // ① 有行动 + 未忽略 → 横幅出现且数量同源
+    mountedViews.push(mount(DashboardView, { target: fixture, props: {
+        preferences: DEFAULT_VIEW_PREFERENCES,
+        onOpenDetail() {}, onOpenPeople() {}, onOpenGraph() {},
+        onPreferencesChange: async (next) => { savedPrefs = next; return next; },
+        facade: { settings, loadDashboard: async () => ({
+            people: 2, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+            stale: [], neverContacted: 0, neverContactedItemIds: [], followUps: [], actions: actionsData,
+        }) },
+    } }));
+    await until(() => dataReady(), "仪表盘未加载");
+    await until(() => fixture.textContent.includes("今天有 2 件值得处理的事"), "摘要横幅未显示");
+    await unmount(mountedViews.shift());
+    fixture.replaceChildren();
+
+    // ② 当日忽略 → 同日抑制
+    mountedViews.push(mountDash({ ...DEFAULT_VIEW_PREFERENCES, summaryDismissedOn: dateKey(0) }));
+    await until(dataReady, "仪表盘未加载");
+    assert(!fixture.textContent.includes("值得处理的事"), "当日忽略后横幅仍显示");
+    await unmount(mountedViews.pop());
+    fixture.replaceChildren();
+
+    // ③ 忽略标记为昨天 → 次日恢复
+    mountedViews.push(mountDash({ ...DEFAULT_VIEW_PREFERENCES, summaryDismissedOn: dateKey(-1) }));
+    await until(dataReady, "仪表盘未加载");
+    await until(() => fixture.textContent.includes("今天有 2 件值得处理的事"), "次日未恢复显示");
+
+    // ④ 点击「今日不再展示」→ 写入当天日期
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "今日不再展示").click();
+    await until(() => savedPrefs?.summaryDismissedOn === dateKey(0), "当日忽略未持久化");
+    await until(() => !fixture.textContent.includes("值得处理的事"), "忽略后横幅未消失");
+
+    // ⑤ 关闭偏好 → 不显示；空清单 → 不显示
+    await unmount(mountedViews.pop());
+    fixture.replaceChildren();
+    mountedViews.push(mountDash({ ...DEFAULT_VIEW_PREFERENCES, summaryEnabled: false }));
+    await until(dataReady, "仪表盘未加载");
+    assert(!fixture.textContent.includes("值得处理的事"), "关闭偏好后横幅仍显示");
+    await unmount(mountedViews.pop());
+    fixture.replaceChildren();
+    mountedViews.push(mountDash({ ...DEFAULT_VIEW_PREFERENCES }, false));
+    await until(dataReady, "仪表盘未加载");
+    assert(!fixture.textContent.includes("值得处理的事"), "空清单不应出横幅");
+    await unmount(mountedViews.pop());
+    fixture.replaceChildren();
+});
+
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {
     const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
         docId: settings.hostDocId,

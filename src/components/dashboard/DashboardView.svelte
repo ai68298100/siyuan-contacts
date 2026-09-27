@@ -1,7 +1,7 @@
 <script lang="ts">
     /** 首页仪表盘：统计 + 近期生日（公/农历）+ 久未联系 */
     import type { ContactsPluginFacade } from "../../types";
-    import { pickActions } from "../../services/dashboard";
+    import { pickActions, pickSummaryCounts } from "../../services/dashboard";
     import type { DashboardData } from "../../services/dashboard";
     import type { ActionCard } from "../../domain/action-list";
     import type { ContactSummary } from "../../domain/person";
@@ -17,6 +17,7 @@
         onOpenDetail,
         onOpenPeople,
         onOpenGraph,
+        onPreferencesChange,
     }: {
         facade: ContactsPluginFacade;
         preferences: ViewPreferences;
@@ -24,6 +25,8 @@
         onOpenDetail: (person: ContactSummary) => void;
         onOpenPeople: (focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" }) => void;
         onOpenGraph: () => void;
+        /** 摘要忽略等偏好写入（F08）；未接线时「当日不再展示」退化为本次隐藏 */
+        onPreferencesChange?: (preferences: ViewPreferences) => Promise<ViewPreferences>;
     } = $props();
 
     let data: DashboardData | null = $state(null);
@@ -175,6 +178,35 @@
         }
     }
 
+    // ---- 打开工作台时的关注摘要（F08） ----
+    let summaryHiddenThisSession = $state(false);
+    let summaryBusy = $state(false);
+    const localTodayKey = $derived.by(() => {
+        const now = new Date();
+        const pad = (value: number) => String(value).padStart(2, "0");
+        return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    });
+    const summaryVisible = $derived.by(() => {
+        if (!preferences.summaryEnabled) return false;
+        if (summaryHiddenThisSession) return false;
+        if (preferences.summaryDismissedOn === localTodayKey) return false;
+        if (!data) return false;
+        // 空清单不出横幅
+        return actions.length > 0;
+    });
+    const summary = $derived(pickSummaryCounts(data, actions));
+
+    async function dismissSummaryToday() {
+        if (summaryBusy) return;
+        summaryBusy = true;
+        try {
+            await onPreferencesChange?.({ ...preferences, summaryDismissedOn: localTodayKey });
+            summaryHiddenThisSession = true;
+        } finally {
+            summaryBusy = false;
+        }
+    }
+
     const bucketStyles: Record<string, string> = {
         today: "lvct-bucket--today",
         week: "lvct-bucket--week",
@@ -196,6 +228,22 @@
             <span class="lvct-skeleton lvct-dash__skeleton-block"></span>
         </div>
     {:else if data}
+        {#if summaryVisible}
+            <div class="lvct-dash__summary" role="region" aria-label="今日关注摘要">
+                <div class="lvct-dash__summary-main">
+                    <b>今天有 {summary.total} 件值得处理的事</b>
+                    <span class="lvct-dash__summary-chips">
+                        {#if summary.overdue > 0}<span class="lvct-action-chip lvct-action-chip--overdue">逾期跟进 {summary.overdue}</span>{/if}
+                        {#if summary.birthdaysToday > 0}<span class="lvct-action-chip lvct-action-chip--today">今天生日 {summary.birthdaysToday}</span>{/if}
+                        {#if summary.stale > 0}<span class="lvct-action-chip lvct-action-chip--stale">久未联系 {summary.stale}</span>{/if}
+                    </span>
+                </div>
+                <div class="lvct-dash__summary-actions">
+                    <button class="b3-button b3-button--text" onclick={() => (summaryHiddenThisSession = true)}>收起</button>
+                    <button class="b3-button b3-button--outline" disabled={summaryBusy} onclick={dismissSummaryToday}>今日不再展示</button>
+                </div>
+            </div>
+        {/if}
         <div class="lvct-dash__welcome">
             <div>
                 <p class="lvct-dash__greeting">{greeting}，今天先联系谁？</p>

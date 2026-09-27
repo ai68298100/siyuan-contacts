@@ -613,6 +613,11 @@
                         </label>
                     </div>
 
+                    <label class="lvct-settings__switch-row">
+                        <div><b>打开工作台时显示关注摘要</b><small>页面内卡片展示生日、久未联系与跟进到期，可设置当日不再展示；不发送宿主通知</small></div>
+                        <span class="lvct-switch"><input type="checkbox" bind:checked={draft.summaryEnabled} /><span class="lvct-switch__track"><span class="lvct-switch__thumb"></span></span></span>
+                    </label>
+
                     <div class="lvct-settings__actions">
                         <button class="b3-button b3-button--outline" onclick={savePreferences} disabled={savingPreferences}>
                             {savingPreferences ? "保存中…" : "保存偏好"}

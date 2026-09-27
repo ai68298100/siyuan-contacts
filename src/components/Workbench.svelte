@@ -161,6 +161,12 @@
                     {facade}
                     revision={dataRevision}
                     preferences={currentPreferences}
+                    onPreferencesChange={async (next) => {
+                        const saved = await facade.saveViewPreferences(next);
+                        currentPreferences = saved;
+                        onPreferencesUpdated(saved);
+                        return saved;
+                    }}
                     onOpenDetail={openDetail}
                     onOpenPeople={openPeople}
                     onOpenGraph={() => selectView("graph")}

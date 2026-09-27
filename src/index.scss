@@ -421,6 +421,39 @@
     margin-top: var(--lvct-sp-3);
 }
 
+// F08 打开工作台时的关注摘要
+.lvct-dash__summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--lvct-sp-2);
+    margin-top: var(--lvct-sp-3);
+    padding: var(--lvct-sp-2) var(--lvct-sp-3);
+    border: 1px solid var(--lvct-accent);
+    border-radius: var(--lvct-r-md);
+    background: var(--lvct-accent-soft);
+
+    .lvct-dash__summary-main {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--lvct-sp-2);
+        font-size: var(--lvct-fs-body);
+    }
+
+    .lvct-dash__summary-chips {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .lvct-dash__summary-actions {
+        margin-left: auto;
+        display: inline-flex;
+        gap: var(--lvct-sp-1);
+    }
+}
+
 .lvct-dash__actions-head {
     display: flex;
     align-items: center;

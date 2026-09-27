@@ -28,6 +28,10 @@ export interface ViewPreferences {
     readonly tableColumns: PeopleTableColumn[];
     /** 保存的联系人视图（F04）：规则快照，应用时重新求值 */
     readonly savedViews: readonly SavedView[];
+    /** 打开工作台时的关注摘要开关（F08） */
+    readonly summaryEnabled: boolean;
+    /** 摘要「当日不再展示」标记（YYYY-MM-DD）；空串表示未忽略 */
+    readonly summaryDismissedOn: string;
 }
 
 export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
@@ -41,6 +45,8 @@ export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
     peopleView: "card",
     tableColumns: [...PEOPLE_TABLE_COLUMNS],
     savedViews: [],
+    summaryEnabled: true,
+    summaryDismissedOn: "",
 };
 
 function isDefaultView(value: unknown): value is DefaultView {
@@ -89,5 +95,9 @@ export function normalizeViewPreferences(raw: unknown): ViewPreferences {
         tableColumns: record.tableColumns === undefined ? [...DEFAULT_VIEW_PREFERENCES.tableColumns] : normalizeTableColumns(record.tableColumns),
         // 旧偏好缺字段取空列表；已有值逐条归一化
         savedViews: record.savedViews === undefined ? [] : normalizeSavedViews(record.savedViews),
+        summaryEnabled: typeof record.summaryEnabled === "boolean" ? record.summaryEnabled : DEFAULT_VIEW_PREFERENCES.summaryEnabled,
+        summaryDismissedOn: typeof record.summaryDismissedOn === "string" && /^\d{4}-\d{2}-\d{2}$/.test(record.summaryDismissedOn)
+            ? record.summaryDismissedOn
+            : "",
     };
 }
