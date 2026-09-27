@@ -6,6 +6,7 @@
     import { onDestroy } from "svelte";
     import ViewState from "../ViewState.svelte";
     import { normalizeImportTags } from "../../domain/import";
+    import { useCloseGuard } from "../close-guard";
 
     let {
         settings,
@@ -32,6 +33,10 @@
     let errorText: string = $state("");
     let loaded = $state(false);
     let importedCount: number | null = $state(null);
+    const guardedClose = useCloseGuard(
+        () => importing,
+        () => importedCount === null && (selectedIds.length > 0 || importGroup !== "" || importTagsText.trim() !== ""),
+    );
 
     let searchTimer: ReturnType<typeof setTimeout> | undefined;
     let searchVersion = 0;
@@ -212,7 +217,7 @@
         {#if importedCount !== null}
             <button class="b3-button b3-button--text" onclick={onClose}>完成</button>
         {:else}
-            <button class="b3-button b3-button--cancel" onclick={onClose}>取消</button>
+            <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={importing}>取消</button>
             <button class="b3-button b3-button--text" onclick={runImport} disabled={importing || loading || !!errorText || selectedIds.length === 0}>
                 {importing ? "收编中…" : `收编为联系人（${selectedIds.length}）`}
             </button>

@@ -58,6 +58,8 @@
     // svelte-ignore state_referenced_locally
     let draft: ViewPreferences = $state({ ...preferences });
     // svelte-ignore state_referenced_locally
+    let savedDraft: ViewPreferences = $state({ ...preferences });
+    // svelte-ignore state_referenced_locally
     let anchorDraft: SettingsAnchorPatch = $state({
         hostDocId: settings.hostDocId,
         dbBlockId: settings.dbBlockId,
@@ -66,7 +68,7 @@
     let errorText = $state("");
     const guardedClose = useCloseGuard(
         () => savingPreferences || rebinding || mappingBusy || importingInteractions,
-        () => JSON.stringify(draft) !== JSON.stringify(preferences) || importText.trim().length > 0,
+        () => JSON.stringify(draft) !== JSON.stringify(savedDraft) || importText.trim().length > 0,
     );
 
     function setHealth(value: SettingsHealth) {
@@ -114,6 +116,7 @@
         try {
             const updated = await facade.saveViewPreferences(draft);
             draft = { ...updated };
+            savedDraft = { ...updated };
             onPreferencesUpdated(updated);
             preferencesMessage = "偏好已保存";
         } catch (error) {

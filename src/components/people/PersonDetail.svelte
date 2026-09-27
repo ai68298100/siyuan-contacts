@@ -62,6 +62,15 @@
     let editing = $state(false);
     let deleting = $state(false);
     let activeTab: "overview" | "activity" | "relations" = $state("overview");
+    const tabIds = ["overview", "activity", "relations"] as const;
+    function handleTabKeydown(event: KeyboardEvent) {
+        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") return;
+        event.preventDefault();
+        const index = tabIds.indexOf(activeTab);
+        const next = event.key === "Home" ? 0 : event.key === "End" ? 2 : (index + (event.key === "ArrowRight" ? 1 : 2)) % 3;
+        activeTab = tabIds[next];
+        (event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus();
+    }
     let activitySearch = $state("");
     let activitySource = $state("");
     let activityLimit = $state(20);
@@ -189,10 +198,10 @@
         </div>
     </div>
 
-    <div class="lvct-detail__tabs" role="tablist" aria-label="人物详情内容">
-        <button type="button" role="tab" aria-selected={activeTab === "overview"} class:lvct-detail__tab--active={activeTab === "overview"} onclick={() => (activeTab = "overview")}>概览</button>
-        <button type="button" role="tab" aria-selected={activeTab === "activity"} class:lvct-detail__tab--active={activeTab === "activity"} onclick={() => (activeTab = "activity")}>互动</button>
-        <button type="button" role="tab" aria-selected={activeTab === "relations"} class:lvct-detail__tab--active={activeTab === "relations"} onclick={() => (activeTab = "relations")}>相关人</button>
+    <div class="lvct-detail__tabs" role="tablist" tabindex="-1" aria-label="人物详情内容" onkeydown={handleTabKeydown}>
+        <button type="button" role="tab" aria-selected={activeTab === "overview"} tabindex={activeTab === "overview" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "overview"} onclick={() => (activeTab = "overview")}>概览</button>
+        <button type="button" role="tab" aria-selected={activeTab === "activity"} tabindex={activeTab === "activity" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "activity"} onclick={() => (activeTab = "activity")}>互动</button>
+        <button type="button" role="tab" aria-selected={activeTab === "relations"} tabindex={activeTab === "relations" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "relations"} onclick={() => (activeTab = "relations")}>相关人</button>
     </div>
 
     {#if activeTab === "overview"}

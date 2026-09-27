@@ -10,6 +10,7 @@
     import ImportDialog from "./ImportDialog.svelte";
     import VCardDialog from "./VCardDialog.svelte";
     import LvctDialog from "../LvctDialog.svelte";
+    import { useCloseGuard } from "../close-guard";
 
     let {
         settings,
@@ -62,6 +63,12 @@
     let batchError: string = $state("");
     let batchGroup: string = $state("__keep");
     let batchTagsText: string = $state("");
+    useCloseGuard(() => batchBusy, () => batchOpen && (batchGroup !== "__keep" || !!batchTagsText.trim()));
+    function closeBatch() {
+        if (batchBusy) return;
+        if ((batchGroup !== "__keep" || batchTagsText.trim()) && !window.confirm("有未保存的修改，确定放弃并离开吗？")) return;
+        batchOpen = false;
+    }
     let selectedIds: string[] = $state([]);
     let visibleCount: number = $state(PAGE_SIZE);
 
@@ -398,7 +405,10 @@
     {/if}
 
     {#if batchOpen}
-        <LvctDialog title={`批量编辑 · ${selectedIds.length} 人`} onClose={() => (batchOpen = false)}>
+        <LvctDialog title={`批量编辑 · ${selectedIds.length} 人`} beforeClose={() => {
+            if (batchBusy) return false;
+            return (batchGroup === "__keep" && !batchTagsText.trim()) || window.confirm("有未保存的修改，确定放弃并离开吗？");
+        }} onClose={() => (batchOpen = false)}>
             <div class="lvct-form">
                 <p class="ft__smaller ft__on-surface">分组会覆盖所选联系人当前值；标签会追加到现有标签并自动去重。</p>
                 <label class="lvct-form__item">
@@ -416,7 +426,7 @@
                 </label>
                 {#if batchError}<div class="lvct-form__error">{batchError}</div>{/if}
                 <div class="lvct-form__actions">
-                    <button class="b3-button b3-button--cancel" onclick={() => (batchOpen = false)}>取消</button>
+                    <button class="b3-button b3-button--cancel" onclick={closeBatch} disabled={batchBusy}>取消</button>
                     <button class="b3-button b3-button--text" onclick={runBatchUpdate} disabled={batchBusy}>{batchBusy ? "保存中…" : "应用到所选联系人"}</button>
                 </div>
             </div>

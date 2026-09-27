@@ -104,6 +104,29 @@ await test("首页零人筛选保持空结果，清除后恢复联系人", async
     await until(() => fixture.querySelector(".lvct-person-card"), "清除首页筛选未恢复联系人");
 });
 
+await test("新建草稿关闭前确认，拒绝放弃时保留输入", async () => {
+    const originalConfirm = window.confirm;
+    let confirms = 0;
+    try {
+        mounted = mount(Workbench, { target: fixture, props: {
+            settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+            onPreferencesUpdated() {}, onOpenPersonDoc() {},
+            facade: { settings, loadRecentInteractions: async () => ({}) },
+        } });
+        button("新建联系人").click();
+        await until(() => fixture.querySelector(".lvct-form input[type=text]"), "新建弹窗未打开");
+        input(fixture.querySelector(".lvct-form input[type=text]"), "待保存的人");
+        window.confirm = () => { confirms++; return false; };
+        fixture.querySelector(".lvct-dialog-panel__close").click();
+        await tick();
+        assert(fixture.querySelector(".lvct-form input[type=text]")?.value === "待保存的人", "拒绝放弃仍丢失草稿");
+        assert(confirms === 1, "脏草稿关闭未确认");
+        window.confirm = () => true;
+        fixture.querySelector(".lvct-dialog-panel__close").click();
+        await until(() => !fixture.querySelector(".lvct-dialog-panel"), "同意放弃后未关闭");
+    } finally { window.confirm = originalConfirm; }
+});
+
 await test("英文工作台导航与标题跟随语言资源，缺失文案回退且设置入口可达", async () => {
     mounted = mount(Workbench, { target: fixture, props: {
         settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: window.innerWidth <= 640,

@@ -4,6 +4,7 @@
     import type { VcfImportPlan, VcfImportReport } from "../../services/vcard";
     import type { ContactsSettings } from "../../domain/model";
     import ViewState from "../ViewState.svelte";
+    import { useCloseGuard } from "../close-guard";
 
     let {
         settings,
@@ -24,6 +25,7 @@
     let statusText: string = $state("");
     let report: VcfImportReport | null = $state(null);
     let fileInput: HTMLInputElement | undefined = $state();
+    const guardedClose = useCloseGuard(() => importing || parsing || exporting, () => report === null && plans !== null && selectedCount > 0);
 
     const selectedCount = $derived.by(() => {
         if (!plans) return 0;
@@ -222,7 +224,7 @@
     {/if}
 
     <div class="lvct-form__actions">
-        <button class="b3-button b3-button--cancel" onclick={onClose}>关闭</button>
+        <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={importing || parsing || exporting}>关闭</button>
         <button class="b3-button b3-button--text" onclick={runImport} disabled={importing || parsing || exporting || !!errorText || !plans || selectedCount === 0 || report !== null}>
             {importing ? "导入中…" : report ? "导入完成" : `导入为联系人（${selectedCount}）`}
         </button>
