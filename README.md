@@ -77,6 +77,7 @@ node scripts/e2e/contacts-flow.mjs   # 真内核流程 E2E（10 项）
 
 架构约定见 [AGENTS.md](AGENTS.md)，存储契约见 [docs/DATA-CONTRACT.md](docs/DATA-CONTRACT.md)，
 设计决策见 [docs/DECISIONS.md](docs/DECISIONS.md)，路线图见 [docs/ROADMAP.md](docs/ROADMAP.md)。
+当前愿景、功能/UI 基线及 16 项后续功能的分批计划见 [产品与开发总计划](docs/PRODUCT-PLAN.md)；计划项不代表已发布能力。
 
 ## 🤝 生态
 

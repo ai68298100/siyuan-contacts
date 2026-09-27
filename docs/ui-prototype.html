@@ -455,7 +455,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
     <!-- ========== 1. 方案总览 ========== -->
     <section class="screen on" id="s-overview">
       <div class="note-box">
-        <b>产品定位（源自仓库分析）：</b>在思源笔记内管理人脉——「一人一文档，数据库作主干」。联系人是普通思源文档（双链/搜索/同步照旧），结构化字段存思源原生数据库（AV），插件负责管理界面。<b>数据不出工作区、卸载插件数据仍在</b>，是核心卖点与所有设计的约束前提。
+        <b>产品定位（源自仓库分析）：</b>在思源笔记内管理人脉——「一人一文档，数据库作主干」。联系人是普通思源文档（双链/搜索/同步照旧），结构化字段存思源原生数据库（AV），插件负责管理界面。<b>人物文档与数据库保留；互动与偏好需另行备份</b>。插件无遥测，AI 仅在主动操作时向用户配置端点发送内容，思源同步由用户控制。当前功能范围与后续批次见 <a href="PRODUCT-PLAN.md">产品总计划</a>；本原型不代表全部能力已实现。
       </div>
 
       <div class="two-col">
@@ -615,7 +615,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
                 <div class="dash-grid" style="margin-top:14px; grid-template-columns: 1fr 1fr">
                   <div class="card card--pad" style="display:flex; align-items:center; gap:14px">
                     <div style="font-size:22px">🗂</div>
-                    <div><b style="font-size:13px">工作空间</b><div style="font-size:12px; color:var(--text-3); margin-top:3px">笔记本「人脉」 · 数据存于本地工作区，不上云</div></div>
+                    <div><b style="font-size:13px">工作空间</b><div style="font-size:12px; color:var(--text-3); margin-top:3px">笔记本「人脉」 · 思源同步由你控制，AI 仅主动操作时发送内容</div></div>
                     <div class="sp" style="flex:1"></div>
                     <button class="btn btn--sm">打开联系人总表</button>
                   </div>
@@ -939,7 +939,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
           <div class="wizard">
             <div class="logo">🫂</div>
             <h2>欢迎使用小驴人脉</h2>
-            <p>将在你的工作区创建：笔记本「人脉」、文档「联系人总表」与原生数据库（生日 / 电话 / 分组 / 标签 / 相关人等 9 个字段一次配齐）。<br>所有数据保存在本地工作区，卸载插件后原样保留。</p>
+            <p>将在你的工作区创建：笔记本「人脉」、文档「联系人总表」与原生数据库（生日 / 电话 / 分组 / 标签 / 相关人等 9 个字段一次配齐）。<br>卸载插件不删除人物文档与数据库；互动记录和偏好属于插件数据，删除插件数据前需另行备份。</p>
             <div class="input">📓 <input value="人脉"></div>
             <button class="btn btn--primary" disabled>初始化中…</button>
             <div class="progress" style="width:380px; margin-top:18px"><i style="width:62%"></i></div>
@@ -982,7 +982,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
                 <div class="set-group__t">提醒（预览）</div>
                 <div class="set-row"><div><div class="tt">生日提前提醒</div><div class="ds">首页生日列表的展示窗口</div></div><div class="sp"></div><span class="select-mock">30 天 ▾</span></div>
                 <div class="set-row"><div><div class="tt">久未联系阈值</div><div class="ds">超过该天数未互动即进入「久未联系」</div></div><div class="sp"></div><span class="select-mock">30 天 ▾</span></div>
-                <div class="set-row"><div><div class="tt">启动时提醒今日生日</div><div class="ds">以思源通知形式提示，可点击直达</div></div><div class="sp"></div><div class="switch on"></div></div>
+                <div class="set-row"><div><div class="tt">打开工作台时显示关注摘要</div><div class="ds">计划 F08：页面内显示生日与待联系事项，可设置当日不再展示；不发送宿主通知</div></div><div class="sp"></div><div class="switch on"></div></div>
               </div>
               <div class="set-group">
                 <div class="set-group__t">数据与字段（预览 · 含健康检查）</div>
@@ -1005,7 +1005,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
 
     <!-- ========== 9. 人物文档档案条 ========== -->
     <section class="screen" id="s-docbar">
-      <div class="note-box"><b>设计要点：</b>档案条是"插件 ⇄ 文档"双向出入口的关键一环——在人物文档标题下方注入：核心字段一览 + 倒计时徽标 + 「编辑资料 / 打开人脉」双入口。形态对齐思源属性面板，避免喧宾夺主；二期"会前简报"将在此下方扩展为可折叠卡片。</div>
+      <div class="note-box"><b>设计要点：</b>档案条是"插件 ⇄ 文档"双向出入口的关键一环——在人物文档标题下方注入：核心字段一览 + 倒计时徽标 + 「编辑资料 / 打开人脉」双入口。形态对齐思源属性面板，避免喧宾夺主；事实型会前简报已实现，后续 F11 将其复用到 Peek 并提供 Markdown 导出。</div>
       <div class="frame">
         <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">思源编辑器 · 人物文档「林晓梅」</span></div>
         <div class="frame__body doc-mock">
@@ -1122,7 +1122,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
       </table>
 
       <h3>可访问性底线</h3>
-      <div class="ds">① 所有弹窗：<kbd>Esc</kbd> 关闭、焦点陷阱、打开时焦点落于首个可交互元素、关闭后焦点归还触发源。② 色彩不作为唯一信息载体（久未联系 = 红色 + 天数文字）。③ 正文对比度 ≥ 4.5:1，三级文字仅用于非关键信息。④ 触控目标 ≥ 32px（移动端 ≥ 40px）。</div>
+      <div class="ds">① 模态弹窗与移动全屏 Peek：<kbd>Esc</kbd> 经草稿/忙碌保护后关闭，管理焦点并在关闭后归还触发源；桌面非模态 Peek 不锁住页面 Tab。② 色彩不作为唯一信息载体（久未联系 = 红色 + 天数文字）。③ 正文对比度 ≥ 4.5:1，三级文字仅用于非关键信息。④ 触控目标 ≥ 32px（移动端 ≥ 40px）。</div>
     </section>
 
     <!-- ========== 12. 组件规范 ========== -->
@@ -1194,7 +1194,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
       </table>
 
       <h3>移动端适配要点</h3>
-      <div class="ds">工作台 = 全屏 Dialog（现状保留）；侧栏导航 → 底部 Tab Bar（首页/联系人/图谱/我的设置）；Peek → 全屏底部抽屉（上滑展开、下滑关闭）；卡片网格单列；触控目标 ≥ 40px；统计卡 2×2。判定一律用 <code>getFrontend()</code>（AGENTS.md 铁律 8），禁 UA 嗅探。</div>
+      <div class="ds">工作台 = 全屏 Dialog（现状保留）；侧栏导航 → 底部 Tab Bar（首页/联系人/图谱/我的设置）；Peek → 全屏详情，通过显式关闭入口并检查未保存内容（滑动关闭未实现，不作为当前承诺）；卡片网格单列；触控目标 ≥ 40px；统计卡 2×2。判定一律用 <code>getFrontend()</code>（AGENTS.md 铁律 8），禁 UA 嗅探。桌面与移动随批对照原型，实际真机验证按要求跳过，未计通过。</div>
     </section>
 
   </main>
