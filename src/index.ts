@@ -11,7 +11,7 @@ import WorkbenchRoot from "./components/WorkbenchRoot.svelte";
 import CaptureDialog from "./components/capture/CaptureDialog.svelte";
 import { initializeWorkspace, loadSettings } from "./services/init";
 import { loadDashboard, DEFAULT_DASHBOARD_OPTIONS } from "./services/dashboard";
-import { recordInteraction } from "./data/interactions";
+import { deleteInteraction, recordInteraction } from "./data/interactions";
 import { captureFromDoc, previewCapture } from "./services/capture";
 import { extractFromDoc } from "./services/ai-extract";
 import { loadPersonInsights } from "./services/insights";
@@ -211,6 +211,10 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     async recordInteraction(personDocId: string, note?: string): Promise<void> {
         await recordInteraction(this, { personDocId, note });
+    }
+
+    async deleteInteraction(personDocId: string, eventId: string): Promise<void> {
+        await deleteInteraction(this, eventId, personDocId);
     }
 
     async previewCapture(docId: string) {

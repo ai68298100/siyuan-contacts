@@ -199,6 +199,7 @@
             settings={currentSettings}
             person={detailPerson}
             onRecord={(personDocId, note) => facade.recordInteraction(personDocId, note)}
+            onDeleteInteraction={(personDocId, eventId) => facade.deleteInteraction(personDocId, eventId)}
             onLoadInsights={(docId) => facade.loadPersonInsights(docId)}
             {onOpenPersonDoc}
             onNavigate={openDetail}

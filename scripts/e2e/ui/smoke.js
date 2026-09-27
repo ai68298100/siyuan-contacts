@@ -15,6 +15,7 @@ import { captureFromDoc } from "../../../src/services/capture";
 import { exportInteractionJson } from "../../../src/services/interaction-export";
 import { importInteractionJson, previewInteractionImport } from "../../../src/services/interaction-import";
 import { FIELD_SPECS } from "../../../src/domain/fields";
+import { buildTimeline, buildCoAttendance } from "../../../src/domain/interactions";
 import { DEFAULT_VIEW_PREFERENCES } from "../../../src/domain/preferences";
 import { kernel } from "./siyuan-mock.js";
 import { handleProtyleEvent } from "../../../src/panels/person-panel";
@@ -823,6 +824,83 @@ await test("无浏览器锁时并发互动与备份合并仍串行，不丢记�
         if (descriptor) Object.defineProperty(navigator, "locks", descriptor);
         else Reflect.deleteProperty(navigator, "locks");
     }
+});
+
+await test("人物互动支持加载更多、筛选及安全删除，取消/失败不丢记录，成功刷新同场统计", async () => {
+    const mine = Array.from({ length: 26 }, (_, index) => ({
+        id: `history-${index}`, personDocId: person.docId, source: "manual", occurredAt: Date.now(),
+        localDate: "2026-09-27", note: `历史互动${index}`,
+    }));
+    mine[0].note = "长备注回归".repeat(40);
+    let saved = { schemaVersion: 1, events: [...mine,
+        { id: "meeting-mine", personDocId: person.docId, source: "diary", externalRef: "会议", occurredAt: Date.now(), localDate: "2026-09-26", note: "共同会议" },
+        { id: "meeting-other", personDocId: "乙", source: "diary", externalRef: "会议", occurredAt: Date.now(), localDate: "2026-09-26" },
+    ], tombstones: [] };
+    let failDelete = true;
+    let changed = 0;
+    const plugin = {
+        loadData: async () => JSON.parse(JSON.stringify(saved)),
+        saveData: async (_key, value) => { if (!failDelete) saved = JSON.parse(JSON.stringify(value)); },
+    };
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person, onRecord: async () => {},
+        onLoadInsights: async () => {
+            const store = await loadInteractionStore(plugin);
+            return { timeline: buildTimeline(store.events, person.docId), coAttendance: buildCoAttendance(store.events, person.docId).map((item) => ({ ...item, name: "乙" })), totalEvents: store.events.filter((item) => item.personDocId === person.docId).length };
+        },
+        onDeleteInteraction: (personDocId, eventId) => deleteInteraction(plugin, eventId, personDocId),
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() { changed += 1; }, onDeleted() {}, onClose() {},
+    } });
+    button("互动").click();
+    await until(() => fixture.querySelectorAll(".lvct-detail__timeline-row").length === 20, "时间线未分批显示");
+    const longNote = fixture.querySelector(".lvct-detail__timeline-note");
+    assert(longNote.scrollWidth <= longNote.clientWidth + 1, "长备注溢出时间线");
+    assert(getComputedStyle(longNote).whiteSpace === "normal", "长备注仍被截断而无法阅读");
+    button("加载更多").click();
+    await until(() => fixture.querySelectorAll(".lvct-detail__timeline-row").length === 27, "旧互动无法继续浏览");
+    const search = fixture.querySelector('input[aria-label="搜索互动备注或日期"]');
+    input(search, "不存在的备注");
+    await until(() => fixture.textContent.includes("没有匹配的互动"), "搜索空结果没有提示");
+    button("清除筛选").click();
+    await tick();
+    assert(fixture.querySelectorAll(".lvct-detail__timeline-row").length === 20, "清除筛选未恢复首批结果");
+    const source = fixture.querySelector('select[aria-label="互动来源"]');
+    source.value = "diary";
+    source.dispatchEvent(new Event("change", { bubbles: true }));
+    await until(() => fixture.querySelectorAll(".lvct-detail__timeline-row").length === 1, "来源筛选未生效");
+    assert(fixture.textContent.includes("与 乙 同场 1 次"), "共同出席统计缺失");
+    const originalConfirm = window.confirm;
+    try {
+        window.confirm = () => false;
+        button("删除", fixture.querySelector(".lvct-detail__timeline-row")).click();
+        await tick();
+        assert(saved.events.length === 28 && changed === 0, "取消删除仍修改记录");
+        window.confirm = (message) => { assert(message.includes("其他参与者"), "删除确认未说明范围"); return true; };
+        button("删除", fixture.querySelector(".lvct-detail__timeline-row")).click();
+        await until(() => fixture.textContent.includes("存储写入未收敛"), "删除失败未显示错误");
+        assert(saved.events.length === 28 && changed === 0, "删除失败丢失记录");
+        failDelete = false;
+        button("删除", fixture.querySelector(".lvct-detail__timeline-row")).click();
+        await until(() => fixture.textContent.includes("没有匹配的互动"), "成功后时间线未刷新");
+        assert(changed === 1 && saved.tombstones.includes("meeting-mine"), "成功删除未刷新统计或写墓碑");
+        assert(saved.events.some((item) => item.id === "meeting-other"), "删除了其他参与者记录");
+        assert(!fixture.textContent.includes("与 乙 同场 1 次"), "删除后共同出席统计未刷新");
+    } finally { window.confirm = originalConfirm; }
+});
+
+await test("人物互动删除在锁内检查归属，不能删除他人事件", async () => {
+    let saved = "";
+    let writes = 0;
+    const plugin = {
+        loadData: async () => JSON.parse(JSON.stringify(saved)),
+        saveData: async (_key, value) => { writes += 1; saved = JSON.parse(JSON.stringify(value)); },
+    };
+    const store = await recordInteraction(plugin, { personDocId: "乙" });
+    const before = writes;
+    let message = "";
+    try { await deleteInteraction(plugin, store.events[0].id, "甲"); } catch (error) { message = error.message; }
+    assert(message.includes("不属于当前人物") && writes === before, "归属不符仍执行删除");
+    assert((await loadInteractionStore(plugin)).events.length === 1, "他人事件被误删");
 });
 
 await pause(100);

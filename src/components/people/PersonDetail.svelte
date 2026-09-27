@@ -12,6 +12,7 @@
         settings,
         person,
         onRecord,
+        onDeleteInteraction,
         onLoadInsights,
         onOpenPersonDoc,
         onNavigate,
@@ -23,6 +24,7 @@
         person: ContactSummary;
         /** 记一笔互动（facade.recordInteraction） */
         onRecord: (personDocId: string, note?: string) => Promise<void>;
+        onDeleteInteraction?: (personDocId: string, eventId: string) => Promise<void>;
         /** 人物洞察（时间线+共同出席） */
         onLoadInsights: (docId: string) => Promise<import("../../services/insights").PersonInsights>;
         onOpenPersonDoc: (docId: string) => void;
@@ -51,6 +53,30 @@
     let editing = $state(false);
     let deleting = $state(false);
     let activeTab: "overview" | "activity" | "relations" = $state("overview");
+    let activitySearch = $state("");
+    let activitySource = $state("");
+    let activityLimit = $state(20);
+    const sourceLabels = { manual: "手动记录", diary: "笔记捕获", api: "外部联动" };
+    const filteredTimeline = $derived.by(() => {
+        const query = activitySearch.trim().toLowerCase();
+        return (insights?.timeline ?? []).filter((item) => (!activitySource || item.source === activitySource) &&
+            (!query || `${item.localDate} ${item.note ?? ""}`.toLowerCase().includes(query)));
+    });
+
+    async function deleteTimelineItem(eventId: string) {
+        if (busy || !onDeleteInteraction) return;
+        if (!window.confirm(`删除「${current.name}」的这条互动吗？只删除本人的记录，其他参与者与人物文档会保留。`)) return;
+        busy = true;
+        errorText = "";
+        try {
+            await onDeleteInteraction(current.docId, eventId);
+            recorded = false;
+            onChanged();
+            await loadInsights();
+        } catch (error) {
+            errorText = error instanceof Error ? error.message : String(error);
+        } finally { busy = false; }
+    }
 
     async function loadInsights() {
         const request = ++insightsRequest;
@@ -200,6 +226,15 @@
 
     <section class="lvct-detail__section">
         <h4>互动与共同出席{insights ? `（共 ${insights.totalEvents} 条）` : ""}</h4>
+        <div class="lvct-detail__activity-filters">
+            <input class="b3-text-field" type="search" aria-label="搜索互动备注或日期" placeholder="搜索备注或日期" bind:value={activitySearch} oninput={() => (activityLimit = 20)} />
+            <select class="b3-select" aria-label="互动来源" bind:value={activitySource} onchange={() => (activityLimit = 20)}>
+                <option value="">全部来源</option>
+                <option value="manual">手动记录</option>
+                <option value="diary">笔记捕获</option>
+                <option value="api">外部联动</option>
+            </select>
+        </div>
         {#if insights && insights.coAttendance.length > 0}
             <div class="lvct-strip__chips" style="margin-bottom: 6px;">
                 {#each insights.coAttendance.slice(0, 5) as item (item.otherDocId)}
@@ -213,16 +248,30 @@
             <ViewState compact error title="互动记录加载失败" description={insightsError}>
                 <button class="b3-button b3-button--outline" onclick={loadInsights}>重试</button>
             </ViewState>
-        {:else if insights && insights.timeline.length > 0}
+        {:else if filteredTimeline.length > 0}
             <div class="lvct-detail__timeline">
-                {#each insights.timeline.slice(0, 5) as item (item.eventId)}
+                {#each filteredTimeline.slice(0, activityLimit) as item (item.eventId)}
                     <div class="lvct-detail__timeline-row">
                         <span class="ft__on-surface">{item.localDate}</span>
                         <span class="lvct-detail__timeline-note">{item.note || "互动"}</span>
+                        <span class="lvct-detail__timeline-source">{sourceLabels[item.source]}</span>
                         {#if item.groupSize > 1}<span class="lvct-chip">{item.groupSize} 人同场</span>{/if}
+                        {#if onDeleteInteraction}
+                            <button class="b3-button b3-button--text" title="删除这条互动" aria-label={`删除 ${item.localDate} 的互动`} disabled={busy} onclick={() => deleteTimelineItem(item.eventId)}>删除</button>
+                        {/if}
                     </div>
                 {/each}
             </div>
+            <div class="lvct-detail__activity-more">
+                <span class="ft__smaller ft__on-surface">显示 {Math.min(activityLimit, filteredTimeline.length)} / {filteredTimeline.length} 条</span>
+                {#if activityLimit < filteredTimeline.length}
+                    <button class="b3-button b3-button--outline" onclick={() => (activityLimit += 20)}>加载更多</button>
+                {/if}
+            </div>
+        {:else if insights && insights.timeline.length > 0}
+            <ViewState compact title="没有匹配的互动">
+                <button class="b3-button b3-button--outline" onclick={() => { activitySearch = ""; activitySource = ""; activityLimit = 20; }}>清除筛选</button>
+            </ViewState>
         {:else}
             <ViewState compact title="还没有互动记录" description="从一次聊天或见面开始，记录你们的往来。">
                 <button class="b3-button b3-button--text" onclick={() => (activeTab = "overview")}>去记一笔</button>

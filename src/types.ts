@@ -22,6 +22,7 @@ export interface ContactsPluginFacade {
     loadDashboard(options?: Partial<DashboardOptions>): Promise<DashboardData>;
     /** 记一笔互动（幂等） */
     recordInteraction(personDocId: string, note?: string): Promise<void>;
+    deleteInteraction(personDocId: string, eventId: string): Promise<void>;
     /** 人物洞察：互动时间线 + 共同出席统计 */
     loadPersonInsights(docId: string): Promise<PersonInsights>;
     /** 检查固化字段 ID 是否仍存在于联系人数据库 */
