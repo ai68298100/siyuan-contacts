@@ -97,6 +97,30 @@ await test("首页零人筛选保持空结果，清除后恢复联系人", async
     await until(() => fixture.querySelector(".lvct-person-card"), "清除首页筛选未恢复联系人");
 });
 
+await test("工作台可通过入口请求切换到设置页", async () => {
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadDashboard: async () => ({
+            people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+            stale: [], neverContacted: 0, neverContactedItemIds: [],
+        }) },
+    } });
+    await until(() => fixture.querySelector("h1")?.textContent === "首页", "工作台未加载");
+    window.dispatchEvent(new CustomEvent("lvct-workbench-view", { detail: { view: "settings" } }));
+    await until(() => fixture.querySelector("h1")?.textContent === "设置", "设置入口请求未切换工作台");
+    assert(fixture.querySelector(".lvct-settings"), "设置页内容未挂载");
+});
+
+await test("新工作台可按入口指定的初始视图打开", async () => {
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, initialView: "settings", isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {}, facade: { settings },
+    } });
+    await until(() => fixture.querySelector("h1")?.textContent === "设置", "工作台没有使用入口指定的初始视图");
+    assert(fixture.querySelector(".lvct-settings"), "初始设置页内容未挂载");
+});
+
 if (window.innerWidth <= 640) {
     await test("移动视口显示底部导航，Peek 详情占满屏幕并保留安全区内距", async () => {
         mounted = mount(Workbench, { target: fixture, props: {

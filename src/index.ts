@@ -23,7 +23,7 @@ import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
 import { svelteDialog } from "./libs/dialog";
 import type { ContactsSettings } from "./domain/model";
 import type { ViewPreferences } from "./domain/preferences";
-import type { ContactsPluginFacade } from "./types";
+import type { ContactsPluginFacade, WorkbenchView } from "./types";
 
 const TAB_TYPE = "workbench";
 
@@ -42,6 +42,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     private workbenchDialog: Dialog | null = null;
     private dialogInstance: ReturnType<typeof mount> | null = null;
+    private requestedWorkbenchView: WorkbenchView | undefined;
 
     async onload() {
         const frontend = getFrontend();
@@ -65,7 +66,9 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
                 const container = document.createElement("div");
                 container.className = "lvct-tab-root fn__flex-1";
                 this.element.appendChild(container);
-                const instance = mount(WorkbenchRoot, { target: container, props: { facade: plugin } });
+                const initialView = plugin.requestedWorkbenchView;
+                plugin.requestedWorkbenchView = undefined;
+                const instance = mount(WorkbenchRoot, { target: container, props: { facade: plugin, initialView } });
                 (this as { __lvctInstance?: ReturnType<typeof mount> }).__lvctInstance = instance;
             },
             destroy() {
@@ -169,10 +172,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         console.debug("[lvct] storage data changed");
     }
 
-    openWorkbench() {
+    openWorkbench(view?: WorkbenchView) {
         if (this.isMobile) {
-            this.openWorkbenchDialog();
+            this.openWorkbenchDialog(view);
         } else {
+            this.requestedWorkbenchView = view;
             openTab({
                 app: this.app,
                 custom: {
@@ -181,6 +185,12 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
                     id: `${this.name}${TAB_TYPE}`,
                 },
             });
+            if (view) {
+                window.setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent("lvct-workbench-view", { detail: { view } }));
+                    if (this.requestedWorkbenchView === view) this.requestedWorkbenchView = undefined;
+                }, 0);
+            }
         }
     }
 
@@ -274,11 +284,22 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     openSettings() {
-        showMessage("设置面板在后续里程碑开放", 2500);
+        if (!this.settings) {
+            showMessage("请先完成人脉工作空间初始化", 3000);
+            return;
+        }
+        this.openWorkbench("settings");
     }
 
-    private openWorkbenchDialog() {
-        if (this.workbenchDialog) return;
+    private openWorkbenchDialog(initialView?: WorkbenchView) {
+        if (this.workbenchDialog) {
+            if (initialView) {
+                window.setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent("lvct-workbench-view", { detail: { view: initialView } }));
+                }, 0);
+            }
+            return;
+        }
         this.workbenchDialog = new Dialog({
             title: this.i18n.tabTitle ?? "小驴人脉",
             content: '<div class="lvct-dialog-root" style="height:100%;"></div>',
@@ -294,6 +315,6 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         });
         const target = this.workbenchDialog.element.querySelector<HTMLElement>(".lvct-dialog-root");
         if (!target) throw new Error("dialog 容器缺失");
-        this.dialogInstance = mount(WorkbenchRoot, { target, props: { facade: this } });
+        this.dialogInstance = mount(WorkbenchRoot, { target, props: { facade: this, initialView } });
     }
 }

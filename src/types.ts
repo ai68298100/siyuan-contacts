@@ -6,6 +6,8 @@ import type { PersonInsights } from "./services/insights";
 import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "./services/settings-health";
 import type { ViewPreferences } from "./domain/preferences";
 
+export type WorkbenchView = "home" | "people" | "graph" | "settings";
+
 /**
  * 插件实例暴露给组件层的结构化视图（避免组件 import 插件入口造成循环依赖）。
  */

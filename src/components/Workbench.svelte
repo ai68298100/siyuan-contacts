@@ -9,15 +9,17 @@
     import DashboardView from "./dashboard/DashboardView.svelte";
     import LvctDialog from "./LvctDialog.svelte";
     import SettingsView from "./SettingsView.svelte";
+    import { onMount } from "svelte";
     import type { ContactsSettings } from "../domain/model";
     import type { ViewPreferences } from "../domain/preferences";
     import type { ContactSummary } from "../domain/person";
-    import type { ContactsPluginFacade } from "../types";
+    import type { ContactsPluginFacade, WorkbenchView } from "../types";
 
     let {
         facade,
         settings,
         preferences,
+        initialView,
         onPreferencesUpdated,
         isMobile,
         onOpenPersonDoc,
@@ -25,12 +27,13 @@
         facade: ContactsPluginFacade;
         settings: ContactsSettings;
         preferences: ViewPreferences;
+        initialView?: WorkbenchView;
         onPreferencesUpdated: (preferences: ViewPreferences) => void;
         isMobile: boolean;
         onOpenPersonDoc: (docId: string) => void;
     } = $props();
 
-    type ViewId = "home" | "people" | "graph" | "settings";
+    type ViewId = WorkbenchView;
 
     const views: readonly { id: ViewId; label: string; icon: string; enabled: boolean }[] = [
         { id: "home", label: "首页", icon: "⌂", enabled: true },
@@ -46,7 +49,7 @@
     };
 
     // svelte-ignore state_referenced_locally
-    let current: ViewId = $state(preferences.defaultView);
+    let current: ViewId = $state(initialView ?? preferences.defaultView);
     // svelte-ignore state_referenced_locally
     let currentSettings: ContactsSettings = $state(settings);
     // svelte-ignore state_referenced_locally
@@ -81,6 +84,17 @@
         peopleFocusLabel = focus?.label ?? "";
         peopleFocusSort = focus?.sort;
     }
+
+    onMount(() => {
+        const handleRequestedView = (event: Event) => {
+            const view = (event as CustomEvent<{ view?: string }>).detail?.view;
+            if (view === "home" || view === "people" || view === "graph" || view === "settings") {
+                selectView(view);
+            }
+        };
+        window.addEventListener("lvct-workbench-view", handleRequestedView);
+        return () => window.removeEventListener("lvct-workbench-view", handleRequestedView);
+    });
 </script>
 
 <div class="lvct-workbench">
