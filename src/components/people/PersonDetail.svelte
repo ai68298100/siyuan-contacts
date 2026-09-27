@@ -7,6 +7,8 @@
     import ViewState from "../ViewState.svelte";
     import type { ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
+    import { nextBirthday } from "../../domain/occasions";
+    import { createCloseScope, useCloseGuard } from "../close-guard";
 
     let {
         settings,
@@ -16,6 +18,7 @@
         onLoadInsights,
         onOpenPersonDoc,
         onNavigate,
+        navigationOrder,
         onChanged,
         onDeleted,
         onClose,
@@ -29,6 +32,7 @@
         onLoadInsights: (docId: string) => Promise<import("../../services/insights").PersonInsights>;
         onOpenPersonDoc: (docId: string) => void;
         onNavigate: (person: ContactSummary) => void;
+        navigationOrder?: readonly ContactSummary[];
         onChanged: () => void;
         onDeleted: () => void;
         onClose: () => void;
@@ -42,6 +46,11 @@
     let busy: boolean = $state(false);
     let errorText: string = $state("");
     let noteText: string = $state("");
+    const canLeave = createCloseScope();
+    const guardedClose = useCloseGuard(() => busy || deleting, () => noteText.trim().length > 0);
+    function navigate(person: ContactSummary | null) {
+        if (person) onNavigate(person);
+    }
     let recorded: boolean = $state(false);
     let insights: import("../../services/insights").PersonInsights | null = $state(null);
     let insightsLoading = $state(true);
@@ -102,9 +111,11 @@
     const candidates = $derived(
         others.filter((item) => item.itemId !== current.itemId && !current.relatedItemIds.includes(item.itemId)),
     );
-    const currentIndex = $derived(others.findIndex((item) => item.itemId === current.itemId));
-    const previousPerson = $derived(currentIndex > 0 ? others[currentIndex - 1] : null);
-    const nextPerson = $derived(currentIndex >= 0 && currentIndex < others.length - 1 ? others[currentIndex + 1] : null);
+    const orderedPeople = $derived(navigationOrder ?? others);
+    const currentIndex = $derived(orderedPeople.findIndex((item) => item.itemId === current.itemId));
+    const previousPerson = $derived(currentIndex > 0 ? orderedPeople[currentIndex - 1] : null);
+    const nextPerson = $derived(currentIndex >= 0 && currentIndex < orderedPeople.length - 1 ? orderedPeople[currentIndex + 1] : null);
+    const birthday = $derived(nextBirthday(current.birthday, current.isLunar));
 
     async function loadOthers() {
         othersLoading = true;
@@ -173,8 +184,8 @@
         </div>
         <div class="lvct-detail__header-actions">
             <button class="b3-button b3-button--outline" onclick={() => (editing = true)} disabled={busy || deleting}>编辑</button>
-            <button class="b3-button b3-button--outline" onclick={() => previousPerson && onNavigate(previousPerson)} disabled={!previousPerson || busy}>上一位</button>
-            <button class="b3-button b3-button--outline" onclick={() => nextPerson && onNavigate(nextPerson)} disabled={!nextPerson || busy}>下一位</button>
+            <button class="b3-button b3-button--outline" onclick={() => navigate(previousPerson)} disabled={!previousPerson || busy}>上一位</button>
+            <button class="b3-button b3-button--outline" onclick={() => navigate(nextPerson)} disabled={!nextPerson || busy}>下一位</button>
         </div>
     </div>
 
@@ -196,6 +207,7 @@
         {#if current.wechat}<div><dt>微信</dt><dd>{current.wechat}</dd></div>{/if}
         {#if current.website}<div><dt>网站</dt><dd>{current.website}</dd></div>{/if}
         {#if current.tags.length > 0}<div><dt>标签</dt><dd>{current.tags.join(" · ")}</dd></div>{/if}
+        {#if birthday}<div><dt>下次生日</dt><dd>{birthday.date.toLocaleDateString("zh-CN")} · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}</dd></div>{/if}
     </dl>
 
     <section class="lvct-detail__section">
@@ -206,11 +218,12 @@
                 type="text"
                 placeholder="做了什么、聊了什么（可留空）"
                 bind:value={noteText}
+                oninput={() => (recorded = false)}
                 disabled={busy}
             />
             <button
                 class="b3-button b3-button--text"
-                disabled={busy || recorded}
+                disabled={busy}
                 onclick={() =>
                     mutate(async () => {
                         await onRecord(current.docId, noteText.trim() || undefined);
@@ -339,7 +352,7 @@
     {/if}
 
     <div class="lvct-form__actions">
-        <button class="b3-button b3-button--cancel" onclick={onClose}>关闭</button>
+        <button class="b3-button b3-button--cancel" onclick={() => { if (canLeave()) guardedClose(onClose); }} disabled={busy || deleting}>关闭</button>
         <button class="b3-button b3-button--text" onclick={() => onOpenPersonDoc(current.docId)}>打开文档</button>
         <button class="b3-button b3-button--cancel lvct-detail__delete" onclick={confirmDelete} disabled={busy || deleting}>{deleting ? "移除中…" : "从人脉移除"}</button>
     </div>

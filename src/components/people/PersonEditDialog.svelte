@@ -4,6 +4,7 @@
     import type { ContactDraft } from "../../domain/person";
     import type { ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
+    import { useCloseGuard } from "../close-guard";
 
     let {
         settings,
@@ -34,6 +35,11 @@
     let tagsText: string = $state(person.tags.join(" "));
     let running: boolean = $state(false);
     let errorText: string = $state("");
+    const original = JSON.stringify(draft);
+    // svelte-ignore state_referenced_locally
+    const originalTags = tagsText;
+    let saved = $state(false);
+    const guardedClose = useCloseGuard(() => running, () => !saved && (JSON.stringify(draft) !== original || tagsText !== originalTags));
 
     async function submit() {
         if (running) return;
@@ -42,6 +48,7 @@
         try {
             const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
             await updateContactFields(settings, person.itemId, { ...draft, tags });
+            saved = true;
             onSaved();
             onClose();
         } catch (error) {
@@ -98,7 +105,7 @@
     {/if}
 
     <div class="lvct-form__actions">
-        <button class="b3-button b3-button--cancel" onclick={onClose}>取消</button>
+        <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={running}>取消</button>
         <button class="b3-button b3-button--text" onclick={submit} disabled={running}>
             {running ? "保存中…" : "保存"}
         </button>

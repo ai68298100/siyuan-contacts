@@ -4,6 +4,7 @@
     import { emptyDraft } from "../../domain/person";
     import type { ContactDraft, ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
+    import { useCloseGuard } from "../close-guard";
 
     let {
         settings,
@@ -19,6 +20,8 @@
     let tagsText: string = $state("");
     let running: boolean = $state(false);
     let errorText: string = $state("");
+    let saved = $state(false);
+    const guardedClose = useCloseGuard(() => running, () => !saved && (JSON.stringify(draft) !== JSON.stringify(emptyDraft()) || tagsText.trim().length > 0));
 
     async function submit() {
         if (running) return;
@@ -27,6 +30,7 @@
         try {
             const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
             const person = await createContact(settings, { ...draft, tags });
+            saved = true;
             onCreated(person);
             onClose();
         } catch (error) {
@@ -87,7 +91,7 @@
     {/if}
 
     <div class="lvct-form__actions">
-        <button class="b3-button b3-button--cancel" onclick={onClose}>取消</button>
+        <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={running}>取消</button>
         <button class="b3-button b3-button--text" onclick={submit} disabled={running || draft.name.trim().length === 0}>
             {running ? "创建中…" : "创建联系人"}
         </button>

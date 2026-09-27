@@ -6,12 +6,16 @@
         person,
         onOpen,
         selected = false,
+        active = false,
         onToggleSelected,
+        onOpenPersonDoc,
     }: {
         person: ContactSummary;
         onOpen: (person: ContactSummary) => void;
         selected?: boolean;
+        active?: boolean;
         onToggleSelected?: (selected: boolean) => void;
+        onOpenPersonDoc?: (docId: string) => void;
     } = $props();
 
     function telHref(phone: string): string {
@@ -23,8 +27,13 @@
     }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="lvct-person-card" onclick={() => onOpen(person)}>
+<div class="lvct-person-card" class:lvct-person-card--active={active} role="button" tabindex="0" aria-label={`查看 ${person.name} 的详情`}
+    onclick={() => onOpen(person)}
+    onkeydown={(event) => {
+        if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
+        event.preventDefault();
+        onOpen(person);
+    }}>
     {#if onToggleSelected}
         <input
             class="lvct-person-card__select"
@@ -45,10 +54,10 @@
             {#if person.group}<span class="lvct-chip lvct-chip--group">{person.group}</span>{/if}
         </div>
         <div class="lvct-person-card__meta ft__smaller ft__on-surface">
-            {#if person.phone}<span class="lvct-person-card__meta-item" onclick={(event) => event.stopPropagation()}>
+            {#if person.phone}<span class="lvct-person-card__meta-item">
                 <a href={telHref(person.phone)} onclick={(event) => event.stopPropagation()}>{person.phone}</a>
             </span>{/if}
-            {#if person.email}<span class="lvct-person-card__meta-item" onclick={(event) => event.stopPropagation()}>
+            {#if person.email}<span class="lvct-person-card__meta-item">
                 <a href={mailHref(person.email)} onclick={(event) => event.stopPropagation()}>{person.email}</a>
             </span>{/if}
             {#if person.wechat}<span class="lvct-person-card__meta-item">微信 {person.wechat}</span>{/if}
@@ -58,4 +67,5 @@
             {/if}
         </div>
     </div>
+    {#if onOpenPersonDoc}<button type="button" class="lvct-person-card__open-doc" title={`打开 ${person.name} 的文档`} aria-label={`打开 ${person.name} 的文档`} onclick={(event) => { event.stopPropagation(); onOpenPersonDoc(person.docId); }}>↗</button>{/if}
 </div>

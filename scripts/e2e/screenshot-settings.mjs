@@ -42,16 +42,14 @@ function capture({ url, outFile, size }) {
 const sections = ["general", "data"];
 try {
     for (const section of sections) {
-        const url = `http://127.0.0.1:${port}/scripts/e2e/shot-settings.html?section=${section}`;
-        const desktop = await capture({
-            url, size: "1280,1000",
-            outFile: join(outDir, `settings-desktop-${section}.png`),
-        });
-        const mobile = await capture({
-            url, size: "390,844",
-            outFile: join(outDir, `settings-mobile-${section}.png`),
-        });
-        console.log(`${section}: desktop ${desktop ? "OK" : "FAIL"}, mobile ${mobile ? "OK" : "FAIL"}`);
+        for (const theme of ["light", "dark"]) {
+            const url = `http://127.0.0.1:${port}/scripts/e2e/shot-settings.html?section=${section}&theme=${theme}`;
+            for (const [viewport, size] of [["desktop", "1280,1000"], ["mobile", "390,844"]]) {
+                const ok = await capture({ url, size, outFile: join(outDir, `settings-${viewport}-${section}-${theme}.png`) });
+                console.log(`${section} ${viewport} ${theme}: ${ok ? "OK" : "FAIL"}`);
+                if (!ok) process.exitCode = 1;
+            }
+        }
     }
 } finally {
     await server.close();

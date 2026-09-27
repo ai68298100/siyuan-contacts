@@ -91,7 +91,7 @@ await test("首页零人筛选保持空结果，清除后恢复联系人", async
     mounted = mount(Workbench, { target: fixture, props: {
         settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
         onPreferencesUpdated() {}, onOpenPersonDoc() {},
-        facade: { settings, loadDashboard: async () => ({
+        facade: { settings, loadRecentInteractions: async () => ({}), loadDashboard: async () => ({
             people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
             stale: [], neverContacted: 0, neverContactedItemIds: [],
         }) },
@@ -112,6 +112,7 @@ await test("英文工作台导航与标题跟随语言资源，缺失文案回�
             loadDashboard: async () => ({ people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
                 stale: [{ person }], neverContacted: 1, neverContactedItemIds: [person.itemId] }),
             loadPersonInsights: async () => emptyInsights(),
+            loadRecentInteractions: async () => ({}),
         },
     } });
     await until(() => fixture.querySelector("h1")?.textContent === "Home", "英文标题未显示");
@@ -169,6 +170,7 @@ if (window.innerWidth <= 640) {
                 loadDashboard: async () => ({ people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
                     stale: [{ person }], neverContacted: 1, neverContactedItemIds: [person.itemId] }),
                 loadPersonInsights: async () => emptyInsights(),
+                loadRecentInteractions: async () => ({}),
                 recordInteraction: async () => {},
             },
         } });

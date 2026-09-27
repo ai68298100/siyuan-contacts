@@ -26,6 +26,7 @@ export interface ContactsPluginFacade {
     deleteInteraction(personDocId: string, eventId: string): Promise<void>;
     /** 人物洞察：互动时间线 + 共同出席统计 */
     loadPersonInsights(docId: string): Promise<PersonInsights>;
+    loadRecentInteractions(): Promise<Record<string, { occurredAt: number; localDate: string }>>;
     /** 检查固化字段 ID 是否仍存在于联系人数据库 */
     checkSettingsHealth(): Promise<SettingsHealth>;
     /** 显式补建健康检查发现的缺失字段，并返回新的字段映射 */

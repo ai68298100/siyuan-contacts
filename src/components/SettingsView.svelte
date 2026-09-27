@@ -3,6 +3,7 @@
     import type { ContactsSettings } from "../domain/model";
     import type { ViewPreferences } from "../domain/preferences";
     import type { InteractionImportSummary } from "../domain/interaction-backup";
+    import { useCloseGuard } from "./close-guard";
     import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "../services/settings-health";
 
     let {
@@ -63,6 +64,10 @@
         avId: settings.avId,
     });
     let errorText = $state("");
+    const guardedClose = useCloseGuard(
+        () => savingPreferences || rebinding || mappingBusy || importingInteractions,
+        () => JSON.stringify(draft) !== JSON.stringify(preferences) || importText.trim().length > 0,
+    );
 
     function setHealth(value: SettingsHealth) {
         health = value;
@@ -234,7 +239,7 @@
 
 <div class="lvct-settings">
     <div class="lvct-settings__topbar">
-        <button class="b3-button b3-button--outline" onclick={onBack}>← 返回工作台</button>
+        <button class="b3-button b3-button--outline" onclick={() => guardedClose(onBack)}>← 返回工作台</button>
     </div>
 
     <div class="lvct-settings__layout">
@@ -283,6 +288,7 @@
                                 <option value="name">按姓名</option>
                                 <option value="group">按分组</option>
                                 <option value="birthday">按生日临近</option>
+                                <option value="recent">按最近互动</option>
                             </select>
                         </label>
                     </div>
@@ -449,7 +455,7 @@
             {:else if activeSection === "about"}
                 <section class="lvct-settings__panel">
                     <h2>关于</h2>
-                    <p class="lvct-settings__desc">数据保存在当前思源工作空间，卸载插件后原样保留。</p>
+                    <p class="lvct-settings__desc">联系人文档和思源数据库是原生数据；插件互动事件、设置和视图偏好保存在插件数据目录，卸载并删除插件数据时可能丢失。请先导出互动备份。</p>
 
                     <div class="lvct-settings__row">
                         <div><b>小驴人脉</b><small>数据主权：一人一文档，数据库作主干</small></div>

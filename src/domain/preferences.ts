@@ -4,7 +4,7 @@ export const VIEW_PREFERENCES_STORAGE_KEY = "view-preferences.json";
 export const VIEW_PREFERENCES_VERSION = 1;
 
 export type DefaultView = "home" | "people" | "graph";
-export type PeopleSortMode = "name" | "group" | "birthday";
+export type PeopleSortMode = "name" | "group" | "birthday" | "recent";
 
 export interface ViewPreferences {
     readonly schemaVersion: number;
@@ -31,7 +31,7 @@ function isDefaultView(value: unknown): value is DefaultView {
 }
 
 function isPeopleSortMode(value: unknown): value is PeopleSortMode {
-    return value === "name" || value === "group" || value === "birthday";
+    return value === "name" || value === "group" || value === "birthday" || value === "recent";
 }
 
 function boundedDays(value: unknown, fallback: number): number {

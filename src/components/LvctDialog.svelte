@@ -1,12 +1,14 @@
 <script lang="ts">
     import { onMount, tick } from "svelte";
     import type { Snippet } from "svelte";
+    import { createCloseScope } from "./close-guard";
 
     let {
         title,
         closeLabel = "关闭",
         wide = false,
         peek = false,
+        modal = !peek,
         closeOnBackdrop = true,
         onClose,
         beforeClose,
@@ -16,6 +18,7 @@
         closeLabel?: string;
         wide?: boolean;
         peek?: boolean;
+        modal?: boolean;
         closeOnBackdrop?: boolean;
         onClose: () => void;
         beforeClose?: () => boolean | Promise<boolean>;
@@ -24,6 +27,7 @@
 
     let panel: HTMLDivElement | undefined = $state();
     let closing = false;
+    const canClose = createCloseScope();
     const titleId = `lvct-dialog-title-${Math.random().toString(36).slice(2)}`;
     const previousActive = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
@@ -38,7 +42,7 @@
         if (closing) return;
         closing = true;
         try {
-            if (beforeClose && !(await beforeClose())) return;
+            if (!canClose() || (beforeClose && !(await beforeClose()))) return;
             onClose();
         } finally {
             closing = false;
@@ -57,7 +61,7 @@
             void requestClose();
             return;
         }
-        if (event.key !== "Tab") return;
+        if (event.key !== "Tab" || !modal) return;
         const items = focusables();
         if (items.length === 0) return;
         const first = items[0];
@@ -92,7 +96,7 @@
         class:lvct-dialog-panel--peek={peek}
         class="lvct-dialog-panel"
         role="dialog"
-        aria-modal="true"
+        aria-modal={modal ? "true" : undefined}
         aria-labelledby={titleId}
         bind:this={panel}
     >

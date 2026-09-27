@@ -8,6 +8,7 @@
     import RelationGraph from "./graph/RelationGraph.svelte";
     import DashboardView from "./dashboard/DashboardView.svelte";
     import LvctDialog from "./LvctDialog.svelte";
+    import { createCloseScope } from "./close-guard";
     import SettingsView from "./SettingsView.svelte";
     import { onMount } from "svelte";
     import { translateText } from "../domain/translation";
@@ -21,6 +22,7 @@
         settings,
         preferences,
         initialView,
+        isMobile,
         onPreferencesUpdated,
         onOpenPersonDoc,
     }: {
@@ -36,6 +38,7 @@
     type ViewId = WorkbenchView;
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(facade.i18n, key, fallback, values));
+    const canLeave = createCloseScope();
 
     const views: readonly { id: ViewId; label: string; icon: string; enabled: boolean }[] = $derived([
         { id: "home", label: text("navHome", "首页"), icon: "⌂", enabled: true },
@@ -58,13 +61,17 @@
     let currentPreferences: ViewPreferences = $state(preferences);
     let detailPerson: ContactSummary | null = $state(null);
     let detailKey = $state(0);
+    let peopleOrder: ContactSummary[] = $state([]);
+    let globalSearch = $state("");
+    let createRequested = $state(0);
     let dataRevision = $state(0);
     let peopleFocusIds: string[] = $state([]);
     let peopleFocusLabel = $state("");
-    let peopleFocusSort: "name" | "group" | "birthday" | undefined = $state(undefined);
+    let peopleFocusSort: "name" | "group" | "birthday" | "recent" | undefined = $state(undefined);
     const currentMeta = $derived(viewMeta[current]);
 
     function openDetail(person: ContactSummary) {
+        if (detailPerson && !canLeave()) return;
         detailPerson = person;
         detailKey += 1; // 同一人重复打开时重置内部状态
     }
@@ -76,11 +83,14 @@
     }
 
     function selectView(view: ViewId) {
+        if (view !== current && !canLeave()) return;
         current = view;
+        if (view !== "people") createRequested = 0;
         clearPeopleFocus();
     }
 
-    function openPeople(focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" }) {
+    function openPeople(focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" | "recent" }) {
+        if (current !== "people" && !canLeave()) return;
         current = "people";
         peopleFocusIds = focus?.itemIds ? [...focus.itemIds] : [];
         peopleFocusLabel = focus?.label ?? "";
@@ -138,6 +148,11 @@
                 <h1>{currentMeta.title}</h1>
                 <p>{currentMeta.subtitle}</p>
             </div>
+            <div class="lvct-workbench__header-actions">
+                <input class="b3-text-field" type="search" aria-label="搜索联系人" placeholder="搜索联系人" bind:value={globalSearch}
+                    oninput={() => { if (globalSearch.trim() && current !== "people") selectView("people"); }} />
+                <button type="button" class="b3-button b3-button--text" onclick={() => { selectView("people"); createRequested += 1; }}>新建联系人</button>
+            </div>
         </header>
         <div class="lvct-workbench__body">
             {#if current === "home"}
@@ -152,12 +167,20 @@
             {:else if current === "people"}
                 <PeopleView
                     settings={currentSettings}
+                    loadRecentInteractions={() => facade.loadRecentInteractions()}
                     initialSort={peopleFocusSort ?? currentPreferences.peopleSort}
                     focusIds={peopleFocusIds}
                     focusLabel={peopleFocusLabel}
+                    externalSearch={globalSearch}
+                    {createRequested}
                     onClearFocus={clearPeopleFocus}
                     revision={dataRevision}
                     onOpenDetail={openDetail}
+                    activePersonId={detailPerson?.itemId ?? ""}
+                    onOrderChange={(ordered) => {
+                        if (ordered.map((person) => person.itemId).join("|") !== peopleOrder.map((person) => person.itemId).join("|")) peopleOrder = ordered;
+                    }}
+                    {onOpenPersonDoc}
                 />
             {:else if current === "graph"}
                 <RelationGraph
@@ -192,7 +215,7 @@
 </div>
 
 {#if detailPerson}
-    <LvctDialog title={text("personDetailTitle", "人物详情 · {name}", { name: detailPerson.name })} closeLabel={text("closeDialog", "关闭")} peek closeOnBackdrop={false} onClose={() => (detailPerson = null)}>
+    <LvctDialog title={text("personDetailTitle", "人物详情 · {name}", { name: detailPerson.name })} closeLabel={text("closeDialog", "关闭")} peek modal={isMobile} closeOnBackdrop={false} onClose={() => (detailPerson = null)}>
         {#key detailKey}
         <PersonDetail
             settings={currentSettings}
@@ -202,6 +225,7 @@
             onLoadInsights={(docId) => facade.loadPersonInsights(docId)}
             {onOpenPersonDoc}
             onNavigate={openDetail}
+            navigationOrder={current === "people" ? peopleOrder : undefined}
             onChanged={() => (dataRevision += 1)}
             onDeleted={() => {
                 detailPerson = null;

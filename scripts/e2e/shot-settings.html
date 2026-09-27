@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="UTF-8"><title>设置页截图</title>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>设置页截图</title>
 <style>
     :root {
         --b3-theme-background: #fff; --b3-theme-surface: #f5f5f5;
@@ -13,8 +13,13 @@
         --b3-theme-success: #23b27c; --b3-theme-info: #3b82f6;
         --b3-font-family: inherit;
     }
-    body { margin: 0; background: #fff; }
-    #shot { width: 1200px; }
+    body { margin: 0; background: var(--b3-theme-background); color: var(--b3-theme-on-background); }
+    #shot { width: 100%; min-height: 100vh; }
+    button, input, select { font: inherit; }
+    .b3-button { border: 0; padding: 7px 12px; background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); cursor: pointer; }
+    .b3-button--outline, .b3-button--cancel { background: var(--b3-theme-surface); color: var(--b3-theme-on-background); }
+    .b3-text-field, .b3-select { background: var(--b3-theme-background); color: var(--b3-theme-on-background); border: 1px solid var(--b3-border-color); padding: 6px; box-sizing: border-box; }
+    html[data-theme="dark"] { --b3-theme-background: #202124; --b3-theme-surface: #303136; --b3-theme-surface-lighter: #393a40; --b3-theme-on-background: #f2f2f3; --b3-theme-on-surface: #d4d5d8; --b3-theme-on-surface-light: #aaaeb5; --b3-theme-primary: #7c8aff; --b3-theme-primary-lightest: #343957; --b3-theme-on-primary: #10121d; --b3-border-color: #484a50; --b3-list-hover: #383a42; --b3-list-icon-hover: #454751; }
 </style></head>
 <body>
 <div id="shot" class="lvct-tab-root"></div>
@@ -55,7 +60,9 @@
         openHostDoc() {},
     };
 
-    const mode = new URLSearchParams(location.search).get("section") || "general";
+    const params = new URLSearchParams(location.search);
+    const mode = params.get("section") || "general";
+    if (params.get("theme") === "dark") document.documentElement.dataset.theme = "dark";
     let app = mount(SettingsView, {
         target: document.getElementById("shot"),
         props: {

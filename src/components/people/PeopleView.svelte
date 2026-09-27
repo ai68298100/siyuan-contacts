@@ -13,30 +13,46 @@
 
     let {
         settings,
+        loadRecentInteractions,
         revision,
         initialSort,
         focusIds = [],
         focusLabel = "",
+        externalSearch = "",
+        createRequested = 0,
         onClearFocus,
         onOpenDetail,
+        activePersonId = "",
+        onOrderChange,
+        onOpenPersonDoc,
     }: {
         settings: ContactsSettings;
+        loadRecentInteractions: () => Promise<Record<string, { occurredAt: number; localDate: string }>>;
         revision: number;
-        initialSort: "name" | "group" | "birthday";
+        initialSort: "name" | "group" | "birthday" | "recent";
         focusIds?: readonly string[];
         focusLabel?: string;
+        externalSearch?: string;
+        createRequested?: number;
         onClearFocus?: () => void;
         onOpenDetail: (person: ContactSummary) => void;
+        activePersonId?: string;
+        onOrderChange?: (people: ContactSummary[]) => void;
+        onOpenPersonDoc?: (docId: string) => void;
     } = $props();
 
     let people: ContactSummary[] = $state([]);
     let loading: boolean = $state(true);
     let errorText: string = $state("");
     let searchText: string = $state("");
+    $effect(() => { searchText = externalSearch; });
+    $effect(() => { if (createRequested > 0) adding = true; });
     let groupFilter: string = $state("");
     let tagFilter: string[] = $state([]);
     // svelte-ignore state_referenced_locally
-    let sortMode: "name" | "group" | "birthday" = $state(initialSort);
+    let sortMode: "name" | "group" | "birthday" | "recent" = $state(initialSort);
+    let recent: Record<string, { occurredAt: number; localDate: string }> = $state({});
+    let recentError = $state("");
     let viewMode: "cards" | "table" = $state("cards");
     let adding: boolean = $state(false);
     let importing: boolean = $state(false);
@@ -67,11 +83,13 @@
         result.sort((a, b) => {
             if (sortMode === "group") return a.group.localeCompare(b.group, "zh-CN") || a.name.localeCompare(b.name, "zh-CN");
             if (sortMode === "birthday") return (birthdayDays.get(a.itemId) ?? Infinity) - (birthdayDays.get(b.itemId) ?? Infinity) || a.name.localeCompare(b.name, "zh-CN");
+            if (sortMode === "recent") return (recent[b.docId]?.occurredAt ?? -Infinity) - (recent[a.docId]?.occurredAt ?? -Infinity) || a.name.localeCompare(b.name, "zh-CN");
             return a.name.localeCompare(b.name, "zh-CN");
         });
         return result;
     });
     const visible = $derived(filtered.slice(0, visibleCount));
+    $effect(() => { onOrderChange?.(filtered); });
     const selectedPeople = $derived(people.filter((person) => selectedIds.includes(person.itemId)));
     const allVisibleSelected = $derived(visible.length > 0 && visible.every((person) => selectedIds.includes(person.itemId)));
 
@@ -92,6 +110,7 @@
     $effect(() => {
         revision;
         void refresh();
+        void loadRecentInteractions().then((value) => { recent = value; recentError = ""; }).catch((error) => { recentError = error instanceof Error ? error.message : String(error); });
     });
 
     function toggleTag(tag: string) {
@@ -199,6 +218,7 @@
             <option value="name">按姓名</option>
             <option value="group">按分组</option>
             <option value="birthday">按生日临近</option>
+            <option value="recent">按最近互动</option>
         </select>
         <button
             class="b3-button b3-button--outline"
@@ -211,6 +231,7 @@
         <button class="b3-button b3-button--outline" onclick={() => (vcarding = true)}>vCard 导入/导出</button>
         <button class="b3-button b3-button--text" onclick={() => (adding = true)}>新建联系人</button>
     </div>
+    {#if recentError}<div class="lvct-form__error" role="alert">最近互动读取失败：{recentError}</div>{/if}
 
     {#if tags.length > 0}
         <div class="lvct-people__filters" aria-label="标签筛选">
@@ -286,6 +307,8 @@
                 <PersonCard
                     {person}
                     selected={selectedIds.includes(person.itemId)}
+                    active={activePersonId === person.itemId}
+                    {onOpenPersonDoc}
                     onToggleSelected={(selected) => toggleSelected(person.itemId, selected)}
                     onOpen={onOpenDetail}
                 />
@@ -299,13 +322,18 @@
                         <th class="lvct-people__select-cell">
                             <input type="checkbox" aria-label="选择当前列表联系人" checked={allVisibleSelected} onchange={(event) => toggleAllVisible((event.currentTarget as HTMLInputElement).checked)} />
                         </th>
-                        <th>姓名</th><th>分组</th><th>电话</th><th>微信</th><th>生日</th><th>标签</th>
+                        <th>姓名</th><th>分组</th><th>电话</th><th>微信</th><th>生日</th><th>最近互动</th><th>标签</th>
                     </tr>
                 </thead>
                 <tbody>
                     {#each visible as person (person.itemId)}
-                        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-                        <tr onclick={() => onOpenDetail(person)}>
+                        <tr tabindex="0" aria-label={`查看 ${person.name} 的详情`} class:lvct-people__row--active={activePersonId === person.itemId}
+                            onclick={() => onOpenDetail(person)}
+                            onkeydown={(event) => {
+                                if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
+                                event.preventDefault();
+                                onOpenDetail(person);
+                            }}>
                             <td class="lvct-people__select-cell">
                                 <input
                                     type="checkbox"
@@ -315,11 +343,12 @@
                                     onchange={(event) => toggleSelected(person.itemId, (event.currentTarget as HTMLInputElement).checked)}
                                 />
                             </td>
-                            <td><b>{person.name}</b></td>
+                            <td><b>{person.name}</b>{#if onOpenPersonDoc}<button type="button" class="lvct-people__open-doc" title={`打开 ${person.name} 的文档`} aria-label={`打开 ${person.name} 的文档`} onclick={(event) => { event.stopPropagation(); onOpenPersonDoc(person.docId); }}>↗</button>{/if}</td>
                             <td>{person.group || "—"}</td>
                             <td>{person.phone || "—"}</td>
                             <td>{person.wechat || "—"}</td>
                             <td>{person.birthday ? `${person.birthday}${person.isLunar ? "（农历）" : ""}` : "—"}</td>
+                            <td>{recent[person.docId]?.localDate ?? "—"}</td>
                             <td>{person.tags.join(" · ") || "—"}</td>
                         </tr>
                     {/each}

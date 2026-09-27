@@ -11,7 +11,7 @@ import WorkbenchRoot from "./components/WorkbenchRoot.svelte";
 import CaptureDialog from "./components/capture/CaptureDialog.svelte";
 import { initializeWorkspace, loadSettings } from "./services/init";
 import { loadDashboard, DEFAULT_DASHBOARD_OPTIONS } from "./services/dashboard";
-import { deleteInteraction, recordInteraction } from "./data/interactions";
+import { deleteInteraction, recordInteraction, loadInteractionStore } from "./data/interactions";
 import { captureFromDoc, previewCapture } from "./services/capture";
 import { extractFromDoc } from "./services/ai-extract";
 import { loadPersonInsights } from "./services/insights";
@@ -235,6 +235,16 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     async loadPersonInsights(docId: string) {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
         return loadPersonInsights(this, this.settings, docId);
+    }
+
+    async loadRecentInteractions() {
+        const store = await loadInteractionStore(this);
+        const latest: Record<string, { occurredAt: number; localDate: string }> = {};
+        for (const event of store.events) {
+            const current = latest[event.personDocId];
+            if (!current || event.occurredAt > current.occurredAt) latest[event.personDocId] = { occurredAt: event.occurredAt, localDate: event.localDate };
+        }
+        return latest;
     }
 
     async checkSettingsHealth() {
