@@ -9,6 +9,7 @@
     import DashboardView from "./dashboard/DashboardView.svelte";
     import LvctDialog from "./LvctDialog.svelte";
     import { createCloseScope } from "./close-guard";
+    import { House, UsersRound, Network, Settings, Building2, Sparkles, UserPlus } from "@lucide/svelte";
     import SettingsView from "./SettingsView.svelte";
     import { onMount } from "svelte";
     import { translateText } from "../domain/translation";
@@ -40,10 +41,10 @@
         translateText(facade.i18n, key, fallback, values));
     const canLeave = createCloseScope();
 
-    const views: readonly { id: ViewId; label: string; icon: string; enabled: boolean }[] = $derived([
-        { id: "home", label: text("navHome", "首页"), icon: "⌂", enabled: true },
-        { id: "people", label: text("navPeople", "联系人"), icon: "♙", enabled: true },
-        { id: "graph", label: text("navGraph", "关系图谱"), icon: "⌘", enabled: true },
+    const views: readonly { id: ViewId; label: string; enabled: boolean }[] = $derived([
+        { id: "home", label: text("navHome", "首页"), enabled: true },
+        { id: "people", label: text("navPeople", "联系人"), enabled: true },
+        { id: "graph", label: text("navGraph", "关系图谱"), enabled: true },
     ]);
 
     const viewMeta: Record<ViewId, { title: string; subtitle: string }> = $derived({
@@ -128,16 +129,16 @@
                     aria-current={current === view.id ? "page" : undefined}
                     onclick={() => selectView(view.id)}
                 >
-                    <span aria-hidden="true">{view.icon}</span>{view.label}
+                    <span aria-hidden="true">{#if view.id === "home"}<House size={16}/>{:else if view.id === "people"}<UsersRound size={16}/>{:else}<Network size={16}/>{/if}</span>{view.label}
                 </button>
             {/each}
             <span class="lvct-workbench__nav-label lvct-workbench__nav-label--secondary">{text("navUpcoming", "即将推出")}</span>
-            <button class="lvct-workbench__nav-item" disabled><span aria-hidden="true">＋</span>{text("navOrganizations", "组织")}</button>
-            <button class="lvct-workbench__nav-item" disabled><span aria-hidden="true">✦</span>{text("navSuggestions", "建议")}</button>
+            <button class="lvct-workbench__nav-item" disabled><span aria-hidden="true"><Building2 size={16}/></span>{text("navOrganizations", "组织")}</button>
+            <button class="lvct-workbench__nav-item" disabled><span aria-hidden="true"><Sparkles size={16}/></span>{text("navSuggestions", "建议")}</button>
         </nav>
         <div class="lvct-workbench__sidebar-footer">
             <button class="lvct-workbench__nav-item" title={text("openSettings", "打开插件设置")} onclick={() => selectView("settings")}>
-                <span aria-hidden="true">⚙</span>{text("navSettings", "设置")}
+                <span aria-hidden="true"><Settings size={16}/></span>{text("navSettings", "设置")}
             </button>
         </div>
     </aside>
@@ -148,11 +149,11 @@
                 <h1>{currentMeta.title}</h1>
                 <p>{currentMeta.subtitle}</p>
             </div>
-            <div class="lvct-workbench__header-actions">
+            {#if current !== "people"}<div class="lvct-workbench__header-actions">
                 <input class="b3-text-field" type="search" aria-label="搜索联系人" placeholder="搜索联系人" bind:value={globalSearch}
                     oninput={() => { if (globalSearch.trim() && current !== "people") selectView("people"); }} />
-                <button type="button" class="b3-button b3-button--text" onclick={() => { selectView("people"); createRequested += 1; }}>新建联系人</button>
-            </div>
+                <button type="button" class="b3-button b3-button--text" onclick={() => { selectView("people"); createRequested += 1; }}><UserPlus size={16}/>新建联系人</button>
+            </div>{/if}
         </header>
         <div class="lvct-workbench__body">
             {#if current === "home"}
@@ -167,6 +168,7 @@
             {:else if current === "people"}
                 <PeopleView
                     settings={currentSettings}
+                    i18n={facade.i18n}
                     loadRecentInteractions={() => facade.loadRecentInteractions()}
                     initialSort={peopleFocusSort ?? currentPreferences.peopleSort}
                     focusIds={peopleFocusIds}
@@ -193,6 +195,7 @@
             {:else if current === "settings"}
                 <SettingsView
                     {facade}
+                    i18n={facade.i18n}
                     settings={currentSettings}
                     preferences={currentPreferences}
                     onSettingsUpdated={(updated) => {
@@ -219,6 +222,7 @@
         {#key detailKey}
         <PersonDetail
             settings={currentSettings}
+            i18n={facade.i18n}
             person={detailPerson}
             onRecord={(personDocId, note) => facade.recordInteraction(personDocId, note)}
             onDeleteInteraction={(personDocId, eventId) => facade.deleteInteraction(personDocId, eventId)}

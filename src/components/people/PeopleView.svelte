@@ -11,9 +11,12 @@
     import VCardDialog from "./VCardDialog.svelte";
     import LvctDialog from "../LvctDialog.svelte";
     import { useCloseGuard } from "../close-guard";
+    import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink } from "@lucide/svelte";
+    import { translateText } from "../../domain/translation";
 
     let {
         settings,
+        i18n,
         loadRecentInteractions,
         revision,
         initialSort,
@@ -28,6 +31,7 @@
         onOpenPersonDoc,
     }: {
         settings: ContactsSettings;
+        i18n?: Readonly<Record<string, string>>;
         loadRecentInteractions: () => Promise<Record<string, { occurredAt: number; localDate: string }>>;
         revision: number;
         initialSort: "name" | "group" | "birthday" | "recent";
@@ -41,6 +45,7 @@
         onOrderChange?: (people: ContactSummary[]) => void;
         onOpenPersonDoc?: (docId: string) => void;
     } = $props();
+    const text = $derived.by(() => (key: string, fallback: string) => translateText(i18n, key, fallback));
 
     let people: ContactSummary[] = $state([]);
     let loading: boolean = $state(true);
@@ -212,37 +217,38 @@
         <input
             class="b3-text-field fn__flex-1"
             type="text"
-            placeholder="搜索姓名/电话/微信/邮箱/标签…"
+            placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
             bind:value={searchText}
         />
         <select class="b3-select" bind:value={groupFilter} onchange={() => (visibleCount = PAGE_SIZE)}>
-            <option value="">全部分组</option>
+            <option value="">{text("peopleAllGroups", "全部分组")}</option>
             {#each groups as group (group)}
                 <option value={group}>{group}</option>
             {/each}
         </select>
-        <select class="b3-select" bind:value={sortMode} aria-label="排序方式" onchange={() => (visibleCount = PAGE_SIZE)}>
-            <option value="name">按姓名</option>
-            <option value="group">按分组</option>
-            <option value="birthday">按生日临近</option>
-            <option value="recent">按最近互动</option>
+        <select class="b3-select" bind:value={sortMode} aria-label={text("peopleSortLabel", "排序方式")} onchange={() => (visibleCount = PAGE_SIZE)}>
+            <option value="name">{text("peopleSortName", "按姓名")}</option>
+            <option value="group">{text("peopleSortGroup", "按分组")}</option>
+            <option value="birthday">{text("peopleSortBirthday", "按生日临近")}</option>
+            <option value="recent">{text("peopleSortRecent", "按最近互动")}</option>
         </select>
         <button
             class="b3-button b3-button--outline"
             title="切换卡片/表格"
             onclick={() => (viewMode = viewMode === "cards" ? "table" : "cards")}
         >
-            {viewMode === "cards" ? "表格" : "卡片"}
+            {#if viewMode === "cards"}<List size={16}/>{:else}<LayoutGrid size={16}/>{/if}
+            {viewMode === "cards" ? text("peopleTable", "表格") : text("peopleCards", "卡片")}
         </button>
-        <button class="b3-button b3-button--outline" onclick={() => (importing = true)}>导入已有文档</button>
-        <button class="b3-button b3-button--outline" onclick={() => (vcarding = true)}>vCard 导入/导出</button>
-        <button class="b3-button b3-button--text" onclick={() => (adding = true)}>新建联系人</button>
+        <button class="b3-button b3-button--outline" onclick={() => (importing = true)}><FolderInput size={16}/>{text("peopleImportDocs", "导入已有文档")}</button>
+        <button class="b3-button b3-button--outline" onclick={() => (vcarding = true)}><ContactRound size={16}/>{text("peopleVcard", "vCard 导入/导出")}</button>
+        <button class="b3-button b3-button--text" onclick={() => (adding = true)}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
     </div>
     {#if recentError}<div class="lvct-form__error" role="alert">最近互动读取失败：{recentError}</div>{/if}
 
     {#if tags.length > 0}
         <div class="lvct-people__filters" aria-label="标签筛选">
-            <span class="ft__smaller ft__on-surface">标签</span>
+            <span class="ft__smaller ft__on-surface">{text("peopleTags", "标签")}</span>
             {#each tags as tag (tag)}
                 <button type="button" class="lvct-people__filter" class:lvct-people__filter--active={tagFilter.includes(tag)} aria-pressed={tagFilter.includes(tag)} onclick={() => toggleTag(tag)}>{tag}</button>
             {/each}
@@ -315,6 +321,7 @@
                     {person}
                     selected={selectedIds.includes(person.itemId)}
                     active={activePersonId === person.itemId}
+                    recent={recent[person.docId]}
                     {onOpenPersonDoc}
                     onToggleSelected={(selected) => toggleSelected(person.itemId, selected)}
                     onOpen={onOpenDetail}
@@ -329,7 +336,7 @@
                         <th class="lvct-people__select-cell">
                             <input type="checkbox" aria-label="选择当前列表联系人" checked={allVisibleSelected} onchange={(event) => toggleAllVisible((event.currentTarget as HTMLInputElement).checked)} />
                         </th>
-                        <th>姓名</th><th>分组</th><th>电话</th><th>微信</th><th>生日</th><th>最近互动</th><th>标签</th>
+                        <th>{text("peopleName", "姓名")}</th><th>{text("peopleGroup", "分组")}</th><th>{text("peoplePhone", "电话")}</th><th>{text("peopleWechat", "微信")}</th><th>{text("peopleBirthday", "生日")}</th><th>{text("peopleRecent", "最近互动")}</th><th>{text("peopleTags", "标签")}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -350,7 +357,7 @@
                                     onchange={(event) => toggleSelected(person.itemId, (event.currentTarget as HTMLInputElement).checked)}
                                 />
                             </td>
-                            <td><b>{person.name}</b>{#if onOpenPersonDoc}<button type="button" class="lvct-people__open-doc" title={`打开 ${person.name} 的文档`} aria-label={`打开 ${person.name} 的文档`} onclick={(event) => { event.stopPropagation(); onOpenPersonDoc(person.docId); }}>↗</button>{/if}</td>
+                            <td><b>{person.name}</b>{#if onOpenPersonDoc}<button type="button" class="lvct-people__open-doc" title={`打开 ${person.name} 的文档`} aria-label={`打开 ${person.name} 的文档`} onclick={(event) => { event.stopPropagation(); onOpenPersonDoc(person.docId); }}><ExternalLink size={16}/></button>{/if}</td>
                             <td>{person.group || "—"}</td>
                             <td>{person.phone || "—"}</td>
                             <td>{person.wechat || "—"}</td>

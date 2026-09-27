@@ -9,9 +9,11 @@
     import type { ContactsSettings } from "../../domain/model";
     import { nextBirthday } from "../../domain/occasions";
     import { createCloseScope, useCloseGuard } from "../close-guard";
+    import { translateText } from "../../domain/translation";
 
     let {
         settings,
+        i18n,
         person,
         onRecord,
         onDeleteInteraction,
@@ -24,6 +26,7 @@
         onClose,
     }: {
         settings: ContactsSettings;
+        i18n?: Readonly<Record<string, string>>;
         person: ContactSummary;
         /** 记一笔互动（facade.recordInteraction） */
         onRecord: (personDocId: string, note?: string) => Promise<void>;
@@ -37,6 +40,7 @@
         onDeleted: () => void;
         onClose: () => void;
     } = $props();
+    const text = $derived.by(() => (key: string, fallback: string) => translateText(i18n, key, fallback));
 
     // 有意取打开弹窗时的快照；后续更新走 refreshPerson 回查
     // svelte-ignore state_referenced_locally
@@ -192,16 +196,16 @@
             </div>
         </div>
         <div class="lvct-detail__header-actions">
-            <button class="b3-button b3-button--outline" onclick={() => (editing = true)} disabled={busy || deleting}>编辑</button>
-            <button class="b3-button b3-button--outline" onclick={() => navigate(previousPerson)} disabled={!previousPerson || busy}>上一位</button>
-            <button class="b3-button b3-button--outline" onclick={() => navigate(nextPerson)} disabled={!nextPerson || busy}>下一位</button>
+            <button class="b3-button b3-button--outline" onclick={() => (editing = true)} disabled={busy || deleting}>{text("detailEdit", "编辑")}</button>
+            <button class="b3-button b3-button--outline" onclick={() => navigate(previousPerson)} disabled={!previousPerson || busy}>{text("detailPrevious", "上一位")}</button>
+            <button class="b3-button b3-button--outline" onclick={() => navigate(nextPerson)} disabled={!nextPerson || busy}>{text("detailNext", "下一位")}</button>
         </div>
     </div>
 
     <div class="lvct-detail__tabs" role="tablist" tabindex="-1" aria-label="人物详情内容" onkeydown={handleTabKeydown}>
-        <button type="button" role="tab" aria-selected={activeTab === "overview"} tabindex={activeTab === "overview" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "overview"} onclick={() => (activeTab = "overview")}>概览</button>
-        <button type="button" role="tab" aria-selected={activeTab === "activity"} tabindex={activeTab === "activity" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "activity"} onclick={() => (activeTab = "activity")}>互动</button>
-        <button type="button" role="tab" aria-selected={activeTab === "relations"} tabindex={activeTab === "relations" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "relations"} onclick={() => (activeTab = "relations")}>相关人</button>
+        <button type="button" role="tab" aria-selected={activeTab === "overview"} tabindex={activeTab === "overview" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "overview"} onclick={() => (activeTab = "overview")}>{text("detailOverview", "概览")}</button>
+        <button type="button" role="tab" aria-selected={activeTab === "activity"} tabindex={activeTab === "activity" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "activity"} onclick={() => (activeTab = "activity")}>{text("detailActivity", "互动")}</button>
+        <button type="button" role="tab" aria-selected={activeTab === "relations"} tabindex={activeTab === "relations" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "relations"} onclick={() => (activeTab = "relations")}>{text("detailRelations", "相关人")}</button>
     </div>
 
     {#if activeTab === "overview"}
@@ -220,12 +224,12 @@
     </dl>
 
     <section class="lvct-detail__section">
-        <h4>记一笔互动</h4>
+        <h4>{text("detailRecordTitle", "记一笔互动")}</h4>
         <div class="lvct-detail__record fn__flex">
             <input
                 class="b3-text-field fn__flex-1"
                 type="text"
-                placeholder="做了什么、聊了什么（可留空）"
+                placeholder={text("detailRecordPlaceholder", "做了什么、聊了什么（可留空）")}
                 bind:value={noteText}
                 oninput={() => (recorded = false)}
                 disabled={busy}
@@ -240,7 +244,7 @@
                         noteText = "";
                         await loadInsights();
                     })}
-            >{recorded ? "已记录 ✓" : "记录"}</button>
+            >{recorded ? text("detailRecorded", "已记录 ✓") : text("detailRecord", "记录")}</button>
         </div>
         <p class="ft__smaller ft__on-surface">记录后，首页"久未联系"会重新计时。</p>
     </section>
@@ -361,9 +365,9 @@
     {/if}
 
     <div class="lvct-form__actions">
-        <button class="b3-button b3-button--cancel" onclick={() => { if (canLeave()) guardedClose(onClose); }} disabled={busy || deleting}>关闭</button>
-        <button class="b3-button b3-button--text" onclick={() => onOpenPersonDoc(current.docId)}>打开文档</button>
-        <button class="b3-button b3-button--cancel lvct-detail__delete" onclick={confirmDelete} disabled={busy || deleting}>{deleting ? "移除中…" : "从人脉移除"}</button>
+        <button class="b3-button b3-button--cancel" onclick={() => { if (canLeave()) guardedClose(onClose); }} disabled={busy || deleting}>{text("closeDialog", "关闭")}</button>
+        <button class="b3-button b3-button--text" onclick={() => onOpenPersonDoc(current.docId)}>{text("detailOpenDoc", "打开文档")}</button>
+        <button class="b3-button b3-button--cancel lvct-detail__delete" onclick={confirmDelete} disabled={busy || deleting}>{deleting ? text("detailRemoving", "移除中…") : text("detailRemove", "从人脉移除")}</button>
     </div>
 </div>
 

@@ -1,6 +1,7 @@
 <script lang="ts">
     /** 关系图谱：cytoscape 力导向布局，节点=联系人，边=related 关系，点击节点开文档 */
     import cytoscape from "cytoscape";
+    import { onMount } from "svelte";
     import ViewState from "../ViewState.svelte";
     import { listContacts } from "../../services/contacts";
     import { buildGraph, capGraph, GRAPH_MAX_NODES, groupColor, queryGraphRelations } from "../../domain/graph";
@@ -142,6 +143,24 @@
         return value || groupColor(group);
     }
 
+    onMount(() => {
+        const updateTheme = () => {
+            const instance = graphInstance;
+            if (!instance || instance.destroyed()) return;
+            const palette = themeColors();
+            instance.batch(() => {
+                instance.nodes().forEach((node) => { node.data("color", groupColorValue(node.data("group"))); });
+                instance.nodes().style({ color: palette.text, "border-color": palette.text });
+                instance.edges().style("line-color", palette.edge);
+            });
+        };
+        const observer = new MutationObserver(updateTheme);
+        for (const target of [document.documentElement, document.body]) {
+            observer.observe(target, { attributes: true, attributeFilter: ["class", "style", "data-theme-mode"] });
+        }
+        return () => observer.disconnect();
+    });
+
     async function refresh() {
         const version = ++refreshVersion;
         loading = true;
@@ -238,6 +257,7 @@
                         id: node.id,
                         label: node.label,
                         degree: node.degree,
+                        group: node.group,
                         color: groupColorValue(node.group),
                     },
                     classes: searchNeedle ? "lvct-graph-hit" : "",

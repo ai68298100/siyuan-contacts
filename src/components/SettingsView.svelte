@@ -4,10 +4,14 @@
     import type { ViewPreferences } from "../domain/preferences";
     import type { InteractionImportSummary } from "../domain/interaction-backup";
     import { useCloseGuard } from "./close-guard";
+    import StatusNotice from "./StatusNotice.svelte";
+    import { SlidersHorizontal, Database, Bell, Sparkles, Plug, Info } from "@lucide/svelte";
+    import { translateText } from "../domain/translation";
     import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "../services/settings-health";
 
     let {
         facade,
+        i18n,
         settings,
         preferences,
         onSettingsUpdated,
@@ -16,6 +20,7 @@
         onInteractionsUpdated = () => {},
     }: {
         facade: ContactsPluginFacade;
+        i18n?: Readonly<Record<string, string>>;
         settings: ContactsSettings;
         preferences: ViewPreferences;
         onSettingsUpdated: (settings: ContactsSettings) => void;
@@ -23,17 +28,18 @@
         onBack: () => void;
         onInteractionsUpdated?: () => void;
     } = $props();
+    const text = $derived.by(() => (key: string, fallback: string) => translateText(i18n, key, fallback));
 
     type SectionId = "general" | "data" | "reminder" | "ai" | "bridge" | "about";
 
-    const sections: readonly { id: SectionId; label: string; icon: string }[] = [
-        { id: "general", label: "通用", icon: "🎛" },
-        { id: "data", label: "数据与字段", icon: "🗂" },
-        { id: "reminder", label: "提醒", icon: "🔔" },
-        { id: "ai", label: "AI 与隐私", icon: "✨" },
-        { id: "bridge", label: "服务桥", icon: "🔌" },
-        { id: "about", label: "关于", icon: "ℹ" },
-    ];
+    const sections: readonly { id: SectionId; label: string }[] = $derived([
+        { id: "general", label: text("settingsGeneral", "通用") },
+        { id: "data", label: text("settingsData", "数据与字段") },
+        { id: "reminder", label: text("settingsReminder", "提醒") },
+        { id: "ai", label: text("settingsAiPrivacy", "AI 与隐私") },
+        { id: "bridge", label: text("settingsBridge", "服务桥") },
+        { id: "about", label: text("settingsAbout", "关于") },
+    ]);
 
     let activeSection: SectionId = $state("general");
     let health: SettingsHealth | null = $state(null);
@@ -242,7 +248,7 @@
 
 <div class="lvct-settings">
     <div class="lvct-settings__topbar">
-        <button class="b3-button b3-button--outline" onclick={() => guardedClose(onBack)}>← 返回工作台</button>
+        <button class="b3-button b3-button--outline" onclick={() => guardedClose(onBack)}>← {text("settingsBack", "返回工作台")}</button>
     </div>
 
     <div class="lvct-settings__layout">
@@ -254,17 +260,24 @@
                     aria-current={activeSection === section.id ? "page" : undefined}
                     onclick={() => (activeSection = section.id)}
                 >
-                    <span aria-hidden="true">{section.icon}</span>{section.label}
+                    <span aria-hidden="true">
+                        {#if section.id === "general"}<SlidersHorizontal size={16}/>
+                        {:else if section.id === "data"}<Database size={16}/>
+                        {:else if section.id === "reminder"}<Bell size={16}/>
+                        {:else if section.id === "ai"}<Sparkles size={16}/>
+                        {:else if section.id === "bridge"}<Plug size={16}/>
+                        {:else}<Info size={16}/>{/if}
+                    </span>{section.label}
                 </button>
             {/each}
         </nav>
 
         <div class="lvct-settings__body">
-            {#if errorText}<div class="lvct-form__error" role="alert">操作失败：{errorText}</div>{/if}
+            <StatusNotice message={errorText ? `操作失败：${errorText}` : ""} error />
 
             {#if activeSection === "general"}
                 <section class="lvct-settings__panel">
-                    <h2>通用</h2>
+                    <h2>{text("settingsGeneral", "通用")}</h2>
                     <p class="lvct-settings__desc">界面与默认行为偏好，仅存于插件本地 JSON，不影响数据库内容。</p>
 
                     <div class="lvct-settings__row">
@@ -305,12 +318,12 @@
                         <button class="b3-button b3-button--outline" onclick={savePreferences} disabled={savingPreferences}>
                             {savingPreferences ? "保存中…" : "保存偏好"}
                         </button>
-                        {#if preferencesMessage}<span class="ft__smaller lvct-text-success" role="status">{preferencesMessage}</span>{/if}
+                        <StatusNotice message={preferencesMessage} onDismiss={() => (preferencesMessage = "")} />
                     </div>
                 </section>
             {:else if activeSection === "data"}
                 <section class="lvct-settings__panel">
-                    <h2>数据与字段</h2>
+                    <h2>{text("settingsData", "数据与字段")}</h2>
                     <p class="lvct-settings__desc">字段 ID 固化在设置中，列名可在思源里自由修改；若列被删除可在此恢复或补建。</p>
 
                     <div class="lvct-settings__row">
@@ -329,7 +342,7 @@
                             </div>
                             <div class="lvct-settings__actions">
                                 <button class="b3-button b3-button--outline" onclick={runRebind} disabled={rebinding}>{rebinding ? "验证并保存中…" : "验证并重新绑定"}</button>
-                                {#if rebindMessage}<span class="ft__smaller lvct-text-success">{rebindMessage}</span>{/if}
+                                <StatusNotice message={rebindMessage} onDismiss={() => (rebindMessage = "")} />
                             </div>
                         </div>
                     {/if}
@@ -340,7 +353,7 @@
                             {exportingInteractions ? "导出中…" : "导出 JSON"}
                         </button>
                     </div>
-                    {#if exportMessage}<p class="lvct-settings__inline-hint lvct-text-success" role="status">{exportMessage}</p>{/if}
+                    <StatusNotice message={exportMessage} onDismiss={() => (exportMessage = "")} actionLabel="再次导出" onAction={runExportInteractions} />
 
                     <div class="lvct-settings__row">
                         <label for="lvct-interaction-backup"><b>合并互动备份</b></label>
@@ -354,7 +367,7 @@
                         <button class="b3-button b3-button--outline" onclick={runImportInteractions} disabled={!importPreview || previewingImport || importingInteractions}>
                             {importingInteractions ? "合并中…" : "确认合并备份"}
                         </button>
-                        {#if importMessage}<span class="ft__smaller lvct-text-success" role="status">{importMessage}</span>{/if}
+                        <StatusNotice message={importMessage} onDismiss={() => (importMessage = "")} />
                     </div>
 
                     <div class="lvct-settings__sub-heading">
@@ -399,7 +412,7 @@
                 </section>
             {:else if activeSection === "reminder"}
                 <section class="lvct-settings__panel">
-                    <h2>提醒</h2>
+                    <h2>{text("settingsReminder", "提醒")}</h2>
                     <p class="lvct-settings__desc">首页展示近期公历和农历生日，根据互动事件计算联系间隔。</p>
 
                     <div class="lvct-settings__form-grid">
@@ -417,12 +430,12 @@
                         <button class="b3-button b3-button--outline" onclick={savePreferences} disabled={savingPreferences}>
                             {savingPreferences ? "保存中…" : "保存偏好"}
                         </button>
-                        {#if preferencesMessage}<span class="ft__smaller lvct-text-success" role="status">{preferencesMessage}</span>{/if}
+                        <StatusNotice message={preferencesMessage} onDismiss={() => (preferencesMessage = "")} />
                     </div>
                 </section>
             {:else if activeSection === "ai"}
                 <section class="lvct-settings__panel">
-                    <h2>AI 与隐私</h2>
+                    <h2>{text("settingsAiPrivacy", "AI 与隐私")}</h2>
                     <p class="lvct-settings__desc">AI 一律显式触发，可全局关闭；插件不持有密钥、无后台扫描。</p>
 
                     <label class="lvct-settings__switch-row">
@@ -439,12 +452,12 @@
                         <button class="b3-button b3-button--outline" onclick={savePreferences} disabled={savingPreferences}>
                             {savingPreferences ? "保存中…" : "保存偏好"}
                         </button>
-                        {#if preferencesMessage}<span class="ft__smaller lvct-text-success" role="status">{preferencesMessage}</span>{/if}
+                        <StatusNotice message={preferencesMessage} onDismiss={() => (preferencesMessage = "")} />
                     </div>
                 </section>
             {:else if activeSection === "bridge"}
                 <section class="lvct-settings__panel">
-                    <h2>服务桥</h2>
+                    <h2>{text("settingsBridge", "服务桥")}</h2>
                     <p class="lvct-settings__desc">供其他插件搜索、创建联系人和记录互动。</p>
 
                     <div class="lvct-settings__row">
@@ -457,7 +470,7 @@
                 </section>
             {:else if activeSection === "about"}
                 <section class="lvct-settings__panel">
-                    <h2>关于</h2>
+                    <h2>{text("settingsAbout", "关于")}</h2>
                     <p class="lvct-settings__desc">联系人文档和思源数据库是原生数据；插件互动事件、设置和视图偏好保存在插件数据目录，卸载并删除插件数据时可能丢失。请先导出互动备份。</p>
 
                     <div class="lvct-settings__row">

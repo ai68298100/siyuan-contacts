@@ -6,6 +6,7 @@
     import type { ViewPreferences } from "../../domain/preferences";
     import { detectCheckinBridge } from "../../bridge/checkin";
     import ViewState from "../ViewState.svelte";
+    import StatusNotice from "../StatusNotice.svelte";
 
     let {
         facade,
@@ -163,8 +164,8 @@
 
             <div class="lvct-home__card">
                 <h3>久未联系</h3>
-                {#if quickError}<div class="lvct-form__error" role="alert">记录失败：{quickError}</div>{/if}
-                {#if quickMessage}<p role="status">{quickMessage}</p>{/if}
+                <StatusNotice message={quickError ? `记录失败：${quickError}` : ""} error />
+                <StatusNotice message={quickMessage} onDismiss={() => (quickMessage = "")} />
                 {#if data.stale.length === 0}
                     <ViewState compact icon="✓" title={data.people === 0 ? "先添加一位联系人" : "暂无久未联系的人"}
                         description={data.people === 0 ? "创建或导入联系人后，就能开始记录互动。" : "可以继续在联系人档案中记录新的互动。"}>

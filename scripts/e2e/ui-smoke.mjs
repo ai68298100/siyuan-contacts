@@ -1,7 +1,7 @@
 /** 隔离浏览器回归：真实 Svelte/Cytoscape，内存 Siyuan 适配器，不连接用户内核。 */
 import { createServer } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { spawn } from "node:child_process";
@@ -35,6 +35,7 @@ const server = await createServer({
     server: { host: "127.0.0.1", port: 0, open: false },
 });
 let browser;
+let debuggerSocket;
 let timeout;
 try {
     await server.listen();
@@ -43,9 +44,38 @@ try {
     console.log(`隔离浏览器临时目录：${profile}`);
     browser = spawn(browserPath, [
         "--headless=new", "--no-first-run", "--no-default-browser-check", "--disable-gpu",
-        ...(process.env.LVCT_UI_MOBILE === "1" ? ["--window-size=390,844"] : ["--window-size=1280,900"]),
-        `--user-data-dir=${profile}`, `http://127.0.0.1:${address.port}/scripts/e2e/ui/index.html`,
+        "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank",
     ], { stdio: "ignore", windowsHide: true });
+    let debugPort;
+    for (let attempt = 0; attempt < 100; attempt++) {
+        const portFile = join(profile, "DevToolsActivePort");
+        if (existsSync(portFile)) { debugPort = Number(readFileSync(portFile, "utf8").split(/\r?\n/)[0]); break; }
+        await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+    }
+    if (!debugPort) throw new Error("浏览器调试端口未启动");
+    const targets = await fetch(`http://127.0.0.1:${debugPort}/json/list`).then((response) => response.json());
+    const page = targets.find((target) => target.type === "page");
+    if (!page) throw new Error("未找到隔离测试页面");
+    debuggerSocket = new WebSocket(page.webSocketDebuggerUrl);
+    await new Promise((resolveOpen, rejectOpen) => {
+        debuggerSocket.addEventListener("open", resolveOpen, { once: true });
+        debuggerSocket.addEventListener("error", rejectOpen, { once: true });
+    });
+    let nextId = 0;
+    const pending = new Map();
+    debuggerSocket.addEventListener("message", ({ data }) => {
+        const reply = JSON.parse(data);
+        const complete = pending.get(reply.id);
+        if (complete) { pending.delete(reply.id); complete(reply); }
+    });
+    const call = (method, params = {}) => new Promise((resolveCall, rejectCall) => {
+        const id = ++nextId;
+        pending.set(id, (reply) => reply.error ? rejectCall(new Error(reply.error.message)) : resolveCall(reply.result));
+        debuggerSocket.send(JSON.stringify({ id, method, params }));
+    });
+    const mobile = process.env.LVCT_UI_MOBILE === "1";
+    await call("Emulation.setDeviceMetricsOverride", { width: mobile ? 390 : 1280, height: mobile ? 844 : 900, deviceScaleFactor: 1, mobile });
+    await call("Page.navigate", { url: `http://127.0.0.1:${address.port}/scripts/e2e/ui/index.html` });
     const results = await Promise.race([
         report,
         new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error("浏览器回归 45 秒超时")), 45000); }),
@@ -56,6 +86,7 @@ try {
     if (results.some((result) => !result.ok)) process.exitCode = 1;
 } finally {
     clearTimeout(timeout);
+    debuggerSocket?.close();
     browser?.kill();
     await server.close();
 }

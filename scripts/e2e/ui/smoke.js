@@ -141,17 +141,20 @@ await test("英文工作台导航与标题跟随语言资源，缺失文案回�
     await until(() => fixture.querySelector("h1")?.textContent === "Home", "英文标题未显示");
     assert(fixture.querySelector("aside").getAttribute("aria-label") === "Lv Contacts navigation", "导航无障碍标签未翻译");
     assert(fixture.querySelector("aside").textContent.includes("组织"), "空翻译未回退");
-    button("⚙Settings").click();
+    button("Settings").click();
     await until(() => fixture.querySelector("h1")?.textContent === "Settings", "英文设置导航未切换");
     window.dispatchEvent(new CustomEvent("lvct-workbench-view", { detail: { view: "home" } }));
     await until(() => fixture.querySelector(".lvct-dash__stats"), "英文首页未恢复");
-    button("⌘Relationships").click();
+    button("Relationships").click();
     await until(() => fixture.querySelector("h1")?.textContent === "Relationships", "英文关系导航未切换");
-    button("♙Contacts").click();
+    button("Contacts").click();
     await until(() => fixture.querySelector("h1")?.textContent === "Contacts", "英文联系人导航未切换");
     await until(() => fixture.querySelector(".lvct-person-card"), "英文导航联系人未加载");
+    assert(button("New contact", fixture.querySelector(".lvct-people__toolbar")), "联系人常用操作未翻译");
+    assert([...fixture.querySelectorAll(".lvct-people__toolbar option")].some((option) => option.textContent === "Recent interaction"), "排序选项未翻译");
     fixture.querySelector(".lvct-person-card").click();
     await until(() => fixture.querySelector(".lvct-dialog-panel__title")?.textContent === `Person Details · ${person.name}`, "详情标题未翻译或姓名丢失");
+    assert(button("Overview", fixture.querySelector(".lvct-detail__tabs")), "详情标签未翻译");
     assert(fixture.querySelector('button[aria-label="Close"]'), "关闭无障碍标签未翻译");
     fixture.querySelector('button[aria-label="Close"]').click();
     await until(() => !fixture.querySelector(".lvct-dialog-panel"), "英文关闭按钮未关闭详情");
@@ -236,6 +239,20 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
     } });
     await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "图谱未挂载");
     const cy = fixture.querySelector(".lvct-graph-view__canvas")._cyreg.cy;
+    const previousTextColor = document.documentElement.style.getPropertyValue("--b3-theme-on-surface");
+    const previousBorderColor = document.documentElement.style.getPropertyValue("--b3-border-color");
+    try {
+        const beforeText = cy.nodes().first().style("color");
+        document.documentElement.style.setProperty("--b3-theme-on-surface", "#13579b");
+        document.documentElement.style.setProperty("--b3-border-color", "#b75319");
+        await until(() => cy.nodes().first().style("color") !== beforeText, "主题切换后图谱文字颜色未更新");
+        assert(!cy.destroyed(), "主题切换不应重建画布");
+    } finally {
+        if (previousTextColor) document.documentElement.style.setProperty("--b3-theme-on-surface", previousTextColor);
+        else document.documentElement.style.removeProperty("--b3-theme-on-surface");
+        if (previousBorderColor) document.documentElement.style.setProperty("--b3-border-color", previousBorderColor);
+        else document.documentElement.style.removeProperty("--b3-border-color");
+    }
     const select = (label, value) => {
         const node = fixture.querySelector(`select[aria-label="${label}"]`);
         node.value = value;
@@ -477,7 +494,8 @@ await test("设置页可按列类型手动恢复字段映射并拒绝空提交",
         const layoutEl = fixture.querySelector(".lvct-settings__layout");
         const navEl = fixture.querySelector(".lvct-settings__nav");
         assert(getComputedStyle(layoutEl).flexDirection === "column", "移动端设置页应为纵向布局");
-        assert(getComputedStyle(navEl).flexDirection === "row", "移动端设置导航应为横向");
+        assert(getComputedStyle(navEl).display === "grid", "移动端设置导航应为网格");
+        assert([...navEl.querySelectorAll("button")].every((item) => item.getBoundingClientRect().right <= window.innerWidth + 1), "移动端设置分区按钮被裁切");
     }
     const dataNav = [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes("数据与字段"));
     assert(dataNav, "未找到数据与字段导航");

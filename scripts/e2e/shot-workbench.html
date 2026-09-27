@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>工作台截图</title>
+<style>
+    :root {
+        --b3-theme-background: #fff; --b3-theme-surface: #f5f5f5; --b3-theme-surface-lighter: #efefef;
+        --b3-theme-on-background: #222; --b3-theme-on-surface: #444; --b3-theme-on-surface-light: #888;
+        --b3-theme-primary: #6366f1; --b3-theme-primary-lightest: #e8e9fe; --b3-theme-on-primary: #fff;
+        --b3-border-color: #e2e2e2; --b3-list-hover: #eee; --b3-list-icon-hover: #e6e6e6;
+        --b3-theme-error: #d32f2f; --b3-theme-success: #23b27c; --b3-theme-info: #3b82f6;
+        --b3-font-family: system-ui, sans-serif;
+    }
+    html[data-theme="dark"] {
+        --b3-theme-background: #202124; --b3-theme-surface: #303136; --b3-theme-surface-lighter: #393a40;
+        --b3-theme-on-background: #f2f2f3; --b3-theme-on-surface: #d4d5d8; --b3-theme-on-surface-light: #aaaeb5;
+        --b3-theme-primary: #7c8aff; --b3-theme-primary-lightest: #343957; --b3-theme-on-primary: #10121d;
+        --b3-border-color: #484a50; --b3-list-hover: #383a42; --b3-list-icon-hover: #454751;
+    }
+    body { margin: 0; background: var(--b3-theme-background); color: var(--b3-theme-on-background); font-family: var(--b3-font-family); }
+    #shot { width: 100%; height: 100vh; }
+    button, input, select { font: inherit; }
+    .fn__flex { display: flex; }
+    .fn__flex-1 { flex: 1; }
+    .b3-button { border: 0; padding: 7px 12px; background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); cursor: pointer; }
+    .b3-button--outline, .b3-button--cancel { background: var(--b3-theme-surface); color: var(--b3-theme-on-background); }
+    .b3-text-field, .b3-select { background: var(--b3-theme-background); color: var(--b3-theme-on-background); border: 1px solid var(--b3-border-color); padding: 6px; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div id="shot" class="lvct-tab-root"></div>
+<script type="module">
+    window.addEventListener("error", (event) => { document.title = `ERROR ${event.message}`; });
+    window.addEventListener("unhandledrejection", (event) => { document.title = `ERROR ${event.reason}`; });
+    import { mount } from "svelte";
+    import "../../src/index.scss";
+    import Workbench from "../../src/components/Workbench.svelte";
+    import { kernel } from "./ui/siyuan-mock.js";
+    import { FIELD_SPECS } from "../../src/domain/fields.ts";
+
+    const params = new URLSearchParams(location.search);
+    const view = params.get("view") || "home";
+    if (params.get("theme") === "dark") document.documentElement.dataset.theme = "dark";
+    const people = [
+        { name: "林晓梅", docId: "20260927000000-person1", itemId: "row-1", group: "家人", phone: "13902257716", tags: ["家人"], birthday: "1990-09-27", related: ["row-2", "row-3"] },
+        { name: "陈立群", docId: "20260927000000-person2", itemId: "row-2", group: "同事", phone: "13826110427", tags: ["数学组"], birthday: "1988-10-04", related: ["row-3"] },
+        { name: "郑好", docId: "20260927000000-person3", itemId: "row-3", group: "朋友", phone: "13688402253", tags: ["球友"], birthday: "", related: [] },
+        { name: "苏婉清", docId: "20260927000000-person4", itemId: "row-4", group: "同学", phone: "13755190086", tags: ["校友"], birthday: "1991-10-12", related: ["row-2"] },
+    ];
+    const settings = {
+        schemaVersion: 1, notebookName: "小驴人脉", notebookId: "20260927000000-book001",
+        hostDocId: "20260927000000-host001", dbBlockId: "20260927000000-block01",
+        avId: "20260927000000-view001", initializedAt: "2026-09-27T00:00:00Z",
+        fieldMap: Object.fromEntries(FIELD_SPECS.map((field) => [field.key, field.key])),
+    };
+    const preferences = { schemaVersion: 1, defaultView: "home", peopleSort: "recent", openOnStartup: false, aiEnabled: true, birthdayWindowDays: 30, staleThresholdDays: 30 };
+    const summary = (person) => ({ ...person, email: "", wechat: "", website: "", isLunar: false, relatedItemIds: [] });
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") return { view: {
+            columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })),
+            rows: people.map((person) => ({ id: person.itemId, cells: [
+                { value: { type: "block", keyID: "name", block: { id: person.docId, content: person.name } } },
+                { value: { type: "phone", keyID: "phone", phone: { content: person.phone } } },
+                { value: { type: "text", keyID: "wechat", text: { content: person.name === "陈立群" ? "chenliqun88" : "" } } },
+                { value: { type: "date", keyID: "birthday", date: { content: person.birthday ? new Date(`${person.birthday}T00:00:00`).getTime() : 0 } } },
+                { value: { type: "mSelect", keyID: "group", mSelect: [{ content: person.group }] } },
+                { value: { type: "mSelect", keyID: "tags", mSelect: person.tags.map((tag) => ({ content: tag })) } },
+                { value: { type: "relation", keyID: "related", relation: { blockIDs: person.related } } },
+            ] })),
+        } };
+        throw new Error(`截图环境不允许请求 ${route}`);
+    };
+    const facade = {
+        settings, viewPreferences: preferences,
+        loadDashboard: async () => ({
+            people: 4, relations: 3, birthdaysThisWeek: 2, neverContacted: 1, neverContactedItemIds: [people[3].itemId],
+            birthdays: [{ person: summary(people[0]), bucket: "today", projection: { daysUntil: 0, label: "9月27日" } }, { person: summary(people[1]), bucket: "week", projection: { daysUntil: 7, label: "10月4日" } }],
+            stale: [{ person: summary(people[2]), lastDaysAgo: 54 }],
+        }),
+        loadRecentInteractions: async () => Object.fromEntries(people.map((person, index) => [person.docId, { occurredAt: Date.now() - index * 86400000, localDate: `2026-09-${String(27 - index).padStart(2, "0")}` }])),
+        loadPersonInsights: async () => ({ timeline: [], coAttendance: [], totalEvents: 0 }),
+        recordInteraction: async () => {}, deleteInteraction: async () => {},
+    };
+    mount(Workbench, { target: document.getElementById("shot"), props: {
+        facade, settings, preferences, initialView: view === "home" ? "home" : view === "graph" ? "graph" : "people",
+        isMobile: innerWidth <= 640, onPreferencesUpdated() {}, onOpenPersonDoc() {},
+    } });
+    setTimeout(() => {
+        if (view === "table") document.querySelector('.lvct-people__toolbar button[title="切换卡片/表格"]')?.click();
+        if (view === "peek") document.querySelector(".lvct-person-card")?.click();
+        setTimeout(() => {
+            const expected = view === "home" ? ".lvct-dash__stats" : view === "graph" ? ".lvct-graph-view__canvas" : view === "table" ? ".lvct-people__table-wrap" : view === "peek" ? ".lvct-detail" : ".lvct-person-card";
+            if (!document.querySelector(expected)) document.title = `ERROR missing ${expected}`;
+            if (view === "graph" && (document.querySelector(expected)?._cyreg?.cy?.nodes().length ?? 0) < 4) document.title = "ERROR blank graph";
+            const clipped = [...document.querySelectorAll(".lvct-people__toolbar, .lvct-detail__header-actions")]
+                .some((element) => element.getBoundingClientRect().right > innerWidth + 2);
+            if (clipped) document.title = `ERROR clipped toolbar ${innerWidth} ${[...document.querySelectorAll(".lvct-people__toolbar, .lvct-detail__header-actions")].map((element) => Math.round(element.getBoundingClientRect().right)).join(",")}`;
+            if (!document.title.startsWith("ERROR")) document.title = "READY";
+        }, 250);
+    }, 600);
+</script>
+</body>
+</html>
