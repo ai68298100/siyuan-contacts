@@ -145,7 +145,7 @@
             anchor.download = `小驴人脉_互动事件_${new Date().toISOString().slice(0, 10)}.json`;
             anchor.click();
             URL.revokeObjectURL(url);
-            exportMessage = "互动事件已导出";
+            exportMessage = "互动事件与原始数据快照已导出";
         } catch (error) {
             errorText = error instanceof Error ? error.message : String(error);
         } finally {
@@ -272,7 +272,7 @@
                     {/if}
 
                     <div class="lvct-settings__row">
-                        <div><b>互动事件导出</b><small>包含事件和墓碑，不会修改当前数据</small></div>
+                        <div><b>互动事件备份</b><small>原始数据快照、事件与墓碑</small></div>
                         <button class="b3-button b3-button--outline" onclick={runExportInteractions} disabled={exportingInteractions}>
                             {exportingInteractions ? "导出中…" : "导出 JSON"}
                         </button>

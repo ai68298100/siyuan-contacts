@@ -94,8 +94,11 @@
 不自动将未知版本或损坏内容归一为空库覆盖。展示读取仍可过滤损坏项，正常去重与墓碑投影不受影响。
 
 设置页的「导出互动事件 JSON」生成一次性导出包：
-`{schemaVersion: 1, exportedAt, events, tombstones}`。导出包不回写插件存储，
-`events` 与 `tombstones` 保留当前归一化后的审计事实，后续迁移工具可据此恢复事件和删除墓碑。
+`{schemaVersion: 1, exportedAt, storageKey, rawStore, events, tombstones}`。导出包不回写插件存储，
+`events` 与 `tombstones` 保留当前归一化后的审计事实；新增 `rawStore` 保存宿主读取的原始 JSON 值，
+不丢弃损坏项、重复项、墓碑或未知版本，`storageKey` 标明源文件。
+这是 JSON 值快照而非源文件字节备份；数据在同一排他锁内读取，读取异常时导出失败，禁止生成空成功备份。
+首次未创建文件的 null 或空字符串也原样保留在 `rawStore` 中。schemaVersion 保持 1，原有字段继续可用。
 
 ## 4. 性能预算（随人数增长的读取策略）
 

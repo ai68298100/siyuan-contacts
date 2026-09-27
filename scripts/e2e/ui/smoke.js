@@ -12,6 +12,7 @@ import { getRoster, invalidateRoster } from "../../../src/services/roster";
 import { recordInteraction, deleteInteraction, loadInteractionStore } from "../../../src/data/interactions";
 import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
 import { captureFromDoc } from "../../../src/services/capture";
+import { exportInteractionJson } from "../../../src/services/interaction-export";
 import { FIELD_SPECS } from "../../../src/domain/fields";
 import { DEFAULT_VIEW_PREFERENCES } from "../../../src/domain/preferences";
 import { kernel } from "./siyuan-mock.js";
@@ -633,6 +634,76 @@ await test("互动损坏数据与未知版本禁止覆盖，宿主空字符串�
     }
     saved = good;
     assert((await recordInteraction(plugin, { personDocId: "乙" })).events.length === 2, "恢复合法文件后不能继续追加");
+});
+
+await test("互动导出保留原始损坏项与未知版本，读取失败不生成空备份", async () => {
+    let saved;
+    let writes = 0;
+    let failRead = false;
+    const plugin = {
+        loadData: async () => {
+            if (failRead) throw new Error("备份读取失败");
+            return JSON.parse(JSON.stringify(saved));
+        },
+        saveData: async () => { writes += 1; },
+    };
+    const event = { id: "备份事件", personDocId: "甲", source: "manual", occurredAt: Date.now(), localDate: "2026-09-27" };
+    for (const raw of ["", null,
+        { schemaVersion: 1, events: [event, event, null], tombstones: ["墓碑", 42] },
+        { schemaVersion: 99, events: [event], tombstones: [], unknownField: "不能丢失" },
+    ]) {
+        saved = raw;
+        const backup = JSON.parse(await exportInteractionJson(plugin));
+        assert(JSON.stringify(backup.rawStore) === JSON.stringify(raw), "原始数据快照丢失内容");
+        assert(backup.storageKey === "interaction-events.json" && backup.exportedAt, "备份缺少来源与导出时间");
+        if (raw?.schemaVersion === 1) {
+            assert(backup.events.length === 1 && backup.tombstones.length === 1, "原有归一化导出字段不兼容");
+        }
+    }
+    failRead = true;
+    let message = "";
+    try { await exportInteractionJson(plugin); } catch (error) { message = error.message; }
+    assert(message.includes("存储读取失败"), "读取失败仍生成备份");
+    assert(writes === 0, "导出修改了原存储");
+});
+
+await test("设置页备份读取失败不下载，重试后下载完整快照", async () => {
+    let failRead = true;
+    const raw = { schemaVersion: 99, events: [null], tombstones: [], preserved: "原始内容" };
+    const plugin = { loadData: async () => {
+        if (failRead) throw new Error("暂时不可读");
+        return raw;
+    } };
+    let blob;
+    let downloads = 0;
+    let filename = "";
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    const originalClick = HTMLAnchorElement.prototype.click;
+    URL.createObjectURL = (value) => { blob = value; return "blob:backup-test"; };
+    URL.revokeObjectURL = () => {};
+    HTMLAnchorElement.prototype.click = function () { downloads += 1; filename = this.download; };
+    try {
+        mounted = mount(SettingsView, { target: fixture, props: {
+            facade: { exportInteractionJson: () => exportInteractionJson(plugin) },
+            settings, preferences: DEFAULT_VIEW_PREFERENCES,
+            onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {},
+        } });
+        [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes("数据与字段")).click();
+        await tick();
+        button("导出 JSON").click();
+        await until(() => fixture.textContent.includes("存储读取失败"), "备份读取失败未显示错误");
+        assert(downloads === 0, "读取失败触发了空下载");
+        failRead = false;
+        button("导出 JSON").click();
+        await until(() => fixture.textContent.includes("原始数据快照已导出"), "重试导出未成功");
+        assert(downloads === 1 && filename.endsWith(".json"), "备份下载次数或文件名错误");
+        assert(JSON.stringify(JSON.parse(await blob.text()).rawStore) === JSON.stringify(raw), "下载文件缺失原始内容");
+    } finally {
+        URL.createObjectURL = originalCreate;
+        URL.revokeObjectURL = originalRevoke;
+        HTMLAnchorElement.prototype.click = originalClick;
+    }
 });
 
 await pause(100);
