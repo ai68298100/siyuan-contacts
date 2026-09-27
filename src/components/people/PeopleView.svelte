@@ -5,18 +5,21 @@
     import { nextBirthday } from "../../domain/occasions";
     import type { ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
+    import { DEFAULT_VIEW_PREFERENCES, normalizeTableColumns, PEOPLE_TABLE_COLUMNS } from "../../domain/preferences";
+    import type { PeopleTableColumn, ViewPreferences } from "../../domain/preferences";
     import PersonCard from "./PersonCard.svelte";
     import AddPersonDialog from "./AddPersonDialog.svelte";
     import ImportDialog from "./ImportDialog.svelte";
     import VCardDialog from "./VCardDialog.svelte";
     import LvctDialog from "../LvctDialog.svelte";
     import { useCloseGuard } from "../close-guard";
-    import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink } from "@lucide/svelte";
+    import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3 } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
 
     let {
         settings,
         i18n,
+        preferences,
         loadRecentInteractions,
         revision,
         initialSort,
@@ -29,9 +32,11 @@
         activePersonId = "",
         onOrderChange,
         onOpenPersonDoc,
+        onPreferencesChange,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
+        preferences: ViewPreferences;
         loadRecentInteractions: () => Promise<Record<string, { occurredAt: number; localDate: string }>>;
         revision: number;
         initialSort: "name" | "group" | "birthday" | "recent";
@@ -44,6 +49,7 @@
         activePersonId?: string;
         onOrderChange?: (people: ContactSummary[]) => void;
         onOpenPersonDoc?: (docId: string) => void;
+        onPreferencesChange: (preferences: ViewPreferences) => Promise<ViewPreferences>;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string) => translateText(i18n, key, fallback));
 
@@ -59,7 +65,83 @@
     let sortMode: "name" | "group" | "birthday" | "recent" = $state(initialSort);
     let recent: Record<string, { occurredAt: number; localDate: string }> = $state({});
     let recentError = $state("");
-    let viewMode: "cards" | "table" = $state("cards");
+    // svelte-ignore state_referenced_locally
+    let viewMode: "cards" | "table" = $state(preferences.peopleView === "table" ? "table" : "cards");
+    // svelte-ignore state_referenced_locally
+    let tableColumns: PeopleTableColumn[] = $state(normalizeTableColumns(preferences.tableColumns));
+    let prefError = $state("");
+    let colMenuOpen = $state(false);
+    const columnLabels: Record<PeopleTableColumn, { labelKey: string; fallback: string }> = {
+        group: { labelKey: "peopleGroup", fallback: "分组" },
+        phone: { labelKey: "peoplePhone", fallback: "电话" },
+        wechat: { labelKey: "peopleWechat", fallback: "微信" },
+        birthday: { labelKey: "peopleBirthday", fallback: "生日" },
+        recent: { labelKey: "peopleRecent", fallback: "最近互动" },
+        tags: { labelKey: "peopleTags", fallback: "标签" },
+    };
+    const columnLabel = (key: PeopleTableColumn) => text(columnLabels[key].labelKey, columnLabels[key].fallback);
+
+    // 外部偏好更新（设置页保存/恢复默认）时同步本地显示
+    $effect(() => {
+        viewMode = preferences.peopleView === "table" ? "table" : "cards";
+        tableColumns = normalizeTableColumns(preferences.tableColumns);
+    });
+
+    async function persistPreferences(next: ViewPreferences) {
+        prefError = "";
+        try {
+            await onPreferencesChange(next);
+        } catch (error) {
+            prefError = error instanceof Error ? error.message : String(error);
+        }
+    }
+
+    function switchViewMode() {
+        const next = viewMode === "cards" ? "table" : "cards";
+        viewMode = next;
+        void persistPreferences({ ...preferences, peopleView: next === "table" ? "table" : "card" });
+    }
+
+    function toggleColumn(key: PeopleTableColumn, visible: boolean) {
+        const next = visible
+            ? [...tableColumns, key]
+            : tableColumns.filter((column) => column !== key);
+        tableColumns = normalizeTableColumns(next);
+        void persistPreferences({ ...preferences, tableColumns });
+    }
+
+    function moveColumn(key: PeopleTableColumn, offset: -1 | 1) {
+        const index = tableColumns.indexOf(key);
+        const target = index + offset;
+        if (index < 0 || target < 0 || target >= tableColumns.length) return;
+        const next = [...tableColumns];
+        next.splice(index, 1);
+        next.splice(target, 0, key);
+        tableColumns = next;
+        void persistPreferences({ ...preferences, tableColumns });
+    }
+
+    function resetDisplayPreferences() {
+        viewMode = "cards";
+        tableColumns = [...DEFAULT_VIEW_PREFERENCES.tableColumns];
+        colMenuOpen = false;
+        void persistPreferences({
+            ...preferences,
+            peopleView: DEFAULT_VIEW_PREFERENCES.peopleView,
+            tableColumns: [...DEFAULT_VIEW_PREFERENCES.tableColumns],
+        });
+    }
+
+    // 列设置面板：点击面板外区域关闭
+    $effect(() => {
+        if (!colMenuOpen) return;
+        const close = (event: MouseEvent) => {
+            const panel = document.getElementById("lvct-people-colmenu");
+            if (panel && !panel.contains(event.target as Node)) colMenuOpen = false;
+        };
+        document.addEventListener("click", close);
+        return () => document.removeEventListener("click", close);
+    });
     let adding: boolean = $state(false);
     let importing: boolean = $state(false);
     let vcarding: boolean = $state(false);
@@ -232,19 +314,60 @@
             <option value="birthday">{text("peopleSortBirthday", "按生日临近")}</option>
             <option value="recent">{text("peopleSortRecent", "按最近互动")}</option>
         </select>
-        <button
-            class="b3-button b3-button--outline"
-            title="切换卡片/表格"
-            onclick={() => (viewMode = viewMode === "cards" ? "table" : "cards")}
-        >
-            {#if viewMode === "cards"}<List size={16}/>{:else}<LayoutGrid size={16}/>{/if}
-            {viewMode === "cards" ? text("peopleTable", "表格") : text("peopleCards", "卡片")}
-        </button>
+        <span class="lvct-people__viewtoggle" style="position:relative; display:inline-flex">
+            <button
+                class="b3-button b3-button--outline"
+                title="切换卡片/表格"
+                onclick={switchViewMode}
+            >
+                {#if viewMode === "cards"}<List size={16}/>{:else}<LayoutGrid size={16}/>{/if}
+                {viewMode === "cards" ? text("peopleTable", "表格") : text("peopleCards", "卡片")}
+            </button>
+            {#if viewMode === "table"}
+                <span id="lvct-people-colmenu" style="position:relative; display:inline-flex">
+                    <button
+                        class="b3-button b3-button--outline"
+                        aria-expanded={colMenuOpen}
+                        aria-label="表格列设置"
+                        title="表格列设置"
+                        onclick={() => (colMenuOpen = !colMenuOpen)}
+                    ><Columns3 size={16}/>{text("peopleColumnSettings", "列设置")}</button>
+                    {#if colMenuOpen}
+                        <div class="lvct-people__colmenu" role="group" aria-label="表格列显隐与顺序">
+                            <label class="lvct-people__colmenu-row" title="姓名列固定显示">
+                                <input type="checkbox" checked disabled />
+                                <span>{text("peopleName", "姓名")}</span>
+                                <small>固定</small>
+                            </label>
+                            {#each PEOPLE_TABLE_COLUMNS as key (key)}
+                                <div class="lvct-people__colmenu-row">
+                                    <input
+                                        type="checkbox"
+                                        aria-label={`显示${columnLabel(key)}列`}
+                                        checked={tableColumns.includes(key)}
+                                        onchange={(event) => toggleColumn(key, (event.currentTarget as HTMLInputElement).checked)}
+                                    />
+                                    <span>{columnLabel(key)}</span>
+                                    <span class="lvct-people__colmenu-actions">
+                                        <button type="button" aria-label={`上移${columnLabel(key)}列`} disabled={tableColumns.indexOf(key) <= 0} onclick={() => moveColumn(key, -1)}>↑</button>
+                                        <button type="button" aria-label={`下移${columnLabel(key)}列`} disabled={tableColumns.indexOf(key) < 0 || tableColumns.indexOf(key) >= tableColumns.length - 1} onclick={() => moveColumn(key, 1)}>↓</button>
+                                    </span>
+                                </div>
+                            {/each}
+                            <div class="lvct-people__colmenu-footer">
+                                <button type="button" class="b3-button b3-button--text" onclick={resetDisplayPreferences}>恢复默认显示</button>
+                            </div>
+                        </div>
+                    {/if}
+                </span>
+            {/if}
+        </span>
         <button class="b3-button b3-button--outline" onclick={() => (importing = true)}><FolderInput size={16}/>{text("peopleImportDocs", "导入已有文档")}</button>
         <button class="b3-button b3-button--outline" onclick={() => (vcarding = true)}><ContactRound size={16}/>{text("peopleVcard", "vCard 导入/导出")}</button>
         <button class="b3-button b3-button--text" onclick={() => (adding = true)}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
     </div>
     {#if recentError}<div class="lvct-form__error" role="alert">最近互动读取失败：{recentError}</div>{/if}
+    {#if prefError}<div class="lvct-form__error" role="alert">显示偏好保存失败：{prefError}</div>{/if}
 
     {#if tags.length > 0}
         <div class="lvct-people__filters" aria-label="标签筛选">
@@ -336,7 +459,8 @@
                         <th class="lvct-people__select-cell">
                             <input type="checkbox" aria-label="选择当前列表联系人" checked={allVisibleSelected} onchange={(event) => toggleAllVisible((event.currentTarget as HTMLInputElement).checked)} />
                         </th>
-                        <th>{text("peopleName", "姓名")}</th><th>{text("peopleGroup", "分组")}</th><th>{text("peoplePhone", "电话")}</th><th>{text("peopleWechat", "微信")}</th><th>{text("peopleBirthday", "生日")}</th><th>{text("peopleRecent", "最近互动")}</th><th>{text("peopleTags", "标签")}</th>
+                        <th>{text("peopleName", "姓名")}</th>
+                        {#each tableColumns as column (column)}<th>{columnLabel(column)}</th>{/each}
                     </tr>
                 </thead>
                 <tbody>
@@ -358,12 +482,16 @@
                                 />
                             </td>
                             <td><b>{person.name}</b>{#if onOpenPersonDoc}<button type="button" class="lvct-people__open-doc" title={`打开 ${person.name} 的文档`} aria-label={`打开 ${person.name} 的文档`} onclick={(event) => { event.stopPropagation(); onOpenPersonDoc(person.docId); }}><ExternalLink size={16}/></button>{/if}</td>
-                            <td>{person.group || "—"}</td>
-                            <td>{person.phone || "—"}</td>
-                            <td>{person.wechat || "—"}</td>
-                            <td>{person.birthday ? `${person.birthday}${person.isLunar ? "（农历）" : ""}` : "—"}</td>
-                            <td>{recent[person.docId]?.localDate ?? "—"}</td>
-                            <td>{person.tags.join(" · ") || "—"}</td>
+                            {#each tableColumns as column (column)}
+                                <td>
+                                    {#if column === "group"}{person.group || "—"}
+                                    {:else if column === "phone"}{person.phone || "—"}
+                                    {:else if column === "wechat"}{person.wechat || "—"}
+                                    {:else if column === "birthday"}{person.birthday ? `${person.birthday}${person.isLunar ? "（农历）" : ""}` : "—"}
+                                    {:else if column === "recent"}{recent[person.docId]?.localDate ?? "—"}
+                                    {:else}{person.tags.join(" · ") || "—"}{/if}
+                                </td>
+                            {/each}
                         </tr>
                     {/each}
                 </tbody>

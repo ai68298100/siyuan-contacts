@@ -25,7 +25,7 @@ import { initExternalBridge, disposeExternalBridge } from "./bridge/external-bri
 import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
 import { svelteDialog } from "./libs/dialog";
 import type { ContactsSettings } from "./domain/model";
-import type { ViewPreferences } from "./domain/preferences";
+import { DEFAULT_VIEW_PREFERENCES, type ViewPreferences } from "./domain/preferences";
 import type { ContactsPluginFacade, WorkbenchView } from "./types";
 
 const TAB_TYPE = "workbench";
@@ -33,15 +33,7 @@ const TAB_TYPE = "workbench";
 export default class LvContactsPlugin extends Plugin implements ContactsPluginFacade {
     isMobile = false;
     settings: ContactsSettings | null = null;
-    viewPreferences: ViewPreferences = {
-        schemaVersion: 1,
-        defaultView: "home",
-        peopleSort: "name",
-        openOnStartup: false,
-        aiEnabled: true,
-        birthdayWindowDays: 30,
-        staleThresholdDays: 30,
-    };
+    viewPreferences: ViewPreferences = DEFAULT_VIEW_PREFERENCES;
 
     private workbenchDialog: Dialog | null = null;
     private dialogInstance: ReturnType<typeof mount> | null = null;

@@ -83,7 +83,7 @@
 | 键 | 版本 | 内容 |
 |---|---|---|
 | `contacts-settings.json` | 1 | 四锚点 ID + fieldMap + 初始化时间 |
-| `view-preferences.json` | 1 | 工作台默认页面、联系人默认排序、启动行为、生日窗口、久未联系阈值、AI 入口开关 |
+| `view-preferences.json` | 1 | 工作台默认页面、联系人默认排序、启动行为、生日窗口、久未联系阈值、AI 入口开关；F02 起新增 `peopleView`（`card`/`table`，联系人默认形态）与 `tableColumns`（表格可见列的有序键数组，可选键仅限 `group/phone/wechat/birthday/recent/tags`；「姓名」为固定列不入数组、恒为首列）。归一化规则：旧偏好缺字段取默认；键不在可选集或重复的项剔除；全部被剔除/清空时回退全列默认——隐藏全部可选列不被视为合法状态 |
 | `interaction-events.json` | （M4） | 互动事件（只追加）：`{id, personDocId, occurredAt, localDate, source, externalRef?, note}`；`personDocId+source+externalRef` 幂等；删除写墓碑 |
 | `bridge-state.json` | （M4） | 打卡联动状态机（unsupported/pending/ready/failed） |
 

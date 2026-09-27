@@ -169,6 +169,7 @@
                 <PeopleView
                     settings={currentSettings}
                     i18n={facade.i18n}
+                    preferences={currentPreferences}
                     loadRecentInteractions={() => facade.loadRecentInteractions()}
                     initialSort={peopleFocusSort ?? currentPreferences.peopleSort}
                     focusIds={peopleFocusIds}
@@ -181,6 +182,12 @@
                     activePersonId={detailPerson?.itemId ?? ""}
                     onOrderChange={(ordered) => {
                         if (ordered.map((person) => person.itemId).join("|") !== peopleOrder.map((person) => person.itemId).join("|")) peopleOrder = ordered;
+                    }}
+                    onPreferencesChange={async (next) => {
+                        const saved = await facade.saveViewPreferences(next);
+                        currentPreferences = saved;
+                        onPreferencesUpdated(saved);
+                        return saved;
                     }}
                     {onOpenPersonDoc}
                 />

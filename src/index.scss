@@ -296,6 +296,67 @@
     > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 }
 
+.lvct-people__viewtoggle > .b3-button { display: inline-flex; align-items: center; gap: 6px; }
+
+// F02 表格列设置面板：锚定在工具栏按钮下方，窄屏不越界
+.lvct-people__colmenu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: var(--lvct-z-popover, 150);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 218px;
+    max-width: calc(100vw - 32px);
+    max-height: min(340px, calc(100vh - 120px));
+    overflow-y: auto;
+    padding: var(--lvct-sp-2);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-md);
+    background: var(--lvct-bg-elevated);
+    box-shadow: var(--lvct-shadow-3);
+
+    .lvct-people__colmenu-row {
+        display: flex;
+        align-items: center;
+        gap: var(--lvct-sp-2);
+        padding: 4px 6px;
+        border-radius: var(--lvct-r-sm);
+        font-size: var(--lvct-fs-body);
+
+        &:hover { background: var(--lvct-accent-soft); }
+
+        small { margin-left: auto; color: var(--lvct-text-3); }
+    }
+
+    .lvct-people__colmenu-actions {
+        margin-left: auto;
+        display: inline-flex;
+        gap: 2px;
+
+        button {
+            min-width: 22px;
+            height: 22px;
+            padding: 0;
+            border: 1px solid var(--lvct-border-subtle);
+            border-radius: var(--lvct-r-sm);
+            background: var(--lvct-bg-surface);
+            color: var(--lvct-text-2);
+            line-height: 1;
+
+            &:disabled { opacity: .35; }
+        }
+    }
+
+    .lvct-people__colmenu-footer {
+        margin-top: var(--lvct-sp-1);
+        padding-top: var(--lvct-sp-1);
+        border-top: 1px solid var(--lvct-border-subtle);
+        text-align: right;
+    }
+}
+
 .lvct-import .lvct-people__toolbar {
     flex-wrap: wrap;
 }

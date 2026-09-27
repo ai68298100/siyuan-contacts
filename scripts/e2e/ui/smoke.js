@@ -6,6 +6,7 @@ import VCardDialog from "../../../src/components/people/VCardDialog.svelte";
 import CaptureDialog from "../../../src/components/capture/CaptureDialog.svelte";
 import ImportDialog from "../../../src/components/people/ImportDialog.svelte";
 import DashboardView from "../../../src/components/dashboard/DashboardView.svelte";
+import PeopleView from "../../../src/components/people/PeopleView.svelte";
 import SettingsView from "../../../src/components/SettingsView.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
@@ -510,6 +511,45 @@ await test("设置页可按列类型手动恢复字段映射并拒绝空提交",
     button("保存字段映射").click();
     await until(() => repaired?.phone === "phone-renamed", "字段映射没有保存");
     await until(() => fixture.textContent.includes("字段完整"), "保存映射后健康状态未刷新");
+});
+
+await test("表格列显隐与顺序偏好持久化，姓名列固定，恢复默认生效", async () => {
+    const headers = () => [...fixture.querySelectorAll("thead th")].map((th) => th.textContent.trim());
+    const sameList = (list, expected, message) => assert(JSON.stringify(list) === JSON.stringify(expected), `${message}（实际：${JSON.stringify(list)}）`);
+    const mountPeople = (prefs) => mount(PeopleView, { target: fixture, props: {
+        settings, preferences: prefs,
+        loadRecentInteractions: async () => ({}),
+        revision: 0, initialSort: "name",
+        onOpenDetail() {}, onOpenPersonDoc() {},
+        onPreferencesChange: async (next) => { savedPrefs = next; return next; },
+    } });
+    let savedPrefs = null;
+    mounted = mountPeople({ ...DEFAULT_VIEW_PREFERENCES, peopleView: "table", tableColumns: ["phone", "group"] });
+    await until(() => fixture.querySelector("table"), "表格未渲染");
+    sameList(headers(), ["", "姓名", "电话", "分组"], "列顺序未按偏好渲染");
+
+    button("列设置").click();
+    await tick();
+    const nameRow = fixture.querySelector(".lvct-people__colmenu-row input");
+    assert(nameRow.disabled && nameRow.checked, "姓名列应固定且不可取消");
+    fixture.querySelector('input[aria-label="显示微信列"]').click();
+    await until(() => headers().includes("微信"), "勾选微信列后表头未更新");
+    sameList(savedPrefs.tableColumns, ["phone", "group", "wechat"], "勾选列未持久化");
+
+    fixture.querySelector('button[aria-label="下移电话列"]').click();
+    await until(() => headers()[2] === "分组", "下移电话列后顺序未更新");
+    sameList(savedPrefs.tableColumns, ["group", "phone", "wechat"], "列顺序未持久化");
+
+    await unmount(mounted);
+    mounted = mountPeople(savedPrefs);
+    await until(() => fixture.querySelector("table"), "重开后表格未渲染");
+    sameList(headers(), ["", "姓名", "分组", "电话", "微信"], "重开后列偏好未恢复");
+
+    button("列设置").click();
+    await tick();
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "恢复默认显示").click();
+    await until(() => savedPrefs?.tableColumns.length === 6 && savedPrefs.peopleView === "card", "恢复默认未持久化");
+    await until(() => !fixture.querySelector("table") && fixture.querySelector(".lvct-people__cards"), "恢复默认后未回到卡片视图");
 });
 
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {

@@ -7,6 +7,7 @@
     import StatusNotice from "./StatusNotice.svelte";
     import { SlidersHorizontal, Database, Bell, Sparkles, Plug, Info } from "@lucide/svelte";
     import { translateText } from "../domain/translation";
+    import { DEFAULT_VIEW_PREFERENCES } from "../domain/preferences";
     import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "../services/settings-health";
     import type { ExportSummary } from "../services/export-center";
 
@@ -353,6 +354,24 @@
                                 <option value="recent">按最近互动</option>
                             </select>
                         </label>
+                        <label class="lvct-form__item">
+                            <span>联系人默认形态</span>
+                            <select class="b3-select fn__block" bind:value={draft.peopleView}>
+                                <option value="card">卡片</option>
+                                <option value="table">表格</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="lvct-settings__row">
+                        <div><b>联系人显示</b><small>表格列的显隐与顺序在联系人页「列设置」中调整；姓名列固定显示</small></div>
+                        <button class="b3-button b3-button--outline" onclick={() => {
+                            draft = {
+                                ...draft,
+                                peopleView: DEFAULT_VIEW_PREFERENCES.peopleView,
+                                tableColumns: [...DEFAULT_VIEW_PREFERENCES.tableColumns],
+                            };
+                        }}>恢复默认显示</button>
                     </div>
 
                     <label class="lvct-settings__switch-row">
