@@ -1312,9 +1312,31 @@
     font-weight: 600;
 }
 
-.lvct-strip__briefing span {
-    display: block;
-    margin-top: 4px;
+.lvct-strip__briefing-list {
+    display: grid;
+    gap: 4px;
+    margin: 6px 0 0;
+
+    div {
+        display: grid;
+        grid-template-columns: 64px minmax(0, 1fr);
+        gap: 8px;
+    }
+
+    dt {
+        color: var(--lvct-text-3);
+    }
+
+    dd {
+        min-width: 0;
+        margin: 0;
+        color: var(--lvct-text-1);
+        overflow-wrap: anywhere;
+    }
+}
+
+.lvct-strip__briefing-empty {
+    margin: 6px 0 0;
 }
 
 .lvct-settings__mapping {

@@ -396,6 +396,27 @@ await test("快速切换文档不会插入旧人物档案条，独立档案条�
     }
 });
 
+await test("人物档案条会前简报展示真实互动事实", async () => {
+    const element = document.createElement("div");
+    element.innerHTML = '<div class="protyle-title"></div>';
+    fixture.append(element);
+    const protyle = { element, block: { rootID: person.docId } };
+    const context = { settings, plugin: { loadData: async () => ({
+        schemaVersion: 1,
+        events: [{
+            id: "event-briefing", personDocId: person.docId, occurredAt: Date.now(),
+            localDate: "2026-09-27", source: "manual", note: "确认下周合作安排",
+        }],
+        tombstones: [],
+    }) } };
+    handleProtyleEvent(context, { detail: { protyle } });
+    await until(() => element.querySelector(".lvct-strip__briefing-list"), "会前简报未渲染事实条目");
+    const briefing = element.querySelector(".lvct-strip__briefing");
+    assert(briefing.textContent.includes("最近互动"), "会前简报缺少最近互动标签");
+    assert(briefing.textContent.includes("确认下周合作安排"), "会前简报缺少互动备注");
+    assert(!briefing.textContent.includes("预留"), "会前简报仍显示占位内容");
+});
+
 await pause(100);
 results.push({ name: "无未处理异常及响应式循环", ok: runtimeErrors.length === 0, detail: runtimeErrors.join("\n") });
 document.querySelector("#results").textContent = JSON.stringify(results, null, 2);

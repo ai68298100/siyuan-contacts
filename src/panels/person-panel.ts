@@ -7,6 +7,8 @@
 import { getRoster } from "../services/roster";
 import { loadInteractionStore } from "../data/interactions";
 import { lastInteractionByPerson } from "../domain/interactions";
+import { buildMeetingBriefing } from "../domain/briefing";
+import type { MeetingBriefingItem } from "../domain/briefing";
 import { nextBirthday } from "../domain/occasions";
 import { svelteDialog } from "../libs/dialog";
 import PersonEditDialog from "../components/people/PersonEditDialog.svelte";
@@ -50,7 +52,8 @@ async function updateStrip(context: PanelContext, protyle: ProtyleLike, rootId: 
         if (stripRequests.get(protyle.element) !== request || protyle.block?.rootID !== rootId || !protyle.element.isConnected) return;
         const lastInteraction = lastInteractionByPerson(interactionStore, [person]).get(person.docId);
         const birthday = person.birthday ? nextBirthday(person.birthday, person.isLunar) : undefined;
-        const strip = buildStrip(context, protyle, person, birthday?.daysUntil, lastInteraction?.lastDaysAgo);
+        const briefing = buildMeetingBriefing(person, roster, interactionStore.events);
+        const strip = buildStrip(context, protyle, person, briefing, birthday?.daysUntil, lastInteraction?.lastDaysAgo);
         const title = protyle.element.querySelector(".protyle-title");
         if (title) {
             title.insertAdjacentElement("afterend", strip);
@@ -66,6 +69,7 @@ function buildStrip(
     context: PanelContext,
     protyle: ProtyleLike,
     person: ContactSummary,
+    briefingItems: readonly MeetingBriefingItem[],
     birthdayDaysUntil?: number,
     lastDaysAgo?: number,
 ): HTMLElement {
@@ -122,16 +126,31 @@ function buildStrip(
     main.appendChild(identity);
     main.appendChild(chips);
 
-    // 二期会前简报的稳定插槽：先提供可折叠的占位，不伪造尚未落库的数据。
     const briefing = document.createElement("details");
     briefing.className = "lvct-strip__briefing";
     briefing.dataset.slot = "briefing";
     const briefingSummary = document.createElement("summary");
-    briefingSummary.textContent = "会前简报（预留）";
-    const briefingHint = document.createElement("span");
-    briefingHint.className = "ft__smaller ft__on-surface";
-    briefingHint.textContent = "后续可在这里汇总最近互动、共同联系人和待办事项";
-    briefing.append(briefingSummary, briefingHint);
+    briefingSummary.textContent = briefingItems.length > 0 ? `会前简报（${briefingItems.length}）` : "会前简报";
+    briefing.appendChild(briefingSummary);
+    if (briefingItems.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "lvct-strip__briefing-empty ft__smaller ft__on-surface";
+        empty.textContent = "暂无互动、关系或共同出席记录";
+        briefing.appendChild(empty);
+    } else {
+        const list = document.createElement("dl");
+        list.className = "lvct-strip__briefing-list";
+        for (const item of briefingItems) {
+            const row = document.createElement("div");
+            const label = document.createElement("dt");
+            label.textContent = item.label;
+            const value = document.createElement("dd");
+            value.textContent = item.value;
+            row.append(label, value);
+            list.appendChild(row);
+        }
+        briefing.appendChild(list);
+    }
     main.appendChild(briefing);
 
     const actions = document.createElement("div");
