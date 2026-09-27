@@ -147,6 +147,46 @@ test("备份合并：当前优先、人物场合去重、双方墓碑阻止复�
     assert.deepEqual(mergeInteractionBackup(result.store, incoming).summary, { added: 0, skipped: 3, removed: 0, tombstonesAdded: 0 });
 });
 
+test("备份批量合并：与逐条追加的去重、墓碑、顺序及计数一致", () => {
+    for (let seed = 0; seed < 40; seed += 1) {
+        const make = (index: number) => event({
+            id: `event-${index % 25}`, personDocId: `person-${(index + seed) % 7}`,
+            source: index % 2 ? "api" : "diary",
+            externalRef: index % 3 ? `ref-${index % 5}` : undefined,
+        });
+        const current = normalizeInteractionStore({ schemaVersion: 1, events: Array.from({ length: 30 }, (_, index) => make(index)), tombstones: [`event-${seed % 25}`] });
+        const incoming = normalizeInteractionStore({ schemaVersion: 1, events: Array.from({ length: 35 }, (_, index) => make(index + seed)), tombstones: [`event-${(seed + 8) % 25}`] });
+        const tombstones = [...new Set([...current.tombstones, ...incoming.tombstones])];
+        let reference = normalizeInteractionStore({ ...current, tombstones });
+        const removed = current.events.length - reference.events.length;
+        let added = 0;
+        let skipped = 0;
+        for (const item of incoming.events) {
+            const next = appendEvent(reference, item);
+            if (next === reference) skipped += 1;
+            else added += 1;
+            reference = next;
+        }
+        assert.deepEqual(mergeInteractionBackup(current, incoming), {
+            store: reference,
+            summary: { added, skipped, removed, tombstonesAdded: tombstones.length - new Set(current.tombstones).size },
+        }, `场景 ${seed} 与逐条追加不一致`);
+    }
+});
+
+test("备份批量合并：两万当前记录与两万备份保留全部独立事实", () => {
+    const make = (index: number) => event({ id: `event-${index}`, personDocId: `person-${index}`, source: "api", externalRef: "会议" });
+    const current: InteractionStore = { schemaVersion: 1, events: Array.from({ length: 20_000 }, (_, index) => make(index)), tombstones: ["event-25000"] };
+    const incoming: InteractionStore = { schemaVersion: 1, events: Array.from({ length: 20_000 }, (_, index) => make(index + 10_000)), tombstones: ["event-100"] };
+    const result = mergeInteractionBackup(current, incoming);
+    assert.equal(result.store.events.length, 29_998);
+    assert.deepEqual(result.summary, { added: 9_999, skipped: 10_001, removed: 1, tombstonesAdded: 1 });
+    assert.equal(result.store.events[0].id, "event-0");
+    assert.equal(result.store.events.at(-1)?.id, "event-29999");
+    assert.equal(current.events.length, 20_000);
+    assert.equal(incoming.events.length, 20_000);
+});
+
 test("lastInteractionByPerson / staleContacts：最近互动与久未联系排序", () => {
     const now = new Date(2026, 8, 27);
     const store = normalizeInteractionStore({

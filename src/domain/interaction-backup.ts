@@ -1,4 +1,4 @@
-import { appendEvent, normalizeInteractionStore, normalizeInteractionStoreForWrite } from "./interactions.ts";
+import { normalizeInteractionStore, normalizeInteractionStoreForWrite } from "./interactions.ts";
 import type { InteractionStore } from "./interactions";
 
 export interface InteractionImportSummary {
@@ -23,15 +23,11 @@ export function mergeInteractionBackup(current: InteractionStore, incoming: Inte
     store: InteractionStore; summary: InteractionImportSummary;
 } {
     const tombstones = [...new Set([...current.tombstones, ...incoming.tombstones])];
-    let store = normalizeInteractionStore({ ...current, tombstones });
-    const removed = current.events.length - store.events.length;
-    let added = 0;
-    let skipped = 0;
-    for (const event of incoming.events) {
-        const next = appendEvent(store, event);
-        if (next === store) skipped += 1;
-        else added += 1;
-        store = next;
-    }
+    const base = normalizeInteractionStore({ ...current, tombstones });
+    const removed = current.events.length - base.events.length;
+    // 当前事件排在前面，批量归一化保持当前优先，避免逐条扫描和复制全库。
+    const store = normalizeInteractionStore({ ...base, events: [...base.events, ...incoming.events] });
+    const added = store.events.length - base.events.length;
+    const skipped = incoming.events.length - added;
     return { store, summary: { added, skipped, removed, tombstonesAdded: tombstones.length - new Set(current.tombstones).size } };
 }
