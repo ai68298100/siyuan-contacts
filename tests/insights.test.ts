@@ -51,6 +51,44 @@ test("buildCoAttendance：无同场事实时为空", () => {
     assert.deepEqual(buildCoAttendance(EVENTS, "d-x"), []);
 });
 
+test("同场索引：重复参与者不放大人数或次数，来源独立", () => {
+    const events = [
+        event({ id: "target", personDocId: "甲" }),
+        event({ id: "other", personDocId: "乙" }),
+        event({ id: "other-repeat", personDocId: "乙" }),
+        event({ id: "different-source", personDocId: "丙", source: "api" }),
+    ];
+    assert.equal(buildTimeline(events, "甲")[0].groupSize, 2);
+    assert.deepEqual(buildCoAttendance(events, "甲"), [{ otherDocId: "乙", count: 1 }]);
+    assert.equal(buildTimeline(events, "丙")[0].groupSize, 1);
+});
+
+test("同场索引：未提供或空标识不关联字面 undefined 场合", () => {
+    const events = [
+        event({ id: "target", personDocId: "甲", externalRef: "undefined" }),
+        event({ id: "same", personDocId: "乙", externalRef: "undefined" }),
+        event({ id: "missing", personDocId: "丙", externalRef: undefined }),
+        event({ id: "empty", personDocId: "丁", externalRef: "" }),
+    ];
+    assert.deepEqual(buildCoAttendance(events, "甲"), [{ otherDocId: "乙", count: 1 }]);
+    assert.deepEqual(buildCoAttendance(events, "丙"), []);
+    assert.equal(buildTimeline(events, "甲")[0].groupSize, 2);
+    assert.equal(buildTimeline(events, "丙")[0].groupSize, 1);
+});
+
+test("同场索引：三万事件保留一万场事实和完整时间线", () => {
+    const events = Array.from({ length: 10_000 }, (_, index) => [
+        event({ id: `target-${index}`, personDocId: "甲", externalRef: `meeting-${index}` }),
+        event({ id: `other-a-${index}`, personDocId: "乙", externalRef: `meeting-${index}` }),
+        event({ id: `other-b-${index}`, personDocId: "丙", externalRef: `meeting-${index}` }),
+    ]).flat();
+    const timeline = buildTimeline(events, "甲");
+    assert.equal(timeline.length, 10_000);
+    assert.ok(timeline.every((item) => item.groupSize === 3));
+    assert.deepEqual(buildCoAttendance(events, "甲"), [{ otherDocId: "乙", count: 10_000 }, { otherDocId: "丙", count: 10_000 }]);
+    assert.equal(events.length, 30_000);
+});
+
 test("buildMeetingBriefing：汇总最近互动、显式关系与共同出席", () => {
     const people: ContactSummary[] = [
         { docId: "d-a", itemId: "i-a", name: "甲", phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false, group: "", tags: [], relatedItemIds: ["i-c"] },

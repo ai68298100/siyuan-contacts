@@ -197,28 +197,38 @@ export interface TimelineItem {
     groupSize: number;
 }
 
-/** 某人的互动时间线（按日期降序；同场事件按 externalRef 聚出人数） */
+function occasionKey(event: InteractionEvent): string | undefined {
+    return event.externalRef ? JSON.stringify([event.source, event.externalRef]) : undefined;
+}
+
+/** 某人的互动时间线（按日期降序；一次建立场合参与者索引） */
 export function buildTimeline(
     events: readonly InteractionEvent[],
     personDocId: string,
 ): TimelineItem[] {
     const mine = events.filter((event) => event.personDocId === personDocId);
-    const groupSizes = new Map<string, number>();
-    for (const event of mine) {
-        if (!event.externalRef) continue;
-        const size = events.filter(
-            (other) => other.externalRef === event.externalRef && other.source === event.source,
-        ).length;
-        groupSizes.set(event.id, size);
+    const participants = new Map<string, Set<string>>();
+    for (const event of events) {
+        const key = occasionKey(event);
+        if (key === undefined) continue;
+        let people = participants.get(key);
+        if (!people) {
+            people = new Set<string>();
+            participants.set(key, people);
+        }
+        people.add(event.personDocId);
     }
     return mine
-        .map((event) => ({
-            eventId: event.id,
-            localDate: event.localDate,
-            ...(event.note ? { note: event.note } : {}),
-            source: event.source,
-            groupSize: groupSizes.get(event.id) ?? 1,
-        }))
+        .map((event) => {
+            const key = occasionKey(event);
+            return {
+                eventId: event.id,
+                localDate: event.localDate,
+                ...(event.note ? { note: event.note } : {}),
+                source: event.source,
+                groupSize: key === undefined ? 1 : participants.get(key)?.size ?? 1,
+            };
+        })
         .sort((a, b) => (a.localDate < b.localDate ? 1 : a.localDate > b.localDate ? -1 : 0));
 }
 
@@ -235,20 +245,26 @@ export function buildCoAttendance(
     events: readonly InteractionEvent[],
     targetDocId: string,
 ): CoAttendance[] {
-    const targetRefs = new Set(
-        events
-            .filter((event) => event.personDocId === targetDocId && event.externalRef)
-            .map((event) => `${event.source}:${event.externalRef}`),
-    );
+    const targetRefs = new Set<string>();
+    for (const event of events) {
+        if (event.personDocId !== targetDocId) continue;
+        const key = occasionKey(event);
+        if (key !== undefined) targetRefs.add(key);
+    }
     if (targetRefs.size === 0) return [];
-    const counts = new Map<string, number>();
+    const sharedOccasions = new Map<string, Set<string>>();
     for (const event of events) {
         if (event.personDocId === targetDocId) continue;
-        const key = `${event.source}:${event.externalRef}`;
-        if (!targetRefs.has(key)) continue;
-        counts.set(event.personDocId, (counts.get(event.personDocId) ?? 0) + 1);
+        const key = occasionKey(event);
+        if (key === undefined || !targetRefs.has(key)) continue;
+        let occasions = sharedOccasions.get(event.personDocId);
+        if (!occasions) {
+            occasions = new Set<string>();
+            sharedOccasions.set(event.personDocId, occasions);
+        }
+        occasions.add(key);
     }
-    return [...counts.entries()]
-        .map(([otherDocId, count]) => ({ otherDocId, count }))
+    return [...sharedOccasions.entries()]
+        .map(([otherDocId, occasions]) => ({ otherDocId, count: occasions.size }))
         .sort((a, b) => b.count - a.count);
 }
