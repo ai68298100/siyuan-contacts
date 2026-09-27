@@ -29,6 +29,22 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@v1
+        id: chrome
+        with:
+          install-dependencies: true
+
+      - name: Desktop UI regression
+        run: pnpm test:ui
+        env:
+          LVCT_TEST_BROWSER: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Mobile viewport UI regression
+        run: pnpm test:ui:mobile
+        env:
+          LVCT_TEST_BROWSER: ${{ steps.chrome.outputs.chrome-path }}
+
       - name: Build
         run: pnpm build
 

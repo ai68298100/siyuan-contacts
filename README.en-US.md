@@ -21,7 +21,7 @@ Phone contacts only store numbers; sales CRMs only serve pipelines. **People are
 
 Lv Contacts makes **every contact a regular SiYuan document** (bidirectional links, search and sync work as usual), while structured fields live in a [native SiYuan database](https://github.com/siyuan-note/siyuan) bound to each document. The plugin turns that into a proper management workspace.
 
-> 🔒 **Data sovereignty**: everything stays in your workspace — no cloud, no telemetry. Contacts survive plugin uninstall.
+> 🔒 **Data sovereignty**: contact documents and databases live in your SiYuan workspace, with no plugin telemetry. Explicit AI analysis sends note content to your configured SiYuan AI endpoint. Uninstalling does not delete person documents, but back up plugin-owned interactions first. SiYuan sync remains under your control.
 
 ## ✨ Features
 
@@ -31,14 +31,19 @@ Lv Contacts makes **every contact a regular SiYuan document** (bidirectional lin
 - 🎂 **Birthday reminders** — solar & lunar birthdays, upcoming-birthday and "haven't talked in a while" dashboard
 - 📄 **Person document strip** — open a contact's document to see and edit their profile inline
 - 🔌 **People service bridge** — other plugins get `window.LvContacts` to search/create people and record shared interactions ([protocol docs](docs/BRIDGE.md))
-- 📱 Mobile support (fullscreen dialogs)
+- vCard import/export, including batch adoption with folder, group and tag options.
+- Interaction history: 20 per page, search, source filters and confirmed per-person deletion that preserves other participants.
+- Settings backup: raw JSON value snapshots and previewed, confirmed merge restoration; deletion markers prevent resurrection. These are not byte-for-byte file backups.
+- 📱 Responsive layouts and fullscreen dialogs have mobile viewport regression coverage; real-device touch and keyboard acceptance is still pending.
 
 ## 📦 Install
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-contacts/releases)
 2. Extract into your SiYuan workspace at `data/plugins/siyuan-contacts/`
 3. Restart SiYuan → Settings → Marketplace → Download → enable **Lv Contacts**
-- Requires **SiYuan ≥ 3.8.5** (marketplace listing under review)
+- Requires **SiYuan ≥ 3.8.5**. Marketplace submission is deferred.
+
+The source includes enhancements after the initial release, while the version remains `0.1.0` pending the next release decision. Published packages may not include unreleased changes. The UI is primarily Chinese; translation-key parity is tested, but a full English UI is not yet delivered.
 
 ## 🚀 Quick start
 
@@ -46,6 +51,7 @@ Lv Contacts makes **every contact a regular SiYuan document** (bidirectional lin
 2. Create contacts, or batch-adopt existing notes via **Import**
 3. Add relations in the person detail dialog; explore the graph view
 4. Right-click inside a meeting note → *Lv Contacts: capture people from this note*
+5. Export interactions from Settings before uninstalling. Review additions, skipped entries and deletion effects before confirming a backup merge. Safe database unbinding preserves person documents and interactions.
 
 ## 🛠 Development
 
@@ -54,7 +60,10 @@ pnpm install
 pnpm dev        # watch build + hot reload into SiYuan
 pnpm check      # tsc + svelte-check
 pnpm test       # domain unit tests + architecture guards + i18n parity
+pnpm test:ui    # isolated desktop browser regression
+pnpm test:ui:mobile # mobile viewport regression, not device acceptance
 pnpm build      # dist/ + package.zip
+pnpm check:release # package release gate
 ```
 
 See [AGENTS.md](AGENTS.md) for the development protocol, [docs/DATA-CONTRACT.md](docs/DATA-CONTRACT.md) for the storage contract and [docs/ROADMAP.md](docs/ROADMAP.md) for the roadmap. 中文文档见 [README.md](README.md)。

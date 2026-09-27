@@ -1,13 +1,16 @@
 # 发布清单（RELEASE）
 
-> 首版 v0.1.0 发布流程。带 ❙ 的步骤是对外动作，执行前与用户确认。
+> 首版 v0.1.0 已发布；本清单用于下一稳定版，版本号待确认。源码后续增强尚未另行发布，集市提交暂缓。改版本、推送、标签、Release 与集市提交均需用户明确授权。
 
 ## 1. 质量门禁（全部绿才发）
 
 ```bash
 pnpm check    # tsc + svelte-check 0 错误
 pnpm test     # 全部单测（域层/守门/i18n parity）
+pnpm test:ui  # 桌面隔离回归
+pnpm test:ui:mobile # 移动视口隔离回归，不等于真机
 pnpm build    # dist/ + package.zip
+pnpm check:release # 发布包检查
 node scripts/spike/av-spike.mjs          # 9/9（可选回归）
 node scripts/e2e/load-check.mjs          # 隔离内核加载
 node scripts/e2e/contacts-flow.mjs       # 联系人流程 10/10
@@ -15,7 +18,9 @@ node scripts/e2e/contacts-flow.mjs       # 联系人流程 10/10
 
 - [ ] 版本号：plugin.json 与 package.json 一致（`pnpm update-version`）
 - [ ] icon.png/preview.png 终稿（当前为脚本生成的家庭视觉版，可请人重绘后替换，重跑 gen-icon 逻辑不变）
-- [ ] README.md / README.zh-CN.md 更新日志段落
+- [ ] README.md / README.en-US.md 更新日志段落与最终包功能一致
+
+CI 在构建和上传产物前执行两套浏览器回归。内核脚本只在隔离工作区执行，先核实目标；故障模拟先保存原文件，不对用户笔记做破坏性测试。隔离 UI 使用内存替身，不证明真实 AV 写入或宿主行为。
 
 ## 2. 手工验收（真机）
 
@@ -24,11 +29,25 @@ node scripts/e2e/contacts-flow.mjs       # 联系人流程 10/10
 - [ ] 移动端：顶栏入口 Dialog 全屏化、工作台四视图、新建/详情/图谱触控（真机）
 - [ ] 亮/暗主题各过一遍（b3 变量应自动适配）
 - [ ] 多窗口：两窗口同时写不丢数据（写后回读 + Web Lock 生效）
+- [ ] 时间线加载更多、搜索与来源筛选；删除取消/失败重试/成功刷新，保留其他参与者和来源笔记
+- [ ] 备份导出原始 JSON 值快照（非字节备份）；恢复预览后确认，重复幂等、保留并发新增与删除标记
+- [ ] 读取异常、损坏与未知版本停止写入且不覆盖；恢复合法文件后可继续操作。宿主可能返回缓存值，未抛错不代表底层读取成功
+- [ ] 真机软键盘、长备注、文件选择、安全区与图谱手势无遮挡
+- [ ] 多窗口同时新增、删除及合并备份；实际验证 Web Locks。降级队列仅保护同一 JS 上下文，不承诺跨窗口互斥
+- [ ] AI 只在主动点击后发送到配置端点，失败不落库；人员桥重复调用与安装/卸载生命周期符合协议
+
+验收结果逐项记录，未执行不得勾选：
+
+| 场景 | 设备/宿主版本/主题 | 预期 | 实际结果 | 日期与证据 |
+|---|---|---|---|---|
+| 桌面核心流程 | 待填写 | 文档、数据库与界面一致 | 待验收 | 待填写 |
+| 真机触控与键盘 | 待填写 | 操作可达、内容无遮挡 | 待验收 | 待填写 |
+| 多窗口与备份恢复 | 待填写 | 无覆盖、删除标记保持 | 待验收 | 待填写 |
 
 ## 3. 对外发布 ❙
 
-1. ❙ GitHub 创建公开仓库 `ai68298100/siyuan-contacts`（main 分支），push
-2. ❙ GitHub Release：tag `v0.1.0`，附 package.zip 与说明（zip mtime 已按真实构建时间，防集市回滚）
+1. ❙ 审查差异及验收记录，确认下一版本；推送现有仓库 `ai68298100/siyuan-contacts` 并确认 CI 通过
+2. ❙ GitHub Release：tag 使用用户确认版本，附已验证的 package.zip 与说明（zip mtime 按真实构建时间，防集市回滚）
 3. ❙ fork `siyuan-note/bazaar` → `plugins.txt` 追加一行 `ai68298100/siyuan-contacts` → PR（一次 PR 只做上架一件事）
 4. PR CI 通过后合并，索引 1-3 小时更新，思源重启刷新集市可见
 
@@ -36,4 +55,4 @@ node scripts/e2e/contacts-flow.mjs       # 联系人流程 10/10
 
 - [ ] GitHub Issues 打开；README 放反馈渠道
 - [ ] 崩溃/丢数据类问题优先：存储纪律层已带写后回读，事件问题查 `data/storage/petal/siyuan-contacts/`
-- [ ] v0.2 候选（见 ROADMAP）：完整英文翻译、关系库、VCF 导入、AI 能力
+- [ ] 后续候选（见 ROADMAP）：图谱深化、完整英文 UI、关系库、组织维度与官方 Agent；vCard、AI 抽取及人员桥已交付
