@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import {spawn} from "node:child_process";
+import { prepareIsolatedWorkspace, assertIsolatedPath, assertTestPortAvailable, observeTestKernel } from "./kernel-safety.mjs";
 
 const PLUGIN_NAME = "siyuan-contacts";
 const MARKER = "renmai-e2e.json";
@@ -32,14 +33,7 @@ function resolveKernel() {
 }
 
 function prepareWorkspace() {
-    if (fs.existsSync(workspace)) {
-        if (!fs.existsSync(path.join(workspace, MARKER))) {
-            throw new Error(`拒绝使用非 E2E 工作区 ${workspace}：缺少标记文件`);
-        }
-        return;
-    }
-    fs.mkdirSync(path.join(workspace, "data"), {recursive: true});
-    fs.writeFileSync(path.join(workspace, MARKER), `${JSON.stringify({createdBy: "renmai e2e", createdIso: new Date().toISOString()}, null, 2)}\n`);
+    prepareIsolatedWorkspace(workspace, MARKER, "renmai e2e");
 }
 
 function installPlugin() {
@@ -50,6 +44,7 @@ function installPlugin() {
     const manifest = JSON.parse(fs.readFileSync(path.join(dist, "plugin.json"), "utf8"));
     if (manifest.name !== PLUGIN_NAME) throw new Error(`plugin.json.name=${manifest.name} 与目录名不一致`);
     const target = path.join(workspace, "data", "plugins", PLUGIN_NAME);
+    assertIsolatedPath(workspace, target);
     fs.rmSync(target, {recursive: true, force: true});
     fs.cpSync(dist, target, {recursive: true, force: true});
     return target;
@@ -75,11 +70,14 @@ function startKernel({kernel, appDir}) {
 }
 
 let token = "";
+let assertKernelRunning;
 async function api(route, body = {}) {
+    assertKernelRunning?.();
     const headers = {"Content-Type": "application/json"};
     if (token) headers.Authorization = `Token ${token}`;
-    const response = await fetch(`${BASE}${route}`, {method: "POST", headers, body: JSON.stringify(body)});
+    const response = await fetch(`${BASE}${route}`, {method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(5000)});
     const text = await response.text();
+    assertKernelRunning?.();
     return text ? JSON.parse(text) : {};
 }
 async function apiChecked(route, body = {}) {
@@ -88,9 +86,10 @@ async function apiChecked(route, body = {}) {
     return payload.data;
 }
 
-async function waitForBoot(lines) {
+async function waitForBoot(lines, assertRunning) {
     const until = Date.now() + 60000;
     while (Date.now() < until) {
+        assertRunning();
         if (lines.some((line) => line.includes("lock workspace"))) {
             throw new Error(`工作区被锁定：${workspace} 有残留内核`);
         }
@@ -103,13 +102,19 @@ async function waitForBoot(lines) {
 
 async function main() {
     assertLoopback();
+    await assertTestPortAvailable(HOST, PORT);
     prepareWorkspace();
     const installPath = installPlugin();
     const {kernel, appDir} = resolveKernel();
     const {child, lines} = startKernel({kernel, appDir});
+    const assertRunning = observeTestKernel(child);
+    assertKernelRunning = assertRunning;
+    let booted = false;
     let exitCode = 0;
     try {
-        await waitForBoot(lines);
+        await waitForBoot(lines, assertRunning);
+        assertRunning();
+        booted = true;
         token = JSON.parse(fs.readFileSync(path.join(workspace, "conf", "conf.json"), "utf8")).accessAuthCode || "";
         console.log(`PASS 内核启动（工作区 ${workspace}）`);
 
@@ -135,9 +140,11 @@ async function main() {
         console.error("E2E FAIL:", error.message);
         console.error(lines.slice(-25).join("\n"));
     } finally {
-        await api("/api/system/exit", {force: true}).catch(() => undefined);
+        if (booted && child.exitCode === null && child.signalCode === null) {
+            await api("/api/system/exit", {force: true}).catch(() => undefined);
+        }
         const exited = await Promise.race([
-            new Promise((resolve) => child.once("exit", () => resolve(true))),
+            new Promise((resolve) => child.exitCode !== null || child.signalCode !== null ? resolve(true) : child.once("exit", () => resolve(true))),
             new Promise((resolve) => setTimeout(() => resolve(false), 8000)),
         ]);
         if (!exited) child.kill("SIGKILL");

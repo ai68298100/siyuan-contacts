@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import {spawn} from "node:child_process";
+import { prepareIsolatedWorkspace, assertTestPortAvailable, observeTestKernel } from "../e2e/kernel-safety.mjs";
 
 const WORKSPACE = path.join(os.homedir(), "SiYuan-Renmai-Spike");
 const HOST = "127.0.0.1";
@@ -39,14 +40,7 @@ function resolveKernel() {
 }
 
 function prepareWorkspace() {
-    if (fs.existsSync(WORKSPACE)) {
-        if (!fs.existsSync(path.join(WORKSPACE, MARKER))) {
-            throw new Error(`拒绝使用非 spike 工作区 ${WORKSPACE}：缺少标记文件`);
-        }
-        return;
-    }
-    fs.mkdirSync(path.join(WORKSPACE, "data"), {recursive: true});
-    fs.writeFileSync(path.join(WORKSPACE, MARKER), `${JSON.stringify({createdBy: "renmai av-spike", createdIso: new Date().toISOString()}, null, 2)}\n`);
+    prepareIsolatedWorkspace(WORKSPACE, MARKER, "renmai av-spike");
 }
 
 function startKernel({kernel, appDir}) {
@@ -69,11 +63,14 @@ function startKernel({kernel, appDir}) {
 }
 
 let token = "";
+let assertKernelRunning;
 async function api(route, body = {}) {
+    assertKernelRunning?.();
     const headers = {"Content-Type": "application/json"};
     if (token) headers.Authorization = `Token ${token}`;
-    const response = await fetch(`${BASE}${route}`, {method: "POST", headers, body: JSON.stringify(body)});
+    const response = await fetch(`${BASE}${route}`, {method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(5000)});
     const text = await response.text();
+    assertKernelRunning?.();
     let payload;
     try { payload = text ? JSON.parse(text) : {}; } catch { throw new Error(`${route} 非 JSON 响应: ${text.slice(0, 200)}`); }
     return payload;
@@ -94,9 +91,10 @@ function newNodeID() {
     return `${stamp}-${rand}`;
 }
 
-async function waitForBoot(lines) {
+async function waitForBoot(lines, assertRunning) {
     const until = Date.now() + 60000;
     while (Date.now() < until) {
+        assertRunning();
         if (lines.some((line) => line.includes("lock workspace"))) {
             throw new Error(`工作区被锁定：${WORKSPACE} 有残留内核。请先结束该进程。`);
         }
@@ -275,12 +273,18 @@ async function verifySqlOnAv(avID) {
 
 async function main() {
     assertLoopback();
+    await assertTestPortAvailable(HOST, PORT);
     prepareWorkspace();
     const {kernel, appDir} = resolveKernel();
     const {child, lines} = startKernel({kernel, appDir});
+    const assertRunning = observeTestKernel(child);
+    assertKernelRunning = assertRunning;
+    let booted = false;
     let exitCode = 0;
     try {
-        const version = await waitForBoot(lines);
+        const version = await waitForBoot(lines, assertRunning);
+        assertRunning();
+        booted = true;
         record("内核启动", true, `v${version}`);
         token = (JSON.parse(fs.readFileSync(path.join(WORKSPACE, "conf", "conf.json"), "utf8")).accessAuthCode) || "";
 
@@ -336,9 +340,11 @@ async function main() {
             `${JSON.stringify({version, at: new Date().toISOString(), results}, null, 2)}\n`);
         console.log(`\n== spike 完成：${results.length - failures.length}/${results.length} 通过，结果已写入 scripts/spike/spike-results.json ==`);
     } finally {
-        await api("/api/system/exit", {force: true}).catch(() => undefined);
+        if (booted && child.exitCode === null && child.signalCode === null) {
+            await api("/api/system/exit", {force: true}).catch(() => undefined);
+        }
         const exited = await Promise.race([
-            new Promise((resolve) => child.once("exit", () => resolve(true))),
+            new Promise((resolve) => child.exitCode !== null || child.signalCode !== null ? resolve(true) : child.once("exit", () => resolve(true))),
             new Promise((resolve) => setTimeout(() => resolve(false), 8000)),
         ]);
         if (!exited) child.kill("SIGKILL");
