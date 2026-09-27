@@ -1435,6 +1435,58 @@ await test("重复候选检查：并排资料与理由展示，查看跳转零�
     assert(!fixture.querySelector(".lvct-dup__pair"), "查看候选后面板应已关闭");
 });
 
+await test("vCard 导入诊断：三段报告区分失败与待核对，重试先核对名册不重复建人", async () => {
+    let failCreate = true;
+    let rosterNames = ["回归测试甲"];
+    let createCalls = 0;
+    kernel.handler = async (route, body) => {
+        if (route === "/api/av/renderAttributeView") {
+            const rows = rosterNames.map((name, index) => ({
+                id: `item-roster-${index}`,
+                cells: [{ value: { type: "block", keyID: "name", block: { id: `doc-roster-${index}`, content: name } } }],
+            }));
+            return { view: { columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })), rows } };
+        }
+        if (route === "/api/filetree/createDocWithMd") {
+            createCalls += 1;
+            const path = String(body?.path ?? "");
+            if (failCreate && path.includes("测试败")) throw new Error("模拟建文档失败");
+            return `20260928000000-newdoc${createCalls}`;
+        }
+        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") return { "20260928000000-newdoc1": "item-new1", "20260928000000-newdoc2": "item-new2" };
+        return {};
+    };
+    mounted = mount(VCardDialog, { target: fixture, props: { settings, onImported() {}, onClose() {} } });
+    const fileInput = fixture.querySelector('input[type="file"]');
+    const selectFile = (names) => {
+        const transfer = new DataTransfer();
+        transfer.items.add(new File([names.map((name) => `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nEND:VCARD`).join("\n")], "test.vcf", { type: "text/vcard" }));
+        fileInput.files = transfer.files;
+        fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    selectFile(["回归测试甲", "测试乙", "测试败"]);
+    await until(() => fixture.textContent.includes("同名已跳过"), "预览未就绪");
+    const importButton = [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("导入为联系人（2）"));
+    assert(importButton, "应默认勾选 2 条（同名跳过不计）");
+    importButton.click();
+    // 三段报告：成功 1（测试乙）/ 跳过 1（同名甲）/ 失败 1（测试败）
+    await until(() => fixture.textContent.includes("✓ 成功（1）"), "成功段未显示");
+    results.push({ name: "diag-f14", ok: true, detail: (fixture.querySelector(".lvct-vcard__report")?.textContent ?? "no-report").slice(0, 400) });
+    assert(fixture.textContent.includes("⊘ 跳过（1）"), "跳过段未显示");
+    assert(fixture.textContent.includes("! 失败（1）"), "失败段未显示");
+    assert(fixture.textContent.includes("模拟建文档失败"), "失败原因缺失");
+    // 重试（仍失败）→ 保持 failed；重试确实调用了建文档（failCreate=true 抛错）
+    await until(() => createCalls === 2, "重试未调用建文档");
+    await until(() => fixture.textContent.includes("! 失败（1）"), "重试后失败段未保留");
+    const callsAfterFirstRetry = createCalls;
+    failCreate = false;
+    rosterNames = ["回归测试甲", "测试败"];
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("核对名册并重试")).click();
+    await until(() => fixture.textContent.includes("⊘ 跳过（2）"), "名册已有同名应跳过重建");
+    assert(createCalls === callsAfterFirstRetry, "名册已有同名仍调用了建文档");
+    await until(() => fixture.textContent.includes("导入完成"), "全部完成后未提示完成");
+});
+
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {
     const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
         docId: settings.hostDocId,
