@@ -532,6 +532,27 @@
     }
 }
 
+.lvct-detail__timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.lvct-detail__timeline-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.lvct-detail__timeline-note {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .lvct-detail__add {
     gap: 8px;
     margin-top: 8px;

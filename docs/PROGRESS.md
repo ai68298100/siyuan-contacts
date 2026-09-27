@@ -87,6 +87,13 @@
       （含任务插件接入示例）；卸载时自动摘除
 - [x] 单测增至 33 项；E2E 10/10；加载验证通过
 
+## 发布前打磨（2026-09-27）
+
+- [x] 详情页互动时间线（最近 5 条，含"同场 N 人"标注）+ 共同出席统计（buildCoAttendance 纯函数，按 externalRef 同场身份实时计算）
+- [x] CI 工作流（GitHub Actions：check + test + build + release gate + dist artifact）
+- [x] `pnpm check:release` 发布门禁：版本一致性、dist 完整性、zip/icon/preview 体积限制
+- [x] 单测 36 项全绿（新增 insights：时间线倒序/同场聚合/共同出席计数）
+
 ## 待启动
 
 - M4 提醒仪表盘：公/农历生日投影（移植打卡 lunar.ts+occasions 模型）、互动事件（source+externalRef 幂等+墓碑）、

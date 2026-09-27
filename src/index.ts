@@ -14,6 +14,7 @@ import { loadDashboard, DEFAULT_DASHBOARD_OPTIONS } from "./services/dashboard";
 import { recordInteraction } from "./data/interactions";
 import { captureFromDoc, previewCapture } from "./services/capture";
 import { extractFromDoc } from "./services/ai-extract";
+import { loadPersonInsights } from "./services/insights";
 import { initExternalBridge, disposeExternalBridge } from "./bridge/external-bridge";import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
 import { svelteDialog } from "./libs/dialog";
 import type { ContactsSettings } from "./domain/model";
@@ -196,6 +197,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     async aiExtractFromDoc(docId: string) {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
         return extractFromDoc(this.settings, docId);
+    }
+
+    async loadPersonInsights(docId: string) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return loadPersonInsights(this, this.settings, docId);
     }
 
     openHostDoc() {

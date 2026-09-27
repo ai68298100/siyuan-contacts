@@ -82,14 +82,15 @@
     <div class="lvct-dialog-mask" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) detailPerson = null; }}>
         <div class="lvct-dialog-panel">
             {#key detailKey}
-                <PersonDetail
-                    {settings}
-                    person={detailPerson}
-                    onRecord={(personDocId, note) => facade.recordInteraction(personDocId, note)}
-                    {onOpenPersonDoc}
-                    onChanged={() => {}}
-                    onClose={() => (detailPerson = null)}
-                />
+            <PersonDetail
+                {settings}
+                person={detailPerson}
+                onRecord={(personDocId, note) => facade.recordInteraction(personDocId, note)}
+                onLoadInsights={(docId) => facade.loadPersonInsights(docId)}
+                {onOpenPersonDoc}
+                onChanged={() => {}}
+                onClose={() => (detailPerson = null)}
+            />
             {/key}
         </div>
     </div>

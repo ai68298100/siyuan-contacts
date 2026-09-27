@@ -9,6 +9,7 @@
         settings,
         person,
         onRecord,
+        onLoadInsights,
         onOpenPersonDoc,
         onChanged,
         onClose,
@@ -17,6 +18,8 @@
         person: ContactSummary;
         /** 记一笔互动（facade.recordInteraction） */
         onRecord: (personDocId: string, note?: string) => Promise<void>;
+        /** 人物洞察（时间线+共同出席） */
+        onLoadInsights: (docId: string) => Promise<import("../../services/insights").PersonInsights>;
         onOpenPersonDoc: (docId: string) => void;
         onChanged: () => void;
         onClose: () => void;
@@ -31,6 +34,17 @@
     let errorText: string = $state("");
     let noteText: string = $state("");
     let recorded: boolean = $state(false);
+    let insights: import("../../services/insights").PersonInsights | null = $state(null);
+
+    async function loadInsights() {
+        try {
+            insights = await onLoadInsights(person.docId);
+        } catch {
+            insights = null;
+        }
+    }
+
+    loadInsights();
 
     const relatedPeople = $derived(
         current.relatedItemIds
@@ -109,6 +123,30 @@
             >{recorded ? "已记录 ✓" : "记录"}</button>
         </div>
         <p class="ft__smaller ft__on-surface">记录后，首页"久未联系"会重新计时。</p>
+    </section>
+
+    <section class="lvct-detail__section">
+        <h4>互动与共同出席{insights ? `（共 ${insights.totalEvents} 条）` : ""}</h4>
+        {#if insights && insights.coAttendance.length > 0}
+            <div class="lvct-strip__chips" style="margin-bottom: 6px;">
+                {#each insights.coAttendance.slice(0, 5) as item (item.otherDocId)}
+                    <span class="lvct-chip lvct-chip--group">与 {item.name} 同场 {item.count} 次</span>
+                {/each}
+            </div>
+        {/if}
+        {#if insights && insights.timeline.length > 0}
+            <div class="lvct-detail__timeline">
+                {#each insights.timeline.slice(0, 5) as item (item.eventId)}
+                    <div class="lvct-detail__timeline-row">
+                        <span class="ft__on-surface">{item.localDate}</span>
+                        <span class="lvct-detail__timeline-note">{item.note || "互动"}</span>
+                        {#if item.groupSize > 1}<span class="lvct-chip">{item.groupSize} 人同场</span>{/if}
+                    </div>
+                {/each}
+            </div>
+        {:else}
+            <p class="ft__smaller ft__on-surface">还没有互动记录：上方记一笔即可开始积累时间线。</p>
+        {/if}
     </section>
 
     <section class="lvct-detail__section">

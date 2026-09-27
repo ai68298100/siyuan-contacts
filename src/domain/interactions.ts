@@ -159,3 +159,70 @@ export function toLocalDateKey(now: Date = new Date()): string {
 export function defaultBridgeRef(personDocIds: readonly string[], date: string): string {
     return `bridge:${date}:${[...personDocIds].sort().join(",")}`;
 }
+
+/* ---------- 人物洞察：互动时间线与共同出席（纯投影） ---------- */
+
+export interface TimelineItem {
+    eventId: string;
+    localDate: string;
+    note?: string;
+    source: InteractionSource;
+    /** 同场人数（含本人）；同场事件才 >1 */
+    groupSize: number;
+}
+
+/** 某人的互动时间线（按日期降序；同场事件按 externalRef 聚出人数） */
+export function buildTimeline(
+    events: readonly InteractionEvent[],
+    personDocId: string,
+): TimelineItem[] {
+    const mine = events.filter((event) => event.personDocId === personDocId);
+    const groupSizes = new Map<string, number>();
+    for (const event of mine) {
+        if (!event.externalRef) continue;
+        const size = events.filter(
+            (other) => other.externalRef === event.externalRef && other.source === event.source,
+        ).length;
+        groupSizes.set(event.id, size);
+    }
+    return mine
+        .map((event) => ({
+            eventId: event.id,
+            localDate: event.localDate,
+            ...(event.note ? { note: event.note } : {}),
+            source: event.source,
+            groupSize: groupSizes.get(event.id) ?? 1,
+        }))
+        .sort((a, b) => (a.localDate < b.localDate ? 1 : a.localDate > b.localDate ? -1 : 0));
+}
+
+export interface CoAttendance {
+    otherDocId: string;
+    count: number;
+}
+
+/**
+ * 共同出席统计（D-0011 的可见化）：与 target 共享过同场身份（同 externalRef 且同来源）
+ * 的其他联系人，按次数降序。只基于事实数据实时计算，不写入关系字段。
+ */
+export function buildCoAttendance(
+    events: readonly InteractionEvent[],
+    targetDocId: string,
+): CoAttendance[] {
+    const targetRefs = new Set(
+        events
+            .filter((event) => event.personDocId === targetDocId && event.externalRef)
+            .map((event) => `${event.source}:${event.externalRef}`),
+    );
+    if (targetRefs.size === 0) return [];
+    const counts = new Map<string, number>();
+    for (const event of events) {
+        if (event.personDocId === targetDocId) continue;
+        const key = `${event.source}:${event.externalRef}`;
+        if (!targetRefs.has(key)) continue;
+        counts.set(event.personDocId, (counts.get(event.personDocId) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+        .map(([otherDocId, count]) => ({ otherDocId, count }))
+        .sort((a, b) => b.count - a.count);
+}
