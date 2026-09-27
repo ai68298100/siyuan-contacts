@@ -6,16 +6,21 @@
     import type { ContactsSettings } from "../../domain/model";
     import ViewState from "../ViewState.svelte";
     import { useCloseGuard } from "../close-guard";
+    import { translateText } from "../../domain/translation";
 
     let {
         settings,
+        i18n,
         onImported,
         onClose,
     }: {
         settings: ContactsSettings;
+        i18n?: Readonly<Record<string, string>>;
         onImported: (count: number) => void;
         onClose: () => void;
     } = $props();
+    const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
+        translateText(i18n, key, fallback, values));
 
     let plans: VcfImportPlan[] | null = $state(null);
     let selected: Record<number, boolean> = $state({});
@@ -93,7 +98,7 @@
             // 同名未勾选项不在服务入参内，在此补进逐项报告（planIndex 指回 plans）
             plans.forEach((plan, planIndex) => {
                 if (plan.duplicate && !selected[planIndex]) {
-                    result.results.unshift({ planIndex, name: plan.contact.name, status: "skipped", reason: "名册已有同名，默认跳过" });
+                    result.results.unshift({ planIndex, name: plan.contact.name, status: "skipped", reason: text("vcardDupReason", "名册已有同名，默认跳过") });
                 }
             });
             report = result;
@@ -175,19 +180,19 @@
 
 <div class="lvct-import lvct-vcard">
     <div class="lvct-vcard__export">
-        <div class="lvct-vcard__section-title">导出</div>
+        <div class="lvct-vcard__section-title">{text("vcardExportTitle", "导出")}</div>
         <div class="fn__flex">
             <button class="b3-button b3-button--outline" onclick={runExport} disabled={exporting || parsing || importing}>
-                {exporting ? "导出中…" : "导出全部联系人为 .vcf"}
+                {exporting ? text("vcardExporting", "导出中…") : text("vcardExportAll", "导出全部联系人为 .vcf")}
             </button>
-            <span class="ft__smaller ft__on-surface lvct-vcard__note">含电话/邮箱/网站/生日/标签；微信不导出（无标准属性）</span>
+            <span class="ft__smaller ft__on-surface lvct-vcard__note">{text("vcardExportNote", "含电话/邮箱/网站/生日/标签；微信不导出（无标准属性）")}</span>
         </div>
     </div>
 
-    <div class="lvct-vcard__section-title">导入</div>
+    <div class="lvct-vcard__section-title">{text("vcardImportTitle", "导入")}</div>
     <div class="lvct-people__toolbar fn__flex">
         <button class="b3-button b3-button--outline" onclick={() => fileInput?.click()} disabled={parsing || importing || exporting}>
-            {parsing ? "解析中…" : "选择 .vcf 文件…"}
+            {parsing ? text("vcardParsing", "解析中…") : text("vcardPickFile", "选择 .vcf 文件…")}
         </button>
         <input
             bind:this={fileInput}
@@ -197,27 +202,27 @@
             onchange={onFileChange}
         />
         <span class="ft__smaller ft__on-surface fn__flex-1 lvct-vcard__note">
-            支持通讯录应用导出的 vCard 2.1/3.0/4.0；只读 FN/N、TEL、EMAIL、URL、BDAY、CATEGORIES。
+            {text("vcardFormatsNote", "支持通讯录应用导出的 vCard 2.1/3.0/4.0；只读 FN/N、TEL、EMAIL、URL、BDAY、CATEGORIES。")}
         </span>
     </div>
 
     {#if parsing}
-        <ViewState compact loading title="正在解析通讯录并检查重名" />
+        <ViewState compact loading title={text("vcardParsingTitle", "正在解析通讯录并检查重名")} />
     {:else if importing}
-        <ViewState compact loading title="正在导入联系人" description={statusText} />
+        <ViewState compact loading title={text("vcardImportingTitle", "正在导入联系人")} description={statusText} />
     {:else if errorText}
-        <ViewState compact error title="通讯录处理失败" description={errorText}>
-            <button class="b3-button b3-button--outline" onclick={() => fileInput?.click()}>重新选择文件</button>
+        <ViewState compact error title={text("vcardErrorTitle", "通讯录处理失败")} description={errorText}>
+            <button class="b3-button b3-button--outline" onclick={() => fileInput?.click()}>{text("vcardPickAgain", "重新选择文件")}</button>
         </ViewState>
     {:else if report}
         <ViewState compact icon={retryable ? "!" : "✓"}
-            title={retryable ? "导入结束，部分联系人未完成" : "导入完成"}
-            description={`新增 ${report.imported} 人，跳过 ${reportSkipped.length} 人，失败 ${reportFailed.length} 人，待核对 ${reportUnknown.length} 人。`}>
-            <button class="b3-button b3-button--text" onclick={onClose}>返回联系人</button>
-            <button class="b3-button b3-button--outline" onclick={() => fileInput?.click()}>选择其他文件</button>
+            title={retryable ? text("vcardReportPartialTitle", "导入结束，部分联系人未完成") : text("vcardReportDoneTitle", "导入完成")}
+            description={text("vcardReportSummary", "新增 {imported} 人，跳过 {skipped} 人，失败 {failed} 人，待核对 {unknown} 人。", { imported: report.imported, skipped: reportSkipped.length, failed: reportFailed.length, unknown: reportUnknown.length })}>
+            <button class="b3-button b3-button--text" onclick={onClose}>{text("vcardBackToPeople", "返回联系人")}</button>
+            <button class="b3-button b3-button--outline" onclick={() => fileInput?.click()}>{text("vcardPickOtherFile", "选择其他文件")}</button>
             {#if retryable}
                 <button class="b3-button b3-button--outline" onclick={runRetry} disabled={retrying}>
-                    {retrying ? "核对并重试中…" : `核对名册并重试（${reportFailed.length + reportUnknown.length} 项）`}
+                    {retrying ? text("vcardRetrying", "核对并重试中…") : text("vcardRetryButton", "核对名册并重试（{n} 项）", { n: reportFailed.length + reportUnknown.length })}
                 </button>
             {/if}
         </ViewState>
@@ -225,26 +230,26 @@
         <div class="lvct-vcard__report">
             {#if reportImported.length > 0}
                 <details open>
-                    <summary>✓ 成功（{reportImported.length}）</summary>
+                    <summary>{text("vcardReportImported", "✓ 成功（{n}）", { n: reportImported.length })}</summary>
                     <ul>{#each reportImported as item (item.planIndex)}<li>{item.name}</li>{/each}</ul>
                 </details>
             {/if}
             {#if reportSkipped.length > 0}
                 <details>
-                    <summary>⊘ 跳过（{reportSkipped.length}）</summary>
-                    <ul>{#each reportSkipped as item (item.planIndex)}<li>{item.name}：{item.reason}</li>{/each}</ul>
+                    <summary>{text("vcardReportSkipped", "⊘ 跳过（{n}）", { n: reportSkipped.length })}</summary>
+                    <ul>{#each reportSkipped as item (item.planIndex)}<li>{text("vcardItemLine", "{name}：{reason}", { name: item.name, reason: item.reason ?? "" })}</li>{/each}</ul>
                 </details>
             {/if}
             {#if reportFailed.length > 0}
                 <details open>
-                    <summary>! 失败（{reportFailed.length}）</summary>
+                    <summary>{text("vcardReportFailed", "! 失败（{n}）", { n: reportFailed.length })}</summary>
                     <ul>{#each reportFailed as item (item.planIndex)}<li>{item.name}：{item.reason}</li>{/each}</ul>
                 </details>
             {/if}
             {#if reportUnknown.length > 0}
                 <details open>
-                    <summary>? 待核对（{reportUnknown.length}）</summary>
-                    <ul>{#each reportUnknown as item (item.planIndex)}<li>{item.name}：{item.reason}（文档可能已创建，重试前会先核对名册）</li>{/each}</ul>
+                    <summary>{text("vcardReportUnknown", "? 待核对（{n}）", { n: reportUnknown.length })}</summary>
+                    <ul>{#each reportUnknown as item (item.planIndex)}<li>{text("vcardUnknownLine", "{name}：{reason}（文档可能已创建，重试前会先核对名册）", { name: item.name, reason: item.reason ?? "" })}</li>{/each}</ul>
                 </details>
             {/if}
         </div>
@@ -266,7 +271,7 @@
                     checked={selectedCount === plans.length - duplicateCount && selectedCount > 0}
                     onchange={(event) => toggleAll((event.currentTarget as HTMLInputElement).checked)}
                 />
-                <span>全选（{selectedCount}/{plans.length} 人{duplicateCount > 0 ? `，${duplicateCount} 人同名已跳过` : ""}）</span>
+                <span>{text("vcardSelectAll", "全选（{selected}/{total} 人{dup}）", { selected: selectedCount, total: plans.length, dup: duplicateCount > 0 ? text("vcardDupSkipped", "，{n} 人同名已跳过", { n: duplicateCount }) : "" })}</span>
             </label>
             {#each plans as plan, index (index)}
                 <label class="lvct-import__row" class:lvct-import__row--dup={plan.duplicate}>
@@ -282,7 +287,7 @@
                         {plan.contact.phone || "—"}{plan.contact.birthday ? ` · ${plan.contact.birthday}${plan.contact.isLunar ? "（农历）" : ""}` : ""}
                     </span>
                     {#if plan.duplicate}
-                        <span class="ft__smaller ft__on-surface">已存在，跳过</span>
+                        <span class="ft__smaller ft__on-surface">{text("vcardDupSkippedShort", "已存在，跳过")}</span>
                     {/if}
                 </label>
             {/each}

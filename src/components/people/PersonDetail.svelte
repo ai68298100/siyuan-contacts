@@ -780,7 +780,7 @@ import StatusNotice from "../StatusNotice.svelte";
 
 {#if templateManagerOpen}
     <LvctDialog title={text("tplManagerTitle", "管理互动备注模板")} onClose={() => (templateManagerOpen = false)}>
-        <TemplateManager templates={templates} onSave={persistTemplates} onClose={() => (templateManagerOpen = false)} />
+        <TemplateManager {i18n} templates={templates} onSave={persistTemplates} onClose={() => (templateManagerOpen = false)} />
     </LvctDialog>
 {/if}
 
