@@ -1,8 +1,12 @@
 /**
- * 生成 icon.png(160x160) 与 preview.png(1024x768)。
- * 与小驴打卡/小驴雷切同一视觉语言：浅色圆角底、层叠卡片、蓝紫渐变、白色主图形、点缀橙点。
- * 主图形 = 双人剪影（人脉）。SDF 距离场绘制 + 3x3 超采样抗锯齿，纯 Node 零依赖。
- * 运行：node scripts/gen-icon.mjs
+ * 生成小驴人脉 logo（小驴系列视觉：浅底圆角 + 渐变主形 + 白色图形）。
+ * 与打卡(紫色对勾+橙点)、雷切(蓝色闪电)区分：人脉 = 青绿色系 + 双人相连图形，无橙点。
+ * SDF 距离场绘制 + 3x3 超采样，纯 Node 零依赖。
+ *
+ * 用法：
+ *   node scripts/gen-icon.mjs a            # 生成变体 a → icon.png + preview.png
+ *   node scripts/gen-icon.mjs a b c --all  # 生成 320px 预览 icon-variant-*.png
+ * 变体：a 青绿卡片·双人相连 / b 轻盈双人(无卡片) / c 深青底白描边
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -60,19 +64,28 @@ function encodePng(width, height, pixelAt) {
     ]);
 }
 
-/* ---------- SDF 绘图 ---------- */
+/* ---------- SDF ---------- */
 
 const sdCircle = (px, py, cx, cy, r) => Math.hypot(px - cx, py - cy) - r;
 
 function sdRoundRect(px, py, cx, cy, hx, hy, r) {
     const qx = Math.abs(px - cx) - (hx - r);
     const qy = Math.abs(py - cy) - (hy - r);
-    const ox = Math.max(qx, 0);
-    const oy = Math.max(qy, 0);
-    return Math.hypot(ox, oy) + Math.min(Math.max(qx, qy), 0) - r;
+    return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
 }
 
-/** 形状：SDF + 填充色（[r,g,b] 或 (x,y)=>[r,g,b]）+ 可选 alpha */
+function sdCapsule(px, py, ax, ay, bx, by, r) {
+    const pax = px - ax;
+    const pay = py - ay;
+    const bax = bx - ax;
+    const bay = by - ay;
+    const h = Math.min(Math.max((pax * bax + pay * bay) / (bax * bax + bay * bay), 0), 1);
+    return Math.hypot(pax - bax * h, pay - bay * h) - r;
+}
+
+/** 白描边圆环（头形描边用） */
+const sdRing = (px, py, cx, cy, r, w) => Math.abs(Math.hypot(px - cx, py - cy) - r) - w;
+
 function shape(sdf, fill, alpha = 1) {
     return { sdf, fill, alpha };
 }
@@ -85,40 +98,20 @@ function mix(base, over, alpha) {
     ];
 }
 
-/** 3x3 超采样渲染：shapes 按 painter's order，坐标以 size=160 的设计稿为准 */
-function render(width, height, shapes) {
-    const scale = Math.min(width, height) / 160;
-    const offsetX = (width - 160 * scale) / 2;
-    const offsetY = (height - 160 * scale) / 2;
-    const ss = 3;
+const solid = (rgb) => () => rgb;
+
+/** 对角渐变（左上→右下） */
+function diagGradient(topLeft, bottomRight) {
     return (x, y) => {
-        let acc = [255, 255, 255];
-        for (const [sx, sy] of [[0, 0], [1, 0], [0, 1], [1, 1], [2, 2], [2, 0], [0, 2], [1, 2], [2, 1]]) {
-            const dx = x + (sx + 0.5) / ss;
-            const dy = y + (sy + 0.5) / ss;
-            const ux = (dx - offsetX) / scale;
-            const uy = (dy - offsetY) / scale;
-            let color = [255, 255, 255];
-            for (const item of shapes) {
-                const d = item.sdf(ux, uy);
-                const cover = Math.min(Math.max(0.5 - d, 0), 1);
-                if (cover <= 0) continue;
-                const fill = typeof item.fill === "function" ? item.fill(ux, uy) : item.fill;
-                color = mix(color, fill, cover * item.alpha);
-            }
-            acc = [
-                acc[0] + color[0] / (ss * ss),
-                acc[1] + color[1] / (ss * ss),
-                acc[2] + color[2] / (ss * ss),
-            ];
-        }
-        return [Math.round(acc[0]), Math.round(acc[1]), Math.round(acc[2])];
+        const t = Math.min(Math.max((x + y) / 200, 0), 1);
+        return [
+            topLeft[0] + (bottomRight[0] - topLeft[0]) * t,
+            topLeft[1] + (bottomRight[1] - topLeft[1]) * t,
+            topLeft[2] + (bottomRight[2] - topLeft[2]) * t,
+        ];
     };
 }
 
-/* ---------- 设计（160 设计稿坐标） ---------- */
-
-/** 垂直渐变填充 */
 function vGradient(y0, y1, top, bottom) {
     return (_x, y) => {
         const t = Math.min(Math.max((y - y0) / (y1 - y0), 0), 1);
@@ -130,27 +123,96 @@ function vGradient(y0, y1, top, bottom) {
     };
 }
 
-function designShapes() {
+function render(width, height, shapes) {
+    const scale = Math.min(width, height) / 160;
+    const offsetX = (width - 160 * scale) / 2;
+    const offsetY = (height - 160 * scale) / 2;
+    const ss = 3;
+    const offsets = [];
+    for (let sy = 0; sy < ss; sy += 1) for (let sx = 0; sx < ss; sx += 1) offsets.push([(sx + 0.5) / ss, (sy + 0.5) / ss]);
+    return (x, y) => {
+        let acc = [255, 255, 255];
+        for (const [sx, sy] of offsets) {
+            const ux = (x + sx - offsetX) / scale;
+            const uy = (y + sy - offsetY) / scale;
+            let color = [255, 255, 255];
+            for (const item of shapes) {
+                const d = item.sdf(ux, uy);
+                const cover = Math.min(Math.max(0.5 - d, 0), 1);
+                if (cover <= 0) continue;
+                const fill = typeof item.fill === "function" ? item.fill(ux, uy) : item.fill;
+                color = mix(color, fill, cover * item.alpha);
+            }
+            acc = [acc[0] + color[0] / (ss * ss), acc[1] + color[1] / (ss * ss), acc[2] + color[2] / (ss * ss)];
+        }
+        return [Math.round(acc[0]), Math.round(acc[1]), Math.round(acc[2])];
+    };
+}
+
+const LIGHT_BG = (x, y) => vGradient(2, 158, [246, 248, 253], [232, 238, 250])(x, y);
+const basePlate = () => shape((x, y) => sdRoundRect(x, y, 80, 80, 78, 78, 34), LIGHT_BG);
+
+/* ---------- 变体 ---------- */
+
+const TEAL = { a: [43, 179, 155], b: [30, 136, 176] };
+const WHITE = [255, 255, 255];
+
+/** a：青绿渐变卡片 + 双人相连（推荐） */
+function variantA() {
     return [
-        // 浅色底板（圆角方形，打卡同款浅灰蓝）
-        shape((x, y) => sdRoundRect(x, y, 80, 80, 78, 78, 34), vGradient(2, 158, [246, 248, 253], [232, 238, 250])),
-        // 后层卡片（浅紫蓝）
-        shape((x, y) => sdRoundRect(x, y, 84, 74, 45, 42, 15), [206, 216, 248]),
-        // 前层卡片（蓝紫渐变）
-        shape((x, y) => sdRoundRect(x, y, 76, 84, 45, 42, 15), vGradient(42, 126, [124, 108, 246], [72, 106, 240])),
-        // 白色双人剪影：后位人（半透明）
-        shape((x, y) => sdCircle(x, y, 92, 76, 10.5), [255, 255, 255], 0.62),
-        shape((x, y) => sdRoundRect(x, y, 92, 103, 13.5, 12, 11), [255, 255, 255], 0.62),
-        // 前位人（实白）
-        shape((x, y) => sdCircle(x, y, 64, 80, 12.5), [255, 255, 255]),
-        shape((x, y) => sdRoundRect(x, y, 64, 110, 16, 14, 13), [255, 255, 255]),
-        // 点缀橙点（打卡同款位置语言：卡片右上）
-        shape((x, y) => sdCircle(x, y, 112, 46, 10.5), [255, 255, 255]),
-        shape((x, y) => sdCircle(x, y, 112, 46, 7.5), [255, 154, 60]),
+        basePlate(),
+        // 青绿渐变圆角卡片（对角渐变，区别于打卡的紫、雷切的蓝）
+        shape((x, y) => sdRoundRect(x, y, 80, 82, 48, 45, 16), diagGradient([56, 190, 160], [26, 128, 176])),
+        // 前位人物（白，头肩相接）
+        shape((x, y) => sdCircle(x, y, 58, 76, 13), WHITE),
+        shape((x, y) => sdRoundRect(x, y, 58, 103, 17, 14, 13.5), WHITE),
+        // 后位人物（白 65%，右后）
+        shape((x, y) => sdCircle(x, y, 98, 72, 10.5), WHITE, 0.65),
+        shape((x, y) => sdRoundRect(x, y, 98, 94, 13.5, 11, 10.5), WHITE, 0.65),
     ];
 }
 
+/** b：轻盈双人（无卡片，人物即主形） */
+function variantB() {
+    const tealFill = diagGradient([56, 190, 160], [26, 136, 176]);
+    return [
+        basePlate(),
+        // 左人物：青绿实心大剪影
+        shape((x, y) => sdCircle(x, y, 55, 74, 17), tealFill),
+        shape((x, y) => sdRoundRect(x, y, 55, 110, 22, 18, 18), tealFill),
+        // 右人物：浅蓝灰半透明
+        shape((x, y) => sdCircle(x, y, 104, 78, 13.5), [120, 144, 190], 0.75),
+        shape((x, y) => sdRoundRect(x, y, 104, 108, 18, 15, 14), [120, 144, 190], 0.75),
+    ];
+}
+
+/** c：深青底 + 白描边双人（最大的货架辨识度） */
+function variantC() {
+    return [
+        shape((x, y) => sdRoundRect(x, y, 80, 80, 78, 78, 34), diagGradient([18, 118, 110], [21, 94, 158])),
+        // 前位人物（白描边头 + 白实心底肩）
+        shape((x, y) => sdRing(x, y, 58, 76, 11.5, 3.4), WHITE),
+        shape((x, y) => sdRoundRect(x, y, 58, 104, 16, 13, 13), WHITE),
+        // 后位人物
+        shape((x, y) => sdRing(x, y, 98, 72, 9.5, 3), WHITE, 0.7),
+        shape((x, y) => sdRoundRect(x, y, 98, 95, 12.5, 10.5, 10), WHITE, 0.7),
+    ];
+}
+
+const VARIANTS = { a: variantA, b: variantB, c: variantC };
+
 const root = path.resolve(import.meta.dirname, "..");
-fs.writeFileSync(path.join(root, "icon.png"), encodePng(160, 160, render(160, 160, designShapes())));
-fs.writeFileSync(path.join(root, "preview.png"), encodePng(1024, 768, render(1024, 768, designShapes())));
-console.log("icon.png / preview.png 已生成（Lv Contacts 家庭视觉）");
+const args = process.argv.slice(2);
+const wantAll = args.includes("--all");
+const picked = args.find((arg) => VARIANTS[arg]) ?? "a";
+
+if (wantAll) {
+    for (const name of Object.keys(VARIANTS)) {
+        fs.writeFileSync(path.join(root, `icon-variant-${name}.png`), encodePng(320, 320, render(320, 320, VARIANTS[name]())));
+    }
+    console.log("预览 icon-variant-a/b/c.png (320px) 已生成");
+} else {
+    fs.writeFileSync(path.join(root, "icon.png"), encodePng(160, 160, render(160, 160, VARIANTS[picked]())));
+    fs.writeFileSync(path.join(root, "preview.png"), encodePng(1024, 768, render(1024, 768, VARIANTS[picked]())));
+    console.log(`icon.png / preview.png 已生成（变体 ${picked}）`);
+}
