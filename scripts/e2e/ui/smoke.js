@@ -13,6 +13,7 @@ import { recordInteraction, deleteInteraction, loadInteractionStore } from "../.
 import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
 import { captureFromDoc } from "../../../src/services/capture";
 import { exportInteractionJson } from "../../../src/services/interaction-export";
+import { importInteractionJson, previewInteractionImport } from "../../../src/services/interaction-import";
 import { FIELD_SPECS } from "../../../src/domain/fields";
 import { DEFAULT_VIEW_PREFERENCES } from "../../../src/domain/preferences";
 import { kernel } from "./siyuan-mock.js";
@@ -704,6 +705,101 @@ await test("设置页备份读取失败不下载，重试后下载完整快照",
         URL.revokeObjectURL = originalRevoke;
         HTMLAnchorElement.prototype.click = originalClick;
     }
+});
+
+await test("备份预览不写入，合并重读当前数据并保留并发新增，再次合并幂等", async () => {
+    let saved = "";
+    let writes = 0;
+    const plugin = {
+        loadData: async () => JSON.parse(JSON.stringify(saved)),
+        saveData: async (_key, value) => { writes += 1; saved = JSON.parse(JSON.stringify(value)); },
+    };
+    const incoming = { id: "导入事件", personDocId: "甲", source: "manual", occurredAt: Date.now(), localDate: "2026-09-27" };
+    const text = JSON.stringify({ schemaVersion: 1, events: [incoming], tombstones: ["删除标记"] });
+    const preview = await previewInteractionImport(plugin, text);
+    assert(preview.added === 1 && writes === 0, "预览发生写入或计数错误");
+    await recordInteraction(plugin, { personDocId: "乙" });
+    const result = await importInteractionJson(plugin, text);
+    assert(result.added === 1 && (await loadInteractionStore(plugin)).events.length === 2, "导入覆盖了预览后的新增记录");
+    const before = writes;
+    const repeat = await importInteractionJson(plugin, text);
+    assert(repeat.added === 0 && repeat.skipped === 1 && writes === before, "重复导入不幂等");
+    const nextText = JSON.stringify({ schemaVersion: 1, events: [{ ...incoming, id: "并发导入", personDocId: "丙" }], tombstones: [] });
+    const concurrent = await Promise.all([importInteractionJson(plugin, nextText), importInteractionJson(plugin, nextText)]);
+    assert(concurrent.reduce((sum, item) => sum + item.added, 0) === 1, "并发导入重复计数");
+    const afterConcurrent = writes;
+    saved = { schemaVersion: 99, events: [], tombstones: [] };
+    let rejected = false;
+    try { await importInteractionJson(plugin, text); } catch { rejected = true; }
+    assert(rejected && writes === afterConcurrent, "导入覆盖了不兼容的当前库");
+});
+
+await test("设置页备份合并先预览，坏文件清空旧计划，取消不写入，失败可重试", async () => {
+    let saved = "";
+    let failWrite = true;
+    let writes = 0;
+    let refreshed = 0;
+    let delayPreview = false;
+    let releasePreview;
+    const plugin = {
+        loadData: async () => JSON.parse(JSON.stringify(saved)),
+        saveData: async (_key, value) => { if (!failWrite) { writes += 1; saved = JSON.parse(JSON.stringify(value)); } },
+    };
+    const facade = {
+        previewInteractionImport: async (text) => {
+            if (delayPreview) {
+                delayPreview = false;
+                await new Promise((resolve) => { releasePreview = resolve; });
+            }
+            return previewInteractionImport(plugin, text);
+        },
+        importInteractionJson: (text) => importInteractionJson(plugin, text),
+    };
+    mounted = mount(SettingsView, { target: fixture, props: {
+        facade, settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {}, onInteractionsUpdated() { refreshed += 1; },
+    } });
+    [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes("数据与字段")).click();
+    await tick();
+    const fileInput = fixture.querySelector("#lvct-interaction-backup");
+    const good = JSON.stringify({ schemaVersion: 1, events: [{ id: "恢复事件", personDocId: "甲", occurredAt: Date.now(), localDate: "2026-09-27", source: "manual" }], tombstones: [] });
+    function selectFile(text) {
+        const transfer = new DataTransfer();
+        transfer.items.add(new File([text], "backup.json", { type: "application/json" }));
+        fileInput.files = transfer.files;
+        fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    const originalConfirm = window.confirm;
+    try {
+        selectFile(good);
+        await until(() => fixture.textContent.includes("预计新增 1 条"), "导入预览未显示");
+        assert(writes === 0, "选择文件即发生写入");
+        delayPreview = true;
+        selectFile(good);
+        await until(() => Boolean(releasePreview), "迟到预览未开始");
+        selectFile("bad-json");
+        await until(() => fixture.textContent.includes("备份不是有效"), "坏文件未报错");
+        releasePreview();
+        await pause(50);
+        await tick();
+        assert(button("确认合并备份").disabled, "坏文件仍可执行旧导入计划");
+        selectFile(good);
+        await until(() => !button("确认合并备份").disabled, "重新选择备份后不可提交");
+        window.confirm = () => false;
+        button("确认合并备份").click();
+        await tick();
+        assert(writes === 0, "取消确认仍写入");
+        window.confirm = (message) => { assert(message.includes("删除标记"), "确认未说明删除语义"); return true; };
+        button("确认合并备份").click();
+        await until(() => fixture.textContent.includes("存储写入未收敛"), "写入失败未显示");
+        assert(!button("确认合并备份").disabled, "失败后无法重试");
+        failWrite = false;
+        button("确认合并备份").click();
+        await until(() => fixture.textContent.includes("合并完成：新增 1 条"), "重试合并未成功");
+        assert(refreshed === 1 && writes === 1, "完成后未通知刷新或重复写入");
+        assert(button("确认合并备份").disabled && fileInput.value === "", "完成后保留了可重复提交的旧计划");
+        assert(fileInput.getBoundingClientRect().right <= fixture.getBoundingClientRect().right + 1, "文件选择框超出移动布局");
+    } finally { window.confirm = originalConfirm; }
 });
 
 await pause(100);

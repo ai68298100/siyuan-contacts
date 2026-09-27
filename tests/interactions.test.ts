@@ -14,6 +14,7 @@ import {
 } from "../src/domain/interactions.ts";
 import type { InteractionEvent, InteractionStore } from "../src/domain/interactions.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
+import { mergeInteractionBackup, parseInteractionBackup } from "../src/domain/interaction-backup.ts";
 
 function event(partial: Partial<InteractionEvent>): InteractionEvent {
     return {
@@ -117,6 +118,33 @@ test("归一化：事件 ID 全局去重，不同来源及空场合标识与追�
     const normalized = normalizeInteractionStore({ schemaVersion: 1, events, tombstones: [] });
     assert.deepEqual(normalized.events, appended.events);
     assert.equal(normalized.events.length, 3);
+});
+
+test("备份解析：旧版兼容，新版优先原快照，不偷换损坏数据", () => {
+    const store = { schemaVersion: 1, events: [event({})], tombstones: [] };
+    assert.deepEqual(parseInteractionBackup(JSON.stringify(store)), store);
+    assert.deepEqual(parseInteractionBackup(JSON.stringify({ ...store, rawStore: store })), store);
+    assert.equal(parseInteractionBackup(JSON.stringify({ ...store, rawStore: "" })).events.length, 0);
+    for (const text of ["bad", "null", JSON.stringify({ ...store, schemaVersion: 99 }),
+        JSON.stringify({ ...store, rawStore: { ...store, schemaVersion: 99 } }),
+        JSON.stringify({ ...store, rawStore: { ...store, events: [null] } })]) {
+        assert.throws(() => parseInteractionBackup(text));
+    }
+});
+
+test("备份合并：当前优先、人物场合去重、双方墓碑阻止复活、再次合并幂等", () => {
+    const current = normalizeInteractionStore({ schemaVersion: 1, events: [event({ id: "keep", note: "现有备注", externalRef: "会议" }), event({ id: "remove" })], tombstones: ["deleted"] });
+    const incoming = normalizeInteractionStore({ schemaVersion: 1, events: [
+        event({ id: "duplicate", note: "旧备注", externalRef: "会议" }),
+        event({ id: "new", personDocId: "d2", externalRef: "会议" }), event({ id: "deleted" }),
+    ], tombstones: ["remove"] });
+    const before = JSON.stringify([current, incoming]);
+    const result = mergeInteractionBackup(current, incoming);
+    assert.deepEqual(result.summary, { added: 1, skipped: 2, removed: 1, tombstonesAdded: 1 });
+    assert.equal(result.store.events.find((item) => item.id === "keep")?.note, "现有备注");
+    assert.deepEqual(result.store.tombstones, ["deleted", "remove"]);
+    assert.equal(JSON.stringify([current, incoming]), before, "输入不应被修改");
+    assert.deepEqual(mergeInteractionBackup(result.store, incoming).summary, { added: 0, skipped: 3, removed: 0, tombstonesAdded: 0 });
 });
 
 test("lastInteractionByPerson / staleContacts：最近互动与久未联系排序", () => {

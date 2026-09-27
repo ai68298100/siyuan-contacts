@@ -181,6 +181,7 @@
                         onPreferencesUpdated(updated);
                     }}
                     onBack={() => (current = "home")}
+                    onInteractionsUpdated={() => (dataRevision += 1)}
                 />
             {/if}
         </div>

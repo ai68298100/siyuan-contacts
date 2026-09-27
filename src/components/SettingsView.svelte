@@ -2,6 +2,7 @@
     import type { ContactsPluginFacade } from "../types";
     import type { ContactsSettings } from "../domain/model";
     import type { ViewPreferences } from "../domain/preferences";
+    import type { InteractionImportSummary } from "../domain/interaction-backup";
     import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "../services/settings-health";
 
     let {
@@ -11,6 +12,7 @@
         onSettingsUpdated,
         onPreferencesUpdated,
         onBack,
+        onInteractionsUpdated = () => {},
     }: {
         facade: ContactsPluginFacade;
         settings: ContactsSettings;
@@ -18,6 +20,7 @@
         onSettingsUpdated: (settings: ContactsSettings) => void;
         onPreferencesUpdated: (preferences: ViewPreferences) => void;
         onBack: () => void;
+        onInteractionsUpdated?: () => void;
     } = $props();
 
     type SectionId = "general" | "data" | "reminder" | "ai" | "bridge" | "about";
@@ -42,6 +45,13 @@
     let rebindMessage = $state("");
     let exportingInteractions = $state(false);
     let exportMessage = $state("");
+    let importPreview: InteractionImportSummary | null = $state(null);
+    let importText = "";
+    let importRequest = 0;
+    let previewingImport = $state(false);
+    let importingInteractions = $state(false);
+    let importMessage = $state("");
+    let importFileInput = $state<HTMLInputElement>();
     let mappingDraft: Record<string, string> = $state({});
     let mappingBusy = $state(false);
     // svelte-ignore state_referenced_locally
@@ -150,6 +160,50 @@
             errorText = error instanceof Error ? error.message : String(error);
         } finally {
             exportingInteractions = false;
+        }
+    }
+
+    async function selectInteractionBackup(event: Event) {
+        if (importingInteractions) return;
+        const request = ++importRequest;
+        const file = (event.currentTarget as HTMLInputElement).files?.[0];
+        importPreview = null;
+        importText = "";
+        importMessage = "";
+        errorText = "";
+        previewingImport = Boolean(file);
+        if (!file) return;
+        try {
+            const text = await file.text();
+            if (request !== importRequest) return;
+            const preview = await facade.previewInteractionImport(text);
+            if (request !== importRequest) return;
+            importText = text;
+            importPreview = preview;
+        } catch (error) {
+            if (request === importRequest) errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            if (request === importRequest) previewingImport = false;
+        }
+    }
+
+    async function runImportInteractions() {
+        if (importingInteractions || previewingImport || !importPreview) return;
+        if (!window.confirm("将合并所选互动备份，不覆盖整个库、不创建联系人文档。备份中的删除标记会移除对应互动，已删除记录不会复活。确认继续吗？")) return;
+        importingInteractions = true;
+        errorText = "";
+        importMessage = "";
+        try {
+            const result = await facade.importInteractionJson(importText);
+            importMessage = `合并完成：新增 ${result.added} 条，跳过 ${result.skipped} 条，移除 ${result.removed} 条，新增删除标记 ${result.tombstonesAdded} 条`;
+            importPreview = null;
+            importText = "";
+            if (importFileInput) importFileInput.value = "";
+            onInteractionsUpdated();
+        } catch (error) {
+            errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            importingInteractions = false;
         }
     }
 
@@ -278,6 +332,21 @@
                         </button>
                     </div>
                     {#if exportMessage}<p class="lvct-settings__inline-hint lvct-text-success" role="status">{exportMessage}</p>{/if}
+
+                    <div class="lvct-settings__row">
+                        <label for="lvct-interaction-backup"><b>合并互动备份</b></label>
+                        <input id="lvct-interaction-backup" class="b3-text-field lvct-settings__backup-input" type="file" accept=".json,application/json" bind:this={importFileInput} onchange={selectInteractionBackup} disabled={importingInteractions} />
+                    </div>
+                    {#if previewingImport}<p class="lvct-settings__inline-hint" role="status">正在检查备份…</p>{/if}
+                    {#if importPreview}
+                        <p class="lvct-settings__inline-hint">预计新增 {importPreview.added} 条，跳过 {importPreview.skipped} 条，移除 {importPreview.removed} 条，新增删除标记 {importPreview.tombstonesAdded} 条</p>
+                    {/if}
+                    <div class="lvct-settings__actions">
+                        <button class="b3-button b3-button--outline" onclick={runImportInteractions} disabled={!importPreview || previewingImport || importingInteractions}>
+                            {importingInteractions ? "合并中…" : "确认合并备份"}
+                        </button>
+                        {#if importMessage}<span class="ft__smaller lvct-text-success" role="status">{importMessage}</span>{/if}
+                    </div>
 
                     <div class="lvct-settings__sub-heading">
                         <b>字段健康检查</b>

@@ -5,6 +5,7 @@ import type { AiExtractOutcome } from "./services/ai-extract";
 import type { PersonInsights } from "./services/insights";
 import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "./services/settings-health";
 import type { ViewPreferences } from "./domain/preferences";
+import type { InteractionImportSummary } from "./domain/interaction-backup";
 
 export type WorkbenchView = "home" | "people" | "graph" | "settings";
 
@@ -32,6 +33,8 @@ export interface ContactsPluginFacade {
     repairFieldMap(patch: FieldMapPatch): Promise<ContactsSettings>;
     /** 导出插件自管互动事件，不修改当前存储 */
     exportInteractionJson(): Promise<string>;
+    previewInteractionImport(text: string): Promise<InteractionImportSummary>;
+    importInteractionJson(text: string): Promise<InteractionImportSummary>;
     loadViewPreferences(): Promise<ViewPreferences>;
     saveViewPreferences(preferences: ViewPreferences): Promise<ViewPreferences>;
     /** 从笔记捕获：预览出链指向的联系人 */

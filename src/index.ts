@@ -18,6 +18,7 @@ import { loadPersonInsights } from "./services/insights";
 import { checkSettingsHealth, rebuildMissingFields, rebindSettings, repairFieldMap } from "./services/settings-health";
 import { loadViewPreferences, saveViewPreferences } from "./services/preferences";
 import { exportInteractionJson } from "./services/interaction-export";
+import { importInteractionJson, previewInteractionImport } from "./services/interaction-import";
 import { initExternalBridge, disposeExternalBridge } from "./bridge/external-bridge";
 import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
 import { svelteDialog } from "./libs/dialog";
@@ -251,6 +252,14 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     async exportInteractionJson() {
         return exportInteractionJson(this);
+    }
+
+    async previewInteractionImport(text: string) {
+        return previewInteractionImport(this, text);
+    }
+
+    async importInteractionJson(text: string) {
+        return importInteractionJson(this, text);
     }
 
     async repairFieldMap(patch: Parameters<typeof repairFieldMap>[2]) {
