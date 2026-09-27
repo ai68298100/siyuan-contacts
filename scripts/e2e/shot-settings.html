@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>设置页截图</title>
+<style>
+    :root {
+        --b3-theme-background: #fff; --b3-theme-surface: #f5f5f5;
+        --b3-theme-surface-lighter: #efefef;
+        --b3-theme-on-background: #222; --b3-theme-on-surface: #444;
+        --b3-theme-on-surface-light: #888; --b3-theme-primary: #6366f1;
+        --b3-theme-primary-lightest: #e8e9fe; --b3-theme-on-primary: #fff;
+        --b3-border-color: #e2e2e2; --b3-list-hover: #eee;
+        --b3-list-icon-hover: #e6e6e6; --b3-theme-error: #d32f2f;
+        --b3-theme-success: #23b27c; --b3-theme-info: #3b82f6;
+        --b3-font-family: inherit;
+    }
+    body { margin: 0; background: #fff; }
+    #shot { width: 1200px; }
+</style></head>
+<body>
+<div id="shot" class="lvct-tab-root"></div>
+<script type="module">
+    import { mount, unmount } from "svelte";
+    import "../../src/index.scss";
+    import SettingsView from "../../src/components/SettingsView.svelte";
+
+    const settings = {
+        schemaVersion: 1, notebookName: "小驴人脉", notebookId: "book1",
+        hostDocId: "host1", dbBlockId: "block1", avId: "av1",
+        initializedAt: "2026-09-27T00:00:00Z",
+        fieldMap: { name: "c1", phone: "c2", email: "c3", wechat: "c4", website: "c5", birthday: "c6", isLunar: "c7", group: "c8", tags: "c9" },
+    };
+    const prefs = {
+        defaultView: "home", peopleSort: "name", openOnStartup: true,
+        birthdayWindowDays: 7, staleThresholdDays: 30, aiEnabled: true,
+    };
+    const columns = [
+        { id: "c1", name: "姓名", type: "text" },
+        { id: "c2", name: "电话", type: "phone" },
+        { id: "c3", name: "邮箱", type: "text" },
+        { id: "c4", name: "微信", type: "text" },
+        { id: "c5", name: "网站", type: "url" },
+        { id: "c6", name: "生日", type: "date" },
+        { id: "c7", name: "农历", type: "checkbox" },
+        { id: "c8", name: "分组", type: "select" },
+        { id: "c9", name: "标签", type: "mSelect" },
+    ];
+    const facade = {
+        settings, viewPreferences: prefs,
+        checkSettingsHealth: async () => ({ ok: true, columns: columns.length, missing: [], availableColumns: columns }),
+        repairFieldMap: async (patch) => ({ ...settings, fieldMap: { ...settings.fieldMap, ...patch } }),
+        rebuildMissingFields: async () => settings,
+        rebindSettings: async () => settings,
+        saveViewPreferences: async (v) => v,
+        exportInteractionJson: async () => "{}",
+        openHostDoc() {},
+    };
+
+    const mode = new URLSearchParams(location.search).get("section") || "general";
+    let app = mount(SettingsView, {
+        target: document.getElementById("shot"),
+        props: {
+            facade, settings, preferences: prefs,
+            onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {},
+        },
+    });
+    // Switch to requested section after mount.
+    setTimeout(() => {
+        const labels = { data: "数据与字段", reminder: "提醒", ai: "AI 与隐私", bridge: "服务桥", about: "关于" };
+        if (labels[mode]) {
+            const btn = [...document.querySelectorAll(".lvct-settings__nav-item")].find((n) => n.textContent.includes(labels[mode]));
+            btn?.click();
+        }
+        document.title = "READY";
+    }, 100);
+    window.__ready = true;
+</script>
+</body>
+</html>

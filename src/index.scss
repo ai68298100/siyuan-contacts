@@ -703,7 +703,7 @@
     input:checked + &__track {
         background: var(--lvct-accent);
 
-        .lvct-switch__thumb { transform: translateX(16px); background: #fff; }
+        .lvct-switch__thumb { transform: translateX(16px); background: var(--lvct-on-accent); }
     }
 
     input:focus-visible + &__track {
@@ -1831,7 +1831,26 @@
         grid-template-columns: 1fr;
     }
 
-    .lvct-settings__preference-grid,
+    .lvct-settings__layout {
+        flex-direction: column;
+        gap: var(--lvct-sp-3);
+    }
+
+    .lvct-settings__nav {
+        position: static;
+        flex-direction: row;
+        width: 100%;
+        gap: var(--lvct-sp-1);
+        overflow-x: auto;
+    }
+
+    .lvct-settings__nav-item {
+        flex-shrink: 0;
+        min-height: var(--lvct-touch-min-mobile);
+        white-space: nowrap;
+    }
+
+    .lvct-settings__form-grid,
     .lvct-settings__rebind-grid {
         grid-template-columns: 1fr;
     }

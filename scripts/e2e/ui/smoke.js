@@ -294,6 +294,12 @@ await test("设置页可按列类型手动恢复字段映射并拒绝空提交",
         facade, settings, preferences: DEFAULT_VIEW_PREFERENCES,
         onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {},
     } });
+    if (window.innerWidth <= 640) {
+        const layoutEl = fixture.querySelector(".lvct-settings__layout");
+        const navEl = fixture.querySelector(".lvct-settings__nav");
+        assert(getComputedStyle(layoutEl).flexDirection === "column", "移动端设置页应为纵向布局");
+        assert(getComputedStyle(navEl).flexDirection === "row", "移动端设置导航应为横向");
+    }
     const dataNav = [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes("数据与字段"));
     assert(dataNav, "未找到数据与字段导航");
     dataNav.click();
