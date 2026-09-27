@@ -7,6 +7,7 @@ import {
     isDuplicateEvent,
     lastInteractionByPerson,
     normalizeInteractionStore,
+    normalizeInteractionStoreForWrite,
     removeEvent,
     staleContacts,
     toLocalDateKey,
@@ -70,6 +71,23 @@ test("normalize：脏数据降级为空库，合法数据过虑保留", () => {
     });
     assert.equal(store.events.length, 1);
     assert.deepEqual(store.tombstones, ["t1"]);
+});
+
+test("写前归一：首次空值可创建，未知版本与损坏数据拒绝修改", () => {
+    for (const raw of [null, undefined, ""]) assert.deepEqual(normalizeInteractionStoreForWrite(raw), { schemaVersion: 1, events: [], tombstones: [] });
+    for (const raw of ["broken", {}, { schemaVersion: 2, events: [], tombstones: [] },
+        { schemaVersion: 1, events: [event({}), null], tombstones: [] },
+        { schemaVersion: 1, events: [], tombstones: [42] },
+        { schemaVersion: 1, events: [ { ...event({}), externalRef: 42 } ], tombstones: [] },
+        { schemaVersion: 1, events: [ { ...event({}), note: {} } ], tombstones: [] }]) {
+        assert.throws(() => normalizeInteractionStoreForWrite(raw), /操作已停止/);
+    }
+});
+
+test("写前归一：合法重复项与墓碑按已有规则投影", () => {
+    const raw = { schemaVersion: 1, events: [event({}), event({}), event({ id: "deleted" })], tombstones: ["deleted"] };
+    assert.deepEqual(normalizeInteractionStoreForWrite(raw), normalizeInteractionStore(raw));
+    assert.equal(normalizeInteractionStoreForWrite(raw).events.length, 1);
 });
 
 test("多人同场：各人记录保留，重复捕获幂等，回读后共同出席可计算", () => {

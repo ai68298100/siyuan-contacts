@@ -29,6 +29,33 @@ export interface InteractionStore {
 
 export const INTERACTION_STORE_VERSION = 1;
 
+function isInteractionEvent(raw: unknown): raw is InteractionEvent {
+    if (raw === null || typeof raw !== "object") return false;
+    const event = raw as Partial<InteractionEvent>;
+    return typeof event.id === "string" && event.id.length > 0 &&
+        typeof event.personDocId === "string" && event.personDocId.length > 0 &&
+        typeof event.occurredAt === "number" && Number.isFinite(event.occurredAt) &&
+        typeof event.localDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(event.localDate) &&
+        (event.source === "manual" || event.source === "diary" || event.source === "api") &&
+        (event.externalRef === undefined || typeof event.externalRef === "string") &&
+        (event.note === undefined || typeof event.note === "string");
+}
+
+/** 写前检查不丢弃损坏数据；正常重复项及墓碑仍按投影规则处理。 */
+export function normalizeInteractionStoreForWrite(raw: unknown): InteractionStore {
+    if (raw == null || raw === "") return emptyStore();
+    if (typeof raw !== "object" ||
+        (raw as Partial<InteractionStore>).schemaVersion !== INTERACTION_STORE_VERSION) {
+        throw new Error("互动存储格式或版本不兼容，操作已停止；请先备份并检查原文件");
+    }
+    const record = raw as Partial<InteractionStore>;
+    if (!Array.isArray(record.events) || !record.events.every(isInteractionEvent) ||
+        !Array.isArray(record.tombstones) || !record.tombstones.every((id) => typeof id === "string")) {
+        throw new Error("互动存储内容损坏，操作已停止；请先备份并检查原文件");
+    }
+    return normalizeInteractionStore(raw);
+}
+
 /** 读时归一：任何脏数据降级为空库，绝不抛错 */
 export function normalizeInteractionStore(raw: unknown): InteractionStore {
     if (raw === null || typeof raw !== "object") return emptyStore();
@@ -36,14 +63,7 @@ export function normalizeInteractionStore(raw: unknown): InteractionStore {
     if (record.schemaVersion !== INTERACTION_STORE_VERSION) return emptyStore();
     const tombstones = Array.isArray(record.tombstones) ? record.tombstones.filter((id) => typeof id === "string") : [];
     const events = Array.isArray(record.events)
-        ? record.events.filter((event): event is InteractionEvent => {
-              if (event === null || typeof event !== "object") return false;
-              if (typeof event.id !== "string" || event.id.length === 0) return false;
-              if (typeof event.personDocId !== "string" || event.personDocId.length === 0) return false;
-              if (typeof event.occurredAt !== "number" || !Number.isFinite(event.occurredAt)) return false;
-              if (typeof event.localDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(event.localDate)) return false;
-              return event.source === "manual" || event.source === "diary" || event.source === "api";
-          })
+        ? record.events.filter(isInteractionEvent)
         : [];
     const seenTombstones = new Set(tombstones);
     const seenIds = new Set<string>();

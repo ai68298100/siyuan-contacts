@@ -604,6 +604,37 @@ await test("互动读取失败阻止新增与删除，恢复后保留旧记录",
     assert(deleted.events.length === 1 && deleted.tombstones.includes(first.events[0].id), "恢复后删除未正常写墓碑");
 });
 
+await test("互动损坏数据与未知版本禁止覆盖，宿主空字符串可首次保存", async () => {
+    let saved = "";
+    let writes = 0;
+    const plugin = {
+        loadData: async () => JSON.parse(JSON.stringify(saved)),
+        saveData: async (_key, value) => { writes += 1; saved = JSON.parse(JSON.stringify(value)); },
+    };
+    const first = await recordInteraction(plugin, { personDocId: "甲" });
+    assert(first.events.length === 1 && writes === 1, "宿主未创建文件的空字符串无法首次保存");
+    const good = JSON.parse(JSON.stringify(saved));
+    for (const damaged of [
+        { ...good, schemaVersion: 99 }, { ...good, events: [...good.events, null] },
+        { ...good, tombstones: [42] }, { schemaVersion: 1 }, "损坏内容",
+    ]) {
+        saved = damaged;
+        const snapshot = JSON.stringify(saved);
+        const before = writes;
+        for (const action of [
+            () => recordInteraction(plugin, { personDocId: "乙" }),
+            () => deleteInteraction(plugin, good.events[0].id),
+        ]) {
+            let message = "";
+            try { await action(); } catch (error) { message = error.message; }
+            assert(message.includes("操作已停止"), "损坏存储未阻止修改");
+        }
+        assert(writes === before && JSON.stringify(saved) === snapshot, "损坏存储被覆盖");
+    }
+    saved = good;
+    assert((await recordInteraction(plugin, { personDocId: "乙" })).events.length === 2, "恢复合法文件后不能继续追加");
+});
+
 await pause(100);
 results.push({ name: "无未处理异常及响应式循环", ok: runtimeErrors.length === 0, detail: runtimeErrors.join("\n") });
 document.querySelector("#results").textContent = JSON.stringify(results, null, 2);
