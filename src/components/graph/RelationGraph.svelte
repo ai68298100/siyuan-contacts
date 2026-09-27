@@ -7,6 +7,7 @@
     import { buildGraph, capGraph, GRAPH_MAX_NODES, groupColor, queryGraphRelations } from "../../domain/graph";
     import { shortestGraphPath, secondDegreeGraphIds } from "../../domain/graph-path";
     import { renderGraphResultMarkdown } from "../../domain/graph-export";
+    import { translateText } from "../../domain/translation";
     import type { ContactsSettings } from "../../domain/model";
     import type { ContactSummary } from "../../domain/person";
     import type { PersonInsights } from "../../services/insights";
@@ -16,15 +17,19 @@
         settings,
         revision = 0,
         facade,
+        i18n,
         onOpenDetail,
         onOpenPeople,
     }: {
         settings: ContactsSettings;
         revision?: number;
         facade?: ContactsPluginFacade;
+        i18n?: Readonly<Record<string, string>>;
         onOpenDetail: (person: ContactSummary) => void;
         onOpenPeople: () => void;
     } = $props();
+    const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
+        translateText(i18n, key, fallback, values));
 
     let container: HTMLElement | undefined = $state();
     let people: ContactSummary[] = $state([]);
@@ -369,20 +374,20 @@
 
 <div class="lvct-graph-view">
     <div class="lvct-people__toolbar fn__flex">
-        <input class="b3-text-field fn__flex-1" type="search" placeholder="搜索节点…" aria-label="搜索关系图谱节点" bind:value={searchText} />
-        {#if searchNeedle}<span class="ft__smaller ft__on-surface">命中 {filteredPeople.length} 人</span>{/if}
-        <select class="b3-select" bind:value={groupFilter} aria-label="按分组过滤">
-            <option value="">全部分组</option>
+        <input class="b3-text-field fn__flex-1" type="search" placeholder={text("graphSearchPlaceholder", "搜索节点…")} aria-label={text("graphSearchNodes", "搜索关系图谱节点")} bind:value={searchText} />
+        {#if searchNeedle}<span class="ft__smaller ft__on-surface">{text("graphHitCount", "命中 {n} 人", { n: filteredPeople.length })}</span>{/if}
+        <select class="b3-select" bind:value={groupFilter} aria-label={text("graphFilterByGroup", "按分组过滤")}>
+            <option value="">{text("graphAllGroups", "全部分组")}</option>
             {#each groups as group (group)}
                 <option value={group}>{group}</option>
             {/each}
         </select>
-        <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={isolatedOnly} />仅无关系人物（{isolatedIds.size}）</label>
-        <button class="b3-button b3-button--outline" onclick={() => graphInstance?.fit()}>适应</button>
-        <button class="b3-button b3-button--outline" onclick={() => zoomBy(1.2)}>放大</button>
-        <button class="b3-button b3-button--outline" onclick={() => zoomBy(1 / 1.2)}>缩小</button>
-        <button class="b3-button b3-button--outline" onclick={relayout}>重新布局</button>
-        <button class="b3-button b3-button--outline" onclick={refresh}>刷新</button>
+        <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={isolatedOnly} />{text("graphIsolatedOnly", "仅无关系人物（{n}）", { n: isolatedIds.size })}</label>
+        <button class="b3-button b3-button--outline" onclick={() => graphInstance?.fit()}>{text("graphFit", "适应")}</button>
+        <button class="b3-button b3-button--outline" onclick={() => zoomBy(1.2)}>{text("graphZoomIn", "放大")}</button>
+        <button class="b3-button b3-button--outline" onclick={() => zoomBy(1 / 1.2)}>{text("graphZoomOut", "缩小")}</button>
+        <button class="b3-button b3-button--outline" onclick={relayout}>{text("graphRelayout", "重新布局")}</button>
+        <button class="b3-button b3-button--outline" onclick={refresh}>{text("graphRefresh", "刷新")}</button>
         <span class="ft__smaller ft__on-surface lvct-graph-legend">
             {#each groupLegend as group (group.label)}
                 <span class={`lvct-graph-legend__item lvct-graph-legend__item--${group.className}`}><i></i>{group.label}</span>
@@ -393,47 +398,47 @@
 
     {#if !loading && !errorText && displayed.graph.nodes.length > 0}
         <div class="lvct-graph-query">
-            <label>关系中心
-                <select class="b3-select" bind:value={focusId} aria-label="关系中心">
-                    <option value="">未选择</option>
+            <label>{text("graphCenterLabel", "关系中心")}
+                <select class="b3-select" bind:value={focusId} aria-label={text("graphCenterLabel", "关系中心")}>
+                    <option value="">{text("graphPickNone", "未选择")}</option>
                     {#each displayed.graph.nodes as node (node.id)}
                         <option value={node.id}>{node.label}</option>
                     {/each}
                 </select>
             </label>
-            <label>对比人物
-                <select class="b3-select" bind:value={compareId} disabled={!focusId} aria-label="对比人物">
-                    <option value="">未选择</option>
+            <label>{text("graphCompareLabel", "对比人物")}
+                <select class="b3-select" bind:value={compareId} disabled={!focusId} aria-label={text("graphCompareLabel", "对比人物")}>
+                    <option value="">{text("graphPickNone", "未选择")}</option>
                     {#each displayed.graph.nodes.filter((node) => node.id !== focusId) as node (node.id)}
                         <option value={node.id}>{node.label}</option>
                     {/each}
                 </select>
             </label>
             {#if focusId && !compareId}
-                <select class="b3-select" bind:value={relationDepth} aria-label="关系层级">
-                    <option value="direct">直接关系</option>
-                    <option value="second">二度关系</option>
+                <select class="b3-select" bind:value={relationDepth} aria-label={text("graphDepthLabel", "关系层级")}>
+                    <option value="direct">{text("graphDepthDirect", "直接关系")}</option>
+                    <option value="second">{text("graphDepthSecond", "二度关系")}</option>
                 </select>
             {/if}
             {#if compareId}
-                <select class="b3-select" bind:value={queryMode} aria-label="关系查询模式">
-                    <option value="common">共同联系人</option>
-                    <option value="path">最短路径</option>
+                <select class="b3-select" bind:value={queryMode} aria-label={text("graphQueryModeLabel", "关系查询模式")}>
+                    <option value="common">{text("graphModeCommon", "共同联系人")}</option>
+                    <option value="path">{text("graphModePath", "最短路径")}</option>
                 </select>
             {/if}
             {#if focusId}
                 {#if pathMode}
-                    <span class="ft__smaller ft__on-surface">最短路径：{pathIds.length > 0 ? `${pathIds.length - 1} 段关系` : "无连接"}（当前图内）</span>
+                    <span class="ft__smaller ft__on-surface">{pathIds.length > 0 ? text("graphPathCount", "最短路径：{n} 段关系（当前图内）", { n: pathIds.length - 1 }) : text("graphPathNone", "最短路径：无连接（当前图内）")}</span>
                 {:else}
-                    <span class="ft__smaller ft__on-surface">{compareId ? "共同联系人" : secondMode ? "二度关系" : "直接关系"}：{resultPeople.length} 人（当前图内）</span>
+                    <span class="ft__smaller ft__on-surface">{compareId ? text("graphCommonCount", "共同联系人：{n} 人（当前图内）", { n: resultPeople.length }) : secondMode ? text("graphSecondCount", "二度关系：{n} 人（当前图内）", { n: resultPeople.length }) : text("graphDirectCount", "直接关系：{n} 人（当前图内）", { n: resultPeople.length })}</span>
                 {/if}
-                <button class="b3-button b3-button--text" onclick={() => { focusId = ""; compareId = ""; }}>清除选择</button>
-                <button class="b3-button b3-button--outline" title="导出查询结果说明（Markdown）" onclick={exportResultMarkdown}>导出结果说明</button>
+                <button class="b3-button b3-button--text" onclick={() => { focusId = ""; compareId = ""; }}>{text("graphClearSelection", "清除选择")}</button>
+                <button class="b3-button b3-button--outline" title={text("graphExportTitle", "导出查询结果说明（Markdown）")} onclick={exportResultMarkdown}>{text("graphExportButton", "导出结果说明")}</button>
             {/if}
         </div>
         {#if focusId}
             {#if resultExportMessage}
-                <div class="ft__smaller ft__on-surface" role="status">{resultExportMessage}（结果仅限当前图内，不代表现实社交关系或引荐意愿。）</div>
+                <div class="ft__smaller ft__on-surface" role="status">{resultExportMessage}（{text("graphExportScope", "结果仅限当前图内，不代表现实社交关系或引荐意愿。")}）</div>
             {/if}
             <div class="lvct-graph-query__results">
                 {#if pathMode}
@@ -441,13 +446,13 @@
                         {#if index > 0}<span class="ft__on-surface" aria-hidden="true">→</span>{/if}
                         <button class="b3-button b3-button--text" onclick={() => onOpenDetail(person)}>{person.name}</button>
                     {:else}
-                        <span class="ft__smaller ft__on-surface">当前图内没有连接路径</span>
+                        <span class="ft__smaller ft__on-surface">{text("graphNoPath", "当前图内没有连接路径")}</span>
                     {/each}
                 {:else}
                 {#each resultPeople as person (person.docId)}
                     <button class="b3-button b3-button--text" onclick={() => onOpenDetail(person)}>{person.name}</button>
                 {:else}
-                    <span class="ft__smaller ft__on-surface">{compareId ? "当前图内没有共同联系人" : secondMode ? "当前图内没有二度关系" : "当前图内没有直接关系"}</span>
+                    <span class="ft__smaller ft__on-surface">{compareId ? text("graphNoCommon", "当前图内没有共同联系人") : secondMode ? text("graphNoSecond", "当前图内没有二度关系") : text("graphNoDirect", "当前图内没有直接关系")}</span>
                 {/each}
                 {/if}
             </div>
@@ -456,23 +461,23 @@
 
     {#if truncated}
         <div class="ft__smaller ft__on-surface lvct-graph-note">
-            联系人超过 {GRAPH_MAX_NODES}，当前只展示关系最多的 {GRAPH_MAX_NODES} 人（用分组筛选或搜索缩小范围可看全）。
+            {text("graphTruncatedNote", "联系人超过 {max}，当前只展示关系最多的 {max} 人（用分组筛选或搜索缩小范围可看全）。", { max: GRAPH_MAX_NODES })}
         </div>
     {/if}
 
     {#if errorText}
-        <ViewState error title="图谱加载失败" description={errorText}>
-            <button class="b3-button b3-button--outline" onclick={refresh}>重新加载</button>
+        <ViewState error title={text("graphLoadFailTitle", "图谱加载失败")} description={errorText}>
+            <button class="b3-button b3-button--outline" onclick={refresh}>{text("graphReload", "重新加载")}</button>
         </ViewState>
     {:else if loading}
-        <ViewState loading title="正在加载关系图谱" />
+        <ViewState loading title={text("graphLoadingTitle", "正在加载关系图谱")} />
     {:else if filteredPeople.length === 0}
-        <ViewState title={people.length === 0 ? "还没有联系人" : "没有匹配的节点"}
-            description={people.length === 0 ? "创建或导入联系人后，在人物详情中建立关系。" : "试试清除关键词和分组筛选。"}>
+        <ViewState title={people.length === 0 ? text("graphEmptyNoPeopleTitle", "还没有联系人") : text("graphEmptyNoMatchTitle", "没有匹配的节点")}
+            description={people.length === 0 ? text("graphEmptyNoPeopleDesc", "创建或导入联系人后，在人物详情中建立关系。") : text("graphEmptyNoMatchDesc", "试试清除关键词和分组筛选。")}>
             {#if people.length > 0}
-                <button class="b3-button b3-button--outline" onclick={() => { searchText = ""; groupFilter = ""; isolatedOnly = false; }}>清除筛选</button>
+                <button class="b3-button b3-button--outline" onclick={() => { searchText = ""; groupFilter = ""; isolatedOnly = false; }}>{text("graphClearFilters", "清除筛选")}</button>
             {/if}
-            <button class="b3-button b3-button--text" onclick={onOpenPeople}>前往联系人</button>
+            <button class="b3-button b3-button--text" onclick={onOpenPeople}>{text("graphGoContacts", "前往联系人")}</button>
         </ViewState>
     {:else}
         <div class="lvct-graph-view__canvas-wrap">
@@ -490,22 +495,22 @@
                         <b>{hoveredPerson.name}</b>
                         {#if hoveredPerson.group}<span class="lvct-chip lvct-chip--group">{hoveredPerson.group}</span>{/if}
                     </div>
-                    <div class="ft__smaller ft__on-surface">关系度数：{hoveredPerson.relatedItemIds.length}</div>
-                    {#if hoveredPerson.phone}<div class="ft__smaller ft__on-surface">电话：{hoveredPerson.phone}</div>{/if}
-                    {#if hoveredPerson.tags.length > 0}<div class="ft__smaller ft__on-surface">标签：{hoveredPerson.tags.join(" · ")}</div>{/if}
+                    <div class="ft__smaller ft__on-surface">{text("graphDegreeLabel", "关系度数：{n}", { n: hoveredPerson.relatedItemIds.length })}</div>
+                    {#if hoveredPerson.phone}<div class="ft__smaller ft__on-surface">{text("graphPhoneLabel", "电话：{n}", { n: hoveredPerson.phone })}</div>{/if}
+                    {#if hoveredPerson.tags.length > 0}<div class="ft__smaller ft__on-surface">{text("graphTagsLabel", "标签：{n}", { n: hoveredPerson.tags.join(" · ") })}</div>{/if}
                     {#if facade}
                         <div class="lvct-graph-view__hover-insights">
                             {#if hoverInsightsLoading}
-                                <span class="ft__smaller ft__on-surface">正在读取互动…</span>
+                                <span class="ft__smaller ft__on-surface">{text("graphHoverLoading", "正在读取互动…")}</span>
                             {:else if hoverInsightsError}
-                                <span class="ft__smaller ft__on-surface">互动摘要暂时不可用</span>
+                                <span class="ft__smaller ft__on-surface">{text("graphHoverUnavailable", "互动摘要暂时不可用")}</span>
                             {:else if hoverInsights}
-                                <span class="ft__smaller ft__on-surface">最近互动：{hoverInsights.timeline[0]?.localDate ?? "暂无记录"}</span>
-                                <span class="ft__smaller ft__on-surface">共同出席：{hoverInsights.coAttendance.slice(0, 3).map((item) => item.name).join("、") || "暂无"}</span>
+                                <span class="ft__smaller ft__on-surface">{text("graphHoverLast", "最近互动：{n}", { n: hoverInsights.timeline[0]?.localDate ?? text("graphHoverNone", "暂无记录") })}</span>
+                                <span class="ft__smaller ft__on-surface">{text("graphHoverCoAttend", "共同出席：{n}", { n: hoverInsights.coAttendance.slice(0, 3).map((item) => item.name).join("、") || text("graphHoverNone", "暂无记录") })}</span>
                             {/if}
                         </div>
                     {/if}
-                    <button class="b3-button b3-button--text" onclick={openHoveredPerson}>查看人物详情</button>
+                    <button class="b3-button b3-button--text" onclick={openHoveredPerson}>{text("graphOpenDetail", "查看人物详情")}</button>
                 </div>
             {/if}
         </div>
