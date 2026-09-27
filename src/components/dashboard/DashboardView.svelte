@@ -34,6 +34,12 @@
     let quickError = $state("");
     let quickMessage = $state("");
     let refreshVersion = 0;
+    // 待办跟进（F05）
+    let fuSnoozeForId = $state("");
+    let fuCustomDate = $state("");
+    let fuBusy = $state(false);
+    let fuError = $state("");
+    let fuMessage = $state("");
 
     const greeting = (() => {
         const hour = new Date().getHours();
@@ -98,6 +104,36 @@
             quickBusy = false;
         }
     }
+
+    // ---- 待办跟进（F05） ----
+    async function runFollowUp(action: () => Promise<void>, message: string) {
+        if (fuBusy) return;
+        fuBusy = true;
+        fuError = "";
+        fuMessage = "";
+        try {
+            await action();
+            fuMessage = message;
+            await refresh();
+        } catch (error) {
+            fuError = error instanceof Error ? error.message : String(error);
+        } finally {
+            fuBusy = false;
+        }
+    }
+    const completeFollowUp = (id: string, title: string) => runFollowUp(() => facade.setFollowUpStatus(id, "done"), `已完成「${title}」`);
+    const skipFollowUp = (id: string, title: string) => runFollowUp(() => facade.setFollowUpStatus(id, "cancelled"), `已跳过「${title}」，可在人物详情中重新打开`);
+    const snoozeFollowUp = (id: string, option: "tomorrow" | "threeDays" | "nextMonday" | "nextMonth", label: string, title: string) =>
+        runFollowUp(async () => {
+            await facade.snoozeFollowUp(id, option);
+            fuSnoozeForId = "";
+        }, `已将「${title}」推迟到${label}`);
+    const snoozeFollowUpCustom = (id: string, title: string) =>
+        runFollowUp(async () => {
+            await facade.snoozeFollowUp(id, "custom", fuCustomDate);
+            fuSnoozeForId = "";
+            fuCustomDate = "";
+        }, `已将「${title}」推迟到指定日期`);
 
     const bucketStyles: Record<string, string> = {
         today: "lvct-bucket--today",
@@ -196,6 +232,55 @@
                             </div>
                         {/each}
                     </div>
+                {/if}
+            </div>
+
+            <div class="lvct-home__card">
+                <h3>待办跟进</h3>
+                <StatusNotice message={fuError ? `操作失败：${fuError}` : ""} error />
+                <StatusNotice message={fuMessage} onDismiss={() => (fuMessage = "")} />
+                {#if (data.followUps ?? []).length === 0}
+                    <ViewState compact icon="🗓" title="没有待办的跟进计划"
+                        description="在联系人详情里可以安排日期型联系计划，到期会出现在这里。">
+                        <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>前往联系人</button>
+                    </ViewState>
+                {:else}
+                    <div class="lvct-dash__list">
+                        {#each data.followUps ?? [] as card (card.item.id)}
+                            <div class="lvct-dash__row">
+                                <button class="lvct-dash__row-main" disabled={!card.reachable || fuBusy}
+                                    title={card.reachable ? undefined : "人物文档不可达（可能已解绑），仍可推迟或跳过"}
+                                    onclick={() => card.person && onOpenDetail(card.person)}>
+                                    <b>{card.item.title || "保持联系"}</b>
+                                    <span class="ft__smaller ft__on-surface">{card.person?.name ?? "人物文档不可达"} · {card.item.dueDate}</span>
+                                    <span class="lvct-bucket {card.bucket === "overdue" ? "lvct-bucket--stale" : card.bucket === "today" ? "lvct-bucket--today" : "lvct-bucket--week"}">
+                                        {card.bucket === "overdue" ? "已逾期" : card.bucket === "today" ? "今天" : "近期"}
+                                    </span>
+                                </button>
+                                {#if fuSnoozeForId === card.item.id}
+                                    <div class="lvct-dash__quick-form">
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "tomorrow", "明天", card.item.title || "保持联系")}>明天</button>
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "threeDays", "三天后", card.item.title || "保持联系")}>三天后</button>
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "nextMonday", "下周一", card.item.title || "保持联系")}>下周一</button>
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "nextMonth", "一个月后", card.item.title || "保持联系")}>一个月后</button>
+                                        <input type="date" class="b3-text-field" aria-label="指定推迟日期" bind:value={fuCustomDate} disabled={fuBusy} />
+                                        <button class="b3-button b3-button--text" disabled={fuBusy || !fuCustomDate} onclick={() => snoozeFollowUpCustom(card.item.id, card.item.title || "保持联系")}>按日期</button>
+                                        <button class="b3-button b3-button--cancel" onclick={() => { fuSnoozeForId = ""; fuCustomDate = ""; }} disabled={fuBusy}>收起</button>
+                                    </div>
+                                {:else}
+                                    <div class="lvct-dash__fu-actions">
+                                        {#if card.reachable}
+                                            <button class="b3-button b3-button--text" disabled={fuBusy} onclick={() => card.person && onOpenDetail(card.person)}>处理</button>
+                                        {/if}
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => { fuSnoozeForId = fuSnoozeForId === card.item.id ? "" : card.item.id; fuCustomDate = ""; }} aria-expanded={fuSnoozeForId === card.item.id}>推迟</button>
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => completeFollowUp(card.item.id, card.item.title || "保持联系")}>完成</button>
+                                        <button class="b3-button b3-button--cancel" disabled={fuBusy} onclick={() => skipFollowUp(card.item.id, card.item.title || "保持联系")}>跳过</button>
+                                    </div>
+                                {/if}
+                            </div>
+                        {/each}
+                    </div>
+                    <p class="ft__smaller ft__on-surface">完成或跳过不会自动记录互动；计划在人物详情里可重新打开。</p>
                 {/if}
             </div>
         </div>

@@ -234,6 +234,10 @@
             onRecord={(personDocId, note) => facade.recordInteraction(personDocId, note)}
             onDeleteInteraction={(personDocId, eventId) => facade.deleteInteraction(personDocId, eventId)}
             onLoadInsights={(docId) => facade.loadPersonInsights(docId)}
+            onListFollowUps={(docId) => facade.listPersonFollowUps(docId)}
+            onCreateFollowUp={(docId, title, dueDate) => facade.createFollowUp(docId, title, dueDate)}
+            onSetFollowUpStatus={(id, status) => facade.setFollowUpStatus(id, status)}
+            onSnoozeFollowUp={(id, option, customDate) => facade.snoozeFollowUp(id, option, customDate)}
             {onOpenPersonDoc}
             onNavigate={openDetail}
             navigationOrder={current === "people" ? peopleOrder : undefined}

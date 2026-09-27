@@ -20,6 +20,16 @@ import { loadViewPreferences, saveViewPreferences } from "./services/preferences
 import { exportInteractionJson } from "./services/interaction-export";
 import { loadExportSummary } from "./services/export-center";
 import { exportVcfText } from "./services/vcard";
+import {
+    createFollowUp,
+    exportFollowUpsJson,
+    importFollowUpsJson,
+    listPersonFollowUps,
+    previewFollowUpsImport,
+    setFollowUpStatus,
+    snoozeFollowUp,
+} from "./services/followups";
+import type { SnoozeOption } from "./domain/followups";
 import { importInteractionJson, previewInteractionImport } from "./services/interaction-import";
 import { initExternalBridge, disposeExternalBridge } from "./bridge/external-bridge";
 import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
@@ -260,6 +270,34 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     async exportInteractionJson() {
         return exportInteractionJson(this);
+    }
+
+    async listPersonFollowUps(personDocId: string) {
+        return listPersonFollowUps(this, personDocId);
+    }
+
+    async createFollowUp(personDocId: string, title: string, dueDate: string) {
+        return createFollowUp(this, { personDocId, title, dueDate });
+    }
+
+    async setFollowUpStatus(id: string, status: "open" | "done" | "cancelled") {
+        await setFollowUpStatus(this, id, status);
+    }
+
+    async snoozeFollowUp(id: string, option: SnoozeOption, customDate?: string) {
+        await snoozeFollowUp(this, id, option, customDate);
+    }
+
+    async exportFollowUpsJson() {
+        return exportFollowUpsJson(this);
+    }
+
+    async previewFollowUpsImport(text: string) {
+        return previewFollowUpsImport(this, text);
+    }
+
+    async importFollowUpsJson(text: string) {
+        return importFollowUpsJson(this, text);
     }
 
     async loadExportSummary() {

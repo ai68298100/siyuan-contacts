@@ -10,6 +10,9 @@
     import { nextBirthday } from "../../domain/occasions";
     import { createCloseScope, useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
+    import { dueLabel } from "../../domain/followups";
+    import type { FollowUpItem, SnoozeOption } from "../../domain/followups";
+    import { toLocalDateKey } from "../../domain/interactions";
 
     let {
         settings,
@@ -24,6 +27,10 @@
         onChanged,
         onDeleted,
         onClose,
+        onListFollowUps,
+        onCreateFollowUp,
+        onSetFollowUpStatus,
+        onSnoozeFollowUp,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
@@ -39,6 +46,11 @@
         onChanged: () => void;
         onDeleted: () => void;
         onClose: () => void;
+        /** 跟进计划（F05，可选：未接线时隐藏该区） */
+        onListFollowUps?: (personDocId: string) => Promise<FollowUpItem[]>;
+        onCreateFollowUp?: (personDocId: string, title: string, dueDate: string) => Promise<FollowUpItem>;
+        onSetFollowUpStatus?: (id: string, status: "open" | "done" | "cancelled") => Promise<void>;
+        onSnoozeFollowUp?: (id: string, option: SnoozeOption, customDate?: string) => Promise<void>;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string) => translateText(i18n, key, fallback));
 
@@ -183,6 +195,101 @@
             deleting = false;
         }
     }
+
+    // ---- 跟进计划（F05） ----
+    const followUpSupported = $derived(Boolean(onListFollowUps && onCreateFollowUp && onSetFollowUpStatus && onSnoozeFollowUp));
+    let followUps: FollowUpItem[] = $state([]);
+    let followUpsLoading = $state(true);
+    let followUpTitle = $state("");
+    let followUpDate = $state(toLocalDateKey(new Date()));
+    let followUpBusy = $state(false);
+    let followUpRecorded = $state(false);
+    let followUpError = $state("");
+    let snoozeForId = $state("");
+    let snoozeCustomDate = $state("");
+    const todayKey = $derived(toLocalDateKey(new Date()));
+    const openFollowUps = $derived(followUps.filter((item) => item.status === "open"));
+    const closedFollowUps = $derived(followUps.filter((item) => item.status !== "open"));
+
+    async function loadFollowUps() {
+        if (!onListFollowUps) return;
+        followUpsLoading = true;
+        try {
+            followUps = await onListFollowUps(current.docId);
+        } catch (error) {
+            followUpError = error instanceof Error ? error.message : String(error);
+        } finally {
+            followUpsLoading = false;
+        }
+    }
+
+    loadFollowUps();
+
+    async function createFollowUp() {
+        if (followUpBusy || !onCreateFollowUp) return;
+        followUpBusy = true;
+        followUpError = "";
+        try {
+            await onCreateFollowUp(current.docId, followUpTitle.trim(), followUpDate);
+            followUpTitle = "";
+            followUpRecorded = true;
+            onChanged();
+            followUps = await onListFollowUps?.(current.docId) ?? followUps;
+        } catch (error) {
+            followUpError = error instanceof Error ? error.message : String(error);
+        } finally {
+            followUpBusy = false;
+        }
+    }
+
+    async function completeFollowUp(item: FollowUpItem) {
+        if (followUpBusy || !onSetFollowUpStatus) return;
+        followUpBusy = true;
+        followUpError = "";
+        try {
+            await onSetFollowUpStatus(item.id, "done");
+            followUps = await onListFollowUps?.(current.docId) ?? followUps;
+            onChanged();
+        } catch (error) {
+            followUpError = error instanceof Error ? error.message : String(error);
+        } finally {
+            followUpBusy = false;
+        }
+    }
+
+    async function cancelFollowUp(item: FollowUpItem) {
+        if (followUpBusy || !onSetFollowUpStatus) return;
+        if (!window.confirm(`取消跟进「${item.title || "保持联系"}」？取消后不再出现在待办中。`)) return;
+        followUpBusy = true;
+        followUpError = "";
+        try {
+            await onSetFollowUpStatus(item.id, "cancelled");
+            followUps = await onListFollowUps?.(current.docId) ?? followUps;
+            onChanged();
+        } catch (error) {
+            followUpError = error instanceof Error ? error.message : String(error);
+        } finally {
+            followUpBusy = false;
+        }
+    }
+
+    async function snooze(item: FollowUpItem, option: SnoozeOption) {
+        if (followUpBusy || !onSnoozeFollowUp) return;
+        if (option === "custom" && !snoozeCustomDate) return;
+        followUpBusy = true;
+        followUpError = "";
+        try {
+            await onSnoozeFollowUp(item.id, option, option === "custom" ? snoozeCustomDate : undefined);
+            snoozeForId = "";
+            snoozeCustomDate = "";
+            followUps = await onListFollowUps?.(current.docId) ?? followUps;
+            onChanged();
+        } catch (error) {
+            followUpError = error instanceof Error ? error.message : String(error);
+        } finally {
+            followUpBusy = false;
+        }
+    }
 </script>
 
 <div class="lvct-detail">
@@ -248,6 +355,64 @@
         </div>
         <p class="ft__smaller ft__on-surface">记录后，首页"久未联系"会重新计时。</p>
     </section>
+
+    {#if followUpSupported}
+    <section class="lvct-detail__section">
+        <h4>跟进计划</h4>
+        {#if followUpError}<div class="lvct-form__error" role="alert">{followUpError}</div>{/if}
+        {#if followUpsLoading}
+            <ViewState compact loading title="正在加载跟进计划" />
+        {:else}
+            {#if openFollowUps.length === 0}
+                <p class="ft__smaller ft__on-surface">没有进行中的跟进计划。安排一个日期，到时来联系 TA。</p>
+            {:else}
+                <div class="lvct-detail__timeline">
+                    {#each openFollowUps as item (item.id)}
+                        <div class="lvct-detail__timeline-row">
+                            <span class="ft__on-surface">{item.dueDate}</span>
+                            <span class="lvct-detail__timeline-note">{item.title || "保持联系"}</span>
+                            <span class="lvct-chip {item.dueDate < todayKey ? "lvct-bucket--stale" : ""}">{dueLabel(item.dueDate, todayKey)}</span>
+                        </div>
+                        {#if snoozeForId === item.id}
+                            <div class="lvct-detail__snooze">
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "tomorrow")}>明天</button>
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "threeDays")}>三天后</button>
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "nextMonday")}>下周一</button>
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "nextMonth")}>一个月后</button>
+                                <span class="lvct-detail__snooze-custom">
+                                    <input type="date" class="b3-text-field" aria-label="指定日期" bind:value={snoozeCustomDate} />
+                                    <button type="button" class="b3-button b3-button--text" disabled={followUpBusy || !snoozeCustomDate} onclick={() => snooze(item, "custom")}>按指定日期推迟</button>
+                                </span>
+                            </div>
+                        {/if}
+                        <div class="lvct-detail__followup-actions">
+                            <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => { snoozeForId = snoozeForId === item.id ? "" : item.id; snoozeCustomDate = ""; }} aria-expanded={snoozeForId === item.id}>推迟</button>
+                            <button type="button" class="b3-button b3-button--text" disabled={followUpBusy} onclick={() => completeFollowUp(item)}>完成</button>
+                            <button type="button" class="b3-button b3-button--cancel" disabled={followUpBusy} onclick={() => cancelFollowUp(item)}>取消计划</button>
+                        </div>
+                    {/each}
+                </div>
+            {/if}
+            {#if closedFollowUps.length > 0}
+                <p class="ft__smaller ft__on-surface">最近关闭：{closedFollowUps.slice(0, 3).map((item) => `${item.title || "保持联系"}（${item.status === "done" ? "已完成" : "已取消"}）`).join("、")}</p>
+            {/if}
+            <div class="lvct-detail__record fn__flex">
+                <input
+                    class="b3-text-field fn__flex-1"
+                    type="text"
+                    placeholder="这次想联系什么？（可选，如：问问面试结果）"
+                    bind:value={followUpTitle}
+                    disabled={followUpBusy}
+                />
+                <input type="date" class="b3-text-field" aria-label="计划日期" bind:value={followUpDate} disabled={followUpBusy} />
+                <button class="b3-button b3-button--text" disabled={followUpBusy} onclick={createFollowUp}>
+                    {followUpBusy ? "添加中…" : followUpRecorded ? "再加一条" : "添加计划"}
+                </button>
+            </div>
+            <p class="ft__smaller ft__on-surface">到期的计划会出现在首页待办；完成计划不会自动记为互动。</p>
+        {/if}
+    </section>
+    {/if}
     {:else if activeTab === "activity"}
 
     <section class="lvct-detail__section">

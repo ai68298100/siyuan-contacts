@@ -387,6 +387,35 @@
     font-size: var(--lvct-fs-caption);
 }
 
+// F05 跟进事项：Peek 内推迟面板与操作行、首页待办操作行
+.lvct-detail__snooze {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--lvct-sp-1);
+    padding: var(--lvct-sp-1) 0;
+
+    .lvct-detail__snooze-custom {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--lvct-sp-1);
+    }
+}
+
+.lvct-detail__followup-actions,
+.lvct-dash__fu-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--lvct-sp-1);
+    padding-bottom: var(--lvct-sp-1);
+}
+
+.lvct-dash__row-main:disabled {
+    cursor: default;
+    opacity: .75;
+}
+
 // F04 视图菜单条目
 .lvct-people__viewsmenu-empty {
     margin: 0;

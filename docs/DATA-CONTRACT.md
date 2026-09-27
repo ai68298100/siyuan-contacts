@@ -85,6 +85,7 @@
 | `contacts-settings.json` | 1 | 四锚点 ID + fieldMap + 初始化时间 |
 | `view-preferences.json` | 1 | 工作台默认页面、联系人默认排序、启动行为、生日窗口、久未联系阈值、AI 入口开关；F02 起新增 `peopleView`（`card`/`table`，联系人默认形态）与 `tableColumns`（表格可见列的有序键数组，可选键仅限 `group/phone/wechat/birthday/recent/tags`；「姓名」为固定列不入数组、恒为首列）。归一化规则：旧偏好缺字段取默认；键不在可选集或重复的项剔除；全部被剔除/清空时回退全列默认——隐藏全部可选列不被视为合法状态。F04 起新增 `savedViews`（保存的联系人视图，规则快照而非人物 ID 快照）：`{id, name, query}` 数组，`query = {search, group, tags, tagMatch, recentFrom, recentTo, neverContacted, sort}`；归一化丢弃缺 id/缺 name 或字段类型非法的条目，按 id 去重、name 去首尾空白、上限 50 条；视图按规则在应用时对当次名册重新求值，不保存人物集合 |
 | `interaction-events.json` | （M4） | 互动事件（只追加）：`{id, personDocId, occurredAt, localDate, source, externalRef?, note}`；`personDocId+source+externalRef` 幂等；删除写墓碑 |
+| `follow-ups.json` | 1 | 跟进事项（F05）：`{id, personDocId, title, dueDate, status, createdAt, updatedAt, closedAt?}`。`dueDate` 为 `YYYY-MM-DD`（严格校验：格式错误或不存在的日期拒绝创建/改期，不顺延回退）；`status ∈ open/done/cancelled`，完成或取消写 `closedAt`，重新打开清除 `closedAt`——**完成跟进不自动写互动事件，记录互动也不悄悄完成跟进**（两类数据独立）。人物按 `personDocId` 关联：人物解绑后事项保留并显示「不可达」，仍可推迟/取消，不指向他人。展示读取容错降级；新增与状态变更在存储锁内严格读取，损坏或未知版本拒绝写入不覆盖原文件。导出为 `{schemaVersion, exportedAt, storageKey, rawStore, items}` 快照（与互动导出同纪律：锁内严格读取，失败不生成空备份）；合并导入按 `id` 现状优先，新增其余条目，预览零写入，确认时锁内重读重算 |
 | `bridge-state.json` | （M4） | 打卡联动状态机（unsupported/pending/ready/failed） |
 
 同一场合允许每位参与者各有一条互动事件；`source+externalRef` 表示共同场合，

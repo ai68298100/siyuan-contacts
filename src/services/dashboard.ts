@@ -5,7 +5,11 @@
 import type { Plugin } from "siyuan";
 import { listContacts } from "./contacts";
 import { loadInteractionStore } from "../data/interactions";
+import { loadFollowUpStore } from "../data/followups";
+import { projectOpenFollowUps } from "../domain/followups";
+import type { FollowUpBucket, FollowUpItem } from "../domain/followups";
 import { staleContacts } from "../domain/interactions";
+import { toLocalDateKey } from "../domain/interactions";
 import { upcomingBirthdays } from "../domain/occasions";
 import type { UpcomingBirthday } from "../domain/occasions";
 import type { StalenessInfo } from "../domain/interactions";
@@ -22,6 +26,14 @@ export const DEFAULT_DASHBOARD_OPTIONS: DashboardOptions = {
     birthdayWindowDays: 30,
 };
 
+export interface FollowUpCard {
+    item: FollowUpItem;
+    bucket: FollowUpBucket;
+    /** 人物已被解绑（从名册移除）时缺省，此时 reachable 为 false，不指向他人 */
+    person?: import("../domain/person").ContactSummary;
+    reachable: boolean;
+}
+
 export interface DashboardData {
     people: number;
     /** 无向关系条数（related 字段双向各记一次，除以 2） */
@@ -31,20 +43,42 @@ export interface DashboardData {
     stale: StalenessInfo[];
     neverContacted: number;
     neverContactedItemIds: string[];
+    /** 待办跟进（F05）：逾期/今天/未来 7 天，open 状态 */
+    followUps: FollowUpCard[];
 }
 export async function loadDashboard(
     plugin: Plugin,
     settings: ContactsSettings,
     options: DashboardOptions = DEFAULT_DASHBOARD_OPTIONS,
 ): Promise<DashboardData> {
-    const [people, store] = await Promise.all([
+    const [people, store, followUpStore] = await Promise.all([
         listContacts(settings),
         loadInteractionStore(plugin),
+        loadFollowUpStore(plugin),
     ]);
     const birthdays: UpcomingBirthday[] = upcomingBirthdays(people)
         .filter((item) => item.projection.daysUntil <= options.birthdayWindowDays);
     const staleAll = staleContacts(store, people, options.staleThresholdDays);
     const neverContactedPeople = staleAll.filter((item) => item.lastDaysAgo === undefined);
+
+    const today = toLocalDateKey(new Date());
+    const buckets = projectOpenFollowUps(followUpStore.items, today);
+    const peopleByDocId = new Map(people.map((person) => [person.docId, person]));
+    const withBucket = (item: FollowUpItem): FollowUpCard => {
+        const person = peopleByDocId.get(item.personDocId);
+        return {
+            item,
+            bucket: item.dueDate < today ? "overdue" : item.dueDate === today ? "today" : "upcoming",
+            ...(person ? { person } : {}),
+            reachable: Boolean(person),
+        };
+    };
+    const followUps: FollowUpCard[] = [
+        ...buckets.overdue,
+        ...buckets.today,
+        ...buckets.upcoming,
+    ].slice(0, 12).map(withBucket);
+
     return {
         people: people.length,
         relations: Math.round(people.reduce((sum, person) => sum + person.relatedItemIds.length, 0) / 2),
@@ -53,5 +87,6 @@ export async function loadDashboard(
         stale: staleAll.slice(0, 20),
         neverContacted: neverContactedPeople.length,
         neverContactedItemIds: neverContactedPeople.map((item) => item.person.itemId),
+        followUps,
     };
 }

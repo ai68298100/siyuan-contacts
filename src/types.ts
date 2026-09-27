@@ -6,6 +6,8 @@ import type { PersonInsights } from "./services/insights";
 import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "./services/settings-health";
 import type { ViewPreferences } from "./domain/preferences";
 import type { InteractionImportSummary } from "./domain/interaction-backup";
+import type { FollowUpItem, SnoozeOption } from "./domain/followups";
+import type { FollowUpImportPreview } from "./services/followups";
 import type { ExportSummary } from "./services/export-center";
 
 export type WorkbenchView = "home" | "people" | "graph" | "settings";
@@ -37,6 +39,17 @@ export interface ContactsPluginFacade {
     repairFieldMap(patch: FieldMapPatch): Promise<ContactsSettings>;
     /** 导出插件自管互动事件，不修改当前存储 */
     exportInteractionJson(): Promise<string>;
+    /** 跟进事项（F05）：日期型联系计划，独立于互动事实 */
+    listPersonFollowUps(personDocId: string): Promise<FollowUpItem[]>;
+    /** 创建跟进计划；dueDate 为 YYYY-MM-DD，非法日期抛错 */
+    createFollowUp(personDocId: string, title: string, dueDate: string): Promise<FollowUpItem>;
+    /** 状态变更：open（重新打开）/ done（完成）/ cancelled（取消）；完成不自动写互动 */
+    setFollowUpStatus(id: string, status: "open" | "done" | "cancelled"): Promise<void>;
+    /** 语义化推迟：tomorrow/threeDays/nextMonday/nextMonth 或 custom（需合法日期） */
+    snoozeFollowUp(id: string, option: SnoozeOption, customDate?: string): Promise<void>;
+    exportFollowUpsJson(): Promise<string>;
+    previewFollowUpsImport(text: string): Promise<FollowUpImportPreview>;
+    importFollowUpsJson(text: string): Promise<FollowUpImportPreview>;
     /** 导出中心摘要：名册人数与活跃互动条数（展示用，容错读取） */
     loadExportSummary(): Promise<ExportSummary>;
     /** 导出全量名册为 vCard 3.0 文本（联系人页选中导出外的设置页统一入口） */

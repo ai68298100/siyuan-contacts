@@ -14,6 +14,8 @@ import { recordInteraction, deleteInteraction, loadInteractionStore } from "../.
 import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
 import { captureFromDoc } from "../../../src/services/capture";
 import { exportInteractionJson } from "../../../src/services/interaction-export";
+import { createFollowUp, exportFollowUpsJson, importFollowUpsJson, previewFollowUpsImport } from "../../../src/services/followups";
+import { loadFollowUpStore } from "../../../src/data/followups";
 import { importInteractionJson, previewInteractionImport } from "../../../src/services/interaction-import";
 import { FIELD_SPECS } from "../../../src/domain/fields";
 import { buildTimeline, buildCoAttendance } from "../../../src/domain/interactions";
@@ -712,6 +714,191 @@ await test("保存视图：命名保存与应用、重名覆盖确认、改名�
         window.prompt = originalPrompt;
         window.confirm = originalConfirm;
     }
+});
+
+await test("首页待办跟进：分桶展示，处理仅限可达人物，推迟与跳过更新状态", async () => {
+    const pad = (value) => String(value).padStart(2, "0");
+    const now = new Date();
+    const offsetDate = (days) => {
+        const date = new Date(now);
+        date.setDate(date.getDate() + days);
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    };
+    const fu = (id, personDocId, person, dueDate, title) => ({
+        item: { id, personDocId, title, dueDate, status: "open", createdAt: 1, updatedAt: 1 },
+        bucket: dueDate < offsetDate(0) ? "overdue" : dueDate === offsetDate(0) ? "today" : "upcoming",
+        ...(person ? { person } : {}),
+        reachable: Boolean(person),
+    });
+    const personA = { ...person, docId: "doc-a", name: "跟进甲" };
+    const personB = { ...person, docId: "doc-b", name: "跟进乙" };
+    let followUpsData = [
+        fu("fu-overdue", "doc-a", personA, offsetDate(-3), "问问面试结果"),
+        fu("fu-today", "doc-b", personB, offsetDate(0), ""),
+        fu("fu-ghost", "doc-ghost", null, offsetDate(5), "已解绑人物的计划"),
+    ];
+    const statusCalls = [];
+    const snoozeCalls = [];
+    const opened = [];
+    mounted = mount(DashboardView, { target: fixture, props: {
+        preferences: DEFAULT_VIEW_PREFERENCES, onOpenDetail(p) { opened.push(p.docId); }, onOpenPeople() {}, onOpenGraph() {},
+        facade: { settings, loadDashboard: async () => ({
+            people: 2, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+            stale: [], neverContacted: 0, neverContactedItemIds: [],
+            followUps: followUpsData,
+        }), setFollowUpStatus: async (id, status) => {
+            statusCalls.push([id, status]);
+            followUpsData = followUpsData.filter((card) => card.item.id !== id);
+        }, snoozeFollowUp: async (id, option) => { snoozeCalls.push([id, option]); } },
+    } });
+    await until(() => [...fixture.querySelectorAll(".lvct-dash__row")].some((node) => node.textContent.includes("问问面试结果")), "待办卡未渲染");
+    const handles = fixture.querySelectorAll(".lvct-dash__row");
+    assert(handles.length === 3, `待办应为 3 条，实际 ${handles.length}`);
+    const processButtons = [...fixture.querySelectorAll(".lvct-dash__fu-actions button")].filter((node) => node.textContent.trim() === "处理");
+    assert(processButtons.length === 2, "不可达人物不应出现处理按钮");
+    processButtons[0].click();
+    await tick();
+    assert(opened.length === 1, "处理未打开人物详情");
+
+    // 推迟 → 语义选项传递
+    [...fixture.querySelectorAll(".lvct-dash__fu-actions button")].find((node) => node.textContent.trim() === "推迟").click();
+    await tick();
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "明天").click();
+    await until(() => snoozeCalls.length === 1 && snoozeCalls[0][0] === "fu-overdue" && snoozeCalls[0][1] === "tomorrow", "推迟未传递语义选项");
+    await until(() => fixture.textContent.includes("已将「问问面试结果」推迟到明天"), "推迟成功提示未显示");
+
+    // 跳过 → 取消并从列表移除（剩余两条继续展示）
+    [...fixture.querySelectorAll(".lvct-dash__fu-actions button")].find((node) => node.textContent.trim() === "跳过").click();
+    await until(() => statusCalls.length === 1 && statusCalls[0][1] === "cancelled", "跳过未取消事项");
+    await until(() => ![...fixture.querySelectorAll(".lvct-dash__row")].some((node) => node.textContent.includes("问问面试结果")), "跳过后列表未更新");
+    assert(fixture.textContent.includes("已跳过"), "跳过成功提示未显示");
+});
+
+await test("人物跟进计划：创建防重复提交，推迟菜单语义选项，完成与取消传递状态", async () => {
+    const statusCalls = [];
+    const snoozeCalls = [];
+    let changed = 0;
+    let items = [];
+    let releaseCreate;
+    const gate = new Promise((resolve) => { releaseCreate = resolve; });
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async () => {},
+        onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onDeleted() {}, onClose() {},
+        onChanged() { changed += 1; },
+        onListFollowUps: async () => items,
+        onCreateFollowUp: async (_docId, title, dueDate) => {
+            await gate;
+            const created = { id: `fu-${items.length + 1}`, personDocId: person.docId, title, dueDate, status: "open", createdAt: 1, updatedAt: 1 };
+            items = [...items, created];
+            return created;
+        },
+        onSetFollowUpStatus: async (id, status) => { statusCalls.push([id, status]); items = items.map((entry) => (entry.id === id ? { ...entry, status } : entry)); },
+        onSnoozeFollowUp: async (id, option) => { snoozeCalls.push([id, option]); },
+    } });
+    await until(() => fixture.textContent.includes("跟进计划"), "跟进区未显示");
+    const titleInput = fixture.querySelector('input[placeholder*="这次想联系什么"]');
+    const dateInput = fixture.querySelector('input[aria-label="计划日期"]');
+    input(titleInput, "问问面试结果");
+    input(dateInput, "2026-10-15");
+    const addButton = [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "添加计划");
+    addButton.click();
+    await until(() => addButton.disabled, "创建挂起时按钮未禁用");
+    addButton.click();
+    releaseCreate();
+    await until(() => items.length === 1 && fixture.textContent.includes("问问面试结果"), "重复提交防護失败或列表未刷新");
+    assert(items[0].dueDate === "2026-10-15" && items[0].title === "问问面试结果", "创建参数丢失");
+
+    // 推迟菜单：语义选项（等推迟落定、按钮恢复可用后再完成）
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "推迟").click();
+    await tick();
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "下周一").click();
+    await until(() => snoozeCalls.length === 1 && snoozeCalls[0][1] === "nextMonday", "推迟未传递语义选项");
+    await until(() => !fixture.querySelector("button[aria-label='指定日期']"), "推迟菜单未收起");
+
+    // 完成 → done，列表清空
+    await until(() => {
+        const button = [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "完成");
+        if (!button || button.disabled) return false;
+        button.click();
+        return true;
+    }, "完成按钮不可用");
+    await until(() => statusCalls.length === 1 && statusCalls[0][1] === "done", "完成未传递状态");
+    await until(() => fixture.textContent.includes("没有进行中的跟进计划"), "完成后列表未更新");
+
+    // 再建一条并取消（confirm 放行）
+    const originalConfirm = window.confirm;
+    window.confirm = () => true;
+    try {
+        input(titleInput, "约球");
+        await until(() => {
+            const button = [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "再加一条");
+            if (!button || button.disabled) return false;
+            button.click();
+            return true;
+        }, "再加一条按钮不可用");
+        await until(() => items.length === 2, "第二条未创建");
+        await until(() => {
+            const button = [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "取消计划");
+            if (!button || button.disabled) return false;
+            button.click();
+            return true;
+        }, "取消计划按钮不可用");
+        await until(() => statusCalls.length === 2 && statusCalls[1][1] === "cancelled", "取消未传递状态");
+        assert(changed >= 4, "跟进操作未触发数据刷新");
+    } finally {
+        window.confirm = originalConfirm;
+    }
+});
+
+await test("跟进备份：预览零写入，合并现状优先幂等，损坏数据与非法日期拒绝", async () => {
+    const fu = (id, dueDate) => ({ id, personDocId: "doc-1", title: "", dueDate, status: "open", createdAt: 1, updatedAt: 1 });
+    // 宿主 loadData 返回已解析的对象；"" 表示首次未创建
+    let saved = { schemaVersion: 1, items: [fu("existing", "2026-10-01")] };
+    let writes = 0;
+    const plugin = {
+        loadData: async () => JSON.parse(JSON.stringify(saved)),
+        saveData: async (_key, value) => { writes += 1; saved = JSON.parse(JSON.stringify(value)); },
+    };
+    // 非法日期创建拒绝且零写入
+    let rejected = false;
+    try { await createFollowUp(plugin, { personDocId: "doc-1", dueDate: "2026-13-40" }); } catch { rejected = true; }
+    assert(rejected && writes === 0, "非法日期创建未被拒绝");
+    // 备份：existing + new
+    const backup = JSON.stringify({
+        schemaVersion: 1, exportedAt: "2026-09-28T00:00:00Z", storageKey: "follow-ups.json",
+        rawStore: JSON.stringify({ schemaVersion: 1, items: [fu("existing", "2026-01-01"), fu("new", "2026-02-01")] }),
+        items: [fu("existing", "2026-01-01"), fu("new", "2026-02-01")],
+    });
+    const beforePreview = writes;
+    const preview = await previewFollowUpsImport(plugin, backup);
+    assert(preview.added === 1, `预览新增计数错误：${JSON.stringify(preview)}`);
+    assert(preview.skipped === 1, `预览跳过计数错误：${JSON.stringify(preview)}`);
+    assert(writes === beforePreview, "预览发生写入");
+    const result = await importFollowUpsJson(plugin, backup);
+    assert(result.added === 1, "合并新增计数错误");
+    const store = await loadFollowUpStore(plugin);
+    assert(store.items.length === 2, "合并后条目数错误");
+    assert(store.items.find((entry) => entry.id === "existing").dueDate === "2026-10-01", "合并覆盖了现状");
+    const repeat = await importFollowUpsJson(plugin, backup);
+    assert(repeat.added === 0, "重复合并不幂等");
+    // 当前库损坏 → 拒绝合并不覆盖
+    const writesBeforeCorrupt = writes;
+    saved = { schemaVersion: 99, items: [] };
+    rejected = false;
+    try { await importFollowUpsJson(plugin, backup); } catch { rejected = true; }
+    assert(rejected && writes === writesBeforeCorrupt, "损坏当前库未被拒绝");
+    // 坏备份拒绝
+    saved = "";
+    rejected = false;
+    try { await previewFollowUpsImport(plugin, "{oops"); } catch { rejected = true; }
+    assert(rejected, "坏 JSON 备份未被拒绝");
+    // 导出读取失败抛错，不生成空备份
+    saved = "not-json";
+    rejected = false;
+    try { await exportFollowUpsJson(plugin); } catch { rejected = true; }
+    assert(rejected, "导出读取失败未抛错");
 });
 
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {

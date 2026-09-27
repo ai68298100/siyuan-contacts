@@ -59,6 +59,16 @@
     let exportSummary: ExportSummary | null = $state(null);
     let loadingSummary = $state(false);
     let summaryRequest = 0;
+    // 跟进事项导出与合并恢复（F05）
+    let exportingFollowUps = $state(false);
+    let followUpsExportMessage = $state("");
+    let fuImportPreview: { added: number; skipped: number } | null = $state(null);
+    let fuImportText = "";
+    let fuImportRequest = 0;
+    let fuPreviewing = $state(false);
+    let fuImporting = $state(false);
+    let fuImportMessage = $state("");
+    let fuFileInput = $state<HTMLInputElement>();
     let importPreview: InteractionImportSummary | null = $state(null);
     let importText = "";
     let importRequest = 0;
@@ -221,6 +231,71 @@
             errorText = error instanceof Error ? error.message : String(error);
         } finally {
             exportingRoster = false;
+        }
+    }
+
+    async function runExportFollowUps() {
+        if (exportingFollowUps) return;
+        exportingFollowUps = true;
+        errorText = "";
+        followUpsExportMessage = "";
+        try {
+            const text = await facade.exportFollowUpsJson();
+            const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = `小驴人脉_跟进事项_${new Date().toISOString().slice(0, 10)}.json`;
+            anchor.click();
+            URL.revokeObjectURL(url);
+            followUpsExportMessage = "跟进事项与原始数据快照已导出";
+        } catch (error) {
+            errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            exportingFollowUps = false;
+        }
+    }
+
+    async function selectFollowUpBackup(event: Event) {
+        if (fuImporting) return;
+        const request = ++fuImportRequest;
+        const file = (event.currentTarget as HTMLInputElement).files?.[0];
+        fuImportPreview = null;
+        fuImportText = "";
+        fuImportMessage = "";
+        errorText = "";
+        fuPreviewing = Boolean(file);
+        if (!file) return;
+        try {
+            const text = await file.text();
+            if (request !== fuImportRequest) return;
+            const preview = await facade.previewFollowUpsImport(text);
+            if (request !== fuImportRequest) return;
+            fuImportText = text;
+            fuImportPreview = preview;
+        } catch (error) {
+            if (request === fuImportRequest) errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            if (request === fuImportRequest) fuPreviewing = false;
+        }
+    }
+
+    async function runImportFollowUps() {
+        if (fuImporting || fuPreviewing || !fuImportPreview) return;
+        if (!window.confirm("将合并所选跟进备份：现状优先按事项 ID，只新增缺失条目，不覆盖已有内容。确认继续吗？")) return;
+        fuImporting = true;
+        errorText = "";
+        fuImportMessage = "";
+        try {
+            const result = await facade.importFollowUpsJson(fuImportText);
+            fuImportMessage = `合并完成：新增 ${result.added} 条，跳过 ${result.skipped} 条`;
+            fuImportPreview = null;
+            fuImportText = "";
+            if (fuFileInput) fuFileInput.value = "";
+        } catch (error) {
+            errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            fuImporting = false;
         }
     }
 
@@ -440,6 +515,16 @@
                         </button>
                     </div>
                     <StatusNotice message={exportMessage} onDismiss={() => (exportMessage = "")} actionLabel="再次导出" onAction={runExportInteractions} />
+                    <div class="lvct-settings__row">
+                        <div>
+                            <b>跟进事项 JSON</b>
+                            <small>日期型联系计划（含原始快照）；不含人物文档与互动记录</small>
+                        </div>
+                        <button class="b3-button b3-button--outline" onclick={runExportFollowUps} disabled={exportingFollowUps}>
+                            {exportingFollowUps ? "导出中…" : "导出 JSON"}
+                        </button>
+                    </div>
+                    <StatusNotice message={followUpsExportMessage} onDismiss={() => (followUpsExportMessage = "")} actionLabel="再次导出" onAction={runExportFollowUps} />
 
                     <div class="lvct-settings__row">
                         <label for="lvct-interaction-backup"><b>合并互动备份</b></label>
@@ -454,6 +539,22 @@
                             {importingInteractions ? "合并中…" : "确认合并备份"}
                         </button>
                         <StatusNotice message={importMessage} onDismiss={() => (importMessage = "")} />
+                    </div>
+
+                    <div class="lvct-settings__sub-heading"><b>合并跟进备份</b></div>
+                    <div class="lvct-settings__row">
+                        <label for="lvct-followup-backup"><b>选择跟进备份文件</b><small>现状优先按事项 ID，只新增缺失条目</small></label>
+                        <input id="lvct-followup-backup" class="b3-text-field lvct-settings__backup-input" type="file" accept=".json,application/json" bind:this={fuFileInput} onchange={selectFollowUpBackup} disabled={fuImporting} />
+                    </div>
+                    {#if fuPreviewing}<p class="lvct-settings__inline-hint" role="status">正在检查备份…</p>{/if}
+                    {#if fuImportPreview}
+                        <p class="lvct-settings__inline-hint">预计新增 {fuImportPreview.added} 条，跳过 {fuImportPreview.skipped} 条</p>
+                    {/if}
+                    <div class="lvct-settings__actions">
+                        <button class="b3-button b3-button--outline" onclick={runImportFollowUps} disabled={!fuImportPreview || fuPreviewing || fuImporting}>
+                            {fuImporting ? "合并中…" : "确认合并备份"}
+                        </button>
+                        <StatusNotice message={fuImportMessage} onDismiss={() => (fuImportMessage = "")} />
                     </div>
 
                     <div class="lvct-settings__sub-heading">
