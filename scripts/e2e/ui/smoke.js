@@ -617,6 +617,103 @@ await test("组合筛选数量与生效条件一致，单项清除与清除全�
     assert(fixture.querySelector(".lvct-people__moremenu select").value === "all", "清除全部后标签匹配未重置");
 });
 
+await test("保存视图：命名保存与应用、重名覆盖确认、改名删除、失效标签提示、重开恢复", async () => {
+    const row = (id, name, group, tags) => ({
+        id: `item-${id}`,
+        cells: [
+            { value: { type: "block", keyID: "name", block: { id: `doc-${id}`, content: name } } },
+            { value: { keyID: "group", mSelect: [{ content: group }] } },
+            { value: { keyID: "tags", mSelect: tags.map((tag) => ({ content: tag })) } },
+        ],
+    });
+    const rows = [
+        row("a", "甲", "朋友", ["球友", "家长群"]),
+        row("b", "乙", "同事", ["家长群"]),
+        row("c", "丙", "朋友", ["球友"]),
+    ];
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") return { view: { columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })), rows } };
+        throw new Error(`回归测试不允许请求 ${route}`);
+    };
+    const originalPrompt = window.prompt;
+    const originalConfirm = window.confirm;
+    let savedPrefs = null;
+    const mountPeople = (prefs) => mount(PeopleView, { target: fixture, props: {
+        settings, preferences: prefs,
+        loadRecentInteractions: async () => ({}),
+        revision: 0, initialSort: "name",
+        onOpenDetail() {}, onOpenPersonDoc() {},
+        onPreferencesChange: async (next) => { savedPrefs = next; return next; },
+    } });
+    try {
+        window.prompt = (label, fallback) => (label && label.includes("重命名") ? "新名字" : "球友圈");
+        window.confirm = () => true;
+        const viewsButton = () => [...fixture.querySelectorAll("button")].find((node) => node.getAttribute("aria-label") === "视图");
+        mounted = mountPeople(DEFAULT_VIEW_PREFERENCES);
+        await until(() => fixture.querySelectorAll(".lvct-people__cards > *").length === 3, "初始名册未加载");
+        // 选中标签 球友+家长群（默认交集只有甲）→ 保存为视图
+        [...fixture.querySelectorAll(".lvct-people__filter")].find((node) => node.textContent.trim() === "球友").click();
+        [...fixture.querySelectorAll(".lvct-people__filter")].find((node) => node.textContent.trim() === "家长群").click();
+        await until(() => fixture.textContent.includes("共 1 人"), "标签交集未生效");
+        viewsButton().click();
+        await tick();
+        [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "保存当前筛选为视图").click();
+        await until(() => savedPrefs?.savedViews?.length === 1, "视图未保存");
+        assert(savedPrefs.savedViews[0].name === "球友圈", "保存的视图名称错误");
+        await until(() => fixture.querySelector(".lvct-people__conditions")?.textContent.includes("视图：球友圈"), "保存后未标记当前视图");
+
+        // 同名保存 → confirm 覆盖同一条
+        const firstId = savedPrefs.savedViews[0].id;
+        viewsButton().click();
+        await tick();
+        [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "保存当前筛选为视图").click();
+        await until(() => savedPrefs.savedViews.length === 1 && savedPrefs.savedViews[0].id === firstId, "重名未按覆盖处理");
+
+        // 改名（prompt 命中重命名分支返回"新名字"）
+        viewsButton().click();
+        await until(() => {
+            const rename = fixture.querySelector('button[aria-label="重命名视图 球友圈"]');
+            if (!rename) return false;
+            rename.click();
+            return true;
+        }, "菜单未显示重命名按钮");
+        await until(() => savedPrefs.savedViews[0].name === "新名字", "视图未改名");
+
+        // 清除全部 → 视图标记取消；再从菜单应用 → 条件恢复
+        [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "清除全部").click();
+        await until(() => fixture.querySelectorAll(".lvct-people__cards > *").length === 3, "清除全部未恢复全量");
+        viewsButton().click();
+        await tick();
+        [...fixture.querySelectorAll(".lvct-people__viewsmenu-apply")].find((node) => node.textContent.trim() === "新名字").click();
+        await until(() => fixture.querySelector(".lvct-people__conditions")?.textContent.includes("视图：新名字"), "应用视图后未标记");
+        await until(() => fixture.textContent.includes("共 1 人"), "应用视图后条件未生效");
+
+        // 删除视图 → 规则移除、标记清空，当前列表条件不受影响
+        viewsButton().click();
+        await tick();
+        fixture.querySelector('button[aria-label="删除视图 新名字"]').click();
+        await until(() => savedPrefs.savedViews.length === 0, "视图未删除");
+        await until(() => !fixture.querySelector(".lvct-people__conditions")?.textContent.includes("视图："), "删除后视图标记未清空");
+        assert(fixture.querySelectorAll(".lvct-people__cards > *").length === 1, "删除视图不应影响当前列表条件");
+
+        // 重开 + 失效标签：预置含幽灵标签的视图，应用时提示
+        await unmount(mounted);
+        savedPrefs = null;
+        mounted = mountPeople({ ...DEFAULT_VIEW_PREFERENCES, savedViews: [{
+            id: "view-ghost", name: "过期视图",
+            query: { search: "", group: "", tags: ["幽灵标签"], tagMatch: "all", recentFrom: "", recentTo: "", neverContacted: false, sort: "name" },
+        }] });
+        await until(() => fixture.querySelectorAll(".lvct-people__cards > *").length === 3, "重开后名册未加载");
+        viewsButton().click();
+        await tick();
+        [...fixture.querySelectorAll(".lvct-people__viewsmenu-apply")].find((node) => node.textContent.trim() === "过期视图").click();
+        await until(() => fixture.querySelector(".lvct-people__viewhint")?.textContent.includes("幽灵标签"), "失效标签未提示");
+    } finally {
+        window.prompt = originalPrompt;
+        window.confirm = originalConfirm;
+    }
+});
+
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {
     const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
         docId: settings.hostDocId,

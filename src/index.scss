@@ -376,6 +376,49 @@
     margin-top: var(--lvct-sp-2);
 }
 
+// F04 视图失效标签提示
+.lvct-people__viewhint {
+    margin-top: var(--lvct-sp-2);
+    padding: var(--lvct-sp-1) var(--lvct-sp-2);
+    border: 1px solid var(--lvct-highlight);
+    border-radius: var(--lvct-r-sm);
+    background: var(--lvct-highlight-soft);
+    color: var(--lvct-text-1);
+    font-size: var(--lvct-fs-caption);
+}
+
+// F04 视图菜单条目
+.lvct-people__viewsmenu-empty {
+    margin: 0;
+    padding: var(--lvct-sp-1) var(--lvct-sp-2);
+    color: var(--lvct-text-3);
+    font-size: var(--lvct-fs-caption);
+}
+
+.lvct-people__viewsmenu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--lvct-sp-1);
+    border-radius: var(--lvct-r-sm);
+
+    &:hover { background: var(--lvct-accent-soft); }
+
+    .lvct-people__viewsmenu-apply {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        text-align: left;
+        padding: 4px 6px;
+        background: none;
+        border: none;
+        color: var(--lvct-text-1);
+        font-size: var(--lvct-fs-body);
+        cursor: pointer;
+    }
+}
+
 .lvct-people__condition {
     display: inline-flex;
     align-items: center;

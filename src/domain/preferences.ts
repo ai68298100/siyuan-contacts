@@ -1,4 +1,6 @@
 /** 工作台视图偏好：仅影响界面默认行为，不改变联系人数据库。 */
+import { normalizeSavedViews } from "./saved-views.ts";
+import type { SavedView } from "./saved-views";
 
 export const VIEW_PREFERENCES_STORAGE_KEY = "view-preferences.json";
 export const VIEW_PREFERENCES_VERSION = 1;
@@ -24,6 +26,8 @@ export interface ViewPreferences {
     readonly peopleView: PeopleViewMode;
     /** 表格可见列（有序）。归一化保证只含可选键、无重复且非空。 */
     readonly tableColumns: PeopleTableColumn[];
+    /** 保存的联系人视图（F04）：规则快照，应用时重新求值 */
+    readonly savedViews: readonly SavedView[];
 }
 
 export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
@@ -36,6 +40,7 @@ export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
     staleThresholdDays: 30,
     peopleView: "card",
     tableColumns: [...PEOPLE_TABLE_COLUMNS],
+    savedViews: [],
 };
 
 function isDefaultView(value: unknown): value is DefaultView {
@@ -82,5 +87,7 @@ export function normalizeViewPreferences(raw: unknown): ViewPreferences {
         peopleView: isPeopleViewMode(record.peopleView) ? record.peopleView : DEFAULT_VIEW_PREFERENCES.peopleView,
         // 旧偏好缺字段取默认；已有值仍逐键校验
         tableColumns: record.tableColumns === undefined ? [...DEFAULT_VIEW_PREFERENCES.tableColumns] : normalizeTableColumns(record.tableColumns),
+        // 旧偏好缺字段取空列表；已有值逐条归一化
+        savedViews: record.savedViews === undefined ? [] : normalizeSavedViews(record.savedViews),
     };
 }

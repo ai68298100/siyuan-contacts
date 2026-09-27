@@ -9,13 +9,15 @@
     import type { PeopleTableColumn, ViewPreferences } from "../../domain/preferences";
     import { applyPeopleFilters, EMPTY_PEOPLE_FILTER, isExtraFilterActive, matchTags } from "../../domain/people-filters";
     import type { PeopleFilterState } from "../../domain/people-filters";
+    import { findSavedViewByName, missingTags, normalizeSavedViews } from "../../domain/saved-views";
+    import type { SavedView, SavedViewQuery } from "../../domain/saved-views";
     import PersonCard from "./PersonCard.svelte";
     import AddPersonDialog from "./AddPersonDialog.svelte";
     import ImportDialog from "./ImportDialog.svelte";
     import VCardDialog from "./VCardDialog.svelte";
     import LvctDialog from "../LvctDialog.svelte";
     import { useCloseGuard } from "../close-guard";
-    import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal } from "@lucide/svelte";
+    import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal, Bookmark, Pencil, Trash2 } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
 
     let {
@@ -66,6 +68,12 @@
     // svelte-ignore state_referenced_locally
     let extraFilter: PeopleFilterState = $state({ ...EMPTY_PEOPLE_FILTER });
     let moreOpen = $state(false);
+    // svelte-ignore state_referenced_locally
+    let localViews: SavedView[] = $state(normalizeSavedViews(preferences.savedViews));
+    let viewsOpen = $state(false);
+    let currentViewId = $state("");
+    let activeViewName = $state("");
+    let viewHint = $state("");
     // svelte-ignore state_referenced_locally
     let sortMode: "name" | "group" | "birthday" | "recent" = $state(initialSort);
     let recent: Record<string, { occurredAt: number; localDate: string }> = $state({});
@@ -195,6 +203,7 @@
     type ConditionChip = { key: string; label: string };
     const conditionChips: ConditionChip[] = $derived.by(() => {
         const chips: ConditionChip[] = [];
+        if (activeViewName) chips.push({ key: "view", label: `视图：${activeViewName}` });
         if (searchText.trim()) chips.push({ key: "search", label: `搜索「${searchText.trim()}」` });
         if (groupFilter) chips.push({ key: "group", label: `分组：${groupFilter}` });
         if (tagFilter.length > 0) chips.push({ key: "tags", label: `标签${extraFilter.tagMatch === "any" ? "（任一）" : ""}：${tagFilter.join(" / ")}` });
@@ -204,6 +213,12 @@
     });
 
     function clearCondition(key: string) {
+        if (key === "view") {
+            // 仅取消当前视图标记，保留已应用的条件
+            currentViewId = "";
+            activeViewName = "";
+            return;
+        }
         if (key === "search") searchText = "";
         else if (key === "group") groupFilter = "";
         else if (key === "tags") tagFilter = [];
@@ -217,6 +232,10 @@
         groupFilter = "";
         tagFilter = [];
         extraFilter = { ...EMPTY_PEOPLE_FILTER };
+        sortMode = initialSort;
+        currentViewId = "";
+        activeViewName = "";
+        viewHint = "";
         visibleCount = PAGE_SIZE;
         onClearFocus?.();
     }
@@ -231,6 +250,128 @@
         document.addEventListener("click", close);
         return () => document.removeEventListener("click", close);
     });
+
+    // 视图菜单：点击面板外区域关闭
+    $effect(() => {
+        if (!viewsOpen) return;
+        const close = (event: MouseEvent) => {
+            const panel = document.getElementById("lvct-people-viewsmenu");
+            if (panel && !panel.contains(event.target as Node)) viewsOpen = false;
+        };
+        document.addEventListener("click", close);
+        return () => document.removeEventListener("click", close);
+    });
+
+    // 外部偏好更新时同步本地视图列表
+    $effect(() => {
+        localViews = normalizeSavedViews(preferences.savedViews);
+    });
+
+    function currentQuery(): SavedViewQuery {
+        return {
+            search: searchText,
+            group: groupFilter,
+            tags: [...tagFilter],
+            tagMatch: extraFilter.tagMatch,
+            recentFrom: extraFilter.recentFrom,
+            recentTo: extraFilter.recentTo,
+            neverContacted: extraFilter.neverContacted,
+            sort: sortMode,
+        };
+    }
+
+    // 条件漂移检测：当前条件与激活视图的规则不一致时，取消视图标记（人物变化时规则自动重新求值）
+    $effect(() => {
+        if (!currentViewId) return;
+        const view = localViews.find((item) => item.id === currentViewId);
+        if (!view) {
+            currentViewId = "";
+            activeViewName = "";
+            return;
+        }
+        if (JSON.stringify(currentQuery()) !== JSON.stringify(view.query)) {
+            currentViewId = "";
+            activeViewName = "";
+        }
+    });
+
+    function applyQueryToState(query: SavedViewQuery) {
+        searchText = query.search;
+        groupFilter = query.group;
+        tagFilter = [...query.tags];
+        extraFilter = { ...extraFilter, tagMatch: query.tagMatch, recentFrom: query.recentFrom, recentTo: query.recentTo, neverContacted: query.neverContacted };
+        sortMode = query.sort;
+        visibleCount = PAGE_SIZE;
+    }
+
+    function applySavedView(view: SavedView) {
+        viewsOpen = false;
+        currentViewId = view.id;
+        activeViewName = view.name;
+        applyQueryToState(view.query);
+        const missing = missingTags(view.query, tags);
+        viewHint = missing.length > 0 ? `视图「${view.name}」中的标签已失效：${missing.join("、")}（其余条件照常生效）` : "";
+    }
+
+    async function persistViews(next: SavedView[]) {
+        prefError = "";
+        try {
+            await onPreferencesChange({ ...preferences, savedViews: next });
+            return true;
+        } catch (error) {
+            prefError = error instanceof Error ? error.message : String(error);
+            return false;
+        }
+    }
+
+    async function saveCurrentAsView() {
+        const name = (window.prompt("视图名称（保存当前的搜索、分组、标签、更多筛选与排序）") ?? "").trim();
+        if (!name) {
+            viewsOpen = false;
+            return;
+        }
+        const existing = findSavedViewByName(localViews, name);
+        if (existing && !window.confirm(`已存在同名视图「${name}」，覆盖它吗？`)) return;
+        const nextView: SavedView = {
+            id: existing?.id ?? `view-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+            name,
+            query: currentQuery(),
+        };
+        const nextViews = existing
+            ? localViews.map((view) => (view.id === existing.id ? nextView : view))
+            : [...localViews, nextView];
+        if (!(await persistViews(nextViews))) return;
+        localViews = normalizeSavedViews(nextViews);
+        currentViewId = nextView.id;
+        activeViewName = nextView.name;
+        viewHint = "";
+        viewsOpen = false;
+    }
+
+    async function renameSavedView(view: SavedView) {
+        const name = (window.prompt("重命名视图", view.name) ?? "").trim();
+        if (!name || name === view.name) return;
+        const duplicate = findSavedViewByName(localViews, name);
+        if (duplicate && duplicate.id !== view.id) {
+            viewHint = `已存在同名视图「${name}」，请换一个名称`;
+            return;
+        }
+        const nextViews = localViews.map((item) => (item.id === view.id ? { ...item, name } : item));
+        if (!(await persistViews(nextViews))) return;
+        localViews = normalizeSavedViews(nextViews);
+        if (currentViewId === view.id) activeViewName = name;
+    }
+
+    async function deleteSavedView(view: SavedView) {
+        if (!window.confirm(`删除视图「${view.name}」？只删除这条保存的规则，不改联系人与当前列表。`)) return;
+        const nextViews = localViews.filter((item) => item.id !== view.id);
+        if (!(await persistViews(nextViews))) return;
+        localViews = normalizeSavedViews(nextViews);
+        if (currentViewId === view.id) {
+            currentViewId = "";
+            activeViewName = "";
+        }
+    }
 
     // 附加筛选变化时重置分页，避免停留在过大的页
     $effect(() => {
@@ -352,6 +493,30 @@
 
 <div class="lvct-people">
     <div class="lvct-people__toolbar fn__flex">
+        <span id="lvct-people-viewsmenu" style="position:relative; display:inline-flex">
+            <button class="b3-button b3-button--outline" aria-label={text("peopleViews", "视图")} aria-expanded={viewsOpen} onclick={() => (viewsOpen = !viewsOpen)}>
+                <Bookmark size={16}/>{activeViewName ? `${text("peopleViews", "视图")}：${activeViewName}` : text("peopleViews", "视图")}
+            </button>
+            {#if viewsOpen}
+                <div class="lvct-people__moremenu lvct-people__viewsmenu" role="menu" aria-label="保存的视图">
+                    {#if localViews.length === 0}
+                        <p class="lvct-people__viewsmenu-empty">还没有保存的视图。设置筛选条件后，点下方「保存当前筛选为视图」。</p>
+                    {/if}
+                    {#each localViews as view (view.id)}
+                        <div class="lvct-people__viewsmenu-item" role="menuitem">
+                            <button type="button" class="lvct-people__viewsmenu-apply" title={`应用视图 ${view.name}`} onclick={() => applySavedView(view)}>{view.name}</button>
+                            <span class="lvct-people__colmenu-actions">
+                                <button type="button" aria-label={`重命名视图 ${view.name}`} onclick={() => renameSavedView(view)}><Pencil size={14}/></button>
+                                <button type="button" aria-label={`删除视图 ${view.name}`} onclick={() => deleteSavedView(view)}><Trash2 size={14}/></button>
+                            </span>
+                        </div>
+                    {/each}
+                    <div class="lvct-people__colmenu-footer">
+                        <button type="button" class="b3-button b3-button--text" onclick={saveCurrentAsView}>保存当前筛选为视图</button>
+                    </div>
+                </div>
+            {/if}
+        </span>
         <input
             class="b3-text-field fn__flex-1"
             type="text"
@@ -456,6 +621,8 @@
     </div>
     {#if recentError}<div class="lvct-form__error" role="alert">最近互动读取失败：{recentError}</div>{/if}
     {#if prefError}<div class="lvct-form__error" role="alert">显示偏好保存失败：{prefError}</div>{/if}
+
+    {#if viewHint}<div class="lvct-people__viewhint" role="status">{viewHint}</div>{/if}
 
     {#if conditionChips.length > 0}
         <div class="lvct-people__conditions" aria-label="生效筛选条件">
