@@ -442,6 +442,65 @@
     word-break: break-word;
 }
 
+// F12 交往回顾报表
+.lvct-review__range {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--lvct-sp-2);
+    margin-bottom: var(--lvct-sp-3);
+}
+
+.lvct-review__hero {
+    display: flex;
+    align-items: baseline;
+    gap: var(--lvct-sp-2);
+
+    .lvct-review__big {
+        font-size: 42px;
+        font-weight: 700;
+        color: var(--lvct-accent);
+    }
+}
+
+.lvct-review__line {
+    margin: var(--lvct-sp-1) 0 var(--lvct-sp-3);
+    font-size: var(--lvct-fs-body);
+}
+
+.lvct-review__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: var(--lvct-sp-2);
+    margin-bottom: var(--lvct-sp-3);
+}
+
+.lvct-review__cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--lvct-sp-2);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-md);
+    background: var(--lvct-bg-surface);
+
+    b { font-size: 20px; }
+    span { color: var(--lvct-text-3); font-size: var(--lvct-fs-caption); }
+}
+
+.lvct-review__section {
+    margin-bottom: var(--lvct-sp-3);
+
+    > b { display: block; margin-bottom: var(--lvct-sp-1); }
+}
+
+.lvct-review__top {
+    margin: 0;
+    padding-left: 20px;
+
+    li { padding: 2px 0; }
+}
+
 // F09 互动备注模板
 .lvct-detail__template-row { margin-bottom: var(--lvct-sp-2); }
 

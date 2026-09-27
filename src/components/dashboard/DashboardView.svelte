@@ -9,6 +9,8 @@
     import { detectCheckinBridge } from "../../bridge/checkin";
     import ViewState from "../ViewState.svelte";
     import StatusNotice from "../StatusNotice.svelte";
+    import LvctDialog from "../LvctDialog.svelte";
+    import ReviewReportDialog from "./ReviewReportDialog.svelte";
 
     let {
         facade,
@@ -179,6 +181,7 @@
     }
 
     // ---- 打开工作台时的关注摘要（F08） ----
+    let reviewOpen = $state(false);
     let summaryHiddenThisSession = $state(false);
     let summaryBusy = $state(false);
     const localTodayKey = $derived.by(() => {
@@ -269,6 +272,7 @@
                 <h3>今日行动</h3>
                 <span class="ft__smaller ft__on-surface">生日 · 联系节奏 · 跟进事项</span>
                 <span style="flex:1"></span>
+                <button class="b3-button b3-button--outline" onclick={() => (reviewOpen = true)}>交往回顾</button>
                 {#if overdueCount > 0}
                     <button class="b3-button b3-button--outline" onclick={postponeOverdueToToday} disabled={alBusy}>
                         {alBusy ? "顺延中…" : `把 ${overdueCount} 条逾期跟进顺延到今天`}
@@ -436,3 +440,9 @@
         </div>
     {/if}
 </div>
+
+{#if reviewOpen}
+    <LvctDialog title="交往回顾报表" wide onClose={() => (reviewOpen = false)}>
+        <ReviewReportDialog i18n={facade.i18n} buildReport={(range) => facade.buildReviewReport(range.from, range.to)} />
+    </LvctDialog>
+{/if}

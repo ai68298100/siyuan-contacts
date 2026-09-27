@@ -34,6 +34,7 @@ import { loadPersonCadence, savePersonCadence } from "./data/cadences";
 import type { PersonCadence } from "./domain/cadence";
 import { listTemplates, saveTemplates } from "./services/templates";
 import type { NoteTemplate } from "./domain/interaction-templates";
+import { buildReview } from "./services/review-report";
 import { importInteractionJson, previewInteractionImport } from "./services/interaction-import";
 import { initExternalBridge, disposeExternalBridge } from "./bridge/external-bridge";
 import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
@@ -318,6 +319,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     async saveTemplates(templates: readonly NoteTemplate[]) {
         return saveTemplates(this, templates);
+    }
+
+    async buildReviewReport(from: string, to: string) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return buildReview(this, this.settings, { from, to });
     }
 
     async loadExportSummary() {

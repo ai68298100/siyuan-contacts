@@ -9,6 +9,7 @@ import type { InteractionImportSummary } from "./domain/interaction-backup";
 import type { FollowUpItem, SnoozeOption } from "./domain/followups";
 import type { PersonCadence } from "./domain/cadence";
 import type { NoteTemplate } from "./domain/interaction-templates";
+import type { ReviewReport } from "./domain/review-report";
 import type { FollowUpImportPreview } from "./services/followups";
 import type { ExportSummary } from "./services/export-center";
 
@@ -58,6 +59,8 @@ export interface ContactsPluginFacade {
     /** 互动备注模板（F09）：空存储返回内置默认；全量保存（增改删统一入口） */
     listTemplates(): Promise<NoteTemplate[]>;
     saveTemplates(templates: readonly NoteTemplate[]): Promise<NoteTemplate[]>;
+    /** 交往回顾报表（F12）：区间互动统计（只读投影，人物条数与同场活动分口径） */
+    buildReviewReport(from: string, to: string): Promise<ReviewReport>;
     /** 导出中心摘要：名册人数与活跃互动条数（展示用，容错读取） */
     loadExportSummary(): Promise<ExportSummary>;
     /** 导出全量名册为 vCard 3.0 文本（联系人页选中导出外的设置页统一入口） */

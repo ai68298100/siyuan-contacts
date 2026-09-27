@@ -1345,6 +1345,55 @@ await test("会面简报导出：预览与范围一致，特殊字符转义，�
     }
 });
 
+await test("交往回顾报表：区间统计与明细渲染，切换区间重新生成，零数据一致", async () => {
+    const reportA = {
+        range: { from: "2026-09-01", to: "2026-09-28" }, previous: { from: "2026-08-02", to: "2026-08-31" },
+        total: 5, activities: 3, contactedPeople: 2, bySource: { manual: 2, diary: 2, api: 1 },
+        topPeople: [{ personDocId: "doc-a", name: "回归测试甲", count: 3 }, { personDocId: "doc-b", name: "", count: 2 }],
+        entries: [
+            { eventId: "e1", localDate: "2026-09-05", personDocId: "doc-a", personName: "回归测试甲", source: "diary", note: "项目会", groupSize: 2 },
+            { eventId: "e2", localDate: "2026-09-10", personDocId: "doc-a", personName: "回归测试甲", source: "manual", note: "电话", groupSize: 1 },
+            { eventId: "e3", localDate: "2026-09-12", personDocId: "doc-a", personName: "回归测试甲", source: "manual", note: "午餐", groupSize: 1 },
+            { eventId: "e4", localDate: "2026-09-20", personDocId: "doc-b", personName: "", source: "api", note: "任务联动", groupSize: 1 },
+            { eventId: "e5", localDate: "2026-09-25", personDocId: "doc-b", personName: "", source: "api", note: "任务联动", groupSize: 1 },
+        ],
+        previousTotal: 3, delta: 2,
+    };
+    const emptyReport = { ...reportA, total: 0, activities: 0, contactedPeople: 0, bySource: { manual: 0, diary: 0, api: 0 }, topPeople: [], entries: [], previousTotal: 0, delta: 0 };
+    let calls = [];
+    let useEmpty = false;
+    mounted = mount(DashboardView, { target: fixture, props: {
+        preferences: DEFAULT_VIEW_PREFERENCES, onOpenDetail() {}, onOpenPeople() {}, onOpenGraph() {},
+        facade: { settings, loadDashboard: async () => ({
+            people: 0, relations: 0, birthdays: [], birthdaysThisWeek: 0, stale: [], neverContacted: 0, neverContactedItemIds: [], followUps: [], actions: [],
+        }), buildReviewReport: async (from, to) => {
+            calls.push([from, to]);
+            return useEmpty ? emptyReport : reportA;
+        } },
+    } });
+    await until(() => fixture.textContent.includes("今日行动"), "首页未渲染");
+    button("交往回顾").click();
+    await until(() => fixture.textContent.includes("本周期与 2 位联系人互动 5 次"), "报表摘要未显示");
+    assert(fixture.textContent.includes("比上一周期多 2 次"), "对比文案缺失");
+    assert(fixture.textContent.includes("同场活动"), "同场活动口径缺失");
+    assert(fixture.textContent.includes("最常联系 Top 2"), "排行缺失");
+    // 明细展开
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("查看明细（5 条）")).click();
+    await until(() => fixture.textContent.includes("项目会"), "明细未展开");
+    // 切换区间 → 重新生成且为空报表
+    useEmpty = true;
+    const modeSelect = fixture.querySelector('select[aria-label="统计区间"]');
+    modeSelect.value = "90";
+    modeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await until(() => fixture.textContent.includes("本周期与 0 位联系人互动 0 次"), "切换区间未重新生成");
+    assert(calls.length === 2, "区间切换未重新请求");
+    // 自定义模式缺日期 → 提示选择
+    modeSelect.value = "custom";
+    modeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await pause(60);
+    assert(fixture.textContent.includes("选择区间后生成报表"), "自定义缺日期未提示");
+});
+
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {
     const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
         docId: settings.hostDocId,
