@@ -714,6 +714,35 @@
     white-space: nowrap;
 }
 
+.lvct-import__row--dup {
+    opacity: 0.55;
+    cursor: default;
+}
+
+/* ---------- vCard 导入导出 ---------- */
+
+.lvct-vcard__export {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.lvct-vcard__section-title {
+    font-weight: 500;
+}
+
+.lvct-vcard__note {
+    align-self: center;
+}
+
+.lvct-vcard__file {
+    display: none;
+}
+
+.lvct-vcard__status {
+    padding: 2px 0;
+}
+
 /* ---------- 详情记互动 ---------- */
 
 .lvct-detail__record {

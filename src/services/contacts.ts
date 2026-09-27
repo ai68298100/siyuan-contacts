@@ -73,7 +73,8 @@ export async function createContact(settings: ContactsSettings, draft: ContactDr
     return created;
 }
 
-async function writeDraftCells(settings: ContactsSettings, itemId: string, draft: ContactDraft): Promise<void> {
+/** 草稿 → 单元格写入（不含查重/建行）。vCard 批量导入复用同一套写入语义。 */
+export async function writeDraftCells(settings: ContactsSettings, itemId: string, draft: ContactDraft): Promise<void> {
     const key = (field: FieldKey) => settings.fieldMap[field];
     const trimOrNull = (value: string) => {
         const trimmed = value.trim();

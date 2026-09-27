@@ -100,6 +100,19 @@
 - Release：https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.1.0（附 package.zip）
 - bazaar 上架：按用户要求暂缓，优化后由用户择机提交（清单见 docs/RELEASE.md §3）
 
+## v0.2d — vCard (.vcf) 导入导出（2026-09-27）
+
+- [x] `domain/vcard.ts` 纯函数：折行展开（RFC 折行 + QP 软换行无空格续行变体）、解析（FN/N 回退、
+      多 TEL 连接、BDAY 三种日期形式、QP/GBK 解码、转义还原）、vCard 3.0 序列化（农历走
+      X-LVCT-BDAY-LUNAR 回写属性，往返无损）+ 10 项单测
+- [x] `services/vcard.ts`：导入计划（对名册快照查重，同名默认跳过）→ 批量建人
+      （逐篇建文档 + 绑行 200/批 + 一次批量映射 + 复用 writeDraftCells，单项失败不中断整批）；
+      导出名册 → vCard 文本
+- [x] 联系人页「vCard 导入/导出」弹窗：导出下载 / 选文件解析预览（重复标注、勾选）/ 导入进度与结果报告
+- [x] 映射契约 DATA-CONTRACT §7；决策 D-0013（数据保真优先：多 TEL 连接、EMAIL 取首、
+      无年份生日丢弃、导入同名跳过不合并、微信号不导出、导出不折行）
+- [x] 单测增至 43 项全绿
+
 ## 待启动
 
 - M4 提醒仪表盘：公/农历生日投影（移植打卡 lunar.ts+occasions 模型）、互动事件（source+externalRef 幂等+墓碑）、

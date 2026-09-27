@@ -6,6 +6,7 @@
     import PersonCard from "./PersonCard.svelte";
     import AddPersonDialog from "./AddPersonDialog.svelte";
     import ImportDialog from "./ImportDialog.svelte";
+    import VCardDialog from "./VCardDialog.svelte";
 
     let {
         settings,
@@ -25,6 +26,7 @@
     let viewMode: "cards" | "table" = $state("cards");
     let adding: boolean = $state(false);
     let importing: boolean = $state(false);
+    let vcarding: boolean = $state(false);
     let visibleCount: number = $state(PAGE_SIZE);
 
     const groups = $derived.by(() => {
@@ -75,6 +77,7 @@
             {viewMode === "cards" ? "表格" : "卡片"}
         </button>
         <button class="b3-button b3-button--outline" onclick={() => (importing = true)}>导入已有文档</button>
+        <button class="b3-button b3-button--outline" onclick={() => (vcarding = true)}>vCard 导入/导出</button>
         <button class="b3-button b3-button--text" onclick={() => (adding = true)}>新建联系人</button>
     </div>
 
@@ -84,7 +87,7 @@
         <div class="lvct-placeholder">加载中…</div>
     {:else if filtered.length === 0}
         <div class="lvct-placeholder">
-            {people.length === 0 ? "还没有联系人：新建或「导入已有文档」开始。" : "当前筛选下没有联系人。"}
+            {people.length === 0 ? "还没有联系人：新建、导入已有文档或导入 vCard 通讯录开始。" : "当前筛选下没有联系人。"}
         </div>
     {:else if viewMode === "cards"}
         <div class="lvct-people__cards">
@@ -144,6 +147,21 @@
                         if (count > 0) refresh();
                     }}
                     onClose={() => (importing = false)}
+                />
+            </div>
+        </div>
+    {/if}
+
+    {#if vcarding}
+        <div class="lvct-dialog-mask" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) vcarding = false; }}>
+            <div class="lvct-dialog-panel lvct-dialog-panel--wide">
+                <h3 class="lvct-dialog-panel__title">vCard 通讯录导入/导出</h3>
+                <VCardDialog
+                    {settings}
+                    onImported={(count) => {
+                        if (count > 0) refresh();
+                    }}
+                    onClose={() => (vcarding = false)}
                 />
             </div>
         </div>
