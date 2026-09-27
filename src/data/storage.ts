@@ -7,6 +7,8 @@
  */
 import type { Plugin } from "siyuan";
 
+const localQueues = new Map<string, Promise<void>>();
+
 /** 写操作的前置读取：读取异常必须传递，不能按空库覆盖已有数据。 */
 export async function loadJsonStrict(plugin: Plugin, key: string): Promise<unknown | null> {
     try {
@@ -39,11 +41,19 @@ export async function saveJsonVerified(plugin: Plugin, key: string, value: unkno
 }
 
 /**
- * 读-改-写临界区。无 Web Locks 的环境降级为直接执行（桌面思源均支持）。
+ * 读-改-写临界区。无 Web Locks 时按键在本上下文排队，不提供跨窗口排他。
  */
 export async function withStoreLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
     if (typeof navigator !== "undefined" && navigator.locks?.request) {
         return navigator.locks.request(`lvct-${key}`, fn);
     }
-    return fn();
+    const previous = localQueues.get(key) ?? Promise.resolve();
+    const task = previous.then(fn);
+    const completion = task.then(() => {}, () => {});
+    localQueues.set(key, completion);
+    try {
+        return await task;
+    } finally {
+        if (localQueues.get(key) === completion) localQueues.delete(key);
+    }
 }

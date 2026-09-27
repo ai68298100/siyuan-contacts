@@ -802,6 +802,29 @@ await test("设置页备份合并先预览，坏文件清空旧计划，取消�
     } finally { window.confirm = originalConfirm; }
 });
 
+await test("无浏览器锁时并发互动与备份合并仍串行，不丢记录", async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, "locks");
+    Object.defineProperty(navigator, "locks", { configurable: true, value: undefined });
+    let saved = "";
+    const plugin = {
+        loadData: async () => JSON.parse(JSON.stringify(saved)),
+        saveData: async (_key, value) => { await pause(5); saved = JSON.parse(JSON.stringify(value)); },
+    };
+    try {
+        await Promise.all(Array.from({ length: 12 }, (_, index) => recordInteraction(plugin, {
+            personDocId: `参与者${index}`, source: "api", externalRef: "降级并发回归",
+        })));
+        assert((await loadInteractionStore(plugin)).events.length === 12, "无浏览器锁时并发保存丢失记录");
+        const text = JSON.stringify({ schemaVersion: 1, events: [{ id: "降级导入", personDocId: "导入参与者", source: "api", occurredAt: Date.now(), localDate: "2026-09-27" }], tombstones: [] });
+        const results = await Promise.all([importInteractionJson(plugin, text), importInteractionJson(plugin, text)]);
+        assert(results.reduce((sum, result) => sum + result.added, 0) === 1, "降级并发导入重复计数");
+        assert((await loadInteractionStore(plugin)).events.length === 13, "降级合并覆盖了已有事件");
+    } finally {
+        if (descriptor) Object.defineProperty(navigator, "locks", descriptor);
+        else Reflect.deleteProperty(navigator, "locks");
+    }
+});
+
 await pause(100);
 results.push({ name: "无未处理异常及响应式循环", ok: runtimeErrors.length === 0, detail: runtimeErrors.join("\n") });
 document.querySelector("#results").textContent = JSON.stringify(results, null, 2);
