@@ -995,6 +995,81 @@ await test("人物互动删除在锁内检查归属，不能删除他人事件",
     assert((await loadInteractionStore(plugin)).events.length === 1, "他人事件被误删");
 });
 
+await test("独立同源上下文共享 Web Locks，记录/删除/备份并发不覆盖且失败释放锁", async () => {
+    assert(navigator.locks?.request, "本环境无 Web Locks，不能验证跨页面排他");
+    const storageKey = "lvct-isolated-multicontext-store";
+    localStorage.removeItem(storageKey);
+    const frames = [document.createElement("iframe"), document.createElement("iframe")];
+    for (const frame of frames) {
+        frame.hidden = true;
+        frame.src = "/scripts/e2e/ui/store-frame.html";
+        fixture.append(frame);
+    }
+    try {
+        await until(() => frames.every((frame) => frame.contentWindow.lvctStoreTest), "独立存储上下文未就绪");
+        assert(frames[0].contentWindow.navigator !== frames[1].contentWindow.navigator, "不是独立页面上下文");
+        const [a, b] = frames.map((frame) => frame.contentWindow.lvctStoreTest);
+        let release;
+        let held;
+        const ready = new Promise((resolve) => { held = resolve; });
+        const gate = new Promise((resolve) => { release = resolve; });
+        const blocker = navigator.locks.request("lvct-interaction-events.json", async () => { held(); await gate; });
+        await ready;
+        const blocked = a.record({ personDocId: "locked", source: "api", externalRef: "gate" });
+        // 等待请求进入实际浏览器锁队列，而非依赖固定延时猜测。
+        try {
+            let pending = false;
+            const deadline = Date.now() + 2000;
+            while (!pending && Date.now() < deadline) {
+                pending = (await navigator.locks.query()).pending.some((lock) => lock.name === "lvct-interaction-events.json");
+                if (!pending) await pause(10);
+            }
+            assert(pending && a.writes() === 0, "另一页面未等待共享锁");
+        } finally { release(); await blocker; await blocked; }
+        const outcomes = await Promise.all(Array.from({ length: 12 }, (_, index) => (index % 2 ? a : b).record({
+            personDocId: `person-${index}`, source: "api", externalRef: "meeting",
+        })));
+        assert(outcomes.every((item) => item.recorded), "跨页面新增计数错误");
+        assert((await a.load()).events.length === 13, "跨页面并发记录丢失");
+        const duplicates = await Promise.all([a.record({ personDocId: "duplicate", source: "api", externalRef: "same" }),
+            b.record({ personDocId: "duplicate", source: "api", externalRef: "same" })]);
+        assert(duplicates.filter((item) => item.recorded).length === 1, "跨页面幂等失效");
+        const snapshot = await a.load();
+        const victim = snapshot.events.find((item) => item.personDocId === "person-0");
+        const backup = JSON.stringify(snapshot);
+        const beforePreview = a.writes() + b.writes();
+        await b.preview(backup);
+        assert(a.writes() + b.writes() === beforePreview, "跨页面预览写入数据");
+        await Promise.all([a.remove(victim.id, victim.personDocId), b.merge(backup),
+            b.record({ personDocId: "late", source: "api", externalRef: "late" })]);
+        await a.merge(backup);
+        const final = await b.load();
+        assert(final.tombstones.includes(victim.id) && !final.events.some((item) => item.id === victim.id), "旧备份复活跨页面删除");
+        assert(final.events.some((item) => item.personDocId === "late") && final.events.length === 14, "删除/合并覆盖并发新增");
+        a.failSave();
+        const failures = await Promise.allSettled([
+            a.record({ personDocId: "failed", source: "api", externalRef: "failed" }),
+            b.record({ personDocId: "survived", source: "api", externalRef: "survived" }),
+        ]);
+        assert(failures[0].status === "rejected" && failures[1].status === "fulfilled", "失败未释放跨页面锁");
+        const recovered = await a.load();
+        assert(!recovered.events.some((item) => item.personDocId === "failed")
+            && recovered.events.some((item) => item.personDocId === "survived"), "失败保存或后续操作结果错误");
+        const incoming = JSON.stringify({ schemaVersion: 1, tombstones: [], events: [{
+            id: "imported-cross-context", personDocId: "imported", occurredAt: 1790467200000,
+            localDate: "2026-09-27", source: "api", externalRef: "imported",
+        }] });
+        const imported = await Promise.all([a.merge(incoming), b.merge(incoming)]);
+        assert(imported.reduce((sum, item) => sum + item.added, 0) === 1, "跨页面同备份新增重复计数");
+        const merged = await a.load();
+        assert(merged.events.filter((item) => item.personDocId === "imported").length === 1
+            && merged.events.length === 16 && merged.tombstones.includes(victim.id), "并发合并丢失记录或删除标记");
+    } finally {
+        frames.forEach((frame) => frame.remove());
+        localStorage.removeItem(storageKey);
+    }
+});
+
 await pause(100);
 results.push({ name: "无未处理异常及响应式循环", ok: runtimeErrors.length === 0, detail: runtimeErrors.join("\n") });
 document.querySelector("#results").textContent = JSON.stringify(results, null, 2);
