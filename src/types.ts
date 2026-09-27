@@ -6,6 +6,7 @@ import type { PersonInsights } from "./services/insights";
 import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "./services/settings-health";
 import type { ViewPreferences } from "./domain/preferences";
 import type { InteractionImportSummary } from "./domain/interaction-backup";
+import type { ExportSummary } from "./services/export-center";
 
 export type WorkbenchView = "home" | "people" | "graph" | "settings";
 
@@ -36,6 +37,10 @@ export interface ContactsPluginFacade {
     repairFieldMap(patch: FieldMapPatch): Promise<ContactsSettings>;
     /** 导出插件自管互动事件，不修改当前存储 */
     exportInteractionJson(): Promise<string>;
+    /** 导出中心摘要：名册人数与活跃互动条数（展示用，容错读取） */
+    loadExportSummary(): Promise<ExportSummary>;
+    /** 导出全量名册为 vCard 3.0 文本（联系人页选中导出外的设置页统一入口） */
+    exportRosterVcf(): Promise<string>;
     previewInteractionImport(text: string): Promise<InteractionImportSummary>;
     importInteractionJson(text: string): Promise<InteractionImportSummary>;
     loadViewPreferences(): Promise<ViewPreferences>;

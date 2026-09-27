@@ -635,15 +635,17 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
 
     <!-- ========== 3. 联系人列表 ========== -->
     <section class="screen" id="s-people">
-      <div class="note-box"><b>设计要点：</b>统一主操作——卡片与表格点击均打开 <b>Peek 侧栏</b>，「打开文档」收敛为悬停出现的图标钮；工具栏支持搜索 + 分组/标签筛选 + 排序 + 视图切换；选中态支持批量操作（加分组、导出）。下方同时给出卡片与表格两种视图。</div>
+      <div class="note-box"><b>设计要点：</b>统一主操作——卡片与表格点击均打开 <b>Peek 侧栏</b>，「打开文档」收敛为悬停出现的图标钮；工具栏支持搜索 + 分组/标签筛选 + 排序 + 视图切换；选中态支持批量操作（加分组、导出）。A 批增量（下图为目标状态，标注 F02/F03/F04 者为计划项）：<b>F03</b> 组合筛选（标签全部/任一、最近互动范围、从未联系，生效条件可逐项清除并显示人数）；<b>F04</b> 命名保存常用视图；<b>F02</b> 表格列显隐与顺序偏好，姓名与操作列不可隐藏。下方同时给出卡片与表格两种视图。</div>
 
       <div class="frame">
         <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">联系人 · 卡片视图</span></div>
         <div class="frame__body" style="padding: 18px 22px">
           <div class="people-toolbar">
+            <button class="btn btn--ghost">☆ 视图：常用 ▾</button>
             <div class="input" style="width:250px">🔍 <input placeholder="搜索姓名 / 电话 / 微信 / 邮箱 / 标签…"></div>
             <button class="btn">分组：全部 ▾</button>
             <button class="btn">标签 ▾</button>
+            <button class="btn">更多筛选 ▾</button>
             <button class="btn btn--ghost">⇅ 最近互动</button>
             <div class="sp" style="flex:1"></div>
             <div class="seg"><button class="on">▦ 卡片</button><button>☰ 表格</button></div>
@@ -651,11 +653,17 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
             <button class="btn">vCard ▾</button>
             <button class="btn btn--primary">＋ 新建</button>
           </div>
-          <div style="display:flex; gap:8px; margin-top:12px; align-items:center">
-            <span style="font-size:12px; color:var(--text-3)">已选筛选：</span>
+          <div style="display:flex; gap:8px; margin-top:12px; align-items:center; flex-wrap:wrap">
+            <span style="font-size:12px; color:var(--text-3)">生效条件（F03）：</span>
             <span class="chip chip--accent"><span class="dot" style="background:var(--g-work)"></span>同事 ×</span>
             <span class="chip chip--accent"># 家长群 ×</span>
+            <span class="chip chip--accent">标签：任一 ×</span>
+            <span class="chip chip--accent">最近互动 ≤ 90 天 ×</span>
+            <span class="chip chip--accent">从未联系 ×</span>
             <span style="font-size:12px; color:var(--text-3)">· 共 48 人</span>
+            <div class="sp" style="flex:1"></div>
+            <button class="btn btn--sm">💾 保存为视图（F04）</button>
+            <button class="btn btn--sm btn--ghost">清除全部</button>
           </div>
           <div class="people-grid">
             <div class="card pcard">
@@ -726,6 +734,11 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
       <div class="frame">
         <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">联系人 · 表格视图（点击行同样打开 Peek）</span></div>
         <div class="frame__body">
+          <div style="display:flex; align-items:center; gap:8px; padding: 12px 16px 0">
+            <span style="font-size:12px; color:var(--text-3)">F02：列显隐与顺序在此调整；「姓名」与操作列不可隐藏，常用列常驻、次要列折叠</span>
+            <div class="sp" style="flex:1"></div>
+            <button class="btn btn--sm">列设置 ▾</button>
+          </div>
           <table class="tbl">
             <thead><tr><th style="width:34px"><div class="checkbox"></div></th><th>姓名 ⇅</th><th>分组</th><th>电话</th><th>微信</th><th>生日</th><th>最近互动 ⇅</th><th>标签</th></tr></thead>
             <tbody>
@@ -956,7 +969,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
 
     <!-- ========== 8. 设置页 ========== -->
     <section class="screen" id="s-settings">
-      <div class="note-box"><b>设计要点：</b>补全现状缺失的设置页。左分栏右内容（思源设置同款范式）；六个分区按"使用频率 × 风险"排序；<b>字段健康检查</b>对应 DATA-CONTRACT 的"用户删列 → 降级提示重建"契约；AI 分区落实"显式触发、可全局关闭"的隐私原则。</div>
+      <div class="note-box"><b>设计要点：</b>补全现状缺失的设置页。左分栏右内容（思源设置同款范式）；六个分区按"使用频率 × 风险"排序；<b>字段健康检查</b>对应 DATA-CONTRACT 的"用户删列 → 降级提示重建"契约；AI 分区落实"显式触发、可全局关闭"的隐私原则。「通用」分区含联系人显示偏好（<b>F02</b>）；「数据」分区的<b>导出中心</b>（<b>F01</b>）展示数量与范围，并明示两项导出都不是完整备份。</div>
       <div class="frame">
         <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">小驴人脉 · 设置</span></div>
         <div class="frame__body">
@@ -979,6 +992,11 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
                 <div class="set-row"><div><div class="tt">启动时打开工作台</div><div class="ds">思源启动后自动展开人脉首页</div></div><div class="sp"></div><div class="switch"></div></div>
               </div>
               <div class="set-group">
+                <div class="set-group__t">联系人显示（F02）</div>
+                <div class="set-row"><div><div class="tt">表格列显隐与顺序</div><div class="ds">「姓名」与主要操作列不可隐藏；常用列常驻、次要列折叠</div></div><div class="sp"></div><button class="btn btn--sm">列设置…</button></div>
+                <div class="set-row"><div><div class="tt">恢复默认显示</div><div class="ds">清空列偏好，回到出厂列集与顺序</div></div><div class="sp"></div><button class="btn btn--sm">恢复默认</button></div>
+              </div>
+              <div class="set-group">
                 <div class="set-group__t">提醒（预览）</div>
                 <div class="set-row"><div><div class="tt">生日提前提醒</div><div class="ds">首页生日列表的展示窗口</div></div><div class="sp"></div><span class="select-mock">30 天 ▾</span></div>
                 <div class="set-row"><div><div class="tt">久未联系阈值</div><div class="ds">超过该天数未互动即进入「久未联系」</div></div><div class="sp"></div><span class="select-mock">30 天 ▾</span></div>
@@ -991,7 +1009,9 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
                   <div class="sp"></div><span class="chip chip--ok">● 健康</span>
                 </div>
                 <div class="set-row"><div><div class="tt">重新绑定锚点</div><div class="ds">笔记本 / 总表文档被移动或删除后，在此重新指定</div></div><div class="sp"></div><button class="btn btn--sm">检查并修复…</button></div>
-                <div class="set-row"><div><div class="tt">导出全部数据</div><div class="ds">名册导出 vCard 3.0；互动事件导出 JSON 备份</div></div><div class="sp"></div><button class="btn btn--sm">导出 ▾</button></div>
+                <div class="set-row"><div><div class="tt">导出中心（F01）· 全量名册 vCard</div><div class="ds">236 位联系人 · 标准 vCard 3.0，手机通讯录可导入；不含互动记录与关系，微信号不导出</div></div><div class="sp"></div><button class="btn btn--sm">导出 .vcf</button></div>
+                <div class="set-row"><div><div class="tt">导出中心（F01）· 互动事件 JSON</div><div class="ds">318 条事件 · 含原始快照与删除标记；不含人物文档与数据库</div></div><div class="sp"></div><button class="btn btn--sm">导出 JSON</button></div>
+                <div class="set-row"><div><div class="tt">导出范围说明</div><div class="ds">人物文档与联系人数据库是思源原生数据，随工作区保留与同步；以上两项都不是完整备份</div></div></div>
               </div>
               <div class="set-group">
                 <div class="set-group__t">AI 与隐私（预览）</div>

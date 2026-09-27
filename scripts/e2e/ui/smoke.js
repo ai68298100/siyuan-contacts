@@ -875,6 +875,63 @@ await test("设置页备份读取失败不下载，重试后下载完整快照",
     }
 });
 
+await test("设置页导出中心显示数量与范围，失败不下载可重试，空名册禁用", async () => {
+    let failRoster = false;
+    let empty = false;
+    let downloads = 0;
+    let filename = "";
+    let blob;
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    const originalClick = HTMLAnchorElement.prototype.click;
+    URL.createObjectURL = (value) => { blob = value; return "blob:export-test"; };
+    URL.revokeObjectURL = () => {};
+    HTMLAnchorElement.prototype.click = function () { downloads += 1; filename = this.download; };
+    try {
+        const facade = {
+            settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+            loadExportSummary: async () => empty ? { peopleCount: 0, interactionCount: 0 } : { peopleCount: 2, interactionCount: 3 },
+            exportRosterVcf: async () => {
+                if (failRoster) throw new Error("名册读取失败");
+                return "BEGIN:VCARD\nVERSION:3.0\nFN:回归测试甲\nEND:VCARD";
+            },
+            exportInteractionJson: async () => "{}",
+            saveViewPreferences: async (value) => value,
+            checkSettingsHealth: async () => ({ ok: true, columns: 9, missing: [], availableColumns: [] }),
+            rebuildMissingFields: async () => settings,
+            rebindSettings: async () => settings,
+            repairFieldMap: async () => settings,
+            openHostDoc() {},
+        };
+        mounted = mount(SettingsView, { target: fixture, props: {
+            facade, settings, preferences: DEFAULT_VIEW_PREFERENCES,
+            onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {},
+        } });
+        [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes("数据与字段")).click();
+        await until(() => fixture.textContent.includes("2 位联系人"), "名册数量未展示");
+        assert(fixture.textContent.includes("3 条事件"), "互动数量未展示");
+        assert(fixture.textContent.includes("都不是完整备份"), "导出范围说明未展示");
+        failRoster = true;
+        button("导出 .vcf").click();
+        await until(() => fixture.textContent.includes("名册读取失败"), "名册导出失败未显示");
+        assert(downloads === 0, "导出失败仍触发了下载");
+        failRoster = false;
+        button("导出 .vcf").click();
+        await until(() => fixture.textContent.includes("全量名册已导出"), "重试导出未成功");
+        assert(downloads === 1 && filename.endsWith(".vcf"), "vCard 下载次数或文件名错误");
+        assert((await blob.text()).includes("BEGIN:VCARD"), "下载内容缺失 vCard 文本");
+        empty = true;
+        [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes("通用")).click();
+        [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes("数据与字段")).click();
+        await until(() => fixture.textContent.includes("名册为空"), "空名册提示未展示");
+        assert(button("导出 .vcf").disabled, "空名册未禁用导出");
+    } finally {
+        URL.createObjectURL = originalCreate;
+        URL.revokeObjectURL = originalRevoke;
+        HTMLAnchorElement.prototype.click = originalClick;
+    }
+});
+
 await test("备份预览不写入，合并重读当前数据并保留并发新增，再次合并幂等", async () => {
     let saved = "";
     let writes = 0;

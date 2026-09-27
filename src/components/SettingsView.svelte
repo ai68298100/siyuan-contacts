@@ -8,6 +8,7 @@
     import { SlidersHorizontal, Database, Bell, Sparkles, Plug, Info } from "@lucide/svelte";
     import { translateText } from "../domain/translation";
     import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "../services/settings-health";
+    import type { ExportSummary } from "../services/export-center";
 
     let {
         facade,
@@ -52,6 +53,11 @@
     let rebindMessage = $state("");
     let exportingInteractions = $state(false);
     let exportMessage = $state("");
+    let exportingRoster = $state(false);
+    let rosterExportMessage = $state("");
+    let exportSummary: ExportSummary | null = $state(null);
+    let loadingSummary = $state(false);
+    let summaryRequest = 0;
     let importPreview: InteractionImportSummary | null = $state(null);
     let importText = "";
     let importRequest = 0;
@@ -155,6 +161,24 @@
         }
     }
 
+    async function refreshExportSummary() {
+        const request = ++summaryRequest;
+        loadingSummary = true;
+        try {
+            const summary = await facade.loadExportSummary();
+            if (request === summaryRequest) exportSummary = summary;
+        } catch {
+            // 数量仅辅助展示；读取失败降级为不显示，不阻塞导出动作
+            if (request === summaryRequest) exportSummary = null;
+        } finally {
+            if (request === summaryRequest) loadingSummary = false;
+        }
+    }
+
+    $effect(() => {
+        if (activeSection === "data") void refreshExportSummary();
+    });
+
     async function runExportInteractions() {
         if (exportingInteractions) return;
         exportingInteractions = true;
@@ -174,6 +198,28 @@
             errorText = error instanceof Error ? error.message : String(error);
         } finally {
             exportingInteractions = false;
+        }
+    }
+
+    async function runExportRoster() {
+        if (exportingRoster) return;
+        exportingRoster = true;
+        errorText = "";
+        rosterExportMessage = "";
+        try {
+            const vcf = await facade.exportRosterVcf();
+            const blob = new Blob([vcf], { type: "text/vcard;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = `小驴人脉_联系人_${new Date().toISOString().slice(0, 10)}.vcf`;
+            anchor.click();
+            URL.revokeObjectURL(url);
+            rosterExportMessage = "全量名册已导出为 vCard 3.0";
+        } catch (error) {
+            errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            exportingRoster = false;
         }
     }
 
@@ -347,8 +393,29 @@
                         </div>
                     {/if}
 
+                    <div class="lvct-settings__sub-heading">
+                        <b>导出中心</b>
+                        {#if loadingSummary}<span class="ft__smaller ft__on-surface">统计中…</span>{/if}
+                    </div>
+                    <p class="lvct-settings__inline-hint">人物文档与联系人数据库是思源原生数据，随工作区保留；以下两项导出都不是完整备份。</p>
                     <div class="lvct-settings__row">
-                        <div><b>互动事件备份</b><small>原始数据快照、事件与墓碑</small></div>
+                        <div>
+                            <b>全量名册 vCard</b>
+                            <small>{#if exportSummary}{exportSummary.peopleCount} 位联系人 · {/if}标准 vCard 3.0，通讯录可导入；不含互动与关系，微信号不导出</small>
+                        </div>
+                        <button class="b3-button b3-button--outline" onclick={runExportRoster} disabled={exportingRoster || (exportSummary !== null && exportSummary.peopleCount === 0)}>
+                            {exportingRoster ? "导出中…" : "导出 .vcf"}
+                        </button>
+                    </div>
+                    {#if exportSummary && exportSummary.peopleCount === 0}
+                        <p class="lvct-settings__inline-hint">名册为空：先在联系人页新建或收编联系人，再来导出。</p>
+                    {/if}
+                    <StatusNotice message={rosterExportMessage} onDismiss={() => (rosterExportMessage = "")} actionLabel="再次导出" onAction={runExportRoster} />
+                    <div class="lvct-settings__row">
+                        <div>
+                            <b>互动事件 JSON</b>
+                            <small>{#if exportSummary}{exportSummary.interactionCount} 条事件 · {/if}原始数据快照、事件与墓碑；不含人物文档与数据库</small>
+                        </div>
                         <button class="b3-button b3-button--outline" onclick={runExportInteractions} disabled={exportingInteractions}>
                             {exportingInteractions ? "导出中…" : "导出 JSON"}
                         </button>

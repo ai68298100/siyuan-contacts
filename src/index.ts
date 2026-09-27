@@ -18,6 +18,8 @@ import { loadPersonInsights } from "./services/insights";
 import { checkSettingsHealth, rebuildMissingFields, rebindSettings, repairFieldMap } from "./services/settings-health";
 import { loadViewPreferences, saveViewPreferences } from "./services/preferences";
 import { exportInteractionJson } from "./services/interaction-export";
+import { loadExportSummary } from "./services/export-center";
+import { exportVcfText } from "./services/vcard";
 import { importInteractionJson, previewInteractionImport } from "./services/interaction-import";
 import { initExternalBridge, disposeExternalBridge } from "./bridge/external-bridge";
 import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
@@ -266,6 +268,16 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     async exportInteractionJson() {
         return exportInteractionJson(this);
+    }
+
+    async loadExportSummary() {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return loadExportSummary(this, this.settings);
+    }
+
+    async exportRosterVcf() {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return exportVcfText(this.settings);
     }
 
     async previewInteractionImport(text: string) {
