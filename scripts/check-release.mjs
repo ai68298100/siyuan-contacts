@@ -16,7 +16,7 @@ check("版本一致（plugin.json = package.json）", plugin.version === pkg.ver
 check("插件名 = 仓库名约定", plugin.name === pkg.name, plugin.name);
 
 const dist = path.join(root, "dist");
-for (const file of ["index.js", "index.css", "plugin.json", "icon.png", "preview.png", "README.md", "README.zh-CN.md", "i18n/zh-CN.json", "i18n/en.json"]) {
+for (const file of ["index.js", "index.css", "plugin.json", "icon.png", "preview.png", "README.md", "README.en-US.md", "i18n/zh-CN.json", "i18n/en.json"]) {
     const p = path.join(dist, file);
     check(`dist/${file}`, fs.existsSync(p) && fs.statSync(p).size > 0);
 }
