@@ -424,6 +424,31 @@
 // F09 互动备注模板
 .lvct-detail__template-row { margin-bottom: var(--lvct-sp-2); }
 
+// F10 互动日期回顾
+.lvct-detail__month-head {
+    margin: var(--lvct-sp-2) 0 var(--lvct-sp-1);
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--lvct-border-subtle);
+    color: var(--lvct-text-3);
+    font-size: var(--lvct-fs-caption);
+    font-weight: 600;
+}
+
+.lvct-detail__history {
+    margin-bottom: var(--lvct-sp-2);
+    padding: var(--lvct-sp-2);
+    border: 1px solid var(--lvct-highlight);
+    border-radius: var(--lvct-r-md);
+    background: var(--lvct-highlight-soft);
+
+    > b {
+        display: block;
+        margin-bottom: var(--lvct-sp-1);
+        font-size: var(--lvct-fs-caption);
+    }
+}
+
+
 .lvct-templates__item {
     display: flex;
     flex-direction: column;

@@ -1246,6 +1246,51 @@ await test("诊断模板弹窗", async () => {
     results.push({ name: "diag-tpl", ok: true, detail: `dialogNodes=${dialogCount}; buttons=${buttons.slice(0, 300)}` });
 });
 
+await test("互动日期回顾：按月分组、日期范围与快捷项、历史上的今天", async () => {
+    const pad = (value) => String(value).padStart(2, "0");
+    const now = new Date();
+    const dateKey = (days) => {
+        const date = new Date(now);
+        date.setDate(date.getDate() + days);
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    };
+    const mk = (localDate, note) => ({ eventId: `e-${localDate}-${note}`, localDate, source: "manual", note, groupSize: 1 });
+    const timeline = [
+        mk(dateKey(0), "今天的事"),
+        mk("2025-09-28", "去年今天聚了个餐"),
+        mk("2026-08-15", "八月的事"),
+        mk("2026-07-20", "七月的事"),
+    ];
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async () => {},
+        onLoadInsights: async () => ({ timeline, coAttendance: [], totalEvents: timeline.length }),
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+    } });
+    await until(() => fixture.textContent.includes("互动与共同出席") === false, "加载中");
+    button("互动").click();
+    await until(() => fixture.textContent.includes("互动与共同出席"), "互动页签未打开");
+    await until(() => fixture.querySelector(".lvct-detail__timeline"), "时间线未渲染");
+    // 默认 20 条全显 → 月分组出现（当月 + 历史）
+    const monthHeads = () => [...fixture.querySelectorAll(".lvct-detail__month-head")].map((node) => node.textContent.trim());
+    assert(monthHeads().length >= 2 && monthHeads().every((text) => text.includes("月") && text.includes("（1）")), "月分组未按月显示计数");
+    // 历史上的今天：往年 09-28
+    await until(() => fixture.textContent.includes("去年今天聚了个餐"), "历史上的今天未显示");
+    // 日期范围过滤：只看 7 月
+    const dateInputs = [...fixture.querySelectorAll('input[aria-label^="互动"][aria-label$="日期"]')];
+    input(dateInputs[0], "2026-07-01");
+    input(dateInputs[1], "2026-07-31");
+    await until(() => !fixture.textContent.includes("八月的事"), "日期范围未排除八月");
+    assert(fixture.textContent.includes("七月的事"), "日期范围内条目丢失");
+    // 快捷项：最近 30 天（今天的事在范围内）
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "最近 30 天").click();
+    await until(() => fixture.textContent.includes("今天的事"), "最近 30 天快捷项未生效");
+    assert(!fixture.textContent.includes("七月的事"), "快捷项未排除范围外条目");
+    // 清除日期
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "清除日期").click();
+    await until(() => fixture.textContent.includes("七月的事"), "清除日期后未恢复全量");
+});
+
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {
     const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
         docId: settings.hostDocId,

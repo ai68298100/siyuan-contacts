@@ -17,6 +17,7 @@ import StatusNotice from "../StatusNotice.svelte";
     import { renderTemplate } from "../../domain/interaction-templates";
     import type { NoteTemplate } from "../../domain/interaction-templates";
     import TemplateManager from "./TemplateManager.svelte";
+    import { addReviewDays, groupByMonth, inDateRange, onThisDay } from "../../domain/date-review";
     import { toLocalDateKey } from "../../domain/interactions";
 
     let {
@@ -105,12 +106,36 @@ import StatusNotice from "../StatusNotice.svelte";
     let activitySearch = $state("");
     let activitySource = $state("");
     let activityLimit = $state(20);
+    // 日期回顾（F10）
+    let activityFrom = $state("");
+    let activityTo = $state("");
     const sourceLabels = { manual: "手动记录", diary: "笔记捕获", api: "外部联动" };
     const filteredTimeline = $derived.by(() => {
         const query = activitySearch.trim().toLowerCase();
-        return (insights?.timeline ?? []).filter((item) => (!activitySource || item.source === activitySource) &&
-            (!query || `${item.localDate} ${item.note ?? ""}`.toLowerCase().includes(query)));
+        return (insights?.timeline ?? [])
+            .filter((item) => inDateRange(item.localDate, activityFrom, activityTo))
+            .filter((item) => (!activitySource || item.source === activitySource) &&
+                (!query || `${item.localDate} ${item.note ?? ""}`.toLowerCase().includes(query)));
     });
+    const pagedTimeline = $derived(filteredTimeline.slice(0, activityLimit));
+    const monthGroups = $derived(groupByMonth(pagedTimeline));
+    const historyToday = $derived.by(() => {
+        const timeline = insights?.timeline ?? [];
+        return onThisDay(timeline, toLocalDateKey(new Date()));
+    });
+
+    function setQuickRange(days: number) {
+        const today = toLocalDateKey(new Date());
+        activityFrom = addReviewDays(today, -(days - 1));
+        activityTo = today;
+        activityLimit = 20;
+    }
+
+    function clearDateRange() {
+        activityFrom = "";
+        activityTo = "";
+        activityLimit = 20;
+    }
 
     async function deleteTimelineItem(eventId: string) {
         if (busy || !onDeleteInteraction) return;
@@ -559,6 +584,17 @@ import StatusNotice from "../StatusNotice.svelte";
 
     <section class="lvct-detail__section">
         <h4>互动与共同出席{insights ? `（共 ${insights.totalEvents} 条）` : ""}</h4>
+        {#if historyToday.length > 0}
+            <div class="lvct-detail__history" role="region" aria-label="历史上的今天">
+                <b>🗓 历史上的今天</b>
+                {#each historyToday as item (item.eventId)}
+                    <div class="lvct-detail__timeline-row">
+                        <span class="ft__on-surface">{item.localDate}</span>
+                        <span class="lvct-detail__timeline-note">{item.note || "互动"}</span>
+                    </div>
+                {/each}
+            </div>
+        {/if}
         <div class="lvct-detail__activity-filters">
             <input class="b3-text-field" type="search" aria-label="搜索互动备注或日期" placeholder="搜索备注或日期" bind:value={activitySearch} oninput={() => (activityLimit = 20)} />
             <select class="b3-select" aria-label="互动来源" bind:value={activitySource} onchange={() => (activityLimit = 20)}>
@@ -567,6 +603,16 @@ import StatusNotice from "../StatusNotice.svelte";
                 <option value="diary">笔记捕获</option>
                 <option value="api">外部联动</option>
             </select>
+        </div>
+        <div class="lvct-detail__activity-filters" aria-label="日期范围">
+            <input type="date" class="b3-text-field" aria-label="互动开始日期" bind:value={activityFrom} onchange={() => (activityLimit = 20)} />
+            <span class="ft__on-surface">~</span>
+            <input type="date" class="b3-text-field" aria-label="互动结束日期" bind:value={activityTo} onchange={() => (activityLimit = 20)} />
+            <button type="button" class="b3-button b3-button--outline" onclick={() => setQuickRange(30)}>最近 30 天</button>
+            <button type="button" class="b3-button b3-button--outline" onclick={() => setQuickRange(90)}>最近 90 天</button>
+            {#if activityFrom || activityTo}
+                <button type="button" class="b3-button b3-button--text" onclick={clearDateRange}>清除日期</button>
+            {/if}
         </div>
         {#if insights && insights.coAttendance.length > 0}
             <div class="lvct-strip__chips" style="margin-bottom: 6px;">
@@ -583,16 +629,19 @@ import StatusNotice from "../StatusNotice.svelte";
             </ViewState>
         {:else if filteredTimeline.length > 0}
             <div class="lvct-detail__timeline">
-                {#each filteredTimeline.slice(0, activityLimit) as item (item.eventId)}
-                    <div class="lvct-detail__timeline-row">
-                        <span class="ft__on-surface">{item.localDate}</span>
-                        <span class="lvct-detail__timeline-note">{item.note || "互动"}</span>
-                        <span class="lvct-detail__timeline-source">{sourceLabels[item.source]}</span>
-                        {#if item.groupSize > 1}<span class="lvct-chip">{item.groupSize} 人同场</span>{/if}
-                        {#if onDeleteInteraction}
-                            <button class="b3-button b3-button--text" title="删除这条互动" aria-label={`删除 ${item.localDate} 的互动`} disabled={busy} onclick={() => deleteTimelineItem(item.eventId)}>删除</button>
-                        {/if}
-                    </div>
+                {#each monthGroups as group (group.month)}
+                    <div class="lvct-detail__month-head">{group.label}（{group.items.length}）</div>
+                    {#each group.items as item (item.eventId)}
+                        <div class="lvct-detail__timeline-row">
+                            <span class="ft__on-surface">{item.localDate}</span>
+                            <span class="lvct-detail__timeline-note">{item.note || "互动"}</span>
+                            <span class="lvct-detail__timeline-source">{sourceLabels[item.source]}</span>
+                            {#if item.groupSize > 1}<span class="lvct-chip">{item.groupSize} 人同场</span>{/if}
+                            {#if onDeleteInteraction}
+                                <button class="b3-button b3-button--text" title="删除这条互动" aria-label={`删除 ${item.localDate} 的互动`} disabled={busy} onclick={() => deleteTimelineItem(item.eventId)}>删除</button>
+                            {/if}
+                        </div>
+                    {/each}
                 {/each}
             </div>
             <div class="lvct-detail__activity-more">
@@ -603,7 +652,7 @@ import StatusNotice from "../StatusNotice.svelte";
             </div>
         {:else if insights && insights.timeline.length > 0}
             <ViewState compact title="没有匹配的互动">
-                <button class="b3-button b3-button--outline" onclick={() => { activitySearch = ""; activitySource = ""; activityLimit = 20; }}>清除筛选</button>
+                <button class="b3-button b3-button--outline" onclick={() => { activitySearch = ""; activitySource = ""; activityFrom = ""; activityTo = ""; activityLimit = 20; }}>清除筛选</button>
             </ViewState>
         {:else}
             <ViewState compact title="还没有互动记录" description="从一次聊天或见面开始，记录你们的往来。">
