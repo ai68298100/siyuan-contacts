@@ -982,6 +982,56 @@ await test("人物联系节奏设置：显示当前规则，自定义/暂停/清
     await until(() => fixture.textContent.includes("已清除覆盖"), "清除提示未显示");
 });
 
+await test("今日行动清单：多原因单卡徽标，逾期跟进批量顺延到今天，空态", async () => {
+    const pad = (value) => String(value).padStart(2, "0");
+    const now = new Date();
+    const offsetDate = (days) => {
+        const date = new Date(now);
+        date.setDate(date.getDate() + days);
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    };
+    const todayKey = offsetDate(0);
+    const personA = { ...person, docId: "doc-a", name: "行动甲" };
+    const personB = { ...person, docId: "doc-b", name: "行动乙" };
+    let actions = [
+        { person: personA, bucket: "overdue", earliestDate: offsetDate(-3), reasons: [
+            { kind: "followup", bucket: "overdue", label: "跟进「问问面试」已逾期", dueDate: offsetDate(-3), followUpId: "fu-1" },
+            { kind: "stale", bucket: "stale", label: "60 天未联系（阈值 30 天）" },
+        ] },
+        { person: personB, bucket: "today", earliestDate: todayKey, reasons: [
+            { kind: "birthday", bucket: "today", label: "今天生日", dueDate: todayKey },
+        ] },
+    ];
+    const snoozeCalls = [];
+    const opened = [];
+    let shifted = false;
+    mounted = mount(DashboardView, { target: fixture, props: {
+        preferences: DEFAULT_VIEW_PREFERENCES,
+        onOpenDetail(p) { opened.push(p.docId); }, onOpenPeople() {}, onOpenGraph() {},
+        facade: { settings, loadDashboard: async () => ({
+            people: 2, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+            stale: [], neverContacted: 0, neverContactedItemIds: [],
+            followUps: [], actions: shifted ? [] : actions,
+        }), snoozeFollowUp: async (id, option, date) => { snoozeCalls.push([id, option, date]); shifted = true; } },
+    } });
+    await until(() => fixture.textContent.includes("今日行动"), "行动清单未渲染");
+    await until(() => fixture.querySelectorAll(".lvct-dash__actions .lvct-dash__row").length === 2, "行动卡数量错误");
+    const cardA = [...fixture.querySelectorAll(".lvct-dash__actions .lvct-dash__row")].find((node) => node.textContent.includes("行动甲"));
+    assert(cardA.textContent.includes("跟进「问问面试」已逾期") && cardA.textContent.includes("60 天未联系"), "多原因徽标未同卡展示");
+    assert(cardA.textContent.includes("行动乙") === false, "不同人物不应合并卡片");
+
+    // 批量顺延：把逾期跟进顺延到今天
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("1 条逾期跟进顺延到今天")).click();
+    await until(() => snoozeCalls.length === 1, "批量顺延未触发");
+    assert(snoozeCalls[0][0] === "fu-1" && snoozeCalls[0][1] === "custom" && snoozeCalls[0][2] === todayKey, "顺延参数错误");
+    await until(() => fixture.textContent.includes("今天没有需要处理的事"), "顺延后清单未清空");
+    assert(fixture.textContent.includes("已把 1 条逾期跟进顺延到今天"), "顺延成功提示未显示");
+
+    // 打开详情
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "浏览联系人").click();
+    assert(opened.length === 0, "空态不应打开详情");
+});
+
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {
     const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
         docId: settings.hostDocId,

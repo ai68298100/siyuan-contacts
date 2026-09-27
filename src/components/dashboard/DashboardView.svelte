@@ -1,7 +1,9 @@
 <script lang="ts">
     /** 首页仪表盘：统计 + 近期生日（公/农历）+ 久未联系 */
     import type { ContactsPluginFacade } from "../../types";
+    import { pickActions } from "../../services/dashboard";
     import type { DashboardData } from "../../services/dashboard";
+    import type { ActionCard } from "../../domain/action-list";
     import type { ContactSummary } from "../../domain/person";
     import type { ViewPreferences } from "../../domain/preferences";
     import { detectCheckinBridge } from "../../bridge/checkin";
@@ -135,6 +137,44 @@
             fuCustomDate = "";
         }, `已将「${title}」推迟到指定日期`);
 
+    // ---- 今日行动清单（F07） ----
+    let alBusy = $state(false);
+    let alError = $state("");
+    let alMessage = $state("");
+    const actions: ActionCard[] = $derived(pickActions(data));
+    const overdueFollowUpIds: string[] = $derived(actions.flatMap((card: ActionCard) =>
+        card.reasons
+            .filter((reason) => reason.kind === "followup" && reason.bucket === "overdue" && reason.followUpId)
+            .map((reason) => reason.followUpId as string)));
+    const overdueCount: number = $derived(overdueFollowUpIds.length);
+
+    async function postponeOverdueToToday() {
+        if (alBusy || overdueCount === 0) return;
+        alBusy = true;
+        alError = "";
+        alMessage = "";
+        const pad = (value: number) => String(value).padStart(2, "0");
+        const now = new Date();
+        const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        try {
+            let done = 0;
+            for (const id of overdueFollowUpIds) {
+                try {
+                    await facade.snoozeFollowUp(id, "custom", today);
+                    done += 1;
+                } catch (error) {
+                    console.warn("顺延单条逾期跟进失败", error);
+                }
+            }
+            alMessage = `已把 ${done} 条逾期跟进顺延到今天`;
+            await refresh();
+        } catch (error) {
+            alError = error instanceof Error ? error.message : String(error);
+        } finally {
+            alBusy = false;
+        }
+    }
+
     const bucketStyles: Record<string, string> = {
         today: "lvct-bucket--today",
         week: "lvct-bucket--week",
@@ -174,6 +214,44 @@
             <button class="lvct-dash__stat" onclick={onOpenGraph}><b>{data.relations}</b><span>关系</span></button>
             <button class="lvct-dash__stat" onclick={openBirthdayPeople}><b>{data.birthdaysThisWeek}</b><span>本周生日</span></button>
             <button class="lvct-dash__stat" onclick={openNeverContactedPeople}><b>{data.neverContacted}</b><span>从未互动</span></button>
+        </div>
+
+        <div class="lvct-home__card lvct-dash__actions">
+            <div class="lvct-dash__actions-head">
+                <h3>今日行动</h3>
+                <span class="ft__smaller ft__on-surface">生日 · 联系节奏 · 跟进事项</span>
+                <span style="flex:1"></span>
+                {#if overdueCount > 0}
+                    <button class="b3-button b3-button--outline" onclick={postponeOverdueToToday} disabled={alBusy}>
+                        {alBusy ? "顺延中…" : `把 ${overdueCount} 条逾期跟进顺延到今天`}
+                    </button>
+                {/if}
+            </div>
+            <StatusNotice message={alError ? `操作失败：${alError}` : ""} error />
+            <StatusNotice message={alMessage} onDismiss={() => (alMessage = "")} />
+            {#if actions.length === 0}
+                <ViewState compact icon="✅" title="今天没有需要处理的事" description="生日、联系节奏和跟进计划都安顿好了。">
+                    <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>浏览联系人</button>
+                </ViewState>
+            {:else}
+                <div class="lvct-dash__list">
+                    {#each actions as card (card.person.docId)}
+                        <div class="lvct-dash__row">
+                            <button class="lvct-dash__row-main" onclick={() => onOpenDetail(card.person)}>
+                                <b>{card.person.name}</b>
+                                <span class="lvct-dash__reasons">
+                                    {#each card.reasons as reason (reason.kind + (reason.followUpId ?? ""))}
+                                        <span class="lvct-chip lvct-action-chip lvct-action-chip--{reason.bucket}">{reason.label}</span>
+                                    {/each}
+                                </span>
+                            </button>
+                            <button class="b3-button b3-button--outline lvct-dash__quick-button" onclick={() => onOpenDetail(card.person)}>
+                                {card.bucket === "stale" ? "去看看" : "处理"}
+                            </button>
+                        </div>
+                    {/each}
+                </div>
+            {/if}
         </div>
 
         <div class="lvct-dash__grid">

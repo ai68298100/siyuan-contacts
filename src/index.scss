@@ -416,6 +416,38 @@
     opacity: .75;
 }
 
+// F07 今日行动清单
+.lvct-dash__actions {
+    margin-top: var(--lvct-sp-3);
+}
+
+.lvct-dash__actions-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--lvct-sp-2);
+
+    h3 { margin: 0; }
+}
+
+.lvct-dash__reasons {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.lvct-action-chip {
+    font-size: var(--lvct-fs-caption);
+    padding: 1px 8px;
+    border-radius: var(--lvct-r-pill);
+}
+
+.lvct-action-chip--overdue { background: var(--lvct-danger-soft); color: var(--lvct-danger); }
+.lvct-action-chip--today { background: var(--lvct-highlight-soft); color: var(--lvct-highlight); }
+.lvct-action-chip--week { background: var(--lvct-accent-soft); color: var(--lvct-accent); }
+.lvct-action-chip--stale { background: var(--lvct-bg-surface); color: var(--lvct-text-2); }
+
 // F04 视图菜单条目
 .lvct-people__viewsmenu-empty {
     margin: 0;

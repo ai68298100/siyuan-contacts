@@ -11,6 +11,8 @@ import { projectOpenFollowUps } from "../domain/followups";
 import type { FollowUpBucket, FollowUpItem } from "../domain/followups";
 import { staleContacts } from "../domain/interactions";
 import { toLocalDateKey } from "../domain/interactions";
+import { buildActionCards } from "../domain/action-list";
+import type { ActionCard, ActionPersonInput } from "../domain/action-list";
 import { upcomingBirthdays } from "../domain/occasions";
 import type { UpcomingBirthday } from "../domain/occasions";
 import type { StalenessInfo } from "../domain/interactions";
@@ -46,6 +48,13 @@ export interface DashboardData {
     neverContactedItemIds: string[];
     /** 待办跟进（F05）：逾期/今天/未来 7 天，open 状态 */
     followUps: FollowUpCard[];
+    /** 今日/本周行动清单（F07）：生日+节奏+跟进三源按人聚合的只读投影 */
+    actions: ActionCard[];
+}
+
+/** 供组件派生使用的取值函数：把可空数据收窄为行动卡列表 */
+export function pickActions(data: DashboardData | null): ActionCard[] {
+    return data?.actions ?? [];
 }
 export async function loadDashboard(
     plugin: Plugin,
@@ -81,6 +90,25 @@ export async function loadDashboard(
         ...buckets.upcoming,
     ].slice(0, 12).map(withBucket);
 
+    // 行动清单（F07）：生日 + 节奏 + 跟进三源按人聚合
+    const followUpsByDoc = new Map<string, { id: string; title: string; dueDate: string }[]>();
+    for (const card of followUps) {
+        if (!card.reachable) continue;
+        const list = followUpsByDoc.get(card.item.personDocId) ?? [];
+        list.push({ id: card.item.id, title: card.item.title, dueDate: card.item.dueDate });
+        followUpsByDoc.set(card.item.personDocId, list);
+    }
+    const inputs: ActionPersonInput[] = people.map((person) => {
+        const birthday = birthdays.find((item) => item.person.docId === person.docId);
+        const staleInfo = staleAll.find((info) => info.person.docId === person.docId);
+        return {
+            person,
+            ...(birthday ? { birthdayDaysUntil: birthday.projection.daysUntil, birthdayDate: toLocalDateKey(birthday.projection.date) } : {}),
+            ...(staleInfo ? { lastDaysAgo: staleInfo.lastDaysAgo, staleThreshold: cadences[person.docId]?.days ?? options.staleThresholdDays } : {}),
+            followUps: followUpsByDoc.get(person.docId) ?? [],
+        };
+    });
+
     return {
         people: people.length,
         relations: Math.round(people.reduce((sum, person) => sum + person.relatedItemIds.length, 0) / 2),
@@ -90,5 +118,6 @@ export async function loadDashboard(
         neverContacted: neverContactedPeople.length,
         neverContactedItemIds: neverContactedPeople.map((item) => item.person.itemId),
         followUps,
+        actions: buildActionCards(inputs, today),
     };
 }
