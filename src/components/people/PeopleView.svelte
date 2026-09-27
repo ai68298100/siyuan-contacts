@@ -786,6 +786,7 @@
         <LvctDialog title="新建联系人" onClose={() => (adding = false)}>
             <AddPersonDialog
                 {settings}
+                {i18n}
                 onCreated={() => refresh()}
                 onClose={() => (adding = false)}
             />

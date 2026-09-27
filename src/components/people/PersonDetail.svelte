@@ -771,6 +771,7 @@ import StatusNotice from "../StatusNotice.svelte";
     <LvctDialog title={`编辑资料 · ${current.name}`} onClose={() => (editing = false)}>
         <PersonEditDialog
             {settings}
+            {i18n}
             person={current}
             onSaved={refreshAfterEdit}
             onClose={() => (editing = false)}
