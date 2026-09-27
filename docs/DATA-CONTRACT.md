@@ -79,9 +79,13 @@
 | 键 | 版本 | 内容 |
 |---|---|---|
 | `contacts-settings.json` | 1 | 四锚点 ID + fieldMap + 初始化时间 |
-| `view-preferences.json` | （M2） | 各视图排序/筛选/列显隐 |
+| `view-preferences.json` | 1 | 工作台默认页面、联系人默认排序、启动行为、生日窗口、久未联系阈值、AI 入口开关 |
 | `interaction-events.json` | （M4） | 互动事件（只追加）：`{id, personDocId, occurredAt, localDate, source, externalRef?, note}`；`source+externalRef` 幂等；删除写墓碑 |
 | `bridge-state.json` | （M4） | 打卡联动状态机（unsupported/pending/ready/failed） |
+
+设置页的「导出互动事件 JSON」生成一次性导出包：
+`{schemaVersion: 1, exportedAt, events, tombstones}`。导出包不回写插件存储，
+`events` 与 `tombstones` 保留当前归一化后的审计事实，后续迁移工具可据此恢复事件和删除墓碑。
 
 ## 4. 性能预算（随人数增长的读取策略）
 

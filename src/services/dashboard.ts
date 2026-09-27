@@ -10,7 +10,6 @@ import { upcomingBirthdays } from "../domain/occasions";
 import type { UpcomingBirthday } from "../domain/occasions";
 import type { StalenessInfo } from "../domain/interactions";
 import type { ContactsSettings } from "../domain/model";
-import type { ContactSummary } from "../domain/person";
 
 export interface DashboardOptions {
     /** 多少天未互动算"久未联系" */
@@ -18,7 +17,6 @@ export interface DashboardOptions {
     /** 生日提醒窗口（天） */
     birthdayWindowDays: number;
 }
-
 export const DEFAULT_DASHBOARD_OPTIONS: DashboardOptions = {
     staleThresholdDays: 30,
     birthdayWindowDays: 30,
@@ -32,8 +30,8 @@ export interface DashboardData {
     birthdaysThisWeek: number;
     stale: StalenessInfo[];
     neverContacted: number;
+    neverContactedItemIds: string[];
 }
-
 export async function loadDashboard(
     plugin: Plugin,
     settings: ContactsSettings,
@@ -45,17 +43,15 @@ export async function loadDashboard(
     ]);
     const birthdays: UpcomingBirthday[] = upcomingBirthdays(people)
         .filter((item) => item.projection.daysUntil <= options.birthdayWindowDays);
+    const staleAll = staleContacts(store, people, options.staleThresholdDays);
+    const neverContactedPeople = staleAll.filter((item) => item.lastDaysAgo === undefined);
     return {
         people: people.length,
         relations: Math.round(people.reduce((sum, person) => sum + person.relatedItemIds.length, 0) / 2),
         birthdays,
         birthdaysThisWeek: birthdays.filter((item) => item.bucket === "today" || item.bucket === "week").length,
-        stale: staleContacts(store, people, options.staleThresholdDays).slice(0, 20),
-        neverContacted: countNeverContacted(store.events.map((event) => event.personDocId), people),
+        stale: staleAll.slice(0, 20),
+        neverContacted: neverContactedPeople.length,
+        neverContactedItemIds: neverContactedPeople.map((item) => item.person.itemId),
     };
-}
-
-function countNeverContacted(contactedDocIds: readonly string[], people: readonly ContactSummary[]): number {
-    const contacted = new Set(contactedDocIds);
-    return people.filter((person) => !contacted.has(person.docId)).length;
 }

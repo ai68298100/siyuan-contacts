@@ -118,9 +118,11 @@ export async function importVcfContacts(
 }
 
 /** 名册 → vCard 3.0 文本（微信号无标准 vCard 属性，不导出） */
-export async function exportVcfText(settings: ContactsSettings): Promise<string> {
+export async function exportVcfText(settings: ContactsSettings, selectedItemIds?: readonly string[]): Promise<string> {
     const people = await getRoster(settings);
-    const contacts: VCardContact[] = people.map((person) => ({
+    const selected = selectedItemIds ? new Set(selectedItemIds) : null;
+    const exportPeople = selected ? people.filter((person) => selected.has(person.itemId)) : people;
+    const contacts: VCardContact[] = exportPeople.map((person) => ({
         name: person.name,
         phone: person.phone,
         email: person.email,

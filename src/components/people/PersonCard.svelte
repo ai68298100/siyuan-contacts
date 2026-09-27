@@ -5,9 +5,13 @@
     let {
         person,
         onOpen,
+        selected = false,
+        onToggleSelected,
     }: {
         person: ContactSummary;
         onOpen: (person: ContactSummary) => void;
+        selected?: boolean;
+        onToggleSelected?: (selected: boolean) => void;
     } = $props();
 
     function telHref(phone: string): string {
@@ -21,6 +25,16 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div class="lvct-person-card" onclick={() => onOpen(person)}>
+    {#if onToggleSelected}
+        <input
+            class="lvct-person-card__select"
+            type="checkbox"
+            aria-label={`选择 ${person.name}`}
+            checked={selected}
+            onclick={(event) => event.stopPropagation()}
+            onchange={(event) => onToggleSelected?.((event.currentTarget as HTMLInputElement).checked)}
+        />
+    {/if}
     <div class="lvct-person-card__avatar" data-group={person.group || "未分组"}>
         {person.name.slice(0, 1)}
     </div>

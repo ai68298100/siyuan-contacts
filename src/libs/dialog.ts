@@ -33,11 +33,13 @@ export const svelteDialog = (args: {
     callback?: () => void;
 }) => {
     let container = document.createElement("div");
+    container.className = "lvct-dialog-root";
     container.style.display = "contents";
 
+    let closeDialog: (() => void) | undefined;
     let componentInstance = mount(args.component, {
         target: container,
-        props: args.props || {}
+        props: { ...args.props, onClose: () => closeDialog?.() }
     });
 
     const { dialog, close } = simpleDialog({
@@ -48,6 +50,8 @@ export const svelteDialog = (args: {
             if (args.callback) args.callback();
         }
     });
+
+    closeDialog = close;
 
     return {
         component: componentInstance,

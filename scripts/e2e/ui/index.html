@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>小驴人脉 · 隔离 UI 回归</title>
+<style>
+    /* 模拟思源宿主主题，生产组件仍消费自己的语义令牌。 */
+    :root {
+        --b3-theme-background: #fff; --b3-theme-surface: #f5f5f5;
+        --b3-theme-on-background: #222; --b3-theme-on-surface: #444;
+        --b3-theme-on-surface-light: #666; --b3-theme-primary: #6366f1;
+        --b3-border-color: #ddd; --b3-list-hover: #eee; --b3-theme-error: #c00;
+    }
+</style></head>
+<body>
+    <h1>隔离 UI 回归（仅内存测试数据）</h1>
+    <pre id="results">运行中…</pre>
+    <div id="fixture" class="lvct-tab-root" style="height:720px;width:1000px"></div>
+    <script type="module" src="/scripts/e2e/ui/smoke.js"></script>
+</body>
+</html>

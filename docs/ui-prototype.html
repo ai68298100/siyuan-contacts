@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小驴人脉 · UI 原型与设计规范 v1.0</title>
+<style>
+/* ============================================================
+   设计令牌 (Design Tokens) —— 明暗双主题
+   与思源 b3 变量的映射关系见「设计规范 · 色彩」一节
+   ============================================================ */
+:root, [data-theme="dark"] {
+  --bg-app: #101216;
+  --bg-base: #16181d;
+  --bg-surface: #1c1f26;
+  --bg-elevated: #23262f;
+  --bg-hover: rgba(255,255,255,.05);
+  --bg-active: rgba(255,255,255,.09);
+  --border-subtle: rgba(255,255,255,.07);
+  --border-strong: rgba(255,255,255,.14);
+  --text-1: #e8eaee;
+  --text-2: #a8adb8;
+  --text-3: #6b7180;
+  --accent: #7c7ff2;
+  --accent-strong: #6366f1;
+  --accent-soft: rgba(124,127,242,.14);
+  --accent-grad: linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);
+  --highlight: #f59e0b;
+  --highlight-soft: rgba(245,158,11,.14);
+  --success: #34c98e;
+  --success-soft: rgba(52,201,142,.14);
+  --danger: #f26d6d;
+  --danger-soft: rgba(242,109,109,.13);
+  --info: #54a8f5;
+  --info-soft: rgba(84,168,245,.14);
+  --g-family: #f2707a; --g-friend: #34c98e; --g-work: #54a8f5; --g-school: #f5a54b; --g-other: #8b91a0;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.3);
+  --shadow-2: 0 4px 16px rgba(0,0,0,.35);
+  --shadow-3: 0 12px 40px rgba(0,0,0,.5);
+  --mask: rgba(8,9,12,.6);
+}
+[data-theme="light"] {
+  --bg-app: #eef0f4;
+  --bg-base: #f6f7fa;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-hover: rgba(15,23,42,.045);
+  --bg-active: rgba(15,23,42,.08);
+  --border-subtle: rgba(15,23,42,.08);
+  --border-strong: rgba(15,23,42,.16);
+  --text-1: #1d2129;
+  --text-2: #4e5566;
+  --text-3: #8a91a1;
+  --accent: #5b5ee6;
+  --accent-strong: #4f51d9;
+  --accent-soft: rgba(91,94,230,.1);
+  --accent-grad: linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);
+  --highlight: #d97706;
+  --highlight-soft: rgba(217,119,6,.12);
+  --success: #1a9e6e;
+  --success-soft: rgba(26,158,110,.12);
+  --danger: #dc4446;
+  --danger-soft: rgba(220,68,70,.1);
+  --info: #2b87db;
+  --info-soft: rgba(43,135,219,.12);
+  --g-family: #e05260; --g-friend: #1a9e6e; --g-work: #2b87db; --g-school: #d9822b; --g-other: #7a8194;
+  --shadow-1: 0 1px 2px rgba(15,23,42,.06);
+  --shadow-2: 0 4px 16px rgba(15,23,42,.08);
+  --shadow-3: 0 12px 40px rgba(15,23,42,.16);
+  --mask: rgba(15,23,42,.4);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { font-size:14px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--bg-app); color: var(--text-1);
+  -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, select, textarea { font-family: inherit; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ============ 原型浏览器的骨架 ============ */
+.proto-shell { display: flex; min-height: 100vh; }
+.proto-nav {
+  width: 232px; flex-shrink: 0; padding: 20px 12px;
+  background: var(--bg-base); border-right: 1px solid var(--border-subtle);
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+.proto-nav__brand { display:flex; align-items:center; gap:10px; padding: 0 10px 16px; }
+.proto-nav__logo { width:34px; height:34px; border-radius:9px; background: var(--accent-grad); display:grid; place-items:center; font-size:17px; box-shadow: var(--shadow-2); position:relative; }
+.proto-nav__logo::after { content:""; position:absolute; right:-2px; top:-2px; width:8px; height:8px; border-radius:50%; background: var(--highlight); border:2px solid var(--bg-base); }
+.proto-nav__brand b { font-size: 14.5px; display:block; }
+.proto-nav__brand span { font-size: 11px; color: var(--text-3); }
+.proto-nav__sec { font-size: 11px; color: var(--text-3); letter-spacing:.08em; padding: 16px 10px 6px; text-transform: uppercase; }
+.proto-nav__item {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  padding: 7px 10px; border-radius: 8px; font-size: 13px; color: var(--text-2);
+  transition: background .12s, color .12s;
+}
+.proto-nav__item:hover { background: var(--bg-hover); color: var(--text-1); }
+.proto-nav__item.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.proto-nav__item .ic { width: 18px; text-align:center; }
+.proto-main { flex: 1; min-width: 0; padding: 28px 36px 80px; }
+.proto-topbar { display:flex; align-items:center; gap:14px; margin-bottom: 22px; }
+.proto-topbar h1 { font-size: 20px; font-weight: 700; }
+.proto-topbar .sub { color: var(--text-3); font-size: 12.5px; margin-top: 3px; }
+.proto-topbar .sp { flex:1; }
+.seg { display:inline-flex; background: var(--bg-surface); border:1px solid var(--border-subtle); border-radius: 9px; padding: 3px; gap:2px; }
+.seg button { padding: 5px 12px; border-radius: 7px; font-size: 12.5px; color: var(--text-2); transition: all .12s; }
+.seg button.on { background: var(--bg-active); color: var(--text-1); font-weight: 600; box-shadow: var(--shadow-1); }
+.screen { display:none; }
+.screen.on { display:block; animation: fadeUp .25s ease; }
+@keyframes fadeUp { from { opacity:0; transform: translateY(6px);} to { opacity:1; transform:none;} }
+.note-box {
+  background: var(--accent-soft); border: 1px solid var(--accent-soft);
+  border-left: 3px solid var(--accent); border-radius: 10px;
+  padding: 12px 16px; font-size: 13px; color: var(--text-2); line-height: 1.7; margin-bottom: 20px;
+}
+.note-box b { color: var(--text-1); }
+
+/* ============ 模拟设备外框 ============ */
+.frame {
+  background: var(--bg-base); border: 1px solid var(--border-subtle);
+  border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-2); margin-bottom: 28px;
+}
+.frame__bar { display:flex; align-items:center; gap:8px; padding: 10px 14px; border-bottom:1px solid var(--border-subtle); background: var(--bg-surface); }
+.frame__dot { width:10px; height:10px; border-radius:50%; }
+.frame__title { font-size:12px; color:var(--text-3); margin-left:6px; }
+.frame__body { position: relative; }
+
+/* ============ 应用通用元素（组件规范的活样例） ============ */
+.app { display:flex; min-height: 620px; background: var(--bg-base); }
+.app__side {
+  width: 196px; flex-shrink:0; background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle); padding: 14px 10px; display:flex; flex-direction:column;
+}
+.app__side-brand { display:flex; align-items:center; gap:9px; padding: 2px 8px 14px; }
+.app__side-brand .lg { width:28px; height:28px; border-radius:8px; background: var(--accent-grad); display:grid; place-items:center; font-size:14px; }
+.app__side-brand b { font-size:13.5px; }
+.side-item {
+  display:flex; align-items:center; gap:9px; padding: 7px 10px; border-radius: 8px;
+  font-size: 13px; color: var(--text-2); width:100%; text-align:left; transition: all .12s; position: relative;
+}
+.side-item:hover { background: var(--bg-hover); color: var(--text-1); }
+.side-item.on { background: var(--accent-soft); color: var(--accent); font-weight:600; }
+.side-item .badge { margin-left:auto; }
+.side-sec { font-size:11px; color:var(--text-3); padding: 14px 10px 5px; letter-spacing:.06em; }
+.app__main { flex:1; min-width:0; display:flex; flex-direction:column; }
+.app__head {
+  display:flex; align-items:center; gap:12px; padding: 14px 22px;
+  border-bottom: 1px solid var(--border-subtle); background: var(--bg-base);
+}
+.app__head h2 { font-size: 16px; font-weight: 700; }
+.app__body { padding: 20px 22px; flex:1; overflow-y:auto; }
+
+.btn {
+  display:inline-flex; align-items:center; gap:6px; padding: 7px 14px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; color: var(--text-1);
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  transition: all .12s; white-space: nowrap;
+}
+.btn:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+.btn--primary { background: var(--accent-grad); border: none; color:#fff; box-shadow: var(--shadow-1); }
+.btn--primary:hover { filter: brightness(1.08); background: var(--accent-grad); }
+.btn--ghost { background: transparent; border-color: transparent; color: var(--text-2); }
+.btn--ghost:hover { background: var(--bg-hover); color: var(--text-1); }
+.btn--danger { color: var(--danger); }
+.btn--danger:hover { background: var(--danger-soft); border-color: var(--danger-soft); }
+.btn--sm { padding: 4px 10px; font-size: 12px; border-radius: 7px; }
+.btn--icon { padding: 7px; }
+.btn:disabled { opacity:.45; cursor:not-allowed; }
+
+.input {
+  display:flex; align-items:center; gap:8px; background: var(--bg-surface);
+  border:1px solid var(--border-subtle); border-radius: 9px; padding: 7px 12px;
+  transition: border-color .12s, box-shadow .12s; font-size:13px;
+}
+.input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.input input { border:none; outline:none; background:none; color: var(--text-1); width:100%; font-size:13px; }
+.input input::placeholder { color: var(--text-3); }
+
+.chip {
+  display:inline-flex; align-items:center; gap:5px; padding: 2px 9px; border-radius: 999px;
+  font-size: 11.5px; font-weight:500; background: var(--bg-active); color: var(--text-2); white-space:nowrap;
+}
+.chip--accent { background: var(--accent-soft); color: var(--accent); }
+.chip--hl { background: var(--highlight-soft); color: var(--highlight); }
+.chip--ok { background: var(--success-soft); color: var(--success); }
+.chip--danger { background: var(--danger-soft); color: var(--danger); }
+.chip--info { background: var(--info-soft); color: var(--info); }
+.chip .dot { width:6px; height:6px; border-radius:50%; }
+
+.avatar {
+  width: 40px; height: 40px; border-radius: 12px; display:grid; place-items:center;
+  font-weight: 700; font-size: 15px; color:#fff; flex-shrink:0;
+}
+.avatar--sm { width: 30px; height:30px; border-radius: 9px; font-size: 12px; }
+.avatar--lg { width: 56px; height:56px; border-radius: 16px; font-size: 20px; }
+.av-family { background: linear-gradient(135deg, var(--g-family), color-mix(in srgb, var(--g-family) 60%, #000 8%)); }
+.av-friend { background: linear-gradient(135deg, var(--g-friend), color-mix(in srgb, var(--g-friend) 60%, #000 12%)); }
+.av-work { background: linear-gradient(135deg, var(--g-work), color-mix(in srgb, var(--g-work) 60%, #000 12%)); }
+.av-school { background: linear-gradient(135deg, var(--g-school), color-mix(in srgb, var(--g-school) 65%, #000 8%)); }
+.av-other { background: linear-gradient(135deg, var(--g-other), color-mix(in srgb, var(--g-other) 65%, #000 12%)); }
+
+.card {
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: 13px; box-shadow: var(--shadow-1);
+}
+.card--pad { padding: 16px; }
+
+.empty {
+  display:flex; flex-direction:column; align-items:center; gap:10px; padding: 44px 20px;
+  color: var(--text-3); text-align:center;
+}
+.empty .ic { font-size: 34px; opacity:.7; }
+.empty b { color: var(--text-2); font-size: 14px; }
+.empty p { font-size: 12.5px; line-height: 1.7; max-width: 340px; }
+
+.skl { border-radius: 7px; background: linear-gradient(90deg, var(--bg-active) 25%, var(--bg-hover) 50%, var(--bg-active) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.tabs { display:flex; gap:2px; border-bottom: 1px solid var(--border-subtle); }
+.tabs button {
+  padding: 9px 14px; font-size: 13px; color: var(--text-2); position: relative; transition: color .12s;
+}
+.tabs button:hover { color: var(--text-1); }
+.tabs button.on { color: var(--accent); font-weight: 600; }
+.tabs button.on::after { content:""; position:absolute; left:12px; right:12px; bottom:-1px; height:2px; border-radius:2px; background: var(--accent); }
+
+.field-row { display:flex; align-items:flex-start; gap:12px; padding: 9px 0; font-size: 13px; }
+.field-row dt { width: 76px; flex-shrink:0; color: var(--text-3); padding-top:1px; }
+.field-row dd { flex:1; color: var(--text-1); line-height:1.6; }
+
+.progress { height: 6px; border-radius: 3px; background: var(--bg-active); overflow:hidden; }
+.progress i { display:block; height:100%; border-radius:3px; background: var(--accent-grad); }
+
+/* ============ 首页仪表盘 ============ */
+.stat-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+.stat { padding: 15px 16px; position:relative; overflow:hidden; transition: transform .15s, box-shadow .15s; }
+.stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+.stat .lb { font-size: 12px; color: var(--text-3); display:flex; align-items:center; gap:6px; }
+.stat .num { font-size: 27px; font-weight: 700; margin-top: 7px; font-variant-numeric: tabular-nums; }
+.stat .ft { font-size: 11.5px; color: var(--text-3); margin-top: 4px; }
+.stat .glow { position:absolute; right:-18px; top:-18px; width:74px; height:74px; border-radius:50%; opacity:.13; }
+.dash-grid { display:grid; grid-template-columns: 1.25fr 1fr; gap: 14px; }
+.panel-h { display:flex; align-items:center; gap:8px; padding: 14px 16px 10px; }
+.panel-h b { font-size: 13.5px; }
+.panel-h .sp { flex:1; }
+.bday-row, .stale-row { display:flex; align-items:center; gap:11px; padding: 9px 16px; transition: background .12s; cursor:pointer; }
+.bday-row:hover, .stale-row:hover { background: var(--bg-hover); }
+.bday-row .nm, .stale-row .nm { font-size: 13px; font-weight: 500; }
+.bday-row .dt, .stale-row .dt { font-size: 11.5px; color: var(--text-3); margin-top: 1px; }
+.bday-row .sp, .stale-row .sp { flex:1; }
+
+/* ============ 联系人列表 ============ */
+.people-toolbar { display:flex; align-items:center; gap:10px; flex-wrap: wrap; }
+.people-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(228px, 1fr)); gap: 13px; margin-top: 16px; }
+.pcard { padding: 15px; cursor:pointer; transition: transform .15s, box-shadow .15s, border-color .15s; position:relative; }
+.pcard:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--border-strong); }
+.pcard__top { display:flex; align-items:center; gap:11px; }
+.pcard__nm { font-size: 14px; font-weight: 600; }
+.pcard__sub { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+.pcard__meta { margin-top: 12px; display:flex; flex-direction:column; gap:6px; font-size: 12px; color: var(--text-2); }
+.pcard__meta .r { display:flex; align-items:center; gap:7px; }
+.pcard__meta .r .ic { width:15px; text-align:center; opacity:.7; }
+.pcard__tags { margin-top: 11px; display:flex; gap:5px; flex-wrap:wrap; }
+.pcard__fav { position:absolute; top:11px; right:11px; opacity:0; transition: opacity .12s; color: var(--text-3); }
+.pcard:hover .pcard__fav { opacity:1; }
+.tbl { width:100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { text-align:left; padding: 10px 14px; font-size: 11.5px; color: var(--text-3); font-weight: 600; letter-spacing:.04em; border-bottom: 1px solid var(--border-subtle); }
+.tbl td { padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); color: var(--text-2); }
+.tbl tbody tr { cursor:pointer; transition: background .1s; }
+.tbl tbody tr:hover { background: var(--bg-hover); }
+.tbl .nm-cell { display:flex; align-items:center; gap:10px; color: var(--text-1); font-weight:500; }
+
+/* ============ 图谱 ============ */
+.graph-wrap { position:relative; height: 480px; background: radial-gradient(ellipse at center, var(--bg-surface) 0%, var(--bg-base) 78%); overflow:hidden; border-radius: 0 0 15px 15px; }
+.graph-fab { position:absolute; right:14px; bottom:14px; display:flex; flex-direction:column; gap:6px; }
+.graph-fab .btn { box-shadow: var(--shadow-2); }
+.graph-tip {
+  position:absolute; background: var(--bg-elevated); border:1px solid var(--border-strong);
+  border-radius: 10px; padding: 10px 13px; box-shadow: var(--shadow-3); font-size:12px; pointer-events:none;
+}
+.graph-cap {
+  position:absolute; top:12px; left:50%; transform:translateX(-50%);
+  background: var(--highlight-soft); color: var(--highlight); border:1px solid var(--highlight-soft);
+  padding: 5px 13px; border-radius: 999px; font-size: 12px; display:flex; align-items:center; gap:7px;
+}
+
+/* ============ 弹窗 / 侧栏详情 ============ */
+.mask { position:absolute; inset:0; background: var(--mask); display:grid; place-items:center; backdrop-filter: blur(2px); z-index: 10; }
+.dialog {
+  width: 560px; max-width: 92%; background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: 15px; box-shadow: var(--shadow-3); overflow:hidden; animation: pop .2s ease;
+}
+@keyframes pop { from { opacity:0; transform: scale(.96) translateY(8px);} to { opacity:1; transform:none;} }
+.dialog__h { display:flex; align-items:center; gap:10px; padding: 15px 18px 12px; }
+.dialog__h b { font-size: 15px; }
+.dialog__h .sp { flex:1; }
+.dialog__b { padding: 4px 18px 16px; max-height: 480px; overflow-y:auto; }
+.dialog__f { display:flex; align-items:center; gap:9px; padding: 13px 18px; border-top: 1px solid var(--border-subtle); }
+.dialog__f .sp { flex:1; }
+.peek {
+  position:absolute; top:0; right:0; bottom:0; width: 400px; background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle); box-shadow: var(--shadow-3);
+  display:flex; flex-direction:column; animation: slideIn .22s ease; z-index: 10;
+}
+@keyframes slideIn { from { transform: translateX(30px); opacity:0;} to { transform:none; opacity:1;} }
+.peek__h { padding: 18px 18px 14px; border-bottom: 1px solid var(--border-subtle); position:relative; }
+.peek__b { flex:1; overflow-y:auto; padding: 14px 18px; }
+.peek__f { padding: 12px 18px; border-top: 1px solid var(--border-subtle); display:flex; gap:9px; }
+.icon-btn { width:28px; height:28px; border-radius:7px; display:grid; place-items:center; color: var(--text-3); transition: all .12s; }
+.icon-btn:hover { background: var(--bg-hover); color: var(--text-1); }
+
+/* 步骤条 */
+.steps { display:flex; align-items:center; gap:8px; font-size:12px; color: var(--text-3); }
+.steps .st { display:flex; align-items:center; gap:6px; }
+.steps .st i { width:20px; height:20px; border-radius:50%; display:grid; place-items:center; font-size:11px; background: var(--bg-active); font-style:normal; }
+.steps .st.on { color: var(--accent); font-weight:600; }
+.steps .st.on i { background: var(--accent-grad); color:#fff; }
+.steps .st.done i { background: var(--success); color:#fff; }
+.steps .ln { flex:1; height:1px; background: var(--border-strong); min-width: 16px; }
+
+/* 捕获弹窗列表 */
+.pick-row { display:flex; align-items:center; gap:10px; padding: 8px 10px; border-radius: 9px; transition: background .1s; }
+.pick-row:hover { background: var(--bg-hover); }
+.pick-row .nm { font-size: 13px; font-weight:500; }
+.pick-row .sb { font-size: 11.5px; color: var(--text-3); }
+.pick-row .sp { flex:1; }
+.checkbox { width:17px; height:17px; border-radius:5px; border:1.5px solid var(--border-strong); display:grid; place-items:center; color:#fff; font-size:11px; transition: all .12s; flex-shrink:0; }
+.checkbox.on { background: var(--accent); border-color: var(--accent); }
+
+/* ============ 设置页 ============ */
+.set-layout { display:flex; min-height: 560px; }
+.set-nav { width: 176px; flex-shrink:0; padding: 18px 10px; border-right: 1px solid var(--border-subtle); }
+.set-nav .side-item { margin-bottom: 2px; }
+.set-body { flex:1; padding: 24px 30px; max-width: 640px; }
+.set-body h3 { font-size: 16px; margin-bottom: 4px; }
+.set-body .desc { font-size: 12.5px; color: var(--text-3); margin-bottom: 20px; line-height:1.6; }
+.set-group { margin-bottom: 26px; }
+.set-group__t { font-size: 12px; font-weight: 600; color: var(--text-3); letter-spacing:.05em; margin-bottom: 10px; }
+.set-row { display:flex; align-items:center; gap:14px; padding: 13px 0; border-bottom: 1px solid var(--border-subtle); }
+.set-row:last-child { border-bottom: none; }
+.set-row .tt { font-size: 13.5px; font-weight: 500; }
+.set-row .ds { font-size: 12px; color: var(--text-3); margin-top: 2px; line-height: 1.55; }
+.set-row .sp { flex:1; }
+.switch { width: 36px; height: 20px; border-radius: 999px; background: var(--bg-active); position:relative; transition: background .15s; flex-shrink:0; }
+.switch::after { content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition: transform .15s; box-shadow: var(--shadow-1); }
+.switch.on { background: var(--accent); }
+.switch.on::after { transform: translateX(16px); }
+.select-mock { display:inline-flex; align-items:center; gap:7px; padding: 6px 11px; border-radius: 8px; border:1px solid var(--border-subtle); background: var(--bg-surface); font-size: 12.5px; color: var(--text-2); }
+
+/* ============ 向导 ============ */
+.wizard { display:flex; flex-direction:column; align-items:center; padding: 52px 30px; text-align:center; }
+.wizard .logo { width:64px; height:64px; border-radius:18px; background: var(--accent-grad); display:grid; place-items:center; font-size:30px; box-shadow: var(--shadow-3); position:relative; margin-bottom: 18px; }
+.wizard .logo::after { content:""; position:absolute; right:-3px; top:-3px; width:14px; height:14px; border-radius:50%; background: var(--highlight); border:3px solid var(--bg-base); }
+.wizard h2 { font-size: 20px; margin-bottom: 8px; }
+.wizard p { color: var(--text-2); font-size: 13px; line-height: 1.8; max-width: 420px; }
+.wizard .input { width: 300px; margin: 18px 0 14px; }
+.wlog { width: 380px; text-align:left; background: var(--bg-base); border:1px solid var(--border-subtle); border-radius: 10px; padding: 12px 14px; font-size: 12px; color: var(--text-2); font-family: ui-monospace, Consolas, monospace; line-height: 1.9; margin-top: 16px; }
+.wlog .ok { color: var(--success); }
+
+/* ============ 文档档案条 ============ */
+.doc-mock { padding: 0; background: var(--bg-base); }
+.doc-head { padding: 26px 40px 0; }
+.doc-title { font-size: 26px; font-weight: 700; }
+.doc-panel {
+  margin: 16px 40px; padding: 14px 18px; display:flex; align-items:center; gap:14px;
+  border-radius: 13px; background: var(--bg-surface); border:1px solid var(--border-subtle); box-shadow: var(--shadow-1);
+}
+.doc-panel .meta { display:flex; gap:16px; font-size: 12px; color: var(--text-2); flex-wrap:wrap; }
+.doc-panel .meta span { display:flex; align-items:center; gap:5px; }
+.doc-body { padding: 6px 40px 30px; color: var(--text-2); font-size: 13.5px; line-height: 2; }
+.doc-body .blk { padding: 2px 6px; border-radius:5px; }
+.doc-body .blk:hover { background: var(--bg-hover); }
+.doc-link { color: var(--accent); border-bottom: 1px dashed var(--accent); }
+
+/* ============ 规范页：色板 / 表格 / 组件陈列 ============ */
+.spec h3 { font-size: 16px; margin: 30px 0 6px; }
+.spec h3:first-child { margin-top: 0; }
+.spec .ds { color: var(--text-3); font-size: 12.5px; margin-bottom: 14px; line-height: 1.7; max-width: 720px; }
+.sw-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 11px; }
+.sw { border:1px solid var(--border-subtle); border-radius: 11px; overflow:hidden; background: var(--bg-surface); }
+.sw .c { height: 52px; }
+.sw .t { padding: 8px 10px; font-size: 11.5px; }
+.sw .t b { display:block; font-size: 12px; }
+.sw .t code { color: var(--text-3); font-size: 10.5px; font-family: ui-monospace, Consolas, monospace; }
+.spec-tbl { width:100%; border-collapse: collapse; font-size: 12.5px; background: var(--bg-surface); border:1px solid var(--border-subtle); border-radius: 12px; overflow:hidden; }
+.spec-tbl th { text-align:left; padding: 9px 14px; background: var(--bg-hover); font-size: 11.5px; color: var(--text-3); letter-spacing:.04em; }
+.spec-tbl td { padding: 9px 14px; border-top: 1px solid var(--border-subtle); color: var(--text-2); }
+.spec-tbl td:first-child { color: var(--text-1); font-weight: 500; }
+.spec-tbl code { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: var(--accent); }
+.comp-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding: 16px; }
+.comp-label { font-size: 12px; color: var(--text-3); width: 100%; margin-bottom: 2px; letter-spacing:.04em; }
+.ia { display:flex; flex-direction:column; gap:0; font-size:12.5px; }
+.ia .node { display:flex; align-items:center; gap:10px; padding: 9px 13px; background: var(--bg-surface); border:1px solid var(--border-subtle); border-radius: 10px; margin: 4px 0; }
+.ia .node .tag { margin-left:auto; }
+.ia .indent { margin-left: 34px; position:relative; }
+.ia .indent::before { content:""; position:absolute; left:-18px; top:-4px; bottom:50%; width:14px; border-left:1.5px solid var(--border-strong); border-bottom:1.5px solid var(--border-strong); border-radius: 0 0 0 8px; }
+.pill-flow { display:flex; align-items:center; gap:0; flex-wrap:wrap; margin: 8px 0 4px; }
+.pill-flow .p { background: var(--bg-surface); border:1px solid var(--border-subtle); padding: 7px 13px; border-radius: 9px; font-size: 12.5px; }
+.pill-flow .p b { display:block; font-size: 12.5px; }
+.pill-flow .p span { color: var(--text-3); font-size: 11px; }
+.pill-flow .ar { padding: 0 9px; color: var(--text-3); }
+kbd { background: var(--bg-active); border:1px solid var(--border-subtle); border-bottom-width:2px; border-radius:5px; padding: 1px 6px; font-size: 11px; font-family: inherit; }
+.toast-mock { display:inline-flex; align-items:center; gap:9px; background: var(--bg-elevated); border:1px solid var(--border-strong); box-shadow: var(--shadow-3); border-radius: 10px; padding: 10px 15px; font-size: 13px; }
+.two-col { display:grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items:start; }
+@media (max-width: 1100px) { .two-col, .dash-grid { grid-template-columns: 1fr; } .stat-grid { grid-template-columns: repeat(2,1fr);} }
+.legend-dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align: baseline; }
+</style>
+</head>
+<body>
+<div class="proto-shell">
+
+  <!-- ================= 左侧：原型导航 ================= -->
+  <nav class="proto-nav">
+    <div class="proto-nav__brand">
+      <div class="proto-nav__logo">🫂</div>
+      <div><b>小驴人脉</b><span>UI 原型 · v1.0</span></div>
+    </div>
+    <div class="proto-nav__sec">方案总览</div>
+    <button class="proto-nav__item on" data-s="overview"><span class="ic">◎</span>设计策略与信息架构</button>
+    <div class="proto-nav__sec">核心界面</div>
+    <button class="proto-nav__item" data-s="home"><span class="ic">⌂</span>工作台 · 首页仪表盘</button>
+    <button class="proto-nav__item" data-s="people"><span class="ic">☰</span>联系人列表</button>
+    <button class="proto-nav__item" data-s="detail"><span class="ic">☻</span>人物详情（侧栏 Peek）</button>
+    <button class="proto-nav__item" data-s="graph"><span class="ic">✦</span>关系图谱</button>
+    <button class="proto-nav__item" data-s="capture"><span class="ic">✎</span>从笔记捕获</button>
+    <button class="proto-nav__item" data-s="wizard"><span class="ic">⚑</span>初始化向导</button>
+    <button class="proto-nav__item" data-s="settings"><span class="ic">⚙</span>设置页</button>
+    <button class="proto-nav__item" data-s="docbar"><span class="ic">▤</span>人物文档档案条</button>
+    <div class="proto-nav__sec">设计规范</div>
+    <button class="proto-nav__item" data-s="color"><span class="ic">❖</span>色彩与令牌</button>
+    <button class="proto-nav__item" data-s="type"><span class="ic">𝐓</span>字体 · 间距 · 动效</button>
+    <button class="proto-nav__item" data-s="comp"><span class="ic">▦</span>组件规范</button>
+  </nav>
+
+  <!-- ================= 右侧：内容区 ================= -->
+  <main class="proto-main">
+    <div class="proto-topbar">
+      <div>
+        <h1 id="pageTitle">设计策略与信息架构</h1>
+        <div class="sub" id="pageSub">产品分析 → 设计原则 → 导航模型 → 关键流程</div>
+      </div>
+      <div class="sp"></div>
+      <div class="seg" id="themeSeg">
+        <button data-t="dark" class="on">🌙 暗色</button>
+        <button data-t="light">☀️ 浅色</button>
+      </div>
+    </div>
+
+    <!-- ========== 1. 方案总览 ========== -->
+    <section class="screen on" id="s-overview">
+      <div class="note-box">
+        <b>产品定位（源自仓库分析）：</b>在思源笔记内管理人脉——「一人一文档，数据库作主干」。联系人是普通思源文档（双链/搜索/同步照旧），结构化字段存思源原生数据库（AV），插件负责管理界面。<b>数据不出工作区、卸载插件数据仍在</b>，是核心卖点与所有设计的约束前提。
+      </div>
+
+      <div class="two-col">
+        <div>
+          <div class="spec">
+            <h3>核心功能地图</h3>
+            <div class="ds">按 README 与 ROADMAP 梳理：已实现（M1–M4）与规划（M5+）的功能分布。</div>
+            <div class="ia">
+              <div class="node">🗂 联系人管理 <span class="tag"><span class="chip chip--ok">已上线</span></span></div>
+              <div class="node indent">卡片/表格双视图 · 即时搜索 · 分组筛选 · 批量收编已有笔记</div>
+              <div class="node">💼 vCard 导入导出 <span class="tag"><span class="chip chip--ok">已上线</span></span></div>
+              <div class="node">🧑‍🤝‍🧑 人际关系 + Cytoscape 图谱 <span class="tag"><span class="chip chip--ok">已上线</span></span></div>
+              <div class="node">📝 从笔记捕获（双链识别 + 可选 AI 抽取） <span class="tag"><span class="chip chip--ok">已上线</span></span></div>
+              <div class="node">🎂 生日（公历/农历）与久未联系提醒 <span class="tag"><span class="chip chip--ok">已上线</span></span></div>
+              <div class="node">📄 人物文档档案条 <span class="tag"><span class="chip chip--ok">已上线</span></span></div>
+              <div class="node">🔌 人员服务桥 window.LvContacts <span class="tag"><span class="chip chip--ok">协议 v1</span></span></div>
+              <div class="node">⚙ 设置页（字段重建 / 提醒偏好 / AI 开关） <span class="tag"><span class="chip chip--hl">本原型补全</span></span></div>
+              <div class="node">🏢 组织维度 · 关系库（类型化/非对称） <span class="tag"><span class="chip chip--info">二期规划</span></span></div>
+              <div class="node">✨ 智能建议 / 问候起草 / 每日简报 <span class="tag"><span class="chip chip--info">远期规划</span></span></div>
+            </div>
+          </div>
+
+          <div class="spec">
+            <h3>五条设计原则</h3>
+            <div class="ds">
+              ① <b>思源原生感</b>：色彩一律取 b3 CSS 变量、控件形态对齐思源设置页，插件像"长出来"而非"贴上去"。
+              ② <b>双向出入口</b>：人脉活在文档里——文档可进（档案条/反链），插件可出（打开文档/写参与人员区块）。
+              ③ <b>渐进披露</b>：列表 → 侧栏 Peek → 完整文档三级详情深度，默认不打断当前任务。
+              ④ <b>本地可信</b>：AI 一律显式触发、可关；所有外发行为在界面上明示。
+              ⑤ <b>为演进留白</b>：导航、筛选栏、设置分区按"组织/关系库/AI 建议"二期功能预留扩展位。
+            </div>
+          </div>
+
+          <div class="spec">
+            <h3>现状短板 → 本方案对策</h3>
+            <table class="spec-tbl">
+              <tr><th>现状短板（代码实证）</th><th>本方案对策</th></tr>
+              <tr><td>设置页为空壳（仅 toast 提示）</td><td>补全六分区设置页，含字段健康检查</td></tr>
+              <tr><td>详情弹窗无编辑/删除入口</td><td>Peek 面板头部常驻操作组，编辑就地展开</td></tr>
+              <tr><td>卡片点开详情、表格点开文档，行为分裂</td><td>统一"主操作=打开 Peek"，文档入口收敛为图标钮</td></tr>
+              <tr><td>图谱无筛选/搜索，与截断提示矛盾</td><td>图谱工具栏：搜索 + 分组过滤 + 缩放控件 + 悬停卡</td></tr>
+              <tr><td>加载态为纯文本</td><td>骨架屏规范（列表/仪表盘/详情三套）</td></tr>
+              <tr><td>自绘弹窗无 ESC / 焦点管理</td><td>对话框规范：ESC 关闭、焦点陷阱、初始焦点</td></tr>
+              <tr><td>分组色硬编码，暗色下刺眼</td><td>分组色令牌化，明暗双套（color-mix 派生）</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <div class="spec">
+            <h3>信息架构（导航模型）</h3>
+            <div class="ds">由"顶部三 Tab"改为<b>左侧栏导航</b>：对齐 Notion/Obsidian 范式，为二期"组织、智能建议"留位；设置从导航底部进入。</div>
+            <div class="ia">
+              <div class="node">🏠 首页 <span class="tag"><span class="chip">仪表盘 · 提醒 · 快捷操作</span></span></div>
+              <div class="node">👥 联系人 <span class="tag"><span class="chip">卡片/表格 · 搜索筛选</span></span></div>
+              <div class="node">✦ 关系图谱 <span class="tag"><span class="chip">全局关系可视化</span></span></div>
+              <div class="node">🏢 组织 <span class="tag"><span class="chip chip--info">二期占位</span></span></div>
+              <div class="node">✨ 建议 <span class="tag"><span class="chip chip--info">远期占位</span></span></div>
+              <div class="node">⚙ 设置（侧栏底部固定）</div>
+            </div>
+          </div>
+
+          <div class="spec">
+            <h3>关键交互流程</h3>
+            <div class="ds">四条主干流程，均已在原型界面中落地。</div>
+            <div class="pill-flow">
+              <div class="p"><b>建人</b><span>三条入口</span></div><div class="ar">→</div>
+              <div class="p"><b>新建 / 收编 / vCard</b><span>统一进确认列表</span></div><div class="ar">→</div>
+              <div class="p"><b>写入数据库+文档</b><span>结果报告</span></div>
+            </div>
+            <div class="pill-flow">
+              <div class="p"><b>笔记捕获</b><span>右键/命令面板</span></div><div class="ar">→</div>
+              <div class="p"><b>识别参与者</b><span>双链确定 + AI 提名</span></div><div class="ar">→</div>
+              <div class="p"><b>确认场合</b><span>日期/地点/备注</span></div><div class="ar">→</div>
+              <div class="p"><b>落库+写区块</b><span>幂等防重</span></div>
+            </div>
+            <div class="pill-flow">
+              <div class="p"><b>浏览</b><span>列表/图谱/仪表盘</span></div><div class="ar">→</div>
+              <div class="p"><b>Peek 侧栏</b><span>概览·互动·相关人</span></div><div class="ar">→</div>
+              <div class="p"><b>完整文档</b><span>需要时深入</span></div>
+            </div>
+            <div class="pill-flow">
+              <div class="p"><b>提醒触达</b><span>生日/久未联系</span></div><div class="ar">→</div>
+              <div class="p"><b>记一笔互动</b><span>Peek 内 10 秒完成</span></div><div class="ar">→</div>
+              <div class="p"><b>staleness 归零</b><span>仪表盘即时刷新</span></div>
+            </div>
+          </div>
+
+          <div class="spec">
+            <h3>布局骨架</h3>
+            <div class="ds">桌面端（≥768px）：196px 侧栏 + 弹性主区；移动端：全屏 Dialog + 底部 Tab Bar（与思源移动端一致）。</div>
+            <div class="card" style="padding:14px">
+              <div style="display:flex; gap:8px; height:150px">
+                <div style="width:64px; background:var(--bg-hover); border-radius:9px; display:grid; place-items:center; color:var(--text-3); font-size:11px; writing-mode:vertical-lr">侧栏导航</div>
+                <div style="flex:1; display:flex; flex-direction:column; gap:8px">
+                  <div style="height:30px; background:var(--bg-hover); border-radius:9px; display:grid; place-items:center; color:var(--text-3); font-size:11px">页头：标题 + 全局搜索 + 主操作</div>
+                  <div style="flex:1; background:var(--bg-hover); border-radius:9px; display:grid; place-items:center; color:var(--text-3); font-size:11px">内容区（视图各自布局，滚动独立）</div>
+                </div>
+                <div style="width:110px; background:var(--accent-soft); border:1px dashed var(--accent); border-radius:9px; display:grid; place-items:center; color:var(--accent); font-size:11px; text-align:center">详情 Peek<br>400px 滑入</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 2. 首页仪表盘 ========== -->
+    <section class="screen" id="s-home">
+      <div class="note-box"><b>设计要点：</b>首页回答"今天该关注谁"。统计卡可点击直达筛选结果；生日按 今天/7天内/30天内 分桶着色；久未联系卡内嵌「记一笔」快捷输入，10 秒完成一次互动记录。空态与骨架屏遵循组件规范。</div>
+      <div class="frame">
+        <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">小驴人脉 · 工作台 — 桌面端 1280px</span></div>
+        <div class="frame__body">
+          <div class="app">
+            <aside class="app__side">
+              <div class="app__side-brand"><div class="lg">🫂</div><b>小驴人脉</b></div>
+              <button class="side-item on">🏠 首页</button>
+              <button class="side-item">👥 联系人<span class="badge chip">236</span></button>
+              <button class="side-item">✦ 关系图谱</button>
+              <div class="side-sec">扩展</div>
+              <button class="side-item" style="opacity:.45">🏢 组织 · 二期</button>
+              <button class="side-item" style="opacity:.45">✨ 建议 · 远期</button>
+              <div style="flex:1"></div>
+              <button class="side-item">⚙ 设置</button>
+            </aside>
+            <div class="app__main">
+              <div class="app__head">
+                <h2>早上好 ☀️</h2>
+                <span class="chip chip--hl">🎂 今天 1 位生日</span>
+                <div class="sp" style="flex:1"></div>
+                <div class="input" style="width:220px">🔍 <input placeholder="搜索联系人 / 电话 / 标签…"></div>
+                <button class="btn btn--primary">＋ 新建联系人</button>
+              </div>
+              <div class="app__body">
+                <div class="stat-grid">
+                  <div class="card stat"><div class="glow" style="background:var(--accent)"></div><div class="lb">👥 联系人</div><div class="num">236</div><div class="ft">本月 +12</div></div>
+                  <div class="card stat"><div class="glow" style="background:var(--info)"></div><div class="lb">🔗 关系</div><div class="num">418</div><div class="ft">人均 1.8 条</div></div>
+                  <div class="card stat"><div class="glow" style="background:var(--highlight)"></div><div class="lb">🎂 本周生日</div><div class="num">5</div><div class="ft">含农历 2 位</div></div>
+                  <div class="card stat"><div class="glow" style="background:var(--danger)"></div><div class="lb">🕒 久未联系</div><div class="num">17</div><div class="ft">超过 30 天</div></div>
+                </div>
+                <div class="dash-grid">
+                  <div class="card">
+                    <div class="panel-h"><b>🎂 近期生日</b><span class="sp"></span><button class="btn btn--ghost btn--sm">查看全部</button></div>
+                    <div class="bday-row"><div class="avatar avatar--sm av-family">林</div><div><div class="nm">林晓梅</div><div class="dt">9月27日 · 农历八月初六</div></div><span class="sp"></span><span class="chip chip--hl">今天</span><button class="btn btn--sm">💬 送祝福</button></div>
+                    <div class="bday-row"><div class="avatar avatar--sm av-friend">周</div><div><div class="nm">周子昂</div><div class="dt">9月30日 · 公历</div></div><span class="sp"></span><span class="chip chip--info">3 天后</span></div>
+                    <div class="bday-row"><div class="avatar avatar--sm av-work">陈</div><div><div class="nm">陈立群</div><div class="dt">10月4日 · 公历</div></div><span class="sp"></span><span class="chip chip--info">7 天后</span></div>
+                    <div class="bday-row"><div class="avatar avatar--sm av-school">苏</div><div><div class="nm">苏婉清</div><div class="dt">10月12日 · 农历九月初一</div></div><span class="sp"></span><span class="chip">15 天后</span></div>
+                    <div class="bday-row"><div class="avatar avatar--sm av-other">高</div><div><div class="nm">高铭远</div><div class="dt">10月21日 · 公历</div></div><span class="sp"></span><span class="chip">24 天后</span></div>
+                  </div>
+                  <div class="card">
+                    <div class="panel-h"><b>🕒 久未联系</b><span class="chip chip--danger">17</span><span class="sp"></span><button class="btn btn--ghost btn--sm">30 天 ▾</button></div>
+                    <div class="stale-row"><div class="avatar avatar--sm av-work">吴</div><div><div class="nm">吴国栋</div><div class="dt">上次互动：68 天前 · 项目复盘会</div></div><span class="sp"></span><button class="btn btn--sm btn--primary">记一笔</button></div>
+                    <div class="stale-row"><div class="avatar avatar--sm av-friend">郑</div><div><div class="nm">郑好</div><div class="dt">上次互动：54 天前 · 羽毛球局</div></div><span class="sp"></span><button class="btn btn--sm btn--primary">记一笔</button></div>
+                    <div class="stale-row"><div class="avatar avatar--sm av-school">何</div><div><div class="nm">何静怡</div><div class="dt">上次互动：47 天前</div></div><span class="sp"></span><button class="btn btn--sm btn--primary">记一笔</button></div>
+                    <div class="stale-row"><div class="avatar avatar--sm av-family">许</div><div><div class="nm">许伯言</div><div class="dt">上次互动：41 天前 · 家宴</div></div><span class="sp"></span><button class="btn btn--sm btn--primary">记一笔</button></div>
+                  </div>
+                </div>
+                <div class="dash-grid" style="margin-top:14px; grid-template-columns: 1fr 1fr">
+                  <div class="card card--pad" style="display:flex; align-items:center; gap:14px">
+                    <div style="font-size:22px">🗂</div>
+                    <div><b style="font-size:13px">工作空间</b><div style="font-size:12px; color:var(--text-3); margin-top:3px">笔记本「人脉」 · 数据存于本地工作区，不上云</div></div>
+                    <div class="sp" style="flex:1"></div>
+                    <button class="btn btn--sm">打开联系人总表</button>
+                  </div>
+                  <div class="card card--pad" style="display:flex; align-items:center; gap:14px">
+                    <div style="font-size:22px">🔌</div>
+                    <div><b style="font-size:13px">人员服务桥</b><div style="font-size:12px; color:var(--text-3); margin-top:3px">LvContacts 协议 v1 · 已就绪，其他插件可调</div></div>
+                    <div class="sp" style="flex:1"></div>
+                    <span class="chip chip--ok">● Ready</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 3. 联系人列表 ========== -->
+    <section class="screen" id="s-people">
+      <div class="note-box"><b>设计要点：</b>统一主操作——卡片与表格点击均打开 <b>Peek 侧栏</b>，「打开文档」收敛为悬停出现的图标钮；工具栏支持搜索 + 分组/标签筛选 + 排序 + 视图切换；选中态支持批量操作（加分组、导出）。下方同时给出卡片与表格两种视图。</div>
+
+      <div class="frame">
+        <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">联系人 · 卡片视图</span></div>
+        <div class="frame__body" style="padding: 18px 22px">
+          <div class="people-toolbar">
+            <div class="input" style="width:250px">🔍 <input placeholder="搜索姓名 / 电话 / 微信 / 邮箱 / 标签…"></div>
+            <button class="btn">分组：全部 ▾</button>
+            <button class="btn">标签 ▾</button>
+            <button class="btn btn--ghost">⇅ 最近互动</button>
+            <div class="sp" style="flex:1"></div>
+            <div class="seg"><button class="on">▦ 卡片</button><button>☰ 表格</button></div>
+            <button class="btn">收编文档</button>
+            <button class="btn">vCard ▾</button>
+            <button class="btn btn--primary">＋ 新建</button>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:12px; align-items:center">
+            <span style="font-size:12px; color:var(--text-3)">已选筛选：</span>
+            <span class="chip chip--accent"><span class="dot" style="background:var(--g-work)"></span>同事 ×</span>
+            <span class="chip chip--accent"># 家长群 ×</span>
+            <span style="font-size:12px; color:var(--text-3)">· 共 48 人</span>
+          </div>
+          <div class="people-grid">
+            <div class="card pcard">
+              <button class="pcard__fav icon-btn">↗</button>
+              <div class="pcard__top"><div class="avatar av-work">陈</div><div><div class="pcard__nm">陈立群</div><div class="pcard__sub">10月4日生日 · 7 天后</div></div></div>
+              <div class="pcard__meta">
+                <div class="r"><span class="ic">📞</span>138 2611 0427</div>
+                <div class="r"><span class="ic">💬</span>chenliqun88</div>
+                <div class="r"><span class="ic">🕒</span>3 天前 · 课程评审会</div>
+              </div>
+              <div class="pcard__tags"><span class="chip"><span class="dot" style="background:var(--g-work)"></span>同事</span><span class="chip chip--accent"># 家长群</span><span class="chip chip--accent"># 数学组</span></div>
+            </div>
+            <div class="card pcard">
+              <button class="pcard__fav icon-btn">↗</button>
+              <div class="pcard__top"><div class="avatar av-family">林</div><div><div class="pcard__nm">林晓梅</div><div class="pcard__sub">🎂 今天生日（农历）</div></div></div>
+              <div class="pcard__meta">
+                <div class="r"><span class="ic">📞</span>139 0225 7716</div>
+                <div class="r"><span class="ic">✉️</span>xiaomei.lin@…</div>
+                <div class="r"><span class="ic">🕒</span>昨天 · 家庭聚餐</div>
+              </div>
+              <div class="pcard__tags"><span class="chip"><span class="dot" style="background:var(--g-family)"></span>家人</span><span class="chip chip--hl">🎂 今天</span></div>
+            </div>
+            <div class="card pcard">
+              <button class="pcard__fav icon-btn">↗</button>
+              <div class="pcard__top"><div class="avatar av-friend">郑</div><div><div class="pcard__nm">郑好</div><div class="pcard__sub">54 天未联系</div></div></div>
+              <div class="pcard__meta">
+                <div class="r"><span class="ic">📞</span>136 8840 2253</div>
+                <div class="r"><span class="ic">💬</span>zhenghao_yu</div>
+                <div class="r"><span class="ic">🕒</span>54 天前 · 羽毛球局</div>
+              </div>
+              <div class="pcard__tags"><span class="chip"><span class="dot" style="background:var(--g-friend)"></span>朋友</span><span class="chip chip--danger">久未联系</span></div>
+            </div>
+            <div class="card pcard">
+              <button class="pcard__fav icon-btn">↗</button>
+              <div class="pcard__top"><div class="avatar av-school">苏</div><div><div class="pcard__nm">苏婉清</div><div class="pcard__sub">10月12日生日</div></div></div>
+              <div class="pcard__meta">
+                <div class="r"><span class="ic">📞</span>137 5519 0086</div>
+                <div class="r"><span class="ic">🕒</span>12 天前 · 校友聚会</div>
+              </div>
+              <div class="pcard__tags"><span class="chip"><span class="dot" style="background:var(--g-school)"></span>同学</span><span class="chip chip--accent"># 华附03届</span></div>
+            </div>
+            <div class="card pcard">
+              <button class="pcard__fav icon-btn">↗</button>
+              <div class="pcard__top"><div class="avatar av-work">吴</div><div><div class="pcard__nm">吴国栋</div><div class="pcard__sub">68 天未联系</div></div></div>
+              <div class="pcard__meta">
+                <div class="r"><span class="ic">📞</span>135 7732 6614</div>
+                <div class="r"><span class="ic">✉️</span>wgd@…</div>
+                <div class="r"><span class="ic">🕒</span>68 天前 · 项目复盘会</div>
+              </div>
+              <div class="pcard__tags"><span class="chip"><span class="dot" style="background:var(--g-work)"></span>同事</span><span class="chip chip--danger">久未联系</span></div>
+            </div>
+            <div class="card pcard">
+              <button class="pcard__fav icon-btn">↗</button>
+              <div class="pcard__top"><div class="avatar av-other">高</div><div><div class="pcard__nm">高铭远</div><div class="pcard__sub">10月21日生日</div></div></div>
+              <div class="pcard__meta">
+                <div class="r"><span class="ic">💬</span>gaomingyuan</div>
+                <div class="r"><span class="ic">🕒</span>26 天前 · 书店偶遇</div>
+              </div>
+              <div class="pcard__tags"><span class="chip"><span class="dot" style="background:var(--g-other)"></span>其他</span></div>
+            </div>
+          </div>
+          <div style="display:flex; justify-content:center; margin-top:18px">
+            <button class="btn">加载更多（已显示 48 / 236）</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="frame">
+        <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">联系人 · 表格视图（点击行同样打开 Peek）</span></div>
+        <div class="frame__body">
+          <table class="tbl">
+            <thead><tr><th style="width:34px"><div class="checkbox"></div></th><th>姓名 ⇅</th><th>分组</th><th>电话</th><th>微信</th><th>生日</th><th>最近互动 ⇅</th><th>标签</th></tr></thead>
+            <tbody>
+              <tr><td><div class="checkbox"></div></td><td><div class="nm-cell"><div class="avatar avatar--sm av-family">林</div>林晓梅</div></td><td><span class="chip"><span class="dot" style="background:var(--g-family)"></span>家人</span></td><td>139 0225 7716</td><td>—</td><td>八月初六 · 今天 <span class="chip chip--hl">🎂</span></td><td>昨天</td><td># 家人</td></tr>
+              <tr><td><div class="checkbox on">✓</div></td><td><div class="nm-cell"><div class="avatar avatar--sm av-work">陈</div>陈立群</div></td><td><span class="chip"><span class="dot" style="background:var(--g-work)"></span>同事</span></td><td>138 2611 0427</td><td>chenliqun88</td><td>10月4日</td><td>3 天前</td><td># 家长群 # 数学组</td></tr>
+              <tr><td><div class="checkbox on">✓</div></td><td><div class="nm-cell"><div class="avatar avatar--sm av-friend">郑</div>郑好</div></td><td><span class="chip"><span class="dot" style="background:var(--g-friend)"></span>朋友</span></td><td>136 8840 2253</td><td>zhenghao_yu</td><td>—</td><td><span style="color:var(--danger)">54 天前</span></td><td># 球友</td></tr>
+              <tr><td><div class="checkbox"></div></td><td><div class="nm-cell"><div class="avatar avatar--sm av-school">苏</div>苏婉清</div></td><td><span class="chip"><span class="dot" style="background:var(--g-school)"></span>同学</span></td><td>137 5519 0086</td><td>—</td><td>10月12日</td><td>12 天前</td><td># 华附03届</td></tr>
+            </tbody>
+          </table>
+          <div style="display:flex; align-items:center; gap:10px; padding: 10px 16px; border-top: 1px solid var(--border-subtle); background: var(--bg-surface)">
+            <span class="chip chip--accent">已选 2 人</span>
+            <button class="btn btn--sm">改分组</button><button class="btn btn--sm">加标签</button><button class="btn btn--sm">导出 vCard</button>
+            <div class="sp" style="flex:1"></div><button class="btn btn--sm btn--ghost">取消选择</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 4. 人物详情 Peek ========== -->
+    <section class="screen" id="s-detail">
+      <div class="note-box"><b>设计要点：</b>详情从"居中弹窗"改为<b>右侧 Peek 面板</b>（Notion 范式）：不遮挡列表上下文，可连续翻看多人。三区 Tab（概览 / 互动 / 相关人）；头部常驻「编辑 / 打开文档 / 更多（删除·导出）」——补齐现状"详情无编辑入口"的短板；「记一笔互动」常驻概览底部。</div>
+      <div class="frame">
+        <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">联系人列表 + Peek 侧栏（400px）</span></div>
+        <div class="frame__body" style="position:relative; min-height:600px; padding:18px 22px; background: var(--bg-base)">
+          <div class="people-toolbar" style="opacity:.55">
+            <div class="input" style="width:230px">🔍 <input placeholder="搜索联系人…"></div>
+            <button class="btn">分组：全部 ▾</button>
+            <div class="sp" style="flex:1"></div>
+            <div class="seg"><button class="on">▦ 卡片</button><button>☰ 表格</button></div>
+          </div>
+          <div class="people-grid" style="opacity:.55; filter:saturate(.7)">
+            <div class="card pcard"><div class="pcard__top"><div class="avatar av-work">陈</div><div><div class="pcard__nm">陈立群</div><div class="pcard__sub">10月4日生日</div></div></div></div>
+            <div class="card pcard" style="outline:2px solid var(--accent); opacity:1; filter:none"><div class="pcard__top"><div class="avatar av-family">林</div><div><div class="pcard__nm">林晓梅</div><div class="pcard__sub">🎂 今天生日</div></div></div></div>
+            <div class="card pcard"><div class="pcard__top"><div class="avatar av-friend">郑</div><div><div class="pcard__nm">郑好</div><div class="pcard__sub">54 天未联系</div></div></div></div>
+          </div>
+
+          <div class="peek">
+            <div class="peek__h">
+              <div style="display:flex; gap:8px; margin-bottom:14px">
+                <span class="chip">1 / 236</span>
+                <button class="icon-btn">‹</button><button class="icon-btn">›</button>
+                <div class="sp" style="flex:1"></div>
+                <button class="icon-btn" title="编辑资料">✏️</button>
+                <button class="icon-btn" title="打开文档">↗</button>
+                <button class="icon-btn" title="更多">⋯</button>
+                <button class="icon-btn" title="关闭 (Esc)">✕</button>
+              </div>
+              <div style="display:flex; align-items:center; gap:14px">
+                <div class="avatar avatar--lg av-family">林</div>
+                <div>
+                  <div style="font-size:18px; font-weight:700">林晓梅</div>
+                  <div style="display:flex; gap:6px; margin-top:6px">
+                    <span class="chip"><span class="dot" style="background:var(--g-family)"></span>家人</span>
+                    <span class="chip chip--hl">🎂 今天生日</span>
+                    <span class="chip">🌙 农历八月初六</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="tabs" style="padding: 0 18px">
+              <button class="on">概览</button><button>互动 12</button><button>相关人 4</button>
+            </div>
+            <div class="peek__b">
+              <dl>
+                <div class="field-row"><dt>电话</dt><dd>139 0225 7716 <button class="btn btn--ghost btn--sm">📋</button></dd></div>
+                <div class="field-row"><dt>邮箱</dt><dd>xiaomei.lin@example.com</dd></div>
+                <div class="field-row"><dt>微信</dt><dd>linxm_family</dd></div>
+                <div class="field-row"><dt>标签</dt><dd><span class="chip chip--accent"># 家人</span> <span class="chip chip--accent"># 紧急联系人</span></dd></div>
+              </dl>
+              <div style="margin: 16px 0 8px; font-size:12px; font-weight:600; color:var(--text-3); letter-spacing:.05em">下次提醒</div>
+              <div class="card card--pad" style="display:flex; align-items:center; gap:10px; font-size:12.5px">
+                <span>🎂 明年生日：2027-09-25（农历，365 天后）</span>
+              </div>
+              <div style="margin: 16px 0 8px; font-size:12px; font-weight:600; color:var(--text-3); letter-spacing:.05em">记一笔互动</div>
+              <div class="card card--pad">
+                <div class="input" style="align-items:flex-start"><textarea rows="2" placeholder="今天和她…（如：喝早茶，聊了小天的入学适应）" style="border:none;outline:none;background:none;color:var(--text-1);width:100%;resize:none;font-size:13px"></textarea></div>
+                <div style="display:flex; align-items:center; gap:8px; margin-top:10px">
+                  <span class="chip">📅 今天 ▾</span><span class="chip">📍 地点</span>
+                  <div class="sp" style="flex:1"></div>
+                  <button class="btn btn--sm btn--primary">记录</button>
+                </div>
+              </div>
+            </div>
+            <div class="peek__f">
+              <button class="btn btn--sm">↗ 打开文档</button>
+              <div class="sp" style="flex:1"></div>
+              <span style="font-size:11px; color:var(--text-3)">文档：人脉/林晓梅 · 反链 8</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 5. 关系图谱 ========== -->
+    <section class="screen" id="s-graph">
+      <div class="note-box"><b>设计要点：</b>补齐现状缺失的<b>搜索框、分组过滤、缩放控件、节点悬停卡</b>；截断提示条给出可操作路径（"用分组过滤缩小范围"）；节点 = 分组色 + 度数定大小；边悬停加粗、点击节点高亮一度邻接。二期边类型化后此处直接扩展"边过滤"下拉，无需改布局。</div>
+      <div class="frame">
+        <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">关系图谱</span></div>
+        <div class="frame__body">
+          <div style="display:flex; align-items:center; gap:10px; padding: 12px 16px; border-bottom:1px solid var(--border-subtle); flex-wrap:wrap">
+            <div class="input" style="width:200px">🔍 <input placeholder="定位联系人…"></div>
+            <button class="btn btn--sm"><span class="legend-dot" style="background:var(--g-family)"></span>家人</button>
+            <button class="btn btn--sm"><span class="legend-dot" style="background:var(--g-friend)"></span>朋友</button>
+            <button class="btn btn--sm" style="opacity:.45"><span class="legend-dot" style="background:var(--g-work)"></span>同事 ✓</button>
+            <button class="btn btn--sm"><span class="legend-dot" style="background:var(--g-school)"></span>同学</button>
+            <button class="btn btn--sm"><span class="legend-dot" style="background:var(--g-other)"></span>其他</button>
+            <div class="sp" style="flex:1"></div>
+            <button class="btn btn--sm btn--ghost">↻ 重新布局</button>
+          </div>
+          <div class="graph-wrap">
+            <svg viewBox="0 0 760 480" style="width:100%; height:100%">
+              <g stroke="var(--border-strong)" stroke-width="1.4" opacity=".8">
+                <line x1="380" y1="230" x2="240" y2="130"/><line x1="380" y1="230" x2="540" y2="120"/>
+                <line x1="380" y1="230" x2="580" y2="300"/><line x1="380" y1="230" x2="210" y2="320"/>
+                <line x1="380" y1="230" x2="430" y2="380"/><line x1="240" y1="130" x2="150" y2="220"/>
+                <line x1="240" y1="130" x2="310" y2="60"/><line x1="540" y1="120" x2="640" y2="200"/>
+                <line x1="580" y1="300" x2="640" y2="200"/><line x1="210" y1="320" x2="130" y2="380"/>
+                <line x1="430" y1="380" x2="560" y2="420"/><line x1="210" y1="320" x2="150" y2="220" stroke-dasharray="4 4"/>
+              </g>
+              <g font-family="inherit" text-anchor="middle">
+                <circle cx="380" cy="230" r="30" fill="var(--accent-grad)" opacity=".95"/>
+                <text x="380" y="236" fill="#fff" font-size="15" font-weight="700">我</text>
+                <circle cx="240" cy="130" r="24" fill="var(--g-family)"/><text x="240" y="136" fill="#fff" font-size="12" font-weight="600">林晓梅</text>
+                <circle cx="540" cy="120" r="21" fill="var(--g-work)"/><text x="540" y="126" fill="#fff" font-size="12" font-weight="600">陈立群</text>
+                <circle cx="580" cy="300" r="18" fill="var(--g-friend)"/><text x="580" y="306" fill="#fff" font-size="11" font-weight="600">郑好</text>
+                <circle cx="210" cy="320" r="19" fill="var(--g-school)"/><text x="210" y="326" fill="#fff" font-size="11" font-weight="600">苏婉清</text>
+                <circle cx="430" cy="380" r="15" fill="var(--g-work)"/><text x="430" y="386" fill="#fff" font-size="11" font-weight="600">吴国栋</text>
+                <circle cx="150" cy="220" r="13" fill="var(--g-family)"/><text x="150" y="246" fill="var(--text-2)" font-size="11">许伯言</text>
+                <circle cx="310" cy="60" r="12" fill="var(--g-family)"/><text x="310" y="38" fill="var(--text-2)" font-size="11">林父</text>
+                <circle cx="640" cy="200" r="13" fill="var(--g-work)"/><text x="640" y="176" fill="var(--text-2)" font-size="11">周子昂</text>
+                <circle cx="130" cy="380" r="11" fill="var(--g-school)"/><text x="130" y="406" fill="var(--text-2)" font-size="11">何静怡</text>
+                <circle cx="560" cy="420" r="11" fill="var(--g-other)"/><text x="560" y="446" fill="var(--text-2)" font-size="11">高铭远</text>
+                <circle cx="540" cy="120" r="27" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="3 3"/>
+              </g>
+            </svg>
+            <div class="graph-tip" style="left: 54%; top: 8%">
+              <b style="font-size:13px">陈立群</b>
+              <div style="color:var(--text-2); margin-top:5px; line-height:1.8">同事 · 关系 3 条 · 3 天前互动<br>共同联系人：周子昂、吴国栋</div>
+            </div>
+            <div class="graph-cap">⚠ 已按关系数截断至 800 节点 · 建议用分组过滤缩小范围</div>
+            <div class="graph-fab">
+              <button class="btn btn--icon">＋</button><button class="btn btn--icon">－</button><button class="btn btn--icon">⛶</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 6. 从笔记捕获 ========== -->
+    <section class="screen" id="s-capture">
+      <div class="note-box"><b>设计要点：</b>把现有单页长表单重构为<b>三步向导</b>（识别 → 确认 → 完成），步骤条给明确预期；AI 提名与双链识别结果用徽标区分来源，<b>AI 只提名不决定</b>，一切勾选后才落库；提交时显示进度，完成页给出可跳转的结果摘要。</div>
+      <div class="frame">
+        <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">编辑器右键「人脉：捕获本文人员」→ 对话框 560px</span></div>
+        <div class="frame__body" style="position:relative; min-height:560px; background: var(--bg-base)">
+          <div style="padding: 30px; opacity:.35">
+            <div class="doc-title" style="font-size:20px">2026-09-26 班级家委会会议纪要</div>
+            <div class="doc-body" style="padding:14px 0 0">
+              <div class="blk">参会：<span class="doc-link">[[陈立群]]</span>、<span class="doc-link">[[周子昂]]</span>，还有王慧敏老师也到场。</div>
+              <div class="blk">地点：学校图书馆二层。讨论了秋季运动会的分工安排……</div>
+            </div>
+          </div>
+          <div class="mask">
+            <div class="dialog">
+              <div class="dialog__h">
+                <b>从笔记捕获人脉</b>
+                <div class="sp"></div>
+                <div class="steps">
+                  <div class="st on"><i>1</i>识别</div><div class="ln"></div>
+                  <div class="st"><i>2</i>确认</div><div class="ln"></div>
+                  <div class="st"><i>3</i>完成</div>
+                </div>
+                <div class="sp"></div>
+                <button class="icon-btn">✕</button>
+              </div>
+              <div class="dialog__b">
+                <div style="font-size:12px; color:var(--text-3); margin: 6px 0 10px">来源：《2026-09-26 班级家委会会议纪要》</div>
+                <div style="font-size:12px; font-weight:600; color:var(--text-3); margin-bottom:8px; letter-spacing:.04em">已在人脉库（双链识别 · 100% 确定）</div>
+                <div class="pick-row"><div class="checkbox on">✓</div><div class="avatar avatar--sm av-work">陈</div><div><div class="nm">陈立群</div><div class="sb">同事 · 上次互动 3 天前</div></div><span class="sp"></span><span class="chip chip--ok">双链</span></div>
+                <div class="pick-row"><div class="checkbox on">✓</div><div class="avatar avatar--sm av-work">周</div><div><div class="nm">周子昂</div><div class="sb">同事 · 上次互动 9 天前</div></div><span class="sp"></span><span class="chip chip--ok">双链</span></div>
+                <div style="display:flex; align-items:center; gap:8px; margin: 14px 0 8px">
+                  <span style="font-size:12px; font-weight:600; color:var(--text-3); letter-spacing:.04em">未入库的人名</span>
+                  <button class="btn btn--sm">✨ AI 分析本页</button>
+                  <span style="font-size:11px; color:var(--text-3)">内容仅发送至你自己配置的思源 AI 端点</span>
+                </div>
+                <div class="pick-row"><div class="checkbox on">✓</div><div class="avatar avatar--sm av-other">王</div><div><div class="nm">王慧敏 <span class="chip chip--info" style="margin-left:4px">AI 提名</span></div><div class="sb">收编为新联系人</div></div><span class="sp"></span><button class="btn btn--ghost btn--sm">忽略</button></div>
+                <div style="margin: 14px 0 8px; font-size:12px; font-weight:600; color:var(--text-3); letter-spacing:.04em">场合信息（应用于所有勾选者）</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+                  <div class="input">📅 <input value="2026-09-26"></div>
+                  <div class="input">📍 <input value="学校图书馆二层"></div>
+                </div>
+                <div class="input" style="margin-top:10px">📝 <input placeholder="备注（可选）：秋季运动会分工讨论"></div>
+              </div>
+              <div class="dialog__f">
+                <span style="font-size:12px; color:var(--text-3)">将记录 3 条互动 · 收编 1 人 · 写入「参与人员」区块</span>
+                <div class="sp"></div>
+                <button class="btn btn--ghost">取消</button>
+                <button class="btn btn--primary">确认捕获（3 人）</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 7. 初始化向导 ========== -->
+    <section class="screen" id="s-wizard">
+      <div class="note-box"><b>设计要点：</b>保持单步式轻量向导（初始化是一次性操作），强化三点：① 前置说明"将创建什么、数据存在哪"；② 实时日志带成功标记与进度条；③ 失败态给出可恢复的下一步（重试 / 查看详情），成功态直接给出三个上手入口。</div>
+      <div class="frame">
+        <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">初始化向导 — 进行中状态</span></div>
+        <div class="frame__body" style="background: var(--bg-base)">
+          <div class="wizard">
+            <div class="logo">🫂</div>
+            <h2>欢迎使用小驴人脉</h2>
+            <p>将在你的工作区创建：笔记本「人脉」、文档「联系人总表」与原生数据库（生日 / 电话 / 分组 / 标签 / 相关人等 9 个字段一次配齐）。<br>所有数据保存在本地工作区，卸载插件后原样保留。</p>
+            <div class="input">📓 <input value="人脉"></div>
+            <button class="btn btn--primary" disabled>初始化中…</button>
+            <div class="progress" style="width:380px; margin-top:18px"><i style="width:62%"></i></div>
+            <div class="wlog">
+              <div><span class="ok">✓</span> 创建笔记本「人脉」</div>
+              <div><span class="ok">✓</span> 创建文档「联系人总表」</div>
+              <div><span class="ok">✓</span> 物化数据库（avId 已固化）</div>
+              <div>⏳ 写入 9 个预设字段…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 8. 设置页 ========== -->
+    <section class="screen" id="s-settings">
+      <div class="note-box"><b>设计要点：</b>补全现状缺失的设置页。左分栏右内容（思源设置同款范式）；六个分区按"使用频率 × 风险"排序；<b>字段健康检查</b>对应 DATA-CONTRACT 的"用户删列 → 降级提示重建"契约；AI 分区落实"显式触发、可全局关闭"的隐私原则。</div>
+      <div class="frame">
+        <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">小驴人脉 · 设置</span></div>
+        <div class="frame__body">
+          <div class="set-layout">
+            <div class="set-nav">
+              <button class="side-item on">🎛 通用</button>
+              <button class="side-item">🗂 数据与字段</button>
+              <button class="side-item">🔔 提醒</button>
+              <button class="side-item">✨ AI 与隐私</button>
+              <button class="side-item">🔌 服务桥</button>
+              <button class="side-item">ℹ 关于</button>
+            </div>
+            <div class="set-body">
+              <h3>通用</h3>
+              <div class="desc">界面与默认行为偏好。所有偏好仅存于插件本地 JSON（view-preferences.json），不影响数据库内容。</div>
+              <div class="set-group">
+                <div class="set-group__t">视图</div>
+                <div class="set-row"><div><div class="tt">默认联系人视图</div><div class="ds">打开工作台时联系人页的默认形态</div></div><div class="sp"></div><span class="select-mock">▦ 卡片 ▾</span></div>
+                <div class="set-row"><div><div class="tt">默认排序</div><div class="ds">列表默认按「最近互动」倒序</div></div><div class="sp"></div><span class="select-mock">最近互动 ▾</span></div>
+                <div class="set-row"><div><div class="tt">启动时打开工作台</div><div class="ds">思源启动后自动展开人脉首页</div></div><div class="sp"></div><div class="switch"></div></div>
+              </div>
+              <div class="set-group">
+                <div class="set-group__t">提醒（预览）</div>
+                <div class="set-row"><div><div class="tt">生日提前提醒</div><div class="ds">首页生日列表的展示窗口</div></div><div class="sp"></div><span class="select-mock">30 天 ▾</span></div>
+                <div class="set-row"><div><div class="tt">久未联系阈值</div><div class="ds">超过该天数未互动即进入「久未联系」</div></div><div class="sp"></div><span class="select-mock">30 天 ▾</span></div>
+                <div class="set-row"><div><div class="tt">启动时提醒今日生日</div><div class="ds">以思源通知形式提示，可点击直达</div></div><div class="sp"></div><div class="switch on"></div></div>
+              </div>
+              <div class="set-group">
+                <div class="set-group__t">数据与字段（预览 · 含健康检查）</div>
+                <div class="set-row">
+                  <div><div class="tt">数据库字段完整性</div><div class="ds">9 / 9 个字段在位；若你手动删过列，相关功能将降级，可在此一键重建</div></div>
+                  <div class="sp"></div><span class="chip chip--ok">● 健康</span>
+                </div>
+                <div class="set-row"><div><div class="tt">重新绑定锚点</div><div class="ds">笔记本 / 总表文档被移动或删除后，在此重新指定</div></div><div class="sp"></div><button class="btn btn--sm">检查并修复…</button></div>
+                <div class="set-row"><div><div class="tt">导出全部数据</div><div class="ds">名册导出 vCard 3.0；互动事件导出 JSON 备份</div></div><div class="sp"></div><button class="btn btn--sm">导出 ▾</button></div>
+              </div>
+              <div class="set-group">
+                <div class="set-group__t">AI 与隐私（预览）</div>
+                <div class="set-row"><div><div class="tt">启用 AI 辅助</div><div class="ds">关闭后，「AI 分析本页」「问候起草」等入口全部隐藏。AI 功能只在你点击时调用你自己配置的思源 AI 端点，插件不持有密钥、无后台扫描</div></div><div class="sp"></div><div class="switch on"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 9. 人物文档档案条 ========== -->
+    <section class="screen" id="s-docbar">
+      <div class="note-box"><b>设计要点：</b>档案条是"插件 ⇄ 文档"双向出入口的关键一环——在人物文档标题下方注入：核心字段一览 + 倒计时徽标 + 「编辑资料 / 打开人脉」双入口。形态对齐思源属性面板，避免喧宾夺主；二期"会前简报"将在此下方扩展为可折叠卡片。</div>
+      <div class="frame">
+        <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">思源编辑器 · 人物文档「林晓梅」</span></div>
+        <div class="frame__body doc-mock">
+          <div class="doc-head"><div class="doc-title">林晓梅</div></div>
+          <div class="doc-panel">
+            <div class="avatar av-family">林</div>
+            <div>
+              <div style="display:flex; gap:6px; margin-bottom:6px">
+                <span class="chip"><span class="dot" style="background:var(--g-family)"></span>家人</span>
+                <span class="chip chip--hl">🎂 今天生日 · 农历八月初六</span>
+                <span class="chip chip--ok">昨天刚互动</span>
+              </div>
+              <div class="meta">
+                <span>📞 139 0225 7716</span><span>💬 linxm_family</span><span>✉️ xiaomei.lin@…</span><span>👥 相关人 4</span><span>📝 互动 12 次</span>
+              </div>
+            </div>
+            <div class="sp" style="flex:1"></div>
+            <button class="btn btn--sm">✏️ 编辑资料</button>
+            <button class="btn btn--sm btn--ghost">打开人脉 ↗</button>
+          </div>
+          <div class="doc-body">
+            <div class="blk">是我姑，小天叫她姑婆。住在荔湾，每周日早茶固定局。</div>
+            <div class="blk">上次见面聊到她想学用智能手机挂号，下次带平板教她。</div>
+            <div class="blk">相关：<span class="doc-link">[[许伯言]]</span>（姑丈）、<span class="doc-link">[[林父]]</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 10. 色彩与令牌 ========== -->
+    <section class="screen spec" id="s-color">
+      <div class="note-box"><b>落地约束（AGENTS.md 铁律 6）：</b>插件内颜色一律走 b3 CSS 变量，类名前缀 <code>lvct-</code>，不硬编码色值。下列令牌表给出 <b>设计令牌 → b3 变量 → 用途</b> 三层映射；分组色为插件自有令牌，用 <code>color-mix()</code> 从 b3 基础色派生，自动适配明暗主题。</div>
+
+      <h3>品牌与语义色</h3>
+      <div class="ds">主色沿用插件图标的蓝紫渐变 + 橙色点缀（与打卡/雷切同视觉语言）。</div>
+      <div class="sw-grid">
+        <div class="sw"><div class="c" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)"></div><div class="t"><b>品牌主色 Accent</b><code>--b3-theme-primary</code></div></div>
+        <div class="sw"><div class="c" style="background:var(--accent-soft)"></div><div class="t"><b>主色浅底</b><code>--b3-theme-primary-light</code></div></div>
+        <div class="sw"><div class="c" style="background:var(--highlight)"></div><div class="t"><b>点缀橙（生日/提醒）</b><code>--lvct-highlight</code></div></div>
+        <div class="sw"><div class="c" style="background:var(--success)"></div><div class="t"><b>成功 / 双链来源</b><code>--b3-theme-success</code></div></div>
+        <div class="sw"><div class="c" style="background:var(--danger)"></div><div class="t"><b>危险 / 久未联系</b><code>--b3-theme-error</code></div></div>
+        <div class="sw"><div class="c" style="background:var(--info)"></div><div class="t"><b>信息 / AI 来源</b><code>--b3-theme-info</code></div></div>
+      </div>
+
+      <h3>中性色阶（表面与文字）</h3>
+      <div class="ds">四层表面 + 三级文字 + 两级描边，覆盖全部界面场景；全部直接复用 b3 变量，主题切换零成本。</div>
+      <table class="spec-tbl">
+        <tr><th>角色</th><th>设计令牌</th><th>b3 变量</th><th>用途</th></tr>
+        <tr><td>应用底色</td><td>bg-app</td><td><code>--b3-theme-background</code></td><td>工作台最底层</td></tr>
+        <tr><td>基底表面</td><td>bg-base</td><td><code>--b3-theme-surface</code></td><td>内容区 / 编辑器</td></tr>
+        <tr><td>卡片表面</td><td>bg-surface</td><td><code>--b3-theme-surface-light</code>（按主题换算）</td><td>卡片、面板、输入框</td></tr>
+        <tr><td>浮层表面</td><td>bg-elevated</td><td><code>--b3-theme-surface-lighter</code></td><td>弹窗、下拉、悬停卡</td></tr>
+        <tr><td>一级文字</td><td>text-1</td><td><code>--b3-theme-on-background</code></td><td>标题、正文</td></tr>
+        <tr><td>二级文字</td><td>text-2</td><td><code>--b3-theme-on-surface</code></td><td>描述、字段值</td></tr>
+        <tr><td>三级文字</td><td>text-3</td><td><code>--b3-theme-on-surface-light</code></td><td>占位、辅助说明</td></tr>
+        <tr><td>描边</td><td>border-subtle / strong</td><td><code>--b3-border-color</code> / 透明化派生</td><td>分隔线 / 悬停描边</td></tr>
+      </table>
+
+      <h3>分组色板（明暗双套）</h3>
+      <div class="ds">保持现有五色语义，但令牌化并以 color-mix 适配暗色（暗色提高明度、浅色压低饱和）。头像渐变 = 分组色 → color-mix(分组色 60%, 黑 10%)。</div>
+      <div class="sw-grid">
+        <div class="sw"><div class="c" style="background:var(--g-family)"></div><div class="t"><b>家人 红</b><code>--lvct-group-family</code></div></div>
+        <div class="sw"><div class="c" style="background:var(--g-friend)"></div><div class="t"><b>朋友 绿</b><code>--lvct-group-friend</code></div></div>
+        <div class="sw"><div class="c" style="background:var(--g-work)"></div><div class="t"><b>同事 蓝</b><code>--lvct-group-work</code></div></div>
+        <div class="sw"><div class="c" style="background:var(--g-school)"></div><div class="t"><b>同学 橙</b><code>--lvct-group-school</code></div></div>
+        <div class="sw"><div class="c" style="background:var(--g-other)"></div><div class="t"><b>其他 灰</b><code>--lvct-group-other</code></div></div>
+      </div>
+      <div class="ds" style="margin-top:14px">二期「自定义分组」开放时，新增分组从 12 色扩展色环取色（同明度同饱和，保证图谱可读性），此色板即取色器数据源。</div>
+    </section>
+
+    <!-- ========== 11. 字体 / 间距 / 动效 ========== -->
+    <section class="screen spec" id="s-type">
+      <h3>字体系统</h3>
+      <div class="ds">字族跟随思源（系统栈），只定义尺寸与字重梯度；数字用 tabular-nums 保证统计卡对齐。</div>
+      <table class="spec-tbl">
+        <tr><th>层级</th><th>规格</th><th>样例</th><th>用途</th></tr>
+        <tr><td>Display</td><td>20 / 700 / -0.01em</td><td style="font-size:20px; font-weight:700; color:var(--text-1)">欢迎使用小驴人脉</td><td>向导标题、页头问候</td></tr>
+        <tr><td>Title</td><td>16 / 700</td><td style="font-size:16px; font-weight:700; color:var(--text-1)">联系人</td><td>视图页头</td></tr>
+        <tr><td>Heading</td><td>13.5 / 600</td><td style="font-size:13.5px; font-weight:600; color:var(--text-1)">近期生日</td><td>面板标题、弹窗标题</td></tr>
+        <tr><td>Body</td><td>13 / 400 / 1.6</td><td style="color:var(--text-1)">参会：陈立群、周子昂，还有王慧敏老师。</td><td>正文、列表主行</td></tr>
+        <tr><td>Caption</td><td>12 / 400</td><td style="font-size:12px">上次互动：68 天前 · 项目复盘会</td><td>次级信息、元数据</td></tr>
+        <tr><td>Micro</td><td>11 / 500 / +0.04em</td><td style="font-size:11px; letter-spacing:.04em">已在人脉库（双链识别）</td><td>分区标签、徽标</td></tr>
+      </table>
+
+      <h3>间距与形状（4pt 网格）</h3>
+      <div class="two-col">
+        <table class="spec-tbl">
+          <tr><th>令牌</th><th>值</th><th>典型用途</th></tr>
+          <tr><td>sp-1</td><td>4px</td><td>图标与文字间距、chip 内距</td></tr>
+          <tr><td>sp-2</td><td>8px</td><td>控件间最小间隔、列表行内距</td></tr>
+          <tr><td>sp-3</td><td>12/14px</td><td>卡片网格 gap、面板内距</td></tr>
+          <tr><td>sp-4</td><td>18/22px</td><td>视图内容区 padding</td></tr>
+          <tr><td>sp-5</td><td>28/36px</td><td>区块间大间隔</td></tr>
+        </table>
+        <table class="spec-tbl">
+          <tr><th>令牌</th><th>值</th><th>典型用途</th></tr>
+          <tr><td>r-sm</td><td>7px</td><td>按钮、chip、小头像</td></tr>
+          <tr><td>r-md</td><td>10px</td><td>输入框、下拉、步骤条</td></tr>
+          <tr><td>r-lg</td><td>13px</td><td>卡片、面板</td></tr>
+          <tr><td>r-xl</td><td>15/16px</td><td>弹窗、外框</td></tr>
+          <tr><td>阴影</td><td>shadow-1/2/3</td><td>卡片静止 / 悬停 / 浮层</td></tr>
+        </table>
+      </div>
+
+      <h3>动效规范</h3>
+      <div class="ds">原则：快、短、可预期。所有过渡 ≤ 250ms，缓动统一 <code>cubic-bezier(.2,.8,.3,1)</code>；尊重思源"减弱动效"系统设置（prefers-reduced-motion 时全部降级为透明度过渡）。</div>
+      <table class="spec-tbl">
+        <tr><th>场景</th><th>参数</th><th>说明</th></tr>
+        <tr><td>悬停反馈</td><td>120ms</td><td>背景 / 描边 / translateY(-2px) + shadow-2（卡片）</td></tr>
+        <tr><td>视图切换</td><td>200ms fade+6px 上移</td><td>避免生硬跳变</td></tr>
+        <tr><td>Peek 滑入</td><td>220ms 右移 30px → 0</td><td>配合列表选中态</td></tr>
+        <tr><td>弹窗弹出</td><td>200ms scale(.96)→1</td><td>遮罩 blur(2px) 淡入</td></tr>
+        <tr><td>骨架屏</td><td>1.4s shimmer 循环</td><td>替代一切"加载中…"纯文本</td></tr>
+      </table>
+
+      <h3>可访问性底线</h3>
+      <div class="ds">① 所有弹窗：<kbd>Esc</kbd> 关闭、焦点陷阱、打开时焦点落于首个可交互元素、关闭后焦点归还触发源。② 色彩不作为唯一信息载体（久未联系 = 红色 + 天数文字）。③ 正文对比度 ≥ 4.5:1，三级文字仅用于非关键信息。④ 触控目标 ≥ 32px（移动端 ≥ 40px）。</div>
+    </section>
+
+    <!-- ========== 12. 组件规范 ========== -->
+    <section class="screen spec" id="s-comp">
+      <div class="note-box">以下为可复用组件的活样例与使用规则。命名遵循 <code>lvct-</code> 前缀（如 <code>.lvct-btn--primary</code>）；优先复用思源 <code>b3-button</code> / <code>b3-text-field</code> 基座，插件仅在需要品牌化（主色渐变按钮、分组头像）时自建。</div>
+
+      <h3>按钮 Button</h3>
+      <div class="card comp-row">
+        <span class="comp-label">变体：主按钮每屏最多 1 个；危险操作仅用文字色 + 浅底悬停，不用实心红</span>
+        <button class="btn btn--primary">主要操作</button>
+        <button class="btn">次要操作</button>
+        <button class="btn btn--ghost">幽灵按钮</button>
+        <button class="btn btn--danger">删除…</button>
+        <button class="btn" disabled>禁用</button>
+        <button class="btn btn--sm btn--primary">小型主按钮</button>
+      </div>
+
+      <h3>输入 Input / 选择 Select</h3>
+      <div class="card comp-row">
+        <span class="comp-label">聚焦态 = 主色描边 + 3px 浅底光晕；图标前置，搜索框右侧可放 <kbd>Esc</kbd> 清除</span>
+        <div class="input" style="width:220px">🔍 <input placeholder="搜索联系人…"></div>
+        <span class="select-mock">分组：全部 ▾</span>
+        <div class="switch on"></div><div class="switch"></div>
+      </div>
+
+      <h3>徽标 Chip / 头像 Avatar / 复选 Checkbox</h3>
+      <div class="card comp-row">
+        <span class="comp-label">Chip 语义固定：accent=标签/选中、hl=生日、ok=确定来源、info=AI 来源、danger=风险</span>
+        <span class="chip chip--accent"># 家长群</span><span class="chip chip--hl">🎂 今天</span><span class="chip chip--ok">双链</span><span class="chip chip--info">AI 提名</span><span class="chip chip--danger">久未联系</span>
+        <span style="width:12px"></span>
+        <div class="avatar av-family">林</div><div class="avatar avatar--sm av-work">陈</div>
+        <div class="checkbox on">✓</div><div class="checkbox"></div>
+      </div>
+
+      <h3>卡片 Card / 统计卡 Stat</h3>
+      <div class="card comp-row" style="align-items:stretch">
+        <span class="comp-label">可点卡片必有悬停提升（translateY -2px + shadow-2）；统计卡右上角辉光面积 ≤ 15%</span>
+        <div class="card stat" style="width:170px"><div class="glow" style="background:var(--accent)"></div><div class="lb">👥 联系人</div><div class="num">236</div><div class="ft">本月 +12</div></div>
+        <div class="card pcard" style="width:230px"><div class="pcard__top"><div class="avatar av-friend">郑</div><div><div class="pcard__nm">郑好</div><div class="pcard__sub">54 天未联系</div></div></div></div>
+      </div>
+
+      <h3>空状态 Empty / 骨架屏 Skeleton / 提示 Toast</h3>
+      <div class="two-col">
+        <div class="card">
+          <div class="empty">
+            <div class="ic">🫂</div>
+            <b>还没有联系人</b>
+            <p>从新建第一个联系人开始，或批量收编已有的人名笔记、导入 vCard 通讯录。</p>
+            <div style="display:flex; gap:8px; margin-top:6px"><button class="btn btn--primary btn--sm">＋ 新建</button><button class="btn btn--sm">收编文档</button><button class="btn btn--sm">导入 vCard</button></div>
+          </div>
+        </div>
+        <div>
+          <div class="card card--pad" style="margin-bottom:14px">
+            <div style="display:flex; gap:11px; align-items:center"><div class="skl" style="width:40px;height:40px;border-radius:12px"></div><div style="flex:1"><div class="skl" style="height:13px;width:40%"></div><div class="skl" style="height:10px;width:65%;margin-top:8px"></div></div></div>
+            <div class="skl" style="height:11px;margin-top:14px"></div><div class="skl" style="height:11px;width:80%;margin-top:8px"></div>
+          </div>
+          <div class="toast-mock">✅ 已记录与「林晓梅」的互动 · <a style="color:var(--accent)">查看</a></div>
+          <div class="ds" style="margin-top:10px">规则：空状态必须给出 1–3 个可执行的下一步；成功 Toast 4s 自动消失、附撤销/查看动作；失败 Toast 常驻至手动关闭。</div>
+        </div>
+      </div>
+
+      <h3>对话框与浮层层级</h3>
+      <table class="spec-tbl">
+        <tr><th>层级</th><th>组件</th><th>规格</th><th>规则</th></tr>
+        <tr><td>L0 内容</td><td>视图</td><td>—</td><td>—</td></tr>
+        <tr><td>L1</td><td>Peek 侧栏</td><td>400px · 右滑入 · 无遮罩</td><td>点击外部不关（防误丢输入），Esc/✕ 关闭；与列表可同时操作</td></tr>
+        <tr><td>L2</td><td>模态对话框</td><td>560px（宽版 720px）· 遮罩 blur(2px)</td><td>新建/编辑/捕获/导入；ESC + 点遮罩关闭；有未保存修改时关闭需二次确认</td></tr>
+        <tr><td>L3</td><td>下拉 / 悬停卡 / Toast</td><td>shadow-3 + border-strong</td><td>悬停卡 300ms 延迟出现；Toast 右上堆叠，最多 3 条</td></tr>
+      </table>
+
+      <h3>移动端适配要点</h3>
+      <div class="ds">工作台 = 全屏 Dialog（现状保留）；侧栏导航 → 底部 Tab Bar（首页/联系人/图谱/我的设置）；Peek → 全屏底部抽屉（上滑展开、下滑关闭）；卡片网格单列；触控目标 ≥ 40px；统计卡 2×2。判定一律用 <code>getFrontend()</code>（AGENTS.md 铁律 8），禁 UA 嗅探。</div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+const titles = {
+  overview: ["设计策略与信息架构", "产品分析 → 设计原则 → 导航模型 → 关键流程"],
+  home: ["工作台 · 首页仪表盘", "回答「今天该关注谁」——提醒触达与快捷互动"],
+  people: ["联系人列表", "卡片/表格双视图 · 统一主操作 · 批量管理"],
+  detail: ["人物详情（Peek 侧栏）", "列表 → Peek → 文档的三级详情深度"],
+  graph: ["关系图谱", "搜索 / 分组过滤 / 缩放 / 悬停卡 · 截断可操作"],
+  capture: ["从笔记捕获", "三步向导：识别 → 确认 → 完成 · AI 只提名不决定"],
+  wizard: ["初始化向导", "一次性轻量流程 · 过程可见 · 失败可恢复"],
+  settings: ["设置页", "六分区 · 字段健康检查 · AI 与隐私边界"],
+  docbar: ["人物文档档案条", "插件 ⇄ 文档的双向出入口"],
+  color: ["色彩与令牌", "设计令牌 → b3 变量映射 · 明暗双套分组色"],
+  type: ["字体 · 间距 · 动效", "4pt 网格 · ≤250ms 动效 · 可访问性底线"],
+  comp: ["组件规范", "可复用组件活样例与使用规则"],
+};
+document.querySelectorAll(".proto-nav__item").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".proto-nav__item").forEach(b => b.classList.remove("on"));
+    document.querySelectorAll(".screen").forEach(s => s.classList.remove("on"));
+    btn.classList.add("on");
+    const id = btn.dataset.s;
+    document.getElementById("s-" + id).classList.add("on");
+    const [t, sub] = titles[id];
+    document.getElementById("pageTitle").textContent = t;
+    document.getElementById("pageSub").textContent = sub;
+    window.scrollTo({ top: 0 });
+  });
+});
+document.querySelectorAll("#themeSeg button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#themeSeg button").forEach(b => b.classList.remove("on"));
+    btn.classList.add("on");
+    document.documentElement.dataset.theme = btn.dataset.t;
+  });
+});
+</script>
+</body>
+</html>

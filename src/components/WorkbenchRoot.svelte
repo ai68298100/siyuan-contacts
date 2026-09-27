@@ -3,18 +3,23 @@
     import InitWizard from "./InitWizard.svelte";
     import Workbench from "./Workbench.svelte";
     import type { ContactsPluginFacade } from "../types";
+    import type { ViewPreferences } from "../domain/preferences";
 
     let { facade }: { facade: ContactsPluginFacade } = $props();
 
     // 有意取挂载时快照：settings 只会经下方向导回调在本组件内更新
     // svelte-ignore state_referenced_locally
     let settings = $state(facade.settings);
+    // svelte-ignore state_referenced_locally
+    let preferences: ViewPreferences = $state(facade.viewPreferences);
 </script>
 
 {#if settings}
     <Workbench
         {facade}
         {settings}
+        {preferences}
+        onPreferencesUpdated={(value) => (preferences = value)}
         isMobile={facade.isMobile}
         onOpenPersonDoc={(docId) => facade.openPersonDoc(docId)}
     />

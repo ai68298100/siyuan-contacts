@@ -1,0 +1,159 @@
+/* ============================================================================
+ * 小驴人脉 · 设计令牌（Design Tokens）v1.0
+ * ----------------------------------------------------------------------------
+ * 事实源：docs/UI-HANDOFF.md §3；视觉对照：docs/ui-prototype.html「色彩与令牌」。
+ *
+ * 三层架构（自上而下只准单向引用）：
+ *   b3 变量（思源主题，随用户主题/明暗自动变化）
+ *     → --lvct-* 语义令牌（本文件，唯一允许桥接 b3 的地方）
+ *       → 组件类（.lvct-*，只准消费 --lvct-* 令牌）
+ *
+ * 硬性规则（与 AGENTS.md 铁律 6 同级）：
+ *   1. 组件 SCSS 中禁止出现 hex/rgba 字面值与 --b3-* 直接引用，一律 var(--lvct-*)。
+ *      （历史代码暂豁免，按 docs/UI-REFACTOR-PLAN.md UI-01 逐步迁移。）
+ *   2. 新增令牌：先在本文件登记并注明用途/b3 映射，再在组件中使用。
+ *   3. 引用 b3 变量必须带 fallback（b3 变量随思源版本有增删，见 DATA-CONTRACT §6 同款教训）。
+ *   4. 令牌只挂在插件根类上（.lvct-tab-root / .lvct-dialog-root / .lvct-doc-strip），不污染全局 :root。
+ *      自绘浮层（fixed 定位）仍是插件根的 DOM 后代；文档档案条独立继承令牌。
+ *   5. 明暗差异只允许出现在本文件的 [data-theme-mode="dark"] 覆写块中。
+ * ========================================================================== */
+
+.lvct-tab-root,
+.lvct-dialog-root,
+.lvct-doc-strip {
+
+    /* ---------- 1. 品牌色（与插件图标同视觉语言：蓝紫渐变 + 橙点） ---------- */
+    --lvct-brand-from: #6366f1;
+    --lvct-brand-to: #8b5cf6;
+    --lvct-brand-gradient: linear-gradient(135deg, var(--lvct-brand-from) 0%, var(--lvct-brand-to) 100%);
+    /* 点缀橙：生日/提醒/图标橙点；暗色下提高明度（见 dark 覆写） */
+    --lvct-highlight: #d97706;
+    --lvct-highlight-soft: color-mix(in srgb, var(--lvct-highlight) 12%, transparent);
+
+    /* ---------- 2. 语义色：表面层级（全部桥接 b3，主题切换零成本） ---------- */
+    --lvct-bg-app: var(--b3-theme-background);                                  /* 工作台最底层 */
+    --lvct-bg-base: var(--b3-theme-background);                                 /* 内容区 */
+    --lvct-bg-surface: var(--b3-theme-surface);                                 /* 卡片 / 面板 / 输入框 */
+    --lvct-bg-elevated: var(--b3-theme-surface-lighter, var(--b3-theme-surface)); /* 弹窗 / 下拉 / 悬停卡 */
+    --lvct-bg-hover: var(--b3-list-hover);                                      /* 行/项悬停 */
+    --lvct-bg-active: var(--b3-list-icon-hover, var(--b3-list-hover));          /* 按下/选中底 */
+
+    /* ---------- 3. 语义色：文字三级 ---------- */
+    --lvct-text-1: var(--b3-theme-on-background);        /* 标题、正文 */
+    --lvct-text-2: var(--b3-theme-on-surface);           /* 描述、字段值 */
+    --lvct-text-3: var(--b3-theme-on-surface-light);     /* 占位、辅助说明（非关键信息） */
+
+    /* ---------- 4. 语义色：描边两级 ---------- */
+    --lvct-border-subtle: var(--b3-border-color);
+    --lvct-border-strong: color-mix(in srgb, var(--b3-theme-on-background) 18%, transparent);
+
+    /* ---------- 5. 语义色：主色与状态色 ---------- */
+    --lvct-accent: var(--b3-theme-primary);
+    --lvct-on-accent: var(--b3-theme-on-primary, #fff);
+    --lvct-accent-soft: var(--b3-theme-primary-lightest,
+        color-mix(in srgb, var(--b3-theme-primary) 12%, transparent));
+    --lvct-success: var(--b3-theme-success, #23b27c);
+    --lvct-success-soft: color-mix(in srgb, var(--lvct-success) 13%, transparent);
+    --lvct-danger: var(--b3-theme-error);
+    --lvct-danger-soft: var(--b3-card-error-background,
+        color-mix(in srgb, var(--lvct-danger) 11%, transparent));
+    --lvct-info: var(--b3-theme-info, #3b82f6);
+    --lvct-info-soft: color-mix(in srgb, var(--lvct-info) 13%, transparent);
+
+    /* ---------- 6. 分组色板（插件自有令牌，明暗双套；dark 覆写见文末） ----------
+     * 语义固定：家人/朋友/同事/同学/其他。
+     * 头像渐变 = linear-gradient(135deg, 分组色, color-mix(分组色 60%, black 10%))。
+     * 二期自定义分组从同明度/同饱和的 12 色扩展环取色，此色板即取色器数据源。 */
+    --lvct-group-family: #e05260;
+    --lvct-group-friend: #1a9e6e;
+    --lvct-group-work: #2b87db;
+    --lvct-group-school: #d9822b;
+    --lvct-group-other: #7a8194;
+    --lvct-group-family-soft: color-mix(in srgb, var(--lvct-group-family) 14%, transparent);
+    --lvct-group-friend-soft: color-mix(in srgb, var(--lvct-group-friend) 14%, transparent);
+    --lvct-group-work-soft: color-mix(in srgb, var(--lvct-group-work) 14%, transparent);
+    --lvct-group-school-soft: color-mix(in srgb, var(--lvct-group-school) 14%, transparent);
+    --lvct-group-other-soft: color-mix(in srgb, var(--lvct-group-other) 14%, transparent);
+
+    /* ---------- 7. 字体（字族跟随思源，只定义尺寸/字重梯度） ---------- */
+    --lvct-font-family: var(--b3-font-family, inherit);
+    --lvct-font-code: var(--b3-font-family-code, monospace);
+    --lvct-fs-display: 20px;   /* 向导标题、页头问候 */
+    --lvct-fs-title: 16px;     /* 视图页头 */
+    --lvct-fs-heading: 13.5px; /* 面板/弹窗标题 */
+    --lvct-fs-body: 13px;      /* 正文、列表主行 */
+    --lvct-fs-caption: 12px;   /* 次级信息、元数据 */
+    --lvct-fs-micro: 11px;     /* 分区标签、徽标 */
+    --lvct-fw-bold: 700;
+    --lvct-fw-medium: 600;
+    --lvct-fw-regular: 400;
+    --lvct-lh-body: 1.6;
+    --lvct-ls-micro: 0.04em;
+
+    /* ---------- 8. 间距（4pt 网格） ---------- */
+    --lvct-sp-1: 4px;    /* 图标与文字间距、chip 内距 */
+    --lvct-sp-2: 8px;    /* 控件最小间隔、列表行内距 */
+    --lvct-sp-3: 12px;   /* 卡片网格 gap、面板内距 */
+    --lvct-sp-4: 16px;   /* 视图内容区 padding（宽屏可到 22px） */
+    --lvct-sp-5: 24px;   /* 区块间大间隔 */
+    --lvct-sp-6: 36px;
+
+    /* ---------- 9. 圆角 ---------- */
+    --lvct-r-sm: 7px;    /* 按钮、chip、小头像 */
+    --lvct-r-md: 10px;   /* 输入框、下拉、步骤条 */
+    --lvct-r-lg: 13px;   /* 卡片、面板 */
+    --lvct-r-xl: 15px;   /* 弹窗 */
+    --lvct-r-pill: 999px;
+
+    /* ---------- 10. 阴影（明暗不同配方；dark 覆写见文末） ---------- */
+    --lvct-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.06);   /* 卡片静止 */
+    --lvct-shadow-2: 0 4px 16px rgba(15, 23, 42, 0.08);  /* 卡片悬停提升 */
+    --lvct-shadow-3: 0 12px 40px rgba(15, 23, 42, 0.16); /* 浮层（弹窗/下拉/Toast） */
+
+    /* ---------- 11. 动效 ----------
+     * 全部过渡 ≤ 250ms；prefers-reduced-motion 时组件降级为透明度过渡。 */
+    --lvct-dur-fast: 120ms;   /* 悬停反馈 */
+    --lvct-dur-base: 200ms;   /* 视图切换、弹窗 */
+    --lvct-dur-slow: 250ms;   /* 上限 */
+    --lvct-ease: cubic-bezier(0.2, 0.8, 0.3, 1);
+
+    /* ---------- 12. 层级（L0 内容 < L1 Peek < L2 模态 < L3 浮层） ---------- */
+    --lvct-z-peek: 20;
+    --lvct-z-dialog: 100;   /* 与既有 .lvct-dialog-mask 一致 */
+    --lvct-z-popover: 200;  /* 下拉、悬停卡 */
+    --lvct-z-toast: 300;
+
+    /* ---------- 13. 布局尺寸 ---------- */
+    --lvct-sidebar-w: 196px;         /* 桌面端左侧栏导航 */
+    --lvct-peek-w: 400px;            /* 人物详情 Peek 侧栏 */
+    --lvct-dialog-w: 560px;          /* 标准模态（与 libs/dialog.ts 一致） */
+    --lvct-dialog-w-wide: 720px;     /* 宽版模态（导入/vCard） */
+    --lvct-touch-min: 32px;          /* 桌面触控目标下限 */
+    --lvct-touch-min-mobile: 40px;   /* 移动端触控目标下限 */
+
+    /* ---------- 14. 组件尺寸 ---------- */
+    --lvct-avatar-sm: 30px;
+    --lvct-avatar-md: 40px;
+    --lvct-avatar-lg: 56px;
+}
+
+/* ============================================================================
+ * 暗色覆写：只放明暗配方不同的令牌（阴影、分组色明度、点缀橙）。
+ * 表面/文字/主色全部走 b3 变量，思源切主题时自动变化，无需覆写。
+ * ========================================================================== */
+html[data-theme-mode="dark"] .lvct-tab-root,
+html[data-theme-mode="dark"] .lvct-dialog-root,
+html[data-theme-mode="dark"] .lvct-doc-strip {
+    --lvct-highlight: #f59e0b;
+
+    --lvct-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --lvct-shadow-2: 0 4px 16px rgba(0, 0, 0, 0.35);
+    --lvct-shadow-3: 0 12px 40px rgba(0, 0, 0, 0.5);
+
+    /* 分组色暗色配方：提高明度，保证图谱与头像在深色表面上的可读性 */
+    --lvct-group-family: #f2707a;
+    --lvct-group-friend: #34c98e;
+    --lvct-group-work: #54a8f5;
+    --lvct-group-school: #f5a54b;
+    --lvct-group-other: #8b91a0;
+}

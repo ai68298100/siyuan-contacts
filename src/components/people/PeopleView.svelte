@@ -1,20 +1,31 @@
 <script lang="ts">
     /** 联系人视图：名册缓存 + 客户端过滤/分页 + 卡片/表格双形态；详情弹窗由 Workbench 统一承载 */
-    import { listContacts, filterContacts, PAGE_SIZE } from "../../services/contacts";
+    import { batchUpdateContacts, listContacts, filterContacts, PAGE_SIZE, PRESET_GROUPS } from "../../services/contacts";
+    import { exportVcfText } from "../../services/vcard";
+    import { nextBirthday } from "../../domain/occasions";
     import type { ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
     import PersonCard from "./PersonCard.svelte";
     import AddPersonDialog from "./AddPersonDialog.svelte";
     import ImportDialog from "./ImportDialog.svelte";
     import VCardDialog from "./VCardDialog.svelte";
+    import LvctDialog from "../LvctDialog.svelte";
 
     let {
         settings,
-        onOpenPersonDoc,
+        revision,
+        initialSort,
+        focusIds = [],
+        focusLabel = "",
+        onClearFocus,
         onOpenDetail,
     }: {
         settings: ContactsSettings;
-        onOpenPersonDoc: (docId: string) => void;
+        revision: number;
+        initialSort: "name" | "group" | "birthday";
+        focusIds?: readonly string[];
+        focusLabel?: string;
+        onClearFocus?: () => void;
         onOpenDetail: (person: ContactSummary) => void;
     } = $props();
 
@@ -23,10 +34,19 @@
     let errorText: string = $state("");
     let searchText: string = $state("");
     let groupFilter: string = $state("");
+    let tagFilter: string[] = $state([]);
+    // svelte-ignore state_referenced_locally
+    let sortMode: "name" | "group" | "birthday" = $state(initialSort);
     let viewMode: "cards" | "table" = $state("cards");
     let adding: boolean = $state(false);
     let importing: boolean = $state(false);
     let vcarding: boolean = $state(false);
+    let batchOpen: boolean = $state(false);
+    let batchBusy: boolean = $state(false);
+    let batchError: string = $state("");
+    let batchGroup: string = $state("__keep");
+    let batchTagsText: string = $state("");
+    let selectedIds: string[] = $state([]);
     let visibleCount: number = $state(PAGE_SIZE);
 
     const groups = $derived.by(() => {
@@ -36,15 +56,32 @@
         }
         return [...set].sort();
     });
+    const tags = $derived([...new Set(people.flatMap((person) => person.tags))].sort((a, b) => a.localeCompare(b, "zh-CN")));
 
-    const filtered = $derived(filterContacts(people, searchText, groupFilter));
+    const filtered = $derived.by(() => {
+        const focus = new Set(focusIds);
+        const result = filterContacts(people, searchText, groupFilter)
+            .filter((person) => !focusLabel || focus.has(person.itemId))
+            .filter((person) => tagFilter.every((tag) => person.tags.includes(tag)));
+        const birthdayDays = new Map(result.map((person) => [person.itemId, nextBirthday(person.birthday, person.isLunar)?.daysUntil ?? Infinity]));
+        result.sort((a, b) => {
+            if (sortMode === "group") return a.group.localeCompare(b.group, "zh-CN") || a.name.localeCompare(b.name, "zh-CN");
+            if (sortMode === "birthday") return (birthdayDays.get(a.itemId) ?? Infinity) - (birthdayDays.get(b.itemId) ?? Infinity) || a.name.localeCompare(b.name, "zh-CN");
+            return a.name.localeCompare(b.name, "zh-CN");
+        });
+        return result;
+    });
     const visible = $derived(filtered.slice(0, visibleCount));
+    const selectedPeople = $derived(people.filter((person) => selectedIds.includes(person.itemId)));
+    const allVisibleSelected = $derived(visible.length > 0 && visible.every((person) => selectedIds.includes(person.itemId)));
 
     async function refresh() {
         loading = true;
         errorText = "";
         try {
             people = await listContacts(settings);
+            const available = new Set(people.map((person) => person.itemId));
+            selectedIds = selectedIds.filter((itemId) => available.has(itemId));
         } catch (error) {
             errorText = error instanceof Error ? error.message : String(error);
         } finally {
@@ -52,7 +89,78 @@
         }
     }
 
-    refresh();
+    $effect(() => {
+        revision;
+        void refresh();
+    });
+
+    function toggleTag(tag: string) {
+        tagFilter = tagFilter.includes(tag) ? tagFilter.filter((item) => item !== tag) : [...tagFilter, tag];
+        visibleCount = PAGE_SIZE;
+    }
+
+    function toggleSelected(itemId: string, selected: boolean) {
+        selectedIds = selected
+            ? [...new Set([...selectedIds, itemId])]
+            : selectedIds.filter((id) => id !== itemId);
+    }
+
+    function toggleAllVisible(selected: boolean) {
+        const visibleIds = new Set(visible.map((person) => person.itemId));
+        selectedIds = selected
+            ? [...new Set([...selectedIds, ...visibleIds])]
+            : selectedIds.filter((id) => !visibleIds.has(id));
+    }
+
+    function parseTags(value: string): string[] {
+        return [...new Set(value.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0))];
+    }
+
+    async function runBatchUpdate() {
+        if (batchBusy) return;
+        const tagsToAdd = parseTags(batchTagsText);
+        const group = batchGroup === "__keep" ? undefined : batchGroup === "__clear" ? "" : batchGroup;
+        if (group === undefined && tagsToAdd.length === 0) {
+            batchError = "请选择要修改的分组，或输入至少一个要添加的标签";
+            return;
+        }
+        batchBusy = true;
+        batchError = "";
+        try {
+            await batchUpdateContacts(settings, selectedPeople.map((person) => ({
+                itemId: person.itemId,
+                ...(group !== undefined ? { group } : {}),
+                ...(tagsToAdd.length > 0 ? { tags: [...new Set([...person.tags, ...tagsToAdd])] } : {}),
+            })));
+            batchOpen = false;
+            batchGroup = "__keep";
+            batchTagsText = "";
+            selectedIds = [];
+            await refresh();
+        } catch (error) {
+            batchError = error instanceof Error ? error.message : String(error);
+        } finally {
+            batchBusy = false;
+        }
+    }
+
+    async function exportSelected() {
+        if (selectedIds.length === 0) return;
+        try {
+            const text = await exportVcfText(settings, selectedIds);
+            if (!text) return;
+            const stamp = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+            const blob = new Blob([text], { type: "text/vcard;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = `小驴人脉_选中_${stamp}.vcf`;
+            anchor.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            errorText = error instanceof Error ? error.message : String(error);
+        }
+    }
 </script>
 
 <div class="lvct-people">
@@ -69,6 +177,11 @@
                 <option value={group}>{group}</option>
             {/each}
         </select>
+        <select class="b3-select" bind:value={sortMode} aria-label="排序方式" onchange={() => (visibleCount = PAGE_SIZE)}>
+            <option value="name">按姓名</option>
+            <option value="group">按分组</option>
+            <option value="birthday">按生日临近</option>
+        </select>
         <button
             class="b3-button b3-button--outline"
             title="切换卡片/表格"
@@ -81,30 +194,104 @@
         <button class="b3-button b3-button--text" onclick={() => (adding = true)}>新建联系人</button>
     </div>
 
+    {#if tags.length > 0}
+        <div class="lvct-people__filters" aria-label="标签筛选">
+            <span class="ft__smaller ft__on-surface">标签</span>
+            {#each tags as tag (tag)}
+                <button type="button" class="lvct-people__filter" class:lvct-people__filter--active={tagFilter.includes(tag)} aria-pressed={tagFilter.includes(tag)} onclick={() => toggleTag(tag)}>{tag}</button>
+            {/each}
+            {#if tagFilter.length > 0}
+                <button type="button" class="lvct-people__filter-clear" onclick={() => { tagFilter = []; visibleCount = PAGE_SIZE; }}>清除筛选</button>
+            {/if}
+        </div>
+    {/if}
+
+    {#if selectedIds.length > 0}
+        <div class="lvct-people__batchbar" role="toolbar" aria-label="批量操作">
+            <b>已选 {selectedIds.length} 人</b>
+            <button class="b3-button b3-button--outline" onclick={() => { batchError = ""; batchOpen = true; }}>批量编辑</button>
+            <button class="b3-button b3-button--outline" onclick={exportSelected}>导出 vCard</button>
+            <button class="b3-button b3-button--text" onclick={() => (selectedIds = [])}>取消选择</button>
+        </div>
+    {/if}
+
+    {#if focusLabel}
+        <div class="lvct-people__focusbar">
+            <span>来自首页：{focusLabel}（{filtered.length} 人）</span>
+            <button type="button" onclick={onClearFocus}>清除首页筛选</button>
+        </div>
+    {/if}
+
     {#if errorText}
         <div class="lvct-form__error">加载失败：{errorText}</div>
     {:else if loading}
-        <div class="lvct-placeholder">加载中…</div>
+        <div class="lvct-people__skeleton" aria-busy="true" aria-label="联系人加载中">
+            {#each Array(6) as _, index (index)}
+                <div class="lvct-people__skeleton-card">
+                    <span class="lvct-skeleton lvct-skeleton--avatar"></span>
+                    <span class="lvct-skeleton lvct-skeleton--name"></span>
+                    <span class="lvct-skeleton lvct-skeleton--meta"></span>
+                </div>
+            {/each}
+        </div>
     {:else if filtered.length === 0}
-        <div class="lvct-placeholder">
-            {people.length === 0 ? "还没有联系人：新建、导入已有文档或导入 vCard 通讯录开始。" : "当前筛选下没有联系人。"}
+        <div class="lvct-empty">
+            <div class="lvct-empty__icon" aria-hidden="true">♧</div>
+            <b>{people.length === 0 ? "还没有联系人" : "当前筛选下没有联系人"}</b>
+            <p>{people.length === 0 ? "从新建第一个联系人开始，也可以收编笔记或导入 vCard。" : "换个关键词、分组或标签试试。"}</p>
+            {#if people.length === 0}
+                <div class="lvct-empty__actions">
+                    <button class="b3-button b3-button--text" onclick={() => (adding = true)}>＋ 新建联系人</button>
+                    <button class="b3-button b3-button--outline" onclick={() => (importing = true)}>收编文档</button>
+                    <button class="b3-button b3-button--outline" onclick={() => (vcarding = true)}>导入 vCard</button>
+                </div>
+            {:else}
+                <div class="lvct-empty__actions">
+                    <button class="b3-button b3-button--outline" onclick={() => {
+                        searchText = "";
+                        groupFilter = "";
+                        tagFilter = [];
+                        visibleCount = PAGE_SIZE;
+                        onClearFocus?.();
+                    }}>清除所有筛选</button>
+                </div>
+            {/if}
         </div>
     {:else if viewMode === "cards"}
         <div class="lvct-people__cards">
             {#each visible as person (person.itemId)}
-                <PersonCard {person} onOpen={onOpenDetail} />
+                <PersonCard
+                    {person}
+                    selected={selectedIds.includes(person.itemId)}
+                    onToggleSelected={(selected) => toggleSelected(person.itemId, selected)}
+                    onOpen={onOpenDetail}
+                />
             {/each}
         </div>
     {:else}
         <div class="lvct-people__table-wrap">
             <table class="b3-table">
                 <thead>
-                    <tr><th>姓名</th><th>分组</th><th>电话</th><th>微信</th><th>生日</th><th>标签</th></tr>
+                    <tr>
+                        <th class="lvct-people__select-cell">
+                            <input type="checkbox" aria-label="选择当前列表联系人" checked={allVisibleSelected} onchange={(event) => toggleAllVisible((event.currentTarget as HTMLInputElement).checked)} />
+                        </th>
+                        <th>姓名</th><th>分组</th><th>电话</th><th>微信</th><th>生日</th><th>标签</th>
+                    </tr>
                 </thead>
                 <tbody>
                     {#each visible as person (person.itemId)}
                         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-                        <tr onclick={() => onOpenPersonDoc(person.docId)}>
+                        <tr onclick={() => onOpenDetail(person)}>
+                            <td class="lvct-people__select-cell">
+                                <input
+                                    type="checkbox"
+                                    aria-label={`选择 ${person.name}`}
+                                    checked={selectedIds.includes(person.itemId)}
+                                    onclick={(event) => event.stopPropagation()}
+                                    onchange={(event) => toggleSelected(person.itemId, (event.currentTarget as HTMLInputElement).checked)}
+                                />
+                            </td>
                             <td><b>{person.name}</b></td>
                             <td>{person.group || "—"}</td>
                             <td>{person.phone || "—"}</td>
@@ -125,45 +312,62 @@
     {/if}
 
     {#if adding}
-        <div class="lvct-dialog-mask" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) adding = false; }}>
-            <div class="lvct-dialog-panel">
-                <h3 class="lvct-dialog-panel__title">新建联系人</h3>
-                <AddPersonDialog
-                    {settings}
-                    onCreated={() => refresh()}
-                    onClose={() => (adding = false)}
-                />
-            </div>
-        </div>
+        <LvctDialog title="新建联系人" onClose={() => (adding = false)}>
+            <AddPersonDialog
+                {settings}
+                onCreated={() => refresh()}
+                onClose={() => (adding = false)}
+            />
+        </LvctDialog>
     {/if}
 
     {#if importing}
-        <div class="lvct-dialog-mask" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) importing = false; }}>
-            <div class="lvct-dialog-panel lvct-dialog-panel--wide">
-                <h3 class="lvct-dialog-panel__title">导入已有文档为联系人</h3>
-                <ImportDialog
-                    {settings}
-                    onImported={(count) => {
-                        if (count > 0) refresh();
-                    }}
-                    onClose={() => (importing = false)}
-                />
-            </div>
-        </div>
+        <LvctDialog title="导入已有文档为联系人" wide onClose={() => (importing = false)}>
+            <ImportDialog
+                {settings}
+                onImported={(count) => {
+                    if (count > 0) refresh();
+                }}
+                onClose={() => (importing = false)}
+            />
+        </LvctDialog>
     {/if}
 
     {#if vcarding}
-        <div class="lvct-dialog-mask" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) vcarding = false; }}>
-            <div class="lvct-dialog-panel lvct-dialog-panel--wide">
-                <h3 class="lvct-dialog-panel__title">vCard 通讯录导入/导出</h3>
-                <VCardDialog
-                    {settings}
-                    onImported={(count) => {
-                        if (count > 0) refresh();
-                    }}
-                    onClose={() => (vcarding = false)}
-                />
+        <LvctDialog title="vCard 通讯录导入/导出" wide onClose={() => (vcarding = false)}>
+            <VCardDialog
+                {settings}
+                onImported={(count) => {
+                    if (count > 0) refresh();
+                }}
+                onClose={() => (vcarding = false)}
+            />
+        </LvctDialog>
+    {/if}
+
+    {#if batchOpen}
+        <LvctDialog title={`批量编辑 · ${selectedIds.length} 人`} onClose={() => (batchOpen = false)}>
+            <div class="lvct-form">
+                <p class="ft__smaller ft__on-surface">分组会覆盖所选联系人当前值；标签会追加到现有标签并自动去重。</p>
+                <label class="lvct-form__item">
+                    <span>统一分组</span>
+                    <select class="b3-select fn__block" bind:value={batchGroup}>
+                        <option value="__keep">保持不变</option>
+                        <option value="__clear">清空分组</option>
+                        {#each PRESET_GROUPS as group (group)}<option value={group}>{group}</option>{/each}
+                        {#each groups.filter((group) => !PRESET_GROUPS.includes(group as typeof PRESET_GROUPS[number])) as group (group)}<option value={group}>{group}</option>{/each}
+                    </select>
+                </label>
+                <label class="lvct-form__item">
+                    <span>追加标签（空格/逗号分隔）</span>
+                    <input class="b3-text-field fn__block" type="text" bind:value={batchTagsText} placeholder="重点 客户" />
+                </label>
+                {#if batchError}<div class="lvct-form__error">{batchError}</div>{/if}
+                <div class="lvct-form__actions">
+                    <button class="b3-button b3-button--cancel" onclick={() => (batchOpen = false)}>取消</button>
+                    <button class="b3-button b3-button--text" onclick={runBatchUpdate} disabled={batchBusy}>{batchBusy ? "保存中…" : "应用到所选联系人"}</button>
+                </div>
             </div>
-        </div>
+        </LvctDialog>
     {/if}
 </div>

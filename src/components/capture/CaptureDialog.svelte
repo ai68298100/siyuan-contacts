@@ -3,6 +3,7 @@
     import { toLocalDateKey } from "../../domain/interactions";
     import type { CapturePreview, CaptureResult } from "../../services/capture";
     import type { ContactsPluginFacade } from "../../types";
+    import ViewState from "../ViewState.svelte";
 
     let {
         facade,
@@ -27,16 +28,29 @@
     let aiRunning: boolean = $state(false);
     let aiError: string = $state("");
     let aiDone: boolean = $state(false);
+    let aiMatchedIds: string[] = $state([]);
+    let aiUnknownNames: string[] = $state([]);
+    let step: 1 | 2 | 3 = $state(1);
 
     const checkedIds = $derived(Object.entries(checked).filter(([, on]) => on).map(([id]) => id));
     const hasTarget = $derived(checkedIds.length > 0 || newNamesText.trim().length > 0);
+    const createdPeople = $derived.by(() => {
+        const current = result;
+        if (!current) return [] as { name: string; docId: string }[];
+        return current.createdNames
+            .map((name: string, index: number) => ({ name, docId: current.createdDocIds[index] }))
+            .filter((item): item is { name: string; docId: string } => Boolean(item.docId));
+    });
 
     async function load() {
+        loadError = "";
         try {
             preview = await facade.previewCapture(docId);
             const initial: Record<string, boolean> = {};
             for (const person of preview.linked) initial[person.docId] = true;
             checked = initial;
+            aiMatchedIds = [];
+            aiUnknownNames = [];
         } catch (error) {
             loadError = error instanceof Error ? error.message : String(error);
         }
@@ -60,6 +74,8 @@
             for (const person of outcome.matched) {
                 checked[person.docId] = true;
             }
+            aiMatchedIds = [...new Set([...aiMatchedIds, ...outcome.matched.map((person) => person.docId)])];
+            aiUnknownNames = [...new Set([...aiUnknownNames, ...outcome.unknownNames])];
             const existing = new Set(
                 newNamesText.split(/[，,、\s]+/).map((name) => name.trim()).filter((name) => name.length > 0),
             );
@@ -90,6 +106,7 @@
                 place: place.trim() || undefined,
                 note: note.trim() || undefined,
             });
+            step = 3;
         } catch (error) {
             errorText = error instanceof Error ? error.message : String(error);
         } finally {
@@ -100,24 +117,48 @@
 
 <div class="lvct-form">
     {#if loadError}
-        <div class="lvct-form__error">{loadError}</div>
+        <ViewState compact error title="笔记分析失败" description={loadError}>
+            <button class="b3-button b3-button--outline" onclick={load}>重试</button>
+            <button class="b3-button b3-button--cancel" onclick={onClose}>关闭</button>
+        </ViewState>
     {:else if !preview}
-        <div class="lvct-placeholder">分析笔记中…</div>
+        <ViewState compact loading title="正在分析笔记中的联系人" />
     {:else if result}
+        <div class="lvct-capture__steps" aria-label="捕获进度">
+            <span class="lvct-capture__step--done"><b>1</b> 识别</span>
+            <i aria-hidden="true">›</i>
+            <span class="lvct-capture__step--done"><b>2</b> 确认</span>
+            <i aria-hidden="true">›</i>
+            <span class="lvct-capture__step--active"><b>3</b> 完成</span>
+        </div>
         <div class="lvct-form__hint">
-            <p>✕ 已记录 <b>{result.interactions}</b> 条互动</p>
+            <p>✓ 已记录 <b>{result.interactions}</b> 条互动</p>
             {#if result.createdNames.length > 0}<p>✦ 新增联系人：{result.createdNames.join("、")}</p>{/if}
             {#if result.attendeeBlockWritten}<p>✦ 笔记已写入「参与人员」双链区块</p>{/if}
             <p class="ft__smaller ft__on-surface">同一篇笔记重复捕获不会重复记录。</p>
+        </div>
+        <div class="lvct-form__actions lvct-capture__result-actions">
+            <button class="b3-button b3-button--outline" onclick={() => facade.openDoc(docId)}>打开原笔记</button>
+            {#each createdPeople as person (person.docId)}
+                <button class="b3-button b3-button--outline" onclick={() => facade.openPersonDoc(person.docId)}>打开{person.name}</button>
+            {/each}
         </div>
         <div class="lvct-form__actions">
             <button class="b3-button b3-button--text" onclick={onClose}>完成</button>
         </div>
     {:else}
+        <div class="lvct-capture__steps" aria-label="捕获进度">
+            <span class:lvct-capture__step--active={step === 1}><b>1</b> 识别</span>
+            <i aria-hidden="true">›</i>
+            <span class:lvct-capture__step--active={step === 2}><b>2</b> 确认</span>
+            <i aria-hidden="true">›</i>
+            <span><b>3</b> 完成</span>
+        </div>
         <p class="ft__smaller ft__on-surface lvct-form__hint">
             笔记：{preview.docName || docId}
         </p>
 
+        {#if step === 1}
         <div class="lvct-form__item">
             <span>已识别的人脉联系人（{preview.linked.length}，来自笔记内双链）</span>
             {#if preview.linked.length === 0}
@@ -131,23 +172,38 @@
                             <input class="b3-switch" type="checkbox" bind:checked={checked[person.docId]} />
                             <span><b>{person.name}</b></span>
                             <span class="ft__smaller ft__on-surface">{person.group || "未分组"}</span>
+                            <span class="lvct-capture__source-badge">双链</span>
+                            {#if aiMatchedIds.includes(person.docId)}<span class="lvct-capture__source-badge lvct-capture__source-badge--ai">AI 提名</span>{/if}
                         </label>
                     {/each}
                 </div>
             {/if}
-            <button class="b3-button b3-button--outline" style="margin-top: 6px;" onclick={runAi} disabled={aiRunning}>
-                {aiRunning ? "AI 分析中…" : aiDone ? "AI 已分析（可再次分析）" : "AI 分析本页（识别未链接的人名/日期/地点）"}
-            </button>
-            {#if aiError}
-                <p class="ft__smaller" style="color: var(--b3-theme-error);">{aiError}</p>
+            {#if facade.viewPreferences.aiEnabled}
+                <button class="b3-button b3-button--outline" style="margin-top: 6px;" onclick={runAi} disabled={aiRunning}>
+                    {aiRunning ? "AI 分析中…" : aiDone ? "AI 已分析（可再次分析）" : "AI 分析本页（识别未链接的人名/日期/地点）"}
+                </button>
+                {#if aiRunning}
+                    <div class="lvct-capture__ai-progress" role="status" aria-live="polite" aria-busy="true">
+                        <span class="lvct-skeleton" aria-hidden="true"></span>
+                        正在读取笔记并核对联系人名册…
+                    </div>
+                {/if}
+                {#if aiError}
+                    <p class="ft__smaller lvct-text-danger">{aiError}</p>
+                {/if}
             {/if}
         </div>
 
         <label class="lvct-form__item">
             <span>新人员名单（不在人脉库中，将按名新建；空格/逗号分隔）</span>
             <input class="b3-text-field fn__block" type="text" bind:value={newNamesText} placeholder="王五 赵六" />
+            {#if aiUnknownNames.length > 0}
+                <span class="lvct-capture__source-note"><b>AI 提名</b>：{aiUnknownNames.join("、")}，请确认后再记录。</span>
+            {/if}
         </label>
+        {/if}
 
+        {#if step === 2}
         <div class="lvct-form__grid">
             <label class="lvct-form__item">
                 <span>场合日期</span>
@@ -167,8 +223,15 @@
             <div class="lvct-form__error">{errorText}</div>
         {/if}
 
+        {#if running}
+            <div class="lvct-capture__ai-progress" role="status" aria-live="polite" aria-busy="true">
+                <span class="lvct-skeleton" aria-hidden="true"></span>
+                正在写入互动和参与人员区块…
+            </div>
+        {/if}
+
         <div class="lvct-form__actions">
-            <button class="b3-button b3-button--cancel" onclick={onClose}>取消</button>
+            <button class="b3-button b3-button--cancel" onclick={() => (step = 1)} disabled={running}>返回识别</button>
             <button class="b3-button b3-button--text" onclick={submit} disabled={running || !hasTarget}>
                 {running ? "记录中…" : "记录互动并写入参与人员"}
             </button>
@@ -176,5 +239,11 @@
         <p class="ft__smaller ft__on-surface lvct-form__hint">
             将为每位参与者记录一条互动（含时间/地点/备注），并在本笔记末尾写入「参与人员」双链区块。
         </p>
+        {:else}
+        <div class="lvct-form__actions">
+            <button class="b3-button b3-button--cancel" onclick={onClose}>取消</button>
+            <button class="b3-button b3-button--text" onclick={() => (step = 2)} disabled={!hasTarget || aiRunning}>下一步：确认记录</button>
+        </div>
+        {/if}
     {/if}
 </div>

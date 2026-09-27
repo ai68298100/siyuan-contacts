@@ -46,6 +46,8 @@ export interface CaptureOptions {
 
 export interface CaptureResult {
     createdNames: string[];
+    /** 本次新建联系人对应的人物文档 ID，与 createdNames 按顺序对应 */
+    createdDocIds: string[];
     /** 本次实际新记录的互动条数（同笔记重复捕获为 0） */
     interactions: number;
     attendeeBlockWritten: boolean;
@@ -70,14 +72,16 @@ export async function captureFromDoc(
 
     // 1. 新人入库（重名跳过并计入结果）
     const createdNames: string[] = [];
+    const createdDocIds: string[] = [];
     for (const rawName of options.newNames) {
         const name = rawName.trim();
         if (!name) continue;
         const draft = { ...emptyDraft(), name };
         if (validateDraft(draft).length > 0) continue;
         try {
-            await createContact(settings, draft);
+            const created = await createContact(settings, draft);
             createdNames.push(name);
+            createdDocIds.push(created.docId);
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             if (!message.includes("已存在")) throw error;
@@ -128,5 +132,5 @@ export async function captureFromDoc(
         attendeeBlockWritten = true;
     }
     invalidateRoster();
-    return { createdNames, interactions: freshTargets.length, attendeeBlockWritten };
+    return { createdNames, createdDocIds, interactions: freshTargets.length, attendeeBlockWritten };
 }

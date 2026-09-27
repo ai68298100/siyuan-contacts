@@ -3,7 +3,7 @@
  * 语义决策见 docs/DATA-CONTRACT.md §1.3 与 D-0007。
  */
 import { createDocWithMd, listNotebooks } from "../api/client";
-import { bindDocsAsRows, mapBoundDocIds, setCell } from "../api/av";
+import { bindDocsAsRows, mapBoundDocIds, setCell, unbindRows } from "../api/av";
 import { listNotebookDocs } from "../api/blocks";
 import { getRoster, invalidateRoster } from "./roster";
 import type { ContactsSettings } from "../domain/model";
@@ -148,6 +148,45 @@ export async function updateContactFields(settings: ContactsSettings, itemId: st
         type: "date",
         value: { date: birthdayMs !== null ? { content: birthdayMs, isNotEmpty: true, isNotTime: true } : { content: 0, isNotEmpty: false } },
     }));
+    await Promise.all(writes);
+    invalidateRoster();
+}
+
+/**
+ * 从人脉名册移除联系人：只解绑数据库行，保留人物文档内容。
+ * 文档仍可在思源中搜索，也可以之后重新收编；这是数据契约 §1.3 的删除语义。
+ */
+export async function removeContact(settings: ContactsSettings, person: Pick<ContactSummary, "itemId">): Promise<void> {
+    await unbindRows(settings.avId, [person.itemId]);
+    invalidateRoster();
+}
+
+export interface ContactBatchUpdate {
+    itemId: string;
+    /** undefined = 不修改；空字符串 = 清空分组 */
+    group?: string;
+    /** undefined = 不修改；空数组 = 清空标签 */
+    tags?: string[];
+}
+
+/** 批量更新联系人轻量字段；失败统一向 UI 抛错，内核不提供跨行原子事务。 */
+export async function batchUpdateContacts(settings: ContactsSettings, updates: readonly ContactBatchUpdate[]): Promise<void> {
+    const key = (field: FieldKey) => settings.fieldMap[field];
+    const writes: Promise<unknown>[] = [];
+    for (const update of updates) {
+        if (update.group !== undefined) {
+            writes.push(setCell(settings.avId, key("group"), update.itemId, {
+                type: "select",
+                value: { mSelect: update.group.trim() ? [{ content: update.group.trim(), color: "1" }] : [] },
+            }));
+        }
+        if (update.tags !== undefined) {
+            writes.push(setCell(settings.avId, key("tags"), update.itemId, {
+                type: "mSelect",
+                value: { mSelect: update.tags.filter((tag) => tag.trim()).map((tag, index) => ({ content: tag.trim(), color: String((index % 9) + 1) })) },
+            }));
+        }
+    }
     await Promise.all(writes);
     invalidateRoster();
 }

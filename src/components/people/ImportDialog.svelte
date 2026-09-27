@@ -3,6 +3,8 @@
     import { adoptDocs, discoverImportCandidates, listImportNotebooks } from "../../services/contacts";
     import type { ImportCandidate } from "../../services/contacts";
     import type { ContactsSettings } from "../../domain/model";
+    import { onDestroy } from "svelte";
+    import ViewState from "../ViewState.svelte";
 
     let {
         settings,
@@ -25,12 +27,20 @@
     let importing: boolean = $state(false);
     let errorText: string = $state("");
     let loaded = $state(false);
+    let importedCount: number | null = $state(null);
 
     let searchTimer: ReturnType<typeof setTimeout> | undefined;
+    let searchVersion = 0;
+    onDestroy(() => {
+        clearTimeout(searchTimer);
+        searchVersion += 1;
+    });
 
     const selectedIds = $derived(Object.entries(selected).filter(([, on]) => on).map(([id]) => id));
 
     async function loadNotebooks() {
+        errorText = "";
+        loaded = false;
         try {
             notebooks = await listImportNotebooks(settings);
             if (notebooks.length > 0) {
@@ -46,22 +56,29 @@
     }
 
     async function search() {
+        clearTimeout(searchTimer);
         if (!notebookId) return;
+        const version = ++searchVersion;
         loading = true;
+        selected = {};
         errorText = "";
         try {
-            candidates = await discoverImportCandidates(settings, notebookId, keyword);
-            selected = {};
+            const result = await discoverImportCandidates(settings, notebookId, keyword);
+            if (version !== searchVersion) return;
+            candidates = result;
             loaded = true;
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            if (version === searchVersion) errorText = error instanceof Error ? error.message : String(error);
         } finally {
-            loading = false;
+            if (version === searchVersion) loading = false;
         }
     }
 
     function onKeywordInput() {
         clearTimeout(searchTimer);
+        searchVersion += 1;
+        selected = {};
+        loading = !!notebookId;
         searchTimer = setTimeout(() => search(), 400);
     }
 
@@ -74,14 +91,14 @@
     }
 
     async function runImport() {
-        if (importing || selectedIds.length === 0) return;
+        if (importing || loading || errorText || importedCount !== null || selectedIds.length === 0) return;
         importing = true;
         errorText = "";
         try {
             const chosen = candidates.filter((candidate) => selected[candidate.docId]);
             const count = await adoptDocs(settings, chosen);
+            importedCount = count;
             onImported(count);
-            onClose();
         } catch (error) {
             errorText = error instanceof Error ? error.message : String(error);
         } finally {
@@ -93,8 +110,9 @@
 </script>
 
 <div class="lvct-import">
+    {#if importedCount === null}
     <div class="lvct-people__toolbar fn__flex">
-        <select class="b3-select" bind:value={notebookId} onchange={() => search()} disabled={loading || importing}>
+        <select class="b3-select" aria-label="选择待收编文档的笔记本" bind:value={notebookId} onchange={() => search()} disabled={importing || !loaded}>
             {#each notebooks as notebook (notebook.id)}
                 <option value={notebook.id}>{notebook.name}</option>
             {/each}
@@ -103,18 +121,34 @@
             class="b3-text-field fn__flex-1"
             type="text"
             placeholder="按文档名过滤…"
+            aria-label="按文档名过滤"
             bind:value={keyword}
             oninput={onKeywordInput}
-            disabled={loading || importing}
+            disabled={importing || !notebookId}
         />
     </div>
+    {/if}
 
-    {#if errorText}
-        <div class="lvct-form__error">{errorText}</div>
+    {#if importedCount !== null}
+        <div class="lvct-empty lvct-empty--compact">
+            <div class="lvct-empty__icon" aria-hidden="true">✓</div>
+            <b>收编完成</b>
+            <p>已将 {importedCount} 篇文档绑定为联系人，原文档内容没有移动或修改。</p>
+        </div>
+    {:else if errorText}
+        <ViewState compact error title="文档收编未完成" description={errorText}>
+            <button class="b3-button b3-button--outline" onclick={() => notebookId ? search() : loadNotebooks()}>重新扫描</button>
+        </ViewState>
     {:else if loading || !loaded}
-        <div class="lvct-placeholder">扫描中…</div>
+        <ViewState compact loading title="正在扫描可收编的文档" />
     {:else if candidates.length === 0}
-        <div class="lvct-placeholder">该笔记本下没有可收编的文档（已绑定或无文档）。</div>
+        <ViewState compact title={notebooks.length === 0 ? "没有可扫描的笔记本" : "没有可收编的文档"}
+            description={keyword ? "当前关键词没有匹配文档，可以清除关键词后再试。" : "可以换一本笔记本，或先创建人物文档，再回来扫描。"}>
+            {#if keyword}
+                <button class="b3-button b3-button--outline" onclick={() => { keyword = ""; void search(); }}>清除关键词</button>
+            {/if}
+            <button class="b3-button b3-button--outline" onclick={loadNotebooks}>刷新笔记本</button>
+        </ViewState>
     {:else}
         <div class="lvct-import__list">
             <label class="lvct-import__row lvct-import__row--head">
@@ -137,10 +171,14 @@
     {/if}
 
     <div class="lvct-form__actions">
-        <button class="b3-button b3-button--cancel" onclick={onClose}>取消</button>
-        <button class="b3-button b3-button--text" onclick={runImport} disabled={importing || selectedIds.length === 0}>
-            {importing ? "收编中…" : `收编为联系人（${selectedIds.length}）`}
-        </button>
+        {#if importedCount !== null}
+            <button class="b3-button b3-button--text" onclick={onClose}>完成</button>
+        {:else}
+            <button class="b3-button b3-button--cancel" onclick={onClose}>取消</button>
+            <button class="b3-button b3-button--text" onclick={runImport} disabled={importing || loading || !!errorText || selectedIds.length === 0}>
+                {importing ? "收编中…" : `收编为联系人（${selectedIds.length}）`}
+            </button>
+        {/if}
     </div>
     <p class="ft__smaller ft__on-surface lvct-form__hint">
         收编不会移动或修改文档本身，只是把它绑定为数据库一行（文档标题即姓名）。

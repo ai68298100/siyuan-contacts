@@ -15,9 +15,14 @@ import { recordInteraction } from "./data/interactions";
 import { captureFromDoc, previewCapture } from "./services/capture";
 import { extractFromDoc } from "./services/ai-extract";
 import { loadPersonInsights } from "./services/insights";
-import { initExternalBridge, disposeExternalBridge } from "./bridge/external-bridge";import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
+import { checkSettingsHealth, rebuildMissingFields, rebindSettings, repairFieldMap } from "./services/settings-health";
+import { loadViewPreferences, saveViewPreferences } from "./services/preferences";
+import { exportInteractionJson } from "./services/interaction-export";
+import { initExternalBridge, disposeExternalBridge } from "./bridge/external-bridge";
+import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
 import { svelteDialog } from "./libs/dialog";
 import type { ContactsSettings } from "./domain/model";
+import type { ViewPreferences } from "./domain/preferences";
 import type { ContactsPluginFacade } from "./types";
 
 const TAB_TYPE = "workbench";
@@ -25,6 +30,15 @@ const TAB_TYPE = "workbench";
 export default class LvContactsPlugin extends Plugin implements ContactsPluginFacade {
     isMobile = false;
     settings: ContactsSettings | null = null;
+    viewPreferences: ViewPreferences = {
+        schemaVersion: 1,
+        defaultView: "home",
+        peopleSort: "name",
+        openOnStartup: false,
+        aiEnabled: true,
+        birthdayWindowDays: 30,
+        staleThresholdDays: 30,
+    };
 
     private workbenchDialog: Dialog | null = null;
     private dialogInstance: ReturnType<typeof mount> | null = null;
@@ -42,6 +56,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
         // 自管设置只在此处加载一次；tab / dialog 都读这个缓存
         this.settings = await loadSettings(this);
+        this.viewPreferences = await loadViewPreferences(this);
 
         const plugin = this;
         this.addTab({
@@ -91,6 +106,9 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
             position: "right",
             callback: () => this.openWorkbench(),
         });
+        if (this.viewPreferences.openOnStartup) {
+            window.setTimeout(() => this.openWorkbench(), 0);
+        }
     }
 
     async onunload() {
@@ -204,14 +222,55 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         return loadPersonInsights(this, this.settings, docId);
     }
 
+    async checkSettingsHealth() {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return checkSettingsHealth(this.settings);
+    }
+
+    async rebuildMissingFields() {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        this.settings = await rebuildMissingFields(this, this.settings);
+        return this.settings;
+    }
+
+    async rebindSettings(patch: Parameters<typeof rebindSettings>[2]) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        this.settings = await rebindSettings(this, this.settings, patch);
+        return this.settings;
+    }
+
+    async exportInteractionJson() {
+        return exportInteractionJson(this);
+    }
+
+    async repairFieldMap(patch: Parameters<typeof repairFieldMap>[2]) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        this.settings = await repairFieldMap(this, this.settings, patch);
+        return this.settings;
+    }
+
+    async loadViewPreferences() {
+        this.viewPreferences = await loadViewPreferences(this);
+        return this.viewPreferences;
+    }
+
+    async saveViewPreferences(preferences: ViewPreferences) {
+        this.viewPreferences = await saveViewPreferences(this, preferences);
+        return this.viewPreferences;
+    }
+
     openHostDoc() {
         if (!this.settings) return;
         openTab({ app: this.app, doc: { id: this.settings.hostDocId } });
     }
 
-    openPersonDoc(docId: string) {
+    openDoc(docId: string) {
         if (!docId) return;
         openTab({ app: this.app, doc: { id: docId } });
+    }
+
+    openPersonDoc(docId: string) {
+        this.openDoc(docId);
     }
 
     openSettings() {

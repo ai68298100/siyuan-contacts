@@ -41,7 +41,8 @@ test("buildCoAttendance：同场次数统计，无关事件不计入", () => {
     const forC = buildCoAttendance(EVENTS, "d-c");
     assert.deepEqual(forC, [
         { otherDocId: "d-a", count: 1 },
-    ], "丙只与甲同场过一次（e7 的 ref 不在甲的 ref 集里）");
+        { otherDocId: "d-b", count: 1 },
+    ], "会议 1 中丙与甲、乙各同场一次，单人的 e7 不增加共同出席次数");
 });
 
 test("buildCoAttendance：无同场事实时为空", () => {

@@ -1,7 +1,10 @@
 <script lang="ts">
-    /** 人物详情弹窗：档案字段 + 关系列表（增删，内核自动维护双向回链） */
-    import { listContacts } from "../../services/contacts";
+    /** 人物详情 Peek：档案字段、互动与关系列表（增删，内核自动维护双向回链） */
+    import { listContacts, removeContact } from "../../services/contacts";
     import { addRelation, removeRelation, refreshPerson } from "../../services/relations";
+    import LvctDialog from "../LvctDialog.svelte";
+    import PersonEditDialog from "./PersonEditDialog.svelte";
+    import ViewState from "../ViewState.svelte";
     import type { ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
 
@@ -11,7 +14,9 @@
         onRecord,
         onLoadInsights,
         onOpenPersonDoc,
+        onNavigate,
         onChanged,
+        onDeleted,
         onClose,
     }: {
         settings: ContactsSettings;
@@ -21,7 +26,9 @@
         /** 人物洞察（时间线+共同出席） */
         onLoadInsights: (docId: string) => Promise<import("../../services/insights").PersonInsights>;
         onOpenPersonDoc: (docId: string) => void;
+        onNavigate: (person: ContactSummary) => void;
         onChanged: () => void;
+        onDeleted: () => void;
         onClose: () => void;
     } = $props();
 
@@ -35,12 +42,27 @@
     let noteText: string = $state("");
     let recorded: boolean = $state(false);
     let insights: import("../../services/insights").PersonInsights | null = $state(null);
+    let insightsLoading = $state(true);
+    let insightsError = $state("");
+    let othersLoading = $state(true);
+    let othersError = $state("");
+    let relationSelect: HTMLSelectElement | undefined = $state();
+    let insightsRequest = 0;
+    let editing = $state(false);
+    let deleting = $state(false);
+    let activeTab: "overview" | "activity" | "relations" = $state("overview");
 
     async function loadInsights() {
+        const request = ++insightsRequest;
+        insightsLoading = true;
+        insightsError = "";
         try {
-            insights = await onLoadInsights(person.docId);
-        } catch {
-            insights = null;
+            const result = await onLoadInsights(current.docId);
+            if (request === insightsRequest) insights = result;
+        } catch (error) {
+            if (request === insightsRequest) insightsError = error instanceof Error ? error.message : String(error);
+        } finally {
+            if (request === insightsRequest) insightsLoading = false;
         }
     }
 
@@ -54,12 +76,23 @@
     const candidates = $derived(
         others.filter((item) => item.itemId !== current.itemId && !current.relatedItemIds.includes(item.itemId)),
     );
+    const currentIndex = $derived(others.findIndex((item) => item.itemId === current.itemId));
+    const previousPerson = $derived(currentIndex > 0 ? others[currentIndex - 1] : null);
+    const nextPerson = $derived(currentIndex >= 0 && currentIndex < others.length - 1 ? others[currentIndex + 1] : null);
 
     async function loadOthers() {
-        const people = await listContacts(settings);
-        others = people;
-        const fresh = people.find((item) => item.itemId === current.itemId);
-        if (fresh) current = fresh;
+        othersLoading = true;
+        othersError = "";
+        try {
+            const people = await listContacts(settings);
+            others = people;
+            const fresh = people.find((item) => item.itemId === current.itemId);
+            if (fresh) current = fresh;
+        } catch (error) {
+            othersError = error instanceof Error ? error.message : String(error);
+        } finally {
+            othersLoading = false;
+        }
     }
 
     loadOthers();
@@ -70,13 +103,34 @@
         errorText = "";
         try {
             await action();
+            onChanged();
             const fresh = await refreshPerson(settings, current);
             if (fresh) current = fresh;
-            onChanged();
         } catch (error) {
             errorText = error instanceof Error ? error.message : String(error);
         } finally {
             busy = false;
+        }
+    }
+
+    async function refreshAfterEdit() {
+        await loadOthers();
+        await loadInsights();
+        onChanged();
+    }
+
+    async function confirmDelete() {
+        if (deleting || busy) return;
+        if (!window.confirm(`确定从人脉名册移除「${current.name}」吗？人物文档会保留。`)) return;
+        deleting = true;
+        errorText = "";
+        try {
+            await removeContact(settings, current);
+            onDeleted();
+        } catch (error) {
+            errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            deleting = false;
         }
     }
 </script>
@@ -91,8 +145,25 @@
                 {#if current.birthday} · 生日 {current.birthday}{current.isLunar ? "（农历）" : ""}{/if}
             </div>
         </div>
+        <div class="lvct-detail__header-actions">
+            <button class="b3-button b3-button--outline" onclick={() => (editing = true)} disabled={busy || deleting}>编辑</button>
+            <button class="b3-button b3-button--outline" onclick={() => previousPerson && onNavigate(previousPerson)} disabled={!previousPerson || busy}>上一位</button>
+            <button class="b3-button b3-button--outline" onclick={() => nextPerson && onNavigate(nextPerson)} disabled={!nextPerson || busy}>下一位</button>
+        </div>
     </div>
 
+    <div class="lvct-detail__tabs" role="tablist" aria-label="人物详情内容">
+        <button type="button" role="tab" aria-selected={activeTab === "overview"} class:lvct-detail__tab--active={activeTab === "overview"} onclick={() => (activeTab = "overview")}>概览</button>
+        <button type="button" role="tab" aria-selected={activeTab === "activity"} class:lvct-detail__tab--active={activeTab === "activity"} onclick={() => (activeTab = "activity")}>互动</button>
+        <button type="button" role="tab" aria-selected={activeTab === "relations"} class:lvct-detail__tab--active={activeTab === "relations"} onclick={() => (activeTab = "relations")}>相关人</button>
+    </div>
+
+    {#if activeTab === "overview"}
+    {#if !current.phone && !current.email && !current.wechat && !current.website && current.tags.length === 0}
+        <ViewState compact title="联系资料还未填写" description="补充电话、邮箱或标签，方便下次查找。">
+            <button class="b3-button b3-button--outline" onclick={() => (editing = true)}>编辑资料</button>
+        </ViewState>
+    {/if}
     <dl class="lvct-detail__fields">
         {#if current.phone}<div><dt>电话</dt><dd><a href={`tel:${current.phone}`}>{current.phone}</a></dd></div>{/if}
         {#if current.email}<div><dt>邮箱</dt><dd><a href={`mailto:${current.email}`}>{current.email}</a></dd></div>{/if}
@@ -119,11 +190,13 @@
                         await onRecord(current.docId, noteText.trim() || undefined);
                         recorded = true;
                         noteText = "";
+                        await loadInsights();
                     })}
             >{recorded ? "已记录 ✓" : "记录"}</button>
         </div>
         <p class="ft__smaller ft__on-surface">记录后，首页"久未联系"会重新计时。</p>
     </section>
+    {:else if activeTab === "activity"}
 
     <section class="lvct-detail__section">
         <h4>互动与共同出席{insights ? `（共 ${insights.totalEvents} 条）` : ""}</h4>
@@ -134,7 +207,13 @@
                 {/each}
             </div>
         {/if}
-        {#if insights && insights.timeline.length > 0}
+        {#if insightsLoading}
+            <ViewState compact loading title="正在加载互动记录" />
+        {:else if insightsError}
+            <ViewState compact error title="互动记录加载失败" description={insightsError}>
+                <button class="b3-button b3-button--outline" onclick={loadInsights}>重试</button>
+            </ViewState>
+        {:else if insights && insights.timeline.length > 0}
             <div class="lvct-detail__timeline">
                 {#each insights.timeline.slice(0, 5) as item (item.eventId)}
                     <div class="lvct-detail__timeline-row">
@@ -145,14 +224,30 @@
                 {/each}
             </div>
         {:else}
-            <p class="ft__smaller ft__on-surface">还没有互动记录：上方记一笔即可开始积累时间线。</p>
+            <ViewState compact title="还没有互动记录" description="从一次聊天或见面开始，记录你们的往来。">
+                <button class="b3-button b3-button--text" onclick={() => (activeTab = "overview")}>去记一笔</button>
+            </ViewState>
         {/if}
     </section>
+    {:else}
 
     <section class="lvct-detail__section">
         <h4>相关人（{relatedPeople.length}）</h4>
-        {#if relatedPeople.length === 0}
-            <p class="ft__smaller ft__on-surface">还没有建立关系。</p>
+        {#if othersLoading}
+            <ViewState compact loading title="正在加载相关人" />
+        {:else if othersError}
+            <ViewState compact error title="相关人加载失败" description={othersError}>
+                <button class="b3-button b3-button--outline" onclick={loadOthers}>重试</button>
+            </ViewState>
+        {:else if relatedPeople.length === 0}
+            <ViewState compact title="还没有建立关系"
+                description={candidates.length > 0 ? "选择一位联系人，建立你们之间的关系。" : "先在联系人页添加其他人物，再回来建立关系。"}>
+                {#if candidates.length > 0}
+                    <button class="b3-button b3-button--outline" onclick={() => relationSelect?.focus()}>选择联系人</button>
+                {:else}
+                    <button class="b3-button b3-button--outline" onclick={onClose}>返回工作台</button>
+                {/if}
+            </ViewState>
         {:else}
             <div class="lvct-detail__relations">
                 {#each relatedPeople as other (other.itemId)}
@@ -170,7 +265,7 @@
         {/if}
 
         <div class="lvct-detail__add fn__flex">
-            <select class="b3-select fn__flex-1" bind:value={addChoice} disabled={busy || candidates.length === 0}>
+            <select class="b3-select fn__flex-1" bind:this={relationSelect} aria-label="选择要添加关系的联系人" bind:value={addChoice} disabled={busy || othersLoading || !!othersError || candidates.length === 0}>
                 <option value="" disabled>{candidates.length === 0 ? "没有可添加的联系人" : "选择联系人…"}</option>
                 {#each candidates as candidate (candidate.itemId)}
                     <option value={candidate.itemId}>{candidate.name}</option>
@@ -188,6 +283,7 @@
         </div>
         <p class="ft__smaller ft__on-surface">关系为双向：添加后对方的「被相关人」列会自动出现你。</p>
     </section>
+    {/if}
 
     {#if errorText}
         <div class="lvct-form__error">{errorText}</div>
@@ -196,5 +292,17 @@
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--cancel" onclick={onClose}>关闭</button>
         <button class="b3-button b3-button--text" onclick={() => onOpenPersonDoc(current.docId)}>打开文档</button>
+        <button class="b3-button b3-button--cancel lvct-detail__delete" onclick={confirmDelete} disabled={busy || deleting}>{deleting ? "移除中…" : "从人脉移除"}</button>
     </div>
 </div>
+
+{#if editing}
+    <LvctDialog title={`编辑资料 · ${current.name}`} onClose={() => (editing = false)}>
+        <PersonEditDialog
+            {settings}
+            person={current}
+            onSaved={refreshAfterEdit}
+            onClose={() => (editing = false)}
+        />
+    </LvctDialog>
+{/if}

@@ -1,17 +1,26 @@
 <script lang="ts">
     /** 关系图谱：cytoscape 力导向布局，节点=联系人，边=related 关系，点击节点开文档 */
     import cytoscape from "cytoscape";
+    import ViewState from "../ViewState.svelte";
     import { listContacts } from "../../services/contacts";
     import { buildGraph, capGraph, GRAPH_MAX_NODES, groupColor } from "../../domain/graph";
     import type { ContactsSettings } from "../../domain/model";
     import type { ContactSummary } from "../../domain/person";
+    import type { PersonInsights } from "../../services/insights";
+    import type { ContactsPluginFacade } from "../../types";
 
     let {
         settings,
+        revision = 0,
+        facade,
         onOpenDetail,
+        onOpenPeople,
     }: {
         settings: ContactsSettings;
+        revision?: number;
+        facade?: ContactsPluginFacade;
         onOpenDetail: (person: ContactSummary) => void;
+        onOpenPeople: () => void;
     } = $props();
 
     let container: HTMLElement | undefined = $state();
@@ -19,32 +28,146 @@
     let loading: boolean = $state(true);
     let errorText: string = $state("");
     let truncated: boolean = $state(false);
+    let searchText: string = $state("");
+    let groupFilter: string = $state("");
+    let graphInstance: cytoscape.Core | null = null;
+    let hoveredPerson: ContactSummary | null = $state(null);
+    let hoverInsights: PersonInsights | null = $state(null);
+    let hoverInsightsLoading = $state(false);
+    let hoverInsightsError = $state(false);
+    let hoverPosition: { x: number; y: number } = $state({ x: 12, y: 12 });
+    let hoverTimer: ReturnType<typeof setTimeout> | undefined;
+    let clearHoverTimer: ReturnType<typeof setTimeout> | undefined;
+    let refreshVersion = 0;
+    let hoverInsightsVersion = 0;
+    const groupLegend = [
+        { label: "家人", className: "family" },
+        { label: "朋友", className: "friend" },
+        { label: "同事", className: "work" },
+        { label: "同学", className: "school" },
+        { label: "其他", className: "other" },
+    ] as const;
+
+    const groups = $derived.by(() => [...new Set(people.map((person) => person.group).filter(Boolean))].sort());
+    const filteredPeople = $derived.by(() => {
+        const needle = searchText.trim().toLowerCase();
+        return people.filter((person) => {
+            const matchesGroup = !groupFilter || person.group === groupFilter;
+            const matchesSearch = !needle || [person.name, person.phone, person.wechat, person.email, ...person.tags]
+                .join(" ")
+                .toLowerCase()
+                .includes(needle);
+            return matchesGroup && matchesSearch;
+        });
+    });
+    const searchNeedle = $derived(searchText.trim().toLowerCase());
 
     /** cytoscape 无法用 CSS 变量，挂载时从主题运行时取值 */
     function themeColors(): { text: string; edge: string } {
         const probe = container ?? document.body;
         const style = getComputedStyle(probe);
         return {
-            text: style.getPropertyValue("--b3-theme-on-surface").trim() || "#8f8f8f",
-            edge: style.getPropertyValue("--b3-border-color").trim() || "#cccccc",
+            text: style.getPropertyValue("--lvct-text-2").trim() || "currentColor",
+            edge: style.getPropertyValue("--lvct-border-subtle").trim() || "currentColor",
         };
     }
 
+    function groupColorValue(group: string): string {
+        const key: Record<string, string> = {
+            "家人": "--lvct-group-family",
+            "朋友": "--lvct-group-friend",
+            "同事": "--lvct-group-work",
+            "同学": "--lvct-group-school",
+            "其他": "--lvct-group-other",
+        };
+        const value = getComputedStyle(container ?? document.body).getPropertyValue(key[group] ?? "--lvct-group-other").trim();
+        return value || groupColor(group);
+    }
+
     async function refresh() {
+        const version = ++refreshVersion;
         loading = true;
         errorText = "";
         try {
-            people = await listContacts(settings);
+            const result = await listContacts(settings);
+            if (version === refreshVersion) people = result;
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            if (version === refreshVersion) errorText = error instanceof Error ? error.message : String(error);
         } finally {
-            loading = false;
+            if (version === refreshVersion) loading = false;
+        }
+    }
+
+    function zoomBy(factor: number) {
+        if (graphInstance) graphInstance.zoom(graphInstance.zoom() * factor);
+    }
+
+    function relayout() {
+        const instance = graphInstance;
+        if (!instance) return;
+        instance.layout({ name: "cose", animate: true, animationDuration: 300, padding: 30 }).run();
+    }
+
+    function clearHover() {
+        if (hoverTimer) clearTimeout(hoverTimer);
+        if (clearHoverTimer) clearTimeout(clearHoverTimer);
+        hoverTimer = undefined;
+        clearHoverTimer = undefined;
+        hoveredPerson = null;
+        hoverInsights = null;
+        hoverInsightsLoading = false;
+        hoverInsightsError = false;
+        hoverInsightsVersion += 1;
+    }
+
+    function scheduleClearHover() {
+        if (hoverTimer) clearTimeout(hoverTimer);
+        hoverTimer = undefined;
+        if (clearHoverTimer) clearTimeout(clearHoverTimer);
+        clearHoverTimer = setTimeout(() => {
+            hoveredPerson = null;
+            clearHoverTimer = undefined;
+        }, 220);
+    }
+
+    function scheduleHover(event: cytoscape.EventObject) {
+        const person = people.find((item) => item.docId === event.target.id());
+        if (!person) return;
+        if (hoverTimer) clearTimeout(hoverTimer);
+        if (clearHoverTimer) clearTimeout(clearHoverTimer);
+        const position = event.renderedPosition ?? event.target.renderedPosition();
+        hoverTimer = setTimeout(() => {
+            const width = container?.clientWidth ?? 420;
+            const height = container?.clientHeight ?? 360;
+            hoverPosition = {
+                x: Math.min(Math.max(8, position.x + 16), Math.max(8, width - 228)),
+                y: Math.min(Math.max(8, position.y + 16), Math.max(8, height - 150)),
+            };
+            hoveredPerson = person;
+            if (facade) void loadHoverInsights(person);
+            hoverTimer = undefined;
+        }, 300);
+    }
+
+    async function loadHoverInsights(person: ContactSummary) {
+        const client = facade;
+        if (!client) return;
+        const version = ++hoverInsightsVersion;
+        hoverInsightsLoading = true;
+        hoverInsightsError = false;
+        try {
+            const result = await client.loadPersonInsights(person.docId);
+            if (version === hoverInsightsVersion && hoveredPerson?.docId === person.docId) hoverInsights = result;
+        } catch {
+            if (version === hoverInsightsVersion && hoveredPerson?.docId === person.docId) hoverInsightsError = true;
+        } finally {
+            if (version === hoverInsightsVersion && hoveredPerson?.docId === person.docId) hoverInsightsLoading = false;
         }
     }
 
     $effect(() => {
         if (!container || people.length === 0) return;
-        const capped = capGraph(buildGraph(people));
+        const capped = capGraph(buildGraph(filteredPeople));
         truncated = capped.truncated;
         if (capped.graph.nodes.length === 0) return;
         const palette = themeColors();
@@ -57,14 +180,16 @@
                         id: node.id,
                         label: node.label,
                         degree: node.degree,
-                        color: groupColor(node.group),
+                        color: groupColorValue(node.group),
                     },
+                    classes: searchNeedle ? "lvct-graph-hit" : "",
                 })),
                 ...capped.graph.edges.map((edge) => ({
                     data: { source: edge.source, target: edge.target },
                 })),
             ],
-            layout: { name: "cose", animate: true, padding: 30 },
+            // 同步完成布局，避免筛选/切页销毁画布后动画帧继续访问 renderer。
+            layout: { name: "cose", animate: false, padding: 30 },
             style: [
                 {
                     selector: "node",
@@ -80,6 +205,13 @@
                     },
                 },
                 {
+                    selector: ".lvct-graph-hit",
+                    style: {
+                        "border-color": palette.text,
+                        "border-width": 3,
+                    },
+                },
+                {
                     selector: "edge",
                     style: {
                         width: 1.5,
@@ -89,30 +221,62 @@
                 },
             ],
         });
+        graphInstance = instance;
+        if (searchNeedle && instance.nodes().length > 0) {
+            instance.fit(instance.nodes(), 72);
+        }
 
         instance.on("tap", "node", (event: cytoscape.EventObject) => {
             const docId = event.target.id();
             const person = people.find((item) => item.docId === docId);
-            if (person) onOpenDetail(person);
+            if (person) {
+                clearHover();
+                onOpenDetail(person);
+            }
         });
+        instance.on("mouseover", "node", scheduleHover);
+        instance.on("mouseout", "node", scheduleClearHover);
 
         return () => {
+            clearHover();
             instance.destroy();
+            if (graphInstance === instance) graphInstance = null;
         };
     });
 
-    refresh();
+    $effect(() => {
+        revision;
+        void refresh();
+    });
+
+    function openHoveredPerson() {
+        const person = hoveredPerson;
+        clearHover();
+        if (person) onOpenDetail(person);
+    }
 </script>
 
 <div class="lvct-graph-view">
     <div class="lvct-people__toolbar fn__flex">
+        <input class="b3-text-field fn__flex-1" type="search" placeholder="搜索节点…" aria-label="搜索关系图谱节点" bind:value={searchText} />
+        {#if searchNeedle}<span class="ft__smaller ft__on-surface">命中 {filteredPeople.length} 人</span>{/if}
+        <select class="b3-select" bind:value={groupFilter} aria-label="按分组过滤">
+            <option value="">全部分组</option>
+            {#each groups as group (group)}
+                <option value={group}>{group}</option>
+            {/each}
+        </select>
+        <button class="b3-button b3-button--outline" onclick={() => graphInstance?.fit()}>适应</button>
+        <button class="b3-button b3-button--outline" onclick={() => zoomBy(1.2)}>放大</button>
+        <button class="b3-button b3-button--outline" onclick={() => zoomBy(1 / 1.2)}>缩小</button>
+        <button class="b3-button b3-button--outline" onclick={relayout}>重新布局</button>
+        <button class="b3-button b3-button--outline" onclick={refresh}>刷新</button>
         <span class="ft__smaller ft__on-surface lvct-graph-legend">
-            {#each Object.entries({ "家人": "#e05a5a", "朋友": "#4caf7d", "同事": "#4a8fe0", "同学": "#e0a13a" }) as [group, color] (group)}
-                <span class="lvct-graph-legend__item"><i style={`background:${color}`}></i>{group}</span>
+            {#each groupLegend as group (group.label)}
+                <span class={`lvct-graph-legend__item lvct-graph-legend__item--${group.className}`}><i></i>{group.label}</span>
             {/each}
         </span>
         <span class="fn__flex-1"></span>
-        <button class="b3-button b3-button--outline" onclick={refresh}>刷新</button>
     </div>
 
     {#if truncated}
@@ -122,12 +286,53 @@
     {/if}
 
     {#if errorText}
-        <div class="lvct-form__error">加载失败：{errorText}</div>
+        <ViewState error title="图谱加载失败" description={errorText}>
+            <button class="b3-button b3-button--outline" onclick={refresh}>重新加载</button>
+        </ViewState>
     {:else if loading}
-        <div class="lvct-placeholder">加载中…</div>
-    {:else if people.length === 0}
-        <div class="lvct-placeholder">先在「联系人」页创建联系人，关系建立后图谱会自动生成。</div>
+        <ViewState loading title="正在加载关系图谱" />
+    {:else if filteredPeople.length === 0}
+        <ViewState title={people.length === 0 ? "还没有联系人" : "没有匹配的节点"}
+            description={people.length === 0 ? "创建或导入联系人后，在人物详情中建立关系。" : "试试清除关键词和分组筛选。"}>
+            {#if people.length > 0}
+                <button class="b3-button b3-button--outline" onclick={() => { searchText = ""; groupFilter = ""; }}>清除筛选</button>
+            {/if}
+            <button class="b3-button b3-button--text" onclick={onOpenPeople}>前往联系人</button>
+        </ViewState>
     {:else}
-        <div class="lvct-graph-view__canvas" bind:this={container}></div>
+        <div class="lvct-graph-view__canvas-wrap">
+            <div class="lvct-graph-view__canvas" bind:this={container}></div>
+            {#if hoveredPerson}
+                <div
+                    class="lvct-graph-view__hover-card"
+                    role="dialog"
+                    tabindex="-1"
+                    style={`left:${hoverPosition.x}px;top:${hoverPosition.y}px`}
+                    onmouseenter={() => clearHoverTimer && clearTimeout(clearHoverTimer)}
+                    onmouseleave={scheduleClearHover}
+                >
+                    <div class="lvct-graph-view__hover-name">
+                        <b>{hoveredPerson.name}</b>
+                        {#if hoveredPerson.group}<span class="lvct-chip lvct-chip--group">{hoveredPerson.group}</span>{/if}
+                    </div>
+                    <div class="ft__smaller ft__on-surface">关系度数：{hoveredPerson.relatedItemIds.length}</div>
+                    {#if hoveredPerson.phone}<div class="ft__smaller ft__on-surface">电话：{hoveredPerson.phone}</div>{/if}
+                    {#if hoveredPerson.tags.length > 0}<div class="ft__smaller ft__on-surface">标签：{hoveredPerson.tags.join(" · ")}</div>{/if}
+                    {#if facade}
+                        <div class="lvct-graph-view__hover-insights">
+                            {#if hoverInsightsLoading}
+                                <span class="ft__smaller ft__on-surface">正在读取互动…</span>
+                            {:else if hoverInsightsError}
+                                <span class="ft__smaller ft__on-surface">互动摘要暂时不可用</span>
+                            {:else if hoverInsights}
+                                <span class="ft__smaller ft__on-surface">最近互动：{hoverInsights.timeline[0]?.localDate ?? "暂无记录"}</span>
+                                <span class="ft__smaller ft__on-surface">共同联系人：{hoverInsights.coAttendance.slice(0, 3).map((item) => item.name).join("、") || "暂无"}</span>
+                            {/if}
+                        </div>
+                    {/if}
+                    <button class="b3-button b3-button--text" onclick={openHoveredPerson}>查看人物详情</button>
+                </div>
+            {/if}
+        </div>
     {/if}
 </div>

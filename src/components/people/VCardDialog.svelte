@@ -3,6 +3,7 @@
     import { buildVcfImportPlan, exportVcfText, importVcfContacts } from "../../services/vcard";
     import type { VcfImportPlan, VcfImportReport } from "../../services/vcard";
     import type { ContactsSettings } from "../../domain/model";
+    import ViewState from "../ViewState.svelte";
 
     let {
         settings,
@@ -37,7 +38,10 @@
         const input = event.currentTarget as HTMLInputElement;
         const file = input.files?.[0];
         if (!file) return;
+        if (importing || exporting || parsing) return;
         parsing = true;
+        plans = null;
+        selected = {};
         errorText = "";
         statusText = "";
         report = null;
@@ -69,7 +73,7 @@
     }
 
     async function runImport() {
-        if (importing || !plans) return;
+        if (importing || parsing || exporting || errorText || report || !plans || selectedCount === 0) return;
         importing = true;
         errorText = "";
         try {
@@ -133,7 +137,7 @@
 
     <div class="lvct-vcard__section-title">导入</div>
     <div class="lvct-people__toolbar fn__flex">
-        <button class="b3-button b3-button--outline" onclick={() => fileInput?.click()} disabled={parsing || importing}>
+        <button class="b3-button b3-button--outline" onclick={() => fileInput?.click()} disabled={parsing || importing || exporting}>
             {parsing ? "解析中…" : "选择 .vcf 文件…"}
         </button>
         <input
@@ -148,10 +152,35 @@
         </span>
     </div>
 
-    {#if errorText}
-        <div class="lvct-form__error">{errorText}</div>
+    {#if parsing}
+        <ViewState compact loading title="正在解析通讯录并检查重名" />
+    {:else if importing}
+        <ViewState compact loading title="正在导入联系人" description={statusText} />
+    {:else if errorText}
+        <ViewState compact error title="通讯录处理失败" description={errorText}>
+            <button class="b3-button b3-button--outline" onclick={() => fileInput?.click()}>重新选择文件</button>
+        </ViewState>
+    {:else if report}
+        <ViewState compact icon={report.failed.length ? "!" : "✓"}
+            title={report.failed.length ? "导入结束，部分联系人未完成" : "导入完成"}
+            description={`新增 ${report.imported} 人，跳过同名 ${report.duplicates.length} 人，失败 ${report.failed.length} 人。`}>
+            <button class="b3-button b3-button--text" onclick={onClose}>返回联系人</button>
+            <button class="b3-button b3-button--outline" onclick={() => fileInput?.click()}>选择其他文件</button>
+        </ViewState>
+        {#if report.failed.length > 0}
+            <ul class="lvct-vcard__failures" aria-label="导入失败明细">
+                {#each report.failed as failure}<li>{failure.name}：{failure.reason}</li>{/each}
+            </ul>
+        {/if}
     {:else if plans && plans.length === 0}
-        <div class="lvct-placeholder">{statusText}</div>
+        <div class="lvct-empty lvct-empty--compact">
+            <div class="lvct-empty__icon" aria-hidden="true">⌁</div>
+            <b>没有可导入的联系人</b>
+            <p>{statusText || "请选择包含姓名字段的 vCard 文件。"}</p>
+            <div class="lvct-empty__actions">
+                <button class="b3-button b3-button--outline" onclick={() => fileInput?.click()} disabled={parsing || importing}>重新选择文件</button>
+            </div>
+        </div>
     {:else if plans}
         <div class="lvct-import__list">
             <label class="lvct-import__row lvct-import__row--head">
@@ -182,21 +211,20 @@
                 </label>
             {/each}
         </div>
+    {:else}
+        <ViewState compact icon="↥" title="导入已有通讯录" description="选择通讯录导出的 .vcf 文件，预览并确认后再导入。">
+            <button class="b3-button b3-button--outline" onclick={() => fileInput?.click()} disabled={exporting}>选择文件</button>
+        </ViewState>
     {/if}
 
-    {#if statusText}
+    {#if statusText && !importing && plans?.length !== 0}
         <div class="ft__smaller ft__on-surface lvct-vcard__status">{statusText}</div>
-    {/if}
-    {#if report}
-        <div class="lvct-form__hint ft__smaller">
-            导入完成：新增 {report.imported} 人{report.duplicates.length > 0 ? `，跳过同名 ${report.duplicates.length} 人` : ""}{report.failed.length > 0 ? `，失败 ${report.failed.length} 人（${report.failed.slice(0, 3).map((item) => `${item.name}：${item.reason}`).join("；")}${report.failed.length > 3 ? "…" : ""}）` : ""}。
-        </div>
     {/if}
 
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--cancel" onclick={onClose}>关闭</button>
-        <button class="b3-button b3-button--text" onclick={runImport} disabled={importing || !plans || selectedCount === 0}>
-            {importing ? "导入中…" : `导入为联系人（${selectedCount}）`}
+        <button class="b3-button b3-button--text" onclick={runImport} disabled={importing || parsing || exporting || !!errorText || !plans || selectedCount === 0 || report !== null}>
+            {importing ? "导入中…" : report ? "导入完成" : `导入为联系人（${selectedCount}）`}
         </button>
     </div>
 </div>
