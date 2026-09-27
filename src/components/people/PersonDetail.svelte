@@ -69,7 +69,8 @@ import StatusNotice from "../StatusNotice.svelte";
         onListTemplates?: () => Promise<NoteTemplate[]>;
         onSaveTemplates?: (templates: NoteTemplate[]) => Promise<NoteTemplate[]>;
     } = $props();
-    const text = $derived.by(() => (key: string, fallback: string) => translateText(i18n, key, fallback));
+    const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
+        translateText(i18n, key, fallback, values));
 
     // 有意取打开弹窗时的快照；后续更新走 refreshPerson 回查
     // svelte-ignore state_referenced_locally
@@ -373,7 +374,7 @@ import StatusNotice from "../StatusNotice.svelte";
 
     async function cancelFollowUp(item: FollowUpItem) {
         if (followUpBusy || !onSetFollowUpStatus) return;
-        if (!window.confirm(`取消跟进「${item.title || "保持联系"}」？取消后不再出现在待办中。`)) return;
+        if (!window.confirm(`取消跟进「${item.title || text("fuKeepInTouch", "保持联系")}」？取消后不再出现在待办中。`)) return;
         followUpBusy = true;
         followUpError = "";
         try {
@@ -502,10 +503,10 @@ import StatusNotice from "../StatusNotice.svelte";
         {#if templatesSupported}
             <div class="lvct-detail__record fn__flex lvct-detail__template-row">
                 <select class="b3-select fn__flex-1" aria-label="选用备注模板" bind:value={templateChoice} onchange={applyTemplate} disabled={busy || templates.length === 0}>
-                    <option value="">{templates.length === 0 ? "暂无模板，点「管理模板」创建" : "选用模板…"}</option>
+                    <option value="">{templates.length === 0 ? text("tplEmptyHint", "暂无模板，点「管理模板」创建") : text("tplPick", "选用模板…")}</option>
                     {#each templates as template (template.id)}<option value={template.id}>{template.name}</option>{/each}
                 </select>
-                <button class="b3-button b3-button--outline" onclick={() => (templateManagerOpen = true)} disabled={busy}>管理模板</button>
+                <button class="b3-button b3-button--outline" onclick={() => (templateManagerOpen = true)} disabled={busy}>{text("tplManage", "管理模板")}</button>
             </div>
         {/if}
         <div class="lvct-detail__record fn__flex">
@@ -534,55 +535,55 @@ import StatusNotice from "../StatusNotice.svelte";
 
     {#if followUpSupported}
     <section class="lvct-detail__section">
-        <h4>跟进计划</h4>
+        <h4>{text("fuSectionTitle", "跟进计划")}</h4>
         {#if followUpError}<div class="lvct-form__error" role="alert">{followUpError}</div>{/if}
         {#if followUpsLoading}
-            <ViewState compact loading title="正在加载跟进计划" />
+            <ViewState compact loading title={text("fuLoading", "正在加载跟进计划")} />
         {:else}
             {#if openFollowUps.length === 0}
-                <p class="ft__smaller ft__on-surface">没有进行中的跟进计划。安排一个日期，到时来联系 TA。</p>
+                <p class="ft__smaller ft__on-surface">{text("fuEmpty", "没有进行中的跟进计划。安排一个日期，到时来联系 TA。")}</p>
             {:else}
                 <div class="lvct-detail__timeline">
                     {#each openFollowUps as item (item.id)}
                         <div class="lvct-detail__timeline-row">
                             <span class="ft__on-surface">{item.dueDate}</span>
-                            <span class="lvct-detail__timeline-note">{item.title || "保持联系"}</span>
+                            <span class="lvct-detail__timeline-note">{item.title || text("fuKeepInTouch", "保持联系")}</span>
                             <span class="lvct-chip {item.dueDate < todayKey ? "lvct-bucket--stale" : ""}">{dueLabel(item.dueDate, todayKey)}</span>
                         </div>
                         {#if snoozeForId === item.id}
                             <div class="lvct-detail__snooze">
-                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "tomorrow")}>明天</button>
-                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "threeDays")}>三天后</button>
-                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "nextMonday")}>下周一</button>
-                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "nextMonth")}>一个月后</button>
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "tomorrow")}>{text("fuSnoozeTomorrow", "明天")}</button>
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "threeDays")}>{text("fuSnoozeThreeDays", "三天后")}</button>
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "nextMonday")}>{text("fuSnoozeNextMonday", "下周一")}</button>
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "nextMonth")}>{text("fuSnoozeNextMonth", "一个月后")}</button>
                                 <span class="lvct-detail__snooze-custom">
-                                    <input type="date" class="b3-text-field" aria-label="指定日期" bind:value={snoozeCustomDate} />
-                                    <button type="button" class="b3-button b3-button--text" disabled={followUpBusy || !snoozeCustomDate} onclick={() => snooze(item, "custom")}>按指定日期推迟</button>
+                                    <input type="date" class="b3-text-field" aria-label={text("fuSnoozeDateLabel", "指定日期")} bind:value={snoozeCustomDate} />
+                                    <button type="button" class="b3-button b3-button--text" disabled={followUpBusy || !snoozeCustomDate} onclick={() => snooze(item, "custom")}>{text("fuSnoozeByDate", "按指定日期推迟")}</button>
                                 </span>
                             </div>
                         {/if}
                         <div class="lvct-detail__followup-actions">
-                            <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => { snoozeForId = snoozeForId === item.id ? "" : item.id; snoozeCustomDate = ""; }} aria-expanded={snoozeForId === item.id}>推迟</button>
-                            <button type="button" class="b3-button b3-button--text" disabled={followUpBusy} onclick={() => completeFollowUp(item)}>完成</button>
-                            <button type="button" class="b3-button b3-button--cancel" disabled={followUpBusy} onclick={() => cancelFollowUp(item)}>取消计划</button>
+                            <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => { snoozeForId = snoozeForId === item.id ? "" : item.id; snoozeCustomDate = ""; }} aria-expanded={snoozeForId === item.id}>{text("fuPostpone", "推迟")}</button>
+                            <button type="button" class="b3-button b3-button--text" disabled={followUpBusy} onclick={() => completeFollowUp(item)}>{text("fuComplete", "完成")}</button>
+                            <button type="button" class="b3-button b3-button--cancel" disabled={followUpBusy} onclick={() => cancelFollowUp(item)}>{text("fuCancelPlan", "取消计划")}</button>
                         </div>
                     {/each}
                 </div>
             {/if}
             {#if closedFollowUps.length > 0}
-                <p class="ft__smaller ft__on-surface">最近关闭：{closedFollowUps.slice(0, 3).map((item) => `${item.title || "保持联系"}（${item.status === "done" ? "已完成" : "已取消"}）`).join("、")}</p>
+                <p class="ft__smaller ft__on-surface">{text("fuRecentlyClosed", "最近关闭：")}{closedFollowUps.slice(0, 3).map((item) => `${item.title || text("fuKeepInTouch", "保持联系")}（${item.status === "done" ? "已完成" : "已取消"}）`).join("、")}</p>
             {/if}
             <div class="lvct-detail__record fn__flex">
                 <input
                     class="b3-text-field fn__flex-1"
                     type="text"
-                    placeholder="这次想联系什么？（可选，如：问问面试结果）"
+                    placeholder={text("fuTitlePlaceholder", "这次想联系什么？（可选，如：问问面试结果）")}
                     bind:value={followUpTitle}
                     disabled={followUpBusy}
                 />
-                <input type="date" class="b3-text-field" aria-label="计划日期" bind:value={followUpDate} disabled={followUpBusy} />
+                <input type="date" class="b3-text-field" aria-label={text("fuDateLabel", "计划日期")} bind:value={followUpDate} disabled={followUpBusy} />
                 <button class="b3-button b3-button--text" disabled={followUpBusy} onclick={createFollowUp}>
-                    {followUpBusy ? "添加中…" : followUpRecorded ? "再加一条" : "添加计划"}
+                    {followUpBusy ? text("fuAdding", "添加中…") : followUpRecorded ? text("fuAddAnother", "再加一条") : text("fuAddPlan", "添加计划")}
                 </button>
             </div>
             <p class="ft__smaller ft__on-surface">到期的计划会出现在首页待办；完成计划不会自动记为互动。</p>
@@ -592,30 +593,30 @@ import StatusNotice from "../StatusNotice.svelte";
 
     {#if cadenceSupported}
     <section class="lvct-detail__section">
-        <h4>联系节奏</h4>
+        <h4>{text("cadenceSectionTitle", "联系节奏")}</h4>
         {#if cadenceError}<div class="lvct-form__error" role="alert">{cadenceError}</div>{/if}
         {#if !cadenceLoaded}
-            <ViewState compact loading title="正在读取联系节奏" />
+            <ViewState compact loading title={text("cadenceLoading", "正在读取联系节奏")} />
         {:else}
             <p class="ft__smaller ft__on-surface">
-                上次互动：{lastContactLabel || "还没有互动记录"} · 当前：
-                {cadenceMode === "paused" ? "已暂停提醒" : cadenceMode === "custom" ? `自定义 ${cadenceDays} 天` : "跟随全局阈值"}
+                {text("cadenceLastLabel", "上次互动：")}{lastContactLabel || text("cadenceNoInteraction", "还没有互动记录")} · {text("cadenceCurrentLabel", "当前：")}
+                {cadenceMode === "paused" ? text("cadencePausedDesc", "已暂停提醒") : cadenceMode === "custom" ? text("cadenceCustomDesc", "自定义 {n} 天", { n: cadenceDays }) : text("cadenceGlobalDesc", "跟随全局阈值")}
             </p>
             <div class="lvct-detail__record fn__flex">
-                <select class="b3-select fn__flex-1" aria-label="联系节奏模式" bind:value={cadenceMode} disabled={cadenceSaving}>
-                    <option value="global">跟随全局阈值</option>
-                    <option value="custom">自定义天数</option>
-                    <option value="paused">暂停提醒</option>
+                <select class="b3-select fn__flex-1" aria-label={text("cadenceModeLabel", "联系节奏模式")} bind:value={cadenceMode} disabled={cadenceSaving}>
+                    <option value="global">{text("cadenceOptionGlobal", "跟随全局阈值")}</option>
+                    <option value="custom">{text("cadenceOptionCustom", "自定义天数")}</option>
+                    <option value="paused">{text("cadenceOptionPaused", "暂停提醒")}</option>
                 </select>
                 {#if cadenceMode === "custom"}
                     <input type="number" class="b3-text-field" min="1" max="365" aria-label="自定义天数" bind:value={cadenceDays} disabled={cadenceSaving} />
                 {/if}
                 <button class="b3-button b3-button--text" onclick={saveCadence} disabled={cadenceSaving}>
-                    {cadenceSaving ? "保存中…" : "保存节奏"}
+                    {cadenceSaving ? text("cadenceSaving", "保存中…") : text("cadenceSave", "保存节奏")}
                 </button>
             </div>
             <StatusNotice message={cadenceMessage} onDismiss={() => (cadenceMessage = "")} />
-            <p class="ft__smaller ft__on-surface">仅影响首页「久未联系」提醒，不写入联系人的数据库字段。</p>
+            <p class="ft__smaller ft__on-surface">{text("cadenceNote", "仅影响首页「久未联系」提醒，不写入联系人的数据库字段。")}</p>
         {/if}
     </section>
     {/if}
@@ -778,7 +779,7 @@ import StatusNotice from "../StatusNotice.svelte";
 {/if}
 
 {#if templateManagerOpen}
-    <LvctDialog title="管理互动备注模板" onClose={() => (templateManagerOpen = false)}>
+    <LvctDialog title={text("tplManagerTitle", "管理互动备注模板")} onClose={() => (templateManagerOpen = false)}>
         <TemplateManager templates={templates} onSave={persistTemplates} onClose={() => (templateManagerOpen = false)} />
     </LvctDialog>
 {/if}
