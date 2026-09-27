@@ -69,6 +69,8 @@ export async function captureFromDoc(
     options: CaptureOptions,
 ): Promise<CaptureResult> {
     if (!/^\d{14}-[0-9a-z]{7}$/.test(docId)) throw new Error("笔记 ID 不是合法的思源 ID");
+    const occurredAt = birthdayToMs(options.date);
+    if (occurredAt === null) throw new Error("场合日期必须是有效的 YYYY-MM-DD 公历日期");
 
     // 1. 新人入库（重名跳过并计入结果）
     const createdNames: string[] = [];
@@ -105,7 +107,6 @@ export async function captureFromDoc(
     // 3. 每人一条互动事件：source=diary，externalRef=笔记 ID（同场身份）；已捕获过的人跳过
     const uniqueTargets = [...new Map(targets.map((person) => [person.docId, person])).values()];
     let interactions = 0;
-    const occurredAt = birthdayToMs(options.date) ?? Date.now();
     const note = composeNote(options);
     for (const person of uniqueTargets) {
         const result = await recordInteractionWithResult(plugin, {

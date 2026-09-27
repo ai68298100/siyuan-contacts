@@ -482,6 +482,40 @@ await test("笔记捕获去重参与人员，重复捕获返回零新增", async
     assert(repeat.interactions === 0, "重复捕获误报新增");
 });
 
+await test("互动日期严格校验，非法日期在创建人物和写入前被拒绝", async () => {
+    let saved;
+    let writes = 0;
+    let requests = 0;
+    const plugin = {
+        loadData: async () => saved === undefined ? null : JSON.parse(JSON.stringify(saved)),
+        saveData: async (_key, value) => { writes += 1; saved = JSON.parse(JSON.stringify(value)); },
+    };
+    kernel.handler = async () => { requests += 1; throw new Error("非法日期不应访问内核"); };
+    initExternalBridge(plugin, () => settings);
+    try {
+        for (const date of ["", "2026-02-29", "2026-04-31", "2026/09/27", "not-a-date"]) {
+            for (const action of [
+                () => window.LvContacts.recordInteraction([person.docId], { ref: "日期回归", date }),
+                () => captureFromDoc(plugin, settings, settings.hostDocId, {
+                    personDocIds: [person.docId], newNames: ["不应创建"], date,
+                }),
+            ]) {
+                let message = "";
+                try { await action(); } catch (error) { message = error.message; }
+                assert(message.includes("场合日期"), `非法日期未明确拒绝：${date}`);
+            }
+        }
+        assert(writes === 0 && requests === 0, "非法日期导致存储或内核写入");
+        const result = await window.LvContacts.recordInteraction([person.docId], { ref: "闰日回归", date: "2024-02-29" });
+        assert(result.recorded === 1, "合法闰日被拒绝");
+        const store = await loadInteractionStore(plugin);
+        assert(store.events[0].localDate === "2024-02-29", "闰日被顺延或回退到今天");
+        assert(new Date(store.events[0].occurredAt).getHours() === 0, "未按当地零点记录");
+    } finally {
+        disposeExternalBridge();
+    }
+});
+
 await pause(100);
 results.push({ name: "无未处理异常及响应式循环", ok: runtimeErrors.length === 0, detail: runtimeErrors.join("\n") });
 document.querySelector("#results").textContent = JSON.stringify(results, null, 2);

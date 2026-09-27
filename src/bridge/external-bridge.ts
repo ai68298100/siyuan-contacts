@@ -8,7 +8,7 @@ import type { Plugin } from "siyuan";
 import { createContact, filterContacts, listContacts } from "../services/contacts";
 import { recordInteractionWithResult } from "../data/interactions";
 import { toLocalDateKey, defaultBridgeRef } from "../domain/interactions";
-import { emptyDraft } from "../domain/person";
+import { birthdayToMs, emptyDraft } from "../domain/person";
 import type { ContactsSettings } from "../domain/model";
 
 export { defaultBridgeRef };
@@ -97,9 +97,10 @@ export function initExternalBridge(plugin: Plugin, getSettings: () => ContactsSe
 
         async recordInteraction(personDocIds, meta = {}) {
             requireSettings();
+            const occurredAt = meta.date === undefined ? Date.now() : birthdayToMs(meta.date);
+            if (occurredAt === null) throw new Error("场合日期必须是有效的 YYYY-MM-DD 公历日期");
             const docIds = [...new Set([...personDocIds].filter((id) => typeof id === "string" && id))];
             if (docIds.length === 0) return { recorded: 0 };
-            const occurredAt = meta.date ? Date.parse(`${meta.date}T00:00:00`) || Date.now() : Date.now();
             const externalRef = meta.ref?.trim() || defaultBridgeRef(docIds, toLocalDateKey(new Date(occurredAt)));
             const noteParts = [meta.place?.trim() ? `@${meta.place.trim()}` : "", meta.note?.trim() ?? ""].filter(
                 (part) => part.length > 0,

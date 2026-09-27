@@ -24,6 +24,10 @@ test("birthdayToMs / msToBirthday：本地时区日期与毫秒互转", () => {
     assert.equal(msToBirthday(ms), "1990-05-20");
     assert.equal(birthdayToMs("1990-13-01"), null, "拒绝不存在的日期");
     assert.equal(birthdayToMs("1990/1/1"), null);
+    assert.equal(birthdayToMs("2026-02-29"), null);
+    assert.equal(birthdayToMs("2026-04-31"), null);
+    assert.equal(birthdayToMs(""), null);
+    assert.equal(msToBirthday(birthdayToMs("2024-02-29")!), "2024-02-29");
     assert.equal(msToBirthday(undefined), "");
 });
 
