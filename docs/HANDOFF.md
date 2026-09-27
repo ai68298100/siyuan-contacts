@@ -27,7 +27,7 @@ pnpm install          # 国内网络慢可先: pnpm config set registry https://
 | `pnpm make-install` | 把 dist 拷进本机思源工作空间 `data/plugins/` |
 | `pnpm spike` | 隔离内核 API 验证（9 项，勿在真实工作区跑） |
 | `node scripts/e2e/load-check.mjs` | 隔离内核加载验证 |
-| `node scripts/e2e/contacts-flow.mjs` | 联系人全流程 E2E（10 项） |
+| `node scripts/e2e/contacts-flow.mjs` | 联系人全流程 E2E（10 项；自动探测常见思源安装路径） |
 | `pnpm check:release` | 发布门禁（发版前必跑） |
 
 ## 动手前必读（按顺序）

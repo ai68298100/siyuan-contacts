@@ -1,6 +1,6 @@
 {
   "version": "3.8.5",
-  "at": "2026-09-26T17:23:07.201Z",
+  "at": "2026-09-27T10:44:13.319Z",
   "results": [
     {
       "name": "内核启动",
@@ -9,8 +9,8 @@
     },
     {
       "name": "① DOM 插库块 + createIfNotExist 建库",
-      "ok": "20260927012306-67iofqq",
-      "detail": "dbBlockID=20260927012306-67iofqq av创建=true"
+      "ok": "20260927184412-7tv0tk1",
+      "detail": "dbBlockID=20260927184412-7tv0tk1 av创建=true"
     },
     {
       "name": "② addAttributeViewKey 建九类字段",
@@ -20,12 +20,12 @@
     {
       "name": "③ transactions 配置 relation 自关联双向",
       "ok": true,
-      "detail": "txn 响应={\"code\":0,\"msg\":\"\",\"data\":[{\"timestamp\":1790443386355,\"doOperations\":[{\"action\":\"updateAttrViewColRelation\",\"id\":\"20260927012305-vjm09b3\",\"rootID\":\"\",\"parentID\":\"\",\"previousID\":\"\",\"nextID\":\"\",\"blockIDs\":null,\"blockID\":\"\",\"deckID\":\"\",\"avID\":\"20260927012305-vjm09b3\",\"srcIDs\":null,\"srcs\":null,\"isDetach relation={\"avID\":\"20260927012305-vjm09b3\",\"isTwoWay\":true,\"backKeyID\":\"20260927012306-hsrrwju\"} 回链字段=被相关人"
+      "detail": "txn 响应={\"code\":0,\"msg\":\"\",\"data\":[{\"timestamp\":1790505852590,\"doOperations\":[{\"action\":\"updateAttrViewColRelation\",\"id\":\"20260927184412-w48t6yc\",\"rootID\":\"\",\"parentID\":\"\",\"previousID\":\"\",\"nextID\":\"\",\"blockIDs\":null,\"blockID\":\"\",\"deckID\":\"\",\"avID\":\"20260927184412-w48t6yc\",\"srcIDs\":null,\"srcs\":null,\"isDetach relation={\"avID\":\"20260927184412-w48t6yc\",\"isTwoWay\":true,\"backKeyID\":\"20260927184412-g2ti0ca\"} 回链字段=被相关人"
     },
     {
       "name": "④ 绑定文档为行 + itemID 映射",
       "ok": true,
-      "detail": "itemA=20260927012306-0im8c7p itemB=20260927012306-f7h88yw 映射端点返回={\"20260927012306-3imbnls\":\"20260927012306-0im8c7p\",\"20260927012306-6fff2mb\":\"20260927012306-f7h88yw\"}"
+      "detail": "itemA=20260927184413-re44n3q itemB=20260927184413-c4u89s1 映射端点返回={\"20260927184412-gbdjye0\":\"20260927184413-c4u89s1\",\"20260927184412-zy90l0x\":\"20260927184413-re44n3q\"}"
     },
     {
       "name": "⑤ 九类单元格值写入回读",
@@ -45,7 +45,7 @@
     {
       "name": "⑧ 数据库 SQL 表探测（预期不存在）",
       "ok": true,
-      "detail": "\"av_20260927…→ code=1 (no such table: av_20260927012305-vjm09b3) | \"av202609270…→ code=1 (no such table: av20260927012305-vjm09b3) | \"20260927012…→ code=1 (no such table: 20260927012305-vjm09b3)"
+      "detail": "\"av_20260927…→ code=1 (no such table: av_20260927184412-w48t6yc) | \"av202609271…→ code=1 (no such table: av20260927184412-w48t6yc) | \"20260927184…→ code=1 (no such table: 20260927184412-w48t6yc)"
     }
   ]
 }

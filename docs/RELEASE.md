@@ -10,7 +10,7 @@ pnpm test     # 全部单测（域层/守门/i18n parity）
 pnpm build    # dist/ + package.zip
 node scripts/spike/av-spike.mjs          # 9/9（可选回归）
 node scripts/e2e/load-check.mjs          # 隔离内核加载
-node scripts/e2e/contacts-flow.mjs       # 联系人流程 8/8
+node scripts/e2e/contacts-flow.mjs       # 联系人流程 10/10
 ```
 
 - [ ] 版本号：plugin.json 与 package.json 一致（`pnpm update-version`）

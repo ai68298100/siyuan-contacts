@@ -42,6 +42,17 @@ function newNodeId() {
     return `${stamp}-${rand}`;
 }
 
+function resolveKernel() {
+    const candidates = [
+        "D:\\biji\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe",
+        "D:\\RJ\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe",
+        path.join(process.env.ProgramFiles || "C:\\Program Files", "SiYuan", "resources", "kernel", "SiYuan-Kernel.exe"),
+    ];
+    const kernel = candidates.find((candidate) => fs.existsSync(candidate));
+    if (!kernel) throw new Error("未找到 SiYuan-Kernel.exe");
+    return {kernel, appDir: path.resolve(path.dirname(kernel), "..")};
+}
+
 /* 以下与 src/services/init.ts + contacts.ts 保持同一序列 */
 
 const FIELD_SPECS = [
@@ -134,14 +145,12 @@ async function waitForBoot(lines) {
 }
 
 async function main() {
-    const kernelPath = ["D:\\biji\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe"].find((c) => fs.existsSync(c));
-    if (!kernelPath) throw new Error("未找到内核");
+    const {kernel, appDir} = resolveKernel();
     if (!fs.existsSync(workspace)) {
         fs.mkdirSync(path.join(workspace, "data"), {recursive: true});
         fs.writeFileSync(path.join(workspace, MARKER), JSON.stringify({createdBy: "renmai e2e"}) + "\n");
     }
-    const appDir = path.resolve(path.dirname(kernelPath), "..");
-    const {child, lines} = startKernel({kernel: kernelPath, appDir});
+    const {child, lines} = startKernel({kernel, appDir});
     let exitCode = 0;
     try {
         await waitForBoot(lines);
