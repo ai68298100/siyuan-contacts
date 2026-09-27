@@ -9,6 +9,8 @@
     import type { PeopleTableColumn, ViewPreferences } from "../../domain/preferences";
     import { applyPeopleFilters, EMPTY_PEOPLE_FILTER, isExtraFilterActive, matchTags } from "../../domain/people-filters";
     import type { PeopleFilterState } from "../../domain/people-filters";
+    import { findDuplicatePairs } from "../../domain/duplicate-check";
+    import type { DuplicatePair } from "../../domain/duplicate-check";
     import { findSavedViewByName, missingTags, normalizeSavedViews } from "../../domain/saved-views";
     import type { SavedView, SavedViewQuery } from "../../domain/saved-views";
     import PersonCard from "./PersonCard.svelte";
@@ -16,6 +18,7 @@
     import ImportDialog from "./ImportDialog.svelte";
     import VCardDialog from "./VCardDialog.svelte";
     import LvctDialog from "../LvctDialog.svelte";
+    import ViewState from "../ViewState.svelte";
     import { useCloseGuard } from "../close-guard";
     import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal, Bookmark, Pencil, Trash2 } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
@@ -74,6 +77,8 @@
     let currentViewId = $state("");
     let activeViewName = $state("");
     let viewHint = $state("");
+    let dupOpen = $state(false);
+    const duplicatePairs: DuplicatePair[] = $derived(findDuplicatePairs(people));
     // svelte-ignore state_referenced_locally
     let sortMode: "name" | "group" | "birthday" | "recent" = $state(initialSort);
     let recent: Record<string, { occurredAt: number; localDate: string }> = $state({});
@@ -615,6 +620,9 @@
                 </span>
             {/if}
         </span>
+        <button class="b3-button b3-button--outline" onclick={() => (dupOpen = true)}>
+            {text("peopleCleanup", "整理")}{duplicatePairs.length > 0 ? ` ·${duplicatePairs.length}` : ""}
+        </button>
         <button class="b3-button b3-button--outline" onclick={() => (importing = true)}><FolderInput size={16}/>{text("peopleImportDocs", "导入已有文档")}</button>
         <button class="b3-button b3-button--outline" onclick={() => (vcarding = true)}><ContactRound size={16}/>{text("peopleVcard", "vCard 导入/导出")}</button>
         <button class="b3-button b3-button--text" onclick={() => (adding = true)}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
@@ -833,6 +841,40 @@
                     <button class="b3-button b3-button--cancel" onclick={closeBatch} disabled={batchBusy}>取消</button>
                     <button class="b3-button b3-button--text" onclick={runBatchUpdate} disabled={batchBusy}>{batchBusy ? "保存中…" : "应用到所选联系人"}</button>
                 </div>
+            </div>
+        </LvctDialog>
+    {/if}
+
+    {#if dupOpen}
+        <LvctDialog title={`重复候选 · ${duplicatePairs.length} 组`} wide onClose={() => (dupOpen = false)}>
+            <div class="lvct-form">
+                <p class="ft__smaller ft__on-surface">
+                    匹配规则：电话去格式后纯数字比较（不猜测补全国家码）、邮箱忽略大小写、姓名同名。
+                    同名不等同同人；查看候选零写入，是否合并由你手动编辑决定。
+                </p>
+                {#if duplicatePairs.length === 0}
+                    <ViewState compact icon="✓" title="没有发现疑似重复" description="当前名册没有按规则命中的候选组合。" />
+                {:else}
+                    {#each duplicatePairs as pair (pair.a.itemId + "::" + pair.b.itemId)}
+                        <div class="lvct-dup__pair">
+                            <div class="lvct-dup__reasons">
+                                {#each pair.reasons as reason (reason.kind)}
+                                    <span class="lvct-chip lvct-chip--group">{reason.label}</span>
+                                {/each}
+                            </div>
+                            <div class="lvct-dup__side">
+                                <b>{pair.a.name}</b>
+                                <small>{pair.a.phone || "—"} · {pair.a.email || "—"} · {pair.a.group || "无分组"}</small>
+                                <button class="b3-button b3-button--outline" onclick={() => { dupOpen = false; onOpenDetail(pair.a); }}>查看 {pair.a.name}</button>
+                            </div>
+                            <div class="lvct-dup__side">
+                                <b>{pair.b.name}</b>
+                                <small>{pair.b.phone || "—"} · {pair.b.email || "—"} · {pair.b.group || "无分组"}</small>
+                                <button class="b3-button b3-button--outline" onclick={() => { dupOpen = false; onOpenDetail(pair.b); }}>查看 {pair.b.name}</button>
+                            </div>
+                        </div>
+                    {/each}
+                {/if}
             </div>
         </LvctDialog>
     {/if}

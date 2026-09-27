@@ -442,6 +442,35 @@
     word-break: break-word;
 }
 
+// F13 重复候选并排
+.lvct-dup__pair {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: var(--lvct-sp-2);
+    align-items: start;
+    padding: var(--lvct-sp-2) 0;
+    border-bottom: 1px solid var(--lvct-border-subtle);
+}
+
+.lvct-dup__reasons {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.lvct-dup__side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-1);
+    padding: var(--lvct-sp-2);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-md);
+    background: var(--lvct-bg-surface);
+
+    small { color: var(--lvct-text-3); }
+}
+
 // F12 交往回顾报表
 .lvct-review__range {
     display: flex;

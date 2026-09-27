@@ -1394,6 +1394,47 @@ await test("交往回顾报表：区间统计与明细渲染，切换区间重�
     assert(fixture.textContent.includes("选择区间后生成报表"), "自定义缺日期未提示");
 });
 
+await test("重复候选检查：并排资料与理由展示，查看跳转零写入，无候选给空态", async () => {
+    const row = (id, name, phone, email) => ({
+        id: `item-${id}`,
+        cells: [
+            { value: { type: "block", keyID: "name", block: { id: `doc-${id}`, content: name } } },
+            { value: { keyID: "phone", phone: { content: phone } } },
+            { value: { keyID: "email", email: { content: email } } },
+        ],
+    });
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") return { view: { columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })), rows: [
+            row("a", "陈立群", "138 2611-0427", "A@X.com"),
+            row("b", "陈立群", "13826110427", "a@x.com"),
+            row("c", "独一人", "", ""),
+        ] } };
+        throw new Error(`回归测试不允许请求 ${route}`);
+    };
+    const opened = [];
+    mounted = mount(PeopleView, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        loadRecentInteractions: async () => ({}),
+        revision: 0, initialSort: "name",
+        onOpenDetail(p) { opened.push(p.docId); }, onOpenPersonDoc() {},
+        onPreferencesChange: async (next) => next,
+    } });
+    await until(() => fixture.querySelectorAll(".lvct-people__cards > *").length === 3, "名册未加载 3 人");
+    // 整理按钮带候选角标
+    assert(button("整理 ·1"), "整理按钮未显示候选角标");
+    button("整理 ·1").click();
+    await until(() => fixture.textContent.includes("匹配规则"), "候选面板未显示规则说明");
+    assert(fixture.textContent.includes("电话相同：13826110427"), "电话理由缺失");
+    assert(fixture.textContent.includes("邮箱相同：a@x.com"), "邮箱理由缺失");
+    assert(fixture.textContent.includes("同名不等同同人"), "同名人工确认提示缺失");
+    // 查看候选 → 打开对应人物详情（零写入路径）
+    const viewButtons = [...fixture.querySelectorAll("button")].filter((node) => node.textContent.trim() === "查看 陈立群");
+    assert(viewButtons.length === 2, "并排两侧应各有一个查看入口");
+    viewButtons[0].click();
+    await until(() => opened.length === 1, "查看候选未打开详情");
+    assert(!fixture.querySelector(".lvct-dup__pair"), "查看候选后面板应已关闭");
+});
+
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {
     const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
         docId: settings.hostDocId,
