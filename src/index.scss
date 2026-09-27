@@ -530,6 +530,27 @@
     li { padding: 2px 0; }
 }
 
+// F15 备份差异明细
+.lvct-settings__diff {
+    margin-top: var(--lvct-sp-2);
+    padding: var(--lvct-sp-2);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-md);
+    background: var(--lvct-bg-surface);
+}
+
+.lvct-settings__diff-section {
+    margin-bottom: var(--lvct-sp-2);
+
+    > b { display: block; margin-bottom: var(--lvct-sp-1); font-size: var(--lvct-fs-caption); }
+}
+
+.lvct-settings__diff-row {
+    padding: 2px 0;
+    font-size: var(--lvct-fs-caption);
+    word-break: break-word;
+}
+
 // F09 互动备注模板
 .lvct-detail__template-row { margin-bottom: var(--lvct-sp-2); }
 

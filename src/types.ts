@@ -11,6 +11,7 @@ import type { PersonCadence } from "./domain/cadence";
 import type { NoteTemplate } from "./domain/interaction-templates";
 import type { ReviewReport } from "./domain/review-report";
 import type { FollowUpImportPreview } from "./services/followups";
+import type { InteractionImportDiff } from "./domain/interaction-backup";
 import type { ExportSummary } from "./services/export-center";
 
 export type WorkbenchView = "home" | "people" | "graph" | "settings";
@@ -67,6 +68,8 @@ export interface ContactsPluginFacade {
     exportRosterVcf(): Promise<string>;
     previewInteractionImport(text: string): Promise<InteractionImportSummary>;
     importInteractionJson(text: string): Promise<InteractionImportSummary>;
+    /** 备份差异明细（F15）：按事件展开将新增/将跳过与删除标记影响（零写入） */
+    previewInteractionImportDiff(text: string): Promise<InteractionImportDiff>;
     loadViewPreferences(): Promise<ViewPreferences>;
     saveViewPreferences(preferences: ViewPreferences): Promise<ViewPreferences>;
     /** 从笔记捕获：预览出链指向的联系人 */

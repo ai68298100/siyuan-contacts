@@ -1487,6 +1487,50 @@ await test("vCard 导入诊断：三段报告区分失败与待核对，重试�
     await until(() => fixture.textContent.includes("导入完成"), "全部完成后未提示完成");
 });
 
+await test("备份差异明细：展开新增/跳过/删除标记影响，合计与摘要一致，人物不可达标注", async () => {
+    const diff = {
+        added: [
+            { eventId: "n1", localDate: "2026-09-05", personDocId: "doc-a", personName: "回归测试甲", source: "diary", note: "项目会", personFound: true },
+            { eventId: "n2", localDate: "2026-09-06", personDocId: "doc-ghost", source: "api", note: "联动记录", personFound: false },
+        ],
+        skipped: [
+            { eventId: "s1", localDate: "2026-08-01", personDocId: "doc-a", personName: "回归测试甲", source: "manual", note: "已有", reason: "本地已存在相同互动", personFound: true },
+        ],
+        tombstoneHits: [
+            { tombstoneId: "gone", willRemove: true, removed: { localDate: "2026-07-01", personDocId: "doc-a", note: "旧记录" } },
+            { tombstoneId: "missing", willRemove: false },
+        ],
+        incomingTotal: 3,
+    };
+    mounted = mount(SettingsView, { target: fixture, props: {
+        facade: {
+            settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+            previewInteractionImport: async () => ({ added: 2, skipped: 1, removed: 1, tombstonesAdded: 2 }),
+            previewInteractionImportDiff: async () => diff,
+            exportInteractionJson: async () => "{}",
+            saveViewPreferences: async (value) => value,
+        },
+        settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {},
+    } });
+    [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes("数据与字段")).click();
+    await tick();
+    const fileInput = fixture.querySelector('input[id="lvct-interaction-backup"]');
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(["{}"], "backup.json", { type: "application/json" }));
+    fileInput.files = transfer.files;
+    fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+    await until(() => fixture.textContent.includes("查看差异明细"), "差异明细入口未出现");
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "查看差异明细").click();
+    await until(() => fixture.textContent.includes("将新增（2 条）"), "新增段未展开");
+    assert(fixture.textContent.includes("将跳过（1 条）"), "跳过段缺失");
+    assert(fixture.textContent.includes("删除标记影响（2 个标记）"), "删除标记段缺失");
+    assert(fixture.textContent.includes("将移除：2026-07-01"), "将移除明细缺失");
+    assert(fixture.textContent.includes("当前库中无对应互动，无影响"), "无影响标记缺失");
+    assert(fixture.textContent.includes("人物不可达"), "不可达人物未标注");
+    assert(fixture.textContent.includes("备份共 3 条事件（新增 2 + 跳过 1）"), "合计与摘要不一致");
+});
+
 await test("原生捕获弹窗可完成并关闭，继承主题令牌", async () => {
     const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
         docId: settings.hostDocId,

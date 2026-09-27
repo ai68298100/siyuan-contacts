@@ -10,6 +10,7 @@
     import { DEFAULT_VIEW_PREFERENCES } from "../domain/preferences";
     import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "../services/settings-health";
     import type { ExportSummary } from "../services/export-center";
+    import type { InteractionImportDiff } from "../domain/interaction-backup";
 
     let {
         facade,
@@ -70,6 +71,8 @@
     let fuImportMessage = $state("");
     let fuFileInput = $state<HTMLInputElement>();
     let importPreview: InteractionImportSummary | null = $state(null);
+    let importDiff: InteractionImportDiff | null = $state(null);
+    let importDiffOpen = $state(false);
     let importText = "";
     let importRequest = 0;
     let previewingImport = $state(false);
@@ -316,6 +319,11 @@
             if (request !== importRequest) return;
             importText = text;
             importPreview = preview;
+            try {
+                importDiff = await facade.previewInteractionImportDiff(text);
+            } catch {
+                importDiff = null; // 明细为辅助信息，失败不影响合并
+            }
         } catch (error) {
             if (request === importRequest) errorText = error instanceof Error ? error.message : String(error);
         } finally {
@@ -333,6 +341,8 @@
             const result = await facade.importInteractionJson(importText);
             importMessage = `合并完成：新增 ${result.added} 条，跳过 ${result.skipped} 条，移除 ${result.removed} 条，新增删除标记 ${result.tombstonesAdded} 条`;
             importPreview = null;
+            importDiff = null;
+            importDiffOpen = false;
             importText = "";
             if (importFileInput) importFileInput.value = "";
             onInteractionsUpdated();
@@ -533,6 +543,49 @@
                     {#if previewingImport}<p class="lvct-settings__inline-hint" role="status">正在检查备份…</p>{/if}
                     {#if importPreview}
                         <p class="lvct-settings__inline-hint">预计新增 {importPreview.added} 条，跳过 {importPreview.skipped} 条，移除 {importPreview.removed} 条，新增删除标记 {importPreview.tombstonesAdded} 条</p>
+                        {#if importDiff}
+                            <button class="b3-button b3-button--text" aria-expanded={importDiffOpen} onclick={() => (importDiffOpen = !importDiffOpen)}>
+                                {importDiffOpen ? "收起差异明细" : "查看差异明细"}
+                            </button>
+                            {#if importDiffOpen}
+                                <div class="lvct-settings__diff" role="region" aria-label="备份差异明细">
+                                    <div class="lvct-settings__diff-section">
+                                        <b>将新增（{importDiff.added.length} 条）</b>
+                                        {#if importDiff.added.length === 0}<p class="ft__smaller ft__on-surface">没有将新增的事件。</p>{/if}
+                                        {#each importDiff.added as entry (entry.eventId)}
+                                            <div class="lvct-settings__diff-row">
+                                                {entry.localDate} · {entry.personName ?? "人物不可达（可能已解绑）"} · {entry.note || "互动"} · {entry.source}
+                                                {#if !entry.personFound}<span class="lvct-form__error">人物不可达</span>{/if}
+                                            </div>
+                                        {/each}
+                                    </div>
+                                    {#if importDiff.skipped.length > 0}
+                                        <div class="lvct-settings__diff-section">
+                                            <b>将跳过（{importDiff.skipped.length} 条）</b>
+                                            {#each importDiff.skipped as entry (entry.eventId)}
+                                                <div class="lvct-settings__diff-row">
+                                                    {entry.localDate} · {entry.personName ?? "人物不可达（可能已解绑）"} · {entry.note || "互动"} · {entry.reason}
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    {/if}
+                                    <div class="lvct-settings__diff-section">
+                                        <b>删除标记影响（{importDiff.tombstoneHits.length} 个标记）</b>
+                                        {#if importDiff.tombstoneHits.length === 0}<p class="ft__smaller ft__on-surface">备份中没有删除标记。</p>{/if}
+                                        {#each importDiff.tombstoneHits as hit (hit.tombstoneId)}
+                                            <div class="lvct-settings__diff-row">
+                                                {#if hit.willRemove}
+                                                    将移除：{hit.removed?.localDate} · {hit.removed?.note || "互动"}
+                                                {:else}
+                                                    当前库中无对应互动，无影响
+                                                {/if}
+                                            </div>
+                                        {/each}
+                                    </div>
+                                    <p class="ft__smaller ft__on-surface">合计：备份共 {importDiff.incomingTotal} 条事件（新增 {importDiff.added.length} + 跳过 {importDiff.skipped.length}）。</p>
+                                </div>
+                            {/if}
+                        {/if}
                     {/if}
                     <div class="lvct-settings__actions">
                         <button class="b3-button b3-button--outline" onclick={runImportInteractions} disabled={!importPreview || previewingImport || importingInteractions}>

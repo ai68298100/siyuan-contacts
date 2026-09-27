@@ -36,6 +36,7 @@ import { listTemplates, saveTemplates } from "./services/templates";
 import type { NoteTemplate } from "./domain/interaction-templates";
 import { buildReview } from "./services/review-report";
 import { importInteractionJson, previewInteractionImport } from "./services/interaction-import";
+import { previewInteractionImportDiff } from "./services/interaction-import";
 import { initExternalBridge, disposeExternalBridge } from "./bridge/external-bridge";
 import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
 import { svelteDialog } from "./libs/dialog";
@@ -338,6 +339,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     async previewInteractionImport(text: string) {
         return previewInteractionImport(this, text);
+    }
+
+    async previewInteractionImportDiff(text: string) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return previewInteractionImportDiff(this, this.settings, text);
     }
 
     async importInteractionJson(text: string) {
