@@ -1,6 +1,6 @@
 <script lang="ts">
     /** 联系人视图：名册缓存 + 客户端过滤/分页 + 卡片/表格双形态；详情弹窗由 Workbench 统一承载 */
-    import { batchUpdateContacts, listContacts, filterContacts, PAGE_SIZE, PRESET_GROUPS } from "../../services/contacts";
+    import { batchUpdateContacts, listContacts, filterContacts, PAGE_SIZE, PRESET_GROUPS, removeContacts } from "../../services/contacts";
     import { exportVcfText } from "../../services/vcard";
     import { nextBirthday } from "../../domain/occasions";
     import type { ContactSummary } from "../../domain/person";
@@ -161,6 +161,24 @@
             errorText = error instanceof Error ? error.message : String(error);
         }
     }
+
+    async function removeSelected() {
+        if (batchBusy || selectedIds.length === 0) return;
+        const names = selectedPeople.map((person) => person.name).slice(0, 5).join("、");
+        const suffix = selectedPeople.length > 5 ? ` 等 ${selectedPeople.length} 人` : "";
+        if (!window.confirm(`将从人脉名册移除「${names}${suffix}」。人物文档和互动记录会保留，确定继续吗？`)) return;
+        batchBusy = true;
+        batchError = "";
+        try {
+            await removeContacts(settings, selectedIds);
+            selectedIds = [];
+            await refresh();
+        } catch (error) {
+            batchError = error instanceof Error ? error.message : String(error);
+        } finally {
+            batchBusy = false;
+        }
+    }
 </script>
 
 <div class="lvct-people">
@@ -211,8 +229,13 @@
             <b>已选 {selectedIds.length} 人</b>
             <button class="b3-button b3-button--outline" onclick={() => { batchError = ""; batchOpen = true; }}>批量编辑</button>
             <button class="b3-button b3-button--outline" onclick={exportSelected}>导出 vCard</button>
+            <button class="b3-button b3-button--cancel lvct-people__remove" onclick={removeSelected} disabled={batchBusy}>从人脉移除</button>
             <button class="b3-button b3-button--text" onclick={() => (selectedIds = [])}>取消选择</button>
         </div>
+    {/if}
+
+    {#if batchError && !batchOpen}
+        <div class="lvct-form__error" role="alert">批量操作失败：{batchError}</div>
     {/if}
 
     {#if focusLabel}

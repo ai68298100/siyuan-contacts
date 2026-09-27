@@ -162,6 +162,18 @@ export async function removeContact(settings: ContactsSettings, person: Pick<Con
     invalidateRoster();
 }
 
+/** 批量安全移除：只解绑数据库行，保留人物文档和插件互动审计记录。 */
+export async function removeContacts(settings: ContactsSettings, itemIds: readonly string[]): Promise<number> {
+    const ids = [...new Set(itemIds.map((itemId) => itemId.trim()).filter(Boolean))];
+    if (ids.length === 0) return 0;
+    const CHUNK = 200;
+    for (let start = 0; start < ids.length; start += CHUNK) {
+        await unbindRows(settings.avId, ids.slice(start, start + CHUNK));
+    }
+    invalidateRoster();
+    return ids.length;
+}
+
 export interface ContactBatchUpdate {
     itemId: string;
     /** undefined = 不修改；空字符串 = 清空分组 */
