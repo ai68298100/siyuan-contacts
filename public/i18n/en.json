@@ -3,5 +3,21 @@
   "tabTitle": "Lv Contacts",
   "captureFromNote": "Lv Contacts: capture people from this note",
   "helloPlugin": "Lv Contacts loaded",
-  "byePlugin": "Lv Contacts unloaded"
+  "byePlugin": "Lv Contacts unloaded",
+  "navHome": "Home",
+  "navPeople": "Contacts",
+  "navGraph": "Relationships",
+  "navSettings": "Settings",
+  "homeSubtitle": "People to keep in touch with",
+  "peopleSubtitle": "Manage contacts and profiles",
+  "graphSubtitle": "Your relationship network",
+  "settingsSubtitle": "Data connections and preferences",
+  "navigationLabel": "Lv Contacts navigation",
+  "navWorkspace": "Workspace",
+  "navUpcoming": "Coming Soon",
+  "navOrganizations": "Organizations",
+  "navSuggestions": "Suggestions",
+  "openSettings": "Open plugin settings",
+  "personDetailTitle": "Person Details · {name}",
+  "closeDialog": "Close"
 }

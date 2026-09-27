@@ -13,6 +13,7 @@ export type WorkbenchView = "home" | "people" | "graph" | "settings";
  * 插件实例暴露给组件层的结构化视图（避免组件 import 插件入口造成循环依赖）。
  */
 export interface ContactsPluginFacade {
+    readonly i18n?: Readonly<Record<string, string>>;
     readonly settings: ContactsSettings | null;
     readonly viewPreferences: ViewPreferences;
     readonly isMobile: boolean;

@@ -4,6 +4,7 @@
 
     let {
         title,
+        closeLabel = "关闭",
         wide = false,
         peek = false,
         closeOnBackdrop = true,
@@ -12,6 +13,7 @@
         children,
     }: {
         title: string;
+        closeLabel?: string;
         wide?: boolean;
         peek?: boolean;
         closeOnBackdrop?: boolean;
@@ -96,7 +98,7 @@
     >
         <div class="lvct-dialog-panel__header">
             <h2 id={titleId} class="lvct-dialog-panel__title">{title}</h2>
-            <button class="lvct-dialog-panel__close" type="button" aria-label="关闭" onclick={() => void requestClose()}>×</button>
+            <button class="lvct-dialog-panel__close" type="button" aria-label={closeLabel} onclick={() => void requestClose()}>×</button>
         </div>
         {@render children()}
     </div>

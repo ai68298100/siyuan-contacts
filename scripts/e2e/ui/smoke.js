@@ -20,6 +20,7 @@ import { DEFAULT_VIEW_PREFERENCES } from "../../../src/domain/preferences";
 import { kernel } from "./siyuan-mock.js";
 import { handleProtyleEvent } from "../../../src/panels/person-panel";
 import "../../../src/index.scss";
+import englishMessages from "../../../public/i18n/en.json";
 
 const fixture = document.querySelector("#fixture");
 const results = [];
@@ -101,6 +102,37 @@ await test("首页零人筛选保持空结果，清除后恢复联系人", async
     assert(!fixture.querySelector(".lvct-person-card"), "零人筛选不应出现卡片");
     button("清除所有筛选").click();
     await until(() => fixture.querySelector(".lvct-person-card"), "清除首页筛选未恢复联系人");
+});
+
+await test("英文工作台导航与标题跟随语言资源，缺失文案回退且设置入口可达", async () => {
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: window.innerWidth <= 640,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, i18n: { ...englishMessages, navOrganizations: "" },
+            loadDashboard: async () => ({ people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+                stale: [{ person }], neverContacted: 1, neverContactedItemIds: [person.itemId] }),
+            loadPersonInsights: async () => emptyInsights(),
+        },
+    } });
+    await until(() => fixture.querySelector("h1")?.textContent === "Home", "英文标题未显示");
+    assert(fixture.querySelector("aside").getAttribute("aria-label") === "Lv Contacts navigation", "导航无障碍标签未翻译");
+    assert(fixture.querySelector("aside").textContent.includes("组织"), "空翻译未回退");
+    button("⚙Settings").click();
+    await until(() => fixture.querySelector("h1")?.textContent === "Settings", "英文设置导航未切换");
+    window.dispatchEvent(new CustomEvent("lvct-workbench-view", { detail: { view: "home" } }));
+    await until(() => fixture.querySelector(".lvct-dash__stats"), "英文首页未恢复");
+    button("⌘Relationships").click();
+    await until(() => fixture.querySelector("h1")?.textContent === "Relationships", "英文关系导航未切换");
+    button("♙Contacts").click();
+    await until(() => fixture.querySelector("h1")?.textContent === "Contacts", "英文联系人导航未切换");
+    await until(() => fixture.querySelector(".lvct-person-card"), "英文导航联系人未加载");
+    fixture.querySelector(".lvct-person-card").click();
+    await until(() => fixture.querySelector(".lvct-dialog-panel__title")?.textContent === `Person Details · ${person.name}`, "详情标题未翻译或姓名丢失");
+    assert(fixture.querySelector('button[aria-label="Close"]'), "关闭无障碍标签未翻译");
+    fixture.querySelector('button[aria-label="Close"]').click();
+    await until(() => !fixture.querySelector(".lvct-dialog-panel"), "英文关闭按钮未关闭详情");
+    const nav = fixture.querySelector(".lvct-workbench__nav");
+    assert(nav.clientWidth > 0 && nav.getBoundingClientRect().right <= window.innerWidth + 1, "英文导航超出视口");
 });
 
 await test("工作台可通过入口请求切换到设置页", async () => {

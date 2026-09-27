@@ -43,7 +43,7 @@ Lv Contacts makes **every contact a regular SiYuan document** (bidirectional lin
 3. Restart SiYuan → Settings → Marketplace → Download → enable **Lv Contacts**
 - Requires **SiYuan ≥ 3.8.5**. Marketplace submission is deferred.
 
-The source includes enhancements after the initial release, while the version remains `0.1.0` pending the next release decision. Published packages may not include unreleased changes. The UI is primarily Chinese; translation-key parity is tested, but a full English UI is not yet delivered.
+The source includes enhancements after the initial release, while the version remains `0.1.0` pending the next release decision. Published packages may not include unreleased changes. Workspace navigation, view headings and the person-detail dialog heading/close label now use the host-provided language resources. Feature content is still primarily Chinese; a full English UI is not yet delivered.
 
 ## 🚀 Quick start
 

@@ -3,5 +3,21 @@
   "tabTitle": "小驴人脉",
   "captureFromNote": "人脉：捕获本文人员",
   "helloPlugin": "小驴人脉已加载",
-  "byePlugin": "小驴人脉已卸载"
+  "byePlugin": "小驴人脉已卸载",
+  "navHome": "首页",
+  "navPeople": "联系人",
+  "navGraph": "关系图谱",
+  "navSettings": "设置",
+  "homeSubtitle": "今天该关注谁",
+  "peopleSubtitle": "管理你的联系人与资料",
+  "graphSubtitle": "查看人际关系网络",
+  "settingsSubtitle": "检查数据锚点与插件行为",
+  "navigationLabel": "小驴人脉导航",
+  "navWorkspace": "工作台",
+  "navUpcoming": "即将推出",
+  "navOrganizations": "组织",
+  "navSuggestions": "建议",
+  "openSettings": "打开插件设置",
+  "personDetailTitle": "人物详情 · {name}",
+  "closeDialog": "关闭"
 }
