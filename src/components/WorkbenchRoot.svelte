@@ -25,5 +25,5 @@
         onOpenPersonDoc={(docId) => facade.openPersonDoc(docId)}
     />
 {:else}
-    <InitWizard facade={facade} onInitialized={(value) => (settings = value)} />
+    <InitWizard facade={facade} i18n={facade.i18n} onInitialized={(value) => (settings = value)} />
 {/if}

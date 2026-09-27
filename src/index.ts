@@ -171,7 +171,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
             title: "从笔记捕获人脉",
             width: "560px",
             component: CaptureDialog,
-            props: { facade: this, docId },
+            props: { facade: this, i18n: this.i18n, docId },
         });
     }
 

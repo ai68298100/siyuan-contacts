@@ -4,16 +4,21 @@
     import type { CapturePreview, CaptureResult } from "../../services/capture";
     import type { ContactsPluginFacade } from "../../types";
     import ViewState from "../ViewState.svelte";
+    import { translateText } from "../../domain/translation";
 
     let {
         facade,
+        i18n,
         docId,
         onClose,
     }: {
         facade: ContactsPluginFacade;
+        i18n?: Readonly<Record<string, string>>;
         docId: string;
         onClose: () => void;
     } = $props();
+    const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
+        translateText(i18n, key, fallback, values));
 
     let preview: CapturePreview | null = $state(null);
     let checked: Record<string, boolean> = $state({});
@@ -67,8 +72,8 @@
             const outcome = await facade.aiExtractFromDoc(docId);
             if (!outcome.extraction) {
                 aiError = outcome.likelyUnconfigured
-                    ? "思源 AI 可能未配置：请到 设置 → 人工智能 中配置模型后重试"
-                    : "AI 未返回有效结果，请重试或手工填写";
+                    ? text("captureAiUnconfigured", "思源 AI 可能未配置：请到 设置 → 人工智能 中配置模型后重试")
+                    : text("captureAiNoResult", "AI 未返回有效结果，请重试或手工填写");
                 return;
             }
             for (const person of outcome.matched) {
@@ -117,53 +122,53 @@
 
 <div class="lvct-form">
     {#if loadError}
-        <ViewState compact error title="笔记分析失败" description={loadError}>
-            <button class="b3-button b3-button--outline" onclick={load}>重试</button>
+        <ViewState compact error title={text("captureLoadFail", "笔记分析失败")} description={loadError}>
+            <button class="b3-button b3-button--outline" onclick={load}>{text("captureRetry", "重试")}</button>
             <button class="b3-button b3-button--cancel" onclick={onClose}>关闭</button>
         </ViewState>
     {:else if !preview}
-        <ViewState compact loading title="正在分析笔记中的联系人" />
+        <ViewState compact loading title={text("captureAnalyzing", "正在分析笔记中的联系人")} />
     {:else if result}
         <div class="lvct-capture__steps" aria-label="捕获进度">
-            <span class="lvct-capture__step--done"><b>1</b> 识别</span>
+            <span class="lvct-capture__step--done"><b>1</b> {text("captureStepIdentify", "识别")}</span>
             <i aria-hidden="true">›</i>
-            <span class="lvct-capture__step--done"><b>2</b> 确认</span>
+            <span class="lvct-capture__step--done"><b>2</b> {text("captureStepConfirm", "确认")}</span>
             <i aria-hidden="true">›</i>
-            <span class="lvct-capture__step--active"><b>3</b> 完成</span>
+            <span class="lvct-capture__step--active"><b>3</b> {text("captureStepDone", "完成")}</span>
         </div>
         <div class="lvct-form__hint">
-            <p>✓ 已记录 <b>{result.interactions}</b> 条互动</p>
-            {#if result.createdNames.length > 0}<p>✦ 新增联系人：{result.createdNames.join("、")}</p>{/if}
-            {#if result.attendeeBlockWritten}<p>✦ 笔记已写入「参与人员」双链区块</p>{/if}
-            <p class="ft__smaller ft__on-surface">同一篇笔记重复捕获不会重复记录。</p>
+            <p>✓ {text("captureDoneInteractions", "已记录 {n} 条互动", { n: result.interactions })}</p>
+            {#if result.createdNames.length > 0}<p>✦ {text("captureDoneCreated", "新增联系人：{n}", { n: result.createdNames.join("、") })}</p>{/if}
+            {#if result.attendeeBlockWritten}<p>✦ {text("captureDoneBlock", "笔记已写入「参与人员」双链区块")}</p>{/if}
+            <p class="ft__smaller ft__on-surface">{text("captureDoneIdempotent", "同一篇笔记重复捕获不会重复记录。")}</p>
         </div>
         <div class="lvct-form__actions lvct-capture__result-actions">
-            <button class="b3-button b3-button--outline" onclick={() => facade.openDoc(docId)}>打开原笔记</button>
+            <button class="b3-button b3-button--outline" onclick={() => facade.openDoc(docId)}>{text("captureOpenNote", "打开原笔记")}</button>
             {#each createdPeople as person (person.docId)}
-                <button class="b3-button b3-button--outline" onclick={() => facade.openPersonDoc(person.docId)}>打开{person.name}</button>
+                <button class="b3-button b3-button--outline" onclick={() => facade.openPersonDoc(person.docId)}>{text("captureOpenPerson", "打开{nm}", { nm: person.name })}</button>
             {/each}
         </div>
         <div class="lvct-form__actions">
-            <button class="b3-button b3-button--text" onclick={onClose}>完成</button>
+            <button class="b3-button b3-button--text" onclick={onClose}>{text("captureDone", "完成")}</button>
         </div>
     {:else}
         <div class="lvct-capture__steps" aria-label="捕获进度">
-            <span class:lvct-capture__step--active={step === 1}><b>1</b> 识别</span>
+            <span class:lvct-capture__step--active={step === 1}><b>1</b> {text("captureStepIdentify", "识别")}</span>
             <i aria-hidden="true">›</i>
-            <span class:lvct-capture__step--active={step === 2}><b>2</b> 确认</span>
+            <span class:lvct-capture__step--active={step === 2}><b>2</b> {text("captureStepConfirm", "确认")}</span>
             <i aria-hidden="true">›</i>
-            <span><b>3</b> 完成</span>
+            <span><b>3</b> {text("captureStepDone", "完成")}</span>
         </div>
         <p class="ft__smaller ft__on-surface lvct-form__hint">
-            笔记：{preview.docName || docId}
+            {text("captureSourceNote", "笔记：")}{preview.docName || docId}
         </p>
 
         {#if step === 1}
         <div class="lvct-form__item">
-            <span>已识别的人脉联系人（{preview.linked.length}，来自笔记内双链）</span>
+            <span>{text("captureLinkedCount", "已识别的人脉联系人（{n}，来自笔记内双链）", { n: preview.linked.length })}</span>
             {#if preview.linked.length === 0}
                 <p class="ft__smaller ft__on-surface">
-                    本笔记没有链接到任何联系人。可先在笔记里用 <code>[[姓名]]</code> 链接联系人，或在下方直接输入新人名单。
+                    {text("captureNoLinked", "本笔记没有链接到任何联系人。可先在笔记里用 [[姓名]] 链接联系人，或在下方直接输入新人名单。")}
                 </p>
             {:else}
                 <div class="lvct-capture__list">
@@ -171,21 +176,21 @@
                         <label class="lvct-import__row">
                             <input class="b3-switch" type="checkbox" bind:checked={checked[person.docId]} />
                             <span><b>{person.name}</b></span>
-                            <span class="ft__smaller ft__on-surface">{person.group || "未分组"}</span>
-                            <span class="lvct-capture__source-badge">双链</span>
-                            {#if aiMatchedIds.includes(person.docId)}<span class="lvct-capture__source-badge lvct-capture__source-badge--ai">AI 提名</span>{/if}
+                            <span class="ft__smaller ft__on-surface">{person.group || text("captureUngrouped", "未分组")}</span>
+                            <span class="lvct-capture__source-badge">{text("captureBadgeLink", "双链")}</span>
+                            {#if aiMatchedIds.includes(person.docId)}<span class="lvct-capture__source-badge lvct-capture__source-badge--ai">{text("captureBadgeAi", "AI 提名")}</span>{/if}
                         </label>
                     {/each}
                 </div>
             {/if}
             {#if facade.viewPreferences.aiEnabled}
                 <button class="b3-button b3-button--outline" style="margin-top: 6px;" onclick={runAi} disabled={aiRunning}>
-                    {aiRunning ? "AI 分析中…" : aiDone ? "AI 已分析（可再次分析）" : "AI 分析本页（识别未链接的人名/日期/地点）"}
+                    {aiRunning ? text("captureAiRunning", "AI 分析中…") : aiDone ? text("captureAiDone", "AI 已分析（可再次分析）") : text("captureAiButton", "AI 分析本页（识别未链接的人名/日期/地点）")}
                 </button>
                 {#if aiRunning}
                     <div class="lvct-capture__ai-progress" role="status" aria-live="polite" aria-busy="true">
                         <span class="lvct-skeleton" aria-hidden="true"></span>
-                        正在读取笔记并核对联系人名册…
+                        {text("captureAiProgress", "正在读取笔记并核对联系人名册…")}
                     </div>
                 {/if}
                 {#if aiError}
@@ -195,10 +200,10 @@
         </div>
 
         <label class="lvct-form__item">
-            <span>新人员名单（不在人脉库中，将按名新建；空格/逗号分隔）</span>
-            <input class="b3-text-field fn__block" type="text" bind:value={newNamesText} placeholder="王五 赵六" />
+            <span>{text("captureNewNamesLabel", "新人员名单（不在人脉库中，将按名新建；空格/逗号分隔）")}</span>
+            <input class="b3-text-field fn__block" type="text" bind:value={newNamesText} placeholder={text("captureNewNamesPlaceholder", "王五 赵六")} />
             {#if aiUnknownNames.length > 0}
-                <span class="lvct-capture__source-note"><b>AI 提名</b>：{aiUnknownNames.join("、")}，请确认后再记录。</span>
+                <span class="lvct-capture__source-note"><b>{text("captureBadgeAi", "AI 提名")}</b>：{aiUnknownNames.join("、")}，{text("captureAiConfirmNote", "请确认后再记录。")}</span>
             {/if}
         </label>
         {/if}
@@ -206,17 +211,17 @@
         {#if step === 2}
         <div class="lvct-form__grid">
             <label class="lvct-form__item">
-                <span>场合日期</span>
+                <span>{text("captureOccasionDate", "场合日期")}</span>
                 <input class="b3-text-field fn__block" type="date" bind:value={date} />
             </label>
             <label class="lvct-form__item">
-                <span>地点（可选）</span>
-                <input class="b3-text-field fn__block" type="text" bind:value={place} placeholder="会议室 / 餐厅…" />
+                <span>{text("capturePlaceLabel", "地点（可选）")}</span>
+                <input class="b3-text-field fn__block" type="text" bind:value={place} placeholder={text("capturePlacePlaceholder", "会议室 / 餐厅…")} />
             </label>
         </div>
         <label class="lvct-form__item">
-            <span>备注（可选）</span>
-            <input class="b3-text-field fn__block" type="text" bind:value={note} placeholder="产品发布会" />
+            <span>{text("captureNoteLabel", "备注（可选）")}</span>
+            <input class="b3-text-field fn__block" type="text" bind:value={note} placeholder={text("captureNotePlaceholder", "产品发布会")} />
         </label>
 
         {#if errorText}
@@ -226,23 +231,23 @@
         {#if running}
             <div class="lvct-capture__ai-progress" role="status" aria-live="polite" aria-busy="true">
                 <span class="lvct-skeleton" aria-hidden="true"></span>
-                正在写入互动和参与人员区块…
+                {text("captureWritingProgress", "正在写入互动和参与人员区块…")}
             </div>
         {/if}
 
         <div class="lvct-form__actions">
-            <button class="b3-button b3-button--cancel" onclick={() => (step = 1)} disabled={running}>返回识别</button>
+            <button class="b3-button b3-button--cancel" onclick={() => (step = 1)} disabled={running}>{text("captureBackToIdentify", "返回识别")}</button>
             <button class="b3-button b3-button--text" onclick={submit} disabled={running || !hasTarget}>
-                {running ? "记录中…" : "记录互动并写入参与人员"}
+                {running ? text("captureRecording", "记录中…") : text("captureRecordAndWrite", "记录互动并写入参与人员")}
             </button>
         </div>
         <p class="ft__smaller ft__on-surface lvct-form__hint">
-            将为每位参与者记录一条互动（含时间/地点/备注），并在本笔记末尾写入「参与人员」双链区块。
+            {text("captureSubmitHint", "将为每位参与者记录一条互动（含时间/地点/备注），并在本笔记末尾写入「参与人员」双链区块。")}
         </p>
         {:else}
         <div class="lvct-form__actions">
-            <button class="b3-button b3-button--cancel" onclick={onClose}>取消</button>
-            <button class="b3-button b3-button--text" onclick={() => (step = 2)} disabled={!hasTarget || aiRunning}>下一步：确认记录</button>
+            <button class="b3-button b3-button--cancel" onclick={onClose}>{text("captureCancel", "取消")}</button>
+            <button class="b3-button b3-button--text" onclick={() => (step = 2)} disabled={!hasTarget || aiRunning}>{text("captureNextConfirm", "下一步：确认记录")}</button>
         </div>
         {/if}
     {/if}
