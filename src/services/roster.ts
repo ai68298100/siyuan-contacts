@@ -13,22 +13,44 @@ import type { ContactsSettings } from "../domain/model";
 import type { ContactSummary } from "../domain/person";
 
 let cache: RosterEntry | null = null;
+let cacheKey: string | null = null;
+let generation = 0;
+let pending: { key: string; generation: number; promise: Promise<ContactSummary[]> } | null = null;
 
 export { ROSTER_TTL_MS };
 
 export function invalidateRoster(): void {
     cache = null;
+    cacheKey = null;
+    generation += 1;
+    pending = null;
 }
 
 /** 全量名册（缓存优先）。仪表盘/图谱/详情关系候选都应走这里，不要自己再全量渲染 */
 export async function getRoster(settings: ContactsSettings): Promise<ContactSummary[]> {
     const now = Date.now();
+    const key = JSON.stringify([settings.avId, settings.dbBlockId, settings.fieldMap]);
     const fresh = cache;
-    if (fresh !== null && isRosterFresh(fresh, settings.avId, now)) {
+    if (cacheKey === key && fresh !== null && isRosterFresh(fresh, settings.avId, now)) {
         return fresh.people;
     }
-    const rendered = await renderView(settings.avId, settings.dbBlockId);
-    const people = rosterFromRender(rendered, settings.fieldMap);
-    cache = { people, avId: settings.avId, fetchedAt: now };
-    return people;
+    if (pending?.key === key && pending.generation === generation) return pending.promise;
+    const fieldMap = { ...settings.fieldMap };
+    const request = { key, generation, promise: Promise.resolve([] as ContactSummary[]) };
+    request.promise = (async () => {
+        try {
+            const rendered = await renderView(settings.avId, settings.dbBlockId);
+            const people = rosterFromRender(rendered, fieldMap);
+            // 已失效或被新配置的请求取代时，仅返回给原调用方，不回填共享缓存。
+            if (request.generation === generation && pending === request) {
+                cache = { people, avId: settings.avId, fetchedAt: Date.now() };
+                cacheKey = key;
+            }
+            return people;
+        } finally {
+            if (pending === request) pending = null;
+        }
+    })();
+    pending = request;
+    return request.promise;
 }

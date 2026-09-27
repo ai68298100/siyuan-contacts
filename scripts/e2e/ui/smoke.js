@@ -8,7 +8,7 @@ import ImportDialog from "../../../src/components/people/ImportDialog.svelte";
 import DashboardView from "../../../src/components/dashboard/DashboardView.svelte";
 import SettingsView from "../../../src/components/SettingsView.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
-import { invalidateRoster } from "../../../src/services/roster";
+import { getRoster, invalidateRoster } from "../../../src/services/roster";
 import { recordInteraction, loadInteractionStore } from "../../../src/data/interactions";
 import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
 import { captureFromDoc } from "../../../src/services/capture";
@@ -538,6 +538,38 @@ await test("按名捕获复用已有联系人，不漏记互动或误报新建",
     assert(store.events.length === 1 && store.events[0].personDocId === person.docId, "没有复用正确的人物文档");
     const repeat = await captureFromDoc(plugin, settings, settings.hostDocId, { ...options, personDocIds: [person.docId] });
     assert(repeat.interactions === 0, "按姓名与文档重叠捕获重复计数");
+});
+
+await test("名册并发查询合并，失效后的旧请求不能回填缓存，失败后可重试", async () => {
+    let calls = 0;
+    let releaseOld;
+    const oldResponse = new Promise((resolve) => { releaseOld = resolve; });
+    kernel.handler = async (route) => {
+        assert(route === "/api/av/renderAttributeView", "名册请求越界");
+        calls += 1;
+        if (calls === 1) return oldResponse;
+        const response = renderResult();
+        response.view.rows[0].cells[0].value.block.content = "最新姓名";
+        return response;
+    };
+    const old = getRoster(settings);
+    const shared = getRoster(settings);
+    await until(() => calls === 1, "旧查询未发出");
+    invalidateRoster();
+    assert((await getRoster(settings))[0].name === "最新姓名", "失效后没有读取新数据");
+    releaseOld(renderResult());
+    await Promise.all([old, shared]);
+    assert((await getRoster(settings))[0].name === "最新姓名", "旧查询覆盖了新缓存");
+    assert(calls === 2, "同配置并发查询未合并或缓存未复用");
+    await getRoster({ ...settings, fieldMap: { ...settings.fieldMap, phone: "changed-phone" } });
+    assert(calls === 3, "字段映射改变仍复用旧缓存");
+    invalidateRoster();
+    kernel.handler = async () => { throw new Error("暂时不可用"); };
+    let failed = false;
+    try { await getRoster(settings); } catch { failed = true; }
+    assert(failed, "查询失败未传递给调用方");
+    kernel.handler = async () => renderResult();
+    assert((await getRoster(settings))[0].name === person.name, "失败后无法重新查询");
 });
 
 await pause(100);
