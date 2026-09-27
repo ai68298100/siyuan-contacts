@@ -2,6 +2,58 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildGraph, capGraph, groupColor, queryGraphRelations } from "../src/domain/graph.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
+import { shortestGraphPath } from "../src/domain/graph-path.ts";
+
+test("最短路径：优先较短链路、支持反向关系且不改变输入", () => {
+    const graph = {
+        nodes: ["a", "b", "c", "d", "e"].map((id) => ({ id, label: id, group: "", degree: 0 })),
+        edges: [{ source: "a", target: "b" }, { source: "b", target: "c" },
+            { source: "c", target: "e" }, { source: "a", target: "d" }, { source: "e", target: "d" }],
+    };
+    const original = structuredClone(graph);
+    assert.deepEqual(shortestGraphPath(graph, "a", "e"), ["a", "d", "e"]);
+    assert.deepEqual(shortestGraphPath(graph, "e", "a"), ["e", "d", "a"]);
+    assert.deepEqual(shortestGraphPath(graph, "a", "b"), ["a", "b"]);
+    assert.deepEqual(shortestGraphPath({
+        nodes: graph.nodes.filter((node) => ["a", "e"].includes(node.id)), edges: graph.edges,
+    }, "a", "e"), []);
+    assert.deepEqual(graph, original);
+});
+
+test("最短路径：800 人链路完整且等长备选只返回一条最短链", () => {
+    const nodes = Array.from({ length: 800 }, (_, index) => ({ id: `n${index}`, label: String(index), group: "", degree: 0 }));
+    const edges = nodes.slice(0, -1).map((node, index) => ({ source: node.id, target: nodes[index + 1].id }));
+    assert.deepEqual(shortestGraphPath({ nodes, edges }, "n0", "n799"), nodes.map((node) => node.id));
+    const graph = {
+        nodes: nodes.slice(0, 4),
+        edges: [{ source: "n0", target: "n1" }, { source: "n1", target: "n3" },
+            { source: "n0", target: "n2" }, { source: "n2", target: "n3" }],
+    };
+    const result = shortestGraphPath(graph, "n0", "n3");
+    assert.equal(result.length, 3);
+    assert.equal(result[0], "n0");
+    assert.equal(result[2], "n3");
+    assert.ok(["n1", "n2"].includes(result[1]));
+});
+
+test("最短路径：断开、缺失端点、空图和相同人物", () => {
+    const graph = { nodes: ["a", "b"].map((id) => ({ id, label: id, group: "", degree: 0 })), edges: [] };
+    assert.deepEqual(shortestGraphPath(graph, "a", "b"), []);
+    assert.deepEqual(shortestGraphPath(graph, "missing", "b"), []);
+    assert.deepEqual(shortestGraphPath(graph, "a", "missing"), []);
+    assert.deepEqual(shortestGraphPath({ nodes: [], edges: [] }, "a", "a"), []);
+    assert.deepEqual(shortestGraphPath(graph, "a", "a"), ["a"]);
+});
+
+test("最短路径：循环、重复、自环与悬空边不影响合法链路", () => {
+    const graph = {
+        nodes: ["a", "b", "c", "d"].map((id) => ({ id, label: id, group: "", degree: 0 })),
+        edges: [{ source: "a", target: "b" }, { source: "a", target: "b" },
+            { source: "b", target: "c" }, { source: "c", target: "a" },
+            { source: "c", target: "d" }, { source: "a", target: "a" }, { source: "a", target: "missing" }],
+    };
+    assert.deepEqual(shortestGraphPath(graph, "a", "d"), ["a", "c", "d"]);
+});
 
 function person(partial: Partial<ContactSummary> & { itemId: string; docId: string; name: string }): ContactSummary {
     return {

@@ -4,6 +4,7 @@
     import ViewState from "../ViewState.svelte";
     import { listContacts } from "../../services/contacts";
     import { buildGraph, capGraph, GRAPH_MAX_NODES, groupColor, queryGraphRelations } from "../../domain/graph";
+    import { shortestGraphPath } from "../../domain/graph-path";
     import type { ContactsSettings } from "../../domain/model";
     import type { ContactSummary } from "../../domain/person";
     import type { PersonInsights } from "../../services/insights";
@@ -33,6 +34,7 @@
     let graphInstance: cytoscape.Core | null = $state.raw(null);
     let focusId = $state("");
     let compareId = $state("");
+    let queryMode: "common" | "path" = $state("common");
     let hoveredPerson: ContactSummary | null = $state(null);
     let hoverInsights: PersonInsights | null = $state(null);
     let hoverInsightsLoading = $state(false);
@@ -67,6 +69,9 @@
     const relations = $derived(queryGraphRelations(displayed.graph, focusId, compareId));
     const resultIds = $derived(compareId ? relations.commonIds : relations.neighborIds);
     const resultPeople = $derived(people.filter((person) => resultIds.includes(person.docId)));
+    const pathMode = $derived.by(() => Boolean(compareId) && queryMode === "path");
+    const pathIds = $derived(pathMode ? shortestGraphPath(displayed.graph, focusId, compareId) : []);
+    const pathPeople = $derived(pathIds.map((id) => people.find((person) => person.docId === id)).filter((person) => person !== undefined));
 
     $effect(() => {
         const ids = new Set(displayed.graph.nodes.map((node) => node.id));
@@ -78,13 +83,15 @@
         const instance = graphInstance;
         const selected = focusId;
         const other = compareId;
-        const hits = resultIds;
+        const hits = pathMode ? pathIds : resultIds;
+        const path = pathMode ? pathIds : null;
         if (!instance || instance.destroyed()) return;
         instance.batch(() => {
             instance.elements().removeClass("lvct-graph-muted lvct-graph-focus");
             if (!selected) return;
             const visible = new Set([selected, other, ...hits]);
             const hitIds = new Set(hits);
+            const nextOnPath = new Map((path ?? []).slice(0, -1).map((id, index) => [id, path![index + 1]]));
             instance.nodes().forEach((node) => {
                 if (!visible.has(node.id())) node.addClass("lvct-graph-muted");
                 if (node.id() === selected || node.id() === other) node.addClass("lvct-graph-focus");
@@ -92,8 +99,10 @@
             instance.edges().forEach((edge) => {
                 const source = edge.source().id();
                 const target = edge.target().id();
-                const connectsHit = (hitIds.has(source) && (target === selected || target === other))
-                    || (hitIds.has(target) && (source === selected || source === other));
+                const connectsHit = path !== null
+                    ? nextOnPath.get(source) === target || nextOnPath.get(target) === source
+                    : (hitIds.has(source) && (target === selected || target === other))
+                        || (hitIds.has(target) && (source === selected || source === other));
                 if (!connectsHit) edge.addClass("lvct-graph-muted");
             });
         });
@@ -336,18 +345,37 @@
                     {/each}
                 </select>
             </label>
+            {#if compareId}
+                <select class="b3-select" bind:value={queryMode} aria-label="关系查询模式">
+                    <option value="common">共同联系人</option>
+                    <option value="path">最短路径</option>
+                </select>
+            {/if}
             {#if focusId}
-                <span class="ft__smaller ft__on-surface">{compareId ? "共同联系人" : "直接关系"}：{resultPeople.length} 人（当前图内）</span>
+                {#if pathMode}
+                    <span class="ft__smaller ft__on-surface">最短路径：{pathIds.length > 0 ? `${pathIds.length - 1} 段关系` : "无连接"}（当前图内）</span>
+                {:else}
+                    <span class="ft__smaller ft__on-surface">{compareId ? "共同联系人" : "直接关系"}：{resultPeople.length} 人（当前图内）</span>
+                {/if}
                 <button class="b3-button b3-button--text" onclick={() => { focusId = ""; compareId = ""; }}>清除选择</button>
             {/if}
         </div>
         {#if focusId}
             <div class="lvct-graph-query__results">
+                {#if pathMode}
+                    {#each pathPeople as person, index (person.docId)}
+                        {#if index > 0}<span class="ft__on-surface" aria-hidden="true">→</span>{/if}
+                        <button class="b3-button b3-button--text" onclick={() => onOpenDetail(person)}>{person.name}</button>
+                    {:else}
+                        <span class="ft__smaller ft__on-surface">当前图内没有连接路径</span>
+                    {/each}
+                {:else}
                 {#each resultPeople as person (person.docId)}
                     <button class="b3-button b3-button--text" onclick={() => onOpenDetail(person)}>{person.name}</button>
                 {:else}
                     <span class="ft__smaller ft__on-surface">{compareId ? "当前图内没有共同联系人" : "当前图内没有直接关系"}</span>
                 {/each}
+                {/if}
             </div>
         {/if}
     {/if}

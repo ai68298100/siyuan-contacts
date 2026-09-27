@@ -156,7 +156,7 @@ if (window.innerWidth <= 640) {
     });
 }
 
-await test("图谱邻接高亮与共同联系人查询不重建画布，筛选清理失效选择", async () => {
+await test("图谱邻接、共同联系人与最短路径不重建画布，筛选清理失效选择", async () => {
     const entries = [
         { id: "a", name: "甲", related: ["c", "d"] },
         { id: "b", name: "乙", related: ["c"] },
@@ -195,6 +195,20 @@ await test("图谱邻接高亮与共同联系人查询不重建画布，筛选�
     button("共同人物", fixture.querySelector(".lvct-graph-query__results")).click();
     assert(opened === "c", "结果未打开正确详情");
     assert(!cy.destroyed(), "选人不应重建图谱");
+    select("关系查询模式", "path");
+    await until(() => fixture.textContent.includes("最短路径：2 段关系"), "最短路径段数错误");
+    assert([...fixture.querySelectorAll(".lvct-graph-query__results button")].map((node) => node.textContent).join(",") === "甲,共同人物,乙", "路径顺序错误");
+    assert(!cy.getElementById("c").hasClass("lvct-graph-muted"), "路径中间人物被淡化");
+    assert(cy.edges().filter((edge) => !edge.hasClass("lvct-graph-muted")).length === 2, "路径连线高亮错误");
+    button("共同人物", fixture.querySelector(".lvct-graph-query__results")).click();
+    assert(opened === "c", "路径人物未打开详情");
+    select("对比人物", "e");
+    await until(() => fixture.textContent.includes("当前图内没有连接路径"), "断开人物应无路径");
+    assert(cy.edges().every((edge) => edge.hasClass("lvct-graph-muted")), "无路径仍高亮旧连线");
+    select("对比人物", "d");
+    await until(() => fixture.textContent.includes("最短路径：1 段关系"), "直接关系应为一段路径");
+    assert(!cy.destroyed(), "切换路径不应重建画布");
+    select("关系查询模式", "common");
     select("对比人物", "e");
     await until(() => fixture.textContent.includes("当前图内没有共同联系人"), "无共同联系人空态错误");
     button("清除选择").click();
