@@ -12,6 +12,7 @@
     import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "../services/settings-health";
     import type { ExportSummary } from "../services/export-center";
     import type { InteractionImportDiff } from "../domain/interaction-backup";
+    import type { AuditIssue } from "../domain/health-audit";
 
     let {
         facade,
@@ -48,6 +49,9 @@
     let activeSection: SectionId = $state("general");
     let health: SettingsHealth | null = $state(null);
     let checking = $state(false);
+    // FUNC-01.4 资料体检：只读巡检，结果按类列出（缺字段/悬空关系/孤儿互动等）
+    let auditIssues: AuditIssue[] | null = $state(null);
+    let auditBusy = $state(false);
     let rebuilding = $state(false);
     let savingPreferences = $state(false);
     let preferencesMessage = $state("");
@@ -121,6 +125,19 @@
             errorText = error instanceof Error ? error.message : String(error);
         } finally {
             checking = false;
+        }
+    }
+
+    async function runDataAudit() {
+        if (auditBusy) return;
+        auditBusy = true;
+        errorText = "";
+        try {
+            auditIssues = await facade.runHealthAudit();
+        } catch (error) {
+            errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            auditBusy = false;
         }
     }
 
@@ -653,6 +670,28 @@
                         {/if}
                     {:else}
                         <p class="lvct-settings__inline-hint">建议运行一次检查，确认数据库列没有被删除。</p>
+                    {/if}
+
+                    <div class="lvct-settings__sub-heading">
+                        <b>资料体检（只读巡检）</b>
+                        <button class="b3-button b3-button--outline" onclick={runDataAudit} disabled={auditBusy}>{auditBusy ? "体检中…" : "运行资料体检"}</button>
+                    </div>
+                    {#if auditIssues}
+                        {#if auditIssues.length === 0}
+                            <p class="lvct-settings__inline-hint" role="status">未发现资料质量问题：缺字段、悬空关系、孤儿互动均为 0。</p>
+                        {:else}
+                            <ul class="lvct-settings__missing">
+                                {#each auditIssues as issue (issue.kind)}
+                                    <li>
+                                        <div class="ft__smaller ft__on-surface">共 {issue.itemIds.length} 项{issue.samples.length > 0 ? `：${issue.samples.join("、")}${issue.itemIds.length > issue.samples.length ? " 等" : ""}` : ""}</div>
+                                        <div>{issue.reason}</div>
+                                    </li>
+                                {/each}
+                            </ul>
+                        {/if}
+                        <p class="ft__smaller ft__on-surface">体检零写入；缺字段可在联系人页筛选补录，悬空关系可在联系人页安全解绑，人物文档被删后收编可归位互动。</p>
+                    {:else}
+                        <p class="lvct-settings__inline-hint">检查数据内容质量：缺关键字段、悬空关系、跟进/互动指向不存在的人物等。</p>
                     {/if}
                 </section>
             {:else if activeSection === "reminder"}

@@ -18,6 +18,7 @@ import { captureFromDoc, previewCapture } from "./services/capture";
 import { extractFromDoc } from "./services/ai-extract";
 import { loadPersonInsights } from "./services/insights";
 import { checkSettingsHealth, rebuildMissingFields, rebindSettings, repairFieldMap } from "./services/settings-health";
+import { auditWorkspaceData } from "./services/health-audit";
 import { loadViewPreferences, saveViewPreferences } from "./services/preferences";
 import { exportInteractionJson } from "./services/interaction-export";
 import { loadExportSummary } from "./services/export-center";
@@ -276,6 +277,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     async checkSettingsHealth() {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
         return checkSettingsHealth(this.settings);
+    }
+
+    async runHealthAudit() {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return auditWorkspaceData(this, this.settings);
     }
 
     async rebuildMissingFields() {

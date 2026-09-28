@@ -72,6 +72,7 @@
     const facade = {
         settings, viewPreferences: prefs,
         checkSettingsHealth: async () => ({ ok: true, columns: columns.length, missing: [], availableColumns: columns }),
+        runHealthAudit: async () => [],
         repairFieldMap: async (patch) => ({ ...settings, fieldMap: { ...settings.fieldMap, ...patch } }),
         rebuildMissingFields: async () => settings,
         rebindSettings: async () => settings,

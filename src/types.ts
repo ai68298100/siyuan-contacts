@@ -39,6 +39,8 @@ export interface ContactsPluginFacade {
     loadRecentInteractions(): Promise<Record<string, { occurredAt: number; localDate: string }>>;
     /** 检查固化字段 ID 是否仍存在于联系人数据库 */
     checkSettingsHealth(): Promise<SettingsHealth>;
+    /** FUNC-01.4 资料体检：只读巡检名册数据质量（缺字段/悬空关系/孤儿互动等），零写入 */
+    runHealthAudit(): Promise<import("./domain/health-audit").AuditIssue[]>;
     /** 显式补建健康检查发现的缺失字段，并返回新的字段映射 */
     rebuildMissingFields(): Promise<ContactsSettings>;
     /** 显式验证并重新绑定已有联系人数据库的文档/数据库/视图锚点 */
