@@ -46,7 +46,7 @@ Lv Contacts makes **every contact a regular SiYuan document** (bidirectional lin
 3. Restart SiYuan → Settings → Marketplace → Download → enable **Lv Contacts**
 - Requires **SiYuan ≥ 3.8.5**. Marketplace submission is deferred.
 
-The source is a **v0.2.0 candidate**: on top of v0.1.0 it adds 16 incremental features — an export center, display preferences and saved views, combined filters, follow-ups, per-person cadences, a today action list, an opening summary banner, note templates, interaction date review, briefing export, an interaction review report, duplicate checking and import diagnosis. Workspace navigation, view headings and the person-detail dialog heading/close label use the host-provided language resources. Feature content is still primarily Chinese; a full English UI is not yet delivered.
+The source is **v0.2.1** (not pushed/released yet): on top of the 16 incremental features of v0.2.0 it fixes first-run setup, which always failed on a real host and then blocked retries with “a notebook with that name already exists” (write-endpoint response shape and database materialization flag). Setup is now idempotent and resumable: re-running only fills in what is missing and never duplicates or deletes existing content.
 
 ## 🚀 Quick start
 

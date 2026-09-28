@@ -611,3 +611,34 @@
 - 同步 ROADMAP、UI 排期、移交入口、README 与决策 D-0017；纠正原型中数据不出区/卸载全保留的过度承诺，更新非模态 Peek 焦点规则、工作台内提醒设计与会前简报已实现状态。废止移动端最后统一做的安排，不以截图就绪等同原型完全对齐。
 - 本轮仅完成规划与说明修订，未实现 F01–F16，未改变生产代码、存储 schema 或版本，未推送/发布。原型只修改文字约束，未重新做视觉验收。
 - 验证：`pnpm check` 零错误/警告，`pnpm test` 80/80；16 个唯一功能 ID 与总计划相对文档链接核查通过，`git diff --check` 通过。本次不重复运行界面截图、构建或宿主验证；此前界面检查结果见上条历史记录。
+
+## v0.2.0 发布与首次引导实故修复（2026-09-28）
+
+- **发布记录**：main 推送（直连失败，走本机代理 127.0.0.1:7897）；CI 首跑在 Linux runner
+  因 Chromium 沙箱启动失败，隔离回归补 `--no-sandbox`/`--disable-dev-shm-usage` 后转绿；
+  tag v0.2.0 与 GitHub Release（附 package.zip）已建。集市 PR 按约定不由本仓库代提。
+- **用户首启实故（带截图）**：第一次点击初始化失败，第二次点击报「已存在同名笔记本「人脉」」，
+  且向导没有下一步按钮、路径或提醒。隔离内核（v3.8.5）复现并定位到两个独立缺陷——
+  1) api 层按**对象**读 `insertBlock` 的 `data`，而真内核返回**事务结果数组**，建库第一步
+  即抛「未返回新块 ID」；2) `createDatabaseInDoc` 物化时传 `createIfNotExist: false`，全新
+  数据库块上内核返回 `attribute view not found`。两者都发生在"笔记本已建成功"之后，
+  于是任何重试都在第一步撞名卡死。
+- **修复**：
+  - `api/client.ts`、`api/blocks.ts`：写入端点响应按事务结果数组消费（两种形状都容忍，
+    取第一个带 id 的操作）；`api/av.ts`：物化改传 `createIfNotExist: true`，新增
+    `findAvBlocksInDoc`（按 `parent_id + type='av'` 找回库块并从 `blocks.markdown` 还原 avId）。
+  - `services/init.ts`：初始化链改为**幂等可续建**——`inspectWorkspace` 预检同名笔记本 /
+    「联系人总表」/ 数据库块 / 可复用列，重跑只补缺失、不重复建、不删除；进度改为 i18n 键
+    上报。`domain/fields.ts` 抽出 `reconcileFieldMap`（设置健康检查同源共用），
+    `domain/init-plan.ts` 提供 avID 还原纯函数。
+  - 向导（InitWizard）：运行前显示「将新建/将复用哪些内容」的预检提示与「重新检测」，
+    失败后按钮变「继续初始化」并提示可断点续建；新增 30 个双语键（键表 423 → 452）。
+- **真内核实证**（`scripts/spike/init-resume-spike.mjs`，新增 `pnpm spike:init`，隔离内核 21/21）：
+  `createIfNotExist` 三态语义、`insertBlock` 两种 dataType 的数组形状、重名笔记本静默新建、
+  重名列叠加、avID 还原通道，以及"半成品现场 → 续建补九字段且无重名列 → 二次续建零新建"
+  的端到端复现。
+- **回归**：单测 140/140（新增 `tests/init-plan.test.ts` 9 项）、桌面隔离回归 60/60、
+  移动视口回归 61/61（各新增 3 项：全新链、续建链、向导失败可继续）、真内核联系人流程
+  E2E 10/10、生产构建与发布门禁通过。构建保留既存的无效动态导入提示，不影响通过。
+- **未验证**：实际宿主、真机与实际多窗口按用户要求跳过；本修复的验收证据来自隔离内核与
+  隔离浏览器，不改口为真实宿主验收。推送与 Release 等用户确认后执行。

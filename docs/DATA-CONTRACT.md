@@ -18,8 +18,12 @@
 
 - 笔记本：向导创建，默认名「人脉」（记录 `notebookId`）。
 - 宿主文档：`人脉/联系人总表`，内嵌一个数据库块（记录 `hostDocId`、`dbBlockId`）。
-- 数据库 ID（`avId`）由**插件客户端预生成**（`newNodeId()`），插 DOM 块后用 `renderAttributeView(createIfNotExist)` 物化（spike ①）。
+- 数据库 ID（`avId`）由**插件客户端预生成**（`newNodeId()`），插 DOM 块后用 `renderAttributeView(createIfNotExist: true)` 物化（spike ①；该参数必须为 `true`，见 §6）。
 - 四个锚点 ID 全部固化在插件设置里；**绝不通过列名/文档名反查锚点**。
+- **初始化幂等可续建**（D-0019）：设置缺失时重跑向导不新建第二份——按名复用笔记本、按
+  标题在笔记本内找回「联系人总表」、按 `type='av'` 找回数据库块并从 `blocks.markdown`
+  还原 `avId`、按列名+类型对账只补缺失列、回链列已在则跳过双向配置；不删除任何已有内容。
+  现场识别只认「联系人总表」文档内的数据库块（同名笔记本里用户的无关数据库不当作自己的）。
 
 ### 1.2 字段契约
 
@@ -176,7 +180,20 @@
 - **IAL 语法**：markdown 中 IAL 必须**独占一行**跟在块后（`内容\n{: custom-x="1"}`）；
   写在行尾不会被解析为属性、原样留在正文（scripts/spike/ial-probe.mjs 实证）。
 - 数据库**没有 SQL 表**：`av_table.go` 系渲染逻辑；数据库读取一律 `renderAttributeView`。
-
+- **`renderAttributeView` 的 `createIfNotExist` 语义**（v0.2.0 首启实故的根因）：
+  全新数据库块上传 `false` 以 `code=-1 attribute view not found` 失败，传 `true` 才物化
+  （默认视图 + 主键列）；物化后两种取值都能读，且重复传 `true` 幂等。
+- **`insertBlock` 的 `data` 是事务结果数组** `[{doOperations:[…]}]`（dom 与 markdown 两种
+  dataType 实测一致）：新块 ID 取 `data[0].doOperations[0].id`；按对象读会取不到 ID
+  （v0.2.0 首启在建库一步抛“未返回新块 ID”的原因）。
+- **`createNotebook` 重名不报错**：返回 `code=0` 并静默创建第二个同名笔记本——
+  重名保护必须由客户端预检完成（`listNotebooks` 比对）。
+- **`addAttributeViewKey` 重名列不报错**：返回 `code=0` 并叠出同名列——续建初始化必须先按
+  列名/类型对账，只补缺失列，否则会把库配出两套同名列。
+- **数据库锚点还原通道**：数据库块的 `blocks.markdown` 列含 `data-av-id`（块 IAL 里没有），
+  按 `parent_id = '<宿主文档ID>' AND type = 'av'` 查块即可还原 `dbBlockId` 与 `avId`；
+  这是初始化续建（D-0019）与“找回半成品现场”的唯一可靠通道，实证见
+  `scripts/spike/init-resume-results.json`。
 ## 7. vCard (.vcf) 导入导出映射（v0.2d）
 
 vCard 处理是**瞬态转换**（不落插件存储），但属性↔字段映射是数据边界契约，事实源在
