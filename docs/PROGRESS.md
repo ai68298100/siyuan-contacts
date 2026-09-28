@@ -940,3 +940,24 @@
   74/74、移动 75/75、宿主基线 74/74；单测 170/170；svelte-check 0 错误；52 景截图 OK；构建通过。
 - **批次 3 全部完成**（B01/B08/C02/C06/C07；B09-6/7/8 消化）。下一批：批次 4（B07 双向同步 + C08
   完整迁移包，先补 DATA-CONTRACT）。
+
+## 批次 4 第 18 轮：B07 跟进 → 原生待办双向同步（2026-09-29）
+
+- **契约**：`DATA-CONTRACT.md` 新增 §3.1「人物文档内任务块」——关联键 `custom-lvct-followup`（IAL，
+  勾选后存活可反查）、识别口径 `type='i' AND subtype='t'`、写入纪律（每事项独立任务块、只增改自己的
+  任务项、改期改标题走 updateBlock、完成打勾、取消删块、插件记录保留）、同步方向（文档为准单向收敛
+  插件库；完成不自动写互动）、失败语义（写侧同步失败不阻断插件库写入）。端点行为全部有 spike 12/12 实证。
+- **域层**（`domain/followup-doc.ts`，纯函数 + 单测 4 例）：任务行序列化/解析（`- [X] 标题 📅日期`）、
+  `planTaskSync`（insert/update/done/delete 四类计划，幂等，不触碰用户手工任务）、
+  `reconcileDecisions`（文档勾选→done、取消勾选→open、cancelled 不复活）。
+- **api 层**（`api/blocks.ts`）：`setBlockAttrs`、`updateTaskListItemMarker`、`findFollowUpTaskBlocks`
+  （关联键反查 + type='i' 过滤，ID 严格校验）。
+- **同步服务**（`services/followup-sync.ts`）：写侧 `syncFollowUpTasksToDoc`（执行计划，失败不阻断
+  插件库写入，console 记录）；读侧 `reconcileFollowUpTasksFromDoc`（文档为准收敛插件库状态）。
+- **触发点**：createFollowUp/setFollowUpStatus/snoozeFollowUp（services/followups）尾部写侧同步；
+  facade.listPersonFollowUps（人物详情打开）先读侧对账再返回（失败静默按未对账返回）。
+- 验证：单测 174/174（新增 followup-doc 4 例）；svelte-check 0 错误；隔离回归桌面 74/74、移动 75/75、
+  宿主基线 74/74；构建通过。
+- **Host pending（需作者真机核对）**：文档勾选/取消勾选/删块后在首页与详情的收敛表现；作者自己的
+  任务管理器插件能否读到这些待办。余留：任务块被删的「不可达」显式标记（当前兜底为插件库记录照常
+  展示）；「集中写入指定文档」开关（默认落各自人物文档）。

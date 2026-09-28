@@ -15,6 +15,7 @@ import {
     readFollowUpStoreStrictInLock,
     updateFollowUpRecord,
 } from "../data/followups";
+import { syncFollowUpTasksToDoc } from "./followup-sync";
 
 export type { FollowUpItem, FollowUpStatus, SnoozeOption } from "../domain/followups";
 
@@ -28,11 +29,15 @@ export async function createFollowUp(
 ): Promise<FollowUpItem> {
     if (!input.personDocId) throw new Error("缺少人物文档 ID");
     assertDateKey(input.dueDate, "计划");
-    return createFollowUpRecord(plugin, { personDocId: input.personDocId, title: input.title, dueDate: input.dueDate });
+    const item = await createFollowUpRecord(plugin, { personDocId: input.personDocId, title: input.title, dueDate: input.dueDate });
+    /* B07：文档任务块为事实源——插件库变更后同步到人物文档（失败不阻断，sync 内部 console 记录） */
+    await syncFollowUpTasksToDoc(plugin, input.personDocId);
+    return item;
 }
 
 export async function setFollowUpStatus(plugin: Plugin, id: string, status: FollowUpItem["status"]): Promise<void> {
     await updateFollowUpRecord(plugin, id, { status });
+    await syncAfterIdChange(plugin, id);
 }
 
 /** 语义化推迟：日期以本地今天为基准计算；custom 需合法日期，否则拒绝 */
@@ -40,6 +45,14 @@ export async function snoozeFollowUp(plugin: Plugin, id: string, option: SnoozeO
     const due = snoozedDueDate(option, toLocalDateKey(new Date()), customDate);
     if (!due) throw new Error("指定日期无效：需要真实存在的公历日期（YYYY-MM-DD）");
     await updateFollowUpRecord(plugin, id, { dueDate: due });
+    await syncAfterIdChange(plugin, id);
+}
+
+/** 由跟进 id 反查人物文档后同步任务块（状态/改期变更共用） */
+async function syncAfterIdChange(plugin: Plugin, id: string): Promise<void> {
+    const store = await loadFollowUpStore(plugin);
+    const item = store.items.find((entry) => entry.id === id);
+    if (item) await syncFollowUpTasksToDoc(plugin, item.personDocId);
 }
 
 export async function listPersonFollowUps(plugin: Plugin, personDocId: string): Promise<FollowUpItem[]> {

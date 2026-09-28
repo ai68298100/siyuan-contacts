@@ -102,6 +102,27 @@
 写 `reminder-dismissals.json`（kind=stale, until=""）——保证首页久未联系统计与名单计数保持真实
 （D-0020），仅提醒行隐藏且可一键恢复；`birthday` 同理只屏蔽生日提醒呈现。
 
+### 3.1 人物文档内任务块（B07 跟进 → 原生待办双向同步）
+
+跟进事项以**思源原生任务列表项**写入人物文档（`- [ ] 标题 📅YYYY-MM-DD`），文档任务块为事实源，
+`follow-ups.json` 保留为索引/快照（首页清单、导出、不可达兜底）。端点行为全部经隔离内核 v3.8.5
+实证（`scripts/spike/task-item-spike.mjs`，12/12）：
+
+- **关联键**：任务块 IAL `custom-lvct-followup="<跟进 id>"`（`/api/attr/setBlockAttrs` 写入，
+  勾选后存活，可按 `ial LIKE '%custom-lvct-followup="%"'` 反查；限定 `root_id=<人物文档>` 归属）。
+- **识别口径**：`type='i' AND subtype='t'`（subtype='t' 会同时命中列表容器 type='l'，必须再按
+  type='i' 过滤）；勾选态在 `blocks.markdown`（`- [X]` 大写为完成）。
+- **写入纪律**：每个跟进事项一个独立任务列表块；只增改**自己的**任务项（按关联键识别），
+  从不删除/改动用户手工添加的任务；改期/改标题 = `updateBlock` 更新该块 markdown（`📅YYYY-MM-DD`
+  原样保留）；完成 = `updateTaskListItemMarker {id, marker:"x"}`（官方端点只认列表项 ID，
+  传容器报错；批量用 `batchUpdateTaskListItemMarker`）；取消 = `deleteBlock` 移除任务块
+  （插件侧记录保留，可重新打开时重建）。
+- **同步方向**：文档勾选 → 插件置 done；取消勾选 → 恢复 open；标题/日期以文档为准；
+  任务块被删 → 该事项按"不可达"呈现而不静默复活；两端冲突以文档为准，不做自动互相覆盖。
+  **完成跟进不自动写互动；记录互动也不悄悄完成跟进**（与 follow-ups.json 同一纪律）。
+- **失败语义**：文档侧同步失败**不阻断**插件库写入（console 记录，BACKLOG 记录改进项）；
+  读侧对账（人物详情打开时）以文档为准单向收敛插件库，不回写文档。
+
 同一场合允许每位参与者各有一条互动事件；`source+externalRef` 表示共同场合，
 只有人物 ID 也相同时才判定重复。事件 ID 在全库唯一，归一化同时按事件 ID 去重。
 此修正保留 schemaVersion 1，不改变存储结构；旧版本已经跳过或丢弃的参与者事件无法自动恢复。

@@ -24,6 +24,7 @@ import { extractFromDoc } from "./services/ai-extract";
 import { loadPersonInsights } from "./services/insights";
 import { checkSettingsHealth, rebuildMissingFields, rebindSettings, repairFieldMap } from "./services/settings-health";
 import { auditWorkspaceData } from "./services/health-audit";
+import { reconcileFollowUpTasksFromDoc } from "./services/followup-sync";
 import { loadViewPreferences, saveViewPreferences } from "./services/preferences";
 import { exportInteractionJson } from "./services/interaction-export";
 import { loadExportSummary } from "./services/export-center";
@@ -443,6 +444,12 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     async listPersonFollowUps(personDocId: string) {
+        /* B07：人物详情打开时读侧对账（文档为准收敛插件库；失败静默按未对账返回） */
+        try {
+            await reconcileFollowUpTasksFromDoc(this, personDocId);
+        } catch (error) {
+            console.warn("[lvct] 跟进任务块对账失败（按未对账返回）:", error);
+        }
         return listPersonFollowUps(this, personDocId);
     }
 

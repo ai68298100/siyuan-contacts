@@ -97,3 +97,36 @@ export async function upsertMarkedBlock(
 }
 
 export { newNodeId };
+
+/* ---------- B07：跟进任务块（原生待办双向同步，端点行为见 §3.1 与 spike 12/12 实证） ---------- */
+
+/** 任务块关联键：IAL custom-lvct-followup="<跟进 id>" */
+export const FOLLOW_UP_ATTR = "custom-lvct-followup";
+
+/** 写任务块关联键（官方 /api/attr/setBlockAttrs；勾选后存活，spike ③ 实证） */
+export async function setBlockAttrs(blockId: string, attrs: Record<string, string>): Promise<void> {
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(blockId)) throw new Error("blockId 不是合法的思源 ID");
+    await kernelPost<unknown>("/api/attr/setBlockAttrs", { id: blockId, attrs });
+}
+
+/** 任务项勾选标记（官方端点只认列表项 ID；marker: "x" 勾选 / " " 取消） */
+export async function updateTaskListItemMarker(blockId: string, marker: "x" | " "): Promise<void> {
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(blockId)) throw new Error("blockId 不是合法的思源 ID");
+    await kernelPost<unknown>("/api/block/updateTaskListItemMarker", { id: blockId, marker });
+}
+
+/** 人物文档内本插件的跟进任务块（关联键反查 + type='i' 过滤列表容器；markdown 含勾选态） */
+export async function findFollowUpTaskBlocks(
+    rootId: string,
+): Promise<Array<{ blockId: string; followUpId: string; markdown: string }>> {
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(rootId)) throw new Error("rootId 不是合法的思源 ID");
+    const rows = await querySql<{ id: string; ial: string; markdown: string }>(
+        `SELECT id, ial, markdown FROM blocks WHERE root_id = '${rootId}' AND type = 'i' AND subtype = 't' AND ial LIKE '%${FOLLOW_UP_ATTR}="%'`,
+    );
+    const result: Array<{ blockId: string; followUpId: string; markdown: string }> = [];
+    for (const row of rows) {
+        const match = String(row.ial ?? "").match(new RegExp(`${FOLLOW_UP_ATTR}="([^"]+)"`));
+        if (match) result.push({ blockId: row.id, followUpId: match[1], markdown: String(row.markdown ?? "") });
+    }
+    return result;
+}
