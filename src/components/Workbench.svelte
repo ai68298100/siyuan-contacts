@@ -129,16 +129,16 @@
                     aria-current={current === view.id ? "page" : undefined}
                     onclick={() => selectView(view.id)}
                 >
-                    <span aria-hidden="true">{#if view.id === "home"}<House size={16}/>{:else if view.id === "people"}<UsersRound size={16}/>{:else}<Network size={16}/>{/if}</span><span class="lvct-workbench__nav-text">{isMobile ? view.shortLabel : view.label}</span>
+                    <span class="lvct-workbench__nav-icon" aria-hidden="true">{#if view.id === "home"}<House size={16}/>{:else if view.id === "people"}<UsersRound size={16}/>{:else}<Network size={16}/>{/if}</span><span class="lvct-workbench__nav-text">{isMobile ? view.shortLabel : view.label}</span>
                 </button>
             {/each}
             <span class="lvct-workbench__nav-label lvct-workbench__nav-label--secondary">{text("navUpcoming", "即将推出")}</span>
-            <button class="lvct-workbench__nav-item" disabled><span aria-hidden="true"><Building2 size={16}/></span>{text("navOrganizations", "组织")}</button>
-            <button class="lvct-workbench__nav-item" disabled><span aria-hidden="true"><Sparkles size={16}/></span>{text("navSuggestions", "建议")}</button>
+            <button class="lvct-workbench__nav-item" disabled><span class="lvct-workbench__nav-icon" aria-hidden="true"><Building2 size={16}/></span><span class="lvct-workbench__nav-text">{text("navOrganizations", "组织")}</span></button>
+            <button class="lvct-workbench__nav-item" disabled><span class="lvct-workbench__nav-icon" aria-hidden="true"><Sparkles size={16}/></span><span class="lvct-workbench__nav-text">{text("navSuggestions", "建议")}</span></button>
         </nav>
         <div class="lvct-workbench__sidebar-footer">
             <button class="lvct-workbench__nav-item" title={text("openSettings", "打开插件设置")} onclick={() => selectView("settings")}>
-                <span aria-hidden="true"><Settings size={16}/></span><span class="lvct-workbench__nav-text">{text("navSettings", "设置")}</span>
+                <span class="lvct-workbench__nav-icon" aria-hidden="true"><Settings size={16}/></span><span class="lvct-workbench__nav-text">{text("navSettings", "设置")}</span>
             </button>
         </div>
     </aside>

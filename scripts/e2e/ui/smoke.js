@@ -118,6 +118,25 @@ await test("首页零人筛选保持空结果，清除后恢复联系人", async
     await until(() => fixture.querySelector(".lvct-person-card"), "清除首页筛选未恢复联系人");
 });
 
+await test("工作台导航文字单行展示，不再被图标盒压成逐字竖排（UX-01.3）", async () => {
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadRecentInteractions: async () => ({}), loadDashboard: async () => ({
+            people: 0, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+            stale: [], neverContacted: 0, neverContactedItemIds: [],
+        }) },
+    } });
+    await until(() => fixture.querySelector(".lvct-workbench__nav-text"), "导航未渲染");
+    for (const node of fixture.querySelectorAll(".lvct-workbench__nav-text")) {
+        const box = node.getBoundingClientRect();
+        if (box.width === 0) continue; /* 移动视口下隐藏项（disabled/品牌区）无布局盒 */
+        /* 竖排缺陷特征：被压进 18px 图标盒、逐字换行（高≥两行） */
+        assert(box.width > 20 && box.height < 32,
+            `导航文字盒子 ${Math.round(box.width)}x${Math.round(box.height)}，仍被压成逐字竖排`);
+    }
+});
+
 await test("新建草稿关闭前三选一：取消保留草稿，放弃后关闭且弹窗列明细", async () => {
     const guardDialog = () => document.body.querySelector(".lvct-closeguard");
     try {

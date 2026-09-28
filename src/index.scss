@@ -17,6 +17,7 @@
     display: grid;
     grid-template-columns: var(--lvct-sidebar-w) minmax(0, 1fr);
     overflow: hidden;
+    background: var(--lvct-bg-base);
 }
 
 .lvct-workbench__sidebar {
@@ -25,7 +26,7 @@
     gap: var(--lvct-sp-4);
     padding: var(--lvct-sp-4) var(--lvct-sp-2);
     border-right: 1px solid var(--lvct-border-subtle);
-    background: var(--lvct-bg-base);
+    background: var(--lvct-bg-app);
 }
 
 .lvct-workbench__brand {
@@ -149,7 +150,23 @@
     border-radius: var(--lvct-r-sm);
     cursor: pointer;
     font-size: 14px;
-    > span { display: inline-flex; align-items: center; justify-content: center; width: 18px; flex: 0 0 18px; }
+    /* UX-01.3：图标与文字分开定位——此前 `> span` 把文字 span 也压进 18px 盒子导致逐字竖排 */
+    .lvct-workbench__nav-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        flex: 0 0 18px;
+    }
+
+    .lvct-workbench__nav-text {
+        flex: 1;
+        min-width: 0;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 
     &:hover {
         background: var(--lvct-bg-hover);
@@ -197,6 +214,7 @@
     border: 1px solid var(--lvct-border-subtle);
     border-radius: var(--lvct-r-lg);
     padding: var(--lvct-sp-3) var(--lvct-sp-4);
+    box-shadow: var(--lvct-shadow-1);
 
     h3 {
         margin: 0 0 8px;
@@ -1197,15 +1215,17 @@
     gap: var(--lvct-sp-3);
     background: var(--lvct-bg-surface);
     border: 1px solid var(--lvct-border-subtle);
-    border-radius: 8px;
+    border-radius: var(--lvct-r-lg);
     padding: var(--lvct-sp-3);
     cursor: pointer;
     min-width: 0;
     min-height: 172px;
     box-sizing: border-box;
+    box-shadow: var(--lvct-shadow-1);
 
     &:hover {
         border-color: var(--lvct-accent);
+        box-shadow: var(--lvct-shadow-2);
     }
     &--active {
         border-color: var(--lvct-accent);
@@ -2193,6 +2213,7 @@
     border: 1px solid var(--lvct-border-subtle);
     border-radius: var(--lvct-r-lg);
     padding: 10px 12px;
+    box-shadow: var(--lvct-shadow-1);
     display: flex;
     flex-direction: column;
     align-items: center;

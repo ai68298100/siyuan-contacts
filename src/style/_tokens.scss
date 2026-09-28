@@ -30,11 +30,16 @@
     --lvct-highlight: #d97706;
     --lvct-highlight-soft: color-mix(in srgb, var(--lvct-highlight) 12%, transparent);
 
-    /* ---------- 2. 语义色：表面层级（全部桥接 b3，主题切换零成本） ---------- */
-    --lvct-bg-app: var(--b3-theme-background);                                  /* 工作台最底层 */
-    --lvct-bg-base: var(--b3-theme-background);                                 /* 内容区 */
-    --lvct-bg-surface: var(--b3-theme-surface);                                 /* 卡片 / 面板 / 输入框 */
-    --lvct-bg-elevated: var(--b3-menu-background, var(--b3-theme-surface, var(--b3-theme-background))); /* 弹窗 / 下拉 / 悬停卡；对齐宿主 .b3-menu 配方（surface-lighter 在 daylight 下过灰，见 B02） */
+    /* ---------- 2. 语义色：表面层级（全部桥接 b3，主题切换零成本） ----------
+     * UX-01.1 四级单调层级（两种明色下都是 app < base < surface < elevated 的显著度序）：
+     *   亮色 app=约#f4f4f4 < base=约#fafafa < surface(卡)=background(#fff) < elevated(浮层)
+     *   暗色 app=约#191a1c < base=background < surface(卡)=约#282a2e < elevated(浮层)
+     * b3 变量本身明暗方向相反（亮色 surface 比 background 深、暗色则浅），
+     * 因此配方按 [data-theme-mode="dark"] 分块，见文末覆写。 */
+    --lvct-bg-app: color-mix(in srgb, var(--b3-theme-surface, var(--b3-theme-background)) 70%, var(--b3-theme-background));  /* 侧栏 / 外壳最底层 */
+    --lvct-bg-base: color-mix(in srgb, var(--b3-theme-surface, var(--b3-theme-background)) 30%, var(--b3-theme-background)); /* 内容区 */
+    --lvct-bg-surface: var(--b3-theme-background);                              /* 卡片 / 面板 / 输入框 */
+    --lvct-bg-elevated: var(--b3-menu-background, var(--b3-theme-surface, var(--b3-theme-background))); /* 弹窗 / 下拉 / 悬停卡；对齐宿主 .b3-menu 配方（B02） */
     --lvct-bg-hover: var(--b3-list-hover);                                      /* 行/项悬停 */
     --lvct-bg-active: var(--b3-list-icon-hover, var(--b3-list-hover));          /* 按下/选中底 */
 
@@ -149,6 +154,11 @@ html[data-theme-mode="dark"] .lvct-doc-strip {
     --lvct-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
     --lvct-shadow-2: 0 4px 16px rgba(0, 0, 0, 0.35);
     --lvct-shadow-3: 0 12px 40px rgba(0, 0, 0, 0.5);
+
+    /* UX-01.1 暗色四级表面：app 比 base 深、surface（卡片）比 base 浅，与原型同构 */
+    --lvct-bg-app: color-mix(in srgb, var(--b3-theme-background, #000) 78%, #000);
+    --lvct-bg-base: var(--b3-theme-background);
+    --lvct-bg-surface: color-mix(in srgb, var(--b3-theme-surface, var(--b3-theme-background)) 50%, var(--b3-theme-background));
 
     /* 分组色暗色配方：提高明度，保证图谱与头像在深色表面上的可读性 */
     --lvct-group-family: #f2707a;

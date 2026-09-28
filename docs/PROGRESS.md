@@ -695,3 +695,20 @@
   档案条六页留骨架随批次补齐；原型状态标识未开始，随 UX-01.12 做。
 - 验证：`svelte-check` 0 错误；单测 140/140；隔离回归桌面 63/63（新增「查看全部」用例）、
   移动 64/64；36 景截图全 OK。
+
+## UX-0 第 2 轮：四级表面层级与外壳竖排修复（2026-09-28）
+
+- **UX-01.1 四级表面层级**（`src/style/_tokens.scss`）：`--lvct-bg-app/base/surface` 此前三者
+  同桥接 `--b3-theme-background`、层级扁平；现按原型（亮 #eef0f4<#f6f7fa<#fff，暗同理）重建
+  明暗单调序——亮色 app/base 用 `color-mix` 向 surface 凹陷 70%/30%、卡片用 background（白卡
+  浮起）；暗色覆写块 app 向黑压 22%、卡片向 surface 提亮 50%。`--lvct-bg-elevated` 保持 B02
+  的 `--b3-menu-background` 桥接。消费侧：侧栏改 `--lvct-bg-app`、工作台底改 `--lvct-bg-base`；
+  首页卡/统计卡静态 `shadow-1`，人物卡静态 `shadow-1` + 悬停 `shadow-2`（UX-01.1「不能只在
+  hover 时才有阴影」），圆角统一 `--lvct-r-lg`。
+- **UX-01.3 导航逐字竖排修复**：根因 `.lvct-workbench__nav-item > span` 把文字 span 与图标
+  span 一起压进 18px 固定盒；图标改专用类 `__nav-icon`、文字 `__nav-text`（flex:1 + 单行
+  省略），组织/建议占位项补文字 span。新增 smoke 守卫：遍历导航文字断言盒子宽 >20px 且高
+  <32px（竖排特征即失败）；移动视口隐藏项按无布局盒跳过。
+- 视觉验证：亮/暗首页截图确认侧栏凹陷、内容区分层、白卡带阴影；宿主基线截图 48 景全 OK。
+- 验证：单测 140/140；svelte-check 0 错误；隔离回归桌面 64/64、移动 65/65、宿主基线 64/64；
+  生产构建通过。UX-01.3 余项（页头统一、断点收敛、滚动容器收口）与 UX-01.2 公共组件未开始。
