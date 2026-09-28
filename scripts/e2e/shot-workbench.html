@@ -127,7 +127,20 @@
                 person: summary(people.find((person) => person.docId === item.personDocId)),
                 reachable: true,
             })),
-            actions: [],
+            actions: [
+                { person: summary(people[0]), bucket: "today", reasons: [
+                    { kind: "birthday", label: "今天生日", bucket: "today", dueDate: localDateKey(0) },
+                ] },
+                { person: summary(people[1]), bucket: "overdue", reasons: [
+                    { kind: "followup", label: "跟进「寄生日礼物」已逾期", bucket: "overdue", dueDate: localDateKey(-2), followUpId: "fu-shot-1" },
+                ] },
+                { person: summary(people[2]), bucket: "stale", reasons: [
+                    { kind: "stale", label: "54 天未联系（阈值 30 天）", bucket: "stale" },
+                ] },
+                { person: summary(people[3]), bucket: "stale", reasons: [
+                    { kind: "stale", label: "从未互动", bucket: "stale", neverContacted: true },
+                ] },
+            ],
         }),
         loadRecentInteractions: async () => Object.fromEntries(people.map((person, index) => [person.docId, { occurredAt: Date.now() - index * 86400000, localDate: `2026-09-${String(27 - index).padStart(2, "0")}` }])),
         loadPersonInsights: async () => ({ timeline: [], coAttendance: [], totalEvents: 0 }),

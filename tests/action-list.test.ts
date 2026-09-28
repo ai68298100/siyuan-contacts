@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildActionCards } from "../src/domain/action-list.ts";
+import { buildActionCards, groupActionCards } from "../src/domain/action-list.ts";
 import type { ActionPersonInput } from "../src/domain/action-list.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
 
@@ -60,4 +60,31 @@ test("行动清单：无原因不出卡，窗口外生日与跟进排除，从�
     ], TODAY);
     assert.deepEqual(cards.map((card) => card.person.name), ["丙"]);
     assert.equal(cards[0].reasons[0].label, "从未互动");
+});
+
+test("groupActionCards（B01）：五组分类、从未互动单独归组、组内保持排序、空组不返回", () => {
+    const mkPerson = (name: string) => ({
+        docId: `doc-${name}`, itemId: `row-${name}`, name,
+        phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
+        group: "", tags: [], relatedItemIds: [],
+    });
+    const cards = buildActionCards([
+        { person: mkPerson("逾期甲"), followUps: [{ id: "f1", title: "还书", dueDate: "2026-09-25" }] },
+        { person: mkPerson("今天乙"), birthdayDaysUntil: 0, birthdayDate: "2026-09-28", followUps: [] },
+        { person: mkPerson("本周丙"), birthdayDaysUntil: 5, birthdayDate: "2026-10-03", followUps: [] },
+        { person: mkPerson("久未丁"), lastDaysAgo: 45, staleThreshold: 30, followUps: [] },
+        { person: mkPerson("从未戊"), staleThreshold: 30, followUps: [] },
+        { person: mkPerson("从未己"), staleThreshold: 30, followUps: [] },
+    ], "2026-09-28");
+    const groups = groupActionCards(cards);
+    assert.deepEqual(groups.map((group) => group.key), ["overdue", "today", "week", "stale", "never"]);
+    assert.deepEqual(groups.find((group) => group.key === "never")!.cards.map((card) => card.person.name), ["从未己", "从未戊"]);
+    assert.equal(groups.find((group) => group.key === "never")!.defaultCollapsed, true);
+    assert.equal(groups.find((group) => group.key === "overdue")!.defaultCollapsed, false);
+    /* 从未互动但今天有跟进到期的人：归「今天」组（紧急桶优先），不进 never */
+    const mixed = buildActionCards([
+        { person: mkPerson("混合庚"), lastDaysAgo: undefined, staleThreshold: 30, followUps: [{ id: "f2", title: "回电", dueDate: "2026-09-28" }] },
+    ], "2026-09-28");
+    const mixedGroups = groupActionCards(mixed);
+    assert.deepEqual(mixedGroups.map((group) => group.key), ["today"]);
 });

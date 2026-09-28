@@ -390,6 +390,43 @@ await test("移动端人物卡片内容自适应，min-height 收缩且空 chips
     }
 });
 
+await test("今日行动分组折叠：从未互动单独归组默认折叠，组头计数展开入口（B01）", async () => {
+    const personOf = (name) => ({
+        docId: `20260927000000-${name}0000`, itemId: `row-${name}`, name,
+        phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
+        group: "", tags: [], relatedItemIds: [],
+    });
+    const actionCard = (name, bucket, reasons) => ({ person: personOf(name), bucket, reasons });
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadRecentInteractions: async () => ({}), loadDashboard: async () => ({
+            people: 5, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+            stale: [], neverContacted: 3, neverContactedItemIds: [],
+            followUps: [], actions: [
+                actionCard("逾期跟进", "overdue", [{ kind: "followup", label: "跟进「还书」已逾期", bucket: "overdue", dueDate: "2026-09-25", followUpId: "f1" }]),
+                actionCard("从未甲", "stale", [{ kind: "stale", label: "从未互动", bucket: "stale", neverContacted: true }]),
+                actionCard("从未乙", "stale", [{ kind: "stale", label: "从未互动", bucket: "stale", neverContacted: true }]),
+                actionCard("从未丙", "stale", [{ kind: "stale", label: "从未互动", bucket: "stale", neverContacted: true }]),
+            ],
+        }) },
+    } });
+    await until(() => fixture.querySelector(".lvct-dash__group-head"), "行动分组未渲染");
+    const heads = () => [...fixture.querySelectorAll(".lvct-dash__group-head")];
+    assert(heads().some((node) => node.textContent.includes("逾期")), "逾期组未渲染");
+    const neverHead = heads().find((node) => node.textContent.includes("从未互动"));
+    assert(neverHead && neverHead.textContent.includes("3"), "从未互动组头计数错误");
+    /* 默认折叠：从未互动行不在 DOM，其余组展开 */
+    assert(!fixture.textContent.includes("从未甲"), "从未互动组未默认折叠");
+    assert(fixture.textContent.includes("逾期跟进"), "逾期组应默认展开");
+    neverHead.click();
+    await until(() => fixture.textContent.includes("从未甲"), "展开从未互动组失败");
+    assert(fixture.querySelectorAll(".lvct-dash__row").length === 4, "展开后行数错误");
+    heads().find((node) => node.textContent.includes("从未互动")).click();
+    await tick();
+    assert(!fixture.textContent.includes("从未甲"), "再次点击未收起");
+});
+
 await test("新建草稿关闭前三选一：取消保留草稿，放弃后关闭且弹窗列明细", async () => {
     const guardDialog = () => document.body.querySelector(".lvct-closeguard");
     try {
@@ -737,7 +774,10 @@ await test("从首页打开详情并记录互动后，首页统计同步刷新",
             loads++;
             return { people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
                 stale: recorded ? [] : [{ person }], neverContacted: recorded ? 0 : 1,
-                neverContactedItemIds: recorded ? [] : [person.itemId] };
+                neverContactedItemIds: recorded ? [] : [person.itemId],
+                actions: recorded ? [] : [{ person, bucket: "stale", reasons: [
+                    { kind: "stale", label: "从未互动", bucket: "stale", neverContacted: true },
+                ] }] };
         }, loadPersonInsights: async () => emptyInsights(),
         recordInteraction: async () => { recorded = true; }, openHostDoc() {},
     };
@@ -745,7 +785,11 @@ await test("从首页打开详情并记录互动后，首页统计同步刷新",
         facade, settings, preferences: DEFAULT_VIEW_PREFERENCES,
         onPreferencesUpdated() {}, isMobile: false, onOpenPersonDoc() {},
     } });
-    await until(() => fixture.querySelector(".lvct-dash__row-main"), "首页未加载");
+    await until(() => fixture.querySelector(".lvct-dash__group-head"), "行动分组未渲染");
+    /* B01：该人是「从未互动」，默认折叠——展开组头后再进详情 */
+    [...fixture.querySelectorAll(".lvct-dash__group-head")]
+        .find((node) => node.textContent.includes("从未互动")).click();
+    await until(() => fixture.querySelector(".lvct-dash__row-main"), "从未互动组未展开");
     fixture.querySelector(".lvct-dash__row-main").click();
     await tick();
     button("记录").click();

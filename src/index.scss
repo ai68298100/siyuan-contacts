@@ -2494,6 +2494,50 @@
     gap: 4px;
 }
 
+/* B01：今日行动分组折叠 */
+.lvct-dash__groups {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-3);
+}
+
+.lvct-dash__group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-1);
+}
+
+.lvct-dash__group-head {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--lvct-sp-2);
+    align-self: flex-start;
+    border: 0;
+    background: transparent;
+    padding: var(--lvct-sp-1) 0;
+    cursor: pointer;
+    font: inherit;
+    color: var(--lvct-text-2);
+    text-align: left;
+
+    &:hover { color: var(--lvct-text-1); }
+}
+
+.lvct-dash__group-caret {
+    flex: 0 0 14px;
+    color: var(--lvct-text-3);
+}
+
+.lvct-dash__group-count {
+    min-width: 20px;
+    text-align: center;
+    font-size: var(--lvct-fs-micro);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-pill);
+    padding: 0 6px;
+    color: var(--lvct-text-2);
+}
+
 .lvct-dash__row {
     display: flex;
     align-items: center;

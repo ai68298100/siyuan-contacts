@@ -4,6 +4,8 @@
     import { pickActions, pickSummaryCounts } from "../../services/dashboard";
     import type { DashboardData } from "../../services/dashboard";
     import type { ActionCard } from "../../domain/action-list";
+    import { groupActionCards } from "../../domain/action-list";
+    import type { ActionGroup } from "../../domain/action-list";
     import type { ContactSummary } from "../../domain/person";
     import type { ViewPreferences } from "../../domain/preferences";
     import { detectCheckinBridge } from "../../bridge/checkin";
@@ -61,6 +63,19 @@
     let showAllFollowUps = $state(false);
     const previewList = <T>(all: readonly T[], expanded: boolean, limit: number): readonly T[] =>
         (expanded ? all : all.slice(0, limit));
+    // B01：行动分组与折叠（会话内保持；「从未互动」默认折叠，组头计数即展开入口）
+    const actionGroups = $derived(groupActionCards(pickActions(data)));
+    let groupOverrides = $state(new Set<string>());
+    function isGroupCollapsed(group: ActionGroup): boolean {
+        const overridden = groupOverrides.has(group.key);
+        return group.defaultCollapsed ? !overridden : overridden;
+    }
+    function toggleGroup(group: ActionGroup): void {
+        const next = new Set(groupOverrides);
+        if (next.has(group.key)) next.delete(group.key);
+        else next.add(group.key);
+        groupOverrides = next;
+    }
 
     const greetingKey = (() => {
         const hour = new Date().getHours();
@@ -300,21 +315,43 @@
                     <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>{text("dashBrowsePeople", "浏览联系人")}</button>
                 </ViewState>
             {:else}
-                <div class="lvct-dash__list">
-                    {#each actions as card (card.person.docId)}
-                        <div class="lvct-dash__row">
-                            <button class="lvct-dash__row-main" onclick={() => onOpenDetail(card.person)}>
-                                <b>{card.person.name}</b>
-                                <span class="lvct-dash__reasons">
-                                    {#each card.reasons as reason (reason.kind + (reason.followUpId ?? ""))}
-                                        <span class="lvct-chip lvct-action-chip lvct-action-chip--{reason.bucket}">{reason.label}</span>
+                {#snippet actionRow(card: ActionCard)}
+                    <div class="lvct-dash__row">
+                        <button class="lvct-dash__row-main" onclick={() => onOpenDetail(card.person)}>
+                            <b>{card.person.name}</b>
+                            <span class="lvct-dash__reasons">
+                                {#each card.reasons as reason (reason.kind + (reason.followUpId ?? ""))}
+                                    <span class="lvct-chip lvct-action-chip lvct-action-chip--{reason.bucket}">{reason.label}</span>
+                                {/each}
+                            </span>
+                        </button>
+                        <button class="b3-button b3-button--outline lvct-dash__quick-button" onclick={() => onOpenDetail(card.person)}>
+                            {card.bucket === "stale" ? text("dashTakeALook", "去看看") : text("dashProcess", "处理")}
+                        </button>
+                    </div>
+                {/snippet}
+                <!-- B01：按原因分组折叠；「从未互动」单独归组且默认折叠，组头计数即展开入口 -->
+                <div class="lvct-dash__groups">
+                    {#each actionGroups as group (group.key)}
+                        <section class="lvct-dash__group">
+                            <button
+                                type="button"
+                                class="lvct-dash__group-head"
+                                aria-expanded={!isGroupCollapsed(group)}
+                                onclick={() => toggleGroup(group)}
+                            >
+                                <span class="lvct-dash__group-caret" aria-hidden="true">{isGroupCollapsed(group) ? "▸" : "▾"}</span>
+                                <b>{group.label}</b>
+                                <span class="lvct-dash__group-count">{group.cards.length}</span>
+                            </button>
+                            {#if !isGroupCollapsed(group)}
+                                <div class="lvct-dash__list">
+                                    {#each group.cards as card (card.person.docId)}
+                                        {@render actionRow(card)}
                                     {/each}
-                                </span>
-                            </button>
-                            <button class="b3-button b3-button--outline lvct-dash__quick-button" onclick={() => onOpenDetail(card.person)}>
-                                {card.bucket === "stale" ? text("dashTakeALook", "去看看") : text("dashProcess", "处理")}
-                            </button>
-                        </div>
+                                </div>
+                            {/if}
+                        </section>
                     {/each}
                 </div>
             {/if}

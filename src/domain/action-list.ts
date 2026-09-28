@@ -16,6 +16,8 @@ export interface ActionReason {
     dueDate?: string;
     /** 跟进原因的操作句柄 */
     followUpId?: string;
+    /** B01：该原因为「从未互动」（stale 且无互动记录），供行动区分组单独归组 */
+    neverContacted?: boolean;
 }
 
 export interface ActionCard {
@@ -59,12 +61,12 @@ export function buildActionCards(
             });
         }
         if (input.staleThreshold !== undefined) {
+            const never = input.lastDaysAgo === undefined;
             reasons.push({
                 kind: "stale",
                 bucket: "stale",
-                label: input.lastDaysAgo === undefined
-                    ? "从未互动"
-                    : `${input.lastDaysAgo} 天未联系（阈值 ${input.staleThreshold} 天）`,
+                label: never ? "从未互动" : `${input.lastDaysAgo} 天未联系（阈值 ${input.staleThreshold} 天）`,
+                ...(never ? { neverContacted: true } : {}),
             });
         }
         for (const followUp of input.followUps) {
@@ -99,4 +101,45 @@ function addDays(dateKey: string, days: number): string {
     const date = new Date(year, month - 1, day + days);
     const pad = (value: number) => String(value).padStart(2, "0");
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** B01 行动分组：按卡片紧急桶归类，「从未互动」与"有互动但久未联系"分开呈现 */
+export type ActionGroupKey = "overdue" | "today" | "week" | "stale" | "never";
+
+export interface ActionGroup {
+    key: ActionGroupKey;
+    label: string;
+    /** 默认折叠的组（从未互动是最大噪音源）；展开状态由 UI 维护 */
+    defaultCollapsed: boolean;
+    cards: ActionCard[];
+}
+
+const GROUP_LABELS: Record<ActionGroupKey, string> = {
+    overdue: "逾期",
+    today: "今天",
+    week: "本周",
+    stale: "久未联系",
+    never: "从未互动",
+};
+
+const GROUP_ORDER: ActionGroupKey[] = ["overdue", "today", "week", "stale", "never"];
+
+/** 纯派生：不改变三源口径与卡片排序（组内保持入参相对序）；空组不返回 */
+export function groupActionCards(cards: readonly ActionCard[]): ActionGroup[] {
+    const buckets = new Map<ActionGroupKey, ActionCard[]>();
+    for (const card of cards) {
+        const never = card.bucket === "stale" && card.reasons.some((reason) => reason.neverContacted);
+        const key: ActionGroupKey = never ? "never" : card.bucket;
+        const list = buckets.get(key) ?? [];
+        list.push(card);
+        buckets.set(key, list);
+    }
+    return GROUP_ORDER
+        .filter((key) => buckets.has(key))
+        .map((key) => ({
+            key,
+            label: GROUP_LABELS[key],
+            defaultCollapsed: key === "never",
+            cards: buckets.get(key)!,
+        }));
 }
