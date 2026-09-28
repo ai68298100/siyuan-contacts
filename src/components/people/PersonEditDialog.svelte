@@ -20,7 +20,7 @@
         onSaved: () => void;
         onClose: () => void;
     } = $props();
-    const text = $derived.by(() => (key: string, fallback: string) => translateText(i18n, key, fallback));
+    const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) => translateText(i18n, key, fallback, values));
 
     // 有意取打开弹窗时的快照（编辑表单不随外部变化）
     // svelte-ignore state_referenced_locally
@@ -43,17 +43,51 @@
     // svelte-ignore state_referenced_locally
     const originalTags = tagsText;
     let saved = $state(false);
-    const guardedClose = useCloseGuard(() => running, () => !saved && (JSON.stringify(draft) !== original || tagsText !== originalTags));
+    // B06：字段级改动明细 + 「保存并离开」（persist 抛错则留在原地）
+    async function persist(): Promise<void> {
+        const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
+        await updateContactFields(settings, person.itemId, { ...draft, tags });
+        saved = true;
+        onSaved();
+    }
+    function draftChanges(): string[] {
+        if (saved) return [];
+        const changes: string[] = [];
+        const empty = text("guardEmpty", "（空）");
+        const fields = [
+            [text("formName", "姓名"), "name"], [text("formPhone", "电话"), "phone"],
+            [text("formEmail", "邮箱"), "email"], [text("formWechat", "微信"), "wechat"],
+            [text("formWebsite", "网站"), "website"], [text("formBirthday", "生日"), "birthday"],
+        ] as const;
+        for (const [label, key] of fields) {
+            if (draft[key] !== person[key]) {
+                changes.push(text("guardFieldChange", "{field}：{from} → {to}", { field: label, from: String(person[key]) || empty, to: String(draft[key]) || empty }));
+            }
+        }
+        if (draft.isLunar !== person.isLunar) {
+            changes.push(text("guardFieldChange", "{field}：{from} → {to}", { field: text("formLunar", "农历生日"), from: person.isLunar ? "✓" : empty, to: draft.isLunar ? "✓" : empty }));
+        }
+        if (draft.group !== person.group) {
+            changes.push(text("guardFieldChange", "{field}：{from} → {to}", { field: text("formGroup", "分组"), from: person.group || empty, to: draft.group || empty }));
+        }
+        if (tagsText !== originalTags) {
+            changes.push(text("guardTagsChange", "标签：{from} → {to}", { from: originalTags || empty, to: tagsText || empty }));
+        }
+        return changes;
+    }
+    const guardedClose = useCloseGuard({
+        busy: () => running,
+        dirty: () => !saved && (JSON.stringify(draft) !== original || tagsText !== originalTags),
+        changes: draftChanges,
+        save: persist,
+    });
 
     async function submit() {
         if (running) return;
         running = true;
         errorText = "";
         try {
-            const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
-            await updateContactFields(settings, person.itemId, { ...draft, tags });
-            saved = true;
-            onSaved();
+            await persist();
             onClose();
         } catch (error) {
             errorText = error instanceof Error ? error.message : String(error);

@@ -1927,6 +1927,63 @@
     gap: var(--lvct-sp-1);
 }
 
+/* ---------- 关闭守卫三选一（B06，直挂 body） ---------- */
+
+.lvct-closeguard {
+    --lvct-z-guard: calc(var(--lvct-z-popover) + 200);
+    position: fixed;
+    inset: 0;
+    z-index: var(--lvct-z-guard);
+}
+
+.lvct-closeguard__mask {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+}
+
+.lvct-closeguard__panel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(440px, calc(100vw - 32px));
+    background: var(--lvct-bg-elevated);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-lg);
+    box-shadow: var(--lvct-shadow-3);
+    padding: var(--lvct-sp-4);
+    box-sizing: border-box;
+
+    h3 {
+        margin: 0 0 6px;
+        font-size: 16px;
+    }
+}
+
+.lvct-closeguard__hint {
+    margin: 0 0 8px;
+    color: var(--lvct-text-2);
+    font-size: 13px;
+}
+
+.lvct-closeguard__list {
+    margin: 0 0 12px;
+    padding-left: 18px;
+    max-height: 180px;
+    overflow: auto;
+    color: var(--lvct-text-1);
+    font-size: 13px;
+    line-height: 1.7;
+    word-break: break-all;
+}
+
+.lvct-closeguard__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--lvct-sp-2);
+    flex-wrap: wrap;
+}
 /* ---------- 人物详情 ---------- */
 
 .lvct-detail {

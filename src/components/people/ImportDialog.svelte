@@ -38,10 +38,14 @@
     let errorText: string = $state("");
     let loaded = $state(false);
     let importedCount: number | null = $state(null);
-    const guardedClose = useCloseGuard(
-        () => importing,
-        () => importedCount === null && (selectedIds.length > 0 || importGroup !== "" || importTagsText.trim() !== ""),
-    );
+    const guardedClose = useCloseGuard({
+        busy: () => importing,
+        dirty: () => importedCount === null && (selectedIds.length > 0 || importGroup !== "" || importTagsText.trim() !== ""),
+        changes: () => [
+            ...(selectedIds.length > 0 ? [text("guardAdoptSelection", "已勾选 {n} 篇文档待收编", { n: selectedIds.length })] : []),
+            ...(importGroup !== "" || importTagsText.trim() !== "" ? [text("guardAdoptMeta", "收编分组/标签输入尚未应用")] : []),
+        ],
+    });
 
     let searchTimer: ReturnType<typeof setTimeout> | undefined;
     let searchVersion = 0;

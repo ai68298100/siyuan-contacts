@@ -118,9 +118,8 @@ await test("首页零人筛选保持空结果，清除后恢复联系人", async
     await until(() => fixture.querySelector(".lvct-person-card"), "清除首页筛选未恢复联系人");
 });
 
-await test("新建草稿关闭前确认，拒绝放弃时保留输入", async () => {
-    const originalConfirm = window.confirm;
-    let confirms = 0;
+await test("新建草稿关闭前三选一：取消保留草稿，放弃后关闭且弹窗列明细", async () => {
+    const guardDialog = () => document.body.querySelector(".lvct-closeguard");
     try {
         mounted = mount(Workbench, { target: fixture, props: {
             settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
@@ -130,15 +129,63 @@ await test("新建草稿关闭前确认，拒绝放弃时保留输入", async ()
         button("新建联系人").click();
         await until(() => fixture.querySelector(".lvct-form input[type=text]"), "新建弹窗未打开");
         input(fixture.querySelector(".lvct-form input[type=text]"), "待保存的人");
-        window.confirm = () => { confirms++; return false; };
         fixture.querySelector(".lvct-dialog-panel__close").click();
+        await until(() => guardDialog(), "脏草稿关闭未弹三选一");
+        // B06：弹窗列出改动明细（哪个字段、从什么到什么）
+        const detail = guardDialog().querySelector(".lvct-closeguard__list")?.textContent ?? "";
+        assert(detail.includes("姓名") && detail.includes("待保存的人"), "改动明细未包含字段与值");
+        // 取消 → 弹窗与编辑弹窗都保留，草稿不丢
+        [...guardDialog().querySelectorAll("button")].find((node) => node.textContent.trim() === "取消").click();
+        await pause(20);
         await tick();
-        assert(fixture.querySelector(".lvct-form input[type=text]")?.value === "待保存的人", "拒绝放弃仍丢失草稿");
-        assert(confirms === 1, "脏草稿关闭未确认");
-        window.confirm = () => true;
+        assert(!guardDialog(), "取消后守卫弹窗未关闭");
+        assert(fixture.querySelector(".lvct-form input[type=text]")?.value === "待保存的人", "取消后草稿丢失");
+        // 放弃并离开 → 编辑弹窗关闭
         fixture.querySelector(".lvct-dialog-panel__close").click();
-        await until(() => !fixture.querySelector(".lvct-dialog-panel"), "同意放弃后未关闭");
-    } finally { window.confirm = originalConfirm; }
+        await until(() => guardDialog(), "第二次关闭未弹三选一");
+        [...guardDialog().querySelectorAll("button")].find((node) => node.textContent.trim() === "放弃并离开").click();
+        await until(() => !fixture.querySelector(".lvct-dialog-panel"), "放弃后未关闭");
+        assert(!guardDialog(), "放弃后守卫弹窗未关闭");
+    } finally {
+        document.body.querySelector(".lvct-closeguard")?.remove();
+    }
+});
+
+await test("新建草稿「保存并离开」：守卫内保存成功并关闭弹窗", async () => {
+    let created = false;
+    kernel.handler = async (route, body) => {
+        if (route === "/api/av/renderAttributeView") {
+            const base = renderResult();
+            return created ? { view: { ...base.view, rows: [...base.view.rows, { id: "row-new9", cells: [
+                { value: { type: "block", keyID: "name", block: { id: "20260927000000-newdoc9", content: "守卫保存的人" } } },
+            ] } ] } } : base;
+        }
+        if (route === "/api/filetree/createDocWithMd") { created = true; return "20260927000000-newdoc9"; }
+        if (route === "/api/av/addAttributeViewBlocks") return null;
+        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") return { "20260927000000-newdoc9": "row-new9" };
+        if (route === "/api/av/setAttributeViewBlockAttr") return null;
+        throw new Error(`保存并离开用例不允许请求 ${route}`);
+    };
+    const guardDialog = () => document.body.querySelector(".lvct-closeguard");
+    try {
+        mounted = mount(Workbench, { target: fixture, props: {
+            settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+            onPreferencesUpdated() {}, onOpenPersonDoc() {},
+            facade: { settings, loadRecentInteractions: async () => ({}) },
+        } });
+        button("新建联系人").click();
+        await until(() => fixture.querySelector(".lvct-form input[type=text]"), "新建弹窗未打开");
+        input(fixture.querySelector(".lvct-form input[type=text]"), "守卫保存的人");
+        fixture.querySelector(".lvct-dialog-panel__close").click();
+        await until(() => guardDialog(), "脏草稿关闭未弹三选一");
+        const saveButton = [...guardDialog().querySelectorAll("button")].find((node) => node.textContent.trim() === "保存并离开");
+        assert(saveButton, "守卫弹窗缺少保存并离开按钮");
+        saveButton.click();
+        await until(() => !fixture.querySelector(".lvct-dialog-panel"), "保存并离开后编辑弹窗未关闭");
+        await until(() => !guardDialog(), "保存并离开后守卫弹窗未关闭");
+    } finally {
+        document.body.querySelector(".lvct-closeguard")?.remove();
+    }
 });
 
 await test("英文工作台导航与标题跟随语言资源，缺失文案回退且设置入口可达", async () => {

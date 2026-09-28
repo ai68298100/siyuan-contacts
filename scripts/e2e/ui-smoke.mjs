@@ -70,8 +70,13 @@ try {
     });
     let nextId = 0;
     const pending = new Map();
+    const browserConsole = [];
     debuggerSocket.addEventListener("message", ({ data }) => {
         const reply = JSON.parse(data);
+        if (reply.method === "Runtime.consoleAPICalled") {
+            browserConsole.push(reply.params.args.map((arg) => arg.value ?? arg.description ?? "").join(" "));
+            return;
+        }
         const complete = pending.get(reply.id);
         if (complete) { pending.delete(reply.id); complete(reply); }
     });
@@ -81,6 +86,7 @@ try {
         debuggerSocket.send(JSON.stringify({ id, method, params }));
     });
     const mobile = process.env.LVCT_UI_MOBILE === "1";
+    await call("Runtime.enable");
     await call("Emulation.setDeviceMetricsOverride", { width: mobile ? 390 : 1280, height: mobile ? 844 : 900, deviceScaleFactor: 1, mobile });
     const hostBaseline = process.env.LVCT_UI_HOST === "1" ? "?host=1" : "";
     await call("Page.navigate", { url: `http://127.0.0.1:${address.port}/scripts/e2e/ui/index.html${hostBaseline}` });
@@ -91,7 +97,11 @@ try {
     ]);
     for (const result of results) console.log(`${result.ok ? "PASS" : "FAIL"} ${result.name}${result.detail ? `\n${result.detail}` : ""}`);
     console.log(`UI 回归：${results.filter((result) => result.ok).length}/${results.length}`);
-    if (results.some((result) => !result.ok)) process.exitCode = 1;
+    if (results.some((result) => !result.ok)) {
+        console.log("--- 浏览器 console（最后 40 条）---");
+        console.log(browserConsole.slice(-40).join(String.fromCharCode(10)));
+        process.exitCode = 1;
+    }
 } finally {
     clearTimeout(timeout);
     debuggerSocket?.close();

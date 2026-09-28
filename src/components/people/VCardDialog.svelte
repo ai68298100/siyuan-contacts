@@ -33,7 +33,11 @@
     let report: VcfImportReport | null = $state(null);
     let fileInput: HTMLInputElement | undefined = $state();
     let lastChosen: { planIndex: number; plan: VcfImportPlan }[] = $state([]);
-    const guardedClose = useCloseGuard(() => importing || parsing || exporting || retrying, () => report === null && plans !== null && selectedCount > 0);
+    const guardedClose = useCloseGuard({
+        busy: () => importing || parsing || exporting || retrying,
+        dirty: () => report === null && plans !== null && selectedCount > 0,
+        changes: () => [text("guardVcardSelection", "已选择 {n} 位联系人待导入", { n: selectedCount })],
+    });
 
     const selectedCount = $derived.by(() => {
         if (!plans) return 0;

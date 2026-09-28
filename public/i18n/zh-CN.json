@@ -454,5 +454,21 @@
   "navGraphShort": "关系图",
   "stripFollowUpsOpen": "待跟进 {n}",
   "stripRelatedCount": "相关人 {n}",
-  "stripChipsMore": "+{n}"
+  "stripChipsMore": "+{n}",
+  "guardTitle": "有未保存的修改",
+  "guardHint": "以下修改尚未保存：",
+  "guardGenericChange": "有未保存的修改",
+  "guardCancel": "取消",
+  "guardDiscard": "放弃并离开",
+  "guardSave": "保存并离开",
+  "guardFieldChange": "{field}：{from} → {to}",
+  "guardTagsChange": "标签：{from} → {to}",
+  "guardEmpty": "（空）",
+  "guardNoteDraft": "互动备注尚未记录：{text}",
+  "guardPrefsDraft": "显示偏好尚未保存",
+  "guardImportTextDraft": "互动合并输入尚未处理",
+  "guardVcardSelection": "已选择 {n} 位联系人待导入",
+  "guardAdoptSelection": "已勾选 {n} 篇文档待收编",
+  "guardAdoptMeta": "收编分组/标签输入尚未应用",
+  "guardBatchDraft": "批量编辑尚未应用"
 }

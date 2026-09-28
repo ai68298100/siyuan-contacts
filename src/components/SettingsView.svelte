@@ -93,10 +93,14 @@
         avId: settings.avId,
     });
     let errorText = $state("");
-    const guardedClose = useCloseGuard(
-        () => savingPreferences || rebinding || mappingBusy || importingInteractions,
-        () => JSON.stringify(draft) !== JSON.stringify(savedDraft) || importText.trim().length > 0,
-    );
+    const guardedClose = useCloseGuard({
+        busy: () => savingPreferences || rebinding || mappingBusy || importingInteractions,
+        dirty: () => JSON.stringify(draft) !== JSON.stringify(savedDraft) || importText.trim().length > 0,
+        changes: () => [
+            ...(JSON.stringify(draft) !== JSON.stringify(savedDraft) ? [text("guardPrefsDraft", "显示偏好尚未保存")] : []),
+            ...(importText.trim().length > 0 ? [text("guardImportTextDraft", "互动合并输入尚未处理")] : []),
+        ],
+    });
 
     function setHealth(value: SettingsHealth) {
         health = value;

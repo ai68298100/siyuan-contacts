@@ -71,8 +71,8 @@
     let peopleFocusSort: "name" | "group" | "birthday" | "recent" | undefined = $state(undefined);
     const currentMeta = $derived(viewMeta[current]);
 
-    function openDetail(person: ContactSummary) {
-        if (detailPerson && !canLeave()) return;
+    async function openDetail(person: ContactSummary) {
+        if (detailPerson && !(await canLeave.requestClose())) return;
         detailPerson = person;
         detailKey += 1; // 同一人重复打开时重置内部状态
     }
@@ -83,15 +83,15 @@
         peopleFocusSort = undefined;
     }
 
-    function selectView(view: ViewId) {
-        if (view !== current && !canLeave()) return;
+    async function selectView(view: ViewId) {
+        if (view !== current && !(await canLeave.requestClose())) return;
         current = view;
         if (view !== "people") createRequested = 0;
         clearPeopleFocus();
     }
 
-    function openPeople(focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" | "recent" }) {
-        if (current !== "people" && !canLeave()) return;
+    async function openPeople(focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" | "recent" }) {
+        if (current !== "people" && !(await canLeave.requestClose())) return;
         current = "people";
         peopleFocusIds = focus?.itemIds ? [...focus.itemIds] : [];
         peopleFocusLabel = focus?.label ?? "";

@@ -10,6 +10,7 @@ import "./index.scss";
 import WorkbenchRoot from "./components/WorkbenchRoot.svelte";
 import CaptureDialog from "./components/capture/CaptureDialog.svelte";
 import { initializeWorkspace, inspectWorkspace, loadSettings } from "./services/init";
+import { configureCloseGuardI18n } from "./components/close-guard";
 import type { InitProgressStep, WorkspaceSnapshot } from "./services/init";
 import { loadDashboard, DEFAULT_DASHBOARD_OPTIONS } from "./services/dashboard";
 import { deleteInteraction, recordInteraction, loadInteractionStore } from "./data/interactions";
@@ -66,6 +67,8 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 <path d="M12 18c4.26 0 8.4 1.772 8.4 4.8V26H3.6v-3.2C3.6 19.772 7.74 18 12 18zm0 2.4c-3.42 0-6 1.276-6 2.4V23.6h12v-0.8c0-1.124-2.58-2.4-6-2.4z"/>
 <path d="M23.2 20.4c2.94 0 6 1.176 6 3.2V26h-6.133v-2.4h3.733v-0.16c-.46-.44-1.76-.8-3.4-.86a9.79 9.79 0 0 0-1.6-2.18h1.4z"/>
 </symbol>`);
+
+        configureCloseGuardI18n(this.i18n);
 
         // 自管设置只在此处加载一次；tab / dialog 都读这个缓存
         this.settings = await loadSettings(this);

@@ -454,5 +454,21 @@
   "navGraphShort": "Graph",
   "stripFollowUpsOpen": "{n} open follow-ups",
   "stripRelatedCount": "{n} relations",
-  "stripChipsMore": "+{n}"
+  "stripChipsMore": "+{n}",
+  "guardTitle": "Unsaved changes",
+  "guardHint": "These changes are not saved yet:",
+  "guardGenericChange": "Unsaved changes",
+  "guardCancel": "Cancel",
+  "guardDiscard": "Discard and leave",
+  "guardSave": "Save and leave",
+  "guardFieldChange": "{field}: {from} → {to}",
+  "guardTagsChange": "Tags: {from} → {to}",
+  "guardEmpty": "(empty)",
+  "guardNoteDraft": "Interaction note not recorded: {text}",
+  "guardPrefsDraft": "Display preferences not saved",
+  "guardImportTextDraft": "Interaction merge input not processed",
+  "guardVcardSelection": "{n} contacts selected for import",
+  "guardAdoptSelection": "{n} documents selected to adopt",
+  "guardAdoptMeta": "Adoption group/tag input not applied",
+  "guardBatchDraft": "Batch edit not applied"
 }

@@ -81,7 +81,20 @@ import StatusNotice from "../StatusNotice.svelte";
     let errorText: string = $state("");
     let noteText: string = $state("");
     const canLeave = createCloseScope();
-    const guardedClose = useCloseGuard(() => busy || deleting, () => noteText.trim().length > 0);
+    // B06：互动备注草稿给出明细与「保存并离开」（保存=记录这条互动）
+    async function persistNote(): Promise<void> {
+        if (!current) throw new Error("当前没有人物");
+        await onRecord(current.docId, noteText.trim() || undefined);
+        recorded = true;
+        noteText = "";
+        await loadInsights();
+    }
+    useCloseGuard({
+        busy: () => busy || deleting,
+        dirty: () => noteText.trim().length > 0,
+        changes: () => [text("guardNoteDraft", "互动备注尚未记录：{text}", { text: noteText.trim() })],
+        save: persistNote,
+    });
     function navigate(person: ContactSummary | null) {
         if (person) onNavigate(person);
     }
@@ -522,12 +535,7 @@ import StatusNotice from "../StatusNotice.svelte";
                 class="b3-button b3-button--text"
                 disabled={busy}
                 onclick={() =>
-                    mutate(async () => {
-                        await onRecord(current.docId, noteText.trim() || undefined);
-                        recorded = true;
-                        noteText = "";
-                        await loadInsights();
-                    })}
+                    mutate(persistNote)}
             >{recorded ? text("detailRecorded", "已记录 ✓") : text("detailRecord", "记录")}</button>
         </div>
         <p class="ft__smaller ft__on-surface">记录后，首页"久未联系"会重新计时。</p>
@@ -761,7 +769,7 @@ import StatusNotice from "../StatusNotice.svelte";
     {/if}
 
     <div class="lvct-form__actions">
-        <button class="b3-button b3-button--cancel" onclick={() => { if (canLeave()) guardedClose(onClose); }} disabled={busy || deleting}>{text("closeDialog", "关闭")}</button>
+        <button class="b3-button b3-button--cancel" onclick={() => void (async () => { if (await canLeave.requestClose()) onClose(); })()} disabled={busy || deleting}>{text("closeDialog", "关闭")}</button>
         <button class="b3-button b3-button--text" onclick={() => onOpenPersonDoc(current.docId)}>{text("detailOpenDoc", "打开文档")}</button>
         <button class="b3-button b3-button--cancel lvct-detail__delete" onclick={confirmDelete} disabled={busy || deleting}>{deleting ? text("detailRemoving", "移除中…") : text("detailRemove", "从人脉移除")}</button>
     </div>

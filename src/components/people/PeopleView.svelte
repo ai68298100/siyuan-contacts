@@ -172,7 +172,11 @@
     let batchError: string = $state("");
     let batchGroup: string = $state("__keep");
     let batchTagsText: string = $state("");
-    useCloseGuard(() => batchBusy, () => batchOpen && (batchGroup !== "__keep" || !!batchTagsText.trim()));
+    useCloseGuard({
+        busy: () => batchBusy,
+        dirty: () => batchOpen && (batchGroup !== "__keep" || !!batchTagsText.trim()),
+        changes: () => [text("guardBatchDraft", "批量编辑尚未应用")],
+    });
     function closeBatch() {
         if (batchBusy) return;
         if ((batchGroup !== "__keep" || batchTagsText.trim()) && !window.confirm("有未保存的修改，确定放弃并离开吗？")) return;

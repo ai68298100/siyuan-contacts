@@ -26,17 +26,45 @@
     let running: boolean = $state(false);
     let errorText: string = $state("");
     let saved = $state(false);
-    const guardedClose = useCloseGuard(() => running, () => !saved && (JSON.stringify(draft) !== JSON.stringify(emptyDraft()) || tagsText.trim().length > 0));
+    // B06：新建草稿给出明细 + 「保存并离开」（persist 抛错则留在原地）
+    async function persist(): Promise<void> {
+        const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
+        const person = await createContact(settings, { ...draft, tags });
+        saved = true;
+        onCreated(person);
+    }
+    function draftChanges(): string[] {
+        if (saved) return [];
+        const changes: string[] = [];
+        const empty = text("guardEmpty", "（空）");
+        const fields = [
+            [text("formName", "姓名"), "name"], [text("formPhone", "电话"), "phone"],
+            [text("formEmail", "邮箱"), "email"], [text("formWechat", "微信"), "wechat"],
+            [text("formWebsite", "网站"), "website"], [text("formBirthday", "生日"), "birthday"],
+            [text("formGroup", "分组"), "group"],
+        ] as const;
+        for (const [label, key] of fields) {
+            if (String(draft[key]).trim().length > 0) {
+                changes.push(text("guardFieldChange", "{field}：{from} → {to}", { field: label, from: empty, to: String(draft[key]) }));
+            }
+        }
+        if (draft.isLunar) changes.push(text("guardFieldChange", "{field}：{from} → {to}", { field: text("formLunar", "农历生日"), from: empty, to: "✓" }));
+        if (tagsText.trim().length > 0) changes.push(text("guardTagsChange", "标签：{from} → {to}", { from: empty, to: tagsText }));
+        return changes;
+    }
+    const guardedClose = useCloseGuard({
+        busy: () => running,
+        dirty: () => !saved && (JSON.stringify(draft) !== JSON.stringify(emptyDraft()) || tagsText.trim().length > 0),
+        changes: draftChanges,
+        save: persist,
+    });
 
     async function submit() {
         if (running) return;
         running = true;
         errorText = "";
         try {
-            const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
-            const person = await createContact(settings, { ...draft, tags });
-            saved = true;
-            onCreated(person);
+            await persist();
             onClose();
         } catch (error) {
             errorText = error instanceof Error ? error.message : String(error);
