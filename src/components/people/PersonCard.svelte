@@ -2,6 +2,7 @@
     /** 联系人卡片（列表默认视图） */
     import type { ContactSummary } from "../../domain/person";
     import { nextBirthday } from "../../domain/occasions";
+    import { formatRelativeInteraction } from "../../domain/format";
     import { ExternalLink, Phone, MessageCircle, Mail, Clock3 } from "@lucide/svelte";
 
     let {
@@ -35,8 +36,7 @@
         const today = new Date();
         const day = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
         const then = new Date(`${recent.localDate}T00:00:00`).getTime();
-        const days = Math.round((day - then) / 86400000);
-        return days <= 0 ? "今天互动" : days === 1 ? "昨天互动" : `${days} 天前互动`;
+        return formatRelativeInteraction(Math.round((day - then) / 86400000));
     });
 </script>
 

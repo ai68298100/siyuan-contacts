@@ -192,7 +192,7 @@ await test("粘贴并识别：分组预览、勾选回填草稿、冲突默认�
     await until(() => fixture.querySelector(".lvct-dash__stats"), "首页未加载");
     button("新建联系人").click();
     await until(() => fixture.querySelector(".lvct-form input[type=text]"), "新建弹窗未打开");
-    button("📋 粘贴并识别").click();
+    [...fixture.querySelectorAll("button")].find((n) => n.textContent.includes("粘贴并识别")).click();
     await until(() => fixture.querySelector(".lvct-qf__input"), "粘贴弹窗未打开");
     input(fixture.querySelector(".lvct-qf__input"), "张三\n手机：13800138000\n微信：zhang_san\n邮箱：a@example.com\n#家人");
     await tick(); /* 等 bind 渲染生效，否则「识别」仍是 disabled，click 会被吞掉 */
@@ -207,7 +207,7 @@ await test("粘贴并识别：分组预览、勾选回填草稿、冲突默认�
     const tagsInput = [...fixture.querySelectorAll(".lvct-form input")].find((node) => node.placeholder?.includes("球友"));
     assert(tagsInput?.value.includes("家人"), "标签未回填");
     /* 冲突：已有值默认不覆盖，用户明确勾选后才写入 */
-    button("📋 粘贴并识别").click();
+    [...fixture.querySelectorAll("button")].find((n) => n.textContent.includes("粘贴并识别")).click();
     await until(() => fixture.querySelector(".lvct-qf__input"), "第二次粘贴弹窗未打开");
     input(fixture.querySelector(".lvct-qf__input"), "手机：13999990000");
     await tick();
@@ -489,14 +489,14 @@ await test("移动端人物卡片内容自适应，min-height 收缩且空 chips
     const card = fixture.querySelector(".lvct-person-card");
     if (window.innerWidth <= 640) {
         const minHeight = Number.parseFloat(getComputedStyle(card).minHeight);
-        assert(minHeight < 100, `移动端卡片 min-height 应收缩（当前 ${minHeight}px）`);
+        assert(minHeight < 100, `移动端卡片 min-height 应收缩（当前 ${minHeight}px，innerWidth ${window.innerWidth}）`);
         const height = card.getBoundingClientRect().height;
         assert(height <= 140, `移动端空资料卡片高度应 ≤140px（当前 ${Math.round(height)}px）`);
         /* 生日未填、无联系方式、无分组标签：meta 只剩互动行、chips 行不渲染 */
         assert(!card.querySelector(".lvct-person-card__tags"), "空分组/标签时 chips 行未收起");
     } else {
         const minHeight = Number.parseFloat(getComputedStyle(card).minHeight);
-        assert(minHeight >= 172, `桌面网格对齐下限不应受影响（当前 ${minHeight}px）`);
+        assert(minHeight >= 172, `桌面断言误触发（min ${minHeight}px，innerWidth ${window.innerWidth}）`);
     }
 });
 

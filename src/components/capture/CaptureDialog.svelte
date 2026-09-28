@@ -4,6 +4,7 @@
     import type { CapturePreview, CaptureResult } from "../../services/capture";
     import type { ContactsPluginFacade } from "../../types";
     import ViewState from "../ViewState.svelte";
+    import { CheckCircle2, Sparkles } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
 
     let {
@@ -213,11 +214,11 @@
             <span class="lvct-capture__step--active"><b>3</b> {text("captureStepDone", "完成")}</span>
         </div>
         <div class="lvct-form__hint">
-            <p>✓ {text("captureDoneInteractions", "已记录 {n} 条互动", { n: result.interactions })}</p>
-            {#if result.createdNames.length > 0}<p>✦ {text("captureDoneCreated", "新增联系人：{n}", { n: result.createdNames.join("、") })}</p>{/if}
-            {#if result.attendeeBlockWritten}<p>✦ {text("captureDoneBlock", "笔记已写入「参与人员」双链区块")}</p>{/if}
+            <p class="lvct-capture__done-line"><CheckCircle2 size={14}/> {text("captureDoneInteractions", "已记录 {n} 条互动", { n: result.interactions })}</p>
+            {#if result.createdNames.length > 0}<p class="lvct-capture__done-line"><Sparkles size={14}/> {text("captureDoneCreated", "新增联系人：{n}", { n: result.createdNames.join("、") })}</p>{/if}
+            {#if result.attendeeBlockWritten}<p class="lvct-capture__done-line"><Sparkles size={14}/> {text("captureDoneBlock", "笔记已写入「参与人员」双链区块")}</p>{/if}
             {#if (aiProfileCandidates.some((c) => c.checked) || aiFollowUpCandidates.some((c) => c.checked)) && !extrasError}
-                <p>✦ {text("captureAiExtrasDone", "AI 候选的资料补充与建跟进已完成")}</p>
+                <p class="lvct-capture__done-line"><Sparkles size={14}/> {text("captureAiExtrasDone", "AI 候选的资料补充与建跟进已完成")}</p>
             {/if}
             {#if extrasError}<p class="ft__smaller lvct-text-danger">{extrasError}</p>{/if}
             <p class="ft__smaller ft__on-surface">{text("captureDoneIdempotent", "同一篇笔记重复捕获不会重复记录。")}</p>

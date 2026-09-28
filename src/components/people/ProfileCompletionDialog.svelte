@@ -7,6 +7,7 @@
     import type { ContactDraft, ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
     import { useCloseGuard } from "../close-guard";
+    import { CheckCircle2 } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
 
     let {
@@ -118,7 +119,7 @@
 
 {#if done}
     <div class="lvct-qf">
-        <p role="status">✅ {text("qfCompletionDone", "补录结束：保存 {saved} 人，跳过 {skipped} 人。", { saved: savedCount, skipped: skippedCount })}</p>
+        <p role="status" class="lvct-capture__done-line"><CheckCircle2 size={14}/> {text("qfCompletionDone", "补录结束：保存 {saved} 人，跳过 {skipped} 人。", { saved: savedCount, skipped: skippedCount })}</p>
         <p class="ft__smaller ft__on-surface">{text("qfCompletionDoneHint", "首页生日提醒与久未联系统计会在下次加载时反映补录结果。")}</p>
         <div class="lvct-form__actions">
             <button class="b3-button" onclick={onClose}>{text("formDone", "完成")}</button>

@@ -1525,6 +1525,12 @@
     margin-bottom: var(--lvct-sp-1);
 }
 
+.lvct-form__toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
 /* FAST-01.1 粘贴并识别预览 */
 .lvct-qf {
     display: flex;
@@ -1593,6 +1599,15 @@
     padding: var(--lvct-sp-2);
 
     b { display: block; margin-bottom: var(--lvct-sp-1); }
+}
+
+.lvct-capture__done-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 2px 0;
+
+    svg { flex: 0 0 auto; color: var(--lvct-success); }
 }
 
 .lvct-capture__result-actions {

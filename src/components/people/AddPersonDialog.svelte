@@ -7,6 +7,7 @@
     import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
     import QuickFillDialog from "./QuickFillDialog.svelte";
+    import { ClipboardPaste } from "@lucide/svelte";
 
     let {
         settings,
@@ -103,8 +104,8 @@
 
 <div class="lvct-form">
     <div class="lvct-form__toolbar">
-        <button type="button" class="b3-button b3-button--text" onclick={() => (quickFillOpen = true)}>
-            {text("qfOpen", "📋 粘贴并识别")}
+        <button type="button" class="b3-button b3-button--text lvct-form__toolbar-btn" onclick={() => (quickFillOpen = true)}>
+            <ClipboardPaste size={14}/>{text("qfOpen", "粘贴并识别")}
         </button>
     </div>
     <label class="lvct-form__item">

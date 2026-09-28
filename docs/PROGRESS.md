@@ -1101,3 +1101,14 @@
   溢出；390 档首扫因 vite 冷启动 optimize reload 捕获到错误浮层（瞬态，预热后消失），
   已剔除污染截图。
 - 断点扫描工具入库备用（发布前可复跑三档核对）。
+
+## UX-01.11 第 30 轮：语义图标与相对时间统一（2026-09-29）
+
+- **共享格式助手**（`domain/format.ts`）：`formatRelativeInteraction`（今天/昨天/N 天前互动）
+  统一 PersonCard 与其他处相对时间文案；`formatMonthDay`（M月D日）备用。
+- **emoji → Lucide**：AddPersonDialog/PersonEditDialog「粘贴并识别」按钮 📋 → ClipboardPaste；
+  CaptureDialog 完成页 ✓/✦ → CheckCircle2/Sparkles；ProfileCompletionDialog ✅ → CheckCircle2。
+- **smoke 适配**：粘贴识别用例按钮查找改 includes 适配图标化文本。
+- 已知问题新增：mobile 套件偶发 Emulation viewport 不生效（innerWidth 1560），B09-2 用例
+  误走桌面分支——影响面仅限该用例断言路径，桌面/移动样式由 52 景截图覆盖核对。
+- 验证：单测 177/177；桌面 76/76、移动 77/77、宿主基线 76/76；构建通过。
