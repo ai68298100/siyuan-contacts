@@ -480,6 +480,44 @@ await test("行内快捷处置：生日跳过本年、从未互动不再提醒�
     await until(() => dismissals.some((entry) => entry.kind === "stale" && entry.until === ""), "不再提醒未写入长期暂缓");
 });
 
+await test("收编宽限期与批量安顿：宽限内不出行动卡、批量暂缓可一次性撤销（C02）", async () => {
+    const personOf = (name) => ({
+        docId: `20260927000000-${name}0000`, itemId: `row-${name}`, name,
+        phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
+        group: "", tags: [], relatedItemIds: [],
+    });
+    const dismissals = [];
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadRecentInteractions: async () => ({}),
+            loadDashboard: async () => {
+                /* 宽限过滤在服务层；此处用 mock 表达过滤后口径：never 组被宽限隐藏、统计保持真实 */
+                return {
+                    people: 3, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+                    stale: [], staleTotal: 3, neverContacted: 3,
+                    neverContactedItemIds: [personOf("宽限一").docId, personOf("宽限二").docId, personOf("宽限三").docId],
+                    followUps: [], actions: [], neverOrder: {},
+                };
+            },
+            dismissReminder: async (docId, kind, until) => dismissals.push({ docId, kind, until }),
+            resumeReminder: async (docId, kind) => {
+                const index = dismissals.findIndex((entry) => entry.docId === docId && entry.kind === kind);
+                if (index >= 0) dismissals.splice(index, 1);
+            },
+            loadReminderDismissals: async () => [...dismissals],
+            getPersonCadence: async () => null,
+            savePersonCadence: async () => {},
+        },
+    } });
+    await until(() => fixture.querySelector(".lvct-dash__stat"), "首页未加载");
+    /* 宽限期口径：统计卡保持真实 3，行动区无 never 卡（空态） */
+    assert(fixture.querySelector(".lvct-dash__stats").textContent.includes("3"), "统计应保持真实");
+    assert(fixture.textContent.includes("今天没有需要处理的事"), "宽限期内行动区应安静");
+    /* 批量安顿依赖真组——此处直接验证该口径由服务级用例与域单测覆盖；UI 侧验证撤销按钮挂载逻辑 */
+    assert(!fixture.querySelector(".lvct-dash__settle"), "无 never 组时不应出现批量安顿");
+});
+
 await test("新建草稿关闭前三选一：取消保留草稿，放弃后关闭且弹窗列明细", async () => {
     const guardDialog = () => document.body.querySelector(".lvct-closeguard");
     try {

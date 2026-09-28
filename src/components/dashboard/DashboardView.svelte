@@ -6,6 +6,7 @@
     import type { ActionCard } from "../../domain/action-list";
     import { groupActionCards } from "../../domain/action-list";
     import type { ActionGroup } from "../../domain/action-list";
+    import type { ReminderDismissal } from "../../domain/reminder-dismissals";
     import type { ContactSummary } from "../../domain/person";
     import type { ViewPreferences } from "../../domain/preferences";
     import { detectCheckinBridge } from "../../bridge/checkin";
@@ -64,7 +65,9 @@
     const previewList = <T>(all: readonly T[], expanded: boolean, limit: number): readonly T[] =>
         (expanded ? all : all.slice(0, limit));
     // B01：行动分组与折叠（会话内保持；「从未互动」默认折叠，组头计数即展开入口）
-    const actionGroups = $derived(groupActionCards(pickActions(data)));
+    // C02：neverOrder（收编日期映射）→ never 组按最近收编倒序
+    const actionGroupsOf = (dashboardData: DashboardData | null): ActionGroup[] =>
+        groupActionCards(pickActions(dashboardData), new Map(Object.entries(dashboardData?.neverOrder ?? {})));
     let groupOverrides = $state(new Set<string>());
     function isGroupCollapsed(group: ActionGroup): boolean {
         const overridden = groupOverrides.has(group.key);
@@ -119,6 +122,58 @@
         const pad = (value: number) => String(value).padStart(2, "0");
         return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     }
+    // C02 批量安顿：「从未互动」组整体暂缓 30 天（dismissal），保留此前暂缓快照供一次性撤销
+    let settleUndo: ReminderDismissal[] | null = $state(null);
+    async function settleNeverGroup(): Promise<void> {
+        const group = actionGroupsOf(data).find((item) => item.key === "never");
+        if (!group || group.cards.length === 0 || alBusy) return;
+        alBusy = true;
+        alError = "";
+        try {
+            const snapshot = await facade.loadReminderDismissals();
+            const until = addDaysToToday(30);
+            for (const card of group.cards) {
+                await facade.dismissReminder(card.person.docId, "stale", until);
+            }
+            settleUndo = snapshot;
+            alMessage = `已把 ${group.cards.length} 位从未互动的提醒整体暂缓 30 天`;
+            rowMenuKey = "";
+            await refresh();
+        } catch (error) {
+            alError = error instanceof Error ? error.message : String(error);
+        } finally {
+            alBusy = false;
+        }
+    }
+    async function undoSettle(): Promise<void> {
+        if (!settleUndo || alBusy) return;
+        alBusy = true;
+        try {
+            /* 一次性撤销：把批量暂缓前的暂缓快照原样写回（覆盖式恢复） */
+            const current = await facade.loadReminderDismissals();
+            for (const entry of current) {
+                if (!settleUndo.some((item) => item.personDocId === entry.personDocId && item.kind === entry.kind)) {
+                    await facade.resumeReminder(entry.personDocId, entry.kind);
+                }
+            }
+            for (const entry of settleUndo) {
+                await facade.dismissReminder(entry.personDocId, entry.kind, entry.until);
+            }
+            settleUndo = null;
+            alMessage = "已撤销批量暂缓";
+            await refresh();
+        } catch (error) {
+            alError = error instanceof Error ? error.message : String(error);
+        } finally {
+            alBusy = false;
+        }
+    }
+    function addDaysToToday(days: number): string {
+        const date = new Date();
+        date.setDate(date.getDate() + days);
+        const pad = (value: number) => String(value).padStart(2, "0");
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    }
     async function runRowAction(action: () => Promise<void>): Promise<void> {
         alBusy = true;
         alError = "";
@@ -148,6 +203,7 @@
             const result = await facade.loadDashboard({
                 birthdayWindowDays: preferences.birthdayWindowDays,
                 staleThresholdDays: preferences.staleThresholdDays,
+                reminderGraceDays: preferences.reminderGraceDays,
             });
             if (version === refreshVersion) data = result;
         } catch (error) {
@@ -408,7 +464,7 @@
                 {/snippet}
                 <!-- B01：按原因分组折叠；「从未互动」单独归组且默认折叠，组头计数即展开入口 -->
                 <div class="lvct-dash__groups">
-                    {#each actionGroups as group (group.key)}
+                    {#each actionGroupsOf(data) as group (group.key)}
                         <section class="lvct-dash__group">
                             <button
                                 type="button"
@@ -420,6 +476,16 @@
                                 <b>{group.label}</b>
                                 <span class="lvct-dash__group-count">{group.cards.length}</span>
                             </button>
+                            {#if group.key === "never" && !isGroupCollapsed(group)}
+                                <div class="lvct-dash__settle">
+                                    <button class="b3-button b3-button--outline lvct-dash__quick-button" disabled={alBusy} onclick={settleNeverGroup}>
+                                        全部顺延 30 天
+                                    </button>
+                                    {#if settleUndo}
+                                        <button class="b3-button b3-button--text lvct-dash__quick-button" disabled={alBusy} onclick={undoSettle}>撤销</button>
+                                    {/if}
+                                </div>
+                            {/if}
                             {#if !isGroupCollapsed(group)}
                                 <div class="lvct-dash__list">
                                     {#each group.cards as card (card.person.docId)}

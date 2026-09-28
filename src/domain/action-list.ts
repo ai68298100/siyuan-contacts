@@ -124,8 +124,15 @@ const GROUP_LABELS: Record<ActionGroupKey, string> = {
 
 const GROUP_ORDER: ActionGroupKey[] = ["overdue", "today", "week", "stale", "never"];
 
-/** 纯派生：不改变三源口径与卡片排序（组内保持入参相对序）；空组不返回 */
-export function groupActionCards(cards: readonly ActionCard[]): ActionGroup[] {
+/**
+ * 纯派生：不改变三源口径与卡片排序（组内保持入参相对序）；空组不返回。
+ * neverOrder（C02/D-0020）：docId → 收编日期（YYYY-MM-DD），提供时 never 组按最近收编倒序
+ * （日期缺失排最后），其余组不受影响。
+ */
+export function groupActionCards(
+    cards: readonly ActionCard[],
+    neverOrder?: ReadonlyMap<string, string>,
+): ActionGroup[] {
     const buckets = new Map<ActionGroupKey, ActionCard[]>();
     for (const card of cards) {
         const never = card.bucket === "stale" && card.reasons.some((reason) => reason.neverContacted);
@@ -133,6 +140,11 @@ export function groupActionCards(cards: readonly ActionCard[]): ActionGroup[] {
         const list = buckets.get(key) ?? [];
         list.push(card);
         buckets.set(key, list);
+    }
+    const neverCards = buckets.get("never");
+    if (neverCards && neverOrder && neverOrder.size > 0) {
+        neverCards.sort((a, b) =>
+            (neverOrder.get(b.person.docId) ?? "0000-00-00").localeCompare(neverOrder.get(a.person.docId) ?? "0000-00-00"));
     }
     return GROUP_ORDER
         .filter((key) => buckets.has(key))

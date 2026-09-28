@@ -32,6 +32,8 @@ export interface ViewPreferences {
     readonly summaryEnabled: boolean;
     /** 摘要「当日不再展示」标记（YYYY-MM-DD）；空串表示未忽略 */
     readonly summaryDismissedOn: string;
+    /** C02 收编宽限期（天）：新收编联系人在此期限内不计入「从未互动」提醒；0 = 关闭 */
+    readonly reminderGraceDays: number;
 }
 
 export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
@@ -47,6 +49,7 @@ export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
     savedViews: [],
     summaryEnabled: true,
     summaryDismissedOn: "",
+    reminderGraceDays: 14,
 };
 
 function isDefaultView(value: unknown): value is DefaultView {
@@ -99,5 +102,12 @@ export function normalizeViewPreferences(raw: unknown): ViewPreferences {
         summaryDismissedOn: typeof record.summaryDismissedOn === "string" && /^\d{4}-\d{2}-\d{2}$/.test(record.summaryDismissedOn)
             ? record.summaryDismissedOn
             : "",
+        reminderGraceDays: clampGraceDays(record.reminderGraceDays),
     };
+}
+
+/** C02：宽限期 0–365 天，非法/缺省回退 14 */
+function clampGraceDays(value: unknown): number {
+    if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_VIEW_PREFERENCES.reminderGraceDays;
+    return Math.max(0, Math.min(365, Math.round(value)));
 }

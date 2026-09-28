@@ -905,3 +905,21 @@
 - 验证：单测 165/165（新增暂缓 3 例）；svelte-check 0 错误；隔离回归桌面 72/72、移动 73/73、
   宿主基线 72/72；52 景截图 OK；构建通过。跨年自动恢复与设置页恢复的真实宿主行为 Host pending。
 - 余留：C06 撤销最小版（顺延/跳过/不再提醒的操作后「已顺延 · 撤销」）；「今天全部跳过」顶栏入口随批消化。
+
+## 批次 3 第 16 轮：C02 收编宽限期与批量安顿（2026-09-29）
+
+- **契约**：`DATA-CONTRACT.md` §3 新增 `person-registry.json`（v1，收编时间索引：首次进入插件视野
+  写当天，`loadDashboard` 读路径幂等补记缺失键，失败按缺失降级）；`view-preferences.json` 新增
+  `reminderGraceDays`（0–365 钳制，缺省/非法回退 14，0=关闭）。
+- **域层**（`domain/registry.ts`）：normalize、`ensureRegistryEntries`（只补缺失）、`isWithinGrace`
+  （未登记视为首次发现宽限、0 关闭、非法日期按已过期）、`daysBetween` + 单测 4 例。
+  `action-list.ts` `groupActionCards` 增加可选 `neverOrder` 映射——「从未互动」组按最近收编倒序
+  （D-0020）+ 单测；无映射保持原序。
+- **接线**：`dashboard.ts` 读路径补记收编时间 + 宽限过滤（仅豁免「从未互动」，有互动的久未联系
+  不受影响）+ 返回 `neverOrder`；DashboardView 传 `reminderGraceDays` 与 neverOrder。
+- **批量安顿**：never 组展开后「全部顺延 30 天」（整组写 dismissal，kind=stale until=今天+30）+
+  一次性「撤销」（暂缓快照写回恢复）；设置页「提醒」分区新增「收编宽限期（天）」输入。
+- 验证：单测 170/170（registry 4 例 + neverOrder 1 例）；svelte-check 0 错误；隔离回归桌面 73/73、
+  移动 74/74、宿主基线 73/73；52 景截图 OK；构建通过。
+- 余留：收编入口（新建/收编/首次发现）写入真实时间目前依赖读路径补记（首次发现口径，D-0020 允许）；
+  宽限期满后的出现时机由日期比较自然生效。

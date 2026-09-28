@@ -2547,6 +2547,13 @@
 
 .lvct-dash__rowmenu { flex-wrap: wrap; }
 
+/* C02：从未互动组批量安顿 */
+.lvct-dash__settle {
+    display: flex;
+    align-items: center;
+    gap: var(--lvct-sp-2);
+}
+
 .lvct-dash__row {
     display: flex;
     align-items: center;

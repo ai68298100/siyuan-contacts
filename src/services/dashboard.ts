@@ -13,6 +13,8 @@ import { staleContacts } from "../domain/interactions";
 import { toLocalDateKey } from "../domain/interactions";
 import { loadReminderDismissals } from "../data/reminder-dismissals";
 import { isDismissed } from "../domain/reminder-dismissals";
+import { ensureRegistryEntriesSaved, loadRegistry } from "../data/registry";
+import { isWithinGrace } from "../domain/registry";
 import { buildActionCards } from "../domain/action-list";
 import type { ActionCard, ActionPersonInput } from "../domain/action-list";
 import { upcomingBirthdays } from "../domain/occasions";
@@ -25,6 +27,8 @@ export interface DashboardOptions {
     staleThresholdDays: number;
     /** 生日提醒窗口（天） */
     birthdayWindowDays: number;
+    /** C02 收编宽限期（天）：新收编者不计入「从未互动」提醒；0/缺省 = 关闭 */
+    reminderGraceDays?: number;
 }
 export const DEFAULT_DASHBOARD_OPTIONS: DashboardOptions = {
     staleThresholdDays: 30,
@@ -55,6 +59,8 @@ export interface DashboardData {
     followUps: FollowUpCard[];
     /** 今日/本周行动清单（F07）：生日+节奏+跟进三源按人聚合的只读投影 */
     actions: ActionCard[];
+    /** C02：「从未互动」行动卡的收编日期映射（docId → YYYY-MM-DD），组内最近收编优先 */
+    neverOrder: Record<string, string>;
 }
 
 /** 供组件派生使用的取值函数：把可空数据收窄为行动卡列表 */
@@ -91,12 +97,21 @@ export async function loadDashboard(
         loadReminderDismissals(plugin),
     ]);
     const today = toLocalDateKey(new Date());
+    // C02：首次发现补记收编时间（幂等，失败按缺失降级）；宽限期内不计入「从未互动」提醒
+    await ensureRegistryEntriesSaved(plugin, people.map((person) => person.docId), today);
+    const registry = await loadRegistry(plugin);
+    const graceDays = options.reminderGraceDays ?? 0;
     // B08：提醒暂缓只屏蔽呈现——生日与久未联系提醒行过滤，统计与名单口径保持真实
     const birthdays = upcomingBirthdays(people)
         .filter((item) => item.projection.daysUntil <= options.birthdayWindowDays)
         .filter((item) => !isDismissed(dismissals, item.person.docId, "birthday", today));
     const staleAll = staleContacts(store, people, options.staleThresholdDays, new Date(), cadences);
-    const staleRemindable = staleAll.filter((info) => !isDismissed(dismissals, info.person.docId, "stale", today));
+    const staleRemindable = staleAll.filter((info) => {
+        if (isDismissed(dismissals, info.person.docId, "stale", today)) return false;
+        /* C02：宽限期只豁免「从未互动」（有互动的久未联系不受影响） */
+        if (info.lastDaysAgo === undefined && isWithinGrace(registry.registeredAt[info.person.docId], today, graceDays)) return false;
+        return true;
+    });
     const neverContactedPeople = staleAll.filter((item) => item.lastDaysAgo === undefined);
 
     const buckets = projectOpenFollowUps(followUpStore.items, today);
@@ -137,6 +152,14 @@ export async function loadDashboard(
         };
     });
 
+    const actions = buildActionCards(inputs, today);
+    const neverOrder: Record<string, string> = {};
+    for (const card of actions) {
+        if (card.bucket !== "stale" || !card.reasons.some((reason) => reason.neverContacted)) continue;
+        const registeredAt = registry.registeredAt[card.person.docId];
+        if (registeredAt) neverOrder[card.person.docId] = registeredAt;
+    }
+
     return {
         people: people.length,
         relations: Math.round(people.reduce((sum, person) => sum + person.relatedItemIds.length, 0) / 2),
@@ -147,6 +170,7 @@ export async function loadDashboard(
         neverContacted: neverContactedPeople.length,
         neverContactedItemIds: neverContactedPeople.map((item) => item.person.itemId),
         followUps,
-        actions: buildActionCards(inputs, today),
+        actions,
+        neverOrder,
     };
 }

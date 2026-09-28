@@ -842,6 +842,11 @@
                             <span>久未联系阈值（天）</span>
                             <input class="b3-text-field fn__block" type="number" min="0" max="365" bind:value={draft.staleThresholdDays} />
                         </label>
+                        <label class="lvct-form__item">
+                            <span>收编宽限期（天）</span>
+                            <input class="b3-text-field fn__block" type="number" min="0" max="365" bind:value={draft.reminderGraceDays} />
+                            <small>新收编的联系人在此期限内不计入「从未互动」提醒；0 为关闭（C02）</small>
+                        </label>
                     </div>
 
                     <label class="lvct-settings__switch-row">

@@ -88,3 +88,25 @@ test("groupActionCards（B01）：五组分类、从未互动单独归组、组�
     const mixedGroups = groupActionCards(mixed);
     assert.deepEqual(mixedGroups.map((group) => group.key), ["today"]);
 });
+
+test("groupActionCards：neverOrder 提供时「从未互动」组按最近收编倒序（C02/D-0020）", () => {
+    const mkPerson = (name: string) => ({
+        docId: `doc-${name}`, itemId: `row-${name}`, name,
+        phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
+        group: "", tags: [], relatedItemIds: [],
+    });
+    const cards = buildActionCards([
+        { person: mkPerson("早收编"), staleThreshold: 30, followUps: [] },
+        { person: mkPerson("晚收编"), staleThreshold: 30, followUps: [] },
+    ], "2026-09-28");
+    const neverOrder = new Map([
+        ["doc-早收编", "2026-08-01"],
+        ["doc-晚收编", "2026-09-20"],
+    ]);
+    const groups = groupActionCards(cards, neverOrder);
+    const never = groups.find((group) => group.key === "never");
+    assert.deepEqual(never!.cards.map((card) => card.person.name), ["晚收编", "早收编"]);
+    /* 未提供映射时保持入参相对序（全局姓名序：晚 wǎn < 早 zǎo） */
+    const plain = groupActionCards(cards);
+    assert.deepEqual(plain.find((group) => group.key === "never")!.cards.map((card) => card.person.name), ["晚收编", "早收编"]);
+});
