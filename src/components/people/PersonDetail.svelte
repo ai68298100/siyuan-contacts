@@ -478,12 +478,12 @@ import StatusNotice from "../StatusNotice.svelte";
 
 <div class="lvct-detail">
     <div class="lvct-detail__header">
-        <div class="lvct-person-card__avatar" data-avatar>{current.name.slice(0, 1)}</div>
-        <div>
+        <div class="lvct-detail__avatar" data-group={current.group || "未分组"}>{current.name.slice(0, 1)}</div>
+        <div class="lvct-detail__id">
             <h3>{current.name}</h3>
-            <div class="ft__smaller ft__on-surface">
-                {#if current.group}{current.group}{/if}
-                {#if current.birthday} · 生日 {current.birthday}{current.isLunar ? "（农历）" : ""}{/if}
+            <div class="lvct-detail__meta">
+                {#if current.group}<span class="lvct-detail__group-chip">{current.group}</span>{/if}
+                {#if current.birthday}<span class="ft__smaller ft__on-surface">生日 {current.birthday}{current.isLunar ? "（农历）" : ""}</span>{/if}
             </div>
         </div>
         <div class="lvct-detail__header-actions">
