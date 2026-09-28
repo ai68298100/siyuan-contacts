@@ -408,5 +408,18 @@
   "captureRecordAndWrite": "Record interaction and write attendees",
   "captureSubmitHint": "Each attendee gets one interaction (with date/place/note), and an attendees block is appended to this note.",
   "captureCancel": "Cancel",
-  "captureNextConfirm": "Next: confirm and record"
+  "captureNextConfirm": "Next: confirm and record",
+  "stripBirthdayToday": "Birthday today",
+  "stripBirthdayIn": "Birthday in {n} days",
+  "stripNever": "No interactions yet",
+  "stripToday": "Interacted today",
+  "stripLastDays": "Last interaction {n} days ago",
+  "stripLunarSuffix": " (lunar)",
+  "stripEmptyContact": "No contact details yet; edit on the right",
+  "stripBriefingTitle": "Meeting briefing",
+  "stripBriefingCount": "Meeting briefing ({n})",
+  "stripBriefingEmpty": "No interaction, relation or shared-occasion records",
+  "stripEdit": "Edit profile",
+  "stripOpen": "Open Lv Contacts",
+  "stripEditDialogTitle": "Edit profile · {name}"
 }

@@ -136,7 +136,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     private readonly onProtyleEvent = (event: { detail?: { protyle?: { element: HTMLElement; block?: { rootID?: string } } } }): void => {
-        const context: PanelContext = { plugin: this, settings: this.settings };
+        const context: PanelContext = { plugin: this, settings: this.settings, i18n: this.i18n };
         handleProtyleEvent(context, event);
     };
 

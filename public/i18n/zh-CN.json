@@ -408,5 +408,18 @@
   "captureRecordAndWrite": "记录互动并写入参与人员",
   "captureSubmitHint": "将为每位参与者记录一条互动（含时间/地点/备注），并在本笔记末尾写入「参与人员」双链区块。",
   "captureCancel": "取消",
-  "captureNextConfirm": "下一步：确认记录"
+  "captureNextConfirm": "下一步：确认记录",
+  "stripBirthdayToday": "生日今天",
+  "stripBirthdayIn": "生日 {n} 天后",
+  "stripNever": "尚未互动",
+  "stripToday": "今天互动",
+  "stripLastDays": "最近互动 {n} 天前",
+  "stripLunarSuffix": "（农历）",
+  "stripEmptyContact": "未填写联系资料，可点右侧编辑",
+  "stripBriefingTitle": "会前简报",
+  "stripBriefingCount": "会前简报（{n}）",
+  "stripBriefingEmpty": "暂无互动、关系或共同出席记录",
+  "stripEdit": "编辑资料",
+  "stripOpen": "打开人脉",
+  "stripEditDialogTitle": "编辑资料 · {name}"
 }

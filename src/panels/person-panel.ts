@@ -12,6 +12,7 @@ import type { MeetingBriefingItem } from "../domain/briefing";
 import { nextBirthday } from "../domain/occasions";
 import { svelteDialog } from "../libs/dialog";
 import PersonEditDialog from "../components/people/PersonEditDialog.svelte";
+import { translateText } from "../domain/translation";
 import type { Plugin } from "siyuan";
 import type { ContactsSettings } from "../domain/model";
 import type { ContactSummary } from "../domain/person";
@@ -22,6 +23,7 @@ const stripRequests = new WeakMap<HTMLElement, number>();
 export interface PanelContext {
     plugin: Plugin;
     settings: ContactsSettings | null;
+    i18n?: Record<string, string>;
 }
 
 interface ProtyleLike {
@@ -65,6 +67,10 @@ async function updateStrip(context: PanelContext, protyle: ProtyleLike, rootId: 
     }
 }
 
+/** 档案条文案取值（i18n 可选，缺失回退中文） */
+function t(context: PanelContext, key: string, fallback: string, values?: Record<string, string | number>): string {
+    return translateText(context.i18n, key, fallback, values);
+}
 function buildStrip(
     context: PanelContext,
     protyle: ProtyleLike,
@@ -93,11 +99,11 @@ function buildStrip(
     badges.className = "lvct-strip__badges";
     if (person.group) badges.appendChild(makeBadge(person.group, "lvct-strip__badge--group"));
     if (birthdayDaysUntil !== undefined) {
-        badges.appendChild(makeBadge(birthdayDaysUntil === 0 ? "生日今天" : `生日 ${birthdayDaysUntil} 天后`, "lvct-strip__badge--birthday"));
+        badges.appendChild(makeBadge(birthdayDaysUntil === 0 ? t(context, "stripBirthdayToday", "生日今天") : t(context, "stripBirthdayIn", "生日 {n} 天后", { n: birthdayDaysUntil }), "lvct-strip__badge--birthday"));
     }
     badges.appendChild(
         makeBadge(
-            lastDaysAgo === undefined ? "尚未互动" : lastDaysAgo === 0 ? "今天互动" : `最近互动 ${lastDaysAgo} 天前`,
+            lastDaysAgo === undefined ? t(context, "stripNever", "尚未互动") : lastDaysAgo === 0 ? t(context, "stripToday", "今天互动") : t(context, "stripLastDays", "最近互动 {n} 天前", { n: lastDaysAgo }),
             lastDaysAgo === undefined ? "lvct-strip__badge--muted" : "lvct-strip__badge--activity",
         ),
     );
@@ -109,12 +115,12 @@ function buildStrip(
     if (person.phone) chipData.push(`📞 ${person.phone}`);
     if (person.wechat) chipData.push(`💬 ${person.wechat}`);
     if (person.email) chipData.push(`✉️ ${person.email}`);
-    if (person.birthday) chipData.push(`🎂 ${person.birthday}${person.isLunar ? "（农历）" : ""}`);
+    if (person.birthday) chipData.push(`🎂 ${person.birthday}${person.isLunar ? t(context, "stripLunarSuffix", "（农历）") : ""}`);
     for (const tag of person.tags) chipData.push(`#${tag}`);
     if (chipData.length === 0) {
         const empty = document.createElement("span");
         empty.className = "ft__smaller ft__on-surface";
-        empty.textContent = "未填写联系资料，可点右侧编辑";
+        empty.textContent = t(context, "stripEmptyContact", "未填写联系资料，可点右侧编辑");
         chips.appendChild(empty);
     }
     for (const chip of chipData) {
@@ -130,12 +136,12 @@ function buildStrip(
     briefing.className = "lvct-strip__briefing";
     briefing.dataset.slot = "briefing";
     const briefingSummary = document.createElement("summary");
-    briefingSummary.textContent = briefingItems.length > 0 ? `会前简报（${briefingItems.length}）` : "会前简报";
+    briefingSummary.textContent = briefingItems.length > 0 ? t(context, "stripBriefingCount", "会前简报（{n}）", { n: briefingItems.length }) : t(context, "stripBriefingTitle", "会前简报");
     briefing.appendChild(briefingSummary);
     if (briefingItems.length === 0) {
         const empty = document.createElement("p");
         empty.className = "lvct-strip__briefing-empty ft__smaller ft__on-surface";
-        empty.textContent = "暂无互动、关系或共同出席记录";
+        empty.textContent = t(context, "stripBriefingEmpty", "暂无互动、关系或共同出席记录");
         briefing.appendChild(empty);
     } else {
         const list = document.createElement("dl");
@@ -157,13 +163,13 @@ function buildStrip(
     actions.className = "lvct-strip__actions";
     const edit = document.createElement("button");
     edit.className = "b3-button b3-button--small b3-button--text";
-    edit.textContent = "编辑资料";
+    edit.textContent = t(context, "stripEdit", "编辑资料");
     edit.addEventListener("click", () => openEditDialog(context, protyle, person));
     actions.appendChild(edit);
 
     const open = document.createElement("button");
     open.className = "b3-button b3-button--small b3-button--outline";
-    open.textContent = "打开人脉";
+    open.textContent = t(context, "stripOpen", "打开人脉");
     open.addEventListener("click", () => {
         const workbench = (context.plugin as Plugin & { openWorkbench?: () => void }).openWorkbench;
         workbench?.call(context.plugin);
@@ -191,6 +197,7 @@ function openEditDialog(context: PanelContext, protyle: ProtyleLike, person: Con
         component: PersonEditDialog,
         props: {
             settings: context.settings,
+            i18n: context.i18n,
             person,
             onSaved: () => {
                 void updateStrip(context, protyle, person.docId);
