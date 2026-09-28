@@ -243,6 +243,7 @@
                     }}
                     onBack={() => (current = "home")}
                     onInteractionsUpdated={() => (dataRevision += 1)}
+                    onOpenPeople={(focus) => void openPeople(focus)}
                 />
             {/if}
         </div>

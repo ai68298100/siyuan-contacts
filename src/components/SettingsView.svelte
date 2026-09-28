@@ -13,7 +13,7 @@
     import type { AnchorCandidate } from "../services/init";
     import type { ExportSummary } from "../services/export-center";
     import type { InteractionImportDiff } from "../domain/interaction-backup";
-    import type { AuditIssue } from "../domain/health-audit";
+    import type { AuditIssue, AuditIssueKind } from "../domain/health-audit";
 
     let {
         facade,
@@ -24,6 +24,7 @@
         onPreferencesUpdated,
         onBack,
         onInteractionsUpdated = () => {},
+        onOpenPeople,
     }: {
         facade: ContactsPluginFacade;
         i18n?: Readonly<Record<string, string>>;
@@ -33,6 +34,8 @@
         onPreferencesUpdated: (preferences: ViewPreferences) => void;
         onBack: () => void;
         onInteractionsUpdated?: () => void;
+        /** C03：体检「查看」跳转联系人页（按人物 itemIds 聚焦筛选） */
+        onOpenPeople?: (focus: { itemIds: readonly string[]; label: string }) => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string) => translateText(i18n, key, fallback));
 
@@ -53,6 +56,18 @@
     // FUNC-01.4 资料体检：只读巡检，结果按类列出（缺字段/悬空关系/孤儿互动等）
     let auditIssues: AuditIssue[] | null = $state(null);
     let auditBusy = $state(false);
+    /* C03：可跳转联系人页聚焦的体检类（人物 itemIds 语义）；孤儿互动/不可达跟进是 docId 语义，不跳转 */
+    const jumpableAuditKinds: ReadonlySet<AuditIssueKind> = new Set([
+        "missingPhone", "missingBirthday", "missingContact", "noGroupNoTags", "suspiciousBirthday", "danglingRelation",
+    ]);
+    const auditJumpLabels: Partial<Record<AuditIssueKind, string>> = {
+        missingPhone: "缺电话",
+        missingBirthday: "缺生日",
+        missingContact: "缺全部联系方式",
+        noGroupNoTags: "无分组且无标签",
+        suspiciousBirthday: "可疑生日",
+        danglingRelation: "悬空关系",
+    };
     let rebuilding = $state(false);
     let savingPreferences = $state(false);
     let preferencesMessage = $state("");
@@ -736,6 +751,11 @@
                                     <li>
                                         <div class="ft__smaller ft__on-surface">共 {issue.itemIds.length} 项{issue.samples.length > 0 ? `：${issue.samples.join("、")}${issue.itemIds.length > issue.samples.length ? " 等" : ""}` : ""}</div>
                                         <div>{issue.reason}</div>
+                                        {#if onOpenPeople && jumpableAuditKinds.has(issue.kind)}
+                                            <button type="button" class="b3-button b3-button--text" onclick={() => onOpenPeople?.({ itemIds: issue.itemIds, label: auditJumpLabels[issue.kind] ?? "资料体检" })}>
+                                                查看这 {issue.itemIds.length} 人
+                                            </button>
+                                        {/if}
                                     </li>
                                 {/each}
                             </ul>

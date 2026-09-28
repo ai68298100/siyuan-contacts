@@ -264,6 +264,59 @@ await test("相关人选择走可搜索选人器：电话关键词筛选、空�
     assert(JSON.stringify(cellWrites[0]).includes("row-2"), "关系写入未包含所选人物");
 });
 
+await test("资料完整度筛选与串行补录：缺电话列表、逐个保存且不清空已有资料（C03）", async () => {
+    const cellWrites = [];
+    const rows = [
+        { id: "row-1", docId: "20260927000000-person1", name: "全空甲", phone: "", wechat: "", email: "", group: "", tags: [] },
+        { id: "row-2", docId: "20260927000000-person2", name: "有邮箱缺电话乙", phone: "", wechat: "", email: "b@x.com", group: "", tags: [] },
+        { id: "row-3", docId: "20260927000000-person3", name: "齐全丙", phone: "13900002222", wechat: "bing_wx", email: "c@x.com", group: "家人", tags: ["球友"] },
+    ];
+    kernel.handler = async (route, body) => {
+        if (route === "/api/av/renderAttributeView") return { view: {
+            columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })),
+            rows: rows.map((row) => ({ id: row.id, cells: [
+                { value: { type: "block", keyID: "name", block: { id: row.docId, content: row.name } } },
+                { value: { type: "phone", keyID: "phone", phone: { content: row.phone } } },
+                { value: { type: "text", keyID: "wechat", text: { content: row.wechat } } },
+                { value: { type: "email", keyID: "email", email: { content: row.email } } },
+                { value: { type: "mSelect", keyID: "group", mSelect: row.group ? [{ content: row.group }] : [] } },
+                { value: { type: "mSelect", keyID: "tags", mSelect: row.tags.map((tag) => ({ content: tag })) } },
+                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+            ] })),
+        } };
+        if (route === "/api/av/setAttributeViewBlockAttr") { cellWrites.push(body ?? {}); return { code: 0 }; }
+        return { code: 0 };
+    };
+    mounted = mount(PeopleView, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        loadRecentInteractions: async () => ({}),
+        revision: 0, initialSort: "name",
+        onOpenDetail() {}, onOpenPersonDoc() {},
+        onPreferencesChange: async (next) => next,
+    } });
+    await until(() => fixture.querySelector(".lvct-person-card"), "列表未渲染");
+    button("更多筛选").click();
+    await until(() => fixture.querySelector('input[name="lvct-profile-gap"]'), "资料完整度筛选组未显示");
+    [...fixture.querySelectorAll('input[name="lvct-profile-gap"]')][0].click();
+    await until(() => fixture.textContent.includes("逐个补录（2）"), "缺口人数统计错误");
+    assert(fixture.textContent.includes("资料：缺电话"), "生效条件 chips 未显示");
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "逐个补录（2）").click();
+    await until(() => fixture.querySelector(".lvct-qf h3"), "补录弹窗未打开");
+    assert(fixture.querySelector(".lvct-qf h3").textContent === "全空甲", "补录未从第一人开始");
+    input(fixture.querySelector('.lvct-qf input[type="tel"]'), "13800001234");
+    await tick(); /* 等 bind 生效，否则保存按钮仍是 disabled，click 被吞 */
+    button("保存并下一位").click();
+    await until(() => fixture.querySelector(".lvct-qf h3")?.textContent === "有邮箱缺电话乙", "保存后未进下一位");
+    input(fixture.querySelector('.lvct-qf input[type="tel"]'), "13900005678");
+    await tick();
+    button("保存并下一位").click();
+    await until(() => fixture.textContent.includes("补录结束：保存 2 人"), "未出现补录总结");
+    assert(cellWrites.length > 0, "未发起字段写入");
+    /* 关键保底：乙已有邮箱 b@x.com 必须随全字段写入回写，不能被清空 */
+    assert(JSON.stringify(cellWrites).includes("b@x.com"), "全字段写入未保底已有邮箱");
+    assert(JSON.stringify(cellWrites).includes("13800001234") && JSON.stringify(cellWrites).includes("13900005678"), "新电话未写入");
+});
+
 await test("新建草稿关闭前三选一：取消保留草稿，放弃后关闭且弹窗列明细", async () => {
     const guardDialog = () => document.body.querySelector(".lvct-closeguard");
     try {

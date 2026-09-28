@@ -4,17 +4,20 @@ import {
     applyPeopleFilters,
     EMPTY_PEOPLE_FILTER,
     extraFilterChips,
+    hasProfileGap,
     isExtraFilterActive,
     matchTags,
+    PROFILE_GAPS,
 } from "../src/domain/people-filters.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
-import type { PeopleFilterState } from "../src/domain/people-filters.ts";
+import type { PeopleFilterState, ProfileGap } from "../src/domain/people-filters.ts";
 
 function person(partial: Partial<ContactSummary> & { docId: string; name: string }): ContactSummary {
     return {
         docId: partial.docId, itemId: partial.itemId ?? partial.docId, name: partial.name,
         phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
         group: partial.group ?? "", tags: partial.tags ?? [], relatedItemIds: [],
+        ...partial,
     };
 }
 
@@ -53,9 +56,29 @@ test("从未联系：只保留无互动者；与日期范围同设时按 AND 为
 });
 
 test("生效条件：按固定顺序输出 chips，重置后不再生效", () => {
-    const filter: PeopleFilterState = { tagMatch: "any", recentFrom: "2026-08-01", recentTo: "", neverContacted: false };
+    const filter: PeopleFilterState = { tagMatch: "any", recentFrom: "2026-08-01", recentTo: "", neverContacted: false, profileGap: "" };
     assert.deepEqual(extraFilterChips(filter).map((chip) => chip.key), ["tagMatch", "recentRange"]);
     assert.equal(isExtraFilterActive(filter), true);
     assert.deepEqual(extraFilterChips(EMPTY_PEOPLE_FILTER), []);
     assert.equal(isExtraFilterActive(EMPTY_PEOPLE_FILTER), false);
+});
+
+test("资料完整度（C03）：四类缺口判定、筛选与 chips（只按现有九字段）", () => {
+    const roster = [
+        person({ docId: "ga", name: "全空甲" }),
+        person({ docId: "gb", name: "有电话缺生日乙", phone: "13800001111" }),
+        person({ docId: "gc", name: "齐全丙", phone: "13900002222", email: "c@x.com", wechat: "c_wx", birthday: "1990-01-01", group: "家人", tags: ["t"] }),
+    ];
+    const withGap = (gap: ProfileGap) => roster.filter((entry) => hasProfileGap(entry, gap)).map((entry) => entry.docId);
+    assert.deepEqual(withGap("phone"), ["ga"]);
+    assert.deepEqual(withGap("birthday"), ["ga", "gb"]);
+    assert.deepEqual(withGap("contact"), ["ga"]);
+    assert.deepEqual(withGap("organize"), ["ga", "gb"]);
+    const ids = (gap: ProfileGap | "") => applyPeopleFilters(roster, {}, { ...EMPTY_PEOPLE_FILTER, profileGap: gap }).map((entry) => entry.docId);
+    assert.deepEqual(ids("birthday"), ["ga", "gb"]);
+    assert.deepEqual(ids(""), ["ga", "gb", "gc"]);
+    const filter: PeopleFilterState = { ...EMPTY_PEOPLE_FILTER, profileGap: "birthday" };
+    assert.deepEqual(extraFilterChips(filter).map((chip) => chip.key), ["profileGap"]);
+    assert.equal(isExtraFilterActive(filter), true);
+    assert.equal(PROFILE_GAPS.length, 4);
 });

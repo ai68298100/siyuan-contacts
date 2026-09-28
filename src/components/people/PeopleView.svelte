@@ -19,6 +19,8 @@
     import ImportDialog from "./ImportDialog.svelte";
     import VCardDialog from "./VCardDialog.svelte";
     import LvctDialog from "../LvctDialog.svelte";
+    import ProfileCompletionDialog from "./ProfileCompletionDialog.svelte";
+    import { PROFILE_GAPS } from "../../domain/people-filters";
     import ViewState from "../ViewState.svelte";
     import { useCloseGuard } from "../close-guard";
     import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal, Bookmark, Pencil, Trash2 } from "@lucide/svelte";
@@ -167,6 +169,8 @@
     let adding: boolean = $state(false);
     let importing: boolean = $state(false);
     let vcarding: boolean = $state(false);
+    // C03 串行补录：对当前筛选列表逐个补缺失字段
+    let completing: boolean = $state(false);
     let batchOpen: boolean = $state(false);
     let batchBusy: boolean = $state(false);
     let batchError: string = $state("");
@@ -222,6 +226,7 @@
         if (tagFilter.length > 0) chips.push({ key: "tags", label: `标签${extraFilter.tagMatch === "any" ? "（任一）" : ""}：${tagFilter.join(" / ")}` });
         if (extraFilter.recentFrom || extraFilter.recentTo) chips.push({ key: "recentRange", label: `最近互动 ${extraFilter.recentFrom || "早期"} ~ ${extraFilter.recentTo || "至今"}` });
         if (extraFilter.neverContacted) chips.push({ key: "neverContacted", label: "从未联系" });
+        if (extraFilter.profileGap) chips.push({ key: "profileGap", label: `资料：${PROFILE_GAPS.find((gap) => gap.key === extraFilter.profileGap)?.label ?? extraFilter.profileGap}` });
         return chips;
     });
 
@@ -237,6 +242,7 @@
         else if (key === "tags") tagFilter = [];
         else if (key === "recentRange") extraFilter = { ...extraFilter, recentFrom: "", recentTo: "" };
         else if (key === "neverContacted") extraFilter = { ...extraFilter, neverContacted: false };
+        else if (key === "profileGap") extraFilter = { ...extraFilter, profileGap: "" };
         visibleCount = PAGE_SIZE;
     }
 
@@ -571,6 +577,30 @@
                         <input type="checkbox" bind:checked={extraFilter.neverContacted} />
                         <span>只看从未联系的人</span>
                     </label>
+                    <!-- C03 资料完整度：只按现有九字段判定 -->
+                    <div class="lvct-form__item">
+                        <span>资料完整度</span>
+                        {#each PROFILE_GAPS as gap (gap.key)}
+                            <label class="lvct-people__moremenu-row">
+                                <input
+                                    type="radio"
+                                    name="lvct-profile-gap"
+                                    checked={extraFilter.profileGap === gap.key}
+                                    onchange={() => (extraFilter = { ...extraFilter, profileGap: extraFilter.profileGap === gap.key ? "" : gap.key })}
+                                />
+                                <span>{gap.label}</span>
+                            </label>
+                        {/each}
+                        {#if extraFilter.profileGap}
+                            <button
+                                type="button"
+                                class="b3-button b3-button--outline"
+                                style="margin-top:6px"
+                                disabled={filtered.length === 0}
+                                onclick={() => (completing = true)}
+                            >逐个补录（{filtered.length}）</button>
+                        {/if}
+                    </div>
                 </div>
             {/if}
         </span>
@@ -880,6 +910,21 @@
                     {/each}
                 {/if}
             </div>
+        </LvctDialog>
+    {/if}
+
+    {#if completing}
+        <LvctDialog title="逐个补录资料" wide onClose={() => (completing = false)}>
+            <ProfileCompletionDialog
+                {i18n}
+                {settings}
+                people={filtered}
+                onSaved={() => refresh()}
+                onClose={() => {
+                    completing = false;
+                    refresh();
+                }}
+            />
         </LvctDialog>
     {/if}
 </div>
