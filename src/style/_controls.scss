@@ -1,0 +1,147 @@
+/* ============================================================================
+ * 小驴人脉 · 公共控件层（UX-01.2）
+ * ----------------------------------------------------------------------------
+ * 全部控件沿用宿主 .b3-* 类名，本文件在插件根内把它们统一重肤到 --lvct-* 视觉语言：
+ * 页面不再出现按钮/输入框级特例；宿主「黑色描边」观感在此替换（次按钮 = 表面底 + 柔和描边）。
+ * 规则：只准消费 --lvct-* 令牌；新增变体先在 _tokens.scss 补令牌再在此登记。
+ * ========================================================================== */
+
+@keyframes lvct-spin {
+    to { transform: rotate(360deg); }
+}
+
+.lvct-tab-root,
+.lvct-dialog-root,
+.lvct-doc-strip {
+
+    /* ---------- 按钮：公共基线（尺寸/圆角/状态过渡/焦点环） ---------- */
+    .b3-button {
+        border-radius: var(--lvct-r-sm);
+        font-size: var(--lvct-fs-body);
+        min-height: var(--lvct-touch-min);
+        box-sizing: border-box;
+        transition:
+            background var(--lvct-dur-fast) var(--lvct-ease),
+            border-color var(--lvct-dur-fast) var(--lvct-ease),
+            box-shadow var(--lvct-dur-fast) var(--lvct-ease),
+            color var(--lvct-dur-fast) var(--lvct-ease),
+            filter var(--lvct-dur-fast) var(--lvct-ease);
+    }
+
+    .b3-button:focus-visible {
+        outline: 2px solid var(--lvct-accent);
+        outline-offset: 2px;
+    }
+
+    .b3-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* 主按钮（无修饰类的填充按钮）：品牌渐变 + 悬停提升 */
+    .b3-button:not(.b3-button--outline):not(.b3-button--cancel):not(.b3-button--text) {
+        background: var(--lvct-brand-gradient);
+        color: var(--lvct-on-accent);
+        border: none;
+
+        &:hover {
+            box-shadow: var(--lvct-shadow-2);
+            filter: brightness(1.05);
+        }
+
+        &:active {
+            box-shadow: none;
+            filter: brightness(0.97);
+        }
+    }
+
+    /* 次按钮：表面底 + 柔和描边（替换宿主描边观感） */
+    .b3-button--outline,
+    .b3-button--cancel {
+        background: var(--lvct-bg-surface);
+        color: var(--lvct-text-1);
+        border: 1px solid var(--lvct-border-subtle);
+
+        &:hover {
+            background: var(--lvct-bg-hover);
+            border-color: var(--lvct-border-strong);
+            color: var(--lvct-text-1);
+        }
+
+        &:active { background: var(--lvct-bg-active); }
+    }
+
+    /* 文字/幽灵按钮 */
+    .b3-button--text {
+        background: transparent;
+        color: var(--lvct-accent);
+
+        &:hover {
+            background: var(--lvct-accent-soft);
+            color: var(--lvct-accent);
+        }
+    }
+
+    /* 危险动作（新代码显式选用）：实底危险色 */
+    .lvct-btn--danger {
+        background: var(--lvct-danger);
+        color: var(--lvct-on-accent);
+        border: none;
+
+        &:hover {
+            box-shadow: var(--lvct-shadow-2);
+            filter: brightness(1.06);
+        }
+    }
+
+    /* 提交中（新代码显式选用）：文字让位给旋转指示，防重复点击 */
+    .lvct-btn--loading {
+        position: relative;
+        color: transparent !important;
+        pointer-events: none;
+
+        &::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            margin: auto;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid color-mix(in srgb, var(--lvct-on-accent, #fff) 40%, transparent);
+            border-top-color: var(--lvct-on-accent, #fff);
+            animation: lvct-spin 0.7s linear infinite;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .lvct-btn--loading::after { animation-duration: 1.6s; }
+    }
+
+    /* ---------- 输入框 / 下拉：柔和描边 + 焦点环 ---------- */
+    .b3-text-field,
+    .b3-select {
+        border-radius: var(--lvct-r-md);
+        border: 1px solid var(--lvct-border-subtle);
+        background: var(--lvct-bg-surface);
+        color: var(--lvct-text-1);
+        min-height: var(--lvct-touch-min);
+        box-sizing: border-box;
+        transition:
+            border-color var(--lvct-dur-fast) var(--lvct-ease),
+            box-shadow var(--lvct-dur-fast) var(--lvct-ease);
+
+        &::placeholder { color: var(--lvct-text-3); }
+
+        &:focus {
+            border-color: var(--lvct-accent);
+            box-shadow: 0 0 0 3px var(--lvct-accent-soft);
+            outline: none;
+        }
+
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    }
+}

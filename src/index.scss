@@ -1,6 +1,8 @@
 /* 小驴人脉样式：视觉融合思源（一律 b3 变量，亮暗主题自动适配），类名前缀 lvct-。 */
 /* 设计令牌：新增/改造组件一律消费 --lvct-*（见 src/style/_tokens.scss 头部规则）。 */
 @use "style/tokens";
+/* 公共控件层（UX-01.2）：插件根内统一 .b3-* 控件视觉，见 src/style/_controls.scss。 */
+@use "style/controls";
 
 .lvct-tab-root,
 .lvct-dialog-root {
