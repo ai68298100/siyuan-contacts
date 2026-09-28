@@ -504,5 +504,10 @@
   "qfNoYear": "Missing year; cannot write yet. Complete the year and recognize again",
   "qfUnrecognized": "Unrecognized (original text kept; nothing written)",
   "qfApply": "Apply to form ({n})",
-  "dataChangedWhileEditing": "Data updated in another window: lists refreshed; unsaved drafts preserved."
+  "dataChangedWhileEditing": "Data updated in another window: lists refreshed; unsaved drafts preserved.",
+  "dashStatPeopleFt": "Of which {n} never contacted",
+  "dashStatRelationsFt": "{n} per person",
+  "dashStatBirthdaysFt": "{n} in 30-day window",
+  "dashStatNeverFt": "Plus {n} gone stale",
+  "wizardProgressLabel": "Setup in progress"
 }

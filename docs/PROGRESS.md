@@ -1122,3 +1122,16 @@
   （graph 档独立 server 瞬态空白除外，标准景正常）。
 - **UX-01 大项收官**：01.1/01.2/01.3/01.4/01.5/01.6/01.7/01.8/01.9/01.10/01.11/01.12
   十二个子项全部完成或核心完成。剩余：UX-01.10 移动 640 档个别页面细节随发布后反馈消化。
+
+## 发布收尾 第 32 轮：i18n 缺键补齐 + 截图套临时目录泄漏修复（2026-09-29）
+
+- **i18n 缺键补齐**：终态核验发现 `collect-i18n` 报 5 键缺失（UX-01.5 统计卡副描述 4 键 +
+  UX-01.9 向导进度标签），此前只用了 text() 内联兜底、未写入资源文件——英文界面会回落中文。
+  已同步补入 zh-CN.json / en.json（dashStatPeopleFt/dashStatRelationsFt/dashStatBirthdaysFt/
+  dashStatNeverFt/wizardProgressLabel），缺失数归 0，i18n 平价测试通过。
+- **截图套临时目录泄漏修复（环境事故复盘）**：screenshot-settings / breakpoint-sweep /
+  ui-smoke 三个脚本的 headless Chrome profile（mkdtempSync）从不删除，历史累积 1045 个
+  目录塞满 C 盘（会话一度无法执行任何命令）。已修复：finally 块 taskkill 整树杀 +
+  rmSync 清理 profile；复跑验证全量 52 景后 0 残留。
+- 验证：单测 177/177；桌面 76/76、移动 77/77、宿主基线 76/76；截图 52/52 OK；
+  breakpoint-sweep 正常；pnpm run build 通过；check:release 全部 PASS。

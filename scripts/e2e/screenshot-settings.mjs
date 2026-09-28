@@ -3,7 +3,7 @@
  *  base.css + 官方主题变量（C01），复现 B02/B09 这类只在真实宿主 CSS 下出现的问题。 */
 import { createServer } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { spawn } from "node:child_process";
@@ -91,6 +91,12 @@ async function capture({ url, outFile, size }) {
     } finally {
         socket?.close();
         browser.kill();
+        if (process.platform === "win32") {
+            /* kill() 只结束主进程，Chrome 子进程残留句柄会让 rmSync 失败，须整树杀 */
+            spawn("taskkill", ["/pid", String(browser.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+            await pause(300);
+        }
+        rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     }
 }
 

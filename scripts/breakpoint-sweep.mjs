@@ -1,6 +1,6 @@
 /** UX-01.10 断点扫描：主页面 × 390/640/1280 三档截图，供断点收敛核对（一次性脚本可复用）。 */
 import { createServer } from "vite";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { spawn } from "node:child_process";
@@ -78,5 +78,11 @@ try {
 } finally {
     socket?.close();
     browser.kill();
+    if (process.platform === "win32") {
+        /* kill() 只结束主进程，Chrome 子进程残留句柄会让 rmSync 失败，须整树杀 */
+        spawn("taskkill", ["/pid", String(browser.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+        await new Promise((r) => setTimeout(r, 300));
+    }
+    rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     await server.close();
 }

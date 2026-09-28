@@ -3,7 +3,7 @@
  *  用于在真实宿主 CSS 下跑同一套断言；本机无思源安装（如 CI）时自动回退近似样式。 */
 import { createServer } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { spawn } from "node:child_process";
@@ -39,11 +39,12 @@ const server = await createServer({
 });
 let browser;
 let debuggerSocket;
+let profile;
 let timeout;
 try {
     await server.listen();
     const address = server.httpServer.address();
-    const profile = mkdtempSync(join(tmpdir(), "lvct-ui-"));
+    profile = mkdtempSync(join(tmpdir(), "lvct-ui-"));
     console.log(`隔离浏览器临时目录：${profile}`);
     browser = spawn(browserPath, [
         "--headless=new", "--no-first-run", "--no-default-browser-check", "--disable-gpu",
@@ -121,5 +122,13 @@ await new Promise((r) => setTimeout(r, 300));
     clearTimeout(timeout);
     debuggerSocket?.close();
     browser?.kill();
+    if (process.platform === "win32" && browser?.pid) {
+        /* kill() 只结束主进程，Chrome 子进程残留句柄会让 rmSync 失败，须整树杀 */
+        spawn("taskkill", ["/pid", String(browser.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+        await new Promise((r) => setTimeout(r, 300));
+    }
+    if (profile) {
+        rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    }
     await server.close();
 }
