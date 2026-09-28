@@ -61,4 +61,25 @@ export async function resumeReminder(
     });
 }
 
+/** C08 迁移包恢复：包内条目覆盖合并（同 personDocId+kind 覆盖、新增补入） */
+export async function mergeReminderDismissals(
+    plugin: Plugin,
+    incoming: readonly ReminderDismissal[],
+): Promise<number> {
+    return withStoreLock(REMINDER_DISMISSALS_STORAGE_KEY, async () => {
+        const store = await readStoreStrict(plugin);
+        const byKey = new Map(store.dismissals.map((entry) => [`${entry.personDocId}|${entry.kind}`, entry]));
+        let merged = 0;
+        for (const entry of incoming) {
+            byKey.set(`${entry.personDocId}|${entry.kind}`, entry);
+            merged += 1;
+        }
+        await saveJsonVerified(plugin, REMINDER_DISMISSALS_STORAGE_KEY, {
+            schemaVersion: 1,
+            dismissals: [...byKey.values()],
+        });
+        return merged;
+    });
+}
+
 export type { ReminderDismissal, ReminderKind };

@@ -50,6 +50,10 @@ export interface ContactsPluginFacade {
     repairFieldMap(patch: FieldMapPatch): Promise<ContactsSettings>;
     /** 导出插件自管互动事件，不修改当前存储 */
     exportInteractionJson(): Promise<string>;
+    /** C08 完整迁移包：六模块聚合导出 / 预览 / 确认合并（契约 §3 lvct-migration-bundle） */
+    exportMigrationBundle(): Promise<string>;
+    previewMigrationImport(text: string): Promise<{ key: string; label: string; count: number }[]>;
+    importMigrationBundle(text: string): Promise<{ modules: { key: string; label: string; merged: number }[]; skipped: { followUps: number; interactions: number } }>;
     /** 跟进事项（F05）：日期型联系计划，独立于互动事实 */
     listPersonFollowUps(personDocId: string): Promise<FollowUpItem[]>;
     /** 创建跟进计划；dueDate 为 YYYY-MM-DD，非法日期抛错 */

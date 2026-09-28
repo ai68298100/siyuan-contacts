@@ -25,6 +25,7 @@ import { loadPersonInsights } from "./services/insights";
 import { checkSettingsHealth, rebuildMissingFields, rebindSettings, repairFieldMap } from "./services/settings-health";
 import { auditWorkspaceData } from "./services/health-audit";
 import { reconcileFollowUpTasksFromDoc } from "./services/followup-sync";
+import { exportMigrationBundle, importMigrationBundle, previewMigrationImport } from "./services/migration-bundle";
 import { loadViewPreferences, saveViewPreferences } from "./services/preferences";
 import { exportInteractionJson } from "./services/interaction-export";
 import { loadExportSummary } from "./services/export-center";
@@ -441,6 +442,18 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     async exportInteractionJson() {
         return exportInteractionJson(this);
+    }
+
+    async exportMigrationBundle() {
+        return exportMigrationBundle(this);
+    }
+
+    async previewMigrationImport(text: string) {
+        return previewMigrationImport(text);
+    }
+
+    async importMigrationBundle(text: string) {
+        return importMigrationBundle(this, text);
     }
 
     async listPersonFollowUps(personDocId: string) {

@@ -27,3 +27,28 @@ export async function ensureRegistryEntriesSaved(plugin: Plugin, docIds: readonl
         /* 补记失败按缺失处理降级：宽限判断未登记视为首次发现，行为一致 */
     }
 }
+
+/** C08 迁移包恢复：包内条目覆盖合并（同 docId 覆盖、新增补入）；非法条目由归一化丢弃 */
+export async function mergeRegistryEntries(
+    plugin: Plugin,
+    incoming: Record<string, string>,
+): Promise<number> {
+    console.log("[reg] merge start");
+    try {
+        return await withStoreLock(REGISTRY_STORAGE_KEY, async () => {
+            console.log("[reg] lock acquired");
+            const store = normalizeRegistryStore(await loadJsonStrict(plugin, REGISTRY_STORAGE_KEY));
+            let merged = 0;
+            for (const [docId, date] of Object.entries(incoming)) {
+                store.registeredAt[docId] = date;
+                merged += 1;
+            }
+            await saveJsonVerified(plugin, REGISTRY_STORAGE_KEY, { schemaVersion: 1, registeredAt: store.registeredAt });
+            console.log("[reg] saved");
+            return merged;
+        });
+    } catch {
+        /* 恢复失败不阻断其他模块，交由调用方计数口径 */
+        return 0;
+    }
+}

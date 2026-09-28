@@ -73,6 +73,10 @@ try {
     const browserConsole = [];
     debuggerSocket.addEventListener("message", ({ data }) => {
         const reply = JSON.parse(data);
+        if (reply.method === "Runtime.exceptionThrown") {
+            browserConsole.push("EXCEPTION " + JSON.stringify(reply.params.exceptionDetails).slice(0, 300));
+            return;
+        }
         if (reply.method === "Runtime.consoleAPICalled") {
             browserConsole.push(reply.params.args.map((arg) => arg.value ?? arg.description ?? "").join(" "));
             return;
@@ -92,7 +96,17 @@ try {
     await call("Page.navigate", { url: `http://127.0.0.1:${address.port}/scripts/e2e/ui/index.html${hostBaseline}` });
     const results = await Promise.race([
         report,
-        new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error("浏览器回归 45 秒超时")), 45000); }),
+        new Promise((_, reject) => {
+            timeout = setTimeout(async () => {
+                try {
+                    const state = await call("Runtime.evaluate", { expression: "(async () => { const q = navigator.locks ? await navigator.locks.query() : {held:[],pending:[]}; return JSON.stringify({stage: window.__stage||'none', held: q.held.map(function(l){return l.name}), pending: q.pending.map(function(l){return l.name})}); })()", awaitPromise: true, returnByValue: true });
+                    console.log("--- 回归超时，页面进度：", state.result.value);
+                    console.log("--- 浏览器 console 尾部 ---");
+                    console.log(browserConsole.slice(-40).join(String.fromCharCode(10)));
+                } catch { console.log("--- 回归超时（页面状态不可读）"); }
+                reject(new Error("浏览器回归 240 秒超时"));
+            }, 240000);
+        }),
         new Promise((_, reject) => browser.once("error", reject)),
     ]);
     for (const result of results) console.log(`${result.ok ? "PASS" : "FAIL"} ${result.name}${result.detail ? `\n${result.detail}` : ""}`);

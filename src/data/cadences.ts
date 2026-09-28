@@ -41,3 +41,23 @@ export async function savePersonCadence(
         });
     });
 }
+
+/** C08 迁移包恢复：包内条目覆盖合并（同 personDocId 覆盖、新增补入）；损坏当前库拒绝写入 */
+export async function mergeCadenceMap(
+    plugin: Plugin,
+    incoming: Record<string, { days: number; paused: boolean }>,
+): Promise<number> {
+    return withStoreLock(CADENCE_STORAGE_KEY, async () => {
+        const store = normalizeCadenceMapForWrite(await loadJsonStrict(plugin, CADENCE_STORAGE_KEY));
+        let merged = 0;
+        for (const [docId, cadence] of Object.entries(incoming)) {
+            store[docId] = { days: cadence.days, paused: cadence.paused };
+            merged += 1;
+        }
+        await saveJsonVerified(plugin, CADENCE_STORAGE_KEY, {
+            schemaVersion: 1,
+            cadences: Object.keys(store).length > 0 ? store : {},
+        });
+        return merged;
+    });
+}

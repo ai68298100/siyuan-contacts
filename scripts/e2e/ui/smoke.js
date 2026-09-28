@@ -16,7 +16,9 @@ import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/e
 import { captureFromDoc } from "../../../src/services/capture";
 import { exportInteractionJson } from "../../../src/services/interaction-export";
 import { createFollowUp, exportFollowUpsJson, importFollowUpsJson, previewFollowUpsImport } from "../../../src/services/followups";
-import { loadFollowUpStore } from "../../../src/data/followups";
+import { loadFollowUpStore, createFollowUpRecord } from "../../../src/data/followups";
+import { loadTemplatesStore, saveTemplatesStore } from "../../../src/data/templates";
+import { exportMigrationBundle, previewMigrationImport, importMigrationBundle } from "../../../src/services/migration-bundle";
 import { loadDashboard } from "../../../src/services/dashboard";
 import { loadPersonCadence, savePersonCadence } from "../../../src/data/cadences";
 import { DEFAULT_TEMPLATES } from "../../../src/domain/interaction-templates";
@@ -105,6 +107,8 @@ function resetKernel() {
 let mounted;
 async function test(name, action) {
     resetKernel();
+    console.log("[case]", name);
+    (window.__cases = window.__cases || []).push(name);
     try {
         await action();
         results.push({ name, ok: true });
@@ -420,6 +424,56 @@ await test("行动区一键建跟进与处置撤销（C07/C06）", async () => {
     assert(undoButton, "通知未提供撤销按钮");
     undoButton.click();
     await until(() => dismissals.length === 0, "撤销未恢复暂缓");
+});
+
+await test("完整迁移包：六模块导出→恢复预览→确认合并，现状优先不重复（C08/FUNC-01.6）", async () => {
+    /* fake plugin：内存文件系统（loadData(key) 返回已解析对象；saveData(key, value)；Web Locks 降级队列） */
+    const files = new Map();
+    const plugin = {
+        loadData: async (key) => files.get(key) ?? "",
+        saveData: async (key, value) => { files.set(key, value); },
+    };
+    /* 预置：一条互动 + 一条跟进 + 一条模板（与包内部分重叠） */
+    kernel.handler = async () => ({ code: 0 });
+
+    await recordInteraction(plugin, { personDocId: "20260927000000-person1", localDate: "2026-09-28", source: "manual", note: "已有互动" });
+    await createFollowUpRecord(plugin, { id: "fu-exist", personDocId: "20260927000000-person1", title: "已有跟进", dueDate: "2026-10-01", status: "open" });
+    await saveTemplatesStore(plugin, [{ id: "tpl-exist", name: "已有模板", content: "x" }]);
+
+    const bundleText = await exportMigrationBundle(plugin);
+    const bundle = JSON.parse(bundleText);
+    assert(bundle.storageKey === "lvct-migration-bundle", "导出包标识错误");
+    assert(Array.isArray(bundle.modules.interactions?.events) && bundle.modules.interactions.events.length === 1, "互动模块缺失");
+    assert(Array.isArray(bundle.modules.followUps?.items) && bundle.modules.followUps.items.length === 1, "跟进模块缺失");
+    assert(Array.isArray(bundle.modules.templates?.templates) && bundle.modules.templates.templates.length === 1, "模板模块缺失");
+    assert(!("registeredAt" in (bundle.modules.registry ?? {})) === false, "registry 模块应存在（可为空对象）");
+
+    /* 包外新增一条互动/跟进（现状优先合并语义） */
+    await recordInteraction(plugin, { personDocId: "20260927000000-person1", localDate: "2026-09-29", source: "manual", note: "包外新增" });
+
+    window.__stage = "bundle-exported";
+    const preview = previewMigrationImport(bundleText);
+    window.__stage = "preview-ok";
+    const byKey = Object.fromEntries(preview.map((module) => [module.key, module.count]));
+    assert(byKey.interactions === 1 && byKey.followUps === 1 && byKey.templates === 1, `预览计数错误：${JSON.stringify(byKey)}`);
+
+    console.log("[c08] import returned");
+    window.__stage = "import-done";
+    const result = await importMigrationBundle(plugin, bundleText);
+    window.__stage = "import-returned";
+    console.log("[c08] import done");
+    assert(result.modules.length >= 5, `恢复模块数不足：${JSON.stringify(result.modules)}`);
+    /* 现状优先：互动/跟进不产生重复 */
+    window.__stage = "check-interactions";
+    assert((await loadInteractionStore(plugin)).events.length === 2, "互动合并后应有 2 条");
+    window.__stage = "check-followups";
+    assert((await loadFollowUpStore(plugin)).items.length === 1, "跟进合并后应仍 1 条（现状优先）");
+    window.__stage = "check-templates";
+    assert((await loadTemplatesStore(plugin))?.templates.length === 1, "模板合并后应仍 1 条");
+    /* 坏包拒绝 */
+    let rejected = false;
+    try { previewMigrationImport("{ broken"); } catch { rejected = true; }
+    assert(rejected, "坏包应被拒绝");
 });
 
 await test("移动端人物卡片内容自适应，min-height 收缩且空 chips 收起（B09-2）", async () => {

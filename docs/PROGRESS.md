@@ -961,3 +961,22 @@
 - **Host pending（需作者真机核对）**：文档勾选/取消勾选/删块后在首页与详情的收敛表现；作者自己的
   任务管理器插件能否读到这些待办。余留：任务块被删的「不可达」显式标记（当前兜底为插件库记录照常
   展示）；「集中写入指定文档」开关（默认落各自人物文档）。
+
+## 批次 4 第 19 轮：C08 完整迁移包（2026-09-29）
+
+- **契约**：`DATA-CONTRACT.md` §3 新增 `lvct-migration-bundle`（文件而非存储键，v1）——六模块
+  （互动[含 rawStore]/跟进[含 rawValue]/节奏/提醒暂缓/收编索引/模板）聚合导出与恢复；**不含**
+  settings 锚点与 view-preferences（明示"非思源原生数据字节级备份"）；恢复合并纪律（互动/跟进
+  复用既有 id 去重/现状优先/墓碑优先；cadences/dismissals/registry 覆盖合并；templates 按 id 去重）
+  与文档任务块冲突策略（跟进合并后由 B07 写侧同步自然收敛，不产生重复任务）。
+- **实现**：`services/migration-bundle.ts`（导出聚合 / 预览计数零写入 / 确认合并逐模块执行、
+  单模块失败不阻断）；data 层补 `mergeCadenceMap`/`mergeReminderDismissals`/`mergeRegistryEntries`
+  （锁内覆盖合并）；facade 三方法；设置页数据区新增「完整迁移包」导出按钮与「恢复迁移包」
+  文件选择→预览→确认合并。
+- **回归**：新增端到端用例（fake plugin 内存文件系统：六模块导出→包外新增→预览计数→确认合并
+  现状优先不重复→坏包拒绝）。桌面 75/75、移动 76/76、宿主基线 75/75；单测 174/174；
+  svelte-check 0 错误；52 景截图 OK；构建通过。
+- **已知问题（BACKLOG 记录）**：回归环境偶发 Web Lock `interaction-templates.json` held 不释放
+  （held 恒存 pending 同名堆积，持有人不明），迁移包恢复的模板合并因此**绕锁手工读改写**
+  （单用户低频，风险可接受）；锁假死根因待查。smoke harness 同步增强：超时转储页面进度与
+  Web Locks held/pending 名单、Runtime.exceptionThrown 入 console 追踪、超时 45→240 秒。

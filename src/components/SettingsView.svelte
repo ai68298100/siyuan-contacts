@@ -309,6 +309,73 @@
         }
     }
 
+    // C08/FUNC-01.6：完整迁移包（六模块）导出与恢复
+    let exportingBundle = $state(false);
+    let bundlePreview: { key: string; label: string; count: number }[] | null = $state(null);
+    let bundlePreviewText = "";
+    let previewingBundle = $state(false);
+    let importingBundle = $state(false);
+    let bundleMessage = $state("");
+
+    async function runExportBundle() {
+        if (exportingBundle) return;
+        exportingBundle = true;
+        errorText = "";
+        try {
+            const text = await facade.exportMigrationBundle();
+            const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = `小驴人脉_完整迁移包_${new Date().toISOString().slice(0, 10)}.json`;
+            anchor.click();
+            URL.revokeObjectURL(url);
+            bundleMessage = "完整迁移包已导出（不含思源原生数据与锚点，非字节级备份）";
+        } catch (error) {
+            errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            exportingBundle = false;
+        }
+    }
+    function selectMigrationBundle(event: Event) {
+        const input = event.currentTarget as HTMLInputElement;
+        const file = input.files?.[0];
+        if (!file) return;
+        bundlePreview = null;
+        previewingBundle = true;
+        bundleMessage = "";
+        const reader = new FileReader();
+        reader.onload = async () => {
+            try {
+                bundlePreviewText = String(reader.result ?? "");
+                bundlePreview = await facade.previewMigrationImport(bundlePreviewText);
+            } catch (error) {
+                bundleMessage = error instanceof Error ? error.message : String(error);
+                bundlePreview = [];
+            } finally {
+                previewingBundle = false;
+            }
+        };
+        reader.readAsText(file);
+        input.value = "";
+    }
+    async function runImportBundle(): Promise<void> {
+        if (importingBundle || !bundlePreviewText) return;
+        importingBundle = true;
+        try {
+            const result = await facade.importMigrationBundle(bundlePreviewText);
+            const summary = result.modules.map((module) => `${module.label} +${module.merged}`).join("、") || "没有可合并的模块";
+            bundleMessage = `迁移恢复完成：${summary}${result.skipped.interactions + result.skipped.followUps > 0 ? `（现状优先跳过 ${result.skipped.interactions + result.skipped.followUps} 条）` : ""}`;
+            bundlePreview = null;
+            bundlePreviewText = "";
+            onInteractionsUpdated();
+        } catch (error) {
+            bundleMessage = error instanceof Error ? error.message : String(error);
+        } finally {
+            importingBundle = false;
+        }
+    }
+
     async function runExportRoster() {
         if (exportingRoster) return;
         exportingRoster = true;
@@ -653,6 +720,40 @@
                         </button>
                     </div>
                     <StatusNotice message={followUpsExportMessage} onDismiss={() => (followUpsExportMessage = "")} actionLabel="再次导出" onAction={runExportFollowUps} />
+
+                    <!-- C08/FUNC-01.6：完整迁移包（六模块合一导出与恢复） -->
+                    <div class="lvct-settings__row">
+                        <div>
+                            <b>完整迁移包</b>
+                            <small>互动 + 跟进 + 节奏 + 提醒暂缓 + 收编索引 + 模板；不含思源原生数据与锚点，非字节级备份</small>
+                        </div>
+                        <button class="b3-button b3-button--outline" onclick={runExportBundle} disabled={exportingBundle}>
+                            {exportingBundle ? "导出中…" : "导出迁移包"}
+                        </button>
+                    </div>
+                    <StatusNotice message={bundleMessage} onDismiss={() => (bundleMessage = "")} />
+                    <div class="lvct-settings__row">
+                        <label for="lvct-migration-bundle"><b>恢复迁移包</b></label>
+                        <input id="lvct-migration-bundle" class="b3-text-field lvct-settings__backup-input" type="file" accept=".json,application/json" onchange={selectMigrationBundle} disabled={importingBundle || previewingBundle} />
+                    </div>
+                    {#if previewingBundle}<p class="lvct-settings__inline-hint" role="status">正在检查迁移包…</p>{/if}
+                    {#if bundlePreview && bundlePreview.length > 0}
+                        <ul class="lvct-settings__missing">
+                            {#each bundlePreview as module (module.key)}
+                                <li>{module.label}：{module.count} 条</li>
+                            {/each}
+                        </ul>
+                        <div class="lvct-settings__actions">
+                            <button class="b3-button b3-button--outline" onclick={runImportBundle} disabled={importingBundle}>
+                                {importingBundle ? "恢复中…" : "确认恢复（现状优先合并）"}
+                            </button>
+                        </div>
+                    {:else if bundlePreview !== null && !previewingBundle && !bundleMessage}
+                        <p class="lvct-settings__inline-hint" role="status">迁移包为空或没有可恢复的模块。</p>
+                    {/if}
+                    {#if bundlePreview && bundlePreview.length > 0}
+                        <p class="ft__smaller ft__on-surface">恢复后跟进会同步收敛人物文档任务块（文档为准的对账在下次详情打开时执行），不产生重复任务。</p>
+                    {/if}
 
                     <div class="lvct-settings__row">
                         <label for="lvct-interaction-backup"><b>合并互动备份</b></label>
