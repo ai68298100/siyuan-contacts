@@ -9,6 +9,11 @@ import "./index.scss";
 
 import WorkbenchRoot from "./components/WorkbenchRoot.svelte";
 import CaptureDialog from "./components/capture/CaptureDialog.svelte";
+import QuickFillDialog from "./components/people/QuickFillDialog.svelte";
+import AddPersonDialog from "./components/people/AddPersonDialog.svelte";
+import PersonEditDialog from "./components/people/PersonEditDialog.svelte";
+import { parseContactText } from "./domain/quick-fill";
+import { getRoster } from "./services/roster";
 import { initializeWorkspace, inspectWorkspace, loadSettings } from "./services/init";
 import { configureCloseGuardI18n } from "./components/close-guard";
 import type { InitProgressStep, WorkspaceSnapshot } from "./services/init";
@@ -45,10 +50,34 @@ import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
 import { svelteDialog } from "./libs/dialog";
 import { emitDataChanged } from "./libs/data-events";
 import type { ContactsSettings } from "./domain/model";
+import type { ContactSummary } from "./domain/person";
+import { emptyDraft } from "./domain/person";
 import { DEFAULT_VIEW_PREFERENCES, type ViewPreferences } from "./domain/preferences";
 import type { ContactsPluginFacade, WorkbenchView } from "./types";
 
 const TAB_TYPE = "workbench";
+
+/** QuickFillDialog 回填补丁（与组件 props 结构一致） */
+interface QuickFillPatch {
+    name?: string;
+    phone?: string;
+    email?: string;
+    wechat?: string;
+    website?: string;
+    birthday?: string;
+    isLunar?: boolean;
+    group?: string;
+    tagsAppend: string[];
+}
+
+/** FAST-01.3：读限定在指定编辑器内的选区；没有选区或选区在别的窗口时返回空串 */
+function readSelectionWithin(scope: HTMLElement): string {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) return "";
+    const anchor = selection.anchorNode;
+    if (!anchor || !scope.contains(anchor)) return "";
+    return selection.toString();
+}
 
 export default class LvContactsPlugin extends Plugin implements ContactsPluginFacade {
     isMobile = false;
@@ -147,7 +176,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         handleProtyleEvent(context, event);
     };
 
-    private readonly onMenuContent = (event: { detail: { protyle?: { block?: { rootID?: string } }; menu: { addItem: (item: unknown) => void } } }): void => {
+    private readonly onMenuContent = (event: { detail: { protyle?: { element?: HTMLElement; block?: { rootID?: string } }; menu: { addItem: (item: unknown) => void } } }): void => {
         const rootId = event.detail.protyle?.block?.rootID;
         if (!rootId) return;
         event.detail.menu.addItem({
@@ -155,6 +184,23 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
             iconHTML: "",
             label: this.i18n.captureFromNote ?? "人脉：捕获本文人员",
             click: () => this.openCaptureDialog(rootId),
+        });
+        /* FAST-01.3：识别资料——选中文本（有选区才显示）与整篇文档；选区只读当前编辑器，不误读其他窗口 */
+        const protyleElement = event.detail.protyle?.element;
+        const selectionText = protyleElement ? readSelectionWithin(protyleElement) : "";
+        if (selectionText.trim()) {
+            event.detail.menu.addItem({
+                id: "lvct-recognize-selection",
+                iconHTML: "",
+                label: `人脉：识别资料（选中文本，${[...selectionText.trim()].length} 字）`,
+                click: () => void this.openRecognizeDialog(selectionText, rootId),
+            });
+        }
+        event.detail.menu.addItem({
+            id: "lvct-recognize-doc",
+            iconHTML: "",
+            label: "人脉：识别资料（整篇文档）",
+            click: () => void this.openRecognizeDialog(protyleElement?.innerText ?? "", rootId),
         });
     };
 
@@ -179,6 +225,96 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
             width: "560px",
             component: CaptureDialog,
             props: { facade: this, i18n: this.i18n, docId },
+        });
+    }
+
+    /** FAST-01.3：识别资料 → 预览确认 → 目标落点（人物文档=补充此联系人；普通笔记=新建） */
+    private async openRecognizeDialog(rawText: string, rootDocId: string): Promise<void> {
+        if (!this.settings) {
+            showMessage("请先完成人脉工作空间初始化", 3000);
+            return;
+        }
+        const text = rawText.trim();
+        if (!text) {
+            showMessage("没有可识别的内容", 3000);
+            return;
+        }
+        const result = parseContactText(text);
+        if (result.items.length === 0) {
+            showMessage("未识别到可填充的资料字段（原文已保留，未做任何写入）", 3000);
+            return;
+        }
+        let person: ContactSummary | null = null;
+        try {
+            person = (await getRoster(this.settings)).find((item) => item.docId === rootDocId) ?? null;
+        } catch { /* 名册读取失败按新建目标处理 */ }
+        const existing = person
+            ? { name: person.name, phone: person.phone, email: person.email, wechat: person.wechat, website: person.website, birthday: person.birthday, group: person.group, tags: person.tags }
+            : { name: "", phone: "", email: "", wechat: "", website: "", birthday: "", group: "", tags: [] as string[] };
+        const container = document.createElement("div");
+        container.className = "lvct-dialog-root";
+        document.body.appendChild(container);
+        const close = () => {
+            unmount(component);
+            container.remove();
+        };
+        const component = mount(QuickFillDialog, {
+            target: container,
+            props: {
+                i18n: this.i18n,
+                existing,
+                initialResult: result,
+                onApply: (patch: QuickFillPatch) => {
+                    close();
+                    if (person) this.openPersonEditPrefilled(person, patch);
+                    else this.openPersonCreatePrefilled(patch);
+                },
+                onClose: close,
+            },
+        });
+    }
+
+    /** 识别结果落到既有联系人：编辑弹窗预填勾选值，保存仍走既有 updateContactFields 与 B06 守卫 */
+    private openPersonEditPrefilled(person: ContactSummary, patch: QuickFillPatch): void {
+        if (!this.settings) return;
+        const merged: ContactSummary = {
+            ...person,
+            name: patch.name ?? person.name,
+            phone: patch.phone ?? person.phone,
+            email: patch.email ?? person.email,
+            wechat: patch.wechat ?? person.wechat,
+            website: patch.website ?? person.website,
+            birthday: patch.birthday ?? person.birthday,
+            isLunar: person.isLunar || Boolean(patch.isLunar),
+            group: patch.group ?? person.group,
+            tags: [...new Set([...person.tags, ...patch.tagsAppend])],
+        };
+        svelteDialog({
+            title: `识别资料 · 补充「${person.name}」`,
+            width: "560px",
+            component: PersonEditDialog,
+            props: { settings: this.settings, i18n: this.i18n, person: merged, onSaved: () => emitDataChanged() },
+        });
+    }
+
+    /** 识别结果落到新建：预填草稿（识别后继续编辑），创建仍走既有 createContact 查重路径 */
+    private openPersonCreatePrefilled(patch: QuickFillPatch): void {
+        if (!this.settings) return;
+        const draft = emptyDraft();
+        if (patch.name !== undefined) draft.name = patch.name;
+        if (patch.phone !== undefined) draft.phone = patch.phone;
+        if (patch.email !== undefined) draft.email = patch.email;
+        if (patch.wechat !== undefined) draft.wechat = patch.wechat;
+        if (patch.website !== undefined) draft.website = patch.website;
+        if (patch.birthday !== undefined) draft.birthday = patch.birthday;
+        draft.isLunar = Boolean(patch.isLunar);
+        if (patch.group !== undefined) draft.group = patch.group;
+        draft.tags = [...patch.tagsAppend];
+        svelteDialog({
+            title: "识别资料 · 新建联系人",
+            width: "560px",
+            component: AddPersonDialog,
+            props: { settings: this.settings, i18n: this.i18n, initial: draft, onCreated: () => emitDataChanged() },
         });
     }
 

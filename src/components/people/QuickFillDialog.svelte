@@ -2,13 +2,14 @@
     /** FAST-01.1 粘贴并识别：本地解析（domain/quick-fill）→ 分组预览 → 用户勾选后才回填草稿。
      *  不直接写库：onApply 只把勾选项交给调用方的草稿，B06 守卫与既有保存路径继续生效。 */
     import { parseContactText, CONTACT_TEMPLATE } from "../../domain/quick-fill";
-    import type { QuickFillItem } from "../../domain/quick-fill";
+    import type { QuickFillItem, QuickFillResult } from "../../domain/quick-fill";
     import LvctDialog from "../LvctDialog.svelte";
     import { translateText } from "../../domain/translation";
 
     let {
         i18n,
         existing,
+        initialResult,
         onApply,
         onClose,
     }: {
@@ -18,6 +19,8 @@
             name: string; phone: string; email: string; wechat: string;
             website: string; birthday: string; group: string; tags: readonly string[];
         };
+        /** FAST-01.3：外部已解析好的结果（选区/整篇文档识别），直接进预览阶段 */
+        initialResult?: QuickFillResult;
         onApply: (patch: {
             name?: string; phone?: string; email?: string; wechat?: string;
             website?: string; birthday?: string; isLunar?: boolean; group?: string;
@@ -39,9 +42,12 @@
     /** 单值字段：同字段多个候选时互斥（单选语义）；tags 可多选 */
     const SINGLE_FIELDS = new Set(["name", "phone", "email", "wechat", "website", "birthday", "group"]);
 
+    // svelte-ignore state_referenced_locally
     let pasteText = $state("");
-    let previewed = $state(false);
-    let result = $state<ReturnType<typeof parseContactText> | null>(null);
+    // svelte-ignore state_referenced_locally
+    let previewed = $state(initialResult !== undefined);
+    // svelte-ignore state_referenced_locally
+    let result = $state<QuickFillResult | null>(initialResult ?? null);
     let checked = $state(new Set<string>());
     /* FAST-01.2：可复制空白模板（剪贴板不可用时静默，用户仍可从文档手抄） */
     let templateCopied = $state(false);
@@ -84,13 +90,20 @@
     }
     function recognize() {
         result = parseContactText(pasteText);
-        checked = new Set();
         previewed = true;
-        /* 默认勾选：无冲突且可写的新增值（已有值默认不覆盖，用户明确选择后才写入） */
+        selectDefaults();
+    }
+    /** 默认勾选：无冲突且可写的新增值（已有值默认不覆盖，用户明确选择后才写入） */
+    function selectDefaults() {
+        checked = new Set();
         for (const [index, item] of visibleItems().entries()) {
             if (!conflict(item) && !notWritable(item)) checked.add(itemKey(item, index));
         }
     }
+    /* 外部传入 initialResult（FAST-01.3）时初始化默认勾选 */
+    $effect(() => {
+        if (initialResult) selectDefaults();
+    });
     function toggle(item: QuickFillItem, index: number) {
         const key = itemKey(item, index);
         const next = new Set(checked);

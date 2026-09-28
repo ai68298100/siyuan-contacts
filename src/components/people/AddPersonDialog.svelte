@@ -11,19 +11,24 @@
     let {
         settings,
         i18n,
+        initial,
         onCreated,
         onClose,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
+        /** FAST-01.3：识别资料后预填的初始草稿（打开快照，不随外部变化） */
+        initial?: ContactDraft;
         onCreated: (person: ContactSummary) => void;
         onClose: () => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
 
-    let draft: ContactDraft = $state(emptyDraft());
-    let tagsText: string = $state("");
+    // svelte-ignore state_referenced_locally
+    let draft: ContactDraft = $state(initial ? { ...initial, tags: [...initial.tags] } : emptyDraft());
+    // svelte-ignore state_referenced_locally
+    let tagsText: string = $state(initial ? initial.tags.join(" ") : "");
     let running: boolean = $state(false);
     let errorText: string = $state("");
     let saved = $state(false);
