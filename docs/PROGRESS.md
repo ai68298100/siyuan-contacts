@@ -646,3 +646,28 @@
   CI 绿（run 36370561511）、tag v0.2.1、GitHub Release
   https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.2.1（附 package.zip 327948B）。
   集市上架仍由用户择机处理。
+
+## 反馈批次 1：宿主样式基线与界面修正（2026-09-28）
+
+作者真实使用反馈（B01–B10，见 docs/FEEDBACK-BACKLOG.md）的第一批落地。
+
+- **C01 宿主样式基线**（`0e571f1`）：隔离 harness 注入本机思源 base.css 与 daylight/midnight
+  主题变量（`scripts/e2e/host-baseline.mjs`，CI 无思源时自动降级）；新增 `LVCT_UI_HOST=1` 回归与
+  `LVCT_HOST_BASELINE=1` 截图套件（含三个自绘浮层位）。顺带修正截图页暗色属性（data-theme →
+  data-theme-mode），此前暗色令牌覆写在隔离环境从未生效。
+- **B02 浮层显示异常修复**（`0e571f1`）：宿主基线下复现——absolute 浮层被 overflow:auto 的
+  滚动祖先裁剪，只剩右半截、观感"半透明"。新增 `src/libs/popover.ts` 定位原语（fixed + 视口
+  钳制 + 上下翻转 + Esc/外点/滚动关闭），视图/更多筛选/列设置三浮层迁移；
+  `--lvct-bg-elevated` 改按宿主 `.b3-menu` 配方桥接 `--b3-menu-background`。
+- **B09-3/5/9 移动端修正**（`c655e61`）：全局头部（搜索/新建）只在首页出现；移动端
+  `.b3-button/.b3-select/.b3-text-field` 触控目标 ≥40px（令牌此前仅 1 处应用，图标按钮用
+  透明热区补足）；底部导航短标签（关系图谱 → 关系图，`navGraphShort`）。
+- **B04 人物档案条重做**（`44f5b3c`）：徽标补「待跟进 {n}」（只计 open）与「相关人 {n}」；
+  chips 行补最近互动摘要；chips 上限 6 枚超出折叠 +N（title 带全量）；移动端紧凑化。
+- **B06 关闭守卫三选一**（`311cdfd`）：自定义弹窗（保存并离开/放弃并离开/取消）+ 改动明细，
+  替代宿主原生 confirm；新建/编辑资料接字段级明细与保存、人物详情互动备注"保存并离开"=记录
+  互动；设置/vCard/收编/批量编辑接明细。实现要点：Svelte 5 snippet 内容继承定义处上下文，
+  守卫项落在根作用域，关闭解析走「自身 → 父链 → 孤儿兜底」（`src/components/close-guard.ts`）。
+- 验证：`pnpm check` 零错误/警告；单测 140/140；桌面隔离回归 62/62、移动视口 63/63、
+  宿主样式基线 62/62（新增守卫/浮层/档案条用例）；生产构建与发布门禁通过。
+- 未验证：实际宿主、真机与多窗口按作者要求跳过；宿主基线不等于真机验收。
