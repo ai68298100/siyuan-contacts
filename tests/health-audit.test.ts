@@ -84,3 +84,41 @@ test("runHealthAudit：异常生日单列且缺生日不重复计入异常", () 
     /* 缺生日与异常生日互斥：异常名单里不重复罗列空生日 */
     assert.equal(issues.find((issue) => issue.kind === "missingBirthday"), undefined);
 });
+
+test("C04 余项：疑似重复对并入体检、长期无互动按阈值筛出", () => {
+    const roster = [
+        person({ docId: "20260927000000-dup0001", itemId: "row-dup-a", name: "张三", phone: "13800000000", group: "家人" }),
+        person({ docId: "20260927000000-dup0002", itemId: "row-dup-b", name: "张三", phone: "13800000000", group: "同事" }),
+        person({ docId: "20260927000000-old0003", itemId: "row-old-c", name: "老王", phone: "13900000000", group: "朋友" }),
+    ];
+    const now = new Date();
+    const longAgo = new Date(now);
+    longAgo.setDate(longAgo.getDate() - 120);
+    const lastInteractionAt: Record<string, number> = {
+        "20260927000000-dup0001": now.getTime(),
+        "20260927000000-dup0002": now.getTime(),
+        "20260927000000-old0003": longAgo.getTime(),
+    };
+    const duplicatePairs = [
+        { a: { itemId: "row-dup-a", name: "张三" }, b: { itemId: "row-dup-b", name: "张三" } },
+    ];
+    const issues = runHealthAudit({
+        people: roster,
+        interactionCounts: {
+            "20260927000000-dup0001": 1,
+            "20260927000000-dup0002": 1,
+            "20260927000000-old0003": 4,
+        },
+        lastInteractionAt,
+        longInactiveDays: 90,
+        duplicatePairs,
+        followUps: [],
+    });
+    const longInactive = issues.find((issue) => issue.kind === "longInactive");
+    assert.ok(longInactive, "长期无互动项缺失");
+    assert.deepEqual(longInactive.itemIds, ["row-old-c"]);
+    const duplicateSuspect = issues.find((issue) => issue.kind === "duplicateSuspect");
+    assert.ok(duplicateSuspect, "疑似重复项缺失");
+    assert.deepEqual(duplicateSuspect.itemIds, ["row-dup-a"]);
+    assert.ok(duplicateSuspect.samples[0].includes("张三"), "疑似重复样本应含人名");
+});

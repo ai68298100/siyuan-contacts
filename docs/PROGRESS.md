@@ -997,3 +997,20 @@
   52 景截图 OK；构建通过。
 - **批次 4 全部完成**（B07 双向同步 + C08 完整迁移包 + FAST-01.4 AI 结构化抽取）。
   剩余批次：批次 5（B05+C04+C05，需先过产品边界与数据契约决策门槛）。
+
+## 批次 5 第 21 轮：C04 余项并入体检 + i18n 资源键补齐（2026-09-29）
+
+- **C04 余项并入体检**（`domain/health-audit.ts` + 服务层）：新增两类巡检——`duplicateSuspect`
+  （疑似重复，复用 F13 `findDuplicatePairs` 判定，服务层传入映射后的 a/b 名册快照，样本"张三 ≈ 张三"）
+  与 `longInactive`（长期无互动：有互动记录但最近一次互动早于阈值，默认 90 天、可调、0=关闭；
+  从未互动者由缺联系方式/无分组口径覆盖不入此类）。服务层同步计算 `lastInteractionAt`（docId →
+  最近互动毫秒）。设置页「查看这 N 人」跳转扩展覆盖这两类。单测 +1（C04 余项用例）。
+  **至此 C04 全部落地**（八类+二类 = 十类只读巡检）。
+- **i18n 资源键补齐（M5 门禁提前完成）**：新增 `scripts/collect-i18n.mjs` 核对工具——扫描组件/面板
+  的 `text("KEY", "fallback")` 引用与 zh-CN 资源差集。本轮补齐全部 33 个缺失键
+  （qf*/qfCompletion*/captureAiStructured/captureAiRelationNote/captureAiExtrasDone/captureRecording/
+  dashShow*/dashLowFreqTitle/graphPickerEmpty/dataChangedWhileEditing/peopleViews 等旧漏键）到
+  zh-CN.json 与 en.json（英文同步翻译），i18n parity 测试通过。
+- 验证：单测 177/177；svelte-check 0 错误；隔离回归桌面 76/76、移动 77/77、宿主基线 76/76；
+  52 景截图 OK；构建通过。
+- **批次 5 状态**：C04 全部完成；B05/C05 类型化关系仍待作者决策门槛（D-0020：批准后另开实现）。

@@ -18,7 +18,9 @@ export type AuditIssueKind =
     | "suspiciousBirthday"
     | "danglingRelation"
     | "unreachableFollowUp"
-    | "orphanInteraction";
+    | "orphanInteraction"
+    | "duplicateSuspect"
+    | "longInactive";
 
 export interface AuditIssue {
     kind: AuditIssueKind;
@@ -36,10 +38,17 @@ export interface HealthAuditInput {
     interactionCounts: Readonly<Record<string, number>>;
     /** 全量跟进（只检查 open 状态的可达性） */
     followUps: readonly FollowUpItem[];
+    /** C04：长期无互动阈值（天，默认 90）；0/缺省 = 不检查 */
+    longInactiveDays?: number;
+    /** 人物 docId → 最近互动毫秒时间戳（服务层从互动库计算；缺条目 = 从未互动） */
+    lastInteractionAt?: Readonly<Record<string, number>>;
+    /** C04：疑似重复对（复用 F13 findDuplicatePairs 判定，服务层传入） */
+    duplicatePairs?: Readonly<{ a: { itemId: string; name: string }; b: { itemId: string; name: string } }[]>;
 }
 
 const SAMPLE_LIMIT = 5;
 const MIN_BIRTH_YEAR = 1900;
+export const DEFAULT_LONG_INACTIVE_DAYS = 90;
 
 function toIssue(kind: AuditIssueKind, reason: string, entries: { id: string; label: string }[]): AuditIssue {
     return {
@@ -58,8 +67,31 @@ export function isSuspiciousBirthday(birthday: string, now = new Date()): boolea
     return year < MIN_BIRTH_YEAR || year > now.getFullYear() + 1;
 }
 
+/**
+ * C04 长期无互动：有互动记录、但最近一次互动早于阈值（默认 90 天）的人。
+ * 从未互动的人不在此类（由缺联系方式/无分组口径覆盖）；阈值 ≤0 时不检查。
+ */
+export function findLongInactive(
+    people: readonly ContactSummary[],
+    lastInteractionAt: Readonly<Record<string, number>>,
+    longInactiveDays: number,
+    now = new Date(),
+): { id: string; label: string }[] {
+    if (longInactiveDays <= 0) return [];
+    const cutoff = new Date(now);
+    cutoff.setDate(cutoff.getDate() - longInactiveDays);
+    const cutoffMs = cutoff.getTime();
+    return people
+        .filter((person) => {
+            const last = lastInteractionAt[person.docId];
+            return last !== undefined && last < cutoffMs;
+        })
+        .map((person) => ({ id: person.itemId, label: person.name }));
+}
+
 export function runHealthAudit(input: HealthAuditInput): AuditIssue[] {
-    const { people, interactionCounts, followUps } = input;
+    const { people, interactionCounts, followUps, lastInteractionAt, duplicatePairs } = input;
+    const graceDays = input.longInactiveDays ?? DEFAULT_LONG_INACTIVE_DAYS;
     const issues: AuditIssue[] = [];
     const byItemId = new Map(people.map((person) => [person.itemId, person]));
     const byDocId = new Map(people.map((person) => [person.docId, person]));
@@ -104,5 +136,17 @@ export function runHealthAudit(input: HealthAuditInput): AuditIssue[] {
     if (dangling.length) issues.push(toIssue("danglingRelation", "以下联系人的「相关人」指向的名册行已不存在（对方可能被解绑），可在联系人页安全解绑", dangling));
     if (unreachableFollowUps.length) issues.push(toIssue("unreachableFollowUp", "以下跟进计划的人物文档已不在名册（可能被解绑），仍可完成/跳过或重建人物", unreachableFollowUps));
     if (orphanInteractions.length) issues.push(toIssue("orphanInteraction", "以下互动记录指向的人物文档不在名册中，导出与回顾仍会包含，重绑或收编后自动归位", orphanInteractions));
+    /* C04 余项并入：疑似重复（复用 F13 判定，服务层传入）与长期无互动 */
+    if (duplicatePairs && duplicatePairs.length > 0) {
+        const entries = duplicatePairs.map((pair) => ({
+            id: pair.a.itemId,
+            label: `${pair.a.name} ≈ ${pair.b.name}`,
+        }));
+        issues.push(toIssue("duplicateSuspect", "以下联系人疑似同一人（同名/同联系方式，F13 判定），请人工核对；本体检不会自动合并", entries));
+    }
+    const longInactive = findLongInactive(people, lastInteractionAt ?? {}, graceDays, new Date());
+    if (longInactive.length) {
+        issues.push(toIssue("longInactive", `以下联系人有互动记录、但最近一次互动已超过 ${graceDays} 天（可在设置调整阈值视角）`, longInactive));
+    }
     return issues;
 }

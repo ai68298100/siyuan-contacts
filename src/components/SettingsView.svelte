@@ -88,7 +88,7 @@
     }
     /* C03：可跳转联系人页聚焦的体检类（人物 itemIds 语义）；孤儿互动/不可达跟进是 docId 语义，不跳转 */
     const jumpableAuditKinds: ReadonlySet<AuditIssueKind> = new Set([
-        "missingPhone", "missingBirthday", "missingContact", "noGroupNoTags", "suspiciousBirthday", "danglingRelation",
+        "missingPhone", "missingBirthday", "missingContact", "noGroupNoTags", "suspiciousBirthday", "danglingRelation", "longInactive",
     ]);
     const auditJumpLabels: Partial<Record<AuditIssueKind, string>> = {
         missingPhone: "缺电话",
