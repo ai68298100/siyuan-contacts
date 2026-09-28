@@ -8,11 +8,13 @@
     import RelationGraph from "./graph/RelationGraph.svelte";
     import DashboardView from "./dashboard/DashboardView.svelte";
     import LvctDialog from "./LvctDialog.svelte";
-    import { createCloseScope } from "./close-guard";
+    import { createCloseScope, anyDirtyChanges } from "./close-guard";
     import { House, UsersRound, Network, Settings, Building2, Sparkles, UserPlus } from "@lucide/svelte";
     import SettingsView from "./SettingsView.svelte";
     import { onMount } from "svelte";
     import { translateText } from "../domain/translation";
+    import { subscribeDataChanged } from "../libs/data-events";
+    import StatusNotice from "./StatusNotice.svelte";
     import type { ContactsSettings } from "../domain/model";
     import type { ViewPreferences } from "../domain/preferences";
     import type { ContactSummary } from "../domain/person";
@@ -108,6 +110,23 @@
         window.addEventListener("lvct-workbench-view", handleRequestedView);
         return () => window.removeEventListener("lvct-workbench-view", handleRequestedView);
     });
+
+    // FUNC-01.7：跨窗口/宿主数据变化 → 防抖合并后 bump revision 原地刷新（筛选与 Peek 上下文保留）；
+    // 有未保存草稿时不静默：追加一条可见提示（草稿在弹窗本地状态中，列表刷新不覆盖草稿）。
+    let dataChangeNotice = $state("");
+    let dataChangeTimer = 0;
+    $effect(() => {
+        return subscribeDataChanged(() => {
+            window.clearTimeout(dataChangeTimer);
+            dataChangeTimer = window.setTimeout(() => {
+                dataChangeTimer = 0;
+                dataRevision += 1;
+                if (anyDirtyChanges()) {
+                    dataChangeNotice = text("dataChangedWhileEditing", "数据已在其他窗口更新：列表已刷新，未保存的草稿已保留。");
+                }
+            }, 400);
+        });
+    });
 </script>
 
 <div class="lvct-workbench">
@@ -155,6 +174,7 @@
                 <button type="button" class="b3-button b3-button--text" onclick={() => { selectView("people"); createRequested += 1; }}><UserPlus size={16}/>新建联系人</button>
             </div>{/if}
         </header>
+        <StatusNotice message={dataChangeNotice} onDismiss={() => (dataChangeNotice = "")} />
         <div class="lvct-workbench__body">
             {#if current === "home"}
                 <DashboardView

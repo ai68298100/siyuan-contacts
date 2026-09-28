@@ -42,6 +42,7 @@ import { previewInteractionImportDiff } from "./services/interaction-import";
 import { initExternalBridge, disposeExternalBridge } from "./bridge/external-bridge";
 import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
 import { svelteDialog } from "./libs/dialog";
+import { emitDataChanged } from "./libs/data-events";
 import type { ContactsSettings } from "./domain/model";
 import { DEFAULT_VIEW_PREFERENCES, type ViewPreferences } from "./domain/preferences";
 import type { ContactsPluginFacade, WorkbenchView } from "./types";
@@ -56,6 +57,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     private workbenchDialog: Dialog | null = null;
     private dialogInstance: ReturnType<typeof mount> | null = null;
     private requestedWorkbenchView: WorkbenchView | undefined;
+    private dataChangeTimer = 0;
 
     async onload() {
         const frontend = getFrontend();
@@ -181,10 +183,16 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     /**
      * 覆写 onDataChanged：不覆写时宿主在同步 dataChange 后会整插件重载（打卡库 D-222）。
-     * M1 只记录事件；M4 互动事件同步在此接线。
+     * FUNC-01.7：防抖合并后广播给本窗口工作台原地刷新（libs/data-events）；
+     * 跨窗口投递依赖宿主对每个窗口实例的推送（Host pending）。
      */
     onDataChanged() {
         console.debug("[lvct] storage data changed");
+        if (this.dataChangeTimer) window.clearTimeout(this.dataChangeTimer);
+        this.dataChangeTimer = window.setTimeout(() => {
+            this.dataChangeTimer = 0;
+            emitDataChanged();
+        }, 600);
     }
 
     openWorkbench(view?: WorkbenchView) {

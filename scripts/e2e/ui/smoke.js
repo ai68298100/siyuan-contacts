@@ -137,6 +137,29 @@ await test("工作台导航文字单行展示，不再被图标盒压成逐字�
     }
 });
 
+await test("数据变化通知：空闲时原地刷新，草稿编辑中刷新且给出可见提示（FUNC-01.7）", async () => {
+    let loads = 0;
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadRecentInteractions: async () => ({}), loadDashboard: async () => {
+            loads += 1;
+            return { people: loads, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+                stale: [], neverContacted: 0, neverContactedItemIds: [] };
+        } },
+    } });
+    await until(() => loads >= 1, "首页未加载");
+    window.dispatchEvent(new CustomEvent("lvct-data-changed"));
+    await until(() => loads >= 2, "数据变化通知未触发原地刷新");
+    /* 草稿编辑中：刷新不静默——提示可见、弹窗与草稿保留 */
+    button("新建联系人").click();
+    await until(() => fixture.querySelector(".lvct-form input[type=text]"), "新建弹窗未打开");
+    input(fixture.querySelector(".lvct-form input[type=text]"), "跨窗口编辑中");
+    window.dispatchEvent(new CustomEvent("lvct-data-changed"));
+    await until(() => fixture.textContent.includes("数据已在其他窗口更新"), "编辑中数据变化未给出可见提示");
+    assert(fixture.querySelector(".lvct-form input[type=text]")?.value === "跨窗口编辑中", "提示后草稿丢失");
+});
+
 await test("新建草稿关闭前三选一：取消保留草稿，放弃后关闭且弹窗列明细", async () => {
     const guardDialog = () => document.body.querySelector(".lvct-closeguard");
     try {

@@ -77,9 +77,17 @@ function createRegistryScope(): CloseScope {
         hasBlocked: () => [...items].some((item) => item.busy()),
         dirtyChanges: () => aggregate(items),
         requestClose: () => requestScopeClose(aggregate(items)),
-        addItem: (item) => items.add(item),
-        removeItem: (item) => items.delete(item),
+        addItem: (item) => { items.add(item); allGuardItems.add(item); },
+        removeItem: (item) => { items.delete(item); allGuardItems.delete(item); },
     };
+}
+
+/** FUNC-01.7：跨作用域的脏草稿全量查询（工作台数据变化提示用）。
+ *  项在守卫组件卸载时经 removeItem 移除，注册表不留悬挂项。 */
+const allGuardItems = new Set<CloseGuardItem>();
+
+export function anyDirtyChanges(): CloseGuardSummary | null {
+    return aggregate(allGuardItems);
 }
 
 /** 无上下文的独立挂载内容（svelteDialog 直挂的弹窗等）兜底作用域 */
