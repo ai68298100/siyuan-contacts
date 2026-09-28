@@ -44,15 +44,19 @@ try {
     console.log(`隔离浏览器临时目录：${profile}`);
     browser = spawn(browserPath, [
         "--headless=new", "--no-first-run", "--no-default-browser-check", "--disable-gpu",
+        // Linux runner（无 user-namespace）上 Chromium 必须关闭沙箱才能启动
+        "--no-sandbox", "--disable-dev-shm-usage",
         "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank",
-    ], { stdio: "ignore", windowsHide: true });
+    ], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
+    let chromeStartupError = "";
+    browser.stderr?.on("data", (chunk) => { chromeStartupError += chunk.toString(); });
     let debugPort;
     for (let attempt = 0; attempt < 100; attempt++) {
         const portFile = join(profile, "DevToolsActivePort");
         if (existsSync(portFile)) { debugPort = Number(readFileSync(portFile, "utf8").split(/\r?\n/)[0]); break; }
         await new Promise((resolveWait) => setTimeout(resolveWait, 100));
     }
-    if (!debugPort) throw new Error("浏览器调试端口未启动");
+    if (!debugPort) throw new Error("浏览器调试端口未启动" + (chromeStartupError ? `：${chromeStartupError.slice(0, 300)}` : ""));
     const targets = await fetch(`http://127.0.0.1:${debugPort}/json/list`).then((response) => response.json());
     const page = targets.find((target) => target.type === "page");
     if (!page) throw new Error("未找到隔离测试页面");
