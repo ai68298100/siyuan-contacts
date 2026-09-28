@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeBirthday, normalizePhone, parseContactText, quickFillValues } from "../src/domain/quick-fill.ts";
+import { normalizeBirthday, normalizePhone, parseContactText, quickFillValues, CONTACT_TEMPLATE } from "../src/domain/quick-fill.ts";
 
 function fields(text: string) {
     return parseContactText(text);
@@ -81,4 +81,37 @@ test("parseContactText：重复粘贴幂等，空输入返回空结果", () => {
     const input = "张三\n手机：13800138000";
     assert.deepEqual(fields(input), fields(input));
     assert.deepEqual(fields(""), { items: [], unrecognized: [] });
+});
+
+test("parseContactText：Markdown frontmatter 剥壳，围栏不误识别（FAST-01.2）", () => {
+    const result = fields("---\nname: 张三\nphone: 13800138000\n---\n正文段落没有固定格式");
+    assert.deepEqual(quickFillValues(result, "name"), ["张三"]);
+    assert.deepEqual(quickFillValues(result, "phone"), ["13800138000"]);
+    assert.deepEqual(result.unrecognized, ["正文段落没有固定格式"]);
+});
+
+test("parseContactText：TSV 表格一行按单元格推断（FAST-01.2）", () => {
+    const result = fields("王五\t13922223333\tb@x.com");
+    assert.deepEqual(quickFillValues(result, "name"), ["王五"]);
+    assert.deepEqual(quickFillValues(result, "phone"), ["13922223333"]);
+    assert.deepEqual(quickFillValues(result, "email"), ["b@x.com"]);
+});
+
+test("parseContactText：模板空键占位行静默忽略，已填键正常识别（FAST-01.2）", () => {
+    const result = fields("姓名：赵六\n手机：\n微信：\n邮箱：zhao@x.com");
+    assert.deepEqual(quickFillValues(result, "name"), ["赵六"]);
+    assert.deepEqual(quickFillValues(result, "email"), ["zhao@x.com"]);
+    assert.deepEqual(result.unrecognized, []);
+});
+
+test("parseContactText：纯标点/分隔线不猜姓名（FAST-01.2）", () => {
+    const result = fields("手机：13800138000\n———\n***");
+    assert.deepEqual(quickFillValues(result, "name"), []);
+    assert.deepEqual(quickFillValues(result, "phone"), ["13800138000"]);
+});
+
+test("CONTACT_TEMPLATE：覆盖全部契约字段的中文键（FAST-01.2）", () => {
+    for (const key of ["姓名", "手机", "微信", "邮箱", "生日", "网站", "分组", "标签"]) {
+        assert(CONTACT_TEMPLATE.includes(`${key}：`), `模板缺 ${key}`);
+    }
 });

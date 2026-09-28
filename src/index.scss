@@ -1483,6 +1483,12 @@
     white-space: nowrap;
 }
 
+.lvct-qf__copy {
+    margin-left: var(--lvct-sp-2);
+    padding: 2px 6px;
+    font-size: var(--lvct-fs-micro);
+}
+
 .lvct-qf__unrecognized {
     border: 1px dashed var(--lvct-border-subtle);
     border-radius: var(--lvct-r-sm);

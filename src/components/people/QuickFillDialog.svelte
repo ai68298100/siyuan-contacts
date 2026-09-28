@@ -1,7 +1,7 @@
 <script lang="ts">
     /** FAST-01.1 粘贴并识别：本地解析（domain/quick-fill）→ 分组预览 → 用户勾选后才回填草稿。
      *  不直接写库：onApply 只把勾选项交给调用方的草稿，B06 守卫与既有保存路径继续生效。 */
-    import { parseContactText } from "../../domain/quick-fill";
+    import { parseContactText, CONTACT_TEMPLATE } from "../../domain/quick-fill";
     import type { QuickFillItem } from "../../domain/quick-fill";
     import LvctDialog from "../LvctDialog.svelte";
     import { translateText } from "../../domain/translation";
@@ -43,6 +43,17 @@
     let previewed = $state(false);
     let result = $state<ReturnType<typeof parseContactText> | null>(null);
     let checked = $state(new Set<string>());
+    /* FAST-01.2：可复制空白模板（剪贴板不可用时静默，用户仍可从文档手抄） */
+    let templateCopied = $state(false);
+    let templateTimer: ReturnType<typeof setTimeout> | undefined;
+    async function copyTemplate() {
+        try {
+            await navigator.clipboard.writeText(CONTACT_TEMPLATE);
+            templateCopied = true;
+            clearTimeout(templateTimer);
+            templateTimer = setTimeout(() => (templateCopied = false), 2000);
+        } catch { /* 非安全上下文等场景忽略 */ }
+    }
 
     function fieldLabel(item: QuickFillItem): string {
         return text(FIELD_LABELS[item.field], FIELD_FALLBACKS[item.field]);
@@ -118,7 +129,12 @@
 <LvctDialog title={text("qfTitle", "粘贴并识别")} onClose={onClose}>
     <div class="lvct-qf">
         {#if !previewed}
-            <p class="ft__smaller ft__on-surface">{text("qfIntro", "粘贴名片文字、聊天记录或键值清单；识别在本机完成，结果经你确认后才会填入表单。")}</p>
+            <p class="ft__smaller ft__on-surface">
+                {text("qfIntro", "粘贴名片文字、聊天记录或键值清单；识别在本机完成，结果经你确认后才会填入表单。")}
+                <button type="button" class="b3-button b3-button--text lvct-qf__copy" onclick={copyTemplate}>
+                    {templateCopied ? text("qfCopied", "已复制 ✓") : text("qfCopyTemplate", "复制空白模板")}
+                </button>
+            </p>
             <textarea class="b3-text-field fn__block lvct-qf__input" rows="7"
                 placeholder={text("qfPlaceholder", "张三\n手机：13800138000\n微信：zhang_san\n邮箱：a@example.com")}
                 bind:value={pasteText}></textarea>

@@ -157,14 +157,39 @@ function parseBareToken(token: string, isFirstNameCandidate: boolean): QuickFill
         const phone = normalizePhone(token);
         if (phone) return { field: "phone", value: phone.value, raw: token, confidence: "likely", ...(phone.note ? { note: phone.note } : {}) };
     }
-    if (isFirstNameCandidate && /^[^\d@:：#，。；！？,.;!?]{1,20}$/.test(token)) {
-        return { field: "name", value: token, raw: token, confidence: "likely" };
+    if (isFirstNameCandidate && /^[^\d@:：#，。；！？,.;!?]{1,20}$/.test(token) && /\p{L}/u.test(token)) {
+        /* 姓名候选：不含键值/句读标点、至少含一个 Unicode 字母/汉字；
+           纯中文限长 ≤6（过滤整句正文），含拉丁字母的音译可到 20 */
+        const isPureCJK = /^[\u4e00-\u9fa5·]+$/.test(token);
+        if (isPureCJK ? token.length <= 6 : true) {
+            return { field: "name", value: token, raw: token, confidence: "likely" };
+        }
     }
     return null;
 }
 
 /** 行首列表序号/项目符号：`1.` `、` `)` `•` `-` 等 */
 const LIST_MARKER_RE = /^(?:\d{1,3}[.、)）]|[•·\-–*])\s+/;
+
+/** FAST-01.2：Markdown frontmatter 剥壳——`---` 围栏内的行按正常键值解析，围栏本身忽略 */
+function stripFrontmatter(lines: string[]): string[] {
+    if (lines[0]?.trim() !== "---") return lines;
+    const end = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
+    if (end === -1) return lines;
+    return [...lines.slice(1, end), ...lines.slice(end + 1)];
+}
+
+/** FAST-01.2：可复制的联系人模板（与字段契约同步；用户粘贴后逐键填值再「识别」） */
+export const CONTACT_TEMPLATE = [
+    "姓名：",
+    "手机：",
+    "微信：",
+    "邮箱：",
+    "生日：",   // YYYY-MM-DD，农历写「农历 2001-01-01」
+    "网站：",
+    "分组：",
+    "标签：",
+].join("\n");
 
 /**
  * 解析粘贴文本（FAST-01.1）。多行键值与单行 `张三 13800138000 wx:zhang_san` 均可；
@@ -173,19 +198,19 @@ const LIST_MARKER_RE = /^(?:\d{1,3}[.、)）]|[•·\-–*])\s+/;
 export function parseContactText(text: string): QuickFillResult {
     const items: QuickFillItem[] = [];
     const unrecognized: string[] = [];
-    const lines = text.split(/\r?\n/);
+    const lines = stripFrontmatter(text.split(/\r?\n/));
     for (const line of lines) {
         const trimmed = line.trim().replace(LIST_MARKER_RE, "");
         if (!trimmed) continue;
 
-        /* 1) 行级「键: 值」 */
-        const lineKV = trimmed.match(/^([^：:＝=｜|]{1,8})[：:＝=｜|]\s*(.+)$/);
+        /* 1) 行级「键: 值」（值允许为空：模板占位行） */
+        const lineKV = trimmed.match(/^([^：:＝=｜|]{1,8})[：:＝=｜|]\s*(.*)$/);
         if (lineKV) {
             const field = lookupKey(lineKV[1]);
             if (field) {
+                if (!lineKV[2].trim()) continue; /* 模板空键占位行：静默忽略 */
                 const parsed = parseKeyedValue(field, lineKV[2], trimmed);
-                if (parsed.length) { items.push(...parsed); continue; }
-                unrecognized.push(trimmed);
+                if (parsed.length) { items.push(...parsed); } else { unrecognized.push(trimmed); }
                 continue;
             }
         }
