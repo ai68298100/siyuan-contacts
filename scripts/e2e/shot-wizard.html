@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>初始化向导截图</title>
+<style>
+    :root {
+        --b3-theme-background: #fff; --b3-theme-surface: #f5f5f5;
+        --b3-theme-surface-lighter: #efefef;
+        --b3-theme-on-background: #222; --b3-theme-on-surface: #444;
+        --b3-theme-on-surface-light: #888; --b3-theme-primary: #6366f1;
+        --b3-theme-primary-lightest: #e8e9fe; --b3-theme-on-primary: #fff;
+        --b3-border-color: #e2e2e2; --b3-list-hover: #eee;
+        --b3-list-icon-hover: #e6e6e6; --b3-theme-error: #d32f2f;
+        --b3-theme-success: #23b27c; --b3-theme-info: #3b82f6;
+        --b3-font-family: inherit;
+    }
+    body { margin: 0; background: var(--b3-theme-background); color: var(--b3-theme-on-background); }
+    #shot { width: 100%; min-height: 100vh; }
+    button, input, select { font: inherit; }
+    .b3-button { border: 0; padding: 7px 12px; background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); cursor: pointer; }
+    .b3-button--text { background: var(--b3-theme-primary); }
+    .b3-button--cancel { background: var(--b3-theme-surface); color: var(--b3-theme-on-background); }
+    .b3-text-field { background: var(--b3-theme-background); color: var(--b3-theme-on-background); border: 1px solid var(--b3-border-color); padding: 6px; box-sizing: border-box; width: 100%; }
+    .ft__smaller { font-size: 12px; }
+    .ft__on-surface { color: var(--b3-theme-on-surface-light); }
+    html[data-theme="dark"] { --b3-theme-background: #202124; --b3-theme-surface: #303136; --b3-theme-surface-lighter: #393a40; --b3-theme-on-background: #f2f2f3; --b3-theme-on-surface: #d4d5d8; --b3-theme-on-surface-light: #aaaeb5; --b3-theme-primary: #7c8aff; --b3-theme-primary-lightest: #343957; --b3-theme-on-primary: #10121d; --b3-border-color: #484a50; --b3-list-hover: #383a42; --b3-list-icon-hover: #454751; }
+</style></head>
+<body>
+<div id="shot" class="lvct-tab-root"></div>
+<script type="module">
+    import { mount } from "svelte";
+    import "../../src/index.scss";
+    import InitWizard from "../../src/components/InitWizard.svelte";
+
+    const params = new URLSearchParams(location.search);
+    const state = params.get("state") || "reuse";
+    if (params.get("theme") === "dark") document.documentElement.dataset.theme = "dark";
+
+    const snapshot = {
+        notebooks: [{ id: "20260928000000-book001", name: "人脉" }],
+        notebook: { id: "20260928000000-book001", name: "人脉" },
+        hostDocId: "20260928000000-host001",
+        dbBlockId: "20260928000000-block01",
+        avId: "20260928000000-av00001",
+        existingFields: ["生日", "农历生日", "电话", "相关人"],
+    };
+    let attempts = 0;
+    const facade = {
+        settings: null, viewPreferences: {}, isMobile: false,
+        previewInitialize: async () => snapshot,
+        initialize: async (_name, onProgress) => {
+            attempts += 1;
+            onProgress({ key: "wizardStepNotebookReuse", values: { name: "人脉", count: 1 } });
+            onProgress({ key: "wizardStepDocReuse", values: { name: "联系人总表" } });
+            onProgress({ key: "wizardStepDbReuse" });
+            onProgress({ key: "wizardStepFieldsKept", values: { count: 4 } });
+            onProgress({ key: "wizardStepFieldCreate", values: { name: "邮箱" } });
+            if (attempts === 1) throw new Error("创建字段「邮箱」失败：kernel code=-1");
+            return { schemaVersion: 1, notebookName: "人脉", initializedAt: new Date().toISOString(), fieldMap: {} };
+        },
+    };
+
+    mount(InitWizard, {
+        target: document.getElementById("shot"),
+        props: { facade, i18n: state === "en" ? undefined : undefined, onInitialized() {} },
+    });
+
+    const waitFor = async (predicate, timeout = 4000) => {
+        const until = Date.now() + timeout;
+        while (Date.now() < until) {
+            if (predicate()) return true;
+            await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        return false;
+    };
+
+    setTimeout(async () => {
+        if (state === "failed" || state === "failed-en") {
+            const button = [...document.querySelectorAll("button")].find((node) => node.textContent.trim() === "开始初始化");
+            button?.click();
+            await waitFor(() => document.body.textContent.includes("初始化失败"));
+        } else {
+            await waitFor(() => document.body.textContent.includes("将复用"));
+        }
+        document.title = "READY";
+    }, 400);
+    window.__ready = true;
+</script>
+</body>
+</html>

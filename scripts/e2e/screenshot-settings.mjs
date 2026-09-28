@@ -104,6 +104,16 @@ try {
             }
         }
     }
+    for (const state of selectedView ? [] : ["reuse", "failed"]) {
+        for (const [viewport, size] of [["desktop", "1280,900"], ["mobile", "390,844"]]) {
+            for (const theme of ["light", "dark"]) {
+                const url = `http://127.0.0.1:${port}/scripts/e2e/shot-wizard.html?state=${state}&theme=${theme}`;
+                const ok = await capture({ url, size, outFile: join(outDir, `wizard-${state}-${viewport}-${theme}.png`) });
+                console.log(`wizard ${state} ${viewport} ${theme}: ${ok ? "OK" : "FAIL"}`);
+                if (!ok) process.exitCode = 1;
+            }
+        }
+    }
     for (const view of selectedView ? [selectedView] : ["home", "people", "table", "peek", "graph"]) {
         for (const [viewport, size] of [["desktop", "1280,900"], ["mobile", "390,844"]]) {
             for (const theme of ["light", "dark"]) {
