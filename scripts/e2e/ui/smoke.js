@@ -363,6 +363,33 @@ await test("移动端工具栏收纳：常驻搜索/视图切换/新建，其余
     await until(() => fixture.textContent.includes("共 1 人"), "弹层内分组筛选未生效");
 });
 
+await test("移动端人物卡片内容自适应，min-height 收缩且空 chips 收起（B09-2）", async () => {
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") return renderResult();
+        return { code: 0 };
+    };
+    mounted = mount(PeopleView, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        loadRecentInteractions: async () => ({}),
+        revision: 0, initialSort: "name", isMobile: window.innerWidth <= 640,
+        onOpenDetail() {}, onOpenPersonDoc() {},
+        onPreferencesChange: async (next) => next,
+    } });
+    await until(() => fixture.querySelector(".lvct-person-card"), "卡片未渲染");
+    const card = fixture.querySelector(".lvct-person-card");
+    if (window.innerWidth <= 640) {
+        const minHeight = Number.parseFloat(getComputedStyle(card).minHeight);
+        assert(minHeight < 100, `移动端卡片 min-height 应收缩（当前 ${minHeight}px）`);
+        const height = card.getBoundingClientRect().height;
+        assert(height <= 140, `移动端空资料卡片高度应 ≤140px（当前 ${Math.round(height)}px）`);
+        /* 生日未填、无联系方式、无分组标签：meta 只剩互动行、chips 行不渲染 */
+        assert(!card.querySelector(".lvct-person-card__tags"), "空分组/标签时 chips 行未收起");
+    } else {
+        const minHeight = Number.parseFloat(getComputedStyle(card).minHeight);
+        assert(minHeight >= 172, `桌面网格对齐下限不应受影响（当前 ${minHeight}px）`);
+    }
+});
+
 await test("新建草稿关闭前三选一：取消保留草稿，放弃后关闭且弹窗列明细", async () => {
     const guardDialog = () => document.body.querySelector(".lvct-closeguard");
     try {

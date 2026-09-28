@@ -2907,3 +2907,18 @@
     .lvct-detail > .lvct-form__actions { flex-wrap: wrap; }
 }
 
+/* B09-2：人物卡片移动自适应——置于 .lvct-person-card 主定义之后以覆盖桌面 172px 下限
+   （媒体查询不增加特异性，靠源顺序取胜） */
+@media (max-width: 640px) {
+    .lvct-person-card {
+        min-height: 0;
+        gap: var(--lvct-sp-2);
+        padding: var(--lvct-sp-2) var(--lvct-sp-3);
+    }
+    .lvct-person-card__avatar {
+        width: var(--lvct-avatar-sm);
+        height: var(--lvct-avatar-sm);
+        font-size: var(--lvct-fs-title);
+    }
+}
+
