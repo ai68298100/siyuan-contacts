@@ -2554,6 +2554,19 @@
     gap: var(--lvct-sp-2);
 }
 
+/* B09-7：工作空间/联动低频区块——桌面强制展开隐藏 summary；移动端 details 默认收起可展开 */
+.lvct-dash__lowfreq > summary {
+    cursor: pointer;
+    color: var(--lvct-text-2);
+    font-size: var(--lvct-fs-caption);
+    padding: var(--lvct-sp-1) 0;
+}
+
+@media (min-width: 641px) {
+    .lvct-dash__lowfreq > summary { display: none; }
+    .lvct-dash__lowfreq:not([open]) > .lvct-dash__grid { display: grid; }
+}
+
 .lvct-dash__row {
     display: flex;
     align-items: center;
@@ -2970,6 +2983,11 @@
 /* B09-2：人物卡片移动自适应——置于 .lvct-person-card 主定义之后以覆盖桌面 172px 下限
    （媒体查询不增加特异性，靠源顺序取胜） */
 @media (max-width: 640px) {
+    /* B09-6：待办跟进按钮组换行不再错位 */
+    .lvct-dash__fu-actions {
+        flex-wrap: wrap;
+        row-gap: var(--lvct-sp-1);
+    }
     .lvct-person-card {
         min-height: 0;
         gap: var(--lvct-sp-2);

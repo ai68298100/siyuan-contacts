@@ -82,6 +82,28 @@
 
     // ---- B08 行内快捷处置（生日跳过本年 / 久未联系顺延与不再提醒 / 从未互动跳过今天） ----
     let rowMenuKey = $state("");
+    // C06：会话内撤销——只保留最近一次操作的反向闭包，跨刷新/重启不保留
+    let undoAction: { run: () => Promise<void> } | null = $state(null);
+    function setUndo(message: string, run: () => Promise<void>): void {
+        alMessage = message;
+        undoAction = { run };
+    }
+    async function runUndo(): Promise<void> {
+        const action = undoAction;
+        if (!action || alBusy) return;
+        alBusy = true;
+        alError = "";
+        try {
+            await action.run();
+            undoAction = null;
+            alMessage = "已撤销";
+            await refresh();
+        } catch (error) {
+            alError = error instanceof Error ? error.message : String(error);
+        } finally {
+            alBusy = false;
+        }
+    }
     function toggleRowMenu(key: string): void {
         rowMenuKey = rowMenuKey === key ? "" : key;
     }
@@ -90,20 +112,43 @@
     }
     async function dismissBirthday(person: ContactSummary): Promise<void> {
         const year = new Date().getFullYear();
-        await facade.dismissReminder(person.docId, "birthday", `${year}-12-31`);
-        alMessage = `已跳过「${person.name}」本年生日提醒，跨年自动恢复`;
+        const until = `${year}-12-31`;
+        /* C06：覆盖已有暂缓前先快照，撤销时精确恢复 */
+        const previous = (await facade.loadReminderDismissals())
+            .find((entry) => entry.personDocId === person.docId && entry.kind === "birthday");
+        await facade.dismissReminder(person.docId, "birthday", until);
+        setUndo(
+            `已跳过「${person.name}」本年生日提醒，跨年自动恢复`,
+            previous
+                ? () => facade.dismissReminder(person.docId, "birthday", previous.until)
+                : () => facade.resumeReminder(person.docId, "birthday"),
+        );
         rowMenuKey = "";
         await refresh();
     }
     async function dismissStaleReminder(person: ContactSummary): Promise<void> {
+        const previous = (await facade.loadReminderDismissals())
+            .find((entry) => entry.personDocId === person.docId && entry.kind === "stale");
         await facade.dismissReminder(person.docId, "stale", "");
-        alMessage = `已不再提醒「${person.name}」，可在设置-提醒中恢复`;
+        setUndo(
+            `已不再提醒「${person.name}」，可在设置-提醒中恢复`,
+            previous
+                ? () => facade.dismissReminder(person.docId, "stale", previous.until)
+                : () => facade.resumeReminder(person.docId, "stale"),
+        );
         rowMenuKey = "";
         await refresh();
     }
     async function dismissNeverToday(person: ContactSummary): Promise<void> {
+        const previous = (await facade.loadReminderDismissals())
+            .find((entry) => entry.personDocId === person.docId && entry.kind === "stale");
         await facade.dismissReminder(person.docId, "stale", toLocalToday());
-        alMessage = `今天先跳过「${person.name}」的提醒`;
+        setUndo(
+            `今天先跳过「${person.name}」的提醒`,
+            previous
+                ? () => facade.dismissReminder(person.docId, "stale", previous.until)
+                : () => facade.resumeReminder(person.docId, "stale"),
+        );
         rowMenuKey = "";
         await refresh();
     }
@@ -113,7 +158,19 @@
         const existing = await facade.getPersonCadence(person.docId);
         const target = Math.min(365, lastDays + days);
         await facade.savePersonCadence(person.docId, { days: target, paused: existing?.paused ?? false });
-        alMessage = `「${person.name}」已顺延：${target} 天内不再提醒`;
+        setUndo(
+            `「${person.name}」已顺延：${target} 天内不再提醒`,
+            () => facade.savePersonCadence(person.docId, existing),
+        );
+        rowMenuKey = "";
+        await refresh();
+    }
+    async function createFollowUpFor(person: ContactSummary): Promise<void> {
+        const due = addDaysToToday(7);
+        await facade.createFollowUp(person.docId, "联系一下", due);
+        /* C07：默认标题「联系一下」+7 天（D-0020）；不自动为生日/久未联系批量生成 */
+        alMessage = `已为「${person.name}」建跟进「联系一下」，到期 ${due}`;
+        undoAction = null;
         rowMenuKey = "";
         await refresh();
     }
@@ -260,6 +317,7 @@
         try {
             await action();
             fuMessage = message;
+            console.log("[lvct-debug] fuMessage set:", message, "undo:", Boolean(undoAction));
             await refresh();
         } catch (error) {
             fuError = error instanceof Error ? error.message : String(error);
@@ -267,19 +325,30 @@
             fuBusy = false;
         }
     }
-    const completeFollowUp = (id: string, title: string) => runFollowUp(() => facade.setFollowUpStatus(id, "done"), `已完成「${title}」`);
-    const skipFollowUp = (id: string, title: string) => runFollowUp(() => facade.setFollowUpStatus(id, "cancelled"), `已跳过「${title}」，可在人物详情中重新打开`);
-    const snoozeFollowUp = (id: string, option: "tomorrow" | "threeDays" | "nextMonday" | "nextMonth", label: string, title: string) =>
+    const completeFollowUp = (id: string, title: string) => runFollowUp(async () => {
+        /* C06：完成可撤销（待办列表只列 open，恢复即重新打开） */
+        await facade.setFollowUpStatus(id, "done");
+        setUndo(`已完成「${title}」`, () => facade.setFollowUpStatus(id, "open"));
+    }, `已完成「${title}」`);
+    const skipFollowUp = (id: string, title: string) => runFollowUp(async () => {
+        await facade.setFollowUpStatus(id, "cancelled");
+        setUndo(`已跳过「${title}」，可在人物详情中重新打开`, () => facade.setFollowUpStatus(id, "open"));
+    }, `已跳过「${title}」，可在人物详情中重新打开`);
+    const snoozeFollowUp = (id: string, option: "tomorrow" | "threeDays" | "nextMonday" | "nextMonth", label: string, title: string, previousDueDate: string) =>
         runFollowUp(async () => {
             await facade.snoozeFollowUp(id, option);
+            /* C06：推迟可撤销（恢复原到期日） */
+            setUndo(`已将「${title}」推迟到${label}`, () => facade.snoozeFollowUp(id, "custom", previousDueDate));
             fuSnoozeForId = "";
         }, `已将「${title}」推迟到${label}`);
-    const snoozeFollowUpCustom = (id: string, title: string) =>
-        runFollowUp(async () => {
-            await facade.snoozeFollowUp(id, "custom", fuCustomDate);
-            fuSnoozeForId = "";
-            fuCustomDate = "";
-        }, `已将「${title}」推迟到指定日期`);
+    const snoozeFollowUpCustom = (id: string, title: string) => runFollowUp(async () => {
+        /* 推迟前的到期日快照必须在动作前取（此后 refresh 会覆盖 data） */
+        const previousDue = (data?.followUps ?? []).find((entry) => entry.item.id === id)?.item.dueDate ?? toLocalToday();
+        await facade.snoozeFollowUp(id, "custom", fuCustomDate);
+        setUndo(`已将「${title}」推迟到指定日期`, () => facade.snoozeFollowUp(id, "custom", previousDue));
+        fuSnoozeForId = "";
+        fuCustomDate = "";
+    }, `已将「${title}」推迟到指定日期`);
 
     // ---- 今日行动清单（F07） ----
     let alBusy = $state(false);
@@ -419,7 +488,7 @@
                 {/if}
             </div>
             <StatusNotice message={alError ? text("dashOpFailed", "操作失败：{msg}", { msg: alError }) : ""} error />
-            <StatusNotice message={alMessage} onDismiss={() => (alMessage = "")} />
+            <StatusNotice message={alMessage} actionLabel={undoAction ? "撤销" : undefined} onAction={undoAction ? runUndo : undefined} onDismiss={() => { alMessage = ""; undoAction = null; }} />
             {#if actions.length === 0}
                 <ViewState compact icon="✅" title={text("dashActionsEmptyTitle", "今天没有需要处理的事")} description={text("dashActionsEmptyDesc", "生日、联系节奏和跟进计划都安顿好了。")}>
                     <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>{text("dashBrowsePeople", "浏览联系人")}</button>
@@ -439,25 +508,28 @@
                             <button class="b3-button b3-button--outline lvct-dash__quick-button" onclick={() => onOpenDetail(card.person)}>
                                 {card.bucket === "stale" ? text("dashTakeALook", "去看看") : text("dashProcess", "处理")}
                             </button>
-                            {#if card.bucket === "stale"}
-                                <button
-                                    class="b3-button b3-button--outline lvct-dash__quick-button"
-                                    aria-label={`更多处置：${card.person.name}`}
-                                    aria-expanded={rowMenuKey === `action:${card.person.docId}`}
-                                    onclick={() => toggleRowMenu(`action:${card.person.docId}`)}
-                                >⋯</button>
-                            {/if}
+                            <button
+                                class="b3-button b3-button--outline lvct-dash__quick-button"
+                                aria-label={`更多处置：${card.person.name}`}
+                                aria-expanded={rowMenuKey === `action:${card.person.docId}`}
+                                onclick={() => toggleRowMenu(`action:${card.person.docId}`)}
+                            >⋯</button>
                         </div>
                         {#if rowMenuKey === `action:${card.person.docId}`}
                             <div class="lvct-dash__quick-form lvct-dash__rowmenu">
                                 {#if isNeverCard(card)}
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => dismissNeverToday(card.person))}>今天先跳过</button>
-                                {:else}
+                                {:else if card.bucket === "stale"}
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(card.person, 3))}>顺延 3 天</button>
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(card.person, 7))}>顺延 1 周</button>
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(card.person, 30))}>顺延 1 个月</button>
+                                {:else if card.reasons.some((reason) => reason.kind === "birthday")}
+                                    <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => dismissBirthday(card.person))}>跳过本年</button>
                                 {/if}
-                                <button class="b3-button b3-button--cancel" disabled={alBusy} onclick={() => runRowAction(() => dismissStaleReminder(card.person))}>不再提醒</button>
+                                <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => createFollowUpFor(card.person))}>建跟进（联系一下）</button>
+                                {#if card.bucket === "stale"}
+                                    <button class="b3-button b3-button--cancel" disabled={alBusy} onclick={() => runRowAction(() => dismissStaleReminder(card.person))}>不再提醒</button>
+                                {/if}
                             </div>
                         {/if}
                     </div>
@@ -623,10 +695,10 @@
                                 </button>
                                 {#if fuSnoozeForId === card.item.id}
                                     <div class="lvct-dash__quick-form">
-                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "tomorrow", text("dashSnoozeTomorrow", "明天"), card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashSnoozeTomorrow", "明天")}</button>
-                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "threeDays", text("dashSnoozeThreeDays", "三天后"), card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashSnoozeThreeDays", "三天后")}</button>
-                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "nextMonday", text("dashSnoozeNextMonday", "下周一"), card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashSnoozeNextMonday", "下周一")}</button>
-                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "nextMonth", text("dashSnoozeNextMonth", "一个月后"), card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashSnoozeNextMonth", "一个月后")}</button>
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "tomorrow", text("dashSnoozeTomorrow", "明天"), card.item.title || text("dashKeepInTouch", "保持联系"), card.item.dueDate)}>{text("dashSnoozeTomorrow", "明天")}</button>
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "threeDays", text("dashSnoozeThreeDays", "三天后"), card.item.title || text("dashKeepInTouch", "保持联系"), card.item.dueDate)}>{text("dashSnoozeThreeDays", "三天后")}</button>
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "nextMonday", text("dashSnoozeNextMonday", "下周一"), card.item.title || text("dashKeepInTouch", "保持联系"), card.item.dueDate)}>{text("dashSnoozeNextMonday", "下周一")}</button>
+                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => snoozeFollowUp(card.item.id, "nextMonth", text("dashSnoozeNextMonth", "一个月后"), card.item.title || text("dashKeepInTouch", "保持联系"), card.item.dueDate)}>{text("dashSnoozeNextMonth", "一个月后")}</button>
                                         <input type="date" class="b3-text-field" aria-label={text("dashSnoozeDateLabel", "指定推迟日期")} bind:value={fuCustomDate} disabled={fuBusy} />
                                         <button class="b3-button b3-button--text" disabled={fuBusy || !fuCustomDate} onclick={() => snoozeFollowUpCustom(card.item.id, card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashSnoozeByDate", "按日期")}</button>
                                         <button class="b3-button b3-button--cancel" onclick={() => { fuSnoozeForId = ""; fuCustomDate = ""; }} disabled={fuBusy}>{text("dashCollapse", "收起")}</button>
@@ -654,7 +726,10 @@
             </div>
         </div>
 
-        <div class="lvct-dash__grid">
+        <!-- B09-7：工作空间/联动为低频区块——移动端默认折叠（details），桌面强制展开 -->
+        <details class="lvct-dash__lowfreq">
+            <summary>{text("dashLowFreqTitle", "工作空间与联动")}</summary>
+            <div class="lvct-dash__grid">
             <div class="lvct-home__card">
                 <h3>{text("dashWorkspaceTitle", "工作空间")}</h3>
                 <div class="lvct-home__row"><span class="ft__on-surface">{text("dashNotebookLabel", "笔记本")}</span><b>{facade.settings?.notebookName ?? "—"}</b></div>
@@ -676,7 +751,8 @@
                     <p class="ft__smaller ft__on-surface">安装小驴打卡后，生日可同步为打卡事项提醒。</p>
                 {/if}
             </div>
-        </div>
+            </div>
+        </details>
     {/if}
 </div>
 

@@ -363,6 +363,65 @@ await test("移动端工具栏收纳：常驻搜索/视图切换/新建，其余
     await until(() => fixture.textContent.includes("共 1 人"), "弹层内分组筛选未生效");
 });
 
+await test("行动区一键建跟进与处置撤销（C07/C06）", async () => {
+    const created = [];
+    const dismissals = [];
+    const personOf = (name) => ({
+        docId: `20260927000000-${name}0000`, itemId: `row-${name}`, name,
+        phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
+        group: "", tags: [], relatedItemIds: [],
+    });
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadRecentInteractions: async () => ({}),
+            loadDashboard: async () => ({
+                people: 1, relations: 0,
+                birthdays: [{ person: personOf("寿星甲"), bucket: "today", projection: { daysUntil: 0, label: "9月29日" } }],
+                birthdaysThisWeek: 1, stale: [], staleTotal: 0, neverContacted: 0, neverContactedItemIds: [],
+                followUps: [], actions: [
+                    { person: personOf("寿星甲"), bucket: "today", reasons: [
+                        { kind: "birthday", label: "今天生日", bucket: "today" },
+                    ] },
+                ],
+            }),
+            loadReminderDismissals: async () => [...dismissals],
+            dismissReminder: async (docId, kind, until) => dismissals.push({ docId, kind, until }),
+            resumeReminder: async (docId, kind) => {
+                const index = dismissals.findIndex((entry) => entry.docId === docId && entry.kind === kind);
+                if (index >= 0) dismissals.splice(index, 1);
+            },
+            createFollowUp: async (docId, title, dueDate) => created.push({ docId, title, dueDate }),
+        },
+    } });
+    await until(() => fixture.querySelector(".lvct-dash__row"), "行动未渲染");
+    /* C07：⋯ → 建跟进（默认「联系一下」+7 天） */
+    [...fixture.querySelectorAll("button")]
+        .find((node) => (node.getAttribute("aria-label") ?? "").includes("更多处置")).click();
+    await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent.includes("建跟进")), "建跟进入口未显示");
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("建跟进")).click();
+    await until(() => created.length === 1, "建跟进未写入");
+    const expectedDue = (() => {
+        const date = new Date();
+        date.setDate(date.getDate() + 7);
+        const pad = (value) => String(value).padStart(2, "0");
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    })();
+    assert(created[0].title === "联系一下" && created[0].dueDate === expectedDue, `默认跟进参数错误：${JSON.stringify(created[0])}`);
+    /* C06：跳过本年后通知带撤销，点击精确恢复（rowmenu 内按钮，等 busy 释放再点） */
+    [...fixture.querySelectorAll("button")]
+        .find((node) => (node.getAttribute("aria-label") ?? "").includes("更多处置")).click();
+    const skipInMenu = () => [...fixture.querySelectorAll(".lvct-dash__rowmenu button")]
+        .find((node) => node.textContent === "跳过本年" && !node.disabled);
+    await until(() => skipInMenu(), "跳过本年入口未显示");
+    skipInMenu().click();
+    await until(() => dismissals.length === 1, "跳过本年未写入");
+    const undoButton = [...fixture.querySelectorAll(".lvct-notice button")].find((node) => node.textContent === "撤销");
+    assert(undoButton, "通知未提供撤销按钮");
+    undoButton.click();
+    await until(() => dismissals.length === 0, "撤销未恢复暂缓");
+});
+
 await test("移动端人物卡片内容自适应，min-height 收缩且空 chips 收起（B09-2）", async () => {
     kernel.handler = async (route) => {
         if (route === "/api/av/renderAttributeView") return renderResult();
@@ -453,6 +512,8 @@ await test("行内快捷处置：生日跳过本年、从未互动不再提醒�
                 ],
             }),
             dismissReminder: async (docId, kind, until) => dismissals.push({ docId, kind, until }),
+            resumeReminder: async () => {},
+            loadReminderDismissals: async () => [],
             getPersonCadence: async () => null,
             savePersonCadence: async () => {},
         },
@@ -1283,11 +1344,13 @@ await test("首页待办跟进：分桶展示，处理仅限可达人物，推�
     await tick();
     [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "明天").click();
     await until(() => snoozeCalls.length === 1 && snoozeCalls[0][0] === "fu-overdue" && snoozeCalls[0][1] === "tomorrow", "推迟未传递语义选项");
-    await until(() => fixture.textContent.includes("已将「问问面试结果」推迟到明天"), "推迟成功提示未显示");
+    await until(() => fixture.textContent.includes("已将「问问面试结果」推迟到明天"), `推迟成功提示未显示（通知区：${[...fixture.querySelectorAll(".lvct-notice")].map((node) => node.textContent).join(" | ") || "无"}）`);
 
-    // 跳过 → 取消并从列表移除（剩余两条继续展示）
-    [...fixture.querySelectorAll(".lvct-dash__fu-actions button")].find((node) => node.textContent.trim() === "跳过").click();
-    await until(() => statusCalls.length === 1 && statusCalls[0][1] === "cancelled", "跳过未取消事项");
+    // 跳过 → 取消并从列表移除（剩余两条继续展示）；等推迟的 busy 释放后再点
+    const skipNode = [...fixture.querySelectorAll(".lvct-dash__fu-actions button")].find((node) => node.textContent.trim() === "跳过");
+    await until(() => skipNode && !skipNode.disabled, "跳过按钮仍处于忙碌态");
+    skipNode.click();
+    await until(() => statusCalls.length === 1 && statusCalls[0][1] === "cancelled", `跳过未取消事项（statusCalls：${JSON.stringify(statusCalls)}）`);
     await until(() => ![...fixture.querySelectorAll(".lvct-dash__row")].some((node) => node.textContent.includes("问问面试结果")), "跳过后列表未更新");
     assert(fixture.textContent.includes("已跳过"), "跳过成功提示未显示");
 });
