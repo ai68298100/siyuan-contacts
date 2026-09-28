@@ -1853,6 +1853,10 @@
     font-size: 12px;
 }
 
+.lvct-strip__chip-more {
+    color: var(--lvct-text-3);
+}
+
 .lvct-strip__briefing {
     margin-top: 6px;
     padding-top: 6px;
@@ -2456,6 +2460,22 @@
     .lvct-workbench__header {
         min-height: 56px;
         padding: var(--lvct-sp-3) var(--lvct-sp-3) var(--lvct-sp-2);
+    }
+
+    /* B04：档案条移动端紧凑化 */
+    .lvct-doc-strip {
+        margin: 2px 0 6px;
+        padding: 6px 8px;
+        gap: 6px;
+    }
+    .lvct-strip__avatar {
+        width: 26px;
+        height: 26px;
+        flex-basis: 26px;
+        font-size: 13px;
+    }
+    .lvct-strip__actions {
+        flex-basis: 100%;
     }
 
     .lvct-workbench__body {

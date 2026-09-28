@@ -451,5 +451,8 @@
   "wizardStepRelationKept": "Two-way relation already configured; skipping…",
   "wizardStepSettings": "Saving workspace settings…",
   "wizardStepDone": "Setup complete ✔",
-  "navGraphShort": "Graph"
+  "navGraphShort": "Graph",
+  "stripFollowUpsOpen": "{n} open follow-ups",
+  "stripRelatedCount": "{n} relations",
+  "stripChipsMore": "+{n}"
 }

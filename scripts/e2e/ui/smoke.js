@@ -1693,6 +1693,44 @@ await test("人物档案条会前简报展示真实互动事实", async () => {
     assert(!briefing.textContent.includes("预留"), "会前简报仍显示占位内容");
 });
 
+await test("档案条显示待跟进与相关人计数，chips 超量折叠为 +N", async () => {
+    const element = document.createElement("div");
+    element.innerHTML = '<div class="protyle-title"></div>';
+    fixture.append(element);
+    const protyle = { element, block: { rootID: person.docId } };
+    const tagValues = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛"];
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") return { view: {
+            columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })),
+            rows: [{ id: person.itemId, cells: [
+                { value: { type: "block", keyID: "name", block: { id: person.docId, content: person.name } } },
+                { value: { type: "mSelect", keyID: "tags", mSelect: tagValues.map((tag) => ({ content: tag })) } },
+                { value: { type: "relation", keyID: "related", relation: { blockIDs: ["row-2"] } } },
+            ] } ],
+        } };
+        throw new Error(`档案条计数测试不允许请求 ${route}`);
+    };
+    invalidateRoster();
+    const context = { settings, plugin: { loadData: async (key) => {
+        if (key === "follow-ups.json") return { schemaVersion: 1, items: [
+            { id: "fu-b04-1", personDocId: person.docId, title: "随访", dueDate: "2026-10-01", status: "open", createdAt: 1, updatedAt: 1 },
+            { id: "fu-b04-2", personDocId: person.docId, title: "送资料", dueDate: "2026-10-02", status: "open", createdAt: 1, updatedAt: 1 },
+            { id: "fu-b04-3", personDocId: person.docId, title: "已完成项", dueDate: "2026-09-01", status: "done", createdAt: 1, updatedAt: 1, closedAt: 1 },
+        ] };
+        return { schemaVersion: 1, events: [], tombstones: [] };
+    } } };
+    handleProtyleEvent(context, { detail: { protyle } });
+    await until(() => element.querySelector(".lvct-strip__chips"), "档案条未渲染");
+    const text = element.querySelector(".lvct-doc-strip").textContent;
+    assert(text.includes("待跟进 2"), "待跟进计数徽标未显示（已完成项不应计入）");
+    assert(text.includes("相关人 1"), "相关人计数徽标未显示");
+    const chips = [...element.querySelectorAll(".lvct-strip__chips .lvct-chip")];
+    assert(chips.length === 7, `chips 应为 6 枚 + 1 个折叠项，实际 ${chips.length}`);
+    assert(chips[chips.length - 1].textContent.trim() === "+2", "折叠计数错误");
+    assert(chips[chips.length - 1].title.includes("庚") && chips[chips.length - 1].title.includes("辛"), "折叠项未带全量提示");
+    element.querySelector(".lvct-doc-strip")?.remove();
+});
+
 await test("多人互动通过真实存储服务写入并回读，重复记录保持幂等", async () => {
     let saved;
     const plugin = {

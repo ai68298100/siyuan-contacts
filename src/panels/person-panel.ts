@@ -6,6 +6,8 @@
  */
 import { getRoster } from "../services/roster";
 import { loadInteractionStore } from "../data/interactions";
+import type { InteractionEvent } from "../domain/interactions";
+import { loadFollowUpStore } from "../data/followups";
 import { lastInteractionByPerson } from "../domain/interactions";
 import { buildMeetingBriefing } from "../domain/briefing";
 import type { MeetingBriefingItem } from "../domain/briefing";
@@ -50,12 +52,25 @@ async function updateStrip(context: PanelContext, protyle: ProtyleLike, rootId: 
         const roster = await getRoster(context.settings);
         const person = roster.find((item) => item.docId === rootId);
         if (!person) return;
-        const interactionStore = await loadInteractionStore(context.plugin);
+        const [interactionStore, followUpStore] = await Promise.all([
+            loadInteractionStore(context.plugin),
+            loadFollowUpStore(context.plugin),
+        ]);
         if (stripRequests.get(protyle.element) !== request || protyle.block?.rootID !== rootId || !protyle.element.isConnected) return;
         const lastInteraction = lastInteractionByPerson(interactionStore, [person]).get(person.docId);
         const birthday = person.birthday ? nextBirthday(person.birthday, person.isLunar) : undefined;
         const briefing = buildMeetingBriefing(person, roster, interactionStore.events);
-        const strip = buildStrip(context, protyle, person, briefing, birthday?.daysUntil, lastInteraction?.lastDaysAgo);
+        const openFollowUps = followUpStore.items.filter(
+            (item) => item.personDocId === person.docId && item.status === "open",
+        ).length;
+        const latestEvent = interactionStore.events.reduce<InteractionEvent | null>(
+            (acc, event) => (event.personDocId === person.docId && (!acc || event.occurredAt > acc.occurredAt) ? event : acc),
+            null,
+        );
+        const strip = buildStrip(context, protyle, person, briefing, birthday?.daysUntil, lastInteraction?.lastDaysAgo, {
+            openFollowUps,
+            latestNote: latestEvent?.note,
+        });
         const title = protyle.element.querySelector(".protyle-title");
         if (title) {
             title.insertAdjacentElement("afterend", strip);
@@ -71,6 +86,9 @@ async function updateStrip(context: PanelContext, protyle: ProtyleLike, rootId: 
 function t(context: PanelContext, key: string, fallback: string, values?: Record<string, string | number>): string {
     return translateText(context.i18n, key, fallback, values);
 }
+/** 档案条 chips 最多直接展示的枚数，超出折叠为 +N（悬停可见全量） */
+const STRIP_CHIPS_MAX = 6;
+
 function buildStrip(
     context: PanelContext,
     protyle: ProtyleLike,
@@ -78,6 +96,7 @@ function buildStrip(
     briefingItems: readonly MeetingBriefingItem[],
     birthdayDaysUntil?: number,
     lastDaysAgo?: number,
+    extras: { openFollowUps?: number; latestNote?: string } = {},
 ): HTMLElement {
     const strip = document.createElement("div");
     strip.className = `${STRIP_CLASS} lvct-strip`;
@@ -107,11 +126,19 @@ function buildStrip(
             lastDaysAgo === undefined ? "lvct-strip__badge--muted" : "lvct-strip__badge--activity",
         ),
     );
+    // B04：计划与关系计数上条，一眼看到「欠着几件事、连着几个人」
+    if (extras.openFollowUps) {
+        badges.appendChild(makeBadge(t(context, "stripFollowUpsOpen", "待跟进 {n}", { n: extras.openFollowUps }), "lvct-strip__badge--activity"));
+    }
+    if (person.relatedItemIds.length > 0) {
+        badges.appendChild(makeBadge(t(context, "stripRelatedCount", "相关人 {n}", { n: person.relatedItemIds.length }), "lvct-strip__badge--muted"));
+    }
     identity.appendChild(badges);
 
     const chips = document.createElement("div");
     chips.className = "lvct-strip__chips";
     const chipData: string[] = [];
+    if (extras.latestNote) chipData.push(`🗒 ${extras.latestNote}`);
     if (person.phone) chipData.push(`📞 ${person.phone}`);
     if (person.wechat) chipData.push(`💬 ${person.wechat}`);
     if (person.email) chipData.push(`✉️ ${person.email}`);
@@ -123,11 +150,20 @@ function buildStrip(
         empty.textContent = t(context, "stripEmptyContact", "未填写联系资料，可点右侧编辑");
         chips.appendChild(empty);
     }
-    for (const chip of chipData) {
+    // B04：chips 有上限，超出折叠为 +N（title 带全量），防止长标签撑爆档案条
+    const visibleChips = chipData.slice(0, STRIP_CHIPS_MAX);
+    for (const chip of visibleChips) {
         const span = document.createElement("span");
         span.className = "lvct-chip";
         span.textContent = chip;
         chips.appendChild(span);
+    }
+    if (chipData.length > visibleChips.length) {
+        const more = document.createElement("span");
+        more.className = "lvct-chip lvct-strip__chip-more";
+        more.textContent = t(context, "stripChipsMore", "+{n}", { n: chipData.length - visibleChips.length });
+        more.title = chipData.slice(visibleChips.length).join("、");
+        chips.appendChild(more);
     }
     main.appendChild(identity);
     main.appendChild(chips);
