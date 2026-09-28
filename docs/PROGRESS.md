@@ -1160,3 +1160,25 @@
   属实；plugin.json/package.json/CHANGELOG 均为 0.3.0；CHANGELOG [0.3.0] 已知限制三条仍准确；
   ROADMAP 已知问题两条（i18n 文件名加载、宿主文档改名续建）均为待真机项，与键补齐无关。
 - 验证：check:release 全 PASS（新构建）。
+
+## UX-02.1~4 第 35 轮：视觉现代化第一批（2026-09-29，作者指令：多轮优化自行开发）
+
+- **立项 UX-02**（作者 2026-09-29 指令：原型 UI 再做几轮优化，风格简约/现代/前沿/科技，
+  参考 Apple/Google/华为 2026 设计语言，不需确认）。业界共识收敛于层次/半透明/表现力/动效；
+  本插件嵌宿主内取克制路线。批次 1 四子项：
+- **UX-02.1 动效层**：新令牌 `--lvct-ease-spring`/`--lvct-dur-micro`；按钮按下回压
+  scale(0.97)（disabled 豁免）；`lvct-pop-in` 关键帧应用于行动处置菜单；reduced-motion
+  全局降级块（回压取消/位移动画只留透明度）。
+- **UX-02.2 色调胶囊**：`.lvct-bucket` 去描边改软填充（today 实底强调保留、week/stale tonal、
+  month 中性 elevation 底）；`.lvct-chip` 胶囊化（999px + 字重 500 + 行高 1）。
+- **UX-02.3 统计卡**：两块重复样式合并重写——左对齐 + 26px 品牌渐变数字（background-clip:text
+  + tabular-nums）+ 语义图标章（Users/Share2/Cake/UserX，accent/highlight/danger 三色 tonal 底）
+  + 悬停提升 -2px + 顶部品牌渐变发丝线 hover 显现。
+- **UX-02.4 图谱质感**：cytoscape 节点同色 underlay 光晕（0.16/6px，ellipse 显式声明——默认
+  渲染圆角方）、表面色描边环、label 字重 500；边 1.5→2；画布点阵网格背景（radial-gradient
+  1px 点阵叠加原径向底）。themeColors 扩展 surface 读取，主题切换同步描边环。
+- **批次 2 预告**（UX-02.5+）：分段控件/骨架屏统一/空状态/移动 bottom-sheet/浮层玻璃质感/
+  向导 stepper/设置分组列表。
+- 验证：svelte-check 0 错误；单测 177/177；桌面 76/76、移动 77/77、宿主基线 76/76；
+  截图 52/52 OK；断点扫描 390/640/1280 正常；构建 + check:release 通过；
+  首页亮暗/图谱/移动首页截图目检通过。

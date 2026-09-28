@@ -170,12 +170,13 @@
     });
 
     /** cytoscape 无法用 CSS 变量，挂载时从主题运行时取值 */
-    function themeColors(): { text: string; edge: string } {
+    function themeColors(): { text: string; edge: string; surface: string } {
         const probe = container ?? document.body;
         const style = getComputedStyle(probe);
         return {
             text: style.getPropertyValue("--lvct-text-2").trim() || "currentColor",
             edge: style.getPropertyValue("--lvct-border-subtle").trim() || "currentColor",
+            surface: style.getPropertyValue("--lvct-bg-surface").trim() || "transparent",
         };
     }
 
@@ -198,7 +199,7 @@
             const palette = themeColors();
             instance.batch(() => {
                 instance.nodes().forEach((node) => { node.data("color", groupColorValue(node.data("group"))); });
-                instance.nodes().style({ color: palette.text, "border-color": palette.text });
+                instance.nodes().style({ color: palette.text, "border-color": palette.surface });
                 instance.edges().style("line-color", palette.edge);
             });
         };
@@ -325,9 +326,17 @@
                         width: "mapData(degree, 0, 6, 24, 48)",
                         height: "mapData(degree, 0, 6, 24, 48)",
                         "font-size": 11,
+                        "font-weight": 500,
                         color: palette.text,
                         "text-valign": "bottom",
                         "text-margin-y": 4,
+                        /* UX-02.4 表面色描边环 + 同色 underlay 光晕 */
+                        "border-width": 2,
+                        "border-color": palette.surface,
+                        "underlay-color": "data(color)",
+                        "underlay-opacity": 0.16,
+                        "underlay-padding": 6,
+                        "underlay-shape": "ellipse",
                     },
                 },
                 {
@@ -335,12 +344,14 @@
                     style: {
                         "border-color": palette.text,
                         "border-width": 3,
+                        "underlay-opacity": 0.3,
+                        "underlay-padding": 10,
                     },
                 },
                 {
                     selector: "edge",
                     style: {
-                        width: 1.5,
+                        width: 2,
                         "line-color": palette.edge,
                         "curve-style": "bezier",
                     },

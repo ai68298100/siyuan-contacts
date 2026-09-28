@@ -1422,13 +1422,15 @@
     }
 }
 
+/* UX-02.2 通用 chip 胶囊化 */
 .lvct-chip {
     font-size: 11px;
-    padding: 1px 6px;
-    border-radius: 4px;
+    font-weight: 500;
+    line-height: 1;
+    padding: 3px 8px;
+    border-radius: var(--lvct-r-pill);
     background: var(--lvct-bg-elevated);
     color: var(--lvct-text-2);
-    font-weight: 400;
 }
 
 .lvct-chip--group {
@@ -1814,6 +1816,11 @@
     border-radius: var(--lvct-r-lg);
     /* UX-01.7：柔和径向背景（对齐原型，非平面纯色） */
     background: radial-gradient(ellipse at 50% 40%, var(--lvct-bg-surface) 0%, var(--lvct-bg-app) 100%);
+    /* UX-02.4 科技感点阵网格 */
+    background-image:
+        radial-gradient(circle, color-mix(in srgb, var(--lvct-text-3) 45%, transparent) 1px, transparent 1px),
+        radial-gradient(ellipse at 50% 40%, var(--lvct-bg-surface) 0%, var(--lvct-bg-app) 100%);
+    background-size: 20px 20px, 100% 100%;
 }
 
 .lvct-graph-view__canvas-wrap {
@@ -2556,48 +2563,91 @@
     gap: 10px;
 }
 
+/* UX-02.3 统计卡：左对齐渐变大数字 + 图标章 + 悬停提升 + 顶部渐变发丝线 */
 .lvct-dash__stat {
+    position: relative;
+    overflow: hidden;
     background: var(--lvct-bg-surface);
     border: 1px solid var(--lvct-border-subtle);
     border-radius: var(--lvct-r-lg);
-    padding: 10px 12px;
+    padding: 12px 14px;
     box-shadow: var(--lvct-shadow-1);
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 2px;
+    align-items: flex-start;
+    gap: 3px;
+    cursor: pointer;
+    text-align: left;
+    transition:
+        transform var(--lvct-dur-fast) var(--lvct-ease),
+        box-shadow var(--lvct-dur-fast) var(--lvct-ease),
+        border-color var(--lvct-dur-fast) var(--lvct-ease);
+
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 2px;
+        background: var(--lvct-brand-gradient);
+        opacity: 0;
+        transition: opacity var(--lvct-dur-base) var(--lvct-ease);
+    }
 
     b {
-        font-size: 20px;
+        font-size: 26px;
+        line-height: 1.15;
         font-variant-numeric: tabular-nums;
+        background: var(--lvct-brand-gradient);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
     }
-}
 
-.lvct-dash__stat-ft {
-    font-size: var(--lvct-fs-micro);
-    color: var(--lvct-text-3);
-    text-align: center;
-}
+    > span {
+        font-size: 12px;
+        color: var(--lvct-text-2);
+    }
 
-.lvct-dash__stat {
-    cursor: pointer;
-    text-align: center;
+    .lvct-dash__stat-ft {
+        font-size: var(--lvct-fs-micro);
+        color: var(--lvct-text-3);
+        text-align: left;
+    }
+
+    .lvct-dash__stat-ic {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        background: var(--lvct-accent-soft);
+        color: var(--lvct-accent);
+        margin-bottom: 2px;
+
+        &--hl {
+            background: var(--lvct-highlight-soft);
+            color: var(--lvct-highlight);
+        }
+
+        &--warn {
+            background: var(--lvct-danger-soft);
+            color: var(--lvct-danger);
+        }
+    }
 
     &:hover,
     &:focus-visible {
-        border-color: var(--lvct-accent);
+        border-color: color-mix(in srgb, var(--lvct-accent) 45%, var(--lvct-border-subtle));
         box-shadow: var(--lvct-shadow-2);
-        transform: translateY(-1px);
+        transform: translateY(-2px);
+
+        &::before { opacity: 1; }
     }
 
-    b {
-        font-size: 20px;
-        color: var(--lvct-accent);
-    }
-
-    span {
-        font-size: 12px;
-        color: var(--lvct-text-2);
+    &:active {
+        transform: translateY(0);
+        box-shadow: var(--lvct-shadow-1);
     }
 }
 
@@ -2681,7 +2731,12 @@
     gap: 2px;
 }
 
-.lvct-dash__rowmenu { flex-wrap: wrap; }
+/* UX-02.1 行内处置菜单 pop-in 入场 */
+.lvct-dash__rowmenu {
+    flex-wrap: wrap;
+    animation: lvct-pop-in var(--lvct-dur-base) var(--lvct-ease-spring);
+    transform-origin: top right;
+}
 
 /* C02：从未互动组批量安顿 */
 .lvct-dash__settle {
@@ -2781,31 +2836,35 @@
     }
 }
 
+/* UX-02.2 状态 pill：去描边改色调软填充，实底仅保留最高强调（today） */
 .lvct-bucket {
     flex-shrink: 0;
     font-size: 11px;
-    padding: 1px 8px;
-    border-radius: 999px;
-    border: 1px solid var(--lvct-border-subtle);
+    font-weight: 500;
+    line-height: 1;
+    padding: 4px 10px;
+    border-radius: var(--lvct-r-pill);
+    border: 1px solid transparent;
+    background: var(--lvct-bg-elevated);
     color: var(--lvct-text-2);
 
     &--today {
         background: var(--lvct-danger);
-        border-color: var(--lvct-danger);
         color: var(--lvct-on-accent);
     }
 
     &--week {
-        border-color: var(--lvct-accent);
+        background: var(--lvct-accent-soft);
         color: var(--lvct-accent);
     }
 
     &--month {
-        border-color: var(--lvct-border-subtle);
+        background: var(--lvct-bg-elevated);
+        color: var(--lvct-text-2);
     }
 
     &--stale {
-        border-color: var(--lvct-danger);
+        background: var(--lvct-danger-soft);
         color: var(--lvct-danger);
     }
 }

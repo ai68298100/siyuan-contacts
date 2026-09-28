@@ -120,7 +120,9 @@
     --lvct-dur-fast: 120ms;   /* 悬停反馈 */
     --lvct-dur-base: 200ms;   /* 视图切换、弹窗 */
     --lvct-dur-slow: 250ms;   /* 上限 */
+    --lvct-dur-micro: 80ms;   /* 按下回压等即时反馈 */
     --lvct-ease: cubic-bezier(0.2, 0.8, 0.3, 1);
+    --lvct-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* 浮层 pop-in（UX-02.1） */
 
     /* ---------- 12. 层级（L0 内容 < L1 Peek < L2 模态 < L3 浮层） ---------- */
     --lvct-z-peek: 20;

@@ -1,6 +1,7 @@
 <script lang="ts">
     /** 首页仪表盘：统计 + 近期生日（公/农历）+ 久未联系 */
     import type { ContactsPluginFacade } from "../../types";
+    import { Users, Share2, Cake, UserX } from "@lucide/svelte";
     import { pickActions, pickSummaryCounts } from "../../services/dashboard";
     import type { DashboardData } from "../../services/dashboard";
     import type { ActionCard } from "../../domain/action-list";
@@ -470,21 +471,25 @@
         </div>
         <div class="lvct-dash__stats">
             <button class="lvct-dash__stat" onclick={() => onOpenPeople()}>
+                <span class="lvct-dash__stat-ic" aria-hidden="true"><Users size={14} /></span>
                 <b>{data.people}</b>
                 <span>{text("dashStatPeople", "联系人")}</span>
                 {#if data.relations > 0}<span class="lvct-dash__stat-ft">{text("dashStatPeopleFt", "其中 {n} 人从未互动", { n: data.neverContacted })}</span>{/if}
             </button>
             <button class="lvct-dash__stat" onclick={onOpenGraph}>
+                <span class="lvct-dash__stat-ic" aria-hidden="true"><Share2 size={14} /></span>
                 <b>{data.relations}</b>
                 <span>{text("dashStatRelations", "关系")}</span>
                 {#if data.people > 0}<span class="lvct-dash__stat-ft">{text("dashStatRelationsFt", "人均 {n} 条", { n: (data.relations / data.people).toFixed(1) })}</span>{/if}
             </button>
             <button class="lvct-dash__stat" onclick={openBirthdayPeople}>
+                <span class="lvct-dash__stat-ic lvct-dash__stat-ic--hl" aria-hidden="true"><Cake size={14} /></span>
                 <b>{data.birthdaysThisWeek}</b>
                 <span>{text("dashStatBirthdaysWeek", "本周生日")}</span>
                 {#if data.birthdays.length > data.birthdaysThisWeek}<span class="lvct-dash__stat-ft">{text("dashStatBirthdaysFt", "窗口内共 {n} 人", { n: data.birthdays.length })}</span>{/if}
             </button>
             <button class="lvct-dash__stat" onclick={openNeverContactedPeople}>
+                <span class="lvct-dash__stat-ic lvct-dash__stat-ic--warn" aria-hidden="true"><UserX size={14} /></span>
                 <b>{data.neverContacted}</b>
                 <span>{text("dashStatNever", "从未互动")}</span>
                 {#if data.staleTotal > data.neverContacted}<span class="lvct-dash__stat-ft">{text("dashStatNeverFt", "另有久未联系 {n} 人", { n: data.staleTotal })}</span>{/if}
