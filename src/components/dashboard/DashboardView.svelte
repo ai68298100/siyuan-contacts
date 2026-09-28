@@ -52,6 +52,15 @@
     let fuBusy = $state(false);
     let fuError = $state("");
     let fuMessage = $state("");
+    // FUNC-01.1：服务层返回全量，首屏只展开前 N 条；「查看全部」就地处达，不静默截断
+    const BIRTHDAY_PREVIEW_LIMIT = 8;
+    const STALE_PREVIEW_LIMIT = 8;
+    const FOLLOW_UP_PREVIEW_LIMIT = 12;
+    let showAllBirthdays = $state(false);
+    let showAllStale = $state(false);
+    let showAllFollowUps = $state(false);
+    const previewList = <T>(all: readonly T[], expanded: boolean, limit: number): readonly T[] =>
+        (expanded ? all : all.slice(0, limit));
 
     const greetingKey = (() => {
         const hour = new Date().getHours();
@@ -320,7 +329,7 @@
                     </ViewState>
                 {:else}
                     <div class="lvct-dash__list">
-                        {#each data.birthdays.slice(0, 8) as item (item.person.itemId)}
+                        {#each previewList(data?.birthdays ?? [], showAllBirthdays, BIRTHDAY_PREVIEW_LIMIT) as item (item.person.itemId)}
                             <button class="lvct-dash__row" onclick={() => onOpenDetail(item.person)}>
                                 <b>{item.person.name}</b>
                                 <span class="ft__smaller ft__on-surface">{item.projection.label}{item.person.isLunar ? "（农历）" : ""}</span>
@@ -330,6 +339,11 @@
                             </button>
                         {/each}
                     </div>
+                    {#if data.birthdays.length > BIRTHDAY_PREVIEW_LIMIT}
+                        <button class="lvct-dash__show-all" onclick={() => (showAllBirthdays = !showAllBirthdays)}>
+                            {showAllBirthdays ? text("dashShowLess", "收起") : text("dashShowAllN", "查看全部（共 {n} 条）", { n: data.birthdays.length })}
+                        </button>
+                    {/if}
                 {/if}
             </div>
 
@@ -344,7 +358,7 @@
                     </ViewState>
                 {:else}
                     <div class="lvct-dash__list">
-                        {#each data.stale.slice(0, 8) as item (item.person.itemId)}
+                        {#each previewList(data?.stale ?? [], showAllStale, STALE_PREVIEW_LIMIT) as item (item.person.itemId)}
                             <div class="lvct-dash__row">
                                 <button class="lvct-dash__row-main" onclick={() => onOpenDetail(item.person)}>
                                     <b>{item.person.name}</b>
@@ -367,6 +381,11 @@
                             </div>
                         {/each}
                     </div>
+                    {#if data.stale.length > STALE_PREVIEW_LIMIT}
+                        <button class="lvct-dash__show-all" onclick={() => (showAllStale = !showAllStale)}>
+                            {showAllStale ? text("dashShowLess", "收起") : text("dashShowAllN", "查看全部（共 {n} 条）", { n: data.stale.length })}
+                        </button>
+                    {/if}
                 {/if}
             </div>
 
@@ -381,7 +400,7 @@
                     </ViewState>
                 {:else}
                     <div class="lvct-dash__list">
-                        {#each data.followUps ?? [] as card (card.item.id)}
+                        {#each previewList(data?.followUps ?? [], showAllFollowUps, FOLLOW_UP_PREVIEW_LIMIT) as card (card.item.id)}
                             <div class="lvct-dash__row">
                                 <button class="lvct-dash__row-main" disabled={!card.reachable || fuBusy}
                                     title={card.reachable ? undefined : text("dashFuUnreachableTitle", "人物文档不可达（可能已解绑），仍可推迟或跳过")}
@@ -415,6 +434,11 @@
                             </div>
                         {/each}
                     </div>
+                    {#if (data.followUps ?? []).length > FOLLOW_UP_PREVIEW_LIMIT}
+                        <button class="lvct-dash__show-all" onclick={() => (showAllFollowUps = !showAllFollowUps)}>
+                            {showAllFollowUps ? text("dashShowLess", "收起") : text("dashShowAllN", "查看全部（共 {n} 条）", { n: (data.followUps ?? []).length })}
+                        </button>
+                    {/if}
                     <p class="ft__smaller ft__on-surface">{text("dashFuScopeNote", "完成或跳过不会自动记录互动；计划在人物详情里可重新打开。")}</p>
                 {/if}
             </div>

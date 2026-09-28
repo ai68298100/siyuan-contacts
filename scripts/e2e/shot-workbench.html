@@ -89,16 +89,89 @@
         } };
         throw new Error(`截图环境不允许请求 ${route}`);
     };
+    const localDateKey = (offsetDays) => {
+        const date = new Date(Date.now() + (offsetDays ?? 0) * 86400000);
+        const pad = (value) => String(value).padStart(2, "0");
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    };
+    /* UX-01.12：facade 按 src/types.ts ContactsPluginFacade 全量实现。
+       截图涉及的视图会实际调用：loadDashboard / loadRecentInteractions / loadPersonInsights /
+       listPersonFollowUps / getPersonCadence / listTemplates / saveViewPreferences /
+       recordInteraction / deleteInteraction / createFollowUp / setFollowUpStatus / snoozeFollowUp。
+       其余方法提供无害桩；任何缺失方法都会以运行时错误暴露（页面 title 置 ERROR，截图脚本判失败）。 */
+    const followUps = [
+        { id: "fu-shot-1", personDocId: people[0].docId, title: "寄生日礼物", dueDate: localDateKey(0), status: "open", createdAt: Date.now() - 3 * 86400000, updatedAt: Date.now() - 3 * 86400000 },
+        { id: "fu-shot-2", personDocId: people[1].docId, title: "同步课程评审结论", dueDate: localDateKey(4), status: "open", createdAt: Date.now() - 86400000, updatedAt: Date.now() - 86400000 },
+    ];
+    const cadenceOverrides = new Map();
+    const templates = [
+        { id: "tpl-meet", name: "见面", content: "和{{姓名}}见面，聊了……" },
+        { id: "tpl-call", name: "电话", content: "和{{姓名}}通电话，主要聊了……" },
+        { id: "tpl-party", name: "聚会", content: "在聚会见到{{姓名}}，大家一起……" },
+    ];
+    const emptyReviewReport = (from, to) => ({
+        range: { from, to }, previous: { from, to },
+        total: 0, activities: 0, contactedPeople: 0,
+        bySource: { manual: 0, diary: 0, api: 0 }, topPeople: [], entries: [],
+        previousTotal: 0, delta: 0,
+    });
     const facade = {
-        settings, viewPreferences: preferences,
+        settings, viewPreferences: preferences, isMobile: innerWidth <= 640,
         loadDashboard: async () => ({
             people: 4, relations: 3, birthdaysThisWeek: 2, neverContacted: 1, neverContactedItemIds: [people[3].itemId],
             birthdays: [{ person: summary(people[0]), bucket: "today", projection: { daysUntil: 0, label: "9月27日" } }, { person: summary(people[1]), bucket: "week", projection: { daysUntil: 7, label: "10月4日" } }],
             stale: [{ person: summary(people[2]), lastDaysAgo: 54 }],
+            followUps: followUps.map((item) => ({
+                item,
+                bucket: item.dueDate < localDateKey(0) ? "overdue" : item.dueDate === localDateKey(0) ? "today" : "upcoming",
+                person: summary(people.find((person) => person.docId === item.personDocId)),
+                reachable: true,
+            })),
+            actions: [],
         }),
         loadRecentInteractions: async () => Object.fromEntries(people.map((person, index) => [person.docId, { occurredAt: Date.now() - index * 86400000, localDate: `2026-09-${String(27 - index).padStart(2, "0")}` }])),
         loadPersonInsights: async () => ({ timeline: [], coAttendance: [], totalEvents: 0 }),
         recordInteraction: async () => {}, deleteInteraction: async () => {},
+        listPersonFollowUps: async (docId) => followUps.filter((item) => item.personDocId === docId),
+        createFollowUp: async (docId, title, dueDate) => {
+            const item = { id: `fu-shot-${followUps.length + 1}`, personDocId: docId, title, dueDate, status: "open", createdAt: Date.now(), updatedAt: Date.now() };
+            followUps.push(item);
+            return item;
+        },
+        setFollowUpStatus: async (id, status) => {
+            const item = followUps.find((entry) => entry.id === id);
+            if (item) { item.status = status; item.updatedAt = Date.now(); }
+        },
+        snoozeFollowUp: async (id, option, customDate) => {
+            const item = followUps.find((entry) => entry.id === id);
+            if (!item) return;
+            const base = localDateKey(0);
+            const offset = option === "tomorrow" ? 1 : option === "threeDays" ? 3 : option === "nextMonday" ? 7 : option === "nextMonth" ? 30 : 0;
+            item.dueDate = option === "custom" ? customDate : localDateKey(offset || 1);
+            item.updatedAt = Date.parse(base);
+        },
+        getPersonCadence: async (docId) => cadenceOverrides.get(docId) ?? null,
+        savePersonCadence: async (docId, cadence) => {
+            if (cadence === null) cadenceOverrides.delete(docId); else cadenceOverrides.set(docId, cadence);
+        },
+        listTemplates: async () => templates,
+        saveTemplates: async (next) => { templates.splice(0, templates.length, ...next); return templates; },
+        saveViewPreferences: async (next) => { Object.assign(preferences, next); return preferences; },
+        buildReviewReport: async (from, to) => emptyReviewReport(from, to),
+        openPersonDoc() {}, openHostDoc() {}, openDoc() {}, openSettings() {},
+        loadViewPreferences: async () => preferences,
+        loadExportSummary: async () => ({ people: people.length, interactions: 0 }),
+        checkSettingsHealth: async () => ({ ok: true, issues: [], fieldMap: settings.fieldMap }),
+        rebuildMissingFields: async () => settings,
+        rebindSettings: async () => settings,
+        repairFieldMap: async () => settings,
+        exportRosterVcf: async () => "", exportInteractionJson: async () => "", exportFollowUpsJson: async () => "",
+        previewInteractionImport: async () => ({}), importInteractionJson: async () => ({}),
+        previewInteractionImportDiff: async () => ({}),
+        previewFollowUpsImport: async () => ({}), importFollowUpsJson: async () => ({}),
+        previewCapture: async () => ({ docId: "", contacts: [] }), captureDoc: async () => ({}),
+        aiExtractFromDoc: async () => ({ people: [], date: null, place: null }),
+        previewInitialize: async () => ({}), initialize: async () => settings,
     };
     mount(Workbench, { target: document.getElementById("shot"), props: {
         facade, settings, preferences, initialView: view === "home" ? "home" : view === "graph" ? "graph" : "people",
@@ -121,6 +194,10 @@
                 : ".lvct-person-card";
             if (!document.querySelector(expected)) document.title = `ERROR missing ${expected}`;
             if (view === "graph" && (document.querySelector(expected)?._cyreg?.cy?.nodes().length ?? 0) < 4) document.title = "ERROR blank graph";
+            /* UX-01.12：页面内可见的错误横幅（role="alert"）必须判失败，不许带病截图 */
+            const alerts = [...document.querySelectorAll('[role="alert"]')]
+                .filter((element) => element.offsetParent !== null && element.textContent.trim());
+            if (alerts.length) document.title = `ERROR banner: ${alerts[0].textContent.trim().slice(0, 80)}`;
             const clipped = [...document.querySelectorAll(".lvct-people__toolbar, .lvct-detail__header-actions")]
                 .some((element) => element.getBoundingClientRect().right > innerWidth + 2);
             if (clipped) document.title = `ERROR clipped toolbar ${innerWidth} ${[...document.querySelectorAll(".lvct-people__toolbar, .lvct-detail__header-actions")].map((element) => Math.round(element.getBoundingClientRect().right)).join(",")}`;

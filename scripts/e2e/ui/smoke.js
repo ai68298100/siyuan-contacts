@@ -525,6 +525,30 @@ await test("首页快捷互动失败保留备注，重试成功后更新提醒",
     assert(notes.length === 2 && notes[1] === notes[0], "重试提交的备注发生变化");
 });
 
+await test("首页超过首屏上限时提供「查看全部」，服务层不再静默截断（FUNC-01.1）", async () => {
+    const stalePeople = Array.from({ length: 10 }, (_, index) => ({
+        ...person, name: `久联人${index + 1}`, itemId: `row-stale-${index + 1}`,
+    }));
+    mounted = mount(DashboardView, { target: fixture, props: {
+        preferences: DEFAULT_VIEW_PREFERENCES, onOpenDetail() {}, onOpenPeople() {}, onOpenGraph() {},
+        facade: { settings, loadDashboard: async () => ({
+            people: 10, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+            stale: stalePeople.map((entry) => ({ person: entry, lastDaysAgo: 40 })),
+            neverContacted: 0, neverContactedItemIds: [],
+        }) },
+    } });
+    await until(() => fixture.querySelector(".lvct-dash__show-all"), "超过上限未出现「查看全部」");
+    const rows = () => fixture.querySelectorAll(".lvct-dash__row").length;
+    assert(rows() === 8, `首屏应只展示前 8 条，实际 ${rows()}`);
+    assert(fixture.textContent.includes("查看全部（共 10 条）"), "未展示剩余数量");
+    button("查看全部（共 10 条）").click();
+    await tick();
+    assert(rows() === 10, "展开后未显示全部条目");
+    button("收起").click();
+    await tick();
+    assert(rows() === 8, "收起后未恢复首屏数量");
+});
+
 await test("设置页可按列类型手动恢复字段映射并拒绝空提交", async () => {
     let repaired;
     let checked = false;

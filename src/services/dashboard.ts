@@ -101,11 +101,12 @@ export async function loadDashboard(
             reachable: Boolean(person),
         };
     };
+    // FUNC-01.1：服务层返回全量，不静默截断；首屏只展示前 N 条由 UI 层「查看全部」就地处达
     const followUps: FollowUpCard[] = [
         ...buckets.overdue,
         ...buckets.today,
         ...buckets.upcoming,
-    ].slice(0, 12).map(withBucket);
+    ].map(withBucket);
 
     // 行动清单（F07）：生日 + 节奏 + 跟进三源按人聚合
     const followUpsByDoc = new Map<string, { id: string; title: string; dueDate: string }[]>();
@@ -131,7 +132,7 @@ export async function loadDashboard(
         relations: Math.round(people.reduce((sum, person) => sum + person.relatedItemIds.length, 0) / 2),
         birthdays,
         birthdaysThisWeek: birthdays.filter((item) => item.bucket === "today" || item.bucket === "week").length,
-        stale: staleAll.slice(0, 20),
+        stale: staleAll,
         neverContacted: neverContactedPeople.length,
         neverContactedItemIds: neverContactedPeople.map((item) => item.person.itemId),
         followUps,
