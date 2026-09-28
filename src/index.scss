@@ -1324,6 +1324,13 @@
     flex-shrink: 0;
 }
 
+/* UX-01.4：分组头像背景色（家人红/朋友绿/工作蓝/同学橙/其他灰），与图例色板一致 */
+.lvct-person-card__avatar[data-group="家人"] { background: var(--lvct-group-family); color: var(--lvct-on-accent); }
+.lvct-person-card__avatar[data-group="朋友"] { background: var(--lvct-group-friend); color: var(--lvct-on-accent); }
+.lvct-person-card__avatar[data-group="同事"] { background: var(--lvct-group-work); color: var(--lvct-on-accent); }
+.lvct-person-card__avatar[data-group="同学"] { background: var(--lvct-group-school); color: var(--lvct-on-accent); }
+.lvct-person-card__avatar[data-group="其他"] { background: var(--lvct-group-other); color: var(--lvct-on-accent); }
+
 .lvct-person-card__main {
     min-width: 0;
     flex: 1;
