@@ -530,7 +530,7 @@
                                 {card.bucket === "stale" ? text("dashTakeALook", "去看看") : text("dashProcess", "处理")}
                             </button>
                             <button
-                                class="b3-button b3-button--outline lvct-dash__quick-button"
+                                class="b3-button b3-button--outline lvct-dash__quick-button lvct-dash__quick-button--more"
                                 aria-label={`更多处置：${card.person.name}`}
                                 aria-expanded={rowMenuKey === `action:${card.person.docId}`}
                                 onclick={() => toggleRowMenu(`action:${card.person.docId}`)}

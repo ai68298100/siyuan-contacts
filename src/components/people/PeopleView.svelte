@@ -126,10 +126,10 @@
         }
     }
 
-    function switchViewMode() {
-        const next = viewMode === "cards" ? "table" : "cards";
-        viewMode = next;
-        void persistPreferences({ ...preferences, peopleView: next === "table" ? "table" : "card" });
+    function setViewMode(mode: "cards" | "table") {
+        if (viewMode === mode) return;
+        viewMode = mode;
+        void persistPreferences({ ...preferences, peopleView: mode === "table" ? "table" : "card" });
     }
 
     function toggleColumn(key: PeopleTableColumn, visible: boolean) {
@@ -625,15 +625,23 @@
             />
             {@render filterControls()}
         {/if}
-        <span class="lvct-people__viewtoggle" style="position:relative; display:inline-flex">
-            <button
-                class="b3-button b3-button--outline"
-                title="切换卡片/表格"
-                onclick={switchViewMode}
-            >
-                {#if viewMode === "cards"}<List size={16}/>{:else}<LayoutGrid size={16}/>{/if}
-                {viewMode === "cards" ? text("peopleTable", "表格") : text("peopleCards", "卡片")}
-            </button>
+        <span class="lvct-people__viewtoggle">
+            <span class="lvct-seg" role="group" aria-label="切换卡片/表格" title="切换卡片/表格">
+                <button
+                    type="button"
+                    class="lvct-seg__item"
+                    class:lvct-seg__item--active={viewMode === "cards"}
+                    aria-pressed={viewMode === "cards"}
+                    onclick={() => setViewMode("cards")}
+                ><LayoutGrid size={14}/>{text("peopleCards", "卡片")}</button>
+                <button
+                    type="button"
+                    class="lvct-seg__item"
+                    class:lvct-seg__item--active={viewMode === "table"}
+                    aria-pressed={viewMode === "table"}
+                    onclick={() => setViewMode("table")}
+                ><List size={14}/>{text("peopleTable", "表格")}</button>
+            </span>
             {#if viewMode === "table"}
                 <span id="lvct-people-colmenu" bind:this={colMenuWrap} style="position:relative; display:inline-flex">
                     <button

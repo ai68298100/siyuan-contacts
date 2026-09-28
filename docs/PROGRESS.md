@@ -1182,3 +1182,25 @@
 - 验证：svelte-check 0 错误；单测 177/177；桌面 76/76、移动 77/77、宿主基线 76/76；
   截图 52/52 OK；断点扫描 390/640/1280 正常；构建 + check:release 通过；
   首页亮暗/图谱/移动首页截图目检通过。
+
+## UX-02.5~8 第 36 轮：视觉现代化第二批（2026-09-29）
+
+- **UX-02.5 分段控件**：联系人视图切换（卡片/表格）改 iOS segmented 双段——凹槽容器
+  （bg-app 底 + 描边 + pill 圆角）+ 活动段浮起（surface 底 + shadow-1 + 字重 600）+
+  aria-pressed；switchViewMode → setViewMode(mode) 幂等；移动端段高 ≥40px。
+  截图夹具 table/colmenu 两景由「点旧切换钮」改「点表格段」（旧钮已删，点击按 text
+  includes 幂等）。
+- **工具栏汉字竖排既有缺陷修复**：桌面 1280 工具栏拥挤时按钮文字逐字竖排（视图/更多筛选/
+  整理/导入/vCard 均中招，最初截图即有）。修法：工具栏按钮 white-space:nowrap + flex-shrink:0，
+  容器 flex-wrap:wrap（原仅移动端有）——整钮换行替代竖排。过程中发现 nowrap 后桌面溢出裁掉
+  新建联系人（容器原本不换行），补 wrap 后解决；三拍截图确认。
+- **UX-02.6 ViewState 精修**：错误态图标章转危险色（新增 lvct-empty--error 钩子）；加载骨架
+  行宽错落（l1/l2/l3 = 100/82/58%）。
+- **UX-02.7 浮层玻璃**：新令牌 --lvct-bg-elevated-glass（86% elevated）；列设置/组合筛选面板、
+  图谱悬停卡半透明底 + backdrop-filter blur(14px) saturate(1.15)（不支持回落 elevated）；
+  两面板补 pop-in；reduced-motion 块改覆盖真实浮层类（原误写 .lvct-popover）。
+- **UX-02.8 行动区快捷按钮 tonal**：处理/去看看 accent-soft 胶囊；⋯（更多处置）中性 elevated
+  （新修饰类 --more，aria-label 不变，smoke 按 aria-label 定位不受影响）。
+- 验证：svelte-check 0 错误；单测 177/177；桌面 76/76、移动 77/77、宿主基线 76/76；
+  截图 52/52（中途 table/colmenu 4 景失败→夹具适配→修复）；断点扫描正常；构建 +
+  check:release 通过；people 桌面/移动、table 截图目检通过。

@@ -240,10 +240,26 @@
 节点加同色 underlay 光环 + 表面色描边环 + label 字重 500；边加宽 2px；画布点阵背景。
 cytoscape 3.34 underlay 支持。
 
-### UX-02.5 及以后（批次 2+，待排期）
-分段控件（视图切换 iOS segmented）、骨架屏统一、空状态插画化、移动端 bottom-sheet 化对话框、
-浮层玻璃质感（backdrop-filter）、向导 stepper 环形进度、设置 iOS 分组内嵌列表、深色层级
-（dark 用浅表面替代阴影的进一步校准）。
+### UX-02.5 分段控件（批次 2）— **已完成（2026-09-29）**
+联系人视图切换（卡片/表格）改 iOS segmented 双段（凹槽容器 + 浮起活动段 + aria-pressed），
+替代「显示另一模式名」的单词切换钮；移动端触控目标 ≥40px。截图夹具 table/colmenu 两景
+改点「表格」段。顺带修复工具栏拥挤汉字竖排既有缺陷（整钮 nowrap + 容器 flex-wrap，
+桌面/移动统一）。
+
+### UX-02.6 空状态与骨架精修（批次 2）— **已完成（2026-09-29）**
+ViewState 错误态图标章转危险色（lvct-empty--error）；加载骨架行宽错落（100/82/58%）。
+
+### UX-02.7 浮层玻璃质感（批次 2）— **已完成（2026-09-29）**
+新令牌 `--lvct-bg-elevated-glass`（86% elevated + transparent）；列设置/组合筛选面板、
+图谱悬停卡改半透明底 + backdrop-filter blur(14px) saturate(1.15)，不支持时回落不透明；
+面板补 pop-in 入场。reduced-motion 降级块同步覆盖真实浮层类。
+
+### UX-02.8 行动区快捷按钮 tonal 化（批次 2）— **已完成（2026-09-29）**
+处理/去看看 accent 软填充胶囊；⋯ 更多处置改中性 elevated 底（lvct-dash__quick-button--more）。
+
+### UX-02.9 及以后（批次 3，待排期）
+移动端对话框 bottom-sheet 化扩展（工具栏弹层已由 B09-1 覆盖）、向导 stepper 环形进度、
+设置 iOS 分组内嵌列表、深色层级进一步校准。
 
 ---
 

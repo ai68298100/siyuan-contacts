@@ -420,10 +420,71 @@
 .lvct-people__toolbar {
     gap: 8px;
     align-items: center;
+    /* 拥挤时整钮换行（配合按钮 nowrap，防汉字竖排，见下） */
+    flex-wrap: wrap;
+    row-gap: var(--lvct-sp-2);
     > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+
+    /* 拥挤时整钮换行而非汉字竖排（导航竖排 UX-01.3 同款教训，覆盖桌面+移动） */
+    .b3-button { white-space: nowrap; flex-shrink: 0; }
 }
 
-.lvct-people__viewtoggle > .b3-button { display: inline-flex; align-items: center; gap: 6px; }
+.lvct-people__viewtoggle { display: inline-flex; }
+
+/* UX-02.5 分段控件（iOS segmented）：凹槽容器 + 浮起活动段 */
+.lvct-seg {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-pill);
+    background: var(--lvct-bg-app);
+    /* 工具栏拥挤时禁止收缩，防汉字竖排（UX-01.3 同款教训） */
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.lvct-seg__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: calc(var(--lvct-touch-min) - 6px);
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--lvct-r-pill);
+    background: transparent;
+    color: var(--lvct-text-2);
+    font-size: var(--lvct-fs-caption);
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+        background var(--lvct-dur-fast) var(--lvct-ease),
+        color var(--lvct-dur-fast) var(--lvct-ease),
+        box-shadow var(--lvct-dur-fast) var(--lvct-ease);
+
+    &:hover { color: var(--lvct-text-1); }
+
+    &:focus-visible {
+        outline: 2px solid var(--lvct-accent);
+        outline-offset: 1px;
+    }
+
+    &--active {
+        background: var(--lvct-bg-surface);
+        color: var(--lvct-text-1);
+        font-weight: 600;
+        box-shadow: var(--lvct-shadow-1);
+    }
+}
+
+/* B09-5：移动端分段控件触控目标 ≥40px */
+@media (max-width: 640px) {
+    .lvct-seg__item {
+        min-height: var(--lvct-touch-min-mobile);
+        padding: 0 14px;
+    }
+}
 
 // F02 列设置 / F03 组合筛选面板：锚定在工具栏按钮下方，窄屏不越界
 .lvct-people__colmenu,
@@ -442,8 +503,13 @@
     padding: var(--lvct-sp-2);
     border: 1px solid var(--lvct-border-subtle);
     border-radius: var(--lvct-r-md);
-    background: var(--lvct-bg-elevated);
+    /* UX-02.7 浮层玻璃质感：半透明底 + 背景模糊（不支持时回落不透明 elevated） */
+    background: var(--lvct-bg-elevated-glass, var(--lvct-bg-elevated));
+    backdrop-filter: blur(14px) saturate(1.15);
+    -webkit-backdrop-filter: blur(14px) saturate(1.15);
     box-shadow: var(--lvct-shadow-3);
+    animation: lvct-pop-in var(--lvct-dur-base) var(--lvct-ease-spring);
+    transform-origin: top left;
 
     .lvct-people__colmenu-row {
         display: flex;
@@ -983,8 +1049,19 @@
     width: min(280px, 65vw);
     margin-bottom: var(--lvct-sp-3);
 
+    /* UX-02.6 骨架行宽错落（优先级高于 nth-child，skeleton 修饰类缺失时仍回落） */
+    .lvct-skeleton--l1 { width: 100%; }
+    .lvct-skeleton--l2 { width: 82%; }
+    .lvct-skeleton--l3 { width: 58%; height: 10px; }
+
     span:nth-child(2) { width: 85%; }
     span:nth-child(3) { width: 60%; }
+}
+
+/* UX-02.6 错误态：图标章转危险色 */
+.lvct-empty--error .lvct-empty__icon {
+    background: var(--lvct-danger-soft);
+    color: var(--lvct-danger);
 }
 
 .lvct-dash__welcome {
@@ -1836,7 +1913,10 @@
     padding: var(--lvct-sp-3);
     border: 1px solid var(--lvct-border-strong);
     border-radius: var(--lvct-r-lg);
-    background: var(--lvct-bg-elevated);
+    /* UX-02.7 浮层玻璃质感 */
+    background: var(--lvct-bg-elevated-glass, var(--lvct-bg-elevated));
+    backdrop-filter: blur(14px) saturate(1.15);
+    -webkit-backdrop-filter: blur(14px) saturate(1.15);
     box-shadow: var(--lvct-shadow-2);
     pointer-events: auto;
 
@@ -2799,10 +2879,35 @@
     font: inherit;
 }
 
+/* UX-02.8 行动区快捷按钮 tonal 化：主动作 accent 软填充；⋯ 更多保持中性 */
 .lvct-dash__quick-button {
     flex-shrink: 0;
-    padding: 3px 8px;
+    padding: 3px 10px;
     font-size: var(--lvct-fs-micro);
+    background: var(--lvct-accent-soft);
+    border-color: transparent;
+    color: var(--lvct-accent);
+    font-weight: 500;
+
+    &:hover {
+        background: color-mix(in srgb, var(--lvct-accent) 20%, transparent);
+        border-color: transparent;
+        color: var(--lvct-accent);
+    }
+
+    &:active {
+        background: color-mix(in srgb, var(--lvct-accent) 28%, transparent);
+    }
+}
+
+.lvct-dash__quick-button--more {
+    background: var(--lvct-bg-elevated);
+    color: var(--lvct-text-2);
+
+    &:hover {
+        background: var(--lvct-bg-hover);
+        color: var(--lvct-text-1);
+    }
 }
 
 .lvct-dash__show-all {

@@ -20,13 +20,13 @@
     } = $props();
 </script>
 
-<div class="lvct-empty" class:lvct-empty--compact={compact} aria-busy={loading}>
+<div class="lvct-empty" class:lvct-empty--compact={compact} class:lvct-empty--error={error} aria-busy={loading}>
     <div role={error ? "alert" : "status"} class="lvct-view-state__content">
         {#if loading}
             <div class="lvct-view-state__skeleton" aria-hidden="true">
-                <span class="lvct-skeleton"></span>
-                <span class="lvct-skeleton"></span>
-                <span class="lvct-skeleton"></span>
+                <span class="lvct-skeleton lvct-skeleton--l1"></span>
+                <span class="lvct-skeleton lvct-skeleton--l2"></span>
+                <span class="lvct-skeleton lvct-skeleton--l3"></span>
             </div>
         {:else}
             <div class="lvct-empty__icon" aria-hidden="true">{error ? "!" : icon}</div>

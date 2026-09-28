@@ -193,7 +193,9 @@
         isMobile: innerWidth <= 640, onPreferencesUpdated() {}, onOpenPersonDoc() {},
     } });
     setTimeout(() => {
-        if (view === "table") document.querySelector('.lvct-people__toolbar button[title="切换卡片/表格"]')?.click();
+        /* UX-02.5：视图切换为分段控件，点「表格」段（幂等：已在表格态时点击无副作用） */
+        const segToTable = () => [...document.querySelectorAll('.lvct-people__toolbar .lvct-seg__item')].find((b) => b.textContent.includes("表格"));
+        if (view === "table") segToTable()?.click();
         if (view === "peek") document.querySelector(".lvct-person-card")?.click();
         if (view === "viewsmenu") {
             /* B09-1：移动端视图菜单收进「筛选与整理」弹层，先开弹层再点视图按钮 */
@@ -215,7 +217,7 @@
             document.querySelector(".lvct-workbench__header-actions button")?.click();
             setTimeout(() => document.querySelector(".lvct-form__toolbar button")?.click(), 120);
         }
-        if (view === "colmenu") { document.querySelector('.lvct-people__toolbar button[title="切换卡片/表格"]')?.click(); setTimeout(() => document.querySelector('button[aria-label="表格列设置"]')?.click(), 120); }
+        if (view === "colmenu") { segToTable()?.click(); setTimeout(() => document.querySelector('button[aria-label="表格列设置"]')?.click(), 120); }
         setTimeout(() => {
             const expected = view === "home" ? ".lvct-dash__stats"
                 : view === "graph" ? ".lvct-graph-view__canvas"

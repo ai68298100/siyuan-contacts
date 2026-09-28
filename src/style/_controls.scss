@@ -137,7 +137,9 @@
         .b3-button,
         .lvct-dash__stat,
         .lvct-dash__rowmenu,
-        .lvct-popover {
+        .lvct-people__colmenu,
+        .lvct-people__moremenu,
+        .lvct-graph-view__hover-card {
             transition-duration: 0.01ms !important;
             animation: none !important;
         }

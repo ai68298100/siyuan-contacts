@@ -40,6 +40,7 @@
     --lvct-bg-base: color-mix(in srgb, var(--b3-theme-surface, var(--b3-theme-background)) 30%, var(--b3-theme-background)); /* 内容区 */
     --lvct-bg-surface: var(--b3-theme-background);                              /* 卡片 / 面板 / 输入框 */
     --lvct-bg-elevated: var(--b3-menu-background, var(--b3-theme-surface, var(--b3-theme-background))); /* 弹窗 / 下拉 / 悬停卡；对齐宿主 .b3-menu 配方（B02） */
+    --lvct-bg-elevated-glass: color-mix(in srgb, var(--b3-menu-background, var(--b3-theme-surface, var(--b3-theme-background))) 86%, transparent); /* UX-02.7 浮层玻璃底（配 backdrop-filter 用） */
     --lvct-bg-hover: var(--b3-list-hover);                                      /* 行/项悬停 */
     --lvct-bg-active: var(--b3-list-icon-hover, var(--b3-list-hover));          /* 按下/选中底 */
 
