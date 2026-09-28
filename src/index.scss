@@ -136,6 +136,7 @@
     border-top: 1px solid var(--lvct-border-subtle);
 }
 
+
 .lvct-workbench__nav-item {
     border: none;
     background: transparent;
@@ -2420,6 +2421,26 @@
         min-height: var(--lvct-touch-min-mobile);
         padding: var(--lvct-sp-2) var(--lvct-sp-3);
         white-space: nowrap;
+    }
+
+
+    /* B09-5：触控目标 ≥40px（令牌 --lvct-touch-min-mobile）；
+       图标-only 的紧凑按钮保持视觉尺寸、用透明热区补足 */
+    .lvct-tab-root .b3-button,
+    .lvct-dialog-root .b3-button,
+    .lvct-tab-root .b3-select,
+    .lvct-dialog-root .b3-select,
+    .lvct-tab-root .b3-text-field,
+    .lvct-dialog-root .b3-text-field {
+        min-height: var(--lvct-touch-min-mobile);
+    }
+    .lvct-people__colmenu-actions button {
+        position: relative;
+    }
+    .lvct-people__colmenu-actions button::after {
+        content: "";
+        position: absolute;
+        inset: -9px;
     }
 
     .lvct-workbench__sidebar-footer {

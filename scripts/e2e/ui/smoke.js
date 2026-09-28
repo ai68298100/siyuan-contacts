@@ -51,6 +51,11 @@ function button(label, root = fixture) {
     assert(found, `未找到按钮：${label}`);
     return found;
 }
+function navButton(labels, root = fixture) {
+    const found = [...root.querySelectorAll("button")].find((node) => labels.includes(node.textContent.trim()));
+    assert(found, `未找到导航按钮：${labels.join("/")}`);
+    return found;
+}
 function input(node, value) {
     node.value = value;
     node.dispatchEvent(new Event("input", { bubbles: true }));
@@ -154,7 +159,7 @@ await test("英文工作台导航与标题跟随语言资源，缺失文案回�
     await until(() => fixture.querySelector("h1")?.textContent === "Settings", "英文设置导航未切换");
     window.dispatchEvent(new CustomEvent("lvct-workbench-view", { detail: { view: "home" } }));
     await until(() => fixture.querySelector(".lvct-dash__stats"), "英文首页未恢复");
-    button("Relationships").click();
+    navButton(["Relationships", "Graph"]).click();
     await until(() => fixture.querySelector("h1")?.textContent === "Relationships", "英文关系导航未切换");
     button("Contacts").click();
     await until(() => fixture.querySelector("h1")?.textContent === "Contacts", "英文联系人导航未切换");

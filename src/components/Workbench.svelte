@@ -41,10 +41,10 @@
         translateText(facade.i18n, key, fallback, values));
     const canLeave = createCloseScope();
 
-    const views: readonly { id: ViewId; label: string; enabled: boolean }[] = $derived([
-        { id: "home", label: text("navHome", "首页"), enabled: true },
-        { id: "people", label: text("navPeople", "联系人"), enabled: true },
-        { id: "graph", label: text("navGraph", "关系图谱"), enabled: true },
+    const views: readonly { id: ViewId; label: string; shortLabel: string; enabled: boolean }[] = $derived([
+        { id: "home", label: text("navHome", "首页"), shortLabel: text("navHome", "首页"), enabled: true },
+        { id: "people", label: text("navPeople", "联系人"), shortLabel: text("navPeople", "联系人"), enabled: true },
+        { id: "graph", label: text("navGraph", "关系图谱"), shortLabel: text("navGraphShort", "关系图"), enabled: true },
     ]);
 
     const viewMeta: Record<ViewId, { title: string; subtitle: string }> = $derived({
@@ -129,7 +129,7 @@
                     aria-current={current === view.id ? "page" : undefined}
                     onclick={() => selectView(view.id)}
                 >
-                    <span aria-hidden="true">{#if view.id === "home"}<House size={16}/>{:else if view.id === "people"}<UsersRound size={16}/>{:else}<Network size={16}/>{/if}</span>{view.label}
+                    <span aria-hidden="true">{#if view.id === "home"}<House size={16}/>{:else if view.id === "people"}<UsersRound size={16}/>{:else}<Network size={16}/>{/if}</span><span class="lvct-workbench__nav-text">{isMobile ? view.shortLabel : view.label}</span>
                 </button>
             {/each}
             <span class="lvct-workbench__nav-label lvct-workbench__nav-label--secondary">{text("navUpcoming", "即将推出")}</span>
@@ -138,7 +138,7 @@
         </nav>
         <div class="lvct-workbench__sidebar-footer">
             <button class="lvct-workbench__nav-item" title={text("openSettings", "打开插件设置")} onclick={() => selectView("settings")}>
-                <span aria-hidden="true"><Settings size={16}/></span>{text("navSettings", "设置")}
+                <span aria-hidden="true"><Settings size={16}/></span><span class="lvct-workbench__nav-text">{text("navSettings", "设置")}</span>
             </button>
         </div>
     </aside>
@@ -149,7 +149,7 @@
                 <h1>{currentMeta.title}</h1>
                 <p>{currentMeta.subtitle}</p>
             </div>
-            {#if current !== "people"}<div class="lvct-workbench__header-actions">
+            {#if current === "home"}<div class="lvct-workbench__header-actions">
                 <input class="b3-text-field" type="search" aria-label="搜索联系人" placeholder="搜索联系人" bind:value={globalSearch}
                     oninput={() => { if (globalSearch.trim() && current !== "people") selectView("people"); }} />
                 <button type="button" class="b3-button b3-button--text" onclick={() => { selectView("people"); createRequested += 1; }}><UserPlus size={16}/>新建联系人</button>
