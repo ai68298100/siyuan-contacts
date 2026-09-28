@@ -317,6 +317,52 @@ await test("资料完整度筛选与串行补录：缺电话列表、逐个保�
     assert(JSON.stringify(cellWrites).includes("13800001234") && JSON.stringify(cellWrites).includes("13900005678"), "新电话未写入");
 });
 
+await test("移动端工具栏收纳：常驻搜索/视图切换/新建，其余进筛选与整理弹层（B09-1）", async () => {
+    const rows = [
+        { id: "row-1", docId: "20260927000000-person1", name: "全空甲", phone: "", wechat: "", email: "", group: "", tags: [] },
+        { id: "row-2", docId: "20260927000000-person2", name: "候选乙", phone: "13800001111", wechat: "", email: "", group: "家人", tags: [] },
+        { id: "row-3", docId: "20260927000000-person3", name: "候选丙", phone: "13900002222", wechat: "", email: "", group: "同事", tags: [] },
+    ];
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") return { view: {
+            columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })),
+            rows: rows.map((row) => ({ id: row.id, cells: [
+                { value: { type: "block", keyID: "name", block: { id: row.docId, content: row.name } } },
+                { value: { type: "phone", keyID: "phone", phone: { content: row.phone } } },
+                { value: { type: "text", keyID: "wechat", text: { content: row.wechat } } },
+                { value: { type: "email", keyID: "email", email: { content: row.email } } },
+                { value: { type: "mSelect", keyID: "group", mSelect: row.group ? [{ content: row.group }] : [] } },
+                { value: { type: "mSelect", keyID: "tags", mSelect: row.tags.map((tag) => ({ content: tag })) } },
+                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+            ] })),
+        } };
+        return { code: 0 };
+    };
+    mounted = mount(PeopleView, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        loadRecentInteractions: async () => ({}),
+        revision: 0, initialSort: "name", isMobile: true,
+        onOpenDetail() {}, onOpenPersonDoc() {},
+        onPreferencesChange: async (next) => next,
+    } });
+    await until(() => fixture.querySelector(".lvct-person-card"), "列表未渲染");
+    const toolbarButtons = () => [...fixture.querySelectorAll(".lvct-people__toolbar button")].map((node) => node.textContent);
+    assert(!toolbarButtons().some((label) => label.trim() === "导入已有文档"), "移动常驻区不应出现导入按钮");
+    assert(!toolbarButtons().some((label) => label.trim() === "整理"), "移动常驻区不应出现整理按钮");
+    const tools = [...fixture.querySelectorAll(".lvct-people__toolbar button")]
+        .find((node) => node.textContent.includes("筛选与整理"));
+    assert(tools, "收纳按钮未渲染");
+    tools.click();
+    await until(() => fixture.querySelector(".lvct-sheet"), "底部弹层未打开");
+    assert(fixture.querySelectorAll(".lvct-sheet select").length >= 2, "弹层缺分组/排序控件");
+    assert([...fixture.querySelectorAll(".lvct-sheet button")].some((node) => node.textContent.includes("导入已有文档")), "弹层缺导入入口");
+    const groupSelect = fixture.querySelectorAll(".lvct-sheet select")[0];
+    groupSelect.value = "家人";
+    groupSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    await until(() => fixture.textContent.includes("共 1 人"), "弹层内分组筛选未生效");
+});
+
 await test("新建草稿关闭前三选一：取消保留草稿，放弃后关闭且弹窗列明细", async () => {
     const guardDialog = () => document.body.querySelector(".lvct-closeguard");
     try {
@@ -411,7 +457,18 @@ await test("英文工作台导航与标题跟随语言资源，缺失文案回�
     await until(() => fixture.querySelector("h1")?.textContent === "Contacts", "英文联系人导航未切换");
     await until(() => fixture.querySelector(".lvct-person-card"), "英文导航联系人未加载");
     assert(button("New contact", fixture.querySelector(".lvct-people__toolbar")), "联系人常用操作未翻译");
-    assert([...fixture.querySelectorAll(".lvct-people__toolbar option")].some((option) => option.textContent === "Recent interaction"), "排序选项未翻译");
+    if (window.innerWidth <= 640) {
+        /* B09-1：移动端排序收进「筛选与整理」底部弹层 */
+        const tools = [...fixture.querySelectorAll(".lvct-people__toolbar button")]
+            .find((node) => node.textContent.includes("Filter & organize"));
+        assert(tools, "移动端收纳按钮未翻译");
+        tools.click();
+        await until(() => [...fixture.querySelectorAll(".lvct-sheet option")]
+            .some((option) => option.textContent === "Recent interaction"), "移动收纳弹层缺排序选项");
+        fixture.querySelector(".lvct-sheet__bar button").click();
+    } else {
+        assert([...fixture.querySelectorAll(".lvct-people__toolbar option")].some((option) => option.textContent === "Recent interaction"), "排序选项未翻译");
+    }
     fixture.querySelector(".lvct-person-card").click();
     await until(() => fixture.querySelector(".lvct-dialog-panel__title")?.textContent === `Person Details · ${person.name}`, "详情标题未翻译或姓名丢失");
     assert(button("Overview", fixture.querySelector(".lvct-detail__tabs")), "详情标签未翻译");

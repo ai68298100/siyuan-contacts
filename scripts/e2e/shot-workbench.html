@@ -182,7 +182,21 @@
     setTimeout(() => {
         if (view === "table") document.querySelector('.lvct-people__toolbar button[title="切换卡片/表格"]')?.click();
         if (view === "peek") document.querySelector(".lvct-person-card")?.click();
-        if (view === "viewsmenu") document.querySelector('.lvct-people__toolbar button[aria-label="视图"]')?.click();
+        if (view === "viewsmenu") {
+            /* B09-1：移动端视图菜单收进「筛选与整理」弹层，先开弹层再点视图按钮 */
+            if (innerWidth <= 640) {
+                const tools = document.querySelector('.lvct-people__toolbar button[aria-label="筛选与整理"]');
+                if (!tools) { document.title = "ERROR no tools button"; return; }
+                tools.click();
+                setTimeout(() => {
+                    const viewBtn = document.querySelector('.lvct-sheet button[aria-label="视图"]');
+                    if (!viewBtn) { document.title = "ERROR no view button in sheet"; return; }
+                    viewBtn.click();
+                }, 200);
+            } else {
+                document.querySelector('.lvct-people__toolbar button[aria-label="视图"]')?.click();
+            }
+        }
         if (view === "morefilter") document.querySelector("#lvct-people-moremenu > button")?.click();
         if (view === "quickfill") {
             document.querySelector(".lvct-workbench__header-actions button")?.click();

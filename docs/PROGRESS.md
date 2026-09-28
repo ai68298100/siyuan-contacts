@@ -843,3 +843,18 @@
   跟进为 docId 语义，不提供跳转。
 - 验证：单测 161/161（people-filters 新增 C03 组）；svelte-check 0 错误；隔离回归桌面 68/68、
   移动 69/69、宿主基线 68/68；52 景截图 OK；构建通过。
+
+## 批次 2 第 12 轮：B09-1 移动端工具栏收纳（2026-09-29）
+
+- **snippet 化重构**（PeopleView）：工具栏控件拆成三个 Svelte 5 snippet——viewMenuControl（保存
+  视图菜单）/ filterControls（分组、排序、更多筛选含 C03 组）/ actionControls（整理、导入、vCard）；
+  桌面（!isMobile）原位渲染布局不变，移动端（isMobile prop，Workbench 传入）只常驻「搜索（整行）+
+  视图切换 + 新建 + 筛选与整理」。桌面/移动互斥渲染，popover wrap/panel 单挂载不冲突。
+- **底部弹层**：遮罩复用 `lvct-dialog-mask`，`.lvct-sheet` 底部弹层（elevated 底、顶部圆角、
+  shadow-3、safe-area padding、70vh 上限可滚动）；弹层内渲染三组 snippet，筛选/视图/整理/导入/
+  vCard 全部可达且直接生效（分组过滤 smoke 验证）；补 `peopleMobileTools` zh/en 双语言键
+  （i18n parity 守门）；收纳按钮补 aria-label。
+- **回归**：新增移动收纳用例（常驻区不含导入/整理；弹层含分组/排序/导入；弹层内分组过滤生效）；
+  英文 i18n 用例适配移动分支（打开弹层断言排序选项）；修复截图套件 viewsmenu 移动驱动（先开弹层
+  再点视图按钮）。桌面 69/69、移动 70/70、宿主基线 69/69；单测 161/161；svelte-check 0 错误；
+  52 景截图全 OK（移动联系人页工具栏一行三件、卡片首屏立现）；构建通过。

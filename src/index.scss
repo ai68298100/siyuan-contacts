@@ -106,14 +106,43 @@
     .lvct-workbench__header { flex-wrap: wrap; }
     .lvct-workbench__header-actions { width: 100%; }
     .lvct-workbench__header-actions input { flex: 1; }
-    .lvct-people > .lvct-people__toolbar {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--lvct-sp-2);
-    }
-    .lvct-people > .lvct-people__toolbar > * { min-width: 0; width: 100%; box-sizing: border-box; }
-    .lvct-people > .lvct-people__toolbar > input:first-child,
-    .lvct-people > .lvct-people__toolbar > button:last-child { grid-column: 1 / -1; }
+    /* B09-1：移动工具栏收纳——常驻搜索（整行）+ 视图切换/新建/筛选与整理，其余进底部弹层 */
+    .lvct-people__toolbar { flex-wrap: wrap; row-gap: var(--lvct-sp-2); }
+    .lvct-people__toolbar > .b3-text-field { flex-basis: 100%; }
+}
+
+/* B09-1：移动端「筛选与整理」底部弹层（复用对话框遮罩与令牌） */
+.lvct-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: calc(var(--lvct-z-dialog) + 1);
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-3);
+    max-height: min(70vh, 520px);
+    padding: var(--lvct-sp-3) var(--lvct-sp-4) calc(var(--lvct-sp-4) + env(safe-area-inset-bottom));
+    box-sizing: border-box;
+    background: var(--lvct-bg-elevated);
+    border-top: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-lg) var(--lvct-r-lg) 0 0;
+    box-shadow: var(--lvct-shadow-3);
+}
+
+.lvct-sheet__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+
+.lvct-sheet__body {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--lvct-sp-2);
+    overflow-y: auto;
 }
 
 .lvct-workbench__nav {

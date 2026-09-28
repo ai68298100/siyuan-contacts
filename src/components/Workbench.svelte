@@ -195,6 +195,7 @@
                 <PeopleView
                     settings={currentSettings}
                     i18n={facade.i18n}
+                    isMobile={isMobile}
                     preferences={currentPreferences}
                     loadRecentInteractions={() => facade.loadRecentInteractions()}
                     initialSort={peopleFocusSort ?? currentPreferences.peopleSort}

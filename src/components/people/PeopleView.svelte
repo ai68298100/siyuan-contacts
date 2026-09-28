@@ -43,6 +43,7 @@
         onOrderChange,
         onOpenPersonDoc,
         onPreferencesChange,
+        isMobile = false,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
@@ -60,6 +61,8 @@
         onOrderChange?: (people: ContactSummary[]) => void;
         onOpenPersonDoc?: (docId: string) => void;
         onPreferencesChange: (preferences: ViewPreferences) => Promise<ViewPreferences>;
+        /** B09-1：移动端工具栏收纳（常驻搜索/视图切换/新建，其余收进底部弹层） */
+        isMobile?: boolean;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string) => translateText(i18n, key, fallback));
 
@@ -171,6 +174,8 @@
     let vcarding: boolean = $state(false);
     // C03 串行补录：对当前筛选列表逐个补缺失字段
     let completing: boolean = $state(false);
+    // B09-1：移动端「筛选与整理」底部弹层
+    let mobileSheetOpen: boolean = $state(false);
     let batchOpen: boolean = $state(false);
     let batchBusy: boolean = $state(false);
     let batchError: string = $state("");
@@ -505,7 +510,8 @@
 </script>
 
 <div class="lvct-people">
-    <div class="lvct-people__toolbar fn__flex">
+    <!-- B09-1：工具栏控件 snippet 化——桌面原位渲染；移动端收进「筛选与整理」底部弹层（互斥渲染，popover 单挂载） -->
+    {#snippet viewMenuControl()}
         <span id="lvct-people-viewsmenu" bind:this={viewsMenuWrap} style="position:relative; display:inline-flex">
             <button class="b3-button b3-button--outline" aria-label={text("peopleViews", "视图")} aria-expanded={viewsOpen} onclick={() => (viewsOpen = !viewsOpen)}>
                 <Bookmark size={16}/>{activeViewName ? `${text("peopleViews", "视图")}：${activeViewName}` : text("peopleViews", "视图")}
@@ -530,12 +536,8 @@
                 </div>
             {/if}
         </span>
-        <input
-            class="b3-text-field fn__flex-1"
-            type="text"
-            placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
-            bind:value={searchText}
-        />
+    {/snippet}
+    {#snippet filterControls()}
         <select class="b3-select" bind:value={groupFilter} onchange={() => (visibleCount = PAGE_SIZE)}>
             <option value="">{text("peopleAllGroups", "全部分组")}</option>
             {#each groups as group (group)}
@@ -604,6 +606,25 @@
                 </div>
             {/if}
         </span>
+    {/snippet}
+    {#snippet actionControls()}
+        <button class="b3-button b3-button--outline" onclick={() => (dupOpen = true)}>
+            {text("peopleCleanup", "整理")}{duplicatePairs.length > 0 ? ` ·${duplicatePairs.length}` : ""}
+        </button>
+        <button class="b3-button b3-button--outline" onclick={() => (importing = true)}><FolderInput size={16}/>{text("peopleImportDocs", "导入已有文档")}</button>
+        <button class="b3-button b3-button--outline" onclick={() => (vcarding = true)}><ContactRound size={16}/>{text("peopleVcard", "vCard 导入/导出")}</button>
+    {/snippet}
+    <div class="lvct-people__toolbar fn__flex">
+        {#if !isMobile}
+            {@render viewMenuControl()}
+            <input
+                class="b3-text-field fn__flex-1"
+                type="text"
+                placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
+                bind:value={searchText}
+            />
+            {@render filterControls()}
+        {/if}
         <span class="lvct-people__viewtoggle" style="position:relative; display:inline-flex">
             <button
                 class="b3-button b3-button--outline"
@@ -652,13 +673,36 @@
                 </span>
             {/if}
         </span>
-        <button class="b3-button b3-button--outline" onclick={() => (dupOpen = true)}>
-            {text("peopleCleanup", "整理")}{duplicatePairs.length > 0 ? ` ·${duplicatePairs.length}` : ""}
-        </button>
-        <button class="b3-button b3-button--outline" onclick={() => (importing = true)}><FolderInput size={16}/>{text("peopleImportDocs", "导入已有文档")}</button>
-        <button class="b3-button b3-button--outline" onclick={() => (vcarding = true)}><ContactRound size={16}/>{text("peopleVcard", "vCard 导入/导出")}</button>
-        <button class="b3-button b3-button--text" onclick={() => (adding = true)}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
+        {#if !isMobile}
+            {@render actionControls()}
+        {/if}
+        {#if !isMobile}
+            <button class="b3-button b3-button--text" onclick={() => (adding = true)}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
+        {:else}
+            <button class="b3-button b3-button--text" onclick={() => (adding = true)} aria-label={text("peopleCreate", "新建联系人")}><UserPlus size={16}/>{text("peopleCreate", "新建")}</button>
+            <button
+                class="b3-button b3-button--outline"
+                aria-label={text("peopleMobileTools", "筛选与整理")}
+                aria-expanded={mobileSheetOpen}
+                onclick={() => (mobileSheetOpen = true)}
+            ><SlidersHorizontal size={16}/>{text("peopleMobileTools", "筛选与整理")}{isExtraFilterActive(extraFilter) || duplicatePairs.length > 0 ? " ·" : ""}</button>
+        {/if}
     </div>
+    {#if isMobile && mobileSheetOpen}
+        <div class="lvct-dialog-mask" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) mobileSheetOpen = false; }}></div>
+        <div class="lvct-sheet" role="dialog" aria-label="筛选与整理">
+            <div class="lvct-sheet__bar">
+                <b>{text("peopleMobileTools", "筛选与整理")}</b>
+                <button type="button" class="b3-button b3-button--text" onclick={() => (mobileSheetOpen = false)}>{text("dashCollapse", "收起")}</button>
+            </div>
+            <div class="lvct-sheet__body">
+                {@render viewMenuControl()}
+                {@render filterControls()}
+                {@render actionControls()}
+                <button class="b3-button b3-button--outline" onclick={() => { mobileSheetOpen = false; adding = true; }}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
+            </div>
+        </div>
+    {/if}
     {#if recentError}<div class="lvct-form__error" role="alert">最近互动读取失败：{recentError}</div>{/if}
     {#if prefError}<div class="lvct-form__error" role="alert">显示偏好保存失败：{prefError}</div>{/if}
 
