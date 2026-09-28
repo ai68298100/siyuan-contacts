@@ -98,6 +98,58 @@ async function readColumnsOrEmpty(avId: string, dbBlockId: string): Promise<AvCo
     }
 }
 
+/** FUNC-01.8 锚点候选：全库扫描得到的一处可复用锚点（笔记本 + 宿主文档 + 数据库块） */
+export interface AnchorCandidate {
+    notebookId: string;
+    notebookName: string;
+    hostDocId: string;
+    /** 宿主文档路径（展示用） */
+    hpath: string;
+    dbBlockId: string;
+    avId: string;
+    /** 九字段契约对回的列数（0–9）；越高越可能是本插件的数据 */
+    matchedFields: number;
+}
+
+/**
+ * FUNC-01.8 锚点找回：全库只读扫描——所有笔记本中的「联系人总表」文档及其数据库块。
+ * 零写入、不创建任何内容；笔记本改名/文档移动后据此在设置页手动重绑，
+ * "找不到原锚点"时列表为空，停在预检，绝不自动建第二套数据。
+ */
+export async function scanAnchorCandidates(): Promise<AnchorCandidate[]> {
+    const candidates: AnchorCandidate[] = [];
+    for (const notebook of await listNotebooks()) {
+        let docs;
+        try {
+            docs = await listNotebookDocs(notebook.id);
+        } catch {
+            continue; /* 单个笔记本读取失败不阻断整体扫描 */
+        }
+        const hostDocs = docs.filter((doc) => doc.content === HOST_DOC_TITLE || doc.hpath === `/${HOST_DOC_TITLE}`);
+        for (const hostDoc of hostDocs) {
+            let avBlocks;
+            try {
+                avBlocks = await findAvBlocksInDoc(hostDoc.id);
+            } catch {
+                continue;
+            }
+            for (const block of avBlocks) {
+                const columns = await readColumnsOrEmpty(block.avId, block.dbBlockId);
+                candidates.push({
+                    notebookId: notebook.id,
+                    notebookName: notebook.name,
+                    hostDocId: hostDoc.id,
+                    hpath: hostDoc.hpath,
+                    dbBlockId: block.dbBlockId,
+                    avId: block.avId,
+                    matchedFields: reconcileFieldMap(columns).matched,
+                });
+            }
+        }
+    }
+    return candidates.sort((a, b) => b.matchedFields - a.matchedFields);
+}
+
 export async function loadSettings(plugin: Plugin): Promise<ContactsSettings | null> {
     return normalizeSettings(await loadJson(plugin, SETTINGS_STORAGE_KEY));
 }

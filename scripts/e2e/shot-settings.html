@@ -76,6 +76,7 @@
         repairFieldMap: async (patch) => ({ ...settings, fieldMap: { ...settings.fieldMap, ...patch } }),
         rebuildMissingFields: async () => settings,
         rebindSettings: async () => settings,
+        scanAnchorCandidates: async () => [],
         saveViewPreferences: async (v) => v,
         exportInteractionJson: async () => "{}",
         openHostDoc() {},

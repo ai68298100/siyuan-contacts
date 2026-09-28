@@ -29,6 +29,8 @@ export interface ContactsPluginFacade {
     initialize(notebookName: string, onProgress: (step: InitProgressStep) => void): Promise<ContactsSettings>;
     /** 初始化前预检：同名笔记本/宿主文档/数据库/可复用字段（向导据此提示将复用哪些内容） */
     previewInitialize(notebookName: string): Promise<WorkspaceSnapshot>;
+    /** FUNC-01.8 锚点找回：全库只读扫描可复用锚点（零写入），供设置页重绑候选选择 */
+    scanAnchorCandidates(): Promise<import("./services/init").AnchorCandidate[]>;
     /** 仪表盘聚合（近期生日/久未联系/统计） */
     loadDashboard(options?: Partial<DashboardOptions>): Promise<DashboardData>;
     /** 记一笔互动（幂等） */

@@ -14,7 +14,7 @@ import AddPersonDialog from "./components/people/AddPersonDialog.svelte";
 import PersonEditDialog from "./components/people/PersonEditDialog.svelte";
 import { parseContactText } from "./domain/quick-fill";
 import { getRoster } from "./services/roster";
-import { initializeWorkspace, inspectWorkspace, loadSettings } from "./services/init";
+import { initializeWorkspace, inspectWorkspace, loadSettings, scanAnchorCandidates } from "./services/init";
 import { configureCloseGuardI18n } from "./components/close-guard";
 import type { InitProgressStep, WorkspaceSnapshot } from "./services/init";
 import { loadDashboard, DEFAULT_DASHBOARD_OPTIONS } from "./services/dashboard";
@@ -365,6 +365,10 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     async previewInitialize(notebookName: string): Promise<WorkspaceSnapshot> {
         return inspectWorkspace(notebookName);
+    }
+
+    async scanAnchorCandidates() {
+        return scanAnchorCandidates();
     }
 
     async loadDashboard(options?: Partial<typeof DEFAULT_DASHBOARD_OPTIONS>) {

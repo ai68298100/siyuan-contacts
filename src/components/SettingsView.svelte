@@ -10,6 +10,7 @@
     import { DEFAULT_VIEW_PREFERENCES } from "../domain/preferences";
     import pluginManifest from "../../plugin.json";
     import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "../services/settings-health";
+    import type { AnchorCandidate } from "../services/init";
     import type { ExportSummary } from "../services/export-center";
     import type { InteractionImportDiff } from "../domain/interaction-backup";
     import type { AuditIssue } from "../domain/health-audit";
@@ -57,6 +58,32 @@
     let preferencesMessage = $state("");
     let rebinding = $state(false);
     let rebindOpen = $state(false);
+    // FUNC-01.8 锚点找回：全库只读扫描候选，选中后填入手填框，提交仍走既有验证路径
+    let anchorCandidates: AnchorCandidate[] | null = $state(null);
+    let scanningAnchors = $state(false);
+    let selectedCandidateKey = $state("");
+    function candidateKey(candidate: AnchorCandidate): string {
+        return `${candidate.notebookId}/${candidate.hostDocId}/${candidate.dbBlockId}/${candidate.avId}`;
+    }
+    async function runAnchorScan() {
+        if (scanningAnchors) return;
+        scanningAnchors = true;
+        errorText = "";
+        try {
+            anchorCandidates = await facade.scanAnchorCandidates();
+            selectedCandidateKey = "";
+        } catch (error) {
+            errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            scanningAnchors = false;
+        }
+    }
+    function applySelectedCandidate() {
+        const picked = (anchorCandidates ?? []).find((candidate) => candidateKey(candidate) === selectedCandidateKey);
+        if (!picked) return;
+        anchorDraft = { hostDocId: picked.hostDocId, dbBlockId: picked.dbBlockId, avId: picked.avId };
+        rebindMessage = `已填入「${picked.notebookName}」的候选锚点，确认后点「验证并重新绑定」。`;
+    }
     let rebindMessage = $state("");
     let exportingInteractions = $state(false);
     let exportMessage = $state("");
@@ -507,6 +534,30 @@
                     {#if rebindOpen}
                         <div class="lvct-settings__rebind">
                             <p>仅在迁移或恢复了已有数据库时使用。提交前会验证属性视图并按原 ID 或标准字段名恢复映射，剩余缺失字段可再通过健康检查补建。</p>
+                            <div class="lvct-settings__actions">
+                                <button class="b3-button b3-button--outline" onclick={runAnchorScan} disabled={scanningAnchors}>{scanningAnchors ? "扫描中…" : "扫描全库候选（只读）"}</button>
+                                <span class="ft__smaller ft__on-surface">当前绑定：文档 …{settings.hostDocId.slice(-6)} · 块 …{settings.dbBlockId.slice(-6)} · 视图 …{settings.avId.slice(-6)}（填错可按此改回）</span>
+                            </div>
+                            {#if anchorCandidates !== null}
+                                {#if anchorCandidates.length === 0}
+                                    <p class="lvct-settings__inline-hint" role="status">全库未找到「联系人总表」文档及数据库块。确认笔记本未被删除后，可手动粘贴 ID；扫描零写入，不会自动创建第二套数据。</p>
+                                {:else}
+                                    <ul class="lvct-settings__missing">
+                                        {#each anchorCandidates as candidate (candidateKey(candidate))}
+                                            <li>
+                                                <label class="lvct-settings__candidate">
+                                                    <input type="radio" name="lvct-anchor-candidate" value={candidateKey(candidate)} bind:group={selectedCandidateKey} />
+                                                    <span>{candidate.notebookName} / {candidate.hpath || "/"} · 可对回字段 {candidate.matchedFields}/9</span>
+                                                    <small class="ft__smaller ft__on-surface">文档 …{candidate.hostDocId.slice(-6)} · 块 …{candidate.dbBlockId.slice(-6)}</small>
+                                                </label>
+                                            </li>
+                                        {/each}
+                                    </ul>
+                                    <div class="lvct-settings__actions">
+                                        <button class="b3-button b3-button--outline" disabled={!selectedCandidateKey} onclick={applySelectedCandidate}>填入所选候选</button>
+                                    </div>
+                                {/if}
+                            {/if}
                             <div class="lvct-settings__rebind-grid">
                                 <label class="lvct-form__item"><span>宿主文档 ID</span><input class="b3-text-field fn__block" bind:value={anchorDraft.hostDocId} /></label>
                                 <label class="lvct-form__item"><span>数据库块 ID</span><input class="b3-text-field fn__block" bind:value={anchorDraft.dbBlockId} /></label>

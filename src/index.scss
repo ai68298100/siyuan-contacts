@@ -1149,6 +1149,16 @@
     b { display: block; margin-bottom: var(--lvct-sp-2); font-size: var(--lvct-fs-body); }
 }
 
+.lvct-settings__candidate {
+    display: flex;
+    align-items: baseline;
+    gap: var(--lvct-sp-2);
+    cursor: pointer;
+
+    input[type="radio"] { flex-shrink: 0; cursor: pointer; }
+    span { min-width: 0; }
+}
+
 .lvct-settings__rebind {
     margin-top: var(--lvct-sp-2);
     padding: var(--lvct-sp-3);
