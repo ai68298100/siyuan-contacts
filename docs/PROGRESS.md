@@ -1148,3 +1148,15 @@
 - **README 中英同步核对（RELEASE 发布前项）**：版本号一致（均 v0.3.0）；英文版能力清单
   漏「资料完整度补录」「跨窗口刷新提示」两项，已补齐对齐。
 - 验证（docs-only）：单测 177/177、collect-i18n 0 缺失。
+
+## 发布收尾 第 34 轮：终态一致性扫描——dist 重建 + RELEASE 版本行校正（2026-09-29）
+
+- **dist 过期重建**：第 33 轮改了 README.en-US.md 后未重新构建，`dist/README.en-US.md`（随
+  package.zip 发布）仍是旧能力清单；`pnpm run build` 重建 + `check:release` 通过，
+  dist 与源码 README 已 diff 核对一致。
+- **RELEASE.md 校正**：质量门禁段两行 v0.2.1 时代的已勾选项（「版本号一致为 0.2.1，已发布」
+  「README 功能表与 v0.2.1 一致」）更新为 0.3.0 候选口径。
+- **其余核对无漂移**：BACKLOG 顶部块声明的 commit 范围（e76a883 首个未推送、19e62b5 已推送）
+  属实；plugin.json/package.json/CHANGELOG 均为 0.3.0；CHANGELOG [0.3.0] 已知限制三条仍准确；
+  ROADMAP 已知问题两条（i18n 文件名加载、宿主文档改名续建）均为待真机项，与键补齐无关。
+- 验证：check:release 全 PASS（新构建）。

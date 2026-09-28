@@ -16,8 +16,8 @@ node scripts/e2e/load-check.mjs          # 隔离内核加载
 node scripts/e2e/contacts-flow.mjs       # 联系人流程 10/10
 ```
 
-- [x] 版本号：plugin.json 与 package.json 一致为 0.2.1，已发布
-- [x] README.md / README.en-US.md 功能表与 v0.2.1 已交付功能一致
+- [x] 版本号：plugin.json 与 package.json 一致为 0.3.0（候选，待作者推送/发布；v0.2.1 已发布）
+- [x] README.md / README.en-US.md 功能表与 v0.3.0 已交付功能一致（2026-09-29 中英能力清单已对齐）
 - [ ] icon.png/preview.png 终稿（当前为脚本生成的家庭视觉版，可请人重绘后替换，重跑 gen-icon 逻辑不变）
 
 CI 在构建和上传产物前执行两套浏览器回归。内核脚本只在隔离工作区执行，先核实目标；故障模拟先保存原文件，不对用户笔记做破坏性测试。隔离 UI 使用内存替身，不证明真实 AV 写入或宿主行为。
