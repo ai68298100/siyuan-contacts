@@ -11,6 +11,8 @@ import { projectOpenFollowUps } from "../domain/followups";
 import type { FollowUpBucket, FollowUpItem } from "../domain/followups";
 import { staleContacts } from "../domain/interactions";
 import { toLocalDateKey } from "../domain/interactions";
+import { loadReminderDismissals } from "../data/reminder-dismissals";
+import { isDismissed } from "../domain/reminder-dismissals";
 import { buildActionCards } from "../domain/action-list";
 import type { ActionCard, ActionPersonInput } from "../domain/action-list";
 import { upcomingBirthdays } from "../domain/occasions";
@@ -43,7 +45,10 @@ export interface DashboardData {
     relations: number;
     birthdays: UpcomingBirthday[];
     birthdaysThisWeek: number;
+    /** 久未联系提醒行（已剔除提醒暂缓中的人物，B08）；统计真实数见 staleTotal */
     stale: StalenessInfo[];
+    /** 久未联系真实总数（含提醒暂缓中的人，D-0020 统计口径不变） */
+    staleTotal: number;
     neverContacted: number;
     neverContactedItemIds: string[];
     /** 待办跟进（F05）：逾期/今天/未来 7 天，open 状态 */
@@ -70,7 +75,7 @@ export function pickSummaryCounts(data: DashboardData | null, actions: readonly 
         total: actions.length,
         overdue: actions.filter((card) => card.bucket === "overdue").length,
         birthdaysToday: (data?.birthdays ?? []).filter((item) => item.bucket === "today").length,
-        stale: data?.stale.length ?? 0,
+        stale: data?.staleTotal ?? data?.stale.length ?? 0,
     };
 }
 export async function loadDashboard(
@@ -78,18 +83,22 @@ export async function loadDashboard(
     settings: ContactsSettings,
     options: DashboardOptions = DEFAULT_DASHBOARD_OPTIONS,
 ): Promise<DashboardData> {
-    const [people, store, followUpStore, cadences] = await Promise.all([
+    const [people, store, followUpStore, cadences, dismissals] = await Promise.all([
         listContacts(settings),
         loadInteractionStore(plugin),
         loadFollowUpStore(plugin),
         loadCadenceMap(plugin),
+        loadReminderDismissals(plugin),
     ]);
-    const birthdays: UpcomingBirthday[] = upcomingBirthdays(people)
-        .filter((item) => item.projection.daysUntil <= options.birthdayWindowDays);
+    const today = toLocalDateKey(new Date());
+    // B08：提醒暂缓只屏蔽呈现——生日与久未联系提醒行过滤，统计与名单口径保持真实
+    const birthdays = upcomingBirthdays(people)
+        .filter((item) => item.projection.daysUntil <= options.birthdayWindowDays)
+        .filter((item) => !isDismissed(dismissals, item.person.docId, "birthday", today));
     const staleAll = staleContacts(store, people, options.staleThresholdDays, new Date(), cadences);
+    const staleRemindable = staleAll.filter((info) => !isDismissed(dismissals, info.person.docId, "stale", today));
     const neverContactedPeople = staleAll.filter((item) => item.lastDaysAgo === undefined);
 
-    const today = toLocalDateKey(new Date());
     const buckets = projectOpenFollowUps(followUpStore.items, today);
     const peopleByDocId = new Map(people.map((person) => [person.docId, person]));
     const withBucket = (item: FollowUpItem): FollowUpCard => {
@@ -118,7 +127,8 @@ export async function loadDashboard(
     }
     const inputs: ActionPersonInput[] = people.map((person) => {
         const birthday = birthdays.find((item) => item.person.docId === person.docId);
-        const staleInfo = staleAll.find((info) => info.person.docId === person.docId);
+        /* 被提醒暂缓的人不产生久未联系行动卡（呈现屏蔽）；统计保持真实 */
+        const staleInfo = staleRemindable.find((info) => info.person.docId === person.docId);
         return {
             person,
             ...(birthday ? { birthdayDaysUntil: birthday.projection.daysUntil, birthdayDate: toLocalDateKey(birthday.projection.date) } : {}),
@@ -132,7 +142,8 @@ export async function loadDashboard(
         relations: Math.round(people.reduce((sum, person) => sum + person.relatedItemIds.length, 0) / 2),
         birthdays,
         birthdaysThisWeek: birthdays.filter((item) => item.bucket === "today" || item.bucket === "week").length,
-        stale: staleAll,
+        stale: staleRemindable,
+        staleTotal: staleAll.length,
         neverContacted: neverContactedPeople.length,
         neverContactedItemIds: neverContactedPeople.map((item) => item.person.itemId),
         followUps,

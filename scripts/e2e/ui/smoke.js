@@ -427,6 +427,59 @@ await test("今日行动分组折叠：从未互动单独归组默认折叠，�
     assert(!fixture.textContent.includes("从未甲"), "再次点击未收起");
 });
 
+await test("行内快捷处置：生日跳过本年、从未互动不再提醒，写入暂缓（B08）", async () => {
+    const dismissals = [];
+    const personOf = (name) => ({
+        docId: `20260927000000-${name}0000`, itemId: `row-${name}`, name,
+        phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
+        group: "", tags: [], relatedItemIds: [],
+    });
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadRecentInteractions: async () => ({}),
+            loadDashboard: async () => ({
+                people: 2, relations: 0,
+                birthdays: [{ person: personOf("寿星甲"), bucket: "today", projection: { daysUntil: 0, label: "9月29日" } }],
+                birthdaysThisWeek: 1,
+                stale: [], staleTotal: 1, neverContacted: 1, neverContactedItemIds: [],
+                followUps: [], actions: [
+                    { person: personOf("寿星甲"), bucket: "today", reasons: [
+                        { kind: "birthday", label: "今天生日", bucket: "today" },
+                    ] },
+                    { person: personOf("从未乙"), bucket: "stale", reasons: [
+                        { kind: "stale", label: "从未互动", bucket: "stale", neverContacted: true },
+                    ] },
+                ],
+            }),
+            dismissReminder: async (docId, kind, until) => dismissals.push({ docId, kind, until }),
+            getPersonCadence: async () => null,
+            savePersonCadence: async () => {},
+        },
+    } });
+    await until(() => fixture.querySelector(".lvct-dash__row"), "行动未渲染");
+    /* 生日行：跳过本年 → until 为当年 12-31 */
+    const skipButton = [...fixture.querySelectorAll("button")].find((node) => node.textContent === "跳过本年");
+    assert(skipButton, "生日行缺「跳过本年」按钮");
+    skipButton.click();
+    await until(() => dismissals.some((entry) => entry.kind === "birthday"), "生日跳过未写入");
+    const year = new Date().getFullYear();
+    assert(dismissals.find((entry) => entry.kind === "birthday").until === `${year}-12-31`, "跳过本年 until 应为年底");
+    /* 从未互动行动行：组默认折叠 → 展开组头 → ⋯ → 不再提醒（长期，统计口径不变由服务层保证） */
+    const neverHead = [...fixture.querySelectorAll(".lvct-dash__group-head")]
+        .find((node) => node.textContent.includes("从未互动"));
+    assert(neverHead, "从未互动组头未渲染");
+    neverHead.click();
+    await tick();
+    const more = [...fixture.querySelectorAll("button")]
+        .find((node) => (node.getAttribute("aria-label") ?? "").includes("更多处置") && (node.getAttribute("aria-label") ?? "").includes("从未乙"));
+    assert(more, "行动行缺更多处置按钮");
+    more.click();
+    await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent === "不再提醒"), "处置菜单未展开");
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent === "不再提醒").click();
+    await until(() => dismissals.some((entry) => entry.kind === "stale" && entry.until === ""), "不再提醒未写入长期暂缓");
+});
+
 await test("新建草稿关闭前三选一：取消保留草稿，放弃后关闭且弹窗列明细", async () => {
     const guardDialog = () => document.body.querySelector(".lvct-closeguard");
     try {

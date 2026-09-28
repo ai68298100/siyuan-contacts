@@ -14,6 +14,7 @@
     import type { ExportSummary } from "../services/export-center";
     import type { InteractionImportDiff } from "../domain/interaction-backup";
     import type { AuditIssue, AuditIssueKind } from "../domain/health-audit";
+    import type { ReminderDismissal } from "../domain/reminder-dismissals";
 
     let {
         facade,
@@ -56,6 +57,35 @@
     // FUNC-01.4 资料体检：只读巡检，结果按类列出（缺字段/悬空关系/孤儿互动等）
     let auditIssues: AuditIssue[] | null = $state(null);
     let auditBusy = $state(false);
+    // B08：已暂缓提醒（reminder-dismissals）恢复入口
+    let dismissedReminders: ReminderDismissal[] | null = $state(null);
+    let dismissalsLoading = $state(false);
+    let dismissalsBusy = $state(false);
+    let dismissalsError = $state("");
+    async function loadDismissedReminders(): Promise<void> {
+        if (dismissalsLoading) return;
+        dismissalsLoading = true;
+        dismissalsError = "";
+        try {
+            dismissedReminders = await facade.loadReminderDismissals();
+        } catch (error) {
+            dismissalsError = error instanceof Error ? error.message : String(error);
+        } finally {
+            dismissalsLoading = false;
+        }
+    }
+    async function resumeOne(personDocId: string, kind: "birthday" | "stale"): Promise<void> {
+        if (dismissalsBusy) return;
+        dismissalsBusy = true;
+        try {
+            await facade.resumeReminder(personDocId, kind);
+            dismissedReminders = await facade.loadReminderDismissals();
+        } catch (error) {
+            dismissalsError = error instanceof Error ? error.message : String(error);
+        } finally {
+            dismissalsBusy = false;
+        }
+    }
     /* C03：可跳转联系人页聚焦的体检类（人物 itemIds 语义）；孤儿互动/不可达跟进是 docId 语义，不跳转 */
     const jumpableAuditKinds: ReadonlySet<AuditIssueKind> = new Set([
         "missingPhone", "missingBirthday", "missingContact", "noGroupNoTags", "suspiciousBirthday", "danglingRelation",
@@ -769,6 +799,39 @@
                 <section class="lvct-settings__panel">
                     <h2>{text("settingsReminder", "提醒")}</h2>
                     <p class="lvct-settings__desc">首页展示近期公历和农历生日，根据互动事件计算联系间隔。</p>
+
+                    <!-- B08：已暂缓的提醒（reminder-dismissals）一键恢复，避免"点过就找不回" -->
+                    <div class="lvct-settings__sub-heading">
+                        <b>已暂缓的提醒</b>
+                        <button class="b3-button b3-button--outline" onclick={loadDismissedReminders} disabled={dismissalsLoading}>
+                            {dismissalsLoading ? "读取中…" : "刷新列表"}
+                        </button>
+                    </div>
+                    {#if dismissalsError}<div class="lvct-form__error">{dismissalsError}</div>{/if}
+                    {#if dismissedReminders !== null}
+                        {#if dismissedReminders.length === 0}
+                            <p class="lvct-settings__inline-hint" role="status">当前没有暂缓中的提醒。生日「跳过本年」与「不再提醒」会出现在这里。</p>
+                        {:else}
+                            <ul class="lvct-settings__missing">
+                                {#each dismissedReminders as entry (entry.personDocId + entry.kind)}
+                                    <li>
+                                        <div>{entry.kind === "birthday" ? "生日提醒" : "久未联系/从未互动提醒"} · 文档 …{entry.personDocId.slice(-6)}</div>
+                                        <div class="ft__smaller ft__on-surface">
+                                            {entry.until === "" ? "长期暂缓（直到手动恢复）" : `暂缓至 ${entry.until}`}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            class="b3-button b3-button--outline"
+                                            disabled={dismissalsBusy}
+                                            onclick={() => resumeOne(entry.personDocId, entry.kind)}
+                                        >恢复提醒</button>
+                                    </li>
+                                {/each}
+                            </ul>
+                        {/if}
+                    {:else}
+                        <p class="lvct-settings__inline-hint">读取暂缓列表后可在此一键恢复被隐藏的提醒；暂缓只影响提醒呈现，不影响统计。</p>
+                    {/if}
 
                     <div class="lvct-settings__form-grid">
                         <label class="lvct-form__item">

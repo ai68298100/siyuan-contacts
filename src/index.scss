@@ -2538,6 +2538,15 @@
     color: var(--lvct-text-2);
 }
 
+/* B08：行动行包装（行 + 行内处置菜单）与菜单块 */
+.lvct-dash__rowwrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.lvct-dash__rowmenu { flex-wrap: wrap; }
+
 .lvct-dash__row {
     display: flex;
     align-items: center;

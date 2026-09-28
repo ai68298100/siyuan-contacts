@@ -64,6 +64,11 @@ export interface ContactsPluginFacade {
     /** 联系节奏（F06）：按人覆盖久未联系阈值或暂停；未登记返回 null（跟随全局），保存 null 清除覆盖 */
     getPersonCadence(personDocId: string): Promise<PersonCadence | null>;
     savePersonCadence(personDocId: string, cadence: PersonCadence | null): Promise<void>;
+    /** B08 提醒暂缓（reminder-dismissals.json）：只屏蔽提醒呈现，统计口径不变 */
+    dismissReminder(personDocId: string, kind: "birthday" | "stale", until: string): Promise<void>;
+    resumeReminder(personDocId: string, kind: "birthday" | "stale"): Promise<void>;
+    /** 已暂缓提醒列表（设置页恢复入口用） */
+    loadReminderDismissals(): Promise<import("./domain/reminder-dismissals").ReminderDismissal[]>;
     /** 互动备注模板（F09）：空存储返回内置默认；全量保存（增改删统一入口） */
     listTemplates(): Promise<NoteTemplate[]>;
     saveTemplates(templates: readonly NoteTemplate[]): Promise<NoteTemplate[]>;

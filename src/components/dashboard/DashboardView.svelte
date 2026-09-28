@@ -77,6 +77,60 @@
         groupOverrides = next;
     }
 
+    // ---- B08 行内快捷处置（生日跳过本年 / 久未联系顺延与不再提醒 / 从未互动跳过今天） ----
+    let rowMenuKey = $state("");
+    function toggleRowMenu(key: string): void {
+        rowMenuKey = rowMenuKey === key ? "" : key;
+    }
+    function isNeverCard(card: ActionCard): boolean {
+        return card.reasons.some((reason) => reason.neverContacted);
+    }
+    async function dismissBirthday(person: ContactSummary): Promise<void> {
+        const year = new Date().getFullYear();
+        await facade.dismissReminder(person.docId, "birthday", `${year}-12-31`);
+        alMessage = `已跳过「${person.name}」本年生日提醒，跨年自动恢复`;
+        rowMenuKey = "";
+        await refresh();
+    }
+    async function dismissStaleReminder(person: ContactSummary): Promise<void> {
+        await facade.dismissReminder(person.docId, "stale", "");
+        alMessage = `已不再提醒「${person.name}」，可在设置-提醒中恢复`;
+        rowMenuKey = "";
+        await refresh();
+    }
+    async function dismissNeverToday(person: ContactSummary): Promise<void> {
+        await facade.dismissReminder(person.docId, "stale", toLocalToday());
+        alMessage = `今天先跳过「${person.name}」的提醒`;
+        rowMenuKey = "";
+        await refresh();
+    }
+    async function snoozeStale(person: ContactSummary, days: number): Promise<void> {
+        const info = data?.stale.find((item) => item.person.docId === person.docId);
+        const lastDays = info?.lastDaysAgo ?? 0;
+        const existing = await facade.getPersonCadence(person.docId);
+        const target = Math.min(365, lastDays + days);
+        await facade.savePersonCadence(person.docId, { days: target, paused: existing?.paused ?? false });
+        alMessage = `「${person.name}」已顺延：${target} 天内不再提醒`;
+        rowMenuKey = "";
+        await refresh();
+    }
+    function toLocalToday(): string {
+        const now = new Date();
+        const pad = (value: number) => String(value).padStart(2, "0");
+        return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    }
+    async function runRowAction(action: () => Promise<void>): Promise<void> {
+        alBusy = true;
+        alError = "";
+        try {
+            await action();
+        } catch (error) {
+            alError = error instanceof Error ? error.message : String(error);
+        } finally {
+            alBusy = false;
+        }
+    }
+
     const greetingKey = (() => {
         const hour = new Date().getHours();
         if (hour < 6) return "dashGreetingNight";
@@ -316,18 +370,40 @@
                 </ViewState>
             {:else}
                 {#snippet actionRow(card: ActionCard)}
-                    <div class="lvct-dash__row">
-                        <button class="lvct-dash__row-main" onclick={() => onOpenDetail(card.person)}>
-                            <b>{card.person.name}</b>
-                            <span class="lvct-dash__reasons">
-                                {#each card.reasons as reason (reason.kind + (reason.followUpId ?? ""))}
-                                    <span class="lvct-chip lvct-action-chip lvct-action-chip--{reason.bucket}">{reason.label}</span>
-                                {/each}
-                            </span>
-                        </button>
-                        <button class="b3-button b3-button--outline lvct-dash__quick-button" onclick={() => onOpenDetail(card.person)}>
-                            {card.bucket === "stale" ? text("dashTakeALook", "去看看") : text("dashProcess", "处理")}
-                        </button>
+                    <div class="lvct-dash__rowwrap">
+                        <div class="lvct-dash__row">
+                            <button class="lvct-dash__row-main" onclick={() => onOpenDetail(card.person)}>
+                                <b>{card.person.name}</b>
+                                <span class="lvct-dash__reasons">
+                                    {#each card.reasons as reason (reason.kind + (reason.followUpId ?? ""))}
+                                        <span class="lvct-chip lvct-action-chip lvct-action-chip--{reason.bucket}">{reason.label}</span>
+                                    {/each}
+                                </span>
+                            </button>
+                            <button class="b3-button b3-button--outline lvct-dash__quick-button" onclick={() => onOpenDetail(card.person)}>
+                                {card.bucket === "stale" ? text("dashTakeALook", "去看看") : text("dashProcess", "处理")}
+                            </button>
+                            {#if card.bucket === "stale"}
+                                <button
+                                    class="b3-button b3-button--outline lvct-dash__quick-button"
+                                    aria-label={`更多处置：${card.person.name}`}
+                                    aria-expanded={rowMenuKey === `action:${card.person.docId}`}
+                                    onclick={() => toggleRowMenu(`action:${card.person.docId}`)}
+                                >⋯</button>
+                            {/if}
+                        </div>
+                        {#if rowMenuKey === `action:${card.person.docId}`}
+                            <div class="lvct-dash__quick-form lvct-dash__rowmenu">
+                                {#if isNeverCard(card)}
+                                    <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => dismissNeverToday(card.person))}>今天先跳过</button>
+                                {:else}
+                                    <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(card.person, 3))}>顺延 3 天</button>
+                                    <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(card.person, 7))}>顺延 1 周</button>
+                                    <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(card.person, 30))}>顺延 1 个月</button>
+                                {/if}
+                                <button class="b3-button b3-button--cancel" disabled={alBusy} onclick={() => runRowAction(() => dismissStaleReminder(card.person))}>不再提醒</button>
+                            </div>
+                        {/if}
                     </div>
                 {/snippet}
                 <!-- B01：按原因分组折叠；「从未互动」单独归组且默认折叠，组头计数即展开入口 -->
@@ -367,13 +443,30 @@
                 {:else}
                     <div class="lvct-dash__list">
                         {#each previewList(data?.birthdays ?? [], showAllBirthdays, BIRTHDAY_PREVIEW_LIMIT) as item (item.person.itemId)}
-                            <button class="lvct-dash__row" onclick={() => onOpenDetail(item.person)}>
+                            <div
+                                class="lvct-dash__row"
+                                role="button"
+                                tabindex="0"
+                                onclick={() => onOpenDetail(item.person)}
+                                onkeydown={(event) => {
+                                    if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
+                                    event.preventDefault();
+                                    onOpenDetail(item.person);
+                                }}
+                            >
                                 <b>{item.person.name}</b>
                                 <span class="ft__smaller ft__on-surface">{item.projection.label}{item.person.isLunar ? "（农历）" : ""}</span>
                                 <span class="lvct-bucket {bucketStyles[item.bucket]}">
                                     {item.projection.daysUntil === 0 ? text("dashFuToday", "今天") : text("dashDaysUntilN", "{n}天", { n: item.projection.daysUntil })}
                                 </span>
-                            </button>
+                                <span style="flex:1"></span>
+                                <button
+                                    type="button"
+                                    class="b3-button b3-button--text lvct-dash__quick-button"
+                                    title={`跳过 ${item.person.name} 本年生日提醒`}
+                                    onclick={(event) => { event.stopPropagation(); runRowAction(() => dismissBirthday(item.person)); }}
+                                >跳过本年</button>
+                            </div>
                         {/each}
                     </div>
                     {#if data.birthdays.length > BIRTHDAY_PREVIEW_LIMIT}
@@ -415,7 +508,21 @@
                                         {quickDoneId === item.person.itemId ? text("dashRecordedDone", "已记录 ✓") : text("dashQuickRecord", "记一笔")}
                                     </button>
                                 {/if}
+                                <button
+                                    class="b3-button b3-button--outline lvct-dash__quick-button"
+                                    aria-label={`更多处置：${item.person.name}`}
+                                    aria-expanded={rowMenuKey === `stale:${item.person.docId}`}
+                                    onclick={(event) => { event.stopPropagation(); toggleRowMenu(`stale:${item.person.docId}`); }}
+                                >⋯</button>
                             </div>
+                            {#if rowMenuKey === `stale:${item.person.docId}`}
+                                <div class="lvct-dash__quick-form lvct-dash__rowmenu">
+                                    <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(item.person, 3))}>顺延 3 天</button>
+                                    <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(item.person, 7))}>顺延 1 周</button>
+                                    <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(item.person, 30))}>顺延 1 个月</button>
+                                    <button class="b3-button b3-button--cancel" disabled={alBusy} onclick={() => runRowAction(() => dismissStaleReminder(item.person))}>不再提醒</button>
+                                </div>
+                            {/if}
                         {/each}
                     </div>
                     {#if data.stale.length > STALE_PREVIEW_LIMIT}

@@ -93,6 +93,13 @@
 | `person-cadences.json` | 1 | 按人物联系节奏（F06）：`{schemaVersion, cadences: {"<personDocId>": {days, paused}}}`。仅存覆盖项，未登记的人物跟随全局久未联系阈值；`days` 为 1–365 整数（写入时钳制），`paused: true` 表示对该人暂停提醒（久未联系与从未互动均不再出现）。键必须是通过 `^\d{14}-[0-9a-z]{7}$` 校验的人物文档 ID，非法键或非法值条目在归一化时丢弃；补录过去互动不影响（最近互动一律取最大 `occurredAt`）。展示读取容错；写入在存储锁内严格读取，损坏拒绝不覆盖。删除键即清除覆盖回退全局 |
 | `interaction-templates.json` | 1 | 互动备注模板（F09）：`{schemaVersion, templates: [{id, name, content}]}`。归一化丢弃缺 id 或 name/content 非字符串的条目，name/content 去首尾空白，按 id 去重，上限 50 条。存储为空时展示内置默认三个模板（见面/电话/聚会，来自代码常量不落盘）；任何增改删即全量落盘，此后以存储为准（删除内置模板即永久移除）。模板内容支持 `{{姓名}}`/`{{日期}}`/`{{上次互动}}` 占位符，应用时纯本地字符串替换，未知占位符原样保留；模板文本不发送 AI，应用模板不自动提交、不悄悄覆盖已有草稿 |
 | `bridge-state.json` | （M4） | 打卡联动状态机（unsupported/pending/ready/failed） |
+| `reminder-dismissals.json` | 1 | 提醒暂缓（B08）：`{schemaVersion, dismissals: [{personDocId, kind, until}]}`。`kind ∈ birthday\|stale`；`until` 为 `YYYY-MM-DD` 或空串（空串=长期，直到手动恢复）。**只屏蔽提醒呈现，不改变统计与名单口径**——生日 `until` ≥ 当天（含空串）时该人生日不出现在近期生日/行动清单（「跳过本年」写入当年 `12-31`，跨年自动恢复）；stale 命中时该人的久未联系/从未互动**提醒行**隐藏，首页久未联系统计卡与名单计数保持真实。键必须通过人物文档 ID 校验，非法条目归一化丢弃；同一 `personDocId+kind` 仅一条（重复写入覆盖）。写入在存储锁内严格读取，损坏或未知版本拒绝写入不覆盖；恢复即删除对应条目；设置页「提醒」分区提供已暂缓列表与一键恢复 |
+
+**reminder-dismissals 与 person-cadences 的分工**：`person-cadences.json` 的 `days` 表达"按更长节奏
+提醒"（顺延 N 天 = `days` 提至最近互动天数 + N，名单按新阈值收敛，属联系节奏正常语义）；`paused`
+表达"联系节奏层面手动暂停"（既有行为：从久未联系名单排除）。B08 的「不再提醒」**不写 `paused`**，
+写 `reminder-dismissals.json`（kind=stale, until=""）——保证首页久未联系统计与名单计数保持真实
+（D-0020），仅提醒行隐藏且可一键恢复；`birthday` 同理只屏蔽生日提醒呈现。
 
 同一场合允许每位参与者各有一条互动事件；`source+externalRef` 表示共同场合，
 只有人物 ID 也相同时才判定重复。事件 ID 在全库唯一，归一化同时按事件 ID 去重。

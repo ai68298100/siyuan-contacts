@@ -886,3 +886,22 @@
 - 验证：单测 162/162（新增分组用例：五组分类/never 判定/混合卡/组内排序）；svelte-check 0 错误；
   隔离回归桌面 71/71、移动 72/72、宿主基线 71/71；52 景截图全 OK；构建通过。
 - 余留：从未互动组内"按最近收编/编辑"排序随 C02 接入收编时间索引。
+
+## 批次 3 第 15 轮：B08 行内快捷处置 + 提醒暂缓（2026-09-29）
+
+- **契约先行**：`DATA-CONTRACT.md` §3 新增 `reminder-dismissals.json`（v1）——`{personDocId, kind ∈
+  birthday|stale, until}`，until 为 YYYY-MM-DD（含当天）或空串（长期）；只屏蔽提醒呈现、不改统计与
+  名单口径；「跳过本年」写入当年 12-31 跨年自动恢复；同 personDocId+kind 去重；锁内严格写入。
+  **口径细化**：「不再提醒」不写 `person-cadences.paused`（paused 会把人从名单排除，违反 D-0020
+  统计真实），改写 dismissal（kind=stale, until=""）——契约中已记与 cadences 的分工。
+- **域层/数据层**：`domain/reminder-dismissals.ts`（normalize 丢弃非法条目/去重、isDismissed 含当天
+  与长期语义、dismissalsFor）+ `data/reminder-dismissals.ts`（锁内严格读写、upsert/删除幂等）+ 单测
+  3 例。`dashboard.ts` 服务过滤：生日与久未联系提醒行按暂缓屏蔽，新增 `staleTotal` 保持统计真实
+  （`pickSummaryCounts` 回退兼容旧 mock）。
+- **UI**：近期生日行「跳过本年」；久未联系行与行动区 stale 行「⋯」菜单（顺延 3 天/1 周/1 月 =
+  cadences.days 提至最近互动+N、不再提醒 = dismissal 长期）；从未互动行「今天先跳过」；操作后行就地
+  消失 + 消息提示（撤销随 C06）。生日行从 button 改 div role=button（避免嵌套 button 无效 HTML）。
+  设置页「提醒」分区新增「已暂缓的提醒」列表（kind/until 文案 + 一键恢复）。
+- 验证：单测 165/165（新增暂缓 3 例）；svelte-check 0 错误；隔离回归桌面 72/72、移动 73/73、
+  宿主基线 72/72；52 景截图 OK；构建通过。跨年自动恢复与设置页恢复的真实宿主行为 Host pending。
+- 余留：C06 撤销最小版（顺延/跳过/不再提醒的操作后「已顺延 · 撤销」）；「今天全部跳过」顶栏入口随批消化。

@@ -39,6 +39,8 @@ import {
 } from "./services/followups";
 import type { SnoozeOption } from "./domain/followups";
 import { loadPersonCadence, savePersonCadence } from "./data/cadences";
+import { dismissReminder, resumeReminder, loadReminderDismissals } from "./data/reminder-dismissals";
+import type { ReminderKind } from "./data/reminder-dismissals";
 import type { PersonCadence } from "./domain/cadence";
 import { listTemplates, saveTemplates } from "./services/templates";
 import type { NoteTemplate } from "./domain/interaction-templates";
@@ -474,6 +476,18 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     async savePersonCadence(personDocId: string, cadence: PersonCadence | null) {
         await savePersonCadence(this, personDocId, cadence);
+    }
+
+    async dismissReminder(personDocId: string, kind: ReminderKind, until: string) {
+        await dismissReminder(this, personDocId, kind, until);
+    }
+
+    async resumeReminder(personDocId: string, kind: ReminderKind) {
+        await resumeReminder(this, personDocId, kind);
+    }
+
+    async loadReminderDismissals() {
+        return loadReminderDismissals(this);
     }
 
     async listTemplates() {
