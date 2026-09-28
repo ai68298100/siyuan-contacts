@@ -46,7 +46,7 @@ Lv Contacts makes **every contact a regular SiYuan document** (bidirectional lin
 3. Restart SiYuan → Settings → Marketplace → Download → enable **Lv Contacts**
 - Requires **SiYuan ≥ 3.8.5**. Marketplace submission is deferred.
 
-The source is **v0.2.1** (not pushed/released yet): on top of the 16 incremental features of v0.2.0 it fixes first-run setup, which always failed on a real host and then blocked retries with “a notebook with that name already exists” (write-endpoint response shape and database materialization flag). Setup is now idempotent and resumable: re-running only fills in what is missing and never duplicates or deletes existing content.
+The source is **v0.3.0** (four batches of real-usage feedback shipped on top of v0.2.1, see [CHANGELOG](docs/CHANGELOG.md)): searchable people pickers, mobile toolbar & card layout, paste-to-recognize with local parsing, AI structured capture candidates, action-list grouping with inline handling & snooze/dismiss + undo, onboarding grace period, ten-point data health audit, full migration bundle (interactions + follow-ups + cadences + dismissals + registry + templates), follow-ups synced to native task blocks in person documents (bidirectional), and anchor re-discovery after notebook rename/move. Real-host, real-device and marketplace submission remain gated per [RELEASE](docs/RELEASE.md).
 
 ## 🚀 Quick start
 
