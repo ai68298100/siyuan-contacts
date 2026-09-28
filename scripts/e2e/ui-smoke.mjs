@@ -1,10 +1,13 @@
-/** 隔离浏览器回归：真实 Svelte/Cytoscape，内存 Siyuan 适配器，不连接用户内核。 */
+/** 隔离浏览器回归：真实 Svelte/Cytoscape，内存 Siyuan 适配器，不连接用户内核。
+ *  LVCT_UI_HOST=1 时页面注入真实思源 base.css + 官方主题变量（宿主样式基线，C01），
+ *  用于在真实宿主 CSS 下跑同一套断言；本机无思源安装（如 CI）时自动回退近似样式。 */
 import { createServer } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { spawn } from "node:child_process";
+import { hostBaselinePlugin } from "./host-baseline.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const browserPath = [
@@ -19,7 +22,7 @@ const report = new Promise((resolve) => { resolveReport = resolve; });
 const server = await createServer({
     configFile: false, root, publicDir: false,
     resolve: { alias: { siyuan: resolve(root, "scripts/e2e/ui/siyuan-mock.js") } },
-    plugins: [svelte(), {
+    plugins: [svelte(), hostBaselinePlugin(), {
         name: "isolated-ui-report",
         configureServer(server) {
             server.middlewares.use("/__ui_report", (request, response) => {
@@ -79,7 +82,8 @@ try {
     });
     const mobile = process.env.LVCT_UI_MOBILE === "1";
     await call("Emulation.setDeviceMetricsOverride", { width: mobile ? 390 : 1280, height: mobile ? 844 : 900, deviceScaleFactor: 1, mobile });
-    await call("Page.navigate", { url: `http://127.0.0.1:${address.port}/scripts/e2e/ui/index.html` });
+    const hostBaseline = process.env.LVCT_UI_HOST === "1" ? "?host=1" : "";
+    await call("Page.navigate", { url: `http://127.0.0.1:${address.port}/scripts/e2e/ui/index.html${hostBaseline}` });
     const results = await Promise.race([
         report,
         new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error("浏览器回归 45 秒超时")), 45000); }),

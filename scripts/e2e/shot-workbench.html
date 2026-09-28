@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>工作台截图</title>
-<style>
+<style id="approx-host-style">
     :root {
         --b3-theme-background: #fff; --b3-theme-surface: #f5f5f5; --b3-theme-surface-lighter: #efefef;
         --b3-theme-on-background: #222; --b3-theme-on-surface: #444; --b3-theme-on-surface-light: #888;
@@ -26,6 +26,25 @@
     .b3-button--outline, .b3-button--cancel { background: var(--b3-theme-surface); color: var(--b3-theme-on-background); }
     .b3-text-field, .b3-select { background: var(--b3-theme-background); color: var(--b3-theme-on-background); border: 1px solid var(--b3-border-color); padding: 6px; box-sizing: border-box; }
 </style>
+<script id="host-baseline-boot">
+    /* 宿主样式基线（C01）：?host=1 时注入真实思源 base.css + 官方主题变量，
+       并撤下手写近似样式；暗色属性对齐宿主的 data-theme-mode。 */
+    (function () {
+        const params = new URLSearchParams(location.search);
+        const theme = params.get("theme") === "dark" ? "dark" : "light";
+        document.documentElement.dataset.themeMode = theme;
+        if (!params.has("host")) return;
+        const link = (href) => {
+            const node = document.createElement("link");
+            node.rel = "stylesheet";
+            node.href = href;
+            document.head.appendChild(node);
+        };
+        link(`/__host/theme-${theme}.css`);
+        link("/__host/base.css");
+        document.getElementById("approx-host-style")?.remove();
+    })();
+</script>
 </head>
 <body>
 <div id="shot" class="lvct-tab-root"></div>
@@ -88,8 +107,18 @@
     setTimeout(() => {
         if (view === "table") document.querySelector('.lvct-people__toolbar button[title="切换卡片/表格"]')?.click();
         if (view === "peek") document.querySelector(".lvct-person-card")?.click();
+        if (view === "viewsmenu") document.querySelector('.lvct-people__toolbar button[aria-label="视图"]')?.click();
+        if (view === "morefilter") document.querySelector("#lvct-people-moremenu > button")?.click();
+        if (view === "colmenu") { document.querySelector('.lvct-people__toolbar button[title="切换卡片/表格"]')?.click(); setTimeout(() => document.querySelector('button[aria-label="表格列设置"]')?.click(), 120); }
         setTimeout(() => {
-            const expected = view === "home" ? ".lvct-dash__stats" : view === "graph" ? ".lvct-graph-view__canvas" : view === "table" ? ".lvct-people__table-wrap" : view === "peek" ? ".lvct-detail" : ".lvct-person-card";
+            const expected = view === "home" ? ".lvct-dash__stats"
+                : view === "graph" ? ".lvct-graph-view__canvas"
+                : view === "table" ? ".lvct-people__table-wrap"
+                : view === "peek" ? ".lvct-detail"
+                : view === "viewsmenu" ? ".lvct-people__viewsmenu"
+                : view === "morefilter" ? ".lvct-people__moremenu"
+                : view === "colmenu" ? ".lvct-people__colmenu"
+                : ".lvct-person-card";
             if (!document.querySelector(expected)) document.title = `ERROR missing ${expected}`;
             if (view === "graph" && (document.querySelector(expected)?._cyreg?.cy?.nodes().length ?? 0) < 4) document.title = "ERROR blank graph";
             const clipped = [...document.querySelectorAll(".lvct-people__toolbar, .lvct-detail__header-actions")]

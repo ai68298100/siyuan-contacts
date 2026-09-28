@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>小驴人脉 · 隔离 UI 回归</title>
-<style>
+<style id="approx-host-style">
     /* 模拟思源宿主主题，生产组件仍消费自己的语义令牌。 */
     :root {
         --b3-theme-background: #fff; --b3-theme-surface: #f5f5f5;
@@ -9,7 +9,23 @@
         --b3-theme-on-surface-light: #666; --b3-theme-primary: #6366f1;
         --b3-border-color: #ddd; --b3-list-hover: #eee; --b3-theme-error: #c00;
     }
-</style></head>
+</style>
+<script>
+    /* 宿主样式基线（C01）：?host=1 时注入真实思源 base.css + 官方主题变量
+       （需 harness 服务端提供 /__host/*.css，如 LVCT_UI_HOST=1），否则用近似样式。 */
+    (function () {
+        if (!new URLSearchParams(location.search).has("host")) return;
+        const link = (href) => {
+            const node = document.createElement("link");
+            node.rel = "stylesheet";
+            node.href = href;
+            document.head.appendChild(node);
+        };
+        link("/__host/theme-light.css");
+        link("/__host/base.css");
+        document.getElementById("approx-host-style")?.remove();
+    })();
+</script></head>
 <body>
     <h1>隔离 UI 回归（仅内存测试数据）</h1>
     <pre id="results">运行中…</pre>

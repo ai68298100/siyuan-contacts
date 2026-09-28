@@ -13,6 +13,7 @@
     import type { DuplicatePair } from "../../domain/duplicate-check";
     import { findSavedViewByName, missingTags, normalizeSavedViews } from "../../domain/saved-views";
     import type { SavedView, SavedViewQuery } from "../../domain/saved-views";
+    import { attachPopover } from "../../libs/popover";
     import PersonCard from "./PersonCard.svelte";
     import AddPersonDialog from "./AddPersonDialog.svelte";
     import ImportDialog from "./ImportDialog.svelte";
@@ -74,6 +75,12 @@
     // svelte-ignore state_referenced_locally
     let localViews: SavedView[] = $state(normalizeSavedViews(preferences.savedViews));
     let viewsOpen = $state(false);
+    let viewsMenuWrap: HTMLElement | null = $state(null);
+    let viewsMenuPanel: HTMLElement | null = $state(null);
+    let moreMenuWrap: HTMLElement | null = $state(null);
+    let moreMenuPanel: HTMLElement | null = $state(null);
+    let colMenuWrap: HTMLElement | null = $state(null);
+    let colMenuPanel: HTMLElement | null = $state(null);
     let currentViewId = $state("");
     let activeViewName = $state("");
     let viewHint = $state("");
@@ -150,15 +157,12 @@
         });
     }
 
-    // 列设置面板：点击面板外区域关闭
+    // 列设置浮层：fixed 定位原语（B02）——absolute 面板会被滚动祖先裁剪，宿主菜单同样用 fixed
     $effect(() => {
-        if (!colMenuOpen) return;
-        const close = (event: MouseEvent) => {
-            const panel = document.getElementById("lvct-people-colmenu");
-            if (panel && !panel.contains(event.target as Node)) colMenuOpen = false;
-        };
-        document.addEventListener("click", close);
-        return () => document.removeEventListener("click", close);
+        const wrap = colMenuWrap;
+        const panel = colMenuPanel;
+        if (!colMenuOpen || !wrap || !panel) return;
+        return attachPopover(panel, wrap, () => (colMenuOpen = false));
     });
     let adding: boolean = $state(false);
     let importing: boolean = $state(false);
@@ -245,26 +249,20 @@
         onClearFocus?.();
     }
 
-    // 更多筛选面板：点击面板外区域关闭
+    // 更多筛选浮层：fixed 定位原语（B02）——absolute 面板会被滚动祖先裁剪，宿主菜单同样用 fixed
     $effect(() => {
-        if (!moreOpen) return;
-        const close = (event: MouseEvent) => {
-            const panel = document.getElementById("lvct-people-moremenu");
-            if (panel && !panel.contains(event.target as Node)) moreOpen = false;
-        };
-        document.addEventListener("click", close);
-        return () => document.removeEventListener("click", close);
+        const wrap = moreMenuWrap;
+        const panel = moreMenuPanel;
+        if (!moreOpen || !wrap || !panel) return;
+        return attachPopover(panel, wrap, () => (moreOpen = false));
     });
 
-    // 视图菜单：点击面板外区域关闭
+    // 视图浮层：fixed 定位原语（B02）——absolute 面板会被滚动祖先裁剪，宿主菜单同样用 fixed
     $effect(() => {
-        if (!viewsOpen) return;
-        const close = (event: MouseEvent) => {
-            const panel = document.getElementById("lvct-people-viewsmenu");
-            if (panel && !panel.contains(event.target as Node)) viewsOpen = false;
-        };
-        document.addEventListener("click", close);
-        return () => document.removeEventListener("click", close);
+        const wrap = viewsMenuWrap;
+        const panel = viewsMenuPanel;
+        if (!viewsOpen || !wrap || !panel) return;
+        return attachPopover(panel, wrap, () => (viewsOpen = false));
     });
 
     // 外部偏好更新时同步本地视图列表
@@ -498,12 +496,12 @@
 
 <div class="lvct-people">
     <div class="lvct-people__toolbar fn__flex">
-        <span id="lvct-people-viewsmenu" style="position:relative; display:inline-flex">
+        <span id="lvct-people-viewsmenu" bind:this={viewsMenuWrap} style="position:relative; display:inline-flex">
             <button class="b3-button b3-button--outline" aria-label={text("peopleViews", "视图")} aria-expanded={viewsOpen} onclick={() => (viewsOpen = !viewsOpen)}>
                 <Bookmark size={16}/>{activeViewName ? `${text("peopleViews", "视图")}：${activeViewName}` : text("peopleViews", "视图")}
             </button>
             {#if viewsOpen}
-                <div class="lvct-people__moremenu lvct-people__viewsmenu" role="menu" aria-label="保存的视图">
+                <div class="lvct-people__moremenu lvct-people__viewsmenu" bind:this={viewsMenuPanel} role="menu" aria-label="保存的视图">
                     {#if localViews.length === 0}
                         <p class="lvct-people__viewsmenu-empty">还没有保存的视图。设置筛选条件后，点下方「保存当前筛选为视图」。</p>
                     {/if}
@@ -540,7 +538,7 @@
             <option value="birthday">{text("peopleSortBirthday", "按生日临近")}</option>
             <option value="recent">{text("peopleSortRecent", "按最近互动")}</option>
         </select>
-        <span id="lvct-people-moremenu" style="position:relative; display:inline-flex">
+        <span id="lvct-people-moremenu" bind:this={moreMenuWrap} style="position:relative; display:inline-flex">
             <button
                 class="b3-button b3-button--outline"
                 aria-expanded={moreOpen}
@@ -549,7 +547,7 @@
                 <SlidersHorizontal size={16}/>{text("peopleMoreFilters", "更多筛选")}{isExtraFilterActive(extraFilter) ? " ·" : ""}
             </button>
             {#if moreOpen}
-                <div class="lvct-people__moremenu" role="group" aria-label="组合筛选">
+                <div class="lvct-people__moremenu" bind:this={moreMenuPanel} role="group" aria-label="组合筛选">
                     <label class="lvct-form__item">
                         <span>标签匹配（选中多个标签时）</span>
                         <select class="b3-select fn__block" bind:value={extraFilter.tagMatch}>
@@ -582,7 +580,7 @@
                 {viewMode === "cards" ? text("peopleTable", "表格") : text("peopleCards", "卡片")}
             </button>
             {#if viewMode === "table"}
-                <span id="lvct-people-colmenu" style="position:relative; display:inline-flex">
+                <span id="lvct-people-colmenu" bind:this={colMenuWrap} style="position:relative; display:inline-flex">
                     <button
                         class="b3-button b3-button--outline"
                         aria-expanded={colMenuOpen}
@@ -591,7 +589,7 @@
                         onclick={() => (colMenuOpen = !colMenuOpen)}
                     ><Columns3 size={16}/>{text("peopleColumnSettings", "列设置")}</button>
                     {#if colMenuOpen}
-                        <div class="lvct-people__colmenu" role="group" aria-label="表格列显隐与顺序">
+                        <div class="lvct-people__colmenu" bind:this={colMenuPanel} role="group" aria-label="表格列显隐与顺序">
                             <label class="lvct-people__colmenu-row" title="姓名列固定显示">
                                 <input type="checkbox" checked disabled />
                                 <span>{text("peopleName", "姓名")}</span>

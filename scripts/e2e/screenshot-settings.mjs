@@ -1,10 +1,13 @@
-/** 隔离工作台视觉截图；CDP 固定真实 CSS 视口，不依赖 Chromium 窗口最小宽度。 */
+/** 隔离工作台视觉截图；CDP 固定真实 CSS 视口，不依赖 Chromium 窗口最小宽度。
+ *  LVCT_HOST_BASELINE=1 时追加"宿主样式基线"套件：页面 ?host=1 注入真实思源
+ *  base.css + 官方主题变量（C01），复现 B02/B09 这类只在真实宿主 CSS 下出现的问题。 */
 import { createServer } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { spawn } from "node:child_process";
+import { hostBaselinePlugin } from "./host-baseline.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const browserPath = [
@@ -20,7 +23,7 @@ mkdirSync(outDir, { recursive: true });
 const server = await createServer({
     configFile: false, root, publicDir: false,
     resolve: { alias: { siyuan: resolve(root, "scripts/e2e/ui/siyuan-mock.js") } },
-    plugins: [svelte()],
+    plugins: [svelte(), hostBaselinePlugin()],
     server: { host: "127.0.0.1", port: 0, open: false },
 });
 await server.listen();
@@ -122,6 +125,32 @@ try {
                 console.log(`${view} ${viewport} ${theme}: ${ok ? "OK" : "FAIL"}`);
                 if (!ok) process.exitCode = 1;
             }
+        }
+    }
+    /* 宿主样式基线套件（C01，LVCT_HOST_BASELINE=1 开启）：
+       真实思源 base.css + 官方主题变量下截图，重点覆盖自绘浮层（B02）与主要页面。 */
+    if (process.env.LVCT_HOST_BASELINE === "1") {
+        const hostShots = [
+            ["shot-wizard.html?state=reuse&host=1", "wizard-reuse", "desktop", "1280,900"],
+            ["shot-wizard.html?state=failed&host=1", "wizard-failed", "desktop", "1280,900"],
+            ["shot-settings.html?section=data&host=1", "settings-data", "desktop", "1280,1000"],
+            ["shot-workbench.html?view=home&host=1", "workbench-home", "desktop", "1280,900"],
+            ["shot-workbench.html?view=people&host=1", "workbench-people", "desktop", "1280,900"],
+            ["shot-workbench.html?view=people&host=1", "workbench-people", "mobile", "390,844"],
+            ["shot-workbench.html?view=viewsmenu&host=1", "pop-viewsmenu", "desktop", "1280,900"],
+            ["shot-workbench.html?view=viewsmenu&host=1", "pop-viewsmenu", "mobile", "390,844"],
+            ["shot-workbench.html?view=morefilter&host=1", "pop-morefilter", "desktop", "1280,900"],
+            ["shot-workbench.html?view=colmenu&host=1", "pop-colmenu", "desktop", "1280,900"],
+            ["shot-workbench.html?view=home&host=1", "workbench-home-dark", "desktop-dark", "1280,900"],
+            ["shot-workbench.html?view=viewsmenu&host=1", "pop-viewsmenu-dark", "desktop-dark", "1280,900"],
+        ];
+        for (const [query, name, viewport, size] of hostShots) {
+            const theme = viewport.endsWith("-dark") ? "&theme=dark" : "";
+            const baseViewport = viewport.replace("-dark", "");
+            const url = `http://127.0.0.1:${port}/scripts/e2e/${query}${theme}`;
+            const ok = await capture({ url, size, outFile: join(outDir, `host-${name}-${baseViewport}.png`) });
+            console.log(`host ${name} ${baseViewport}: ${ok ? "OK" : "FAIL"}`);
+            if (!ok) process.exitCode = 1;
         }
     }
 } finally {

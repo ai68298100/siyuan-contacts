@@ -330,9 +330,9 @@
 // F02 列设置 / F03 组合筛选面板：锚定在工具栏按钮下方，窄屏不越界
 .lvct-people__colmenu,
 .lvct-people__moremenu {
-    position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
+    /* 定位（fixed/left/top）由 libs/popover.ts 注入：absolute 面板会被滚动祖先裁剪（B02），
+       思源自家的 .b3-menu 同样用 position:fixed */
+    position: fixed;
     z-index: var(--lvct-z-popover, 150);
     display: flex;
     flex-direction: column;

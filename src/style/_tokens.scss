@@ -34,7 +34,7 @@
     --lvct-bg-app: var(--b3-theme-background);                                  /* 工作台最底层 */
     --lvct-bg-base: var(--b3-theme-background);                                 /* 内容区 */
     --lvct-bg-surface: var(--b3-theme-surface);                                 /* 卡片 / 面板 / 输入框 */
-    --lvct-bg-elevated: var(--b3-theme-surface-lighter, var(--b3-theme-surface)); /* 弹窗 / 下拉 / 悬停卡 */
+    --lvct-bg-elevated: var(--b3-menu-background, var(--b3-theme-surface, var(--b3-theme-background))); /* 弹窗 / 下拉 / 悬停卡；对齐宿主 .b3-menu 配方（surface-lighter 在 daylight 下过灰，见 B02） */
     --lvct-bg-hover: var(--b3-list-hover);                                      /* 行/项悬停 */
     --lvct-bg-active: var(--b3-list-icon-hover, var(--b3-list-hover));          /* 按下/选中底 */
 

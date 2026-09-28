@@ -26,6 +26,7 @@
     "check:release": "node scripts/check-release.mjs",
     "test:ui": "node scripts/e2e/ui-smoke.mjs",
     "test:ui:mobile": "cross-env LVCT_UI_MOBILE=1 node scripts/e2e/ui-smoke.mjs",
+    "test:ui:host": "cross-env LVCT_UI_HOST=1 node scripts/e2e/ui-smoke.mjs",
     "spike": "node scripts/spike/av-spike.mjs",
     "spike:init": "node scripts/spike/init-resume-spike.mjs",
     "spike:task": "node scripts/spike/task-item-spike.mjs"

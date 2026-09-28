@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>设置页截图</title>
-<style>
+<style id="approx-host-style">
     :root {
         --b3-theme-background: #fff; --b3-theme-surface: #f5f5f5;
         --b3-theme-surface-lighter: #efefef;
@@ -22,7 +22,25 @@
     .b3-button--outline, .b3-button--cancel { background: var(--b3-theme-surface); color: var(--b3-theme-on-background); }
     .b3-text-field, .b3-select { background: var(--b3-theme-background); color: var(--b3-theme-on-background); border: 1px solid var(--b3-border-color); padding: 6px; box-sizing: border-box; }
     html[data-theme="dark"] { --b3-theme-background: #202124; --b3-theme-surface: #303136; --b3-theme-surface-lighter: #393a40; --b3-theme-on-background: #f2f2f3; --b3-theme-on-surface: #d4d5d8; --b3-theme-on-surface-light: #aaaeb5; --b3-theme-primary: #7c8aff; --b3-theme-primary-lightest: #343957; --b3-theme-on-primary: #10121d; --b3-border-color: #484a50; --b3-list-hover: #383a42; --b3-list-icon-hover: #454751; }
-</style></head>
+</style><script id="host-baseline-boot">
+    /* 宿主样式基线（C01）：?host=1 时注入真实思源 base.css + 官方主题变量，
+       并撤下手写近似样式；暗色属性对齐宿主的 data-theme-mode。 */
+    (function () {
+        const params = new URLSearchParams(location.search);
+        const theme = params.get("theme") === "dark" ? "dark" : "light";
+        document.documentElement.dataset.themeMode = theme;
+        if (!params.has("host")) return;
+        const link = (href) => {
+            const node = document.createElement("link");
+            node.rel = "stylesheet";
+            node.href = href;
+            document.head.appendChild(node);
+        };
+        link("/__host/theme-" + theme + ".css");
+        link("/__host/base.css");
+        document.getElementById("approx-host-style")?.remove();
+    })();
+</script></head>
 <body>
 <div id="shot" class="lvct-tab-root"></div>
 <script type="module">
