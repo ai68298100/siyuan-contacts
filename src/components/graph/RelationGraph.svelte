@@ -12,6 +12,8 @@
     import type { ContactSummary } from "../../domain/person";
     import type { PersonInsights } from "../../services/insights";
     import type { ContactsPluginFacade } from "../../types";
+    import PersonPicker from "../people/PersonPicker.svelte";
+    import type { PickerItem } from "../people/PersonPicker.svelte";
 
     let {
         settings,
@@ -62,6 +64,16 @@
     ] as const;
 
     const groups = $derived.by(() => [...new Set(people.map((person) => person.group).filter(Boolean))].sort());
+    /* B03 可搜索选人器：图内节点 → 候选项（带分组提示与联系方式关键词） */
+    const graphPickerItems = $derived.by((): PickerItem[] => displayed.graph.nodes.map((node) => {
+        const person = people.find((item) => item.docId === node.id);
+        return {
+            id: node.id,
+            label: node.label,
+            hint: person ? [person.group, ...person.tags].filter(Boolean).join(" · ") : undefined,
+            keywords: person ? `${person.phone} ${person.wechat} ${person.email}`.toLowerCase() : undefined,
+        };
+    }));
     const fullGraph = $derived(buildGraph(people));
     const isolatedIds = $derived(new Set(fullGraph.nodes.filter((node) => node.degree === 0).map((node) => node.id)));
     const filteredPeople = $derived.by(() => {
@@ -399,20 +411,26 @@
     {#if !loading && !errorText && displayed.graph.nodes.length > 0}
         <div class="lvct-graph-query">
             <label>{text("graphCenterLabel", "关系中心")}
-                <select class="b3-select" bind:value={focusId} aria-label={text("graphCenterLabel", "关系中心")}>
-                    <option value="">{text("graphPickNone", "未选择")}</option>
-                    {#each displayed.graph.nodes as node (node.id)}
-                        <option value={node.id}>{node.label}</option>
-                    {/each}
-                </select>
+                <!-- B03 可搜索选人器：输入即筛替换全量长列表 -->
+                <PersonPicker
+                    items={graphPickerItems}
+                    value={focusId}
+                    placeholder={text("graphPickNone", "未选择")}
+                    emptyText={text("graphPickerEmpty", "当前图内没有匹配的人物")}
+                    ariaLabel={text("graphCenterLabel", "关系中心")}
+                    onSelect={(id) => (focusId = id)}
+                />
             </label>
             <label>{text("graphCompareLabel", "对比人物")}
-                <select class="b3-select" bind:value={compareId} disabled={!focusId} aria-label={text("graphCompareLabel", "对比人物")}>
-                    <option value="">{text("graphPickNone", "未选择")}</option>
-                    {#each displayed.graph.nodes.filter((node) => node.id !== focusId) as node (node.id)}
-                        <option value={node.id}>{node.label}</option>
-                    {/each}
-                </select>
+                <PersonPicker
+                    items={graphPickerItems.filter((item) => item.id !== focusId)}
+                    value={compareId}
+                    placeholder={text("graphPickNone", "未选择")}
+                    emptyText={text("graphPickerEmpty", "当前图内没有匹配的人物")}
+                    ariaLabel={text("graphCompareLabel", "对比人物")}
+                    disabled={!focusId}
+                    onSelect={(id) => (compareId = id)}
+                />
             </label>
             {#if focusId && !compareId}
                 <select class="b3-select" bind:value={relationDepth} aria-label={text("graphDepthLabel", "关系层级")}>

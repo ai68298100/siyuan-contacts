@@ -60,6 +60,23 @@ function input(node, value) {
     node.value = value;
     node.dispatchEvent(new Event("input", { bubbles: true }));
 }
+/** B03 可搜索选人器驱动：按 aria-label 打开浮层，按候选名筛选后点选第一项 */
+async function pickOption(label, name) {
+    const trigger = [...fixture.querySelectorAll(".lvct-picker__trigger")]
+        .find((node) => node.getAttribute("aria-label") === label);
+    assert(trigger, `未找到选人器：${label}`);
+    trigger.click();
+    await until(() => fixture.querySelector(".lvct-picker__panel"), `${label}浮层未打开`);
+    const search = fixture.querySelector(".lvct-picker__search");
+    if (name) {
+        input(search, name);
+        await tick();
+    }
+    const option = [...fixture.querySelectorAll(".lvct-picker__option")][0];
+    assert(option, `${label} 未找到候选：${name ?? "（全部）"}`);
+    option.click();
+    await tick();
+}
 const settings = {
     schemaVersion: 1, notebookName: "回归测试", notebookId: "20260927000000-book001",
     hostDocId: "20260927000000-host001", dbBlockId: "20260927000000-block01",
@@ -200,6 +217,51 @@ await test("粘贴并识别：分组预览、勾选回填草稿、冲突默认�
     button("应用到表单（1）").click();
     await until(() => !fixture.querySelector(".lvct-qf__input"), "冲突应用后未关闭");
     assert(fixture.querySelector('.lvct-form input[type="tel"]')?.value === "13999990000", "明确勾选后未更新");
+});
+
+await test("相关人选择走可搜索选人器：电话关键词筛选、空态、回车选中即建关系（B03）", async () => {
+    const cellWrites = [];
+    const rows = [
+        { id: "row-1", docId: "20260927000000-person1", name: "回归测试甲", phone: "", wechat: "", tags: [], group: "朋友" },
+        { id: "row-2", docId: "20260927000000-person2", name: "候选乙", phone: "13800001111", wechat: "yi_wx", tags: ["球友"], group: "同事" },
+        { id: "row-3", docId: "20260927000000-person3", name: "候选丙", phone: "13900002222", wechat: "", tags: [], group: "家人" },
+    ];
+    kernel.handler = async (route, body) => {
+        if (route === "/api/av/renderAttributeView") return { view: {
+            columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })),
+            rows: rows.map((row) => ({ id: row.id, cells: [
+                { value: { type: "block", keyID: "name", block: { id: row.docId, content: row.name } } },
+                { value: { type: "phone", keyID: "phone", phone: { content: row.phone } } },
+                { value: { type: "text", keyID: "wechat", text: { content: row.wechat } } },
+                { value: { type: "mSelect", keyID: "group", mSelect: row.group ? [{ content: row.group }] : [] } },
+                { value: { type: "mSelect", keyID: "tags", mSelect: row.tags.map((tag) => ({ content: tag })) } },
+                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+            ] })),
+        } };
+        if (route === "/api/av/setAttributeViewBlockAttr") { cellWrites.push(body ?? {}); return { code: 0 }; }
+        return { code: 0 }; /* 文档区块同步等后续调用宽松放行 */
+    };
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person, onRecord: async () => {}, onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+    } });
+    button("相关人").click();
+    await until(() => fixture.querySelector(".lvct-picker__trigger"), "选人器未渲染");
+    fixture.querySelector(".lvct-picker__trigger").click();
+    await until(() => fixture.querySelector(".lvct-picker__panel"), "选人浮层未打开");
+    const search = fixture.querySelector(".lvct-picker__search");
+    input(search, "13800001111");
+    await tick();
+    let options = [...fixture.querySelectorAll(".lvct-picker__option")];
+    assert(options.length === 1 && options[0].textContent.includes("候选乙"), "按电话关键词筛选失败");
+    input(search, "不存在的词");
+    await tick();
+    await until(() => fixture.querySelector(".lvct-picker__empty"), "空态未显示");
+    input(search, "候选乙");
+    await tick();
+    fixture.querySelector(".lvct-picker__search").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await until(() => cellWrites.length > 0, "回车选中后未发起关系写入");
+    assert(JSON.stringify(cellWrites[0]).includes("row-2"), "关系写入未包含所选人物");
 });
 
 await test("新建草稿关闭前三选一：取消保留草稿，放弃后关闭且弹窗列明细", async () => {
@@ -403,7 +465,22 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
         node.value = value;
         node.dispatchEvent(new Event("change", { bubbles: true }));
     };
-    select("关系中心", "a");
+    /* B03：关系中心/对比人物改走可搜索选人器（打开 → 按名筛选 → 点选） */
+    const pick = async (label, id) => {
+        const trigger = [...fixture.querySelectorAll(".lvct-picker__trigger")]
+            .find((node) => node.getAttribute("aria-label") === label);
+        assert(trigger, `未找到选人器：${label}`);
+        trigger.click();
+        await until(() => fixture.querySelector(".lvct-picker__panel"), `${label}浮层未打开`);
+        const name = entries.find((entry) => entry.id === id)?.name ?? id;
+        input(fixture.querySelector(".lvct-picker__search"), name);
+        await tick();
+        const option = [...fixture.querySelectorAll(".lvct-picker__option")][0];
+        assert(option, `${label} 未找到候选 ${id}`);
+        option.click();
+        await tick();
+    };
+    await pick("关系中心", "a");
     await until(() => fixture.textContent.includes("直接关系：2 人"), "直接关系计数错误");
     assert(cy.getElementById("a").hasClass("lvct-graph-focus"), "中心未高亮");
     assert(cy.getElementById("e").hasClass("lvct-graph-muted"), "无关人物未淡化");
@@ -418,7 +495,7 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
     button("乙", fixture.querySelector(".lvct-graph-query__results")).click();
     assert(opened === "b", "二度结果未打开人物");
     select("关系层级", "direct");
-    select("对比人物", "b");
+    await pick("对比人物", "b");
     await until(() => fixture.textContent.includes("共同联系人：1 人"), "共同联系人计数错误");
     assert(cy.getElementById("d").hasClass("lvct-graph-muted"), "独有关系未淡化");
     button("共同人物", fixture.querySelector(".lvct-graph-query__results")).click();
@@ -431,22 +508,25 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
     assert(cy.edges().filter((edge) => !edge.hasClass("lvct-graph-muted")).length === 2, "路径连线高亮错误");
     button("共同人物", fixture.querySelector(".lvct-graph-query__results")).click();
     assert(opened === "c", "路径人物未打开详情");
-    select("对比人物", "e");
+    await pick("对比人物", "e");
     await until(() => fixture.textContent.includes("当前图内没有连接路径"), "断开人物应无路径");
     assert(cy.edges().every((edge) => edge.hasClass("lvct-graph-muted")), "无路径仍高亮旧连线");
-    select("对比人物", "d");
+    await pick("对比人物", "d");
     await until(() => fixture.textContent.includes("最短路径：1 段关系"), "直接关系应为一段路径");
     assert(!cy.destroyed(), "切换路径不应重建画布");
     select("关系查询模式", "common");
-    select("对比人物", "e");
+    await pick("对比人物", "e");
     await until(() => fixture.textContent.includes("当前图内没有共同联系人"), "无共同联系人空态错误");
     button("清除选择").click();
     await until(() => cy.elements(".lvct-graph-muted").length === 0, "清除未恢复图谱");
-    select("关系中心", "e");
+    await pick("关系中心", "e");
     await until(() => fixture.textContent.includes("当前图内没有直接关系"), "孤立人物空态错误");
     input(fixture.querySelector('input[type="search"]'), "共同人物");
-    await until(() => fixture.querySelector('select[aria-label="关系中心"]')?.value === "", "筛选后未清除失效中心");
-    assert(fixture.querySelector('select[aria-label="对比人物"]').disabled, "无中心不应允许对比");
+    await until(() => [...fixture.querySelectorAll(".lvct-picker__trigger")]
+        .find((node) => node.getAttribute("aria-label") === "关系中心")?.textContent.includes("未选择"), "筛选后未清除失效中心");
+    const compareTrigger = [...fixture.querySelectorAll(".lvct-picker__trigger")]
+        .find((node) => node.getAttribute("aria-label") === "对比人物");
+    assert(compareTrigger?.disabled, "无中心不应允许对比");
     const bounds = fixture.querySelector(".lvct-graph-query").getBoundingClientRect();
     assert(bounds.right <= window.innerWidth + 1, "关系查询超出视口");
     for (const control of fixture.querySelectorAll(".lvct-graph-query select")) {
@@ -461,7 +541,7 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
     await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy?.nodes().length === 1, "未只显示孤立人物");
     const isolatedCy = fixture.querySelector(".lvct-graph-view__canvas")._cyreg.cy;
     assert(isolatedCy.nodes()[0].id() === "e", "孤立筛选人物错误");
-    select("关系中心", "e");
+    await pick("关系中心", "e");
     await tick();
     select("关系层级", "second");
     await until(() => fixture.textContent.includes("当前图内没有二度关系"), "孤立人物二度空态错误");
@@ -1732,8 +1812,8 @@ await test("关系结果导出：路径链 Markdown、无路径兜底与图规�
             settings, onOpenDetail() {}, onOpenPeople() {},
         } });
         await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "图谱未挂载");
-        select("关系中心", "a");
-        select("对比人物", "b");
+        await pickOption("关系中心", "甲");
+        await pickOption("对比人物", "乙");
         await until(() => fixture.querySelector('select[aria-label="关系查询模式"]'), "查询模式未显示");
         select("关系查询模式", "path");
         await until(() => fixture.textContent.includes("无连接"), "无路径兜底缺失");
@@ -1753,8 +1833,8 @@ await test("关系结果导出：路径链 Markdown、无路径兜底与图规�
             settings, onOpenDetail() {}, onOpenPeople() {},
         } });
         await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "图谱重新挂载");
-        select("关系中心", "a");
-        select("对比人物", "b");
+        await pickOption("关系中心", "甲");
+        await pickOption("对比人物", "乙");
         await until(() => fixture.querySelector('select[aria-label="关系查询模式"]'), "查询模式重新显示");
         select("关系查询模式", "path");
         await until(() => fixture.textContent.includes("2 段关系"), "路径链未更新");

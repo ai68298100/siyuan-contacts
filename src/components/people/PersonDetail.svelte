@@ -11,6 +11,8 @@ import StatusNotice from "../StatusNotice.svelte";
     import { nextBirthday } from "../../domain/occasions";
     import { createCloseScope, useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
+    import PersonPicker from "./PersonPicker.svelte";
+    import type { PickerItem } from "./PersonPicker.svelte";
     import { dueLabel } from "../../domain/followups";
     import type { FollowUpItem, SnoozeOption } from "../../domain/followups";
     import type { PersonCadence } from "../../domain/cadence";
@@ -76,7 +78,14 @@ import StatusNotice from "../StatusNotice.svelte";
     // svelte-ignore state_referenced_locally
     let current: ContactSummary = $state(person);
     let others: ContactSummary[] = $state([]);
-    let addChoice: string = $state("");
+    /* B03 可搜索选人器：候选（排除本人与已关联）→ 选中即建关系，写入语义不变 */
+    const relationCandidates = $derived.by((): PickerItem[] => candidates.map((person) => ({
+        id: person.itemId,
+        label: person.name,
+        hint: [person.group, ...person.tags].filter(Boolean).join(" · "),
+        keywords: `${person.phone} ${person.wechat} ${person.email}`.toLowerCase(),
+    })));
+    let relationPicker: { openPicker: () => void } | undefined = $state(undefined);
     let busy: boolean = $state(false);
     let errorText: string = $state("");
     let noteText: string = $state("");
@@ -104,7 +113,6 @@ import StatusNotice from "../StatusNotice.svelte";
     let insightsError = $state("");
     let othersLoading = $state(true);
     let othersError = $state("");
-    let relationSelect: HTMLSelectElement | undefined = $state();
     let insightsRequest = 0;
     let editing = $state(false);
     let deleting = $state(false);
@@ -722,7 +730,7 @@ import StatusNotice from "../StatusNotice.svelte";
             <ViewState compact title="还没有建立关系"
                 description={candidates.length > 0 ? "选择一位联系人，建立你们之间的关系。" : "先在联系人页添加其他人物，再回来建立关系。"}>
                 {#if candidates.length > 0}
-                    <button class="b3-button b3-button--outline" onclick={() => relationSelect?.focus()}>选择联系人</button>
+                    <button class="b3-button b3-button--outline" onclick={() => relationPicker?.openPicker()}>选择联系人</button>
                 {:else}
                     <button class="b3-button b3-button--outline" onclick={onClose}>返回工作台</button>
                 {/if}
@@ -744,21 +752,18 @@ import StatusNotice from "../StatusNotice.svelte";
         {/if}
 
         <div class="lvct-detail__add fn__flex">
-            <select class="b3-select fn__flex-1" bind:this={relationSelect} aria-label="选择要添加关系的联系人" bind:value={addChoice} disabled={busy || othersLoading || !!othersError || candidates.length === 0}>
-                <option value="" disabled>{candidates.length === 0 ? "没有可添加的联系人" : "选择联系人…"}</option>
-                {#each candidates as candidate (candidate.itemId)}
-                    <option value={candidate.itemId}>{candidate.name}</option>
-                {/each}
-            </select>
-            <button
-                class="b3-button b3-button--text"
-                disabled={busy || !addChoice}
-                onclick={() => {
-                    const other = others.find((item) => item.itemId === addChoice);
+            <PersonPicker
+                bind:this={relationPicker}
+                items={relationCandidates}
+                ariaLabel="选择要添加关系的联系人"
+                placeholder={candidates.length === 0 ? "没有可添加的联系人" : "搜索并选择联系人…"}
+                emptyText={candidates.length === 0 ? "没有可添加的联系人" : "没有匹配的联系人"}
+                disabled={busy || othersLoading || !!othersError}
+                onSelect={(itemId) => {
+                    const other = others.find((item) => item.itemId === itemId);
                     if (other) mutate(() => addRelation(settings, current, other));
-                    addChoice = "";
                 }}
-            >添加关系</button>
+            />
         </div>
         <p class="ft__smaller ft__on-surface">关系为双向：添加后对方的「被相关人」列会自动出现你。</p>
     </section>

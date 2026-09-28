@@ -2282,6 +2282,115 @@
     margin-top: 8px;
 }
 
+/* ---------- 可搜索选人器（B03） ---------- */
+
+.lvct-picker {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+}
+
+.lvct-picker__trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--lvct-sp-2);
+    width: 100%;
+    min-width: 0;
+    text-align: left;
+    cursor: pointer;
+}
+
+.lvct-picker__value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lvct-picker__placeholder { color: var(--lvct-text-3); }
+
+.lvct-picker__caret {
+    flex-shrink: 0;
+    color: var(--lvct-text-3);
+}
+
+.lvct-picker__panel {
+    position: fixed;
+    z-index: var(--lvct-z-popover);
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-1);
+    min-width: 220px;
+    max-width: min(340px, calc(100vw - 16px));
+    max-height: min(360px, calc(100vh - 24px));
+    padding: var(--lvct-sp-2);
+    box-sizing: border-box;
+    background: var(--lvct-bg-elevated);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-md);
+    box-shadow: var(--lvct-shadow-3);
+}
+
+.lvct-picker__search { flex-shrink: 0; }
+
+.lvct-picker__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.lvct-picker__option {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--lvct-sp-2);
+    width: 100%;
+    min-height: var(--lvct-touch-min);
+    padding: var(--lvct-sp-1) var(--lvct-sp-2);
+    box-sizing: border-box;
+    border: 0;
+    border-radius: var(--lvct-r-sm);
+    background: transparent;
+    color: var(--lvct-text-1);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.lvct-picker__option--active,
+.lvct-picker__option:hover {
+    background: var(--lvct-bg-hover);
+}
+
+.lvct-picker__label {
+    flex-shrink: 0;
+    font-weight: var(--lvct-fw-medium);
+}
+
+.lvct-picker__hint {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--lvct-text-3);
+    font-size: var(--lvct-fs-caption);
+}
+
+.lvct-picker__empty {
+    padding: var(--lvct-sp-2);
+    color: var(--lvct-text-3);
+    font-size: var(--lvct-fs-caption);
+}
+
+@media (max-width: 640px) {
+    .lvct-picker__option { min-height: var(--lvct-touch-min-mobile); }
+}
+
 /* ---------- 仪表盘 ---------- */
 
 .lvct-dash {
