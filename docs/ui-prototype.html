@@ -410,6 +410,17 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
 .two-col { display:grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items:start; }
 @media (max-width: 1100px) { .two-col, .dash-grid { grid-template-columns: 1fr; } .stat-grid { grid-template-columns: repeat(2,1fr);} }
 .legend-dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align: baseline; }
+  /* PAGE-01.0：实现状态标识条 */
+  .proto-status {
+    display: block;
+    margin: 0 0 10px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-2);
+    font-size: 12px;
+  }
 </style>
 </head>
 <body>
@@ -455,6 +466,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
     <!-- ========== 1. 方案总览 ========== -->
     <section class="screen on" id="s-overview">
       <div class="note-box">
+      <div class="proto-status">📋 设计总览页（本页为设计说明，非实现画面）</div>
         <b>产品定位（源自仓库分析）：</b>在思源笔记内管理人脉——「一人一文档，数据库作主干」。联系人是普通思源文档（双链/搜索/同步照旧），结构化字段存思源原生数据库（AV），插件负责管理界面。<b>人物文档与数据库保留；互动与偏好需另行备份</b>。插件无遥测，AI 仅在主动操作时向用户配置端点发送内容，思源同步由用户控制。当前功能范围与后续批次见 <a href="PRODUCT-PLAN.md">产品总计划</a>；本原型不代表全部能力已实现。
       </div>
 
@@ -565,6 +577,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
     <!-- ========== 2. 首页仪表盘 ========== -->
     <section class="screen" id="s-home">
       <div class="note-box"><b>设计要点：</b>首页回答"今天该关注谁"。统计卡可点击直达筛选结果；生日按 今天/7天内/30天内 分桶着色；久未联系卡内嵌「记一笔」快捷输入，10 秒完成一次互动记录。空态与骨架屏遵循组件规范。</div>
+      <div class="proto-status">✅ 已实现（v0.3.0：统计/行动分组折叠/行内处置/查看全部）· 待优化：UX-01.5 视觉细节</div>
       <div class="frame">
         <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">小驴人脉 · 工作台 — 桌面端 1280px</span></div>
         <div class="frame__body">
@@ -636,6 +649,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
     <!-- ========== 3. 联系人列表 ========== -->
     <section class="screen" id="s-people">
       <div class="note-box"><b>设计要点：</b>统一主操作——卡片与表格点击均打开 <b>Peek 侧栏</b>，「打开文档」收敛为悬停出现的图标钮；工具栏支持搜索 + 分组/标签筛选 + 排序 + 视图切换；选中态支持批量操作（加分组、导出）。A 批增量（下图为目标状态，标注 F02/F03/F04 者为计划项）：<b>F03</b> 组合筛选（标签全部/任一、最近互动范围、从未联系，生效条件可逐项清除并显示人数）；<b>F04</b> 命名保存常用视图；<b>F02</b> 表格列显隐与顺序偏好，姓名与操作列不可隐藏。下方同时给出卡片与表格两种视图。</div>
+      <div class="proto-status">✅ 已实现（v0.3.0：卡片/表格/选人器/完整度筛选/串行补录/粘贴识别）· 待优化：UX-01.4 视觉细节</div>
 
       <div class="frame">
         <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">联系人 · 卡片视图</span></div>
@@ -760,6 +774,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
     <!-- ========== 4. 人物详情 Peek ========== -->
     <section class="screen" id="s-detail">
       <div class="note-box"><b>设计要点：</b>详情从"居中弹窗"改为<b>右侧 Peek 面板</b>（Notion 范式）：不遮挡列表上下文，可连续翻看多人。三区 Tab（概览 / 互动 / 相关人）；头部常驻「编辑 / 打开文档 / 更多（删除·导出）」——补齐现状"详情无编辑入口"的短板；「记一笔互动」常驻概览底部。</div>
+      <div class="proto-status">✅ 已实现（v0.3.0：Peek/跟进/模板/AI 结构化候选）· 待优化：UX-01.6 视觉细节</div>
       <div class="frame">
         <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">联系人列表 + Peek 侧栏（400px）</span></div>
         <div class="frame__body" style="position:relative; min-height:600px; padding:18px 22px; background: var(--bg-base)">
@@ -835,6 +850,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
     <!-- ========== 5. 关系图谱 ========== -->
     <section class="screen" id="s-graph">
       <div class="note-box"><b>设计要点：</b>补齐现状缺失的<b>搜索框、分组过滤、缩放控件、节点悬停卡</b>；截断提示条给出可操作路径（"用分组过滤缩小范围"）；节点 = 分组色 + 度数定大小；边悬停加粗、点击节点高亮一度邻接。二期边类型化后此处直接扩展"边过滤"下拉，无需改布局。</div>
+      <div class="proto-status">✅ 已实现（v0.3.0：过滤/路径/共同联系人/选人器/导出）· 待优化：UX-01.7 移动端细节</div>
       <div class="frame">
         <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">关系图谱</span></div>
         <div class="frame__body">
@@ -890,6 +906,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
     <!-- ========== 6. 从笔记捕获 ========== -->
     <section class="screen" id="s-capture">
       <div class="note-box"><b>设计要点：</b>把现有单页长表单重构为<b>三步向导</b>（识别 → 确认 → 完成），步骤条给明确预期；AI 提名与双链识别结果用徽标区分来源，<b>AI 只提名不决定</b>，一切勾选后才落库；提交时显示进度，完成页给出可跳转的结果摘要。</div>
+      <div class="proto-status">✅ 已实现（v0.3.0：三步捕获/AI 结构化候选/粘贴识别入口）· 真机核对：Host pending</div>
       <div class="frame">
         <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">编辑器右键「人脉：捕获本文人员」→ 对话框 560px</span></div>
         <div class="frame__body" style="position:relative; min-height:560px; background: var(--bg-base)">
@@ -946,6 +963,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
     <!-- ========== 7. 初始化向导 ========== -->
     <section class="screen" id="s-wizard">
       <div class="note-box"><b>设计要点：</b>保持单步式轻量向导（初始化是一次性操作），强化三点：① 前置说明"将创建什么、数据存在哪"；② 实时日志带成功标记与进度条；③ 失败态给出可恢复的下一步（重试 / 查看详情），成功态直接给出三个上手入口。</div>
+      <div class="proto-status">✅ 已实现（v0.2.1 起幂等续建 + v0.3.0 候选扫描）· 真机核对：Host pending</div>
       <div class="frame">
         <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">初始化向导 — 进行中状态</span></div>
         <div class="frame__body" style="background: var(--bg-base)">
@@ -970,6 +988,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
     <!-- ========== 8. 设置页 ========== -->
     <section class="screen" id="s-settings">
       <div class="note-box"><b>设计要点：</b>补全现状缺失的设置页。左分栏右内容（思源设置同款范式）；六个分区按"使用频率 × 风险"排序；<b>字段健康检查</b>对应 DATA-CONTRACT 的"用户删列 → 降级提示重建"契约；AI 分区落实"显式触发、可全局关闭"的隐私原则。「通用」分区含联系人显示偏好（<b>F02</b>）；「数据」分区的<b>导出中心</b>（<b>F01</b>）展示数量与范围，并明示两项导出都不是完整备份。</div>
+      <div class="proto-status">✅ 已实现（v0.3.0：体检十类/迁移包/锚点扫描/提醒暂缓恢复）</div>
       <div class="frame">
         <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">小驴人脉 · 设置</span></div>
         <div class="frame__body">
@@ -1026,6 +1045,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
     <!-- ========== 9. 人物文档档案条 ========== -->
     <section class="screen" id="s-docbar">
       <div class="note-box"><b>设计要点：</b>档案条是"插件 ⇄ 文档"双向出入口的关键一环——在人物文档标题下方注入：核心字段一览 + 倒计时徽标 + 「编辑资料 / 打开人脉」双入口。形态对齐思源属性面板，避免喧宾夺主；事实型会前简报已实现，后续 F11 将其复用到 Peek 并提供 Markdown 导出。</div>
+      <div class="proto-status">✅ 已实现（v0.3.0：档案条重做）· 余项：外部变化主动刷新</div>
       <div class="frame">
         <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">思源编辑器 · 人物文档「林晓梅」</span></div>
         <div class="frame__body doc-mock">
@@ -1057,6 +1077,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
 
     <!-- ========== 10. 色彩与令牌 ========== -->
     <section class="screen spec" id="s-color">
+      <div class="proto-status">🎨 组件规范页（设计规格参照，非独立实现画面）</div>
       <div class="note-box"><b>落地约束（AGENTS.md 铁律 6）：</b>插件内颜色一律走 b3 CSS 变量，类名前缀 <code>lvct-</code>，不硬编码色值。下列令牌表给出 <b>设计令牌 → b3 变量 → 用途</b> 三层映射；分组色为插件自有令牌，用 <code>color-mix()</code> 从 b3 基础色派生，自动适配明暗主题。</div>
 
       <h3>品牌与语义色</h3>
@@ -1098,6 +1119,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
 
     <!-- ========== 11. 字体 / 间距 / 动效 ========== -->
     <section class="screen spec" id="s-type">
+      <div class="proto-status">🎨 组件规范页（设计规格参照，非独立实现画面）</div>
       <h3>字体系统</h3>
       <div class="ds">字族跟随思源（系统栈），只定义尺寸与字重梯度；数字用 tabular-nums 保证统计卡对齐。</div>
       <table class="spec-tbl">
@@ -1147,6 +1169,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
 
     <!-- ========== 12. 组件规范 ========== -->
     <section class="screen spec" id="s-comp">
+      <div class="proto-status">🎨 组件规范页（设计规格参照，非独立实现画面）</div>
       <div class="note-box">以下为可复用组件的活样例与使用规则。命名遵循 <code>lvct-</code> 前缀（如 <code>.lvct-btn--primary</code>）；优先复用思源 <code>b3-button</code> / <code>b3-text-field</code> 基座，插件仅在需要品牌化（主色渐变按钮、分组头像）时自建。</div>
 
       <h3>按钮 Button</h3>
