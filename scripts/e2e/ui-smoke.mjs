@@ -94,6 +94,7 @@ try {
     await call("Emulation.setDeviceMetricsOverride", { width: mobile ? 390 : 1280, height: mobile ? 844 : 900, deviceScaleFactor: 1, mobile });
     const hostBaseline = process.env.LVCT_UI_HOST === "1" ? "?host=1" : "";
     await call("Page.navigate", { url: `http://127.0.0.1:${address.port}/scripts/e2e/ui/index.html${hostBaseline}` });
+await new Promise((r) => setTimeout(r, 300));
     const results = await Promise.race([
         report,
         new Promise((_, reject) => {
