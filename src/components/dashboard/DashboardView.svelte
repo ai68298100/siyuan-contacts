@@ -469,10 +469,26 @@
             {/if}
         </div>
         <div class="lvct-dash__stats">
-            <button class="lvct-dash__stat" onclick={() => onOpenPeople()}><b>{data.people}</b><span>{text("dashStatPeople", "联系人")}</span></button>
-            <button class="lvct-dash__stat" onclick={onOpenGraph}><b>{data.relations}</b><span>{text("dashStatRelations", "关系")}</span></button>
-            <button class="lvct-dash__stat" onclick={openBirthdayPeople}><b>{data.birthdaysThisWeek}</b><span>{text("dashStatBirthdaysWeek", "本周生日")}</span></button>
-            <button class="lvct-dash__stat" onclick={openNeverContactedPeople}><b>{data.neverContacted}</b><span>{text("dashStatNever", "从未互动")}</span></button>
+            <button class="lvct-dash__stat" onclick={() => onOpenPeople()}>
+                <b>{data.people}</b>
+                <span>{text("dashStatPeople", "联系人")}</span>
+                {#if data.relations > 0}<span class="lvct-dash__stat-ft">{text("dashStatPeopleFt", "其中 {n} 人从未互动", { n: data.neverContacted })}</span>{/if}
+            </button>
+            <button class="lvct-dash__stat" onclick={onOpenGraph}>
+                <b>{data.relations}</b>
+                <span>{text("dashStatRelations", "关系")}</span>
+                {#if data.people > 0}<span class="lvct-dash__stat-ft">{text("dashStatRelationsFt", "人均 {n} 条", { n: (data.relations / data.people).toFixed(1) })}</span>{/if}
+            </button>
+            <button class="lvct-dash__stat" onclick={openBirthdayPeople}>
+                <b>{data.birthdaysThisWeek}</b>
+                <span>{text("dashStatBirthdaysWeek", "本周生日")}</span>
+                {#if data.birthdays.length > data.birthdaysThisWeek}<span class="lvct-dash__stat-ft">{text("dashStatBirthdaysFt", "窗口内共 {n} 人", { n: data.birthdays.length })}</span>{/if}
+            </button>
+            <button class="lvct-dash__stat" onclick={openNeverContactedPeople}>
+                <b>{data.neverContacted}</b>
+                <span>{text("dashStatNever", "从未互动")}</span>
+                {#if data.staleTotal > data.neverContacted}<span class="lvct-dash__stat-ft">{text("dashStatNeverFt", "另有久未联系 {n} 人", { n: data.staleTotal })}</span>{/if}
+            </button>
         </div>
 
         <div class="lvct-home__card lvct-dash__actions">
