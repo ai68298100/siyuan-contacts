@@ -1083,3 +1083,12 @@
   nav-item 显式重置宿主 button 默认边框/背景（appearance:none + border:0 + transparent），
   hover/active 沿用柔和色。消除宿主式描边导航观感。
 - 验证：桌面 76/76；构建通过。
+
+## UX-01.9 第 28 轮：向导视觉对齐原型（2026-09-29）
+
+- 向导 logo 从 44px 单色 SVG 升级为 64px 渐变底圆角块 + 橙色角标点（对齐原型 `.wizard .logo`）；
+  头部改居中纵向布局（logo → 标题 20px → 说明文案），text-align center。
+- 新增运行时不确定进度条（`.lvct-wizard__progress`，渐变滑块 + reduced-motion 降频），
+  初始化运行中显示。
+- 验证：单测 177/177；svelte-check 0 错误；桌面 76/76、移动 77/77、宿主基线 76/76；
+  wizard 截图确认 64px 渐变 logo + 居中布局生效；构建通过。

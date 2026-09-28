@@ -163,6 +163,12 @@
                 : text("wizardStart", "开始初始化")}
     </button>
 
+    {#if running}
+        <div class="lvct-wizard__progress" role="progressbar" aria-label={text("wizardProgressLabel", "初始化进行中")}>
+            <i></i>
+        </div>
+    {/if}
+
     {#if logLines.length > 0}
         <div class="lvct-wizard__log">
             {#each logLines as line, index (index)}
