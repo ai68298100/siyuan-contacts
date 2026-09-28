@@ -1,0 +1,66 @@
+{
+  "kernel": "3.8.5",
+  "ranAt": "2026-09-28T03:05:42.368Z",
+  "results": [
+    {
+      "name": "内核启动",
+      "ok": true,
+      "detail": "v3.8.5"
+    },
+    {
+      "name": "① 原生待办块可建且 SQL 可识别",
+      "ok": true,
+      "detail": "type=i subtype=t content=\" 联系是否开中药 📅2026-09-29\" id=20260928110541-8lu2yv5"
+    },
+    {
+      "name": "② 其他插件可按 type='i' + subtype='t' 扫到该待办",
+      "ok": true,
+      "detail": "[{\"content\":\" 联系是否开中药 📅2026-09-29\",\"id\":\"20260928110541-8lu2yv5\",\"markdown\":\"- [ ] 联系是否开中药 📅2026-09-29\",\"subtype\":\"t\",\"type\":\"i\"}]"
+    },
+    {
+      "name": "②b updateTaskListItemMarker 勾选",
+      "ok": true,
+      "detail": "code=0 msg= → {\"content\":\" 联系是否开中药 📅2026-09-29\",\"ial\":\"{: id=\\\"20260928110541-8lu2yv5\\\" updated=\\\"20260928110541\\\"}\",\"id\":\"20260928110541-8lu2yv5\",\"markdown\":\"- [X] 联系是否开中药 📅2026-09-29\"}"
+    },
+    {
+      "name": "②c 反向取消勾选",
+      "ok": true,
+      "detail": "code=0 → {\"ial\":\"{: id=\\\"20260928110541-8lu2yv5\\\" updated=\\\"20260928110541\\\"}\",\"id\":\"20260928110541-8lu2yv5\",\"markdown\":\"- [ ] 联系是否开中药 📅2026-09-29\"}"
+    },
+    {
+      "name": "②d batchUpdateTaskListItemMarker 生效于每条",
+      "ok": true,
+      "detail": "code=0 items=2 → [\"- [X] 乙事\",\"- [X] 甲事\"]"
+    },
+    {
+      "name": "②e marker='-' 行为（未开工/无标记）",
+      "ok": true,
+      "detail": "code=0 msg= markdown=\"- [-] 联系是否开中药 📅2026-09-29\""
+    },
+    {
+      "name": "③ setBlockAttrs 挂跟进 ID",
+      "ok": true,
+      "detail": "code=0 msg= ial={: updated=\"20260928110541\" custom-lvct-followup=\"fu-123\" custom-lvct-kind=\"followup\" id=\"20260928110541-8lu2yv5\"}"
+    },
+    {
+      "name": "③b 勾选后自定义属性是否存活",
+      "ok": true,
+      "detail": "ial={: id=\"20260928110541-8lu2yv5\" updated=\"20260928110542\" custom-lvct-followup=\"fu-123\" custom-lvct-kind=\"followup\"}"
+    },
+    {
+      "name": "③c 按自定义属性反查任务块",
+      "ok": true,
+      "detail": "[{\"content\":\" 联系是否开中药 📅2026-09-29\",\"id\":\"20260928110512-847cxgz\"},{\"content\":\" 联系是否开中药 📅2026-09-29\",\"id\":\"20260928110532-57352ee\"},{\"content\":\" 联系是否开中药 📅2026-09-29\",\"id\":\"20260928110541-8lu2yv5\"}]"
+    },
+    {
+      "name": "④ 日期标记原样保留",
+      "ok": true,
+      "detail": "[{\"content\":\" 联系是否开中药 📅2026-09-29\",\"markdown\":\"- [X] 联系是否开中药 📅2026-09-29\"},{\"content\":\" 联系是否开中药 📅2026-09-29\",\"markdown\":\"- [X] 联系是否开中药 📅2026-09-29\"},{\"content\":\" 送资料 @2026-10-01\",\"markdown\":\"- [ ] 送资料 @2026-10-01\"},{\"content\":\" 送资料 @2026-10-01 约饭 📅2026-10-05\",\"markdown\":\"- [ ] 送资料 @2026-10-01\\n- [ ] 约饭 📅2026-10-05\"},{\"content\":\" 约饭 📅2026-10-05\",\"markdown\":\"- [ ] 约饭 📅2026-10-05\"}]"
+    },
+    {
+      "name": "④b 任务块被删后按 ID 反查为空",
+      "ok": true,
+      "detail": "rows=0"
+    }
+  ]
+}
