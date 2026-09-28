@@ -69,7 +69,7 @@ pnpm build      # dist/ + package.zip
 pnpm check:release # package release gate
 ```
 
-See [AGENTS.md](AGENTS.md) for the development protocol, [docs/DATA-CONTRACT.md](docs/DATA-CONTRACT.md) for the storage contract and [docs/ROADMAP.md](docs/ROADMAP.md) for the roadmap. 中文文档见 [README.md](README.md)。
+See [AGENTS.md](AGENTS.md) for the development protocol, [docs/DATA-CONTRACT.md](docs/DATA-CONTRACT.md) for the storage contract and [docs/ROADMAP.md](docs/ROADMAP.md) for the roadmap. Changelog: [docs/CHANGELOG.md](docs/CHANGELOG.md). 中文文档见 [README.md](README.md)。
 
 ## 📄 License
 
