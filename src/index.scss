@@ -1421,6 +1421,76 @@
     gap: 8px;
 }
 
+.lvct-form__toolbar {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: var(--lvct-sp-1);
+}
+
+/* FAST-01.1 粘贴并识别预览 */
+.lvct-qf {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-2);
+}
+
+.lvct-qf__input {
+    resize: vertical;
+    min-height: 120px;
+    font-family: var(--lvct-font-family);
+}
+
+.lvct-qf__item {
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    align-items: baseline;
+    gap: var(--lvct-sp-2);
+    padding: var(--lvct-sp-1) var(--lvct-sp-2);
+    border-radius: var(--lvct-r-sm);
+
+    &:hover { background: var(--lvct-bg-hover); }
+    &:focus-within { background: var(--lvct-accent-soft); }
+
+    input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        flex-shrink: 0;
+        cursor: pointer;
+    }
+}
+
+.lvct-qf__item--conflict {
+    background: var(--lvct-highlight-soft);
+}
+
+.lvct-qf__field {
+    font-weight: var(--lvct-fw-medium);
+    color: var(--lvct-text-2);
+    white-space: nowrap;
+}
+
+.lvct-qf__value {
+    min-width: 0;
+    word-break: break-all;
+
+    small { display: block; }
+}
+
+.lvct-qf__raw {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lvct-qf__unrecognized {
+    border: 1px dashed var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-sm);
+    padding: var(--lvct-sp-2);
+
+    b { display: block; margin-bottom: var(--lvct-sp-1); }
+}
+
 .lvct-capture__result-actions {
     justify-content: flex-start;
     flex-wrap: wrap;

@@ -6,6 +6,7 @@
     import type { ContactsSettings } from "../../domain/model";
     import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
+    import QuickFillDialog from "./QuickFillDialog.svelte";
 
     let {
         settings,
@@ -43,6 +44,27 @@
     // svelte-ignore state_referenced_locally
     const originalTags = tagsText;
     let saved = $state(false);
+    // FAST-01.1：粘贴并识别（识别结果经勾选后回填草稿，不直接写库）
+    let quickFillOpen = $state(false);
+    function applyQuickFill(patch: {
+        name?: string; phone?: string; email?: string; wechat?: string;
+        website?: string; birthday?: string; isLunar?: boolean; group?: string;
+        tagsAppend: string[];
+    }) {
+        if (patch.name !== undefined) draft.name = patch.name;
+        if (patch.phone !== undefined) draft.phone = patch.phone;
+        if (patch.email !== undefined) draft.email = patch.email;
+        if (patch.wechat !== undefined) draft.wechat = patch.wechat;
+        if (patch.website !== undefined) draft.website = patch.website;
+        if (patch.birthday !== undefined) draft.birthday = patch.birthday;
+        if (patch.isLunar) draft.isLunar = true;
+        if (patch.group !== undefined) draft.group = patch.group;
+        if (patch.tagsAppend.length) {
+            const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter(Boolean);
+            for (const tag of patch.tagsAppend) if (!tags.includes(tag)) tags.push(tag);
+            tagsText = tags.join(" ");
+        }
+    }
     // B06：字段级改动明细 + 「保存并离开」（persist 抛错则留在原地）
     async function persist(): Promise<void> {
         const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
@@ -98,6 +120,11 @@
 </script>
 
 <div class="lvct-form">
+    <div class="lvct-form__toolbar">
+        <button type="button" class="b3-button b3-button--text" onclick={() => (quickFillOpen = true)}>
+            {text("qfOpen", "📋 粘贴并识别")}
+        </button>
+    </div>
     <div class="lvct-form__grid">
         <label class="lvct-form__item">
             <span>{text("formPhone", "电话")}</span>
@@ -150,3 +177,12 @@
     </div>
     <p class="ft__smaller ft__on-surface lvct-form__hint">{text("formEditHint", "留空即清空对应字段；姓名在思源里改文档名即可。")}</p>
 </div>
+
+{#if quickFillOpen}
+    <QuickFillDialog
+        {i18n}
+        existing={{ name: draft.name, phone: draft.phone, email: draft.email, wechat: draft.wechat, website: draft.website, birthday: draft.birthday, group: draft.group, tags: tagsText.split(/[，,、\s]+/).filter(Boolean) }}
+        onApply={applyQuickFill}
+        onClose={() => (quickFillOpen = false)}
+    />
+{/if}

@@ -160,6 +160,48 @@ await test("数据变化通知：空闲时原地刷新，草稿编辑中刷新�
     assert(fixture.querySelector(".lvct-form input[type=text]")?.value === "跨窗口编辑中", "提示后草稿丢失");
 });
 
+await test("粘贴并识别：分组预览、勾选回填草稿、冲突默认不覆盖（FAST-01.1）", async () => {
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadRecentInteractions: async () => ({}), loadDashboard: async () => ({
+            people: 0, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+            stale: [], neverContacted: 0, neverContactedItemIds: [],
+        }) },
+    } });
+    await until(() => fixture.querySelector(".lvct-dash__stats"), "首页未加载");
+    button("新建联系人").click();
+    await until(() => fixture.querySelector(".lvct-form input[type=text]"), "新建弹窗未打开");
+    button("📋 粘贴并识别").click();
+    await until(() => fixture.querySelector(".lvct-qf__input"), "粘贴弹窗未打开");
+    input(fixture.querySelector(".lvct-qf__input"), "张三\n手机：13800138000\n微信：zhang_san\n邮箱：a@example.com\n#家人");
+    await tick(); /* 等 bind 渲染生效，否则「识别」仍是 disabled，click 会被吞掉 */
+    button("识别").click();
+    await until(() => fixture.querySelector(".lvct-qf__item"), "识别结果未展示");
+    assert(fixture.textContent.includes("应用到表单（5）"), "无冲突新增项应默认全选");
+    button("应用到表单（5）").click();
+    await until(() => !fixture.querySelector(".lvct-qf__input"), "应用后粘贴弹窗未关闭");
+    const nameInput = [...fixture.querySelectorAll(".lvct-form input")].find((node) => node.type === "text");
+    assert(nameInput?.value === "张三", "姓名未回填");
+    assert(fixture.querySelector('.lvct-form input[type="tel"]')?.value === "13800138000", "电话未回填");
+    const tagsInput = [...fixture.querySelectorAll(".lvct-form input")].find((node) => node.placeholder?.includes("球友"));
+    assert(tagsInput?.value.includes("家人"), "标签未回填");
+    /* 冲突：已有值默认不覆盖，用户明确勾选后才写入 */
+    button("📋 粘贴并识别").click();
+    await until(() => fixture.querySelector(".lvct-qf__input"), "第二次粘贴弹窗未打开");
+    input(fixture.querySelector(".lvct-qf__input"), "手机：13999990000");
+    await tick();
+    button("识别").click();
+    await until(() => fixture.querySelector(".lvct-qf__item--conflict"), "冲突项未标记");
+    assert(fixture.textContent.includes("将覆盖当前值：13800138000"), "冲突提示未显示当前值");
+    assert(button("应用到表单（0）").disabled, "冲突项默认不应勾选");
+    fixture.querySelector(".lvct-qf__item--conflict input").click();
+    await tick();
+    button("应用到表单（1）").click();
+    await until(() => !fixture.querySelector(".lvct-qf__input"), "冲突应用后未关闭");
+    assert(fixture.querySelector('.lvct-form input[type="tel"]')?.value === "13999990000", "明确勾选后未更新");
+});
+
 await test("新建草稿关闭前三选一：取消保留草稿，放弃后关闭且弹窗列明细", async () => {
     const guardDialog = () => document.body.querySelector(".lvct-closeguard");
     try {

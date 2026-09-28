@@ -174,7 +174,8 @@
         previewInitialize: async () => ({}), initialize: async () => settings,
     };
     mount(Workbench, { target: document.getElementById("shot"), props: {
-        facade, settings, preferences, initialView: view === "home" ? "home" : view === "graph" ? "graph" : "people",
+        facade, settings, preferences,
+        initialView: (view === "home" || view === "quickfill") ? "home" : view === "graph" ? "graph" : "people",
         isMobile: innerWidth <= 640, onPreferencesUpdated() {}, onOpenPersonDoc() {},
     } });
     setTimeout(() => {
@@ -182,6 +183,10 @@
         if (view === "peek") document.querySelector(".lvct-person-card")?.click();
         if (view === "viewsmenu") document.querySelector('.lvct-people__toolbar button[aria-label="视图"]')?.click();
         if (view === "morefilter") document.querySelector("#lvct-people-moremenu > button")?.click();
+        if (view === "quickfill") {
+            document.querySelector(".lvct-workbench__header-actions button")?.click();
+            setTimeout(() => document.querySelector(".lvct-form__toolbar button")?.click(), 120);
+        }
         if (view === "colmenu") { document.querySelector('.lvct-people__toolbar button[title="切换卡片/表格"]')?.click(); setTimeout(() => document.querySelector('button[aria-label="表格列设置"]')?.click(), 120); }
         setTimeout(() => {
             const expected = view === "home" ? ".lvct-dash__stats"
@@ -190,6 +195,7 @@
                 : view === "peek" ? ".lvct-detail"
                 : view === "viewsmenu" ? ".lvct-people__viewsmenu"
                 : view === "morefilter" ? ".lvct-people__moremenu"
+                : view === "quickfill" ? ".lvct-qf__input"
                 : view === "colmenu" ? ".lvct-people__colmenu"
                 : ".lvct-person-card";
             if (!document.querySelector(expected)) document.title = `ERROR missing ${expected}`;
