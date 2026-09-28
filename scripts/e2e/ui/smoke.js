@@ -4,6 +4,7 @@ import PersonDetail from "../../../src/components/people/PersonDetail.svelte";
 import RelationGraph from "../../../src/components/graph/RelationGraph.svelte";
 import VCardDialog from "../../../src/components/people/VCardDialog.svelte";
 import CaptureDialog from "../../../src/components/capture/CaptureDialog.svelte";
+import InitWizard from "../../../src/components/InitWizard.svelte";
 import ImportDialog from "../../../src/components/people/ImportDialog.svelte";
 import DashboardView from "../../../src/components/dashboard/DashboardView.svelte";
 import PeopleView from "../../../src/components/people/PeopleView.svelte";
@@ -22,6 +23,7 @@ import { DEFAULT_TEMPLATES } from "../../../src/domain/interaction-templates";
 import { listTemplates, saveTemplates } from "../../../src/services/templates";
 import { importInteractionJson, previewInteractionImport } from "../../../src/services/interaction-import";
 import { FIELD_SPECS } from "../../../src/domain/fields";
+import { initializeWorkspace, inspectWorkspace } from "../../../src/services/init";
 import { buildTimeline, buildCoAttendance } from "../../../src/domain/interactions";
 import { DEFAULT_VIEW_PREFERENCES } from "../../../src/domain/preferences";
 import { kernel } from "./siyuan-mock.js";
@@ -2296,6 +2298,147 @@ await test("独立同源上下文共享 Web Locks，记录/删除/备份并发�
         frames.forEach((frame) => frame.remove());
         localStorage.removeItem(storageKey);
     }
+});
+
+await test("初始化（全新）：物化传 createIfNotExist、九字段按序配齐、双向关联只配一次", async () => {
+    const calls = [];
+    let notebooks = [];
+    const fieldKeys = [];
+    let saved = "";
+    const plugin = {
+        loadData: async () => (saved === "" ? "" : JSON.parse(JSON.stringify(saved))),
+        saveData: async (_key, value) => { saved = JSON.parse(JSON.stringify(value)); },
+    };
+    kernel.handler = async (route, body) => {
+        calls.push([route, body]);
+        if (route === "/api/notebook/lsNotebooks") return { notebooks };
+        if (route === "/api/notebook/createNotebook") {
+            notebooks = [{ id: "20260928000000-book001", name: body.name }];
+            return null;
+        }
+        if (route === "/api/filetree/createDocWithMd") return "20260928000000-host001";
+        if (route === "/api/block/insertBlock") return [{ doOperations: [{ id: "20260928000000-block01" }] }];
+        if (route === "/api/av/renderAttributeView") {
+            return { view: { columns: [
+                { id: "col-pk", name: "Primary Key", type: "block" },
+                { id: "col-sel", name: "Select", type: "select" },
+            ], rows: [] } };
+        }
+        if (route === "/api/av/addAttributeViewKey") {
+            fieldKeys.push({ name: body.keyName, previous: body.previousKeyID });
+            return null;
+        }
+        if (route === "/api/transactions") return [];
+        throw new Error(`全新初始化不允许请求 ${route}`);
+    };
+    const steps = [];
+    const settings2 = await initializeWorkspace(plugin, { notebookName: "人脉" }, (step) => steps.push(step.key));
+    const renderCall = calls.find(([route]) => route === "/api/av/renderAttributeView");
+    assert(renderCall[1].createIfNotExist === true, "建库物化未传 createIfNotExist:true（首次引导卡死根因）");
+    assert(fieldKeys.map((item) => item.name).join(",") === FIELD_SPECS.map((spec) => spec.nameZh).join(","),
+        `字段未按契约顺序建齐：${fieldKeys.map((item) => item.name).join(",")}`);
+    assert(fieldKeys[0].previous === "col-sel", "首个字段未接在现有列之后");
+    const relationCalls = calls.filter(([route]) => route === "/api/transactions");
+    assert(relationCalls.length === 1, `双向关联配置次数错误：${relationCalls.length}`);
+    const relatedKeyId = settings2.fieldMap.related;
+    assert(relationCalls[0][1].transactions[0].doOperations[0].keyID === relatedKeyId, "双向关联未使用相关人列 keyID");
+    assert(Object.keys(settings2.fieldMap).length === FIELD_SPECS.length, "fieldMap 未含全部字段");
+    assert(settings2.hostDocId === "20260928000000-host001" && settings2.dbBlockId === "20260928000000-block01"
+        && settings2.avId && settings2.notebookId === "20260928000000-book001", "锚点落盘错误");
+    assert(saved.hostDocId === settings2.hostDocId, "设置未写回宿主存储");
+    assert(steps[0] === "wizardStepNotebookCreate" && steps.includes("wizardStepDone"), `进度步骤异常：${steps.join(",")}`);
+});
+
+await test("初始化（续建）：复用笔记本/宿主文档/数据库/已有列，不重复建不重配双向", async () => {
+    const calls = [];
+    const fieldKeys = [];
+    let saved = "";
+    const plugin = {
+        loadData: async () => (saved === "" ? "" : JSON.parse(JSON.stringify(saved))),
+        saveData: async (_key, value) => { saved = JSON.parse(JSON.stringify(value)); },
+    };
+    const columns = [
+        { id: "col-pk", name: "Primary Key", type: "block" },
+        { id: "col-sel", name: "Select", type: "select" },
+        { id: "col-birthday", name: "生日", type: "date" },
+        { id: "col-phone", name: "电话", type: "phone" },
+        { id: "col-related", name: "相关人", type: "relation" },
+        { id: "col-back", name: "被相关人", type: "relation" },
+    ];
+    kernel.handler = async (route, body) => {
+        calls.push([route, body]);
+        if (route === "/api/notebook/lsNotebooks") return { notebooks: [{ id: "20260928000000-book002", name: "人脉" }] };
+        if (route === "/api/query/sql") {
+            if (String(body.stmt).includes("AND type = 'av'")) {
+                return [{ id: "20260928000000-block02", parent_id: "20260928000000-host002",
+                    markdown: '<div data-type="NodeAttributeView" data-av-id="20260928000000-av00002" data-av-type="table"></div>' }];
+            }
+            return [{ id: "20260928000000-host002", content: "联系人总表", hpath: "/联系人总表" }];
+        }
+        if (route === "/api/av/renderAttributeView") return { view: { columns, rows: [] } };
+        if (route === "/api/av/addAttributeViewKey") {
+            fieldKeys.push(body.keyName);
+            return null;
+        }
+        throw new Error(`续建不允许请求 ${route}`);
+    };
+    const snapshot = await inspectWorkspace("人脉");
+    assert(snapshot.notebook?.id === "20260928000000-book002" && snapshot.hostDocId === "20260928000000-host002"
+        && snapshot.dbBlockId === "20260928000000-block02" && snapshot.avId === "20260928000000-av00002",
+        `预检未找回锚点：${JSON.stringify(snapshot)}`);
+    assert(snapshot.existingFields.join(",") === "生日,电话,相关人", `预检可复用字段错误：${snapshot.existingFields.join(",")}`);
+
+    calls.length = 0;
+    const steps = [];
+    const settings2 = await initializeWorkspace(plugin, { notebookName: "人脉" }, (step) => steps.push(step.key));
+    const routes = calls.map(([route]) => route);
+    assert(!routes.includes("/api/notebook/createNotebook"), "续建重复创建笔记本");
+    assert(!routes.includes("/api/filetree/createDocWithMd"), "续建重复创建宿主文档");
+    assert(!routes.includes("/api/block/insertBlock"), "续建重复插入数据库块");
+    assert(!routes.includes("/api/transactions"), "双向关联已存在仍重复配置（会叠出第二列）");
+    assert(!fieldKeys.includes("生日") && !fieldKeys.includes("电话") && !fieldKeys.includes("相关人"),
+        `续建重复创建已有列：${fieldKeys.join(",")}`);
+    assert(fieldKeys.length === 6, `补建字段数错误：${fieldKeys.join(",")}`);
+    assert(settings2.fieldMap.birthday === "col-birthday" && settings2.fieldMap.related === "col-related",
+        "续建未沿用已有列 keyID");
+    assert(settings2.avId === "20260928000000-av00002" && settings2.notebookId === "20260928000000-book002", "续建锚点错误");
+    assert(steps[0] === "wizardStepNotebookReuse" && steps.includes("wizardStepFieldsKept")
+        && steps.includes("wizardStepRelationKept"), `续建进度未体现复用：${steps.join(",")}`);
+});
+
+await test("向导：预检提示将复用的内容，失败后可继续并在续建成功时回调", async () => {
+    const snapshot = {
+        notebooks: [{ id: "20260928000000-book003", name: "人脉" }],
+        notebook: { id: "20260928000000-book003", name: "人脉" },
+        hostDocId: "20260928000000-host003", dbBlockId: "20260928000000-block03",
+        avId: "20260928000000-av00003", existingFields: ["生日", "电话"],
+    };
+    let attempts = 0;
+    let initialized = null;
+    const facadeStub = {
+        settings: null,
+        viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        isMobile: false,
+        previewInitialize: async () => snapshot,
+        initialize: async (_name, onProgress) => {
+            attempts += 1;
+            onProgress({ key: "wizardStepNotebookReuse", values: { name: "人脉", count: 1 } });
+            if (attempts === 1) throw new Error("已存在同名笔记本「人脉」");
+            return settings;
+        },
+    };
+    mounted = mount(InitWizard, { target: fixture, props: {
+        facade: facadeStub, i18n: undefined, onInitialized: (value) => { initialized = value; },
+    } });
+    await until(() => fixture.textContent.includes("将保留已建字段：生日、电话"), "预检提示未显示可复用内容");
+    assert(fixture.textContent.includes("将复用已有的「联系人总表」文档"), "预检未提示复用宿主文档");
+    button("开始初始化").click();
+    await until(() => fixture.textContent.includes("初始化失败"), "失败信息未显示");
+    assert(fixture.textContent.includes("从断点续建"), "失败后未提示可继续");
+    assert(fixture.textContent.includes("复用已存在的笔记本"), "续建日志未体现复用");
+    button("继续初始化").click();
+    await until(() => initialized === settings, "续建成功后未回调初始化结果");
+    assert(attempts === 2, "续建未走第二次初始化");
 });
 
 await pause(100);

@@ -1,0 +1,111 @@
+{
+  "kernel": "3.8.5",
+  "ranAt": "2026-09-28T02:31:41.596Z",
+  "results": [
+    {
+      "name": "内核启动",
+      "ok": true,
+      "detail": "v3.8.5"
+    },
+    {
+      "name": "通道9a：全新块 createIfNotExist:false（生产 current 形状）",
+      "ok": true,
+      "detail": "code=-1 msg=attribute view not found columns=null"
+    },
+    {
+      "name": "通道9b：随后 createIfNotExist:true 可物化",
+      "ok": true,
+      "detail": "code=0 msg= columns=[\"Primary Key\",\"Select\"]"
+    },
+    {
+      "name": "通道9c：物化后 createIfNotExist:false 可读",
+      "ok": true,
+      "detail": "code=0 msg="
+    },
+    {
+      "name": "通道10a：insertBlock(dom) data 为事务结果数组且可取其 id",
+      "ok": true,
+      "detail": "{\"isArray\":true,\"id\":\"20260928103140-0ijj35y\",\"keys\":[\"0\"]}"
+    },
+    {
+      "name": "通道10b：insertBlock(markdown) 同上",
+      "ok": true,
+      "detail": "{\"isArray\":true,\"id\":\"20260928103140-ok1ira7\"}"
+    },
+    {
+      "name": "通道11·现场：半成品（笔记本+宿主文档+未物化数据库块，无字段）",
+      "ok": true,
+      "detail": "book=20260928103140-x6unzau host=20260928103140-arq92ma block=20260928103140-gu9xt3q"
+    },
+    {
+      "name": "通道11a：续建补建九个字段、无重名列、双向回链列就位",
+      "ok": true,
+      "detail": "新建=生日,农历生日,电话,邮箱,微信,网站,分组,标签,相关人 缺= 重="
+    },
+    {
+      "name": "通道11b：二次续建完全幂等（零新建字段、零重配双向）",
+      "ok": true,
+      "detail": "fields=0 relation=0 columns=12"
+    },
+    {
+      "name": "造现场",
+      "ok": true,
+      "detail": "notebook=20260928103141-nf7d2ev host=20260928103141-g7bywah av=20260928103141-iic1x6x dbBlock=20260928103141-c7bzwuf"
+    },
+    {
+      "name": "通道1：笔记本内按标题找回宿主文档",
+      "ok": true,
+      "detail": "rows=1 hit=true hpath=/联系人总表"
+    },
+    {
+      "name": "通道1b：hpath 字面量可查到（仅记录）",
+      "ok": true,
+      "detail": "rows=1"
+    },
+    {
+      "name": "通道2：parent_id + type='av' 找回数据库块",
+      "ok": true,
+      "detail": "children=[{\"content\":\"Table Primary Key Select 生日 相关人 被相关人\",\"id\":\"20260928103141-c7bzwuf\",\"subtype\":\"\",\"type\":\"av\"},{\"content\":\"联系人总表\",\"id\":\"20260928103141-lp3byer\",\"subtype\":\"h1\",\"type\":\"h\"}]"
+    },
+    {
+      "name": "通道3a：blocks.markdown/ial 是否含 avID",
+      "ok": true,
+      "detail": "[{\"content\":\"Table Primary Key Select 生日 相关人 被相关人\",\"ial\":\"{: id=\\\"20260928103141-c7bzwuf\\\" updated=\\\"20260928103141\\\"}\",\"id\":\"20260928103141-c7bzwuf\",\"markdown\":\"<div data-type=\\\"NodeAttributeView\\\" data-av-id=\\\"20260928103141-iic1x6x\\\" data-av-type=\\\"table\\\"></div>\",\"subtype\":\"\",\"type\":\"av\"}]"
+    },
+    {
+      "name": "通道3b：getBlockKramdown 是否含 avID",
+      "ok": true,
+      "detail": "code=0 data={\"id\":\"20260928103141-c7bzwuf\",\"kramdown\":\"<div data-type=\\\"NodeAttributeView\\\" data-av-id=\\\"20260928103141-iic1x6x\\\" data-av-type=\\\"table\\\"></div>\\n{: id=\\\"20260928103141-c7bzwuf\\\" updated=\\\"20260928103141\\\"}\"}"
+    },
+    {
+      "name": "通道3c：getChildBlocks 是否含 avID",
+      "ok": true,
+      "detail": "code=0 data=[{\"id\":\"20260928103141-c7bzwuf\",\"type\":\"av\",\"content\":\"Table Primary Key Select 生日 相关人 被相关人\",\"markdown\":\"<div data-type=\\\"NodeAttributeView\\\" data-av-id=\\\"20260928103141-iic1x6x\\\" data-av-type=\\\"table\\\"></div>\"},{\"id\":\"20260928103141-lp3byer\",\"type\":\"h\",\"subType\":\"h1\",\"content\":\"联系人总表\",\"markdown\":\"# 联系人总表\"}]"
+    },
+    {
+      "name": "通道4：renderView 列名→keyID 映射（含双向回链列）",
+      "ok": true,
+      "detail": "[{\"id\":\"20260928103141-q5lmic8\",\"name\":\"生日\",\"type\":\"date\"},{\"id\":\"20260928103141-01w700y\",\"name\":\"相关人\",\"type\":\"relation\"},{\"id\":\"20260928103141-y9sc85g\",\"name\":\"Primary Key\",\"type\":\"block\"},{\"id\":\"20260928103141-duolhtk\",\"name\":\"Select\",\"type\":\"select\"},{\"id\":\"20260928103141-tcgti7z\",\"name\":\"被相关人\",\"type\":\"relation\"}]"
+    },
+    {
+      "name": "通道5：错误 avID+正确 blockID（createIfNotExist:false）",
+      "ok": true,
+      "detail": "code=-1 msg=attribute view not found columns=null"
+    },
+    {
+      "name": "通道6：重复 keyName 不报错但会叠加同名列",
+      "ok": true,
+      "detail": "addCode=0 birthdayCols=2"
+    },
+    {
+      "name": "通道7：物化调用幂等",
+      "ok": true,
+      "detail": "before=6 after=6"
+    },
+    {
+      "name": "通道8：重名 createNotebook 行为",
+      "ok": true,
+      "detail": "code=0 msg= sameNameCount=2"
+    }
+  ]
+}

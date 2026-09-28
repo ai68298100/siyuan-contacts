@@ -6,8 +6,12 @@
  * 2. setAttributeViewBlockAttr 必须传 itemID（rowID 已进弃用通道）。
  * 3. 写渲染一律走 renderAttributeView；数据库没有 SQL 表。
  */
-import { appendBlockDom, kernelPost, newNodeId } from "./client";
+import { appendBlockDom, kernelPost, newNodeId, querySql } from "./client";
+import { parseAvIdFromBlockMarkdown } from "../domain/init-plan.ts";
 import type { AvFieldType, FieldSpec } from "../domain/fields";
+
+/** 思源节点 ID 形状（DATA-CONTRACT §4：进 SQL 的值仅限严格校验过的 ID） */
+const ID_PATTERN = /^\d{14}-[0-9a-z]{7}$/;
 
 /* ---------- 类型（渲染响应的最小切片） ---------- */
 
@@ -75,19 +79,51 @@ export async function createDatabaseInDoc(hostDocId: string): Promise<{ avId: st
     const avId = newNodeId();
     const dom = `<div data-type="NodeAttributeView" data-av-id="${avId}" data-av-type="table"></div>`;
     const dbBlockId = await appendBlockDom(hostDocId, dom);
-    // createIfNotExist 物化数据库（默认视图 + 主键列）
-    await renderView(avId, dbBlockId);
+    // 物化必须 createIfNotExist: true——全新块上传 false 会以
+    // `code=-1 attribute view not found` 失败（v0.2.0 首次引导卡死的根因，spike 通道9a）
+    await renderView(avId, dbBlockId, "", true);
     return { avId, dbBlockId };
 }
 
-export async function renderView(avId: string, dbBlockId: string, query: string = ""): Promise<AvRenderResult> {
+export async function renderView(
+    avId: string,
+    dbBlockId: string,
+    query: string = "",
+    createIfNotExist: boolean = false,
+): Promise<AvRenderResult> {
     return kernelPost<AvRenderResult>("/api/av/renderAttributeView", {
         id: avId,
         blockID: dbBlockId,
         query,
         pageSize: -1,
-        createIfNotExist: false,
+        createIfNotExist,
     });
+}
+
+/** 文档内的数据库块（含从块 markdown 还原的 avID） */
+export interface AvBlockRef {
+    dbBlockId: string;
+    /** 数据库块所在文档（= 行绑定目标的宿主文档） */
+    hostDocId: string;
+    avId: string;
+}
+
+/**
+ * 按文档找回数据库块。续建初始化时用它还原 dbBlockId/avId 锚点：
+ * 块 IAL 里没有 avID，唯一的还原通道是同一条 blocks 行的 markdown 列。
+ */
+export async function findAvBlocksInDoc(docId: string): Promise<AvBlockRef[]> {
+    if (!ID_PATTERN.test(docId)) throw new Error("docId 不是合法的思源 ID");
+    const rows = await querySql<{ id: string; parent_id: string; markdown: string }>(
+        `SELECT id, parent_id, markdown FROM blocks WHERE parent_id = '${docId}' AND type = 'av'`,
+    );
+    const refs: AvBlockRef[] = [];
+    for (const row of rows) {
+        const avId = parseAvIdFromBlockMarkdown(row.markdown);
+        if (!avId || !ID_PATTERN.test(row.id) || !ID_PATTERN.test(row.parent_id)) continue;
+        refs.push({ dbBlockId: row.id, hostDocId: row.parent_id, avId });
+    }
+    return refs;
 }
 
 /** 分页参数（性能预算见 DATA-CONTRACT §4：列表热路径禁止 -1 全量渲染；当前视图均走名册缓存，本接口供大规模演进预案使用） */

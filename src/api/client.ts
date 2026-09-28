@@ -87,9 +87,26 @@ interface DoOperation {
     action: string;
 }
 
-interface InsertBlockData {
+interface TransactionResult {
     operations?: DoOperation[];
     doOperations?: DoOperation[];
+}
+
+/**
+ * insertBlock 等写入端点的 data 形状：
+ * v3.8.5 实测（spike/init-resume 通道）是**事务结果数组** `[{doOperations:[…]}]`，
+ * 早期代码按对象读导致首次引导在建库一步抛"未返回新块 ID"。
+ * 两种形状都容忍，取第一个带 id 的操作。
+ */
+export type InsertBlockData = TransactionResult[] | TransactionResult;
+
+export function firstOperationId(data: InsertBlockData | undefined): string {
+    const results: TransactionResult[] = Array.isArray(data) ? data : data ? [data] : [];
+    for (const result of results) {
+        const operation = result?.doOperations?.[0] ?? result?.operations?.[0];
+        if (operation?.id) return operation.id;
+    }
+    return "";
 }
 
 /** 向文档追加一个块（DOM），返回新块 ID */
@@ -99,9 +116,9 @@ export async function appendBlockDom(parentBlockId: string, dom: string): Promis
         parentID: parentBlockId,
         data: dom,
     });
-    const op = data?.doOperations?.[0] ?? data?.operations?.[0];
-    if (!op?.id) throw new Error("insertBlock 未返回新块 ID");
-    return op.id;
+    const id = firstOperationId(data);
+    if (!id) throw new Error("insertBlock 未返回新块 ID");
+    return id;
 }
 
 export { kernelPost };

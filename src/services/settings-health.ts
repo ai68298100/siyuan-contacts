@@ -1,7 +1,6 @@
 import { addField, configureSelfRelationTwoWay, renderView } from "../api/av";
-import type { AvColumn } from "../api/av";
 import { newNodeId } from "../api/client";
-import { FIELD_SPECS } from "../domain/fields";
+import { FIELD_SPECS, reconcileFieldMap } from "../domain/fields.ts";
 import type { FieldKey } from "../domain/fields";
 import type { ContactsSettings } from "../domain/model";
 import { persistSettings } from "./init";
@@ -30,40 +29,6 @@ export interface SettingsHealth {
 
 export type SettingsAnchorPatch = Pick<ContactsSettings, "hostDocId" | "dbBlockId" | "avId">;
 export type FieldMapPatch = Partial<ContactsSettings["fieldMap"]>;
-
-interface RebindFieldMapResult {
-    fieldMap: ContactsSettings["fieldMap"];
-    matched: number;
-}
-
-/**
- * 重绑时优先沿用旧 keyID；迁移到同结构的新库时，再按默认列名和类型恢复。
- * 列名被用户改过且 keyID 也变化时不猜测，交给健康检查和显式补建处理。
- */
-function reconcileFieldMap(
-    current: ContactsSettings["fieldMap"],
-    columns: readonly AvColumn[],
-): RebindFieldMapResult {
-    const next = { ...current };
-    const used = new Set<string>();
-    let matched = 0;
-    for (const spec of FIELD_SPECS) {
-        const byId = columns.find((column) =>
-            !used.has(column.id) && column.id === current[spec.key] && column.type === spec.type,
-        );
-        const byDefaultName = columns.find((column) =>
-            !used.has(column.id) &&
-            column.type === spec.type &&
-            (column.name === spec.nameZh || column.name === spec.nameEn),
-        );
-        const column = byId ?? byDefaultName;
-        if (!column) continue;
-        next[spec.key] = column.id;
-        used.add(column.id);
-        matched += 1;
-    }
-    return { fieldMap: next, matched };
-}
 
 /**
  * 对照设置中固化的字段 ID 与当前数据库列，给设置页提供可解释的健康状态。
@@ -175,11 +140,17 @@ export async function rebindSettings(
     }
 
     const rendered = await renderView(anchors.avId, anchors.dbBlockId);
-    const reconciled = reconcileFieldMap(settings.fieldMap, rendered.view.columns);
+    // 重绑优先沿用旧 keyID；迁移到同结构的新库时按默认列名和类型恢复。
+    // 列名被用户改过且 keyID 也变化时不猜测，交给健康检查和显式补建处理。
+    const reconciled = reconcileFieldMap(rendered.view.columns, settings.fieldMap);
     if (reconciled.matched === 0) {
         throw new Error("目标属性视图无法识别为联系人数据库：请确认数据库锚点，或先恢复标准字段名称");
     }
-    const updated: ContactsSettings = { ...settings, ...anchors, fieldMap: reconciled.fieldMap };
+    const updated: ContactsSettings = {
+        ...settings,
+        ...anchors,
+        fieldMap: { ...settings.fieldMap, ...reconciled.fieldMap },
+    };
     await persistSettings(plugin, updated);
     invalidateRoster();
     return updated;

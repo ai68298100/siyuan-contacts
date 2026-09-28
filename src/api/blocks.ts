@@ -3,23 +3,19 @@
  * 用于维护人物文档的"相关人物"区块（带 custom-lvct-related 属性标记）。
  * SQL 组装遵守 DATA-CONTRACT §4：进入语句的值仅限严格校验过的思源 ID。
  */
-import { kernelPost, newNodeId, querySql } from "./client";
-
-interface DoOperationsData {
-    operations?: Array<{ id: string; action: string }>;
-    doOperations?: Array<{ id: string; action: string }>;
-}
+import { firstOperationId, kernelPost, newNodeId, querySql } from "./client";
+import type { InsertBlockData } from "./client";
 
 /** 在容器块（通常是文档根）末尾追加一个 markdown 块，返回新块 ID */
 export async function appendBlockMd(parentId: string, markdown: string): Promise<string> {
-    const data = await kernelPost<DoOperationsData>("/api/block/insertBlock", {
+    const data = await kernelPost<InsertBlockData>("/api/block/insertBlock", {
         dataType: "markdown",
         parentID: parentId,
         data: markdown,
     });
-    const op = data?.doOperations?.[0] ?? data?.operations?.[0];
-    if (!op?.id) throw new Error("insertBlock 未返回新块 ID");
-    return op.id;
+    const id = firstOperationId(data);
+    if (!id) throw new Error("insertBlock 未返回新块 ID");
+    return id;
 }
 
 /** 整块更新为新的 markdown（保留原块 ID） */

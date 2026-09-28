@@ -9,7 +9,8 @@ import "./index.scss";
 
 import WorkbenchRoot from "./components/WorkbenchRoot.svelte";
 import CaptureDialog from "./components/capture/CaptureDialog.svelte";
-import { initializeWorkspace, loadSettings } from "./services/init";
+import { initializeWorkspace, inspectWorkspace, loadSettings } from "./services/init";
+import type { InitProgressStep, WorkspaceSnapshot } from "./services/init";
 import { loadDashboard, DEFAULT_DASHBOARD_OPTIONS } from "./services/dashboard";
 import { deleteInteraction, recordInteraction, loadInteractionStore } from "./data/interactions";
 import { captureFromDoc, previewCapture } from "./services/capture";
@@ -207,11 +208,15 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     async initialize(
         notebookName: string,
-        onProgress: (message: string) => void,
+        onProgress: (step: InitProgressStep) => void,
     ): Promise<ContactsSettings> {
         const settings = await initializeWorkspace(this, { notebookName }, onProgress);
         this.settings = settings;
         return settings;
+    }
+
+    async previewInitialize(notebookName: string): Promise<WorkspaceSnapshot> {
+        return inspectWorkspace(notebookName);
     }
 
     async loadDashboard(options?: Partial<typeof DEFAULT_DASHBOARD_OPTIONS>) {

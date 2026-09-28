@@ -13,6 +13,7 @@ import type { ReviewReport } from "./domain/review-report";
 import type { FollowUpImportPreview } from "./services/followups";
 import type { InteractionImportDiff } from "./domain/interaction-backup";
 import type { ExportSummary } from "./services/export-center";
+import type { InitProgressStep, WorkspaceSnapshot } from "./services/init";
 
 export type WorkbenchView = "home" | "people" | "graph" | "settings";
 
@@ -24,8 +25,10 @@ export interface ContactsPluginFacade {
     readonly settings: ContactsSettings | null;
     readonly viewPreferences: ViewPreferences;
     readonly isMobile: boolean;
-    /** 执行工作空间初始化并向导日志回调进度；失败抛错 */
-    initialize(notebookName: string, onProgress: (message: string) => void): Promise<ContactsSettings>;
+    /** 执行工作空间初始化并向导日志回调进度；幂等可续建，失败抛错 */
+    initialize(notebookName: string, onProgress: (step: InitProgressStep) => void): Promise<ContactsSettings>;
+    /** 初始化前预检：同名笔记本/宿主文档/数据库/可复用字段（向导据此提示将复用哪些内容） */
+    previewInitialize(notebookName: string): Promise<WorkspaceSnapshot>;
     /** 仪表盘聚合（近期生日/久未联系/统计） */
     loadDashboard(options?: Partial<DashboardOptions>): Promise<DashboardData>;
     /** 记一笔互动（幂等） */

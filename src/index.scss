@@ -266,6 +266,34 @@
     word-break: break-all;
 }
 
+.lvct-wizard__error-hint {
+    margin: 6px 0 0;
+    color: var(--lvct-text-2);
+}
+
+/* 预检提示：将新建/将复用哪些已有内容（D-0019 续建） */
+.lvct-wizard__plan {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--lvct-bg-surface);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-sm);
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--lvct-text-2);
+    word-break: break-all;
+
+    p {
+        margin: 0;
+    }
+
+    button {
+        align-self: flex-start;
+        padding: 0;
+    }
+}
+
 .lvct-wizard__log {
     font-family: var(--lvct-font-code);
     font-size: 12px;
