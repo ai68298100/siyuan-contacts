@@ -1698,9 +1698,20 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 8px;
-    padding: 8px 12px;
+    gap: 6px;
+    padding: 6px 10px;
     border-bottom: 1px solid var(--lvct-border-subtle);
+    background: var(--lvct-bg-surface);
+
+    /* UX-01.7：紧凑筛选胶囊 */
+    select {
+        min-width: 0;
+        max-width: 170px;
+        border-radius: var(--lvct-r-pill);
+        padding: 3px 10px;
+        font-size: var(--lvct-fs-caption);
+    }
+
     label {
         display: flex;
         align-items: center;
@@ -1734,7 +1745,8 @@
     min-height: 320px;
     border: 1px solid var(--lvct-border-subtle);
     border-radius: var(--lvct-r-lg);
-    background: var(--lvct-bg-surface);
+    /* UX-01.7：柔和径向背景（对齐原型，非平面纯色） */
+    background: radial-gradient(ellipse at 50% 40%, var(--lvct-bg-surface) 0%, var(--lvct-bg-app) 100%);
 }
 
 .lvct-graph-view__canvas-wrap {
