@@ -107,7 +107,6 @@ function resetKernel() {
 let mounted;
 async function test(name, action) {
     resetKernel();
-    console.log("[case]", name);
     (window.__cases = window.__cases || []).push(name);
     try {
         await action();
@@ -457,11 +456,9 @@ await test("完整迁移包：六模块导出→恢复预览→确认合并，�
     const byKey = Object.fromEntries(preview.map((module) => [module.key, module.count]));
     assert(byKey.interactions === 1 && byKey.followUps === 1 && byKey.templates === 1, `预览计数错误：${JSON.stringify(byKey)}`);
 
-    console.log("[c08] import returned");
     window.__stage = "import-done";
     const result = await importMigrationBundle(plugin, bundleText);
     window.__stage = "import-returned";
-    console.log("[c08] import done");
     assert(result.modules.length >= 5, `恢复模块数不足：${JSON.stringify(result.modules)}`);
     /* 现状优先：互动/跟进不产生重复 */
     window.__stage = "check-interactions";
@@ -2258,6 +2255,58 @@ await test("原生捕获弹窗可完成并关闭，继承主题令牌", async ()
         button("完成", dialog.dialog.element).click();
         await tick();
         assert(!dialog.dialog.element.isConnected, "完成按钮未关闭弹窗");
+    } finally {
+        if (dialog.dialog.element.isConnected) dialog.close();
+    }
+});
+
+await test("AI 结构化候选：分组勾选确认，资料补充/建跟进写入且不越契约（FAST-01.4）", async () => {
+    const personOf = (name) => ({
+        docId: `20260927000000-${name}0000`, itemId: `row-${name}`, name,
+        phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
+        group: "朋友", tags: [], relatedItemIds: [],
+    });
+    const 甲 = personOf("寿星甲");
+    const fieldWrites = [];
+    const followUpWrites = [];
+    const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
+        docId: settings.hostDocId,
+        facade: {
+            viewPreferences: DEFAULT_VIEW_PREFERENCES,
+            previewCapture: async () => ({ docName: "测试笔记", linked: [甲] }),
+            captureDoc: async () => ({ createdNames: [], createdDocIds: [], interactions: 1, attendeeBlockWritten: true }),
+            aiExtractFromDoc: async () => ({
+                extraction: {
+                    names: ["寿星甲"], date: "2026-09-29", place: "会议室", occasion: null, note: "聊了发布计划",
+                    profileCandidates: [{ person: "寿星甲", field: "phone", value: "13800001234" }],
+                    followUpCandidates: [{ person: "寿星甲", title: "回传资料", dueDate: "2026-10-06" }],
+                    relationCandidates: [{ personA: "寿星甲", personB: "路人乙", relation: "同学" }],
+                    rejected: 0,
+                },
+                likelyUnconfigured: false,
+                matched: [甲],
+                unknownNames: [],
+            }),
+            updatePersonFields: async (itemId, draft) => fieldWrites.push({ itemId, draft }),
+            createFollowUp: async (docId, title, dueDate) => followUpWrites.push({ docId, title, dueDate }),
+        },
+    } });
+    try {
+        await until(() => dialog.dialog.element.textContent.includes("AI 分析本页"), "捕获未加载");
+        [...dialog.dialog.element.querySelectorAll("button")]
+            .find((node) => node.textContent.includes("AI 分析本页")).click();
+        await until(() => dialog.dialog.element.textContent.includes("AI 结构化候选"), "AI 候选未展示");
+        /* 关系候选仅展示、不提供写入 */
+        assert(dialog.dialog.element.textContent.includes("当前版本仅记录在笔记中"), "关系建议说明缺失");
+        /* 默认勾选：直接进入确认 */
+        button("下一步：确认记录", dialog.dialog.element).click();
+        await tick();
+        button("记录互动并写入参与人员", dialog.dialog.element).click();
+        await until(() => dialog.dialog.element.textContent.includes("AI 候选的资料补充与建跟进已完成"), "AI 候选写入未完成");
+        assert(fieldWrites.length === 1 && fieldWrites[0].draft.phone === "13800001234", "资料候选未写入");
+        /* 只补缺失：其余字段以名册快照打底不被清空 */
+        assert(fieldWrites[0].draft.group === "朋友", "全字段写入未以现有值打底");
+        assert(followUpWrites.length === 1 && followUpWrites[0].title === "回传资料" && followUpWrites[0].dueDate === "2026-10-06", "跟进候选未写入");
     } finally {
         if (dialog.dialog.element.isConnected) dialog.close();
     }
