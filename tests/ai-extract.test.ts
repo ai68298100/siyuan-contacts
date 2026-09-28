@@ -39,3 +39,50 @@ test("defaultBridgeRef：确定性幂等键（与人员顺序无关）", () => {
     assert.equal(a, b);
     assert.ok(a.startsWith("bridge:2026-09-27:"));
 });
+
+test("FAST-01.4：结构化候选解析——profile/followUp/relation 分组、字段白名单、非法丢弃并计数", () => {
+    const reply = JSON.stringify({
+        version: 1,
+        people: ["张三", "李四"],
+        date: "2026-09-27",
+        place: "会议室",
+        occasion: "产品评审",
+        note: "聊了发布计划",
+        profileCandidates: [
+            { person: "张三", field: "phone", value: "13800000000" },
+            { person: "张三", field: "company", value: "不该出现的字段" },
+            { person: "李四", field: "birthday", value: "1990-01-01" },
+            { person: "李四", field: "email", value: "" },
+        ],
+        followUpCandidates: [
+            { person: "张三", title: "回传资料", dueDate: "2026-10-08" },
+            { person: "李四", title: "没有日期", dueDate: null },
+        ],
+        relationCandidates: [
+            { personA: "张三", personB: "李四", relation: "同事" },
+        ],
+    });
+    const result = parseExtraction(`好的，以下是抽取结果：${reply}`);
+    assert.ok(result);
+    assert.deepEqual(result.profileCandidates, [
+        { person: "张三", field: "phone", value: "13800000000" },
+        { person: "李四", field: "birthday", value: "1990-01-01" },
+    ]);
+    assert.deepEqual(result.followUpCandidates, [{ person: "张三", title: "回传资料", dueDate: "2026-10-08" }]);
+    assert.deepEqual(result.relationCandidates, [{ personA: "张三", personB: "李四", relation: "同事" }]);
+    assert.equal(result.rejected, 3, "company 非白名单、email 空值、followup 缺日期各计一次");
+    assert.equal(result.occasion, "产品评审");
+});
+
+test("FAST-01.4：旧格式（无候选字段）兼容解析，生日日期非法被丢弃", () => {
+    const result = parseExtraction('{"people":["王五"],"date":"2026-09-27","place":"餐厅"}');
+    assert.ok(result);
+    assert.deepEqual(result.names, ["王五"]);
+    assert.deepEqual(result.profileCandidates, []);
+    assert.deepEqual(result.followUpCandidates, []);
+    assert.deepEqual(result.relationCandidates, []);
+    assert.equal(result.rejected, 0);
+    const bad = parseExtraction('{"people":["王五"],"profileCandidates":[{"person":"王五","field":"birthday","value":"1990-13-40"}]}');
+    assert.deepEqual(bad?.profileCandidates, [], "生日日期无法解析时应丢弃候选");
+    assert.equal(bad?.rejected, 1);
+});

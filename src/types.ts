@@ -90,6 +90,8 @@ export interface ContactsPluginFacade {
     saveViewPreferences(preferences: ViewPreferences): Promise<ViewPreferences>;
     /** 从笔记捕获：预览出链指向的联系人 */
     previewCapture(docId: string): Promise<CapturePreview>;
+    /** FAST-01.4：按全字段更新联系人资料（AI 资料候选确认后补录用） */
+    updatePersonFields(personItemId: string, draft: import("./domain/person").ContactDraft): Promise<void>;
     /** 从笔记捕获：确认执行（互动事件 + 参与人区块 + 新人收编） */
     captureDoc(docId: string, options: CaptureOptions): Promise<CaptureResult>;
     /** AI 抽取本页人名/日期/地点（需思源内置 AI；结果须经确认 UI） */

@@ -980,3 +980,20 @@
   （held 恒存 pending 同名堆积，持有人不明），迁移包恢复的模板合并因此**绕锁手工读改写**
   （单用户低频，风险可接受）；锁假死根因待查。smoke harness 同步增强：超时转储页面进度与
   Web Locks held/pending 名单、Runtime.exceptionThrown 入 console 追踪、超时 45→240 秒。
+
+## 批次 4 第 20 轮：FAST-01.4 AI 结构化抽取（2026-09-29）——批次 4 收尾
+
+- **域层**（`domain/ai-extract.ts`）：提示词升级为版本化 JSON（v1：people/date/place/occasion/note +
+  profileCandidates[field 白名单 phone/wechat/email/website/birthday]/followUpCandidates/
+  relationCandidates，字段缺省 null、不确定不猜）；解析严格校验（字段白名单、真实日期校验、长度上限
+  80/200、各候选上限 20、非法/超限丢弃并 rejected 计数、未知字段忽略；旧格式无候选字段兼容）。
+  单测 +2（结构化分组解析与拒绝计数、旧格式兼容与非法生日丢弃）。
+- **UI**（CaptureDialog）：AI 分析后展示结构化候选分组——资料补充（勾选，只对名册已匹配人）、
+  建跟进候选（勾选）、关系候选（仅展示"当前版本仅记录在笔记中"说明，不写库，对齐 D-0020 无关系
+  类型契约）；默认勾选待确认。主捕获成功后执行勾选项：资料补充走 facade.updatePersonFields
+  （**以名册快照打底只补缺失**，全字段写入不清空已有资料——smoke 专项断言 group 保底）、建跟进走
+  既有 createFollowUp；extrasError 单独提示不阻断主捕获结果。
+- 验证：单测 176/176；svelte-check 0 错误；隔离回归桌面 76/76、移动 77/77、宿主基线 76/76；
+  52 景截图 OK；构建通过。
+- **批次 4 全部完成**（B07 双向同步 + C08 完整迁移包 + FAST-01.4 AI 结构化抽取）。
+  剩余批次：批次 5（B05+C04+C05，需先过产品边界与数据契约决策门槛）。

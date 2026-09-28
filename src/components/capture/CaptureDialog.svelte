@@ -35,6 +35,11 @@
     let aiDone: boolean = $state(false);
     let aiMatchedIds: string[] = $state([]);
     let aiUnknownNames: string[] = $state([]);
+    // FAST-01.4：AI 结构化候选（资料补充/建跟进），勾选确认后写入；关系候选仅展示不写库
+    let aiProfileCandidates: { personDocId: string; personItemId: string; personName: string; field: string; value: string; checked: boolean }[] = $state([]);
+    let aiFollowUpCandidates: { personDocId: string; personName: string; title: string; dueDate: string; checked: boolean }[] = $state([]);
+    let aiRelationNote: string = $state("");
+    let extrasError: string = $state("");
     let step: 1 | 2 | 3 = $state(1);
 
     const checkedIds = $derived(Object.entries(checked).filter(([, on]) => on).map(([id]) => id));
@@ -56,6 +61,9 @@
             checked = initial;
             aiMatchedIds = [];
             aiUnknownNames = [];
+            aiProfileCandidates = [];
+            aiFollowUpCandidates = [];
+            aiRelationNote = "";
         } catch (error) {
             loadError = error instanceof Error ? error.message : String(error);
         }
@@ -90,12 +98,78 @@
             newNamesText = [...existing].join(" ");
             if (outcome.extraction.date && !date) date = outcome.extraction.date;
             if (outcome.extraction.place && !place) place = outcome.extraction.place;
+            if (outcome.extraction.occasion && !note) note = outcome.extraction.occasion;
+            /* FAST-01.4：结构化候选——只对名册已匹配的人生效，默认勾选待确认 */
+            aiProfileCandidates = (outcome.extraction.profileCandidates ?? [])
+                .map((candidate) => {
+                    const target = outcome.matched.find((person) => person.name === candidate.person);
+                    if (!target) return null;
+                    return {
+                        personDocId: target.docId, personItemId: target.itemId, personName: target.name,
+                        field: candidate.field, value: candidate.value, checked: true,
+                    };
+                })
+                .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+            aiFollowUpCandidates = (outcome.extraction.followUpCandidates ?? [])
+                .map((candidate) => {
+                    const target = outcome.matched.find((person) => person.name === candidate.person);
+                    if (!target) return null;
+                    return {
+                        personDocId: target.docId, personName: target.name,
+                        title: candidate.title || "联系一下", dueDate: candidate.dueDate, checked: true,
+                    };
+                })
+                .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+            aiRelationNote = (outcome.extraction.relationCandidates ?? [])
+                .map((candidate) => `${candidate.personA} ↔ ${candidate.personB}（${candidate.relation}）`)
+                .join("；");
             aiDone = true;
         } catch (error) {
             aiError = error instanceof Error ? error.message : String(error);
         } finally {
             aiRunning = false;
         }
+    }
+
+    /** C07/FUNC：主捕获完成后执行勾选的资料补充与建跟进（失败不阻断主结果，单独提示） */
+    async function applyAiExtras(): Promise<void> {
+        extrasError = "";
+        for (const candidate of aiProfileCandidates) {
+            if (!candidate.checked) continue;
+            try {
+                /* AI 候选只补缺失字段：以名册快照打底（updatePersonFields 全字段写入） */
+                const person = preview?.linked.find((entry) => entry.docId === candidate.personDocId)
+                    ?? outcomeSnapshot().find((entry) => entry.docId === candidate.personDocId);
+                const draft = {
+                    name: person?.name ?? candidate.personName,
+                    phone: candidate.field === "phone" ? candidate.value : person?.phone ?? "",
+                    wechat: candidate.field === "wechat" ? candidate.value : person?.wechat ?? "",
+                    email: candidate.field === "email" ? candidate.value : person?.email ?? "",
+                    website: candidate.field === "website" ? candidate.value : person?.website ?? "",
+                    birthday: candidate.field === "birthday" ? candidate.value : person?.birthday ?? "",
+                    isLunar: person?.isLunar ?? false,
+                    group: person?.group ?? "",
+                    tags: [...(person?.tags ?? [])],
+                };
+                await facade.updatePersonFields(candidate.personItemId, draft);
+            } catch (error) {
+                extrasError = `资料补充失败（${candidate.personName}）：${error instanceof Error ? error.message : String(error)}`;
+                return;
+            }
+        }
+        for (const candidate of aiFollowUpCandidates) {
+            if (!candidate.checked) continue;
+            try {
+                await facade.createFollowUp(candidate.personDocId, candidate.title, candidate.dueDate);
+            } catch (error) {
+                extrasError = `建跟进失败（${candidate.personName}）：${error instanceof Error ? error.message : String(error)}`;
+                return;
+            }
+        }
+    }
+    /** 捕获完成后的名册快照（AI 候选打底用）；preview.linked 优先 */
+    function outcomeSnapshot() {
+        return preview?.linked ?? [];
     }
 
     async function submit() {
@@ -111,6 +185,8 @@
                 place: place.trim() || undefined,
                 note: note.trim() || undefined,
             });
+            /* FAST-01.4：AI 候选的资料补充/建跟进在主捕获成功后执行（失败单独提示不阻断主结果） */
+            await applyAiExtras();
             step = 3;
         } catch (error) {
             errorText = error instanceof Error ? error.message : String(error);
@@ -140,6 +216,10 @@
             <p>✓ {text("captureDoneInteractions", "已记录 {n} 条互动", { n: result.interactions })}</p>
             {#if result.createdNames.length > 0}<p>✦ {text("captureDoneCreated", "新增联系人：{n}", { n: result.createdNames.join("、") })}</p>{/if}
             {#if result.attendeeBlockWritten}<p>✦ {text("captureDoneBlock", "笔记已写入「参与人员」双链区块")}</p>{/if}
+            {#if (aiProfileCandidates.some((c) => c.checked) || aiFollowUpCandidates.some((c) => c.checked)) && !extrasError}
+                <p>✦ {text("captureAiExtrasDone", "AI 候选的资料补充与建跟进已完成")}</p>
+            {/if}
+            {#if extrasError}<p class="ft__smaller lvct-text-danger">{extrasError}</p>{/if}
             <p class="ft__smaller ft__on-surface">{text("captureDoneIdempotent", "同一篇笔记重复捕获不会重复记录。")}</p>
         </div>
         <div class="lvct-form__actions lvct-capture__result-actions">
@@ -206,6 +286,43 @@
                 <span class="lvct-capture__source-note"><b>{text("captureBadgeAi", "AI 提名")}</b>：{aiUnknownNames.join("、")}，{text("captureAiConfirmNote", "请确认后再记录。")}</span>
             {/if}
         </label>
+
+        {#if aiDone && (aiProfileCandidates.length > 0 || aiFollowUpCandidates.length > 0 || aiRelationNote)}
+            <div class="lvct-form__item" aria-label="AI 结构化候选">
+                <span><b class="lvct-capture__source-note">{text("captureAiStructured", "AI 结构化候选（勾选确认后才会写入）")}</b></span>
+                {#if aiProfileCandidates.length > 0}
+                    <div class="lvct-capture__list">
+                        {#each aiProfileCandidates as candidate (candidate.personDocId + candidate.field)}
+                            <label class="lvct-import__row">
+                                <input class="b3-switch" type="checkbox" bind:checked={candidate.checked} />
+                                <span><b>{candidate.personName}</b></span>
+                                <span class="ft__smaller ft__on-surface">
+                                    {candidate.field === "phone" ? "电话" : candidate.field === "wechat" ? "微信" : candidate.field === "email" ? "邮箱" : candidate.field === "website" ? "网址" : "生日"}：{candidate.value}
+                                </span>
+                                <span class="lvct-capture__source-badge lvct-capture__source-badge--ai">{text("captureBadgeAi", "AI 提名")}</span>
+                            </label>
+                        {/each}
+                    </div>
+                {/if}
+                {#if aiFollowUpCandidates.length > 0}
+                    <div class="lvct-capture__list">
+                        {#each aiFollowUpCandidates as candidate (candidate.personDocId + candidate.title)}
+                            <label class="lvct-import__row">
+                                <input class="b3-switch" type="checkbox" bind:checked={candidate.checked} />
+                                <span><b>{candidate.personName}</b></span>
+                                <span class="ft__smaller ft__on-surface">建跟进「{candidate.title}」· {candidate.dueDate}</span>
+                                <span class="lvct-capture__source-badge lvct-capture__source-badge--ai">{text("captureBadgeAi", "AI 提名")}</span>
+                            </label>
+                        {/each}
+                    </div>
+                {/if}
+                {#if aiRelationNote}
+                    <p class="ft__smaller ft__on-surface">
+                        {text("captureAiRelationNote", "AI 建议的关系（当前版本仅记录在笔记中，不写入人脉）：")}{aiRelationNote}
+                    </p>
+                {/if}
+            </div>
+        {/if}
         {/if}
 
         {#if step === 2}

@@ -25,6 +25,7 @@ import { loadPersonInsights } from "./services/insights";
 import { checkSettingsHealth, rebuildMissingFields, rebindSettings, repairFieldMap } from "./services/settings-health";
 import { auditWorkspaceData } from "./services/health-audit";
 import { reconcileFollowUpTasksFromDoc } from "./services/followup-sync";
+import { updateContactFields } from "./services/contacts";
 import { exportMigrationBundle, importMigrationBundle, previewMigrationImport } from "./services/migration-bundle";
 import { loadViewPreferences, saveViewPreferences } from "./services/preferences";
 import { exportInteractionJson } from "./services/interaction-export";
@@ -391,6 +392,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     async previewCapture(docId: string) {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
         return previewCapture(this.settings, docId);
+    }
+
+    async updatePersonFields(personItemId: string, draft: import("./domain/person").ContactDraft) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        await updateContactFields(this.settings, personItemId, draft);
     }
 
     async captureDoc(docId: string, options: Parameters<typeof captureFromDoc>[3]) {
