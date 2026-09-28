@@ -1019,13 +1019,16 @@
     gap: 2px;
     flex-shrink: 0;
     width: 168px;
-    padding: var(--lvct-sp-2);
-    border: 1px solid var(--lvct-border-subtle);
+    padding: var(--lvct-sp-1);
+    border: 0;
     border-radius: var(--lvct-r-lg);
-    background: var(--lvct-bg-surface);
+    background: transparent;
 }
 
 .lvct-settings__nav-item {
+    appearance: none;
+    border: 0;
+    background: transparent;
     display: flex;
     align-items: center;
     gap: var(--lvct-sp-2);
@@ -1034,6 +1037,7 @@
     color: var(--lvct-text-2);
     font-size: var(--lvct-fs-body);
     text-align: left;
+    cursor: pointer;
     transition: background var(--lvct-dur-fast) var(--lvct-ease), color var(--lvct-dur-fast) var(--lvct-ease);
 
     &:hover { background: var(--lvct-bg-hover); color: var(--lvct-text-1); }
