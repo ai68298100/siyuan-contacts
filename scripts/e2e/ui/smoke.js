@@ -16,6 +16,7 @@ import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/e
 import { captureFromDoc } from "../../../src/services/capture";
 import { exportInteractionJson } from "../../../src/services/interaction-export";
 import { createFollowUp, exportFollowUpsJson, importFollowUpsJson, previewFollowUpsImport } from "../../../src/services/followups";
+import { reconcileFollowUpTasksFromDoc, syncFollowUpTasksToDoc } from "../../../src/services/followup-sync";
 import { loadFollowUpStore, createFollowUpRecord } from "../../../src/data/followups";
 import { loadTemplatesStore, saveTemplatesStore } from "../../../src/data/templates";
 import { exportMigrationBundle, previewMigrationImport, importMigrationBundle } from "../../../src/services/migration-bundle";
@@ -501,6 +502,46 @@ await test("迁移恢复单模块失败可见、不阻断其他模块且不污�
     assert(result.modules.some((module) => module.key === "cadences") && result.modules.some((module) => module.key === "registry"),
         "失败后的其余模块未继续执行");
     assert(files.get("interaction-templates.json").schemaVersion === 2, "损坏模板库被恢复覆盖污染");
+});
+
+await test("任务对账：勾选/改标题/改期回写索引，块删除标不可达且写侧不复活（B07/FUNC-01.3-a）", async () => {
+    const files = new Map();
+    const plugin = {
+        loadData: async (key) => files.get(key) ?? "",
+        saveData: async (key, value) => { files.set(key, value); },
+    };
+    files.set("contacts-settings.json", settings);
+    files.set("follow-ups.json", { schemaVersion: 1, items: [
+        { id: "fu-doc-1", personDocId: person.docId, title: "索引旧标题", dueDate: "2026-10-01", status: "open", createdAt: 1, updatedAt: 1 },
+        { id: "fu-doc-2", personDocId: person.docId, title: "块被删事项", dueDate: "2026-10-02", status: "open", createdAt: 1, updatedAt: 1, docBlockId: "blk-gone" },
+        { id: "fu-doc-3", personDocId: person.docId, title: "一致事项", dueDate: "2026-10-03", status: "open", createdAt: 1, updatedAt: 1, docBlockId: "blk-3" },
+    ] });
+    kernel.handler = async (route) => {
+        if (route === "/api/query/sql") {
+            /* 文档现状：fu-doc-1 已勾选且改标题/改期；fu-doc-2 的块已被删（不出现在本文档）；fu-doc-3 一致 */
+            return [
+                { id: "blk-1", ial: 'custom-lvct-followup="fu-doc-1"', markdown: "- [X] 文档新标题 📅2026-11-05" },
+                { id: "blk-3", ial: 'custom-lvct-followup="fu-doc-3"', markdown: "- [ ] 一致事项 📅2026-10-03" },
+            ];
+        }
+        return { code: 0 };
+    };
+
+    const changed = await reconcileFollowUpTasksFromDoc(plugin, person.docId);
+    assert(changed, "对账未报告收敛");
+    const byId = Object.fromEntries((await loadFollowUpStore(plugin)).items.map((item) => [item.id, item]));
+    assert(byId["fu-doc-1"].status === "done", "文档勾选未收敛为 done");
+    assert(byId["fu-doc-1"].title === "文档新标题", "文档标题未回写索引");
+    assert(byId["fu-doc-1"].dueDate === "2026-11-05", "文档日期未回写索引");
+    assert(byId["fu-doc-1"].docBlockId === "blk-1", "块 ID 未记录");
+    assert(byId["fu-doc-2"].docMissing === true, "块删除未标不可达");
+    assert(byId["fu-doc-2"].docBlockId === undefined, "消失块的旧 ID 未清空");
+    assert(byId["fu-doc-3"].docMissing === undefined, "一致事项不得被标缺失");
+
+    /* 写侧不复活：docMissing 的 open 事项不产生 insert，索引不被改动 */
+    const before = JSON.stringify(files.get("follow-ups.json"));
+    await syncFollowUpTasksToDoc(plugin, person.docId);
+    assert(JSON.stringify(files.get("follow-ups.json")) === before, "写侧同步改动索引或复活已删任务块");
 });
 
 await test("移动端人物卡片内容自适应，min-height 收缩且空 chips 收起（B09-2）", async () => {

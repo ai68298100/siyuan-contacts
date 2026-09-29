@@ -28,7 +28,7 @@ export async function syncFollowUpTasksToDoc(plugin: Plugin, personDocId: string
         const settings: ContactsSettings | null = await loadSettings(plugin);
         if (!settings) return;
         const items = (await listPersonFollowUps(plugin, personDocId))
-            .map((item) => ({ id: item.id, title: item.title, dueDate: item.dueDate, status: item.status }));
+            .map((item) => ({ id: item.id, title: item.title, dueDate: item.dueDate, status: item.status, docMissing: item.docMissing }));
         const blocks: DocTaskBlock[] = await findFollowUpTaskBlocks(personDocId);
         const plans = planTaskSync(items, blocks);
         for (const plan of plans) {
@@ -48,7 +48,7 @@ export async function syncFollowUpTasksToDoc(plugin: Plugin, personDocId: string
     }
 }
 
-/** 读侧对账（文档为准）：文档勾选 → 插件置 done；取消勾选 → 恢复 open；返回是否发生收敛 */
+/** 读侧对账（文档为准，B07-a）：勾选收敛 + 标题/日期回写 + 块缺失标记不可达；返回是否发生收敛 */
 export async function reconcileFollowUpTasksFromDoc(plugin: Plugin, personDocId: string): Promise<boolean> {
     const settings: ContactsSettings | null = await loadSettings(plugin);
     if (!settings) return false;
@@ -57,17 +57,44 @@ export async function reconcileFollowUpTasksFromDoc(plugin: Plugin, personDocId:
         findFollowUpTaskBlocks(personDocId),
     ]);
     const decisions = reconcileDecisions(
-        items.map((item) => ({ id: item.id, status: item.status })),
+        items.map((item) => ({
+            id: item.id,
+            status: item.status,
+            title: item.title,
+            dueDate: item.dueDate,
+            ...(item.docBlockId !== undefined ? { docBlockId: item.docBlockId } : {}),
+            ...(item.docMissing !== undefined ? { docMissing: item.docMissing } : {}),
+        })),
         blocks,
     );
     let changed = false;
     for (const id of decisions.toDone) {
         /* done/closedAt 由 updateFollowUpRecord 的 status 语义统一维护 */
-        await updateFollowUpRecord(plugin, id, { status: "done" });
+        await updateFollowUpRecord(plugin, id, { status: "done" }, { fromReconcile: true });
         changed = true;
     }
     for (const id of decisions.toOpen) {
-        await updateFollowUpRecord(plugin, id, { status: "open" });
+        await updateFollowUpRecord(plugin, id, { status: "open" }, { fromReconcile: true });
+        changed = true;
+    }
+    for (const update of decisions.updates) {
+        /* 文档为准回写（含块 ID 记录与 docMissing 恢复）；updates 仅在有实际差异时发出 */
+        await updateFollowUpRecord(
+            plugin,
+            update.id,
+            {
+                ...(update.title !== undefined ? { title: update.title } : {}),
+                ...(update.dueDate !== undefined ? { dueDate: update.dueDate } : {}),
+                docBlockId: update.blockId,
+                docMissing: false,
+            },
+            { fromReconcile: true },
+        );
+        changed = true;
+    }
+    for (const id of decisions.missing) {
+        /* 任务块已被删除/移出：显式不可达，写侧不再自动重建（契约 §3.1 同步方向） */
+        await updateFollowUpRecord(plugin, id, { docMissing: true, docBlockId: undefined }, { fromReconcile: true });
         changed = true;
     }
     return changed;

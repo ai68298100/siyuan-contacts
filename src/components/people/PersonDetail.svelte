@@ -569,6 +569,7 @@ import StatusNotice from "../StatusNotice.svelte";
                         <div class="lvct-detail__timeline-row">
                             <span class="ft__on-surface">{item.dueDate}</span>
                             <span class="lvct-detail__timeline-note">{item.title || text("fuKeepInTouch", "保持联系")}</span>
+                            {#if item.docMissing}<span class="lvct-chip lvct-bucket--stale">{text("fuDocMissing", "任务块已移除")}</span>{/if}
                             <span class="lvct-chip {item.dueDate < todayKey ? "lvct-bucket--stale" : ""}">{dueLabel(item.dueDate, todayKey)}</span>
                         </div>
                         {#if snoozeForId === item.id}

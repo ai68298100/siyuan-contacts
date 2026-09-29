@@ -240,6 +240,7 @@
   "fuSectionTitle": "Follow-ups",
   "fuLoading": "Loading follow-ups",
   "fuLoadFailTitle": "Failed to load follow-ups",
+  "fuDocMissing": "Task block removed",
   "fuEmpty": "No open follow-ups. Schedule a date to reach out.",
   "commonRetry": "Retry",
   "fuKeepInTouch": "Keep in touch",

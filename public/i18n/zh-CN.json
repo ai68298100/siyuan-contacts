@@ -240,6 +240,7 @@
   "fuSectionTitle": "跟进计划",
   "fuLoading": "正在加载跟进计划",
   "fuLoadFailTitle": "跟进计划加载失败",
+  "fuDocMissing": "任务块已移除",
   "fuEmpty": "没有进行中的跟进计划。安排一个日期，到时来联系 TA。",
   "commonRetry": "重试",
   "fuKeepInTouch": "保持联系",

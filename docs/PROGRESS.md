@@ -1405,3 +1405,32 @@
 - CODE-02.2/02.3（迁移可靠性）随本切片一并交付，计划表已标注。P0 余项：B07/FUNC-01.3 对账、
   FUNC-01.7 刷新通道、FUNC-01.13 锁接管审计、FUNC-01.14 AI 候选安全写、FUNC-01.15 写入断点、
   FAST-01.3a、FUNC-01.8a 锚点消歧、CODE-02.1/02.4–02.6。
+
+## P0 数据可信 第 49 轮：B07/FUNC-01.3-a 任务对账 + 移动套件视口偶发根修（2026-09-29，续跑口令第 49 版驱动）
+
+- **任务对账全量落地（契约 §3.1「同步方向」此前的承诺补齐实现）**：
+  - 索引新增可选字段 `docBlockId`（最近观测到的文档任务块 ID）/`docMissing`（块已删/移出，
+    显式不可达）——DATA-CONTRACT §3 follow-ups 行与 §3.1 先行更新，归一化守卫同步。
+  - 域层 `reconcileDecisions` 扩展：勾选收敛（原有）+ 文档非空标题/合法 `📅` 日期回写索引 +
+    块 ID 记录（仅在变化或清 `docMissing` 时发出更新，避免每次打开都写库）+ 曾记录块的
+    事项块消失判 missing（从未同步/跨空间迁入不判）；`planTaskSync` 对 `docMissing` 的
+    open 事项**不再 insert**（不复活用户删掉的块）；块重新出现自动恢复跟踪。
+  - 写入纪律：`updateFollowUpRecord` 增 `opts.fromReconcile`——对账写入允许 docBlockId/
+    docMissing；用户显式改动（改标题/改期/状态）清除 docMissing（重新意图 → 下次同步重建）。
+  - UI：Peek 跟进列表不可达事项显示「任务块已移除」徽标（i18n fuDocMissing 中英）。
+- **移动套件「innerWidth 偶发」根修（ Harness 级发现）**：B09-2 连续以 innerWidth=680 失败，
+  探针证明仿真完全生效（screen/visualViewport=390）而布局视口被撑到 680——`#results` 为
+  `white-space:pre` 不换行，结果 JSON 中最长用例名/错误栈把 pre 撑出横线，Chrome 移动仿真对
+  溢出页面 overview 缩小，innerWidth 变为内容宽度，越过用例的 `<=640` 视口判定线。
+  **历史「innerWidth 1560 偶发」同源（超长错误栈行）**。修复：`ui/index.html` 给 `#results`
+  加 `pre-wrap + break-all`；修复后移动套件连续两轮 81/81。此前 B07 对账 smoke 调试中踩到
+  两条既有坑位并记录：python 外部写文件会被 Edit 工具的文件状态跟踪回滚（批量修改一律
+  Edit 工具的深层原因）；smoke assert 只有单参 (ok, msg) 形态。
+- **验证**：svelte-check/tsc 0 错误；单测 **186/186**（followup-doc 新增 4 例：标题/日期回写、
+  空标题/无日期不回写、missing 判定幂等、docMissing 不重建 + followups 1 例对账字段守卫）；
+  三套 UI 回归**桌面 80 / 移动 81（两轮）/ 宿主 80 全绿**（新增 smoke「任务对账：勾选/改标题/
+  改期回写索引，块删除标不可达且写侧不复活」——SQL mock 三事项文档现状，断言收敛/回写/
+  docMissing/写侧零改动）；`pnpm run build` + `check:release` 全 PASS；52 景基线 + 断点扫描
+  390/640/1280 重拍有效（正常态无视觉漂移，徽标仅 docMissing 态渲染）。
+- **边界**：首页与详情对同一事项的一致性、真实任务管理器互读仍 Host pending；B07/FUNC-01.3-b
+  （同步失败分项报告/重试）与 CODE-02.11（全量对账，本轮只做按人打开路径）保持未完成。

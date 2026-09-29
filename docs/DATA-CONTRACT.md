@@ -94,7 +94,7 @@
 | `contacts-settings.json` | 1 | 四锚点 ID + fieldMap + 初始化时间 |
 | `view-preferences.json` | 1 | 工作台默认页面、联系人默认排序、启动行为、生日窗口、久未联系阈值、AI 入口开关；F02 起新增 `peopleView`（`card`/`table`，联系人默认形态）与 `tableColumns`（表格可见列的有序键数组，可选键仅限 `group/phone/wechat/birthday/recent/tags`；「姓名」为固定列不入数组、恒为首列）。归一化规则：旧偏好缺字段取默认；键不在可选集或重复的项剔除；全部被剔除/清空时回退全列默认——隐藏全部可选列不被视为合法状态。F04 起新增 `savedViews`（保存的联系人视图，规则快照而非人物 ID 快照）：`{id, name, query}` 数组，`query = {search, group, tags, tagMatch, recentFrom, recentTo, neverContacted, sort}`；归一化丢弃缺 id/缺 name 或字段类型非法的条目，按 id 去重、name 去首尾空白、上限 50 条；视图按规则在应用时对当次名册重新求值，不保存人物集合。F08 起新增 `summaryEnabled`（默认 true，打开工作台时的关注摘要开关，设置「提醒」分区控制）与 `summaryDismissedOn`（`YYYY-MM-DD` 或空串；「当日不再展示」写入当天本地日期，次日自动恢复展示）；非法日期串归一化为空串。C02 起新增 `reminderGraceDays`（收编宽限期天数，0–365 整数钳制，缺省/非法回退 14；0=关闭）：新收编联系人在宽限期内不计入「从未互动」提醒（设置「提醒」分区可调） |
 | `interaction-events.json` | （M4） | 互动事件（只追加）：`{id, personDocId, occurredAt, localDate, source, externalRef?, note}`；`personDocId+source+externalRef` 幂等；删除写墓碑 |
-| `follow-ups.json` | 1 | 跟进事项（F05）：`{id, personDocId, title, dueDate, status, createdAt, updatedAt, closedAt?}`。`dueDate` 为 `YYYY-MM-DD`（严格校验：格式错误或不存在的日期拒绝创建/改期，不顺延回退）；`status ∈ open/done/cancelled`，完成或取消写 `closedAt`，重新打开清除 `closedAt`——**完成跟进不自动写互动事件，记录互动也不悄悄完成跟进**（两类数据独立）。人物按 `personDocId` 关联：人物解绑后事项保留并显示「不可达」，仍可推迟/取消，不指向他人。人物跟进列表与备份预览用严格展示读（读取失败显式报错，见上）；新增与状态变更在存储锁内严格读取，损坏或未知版本拒绝写入不覆盖原文件。导出为 `{schemaVersion, exportedAt, storageKey, rawStore, items}` 快照（与互动导出同纪律：锁内严格读取，失败不生成空备份）；**rawStore 兼容三种形态**——字符串（文本快照）、对象（真实宿主 loadData 返回已解析对象）、null/空串（首次未创建=空快照），解析下沉域层 `domain/followup-backup.ts`（FUNC-01.6-a 往返纪律）；合并导入按 `id` 现状优先，新增其余条目，预览零写入，确认时锁内重读重算 |
+| `follow-ups.json` | 1 | 跟进事项（F05）：`{id, personDocId, title, dueDate, status, createdAt, updatedAt, closedAt?, docBlockId?, docMissing?}`。`dueDate` 为 `YYYY-MM-DD`（严格校验：格式错误或不存在的日期拒绝创建/改期，不顺延回退）；`status ∈ open/done/cancelled`，完成或取消写 `closedAt`，重新打开清除 `closedAt`——**完成跟进不自动写互动事件，记录互动也不悄悄完成跟进**（两类数据独立）。**B07-a 对账字段（可选，向后兼容）**：`docBlockId` 为最近一次对账观测到的文档任务块 ID；`docMissing: true` 表示该任务块已被删除/移出人物文档——显式「不可达」，写侧不再自动重建任务块（不复活用户删掉的块），插件侧对该事项的显式改动（改标题/改期/状态变更，非对账写入）清除标记并在下次同步重建；对账发现块重新出现时清除标记恢复跟踪。人物按 `personDocId` 关联：人物解绑后事项保留并显示「不可达」，仍可推迟/取消，不指向他人。人物跟进列表与备份预览用严格展示读（读取失败显式报错，见上）；新增与状态变更在存储锁内严格读取，损坏或未知版本拒绝写入不覆盖原文件。导出为 `{schemaVersion, exportedAt, storageKey, rawStore, items}` 快照（与互动导出同纪律：锁内严格读取，失败不生成空备份）；**rawStore 兼容三种形态**——字符串（文本快照）、对象（真实宿主 loadData 返回已解析对象）、null/空串（首次未创建=空快照），解析下沉域层 `domain/followup-backup.ts`（FUNC-01.6-a 往返纪律）；合并导入按 `id` 现状优先，新增其余条目，预览零写入，确认时锁内重读重算 |
 | `person-cadences.json` | 1 | 按人物联系节奏（F06）：`{schemaVersion, cadences: {"<personDocId>": {days, paused}}}`。仅存覆盖项，未登记的人物跟随全局久未联系阈值；`days` 为 1–365 整数（写入时钳制），`paused: true` 表示对该人暂停提醒（久未联系与从未互动均不再出现）。键必须是通过 `^\d{14}-[0-9a-z]{7}$` 校验的人物文档 ID，非法键或非法值条目在归一化时丢弃；补录过去互动不影响（最近互动一律取最大 `occurredAt`）。仪表盘读取为严格展示读（失败计入 `readFailures`，见上）；写入在存储锁内严格读取，损坏拒绝不覆盖。删除键即清除覆盖回退全局 |
 | `interaction-templates.json` | 1 | 互动备注模板（F09）：`{schemaVersion, templates: [{id, name, content}]}`。归一化丢弃缺 id 或 name/content 非字符串的条目，name/content 去首尾空白，按 id 去重，上限 50 条。存储为空时展示内置默认三个模板（见面/电话/聚会，来自代码常量不落盘）；任何增改删即全量落盘，此后以存储为准（删除内置模板即永久移除）。模板内容支持 `{{姓名}}`/`{{日期}}`/`{{上次互动}}` 占位符，应用时纯本地字符串替换，未知占位符原样保留；模板文本不发送 AI，应用模板不自动提交、不悄悄覆盖已有草稿 |
 | `bridge-state.json` | （M4） | 打卡联动状态机（unsupported/pending/ready/failed） |
@@ -123,8 +123,12 @@
   原样保留）；完成 = `updateTaskListItemMarker {id, marker:"x"}`（官方端点只认列表项 ID，
   传容器报错；批量用 `batchUpdateTaskListItemMarker`）；取消 = `deleteBlock` 移除任务块
   （插件侧记录保留，可重新打开时重建）。
-- **同步方向**：文档勾选 → 插件置 done；取消勾选 → 恢复 open；标题/日期以文档为准；
-  任务块被删 → 该事项按"不可达"呈现而不静默复活；两端冲突以文档为准，不做自动互相覆盖。
+- **同步方向（B07-a 已实现）**：文档勾选 → 插件置 done；取消勾选 → 恢复 open；文档标题/日期
+  （非空标题、合法 `📅` 日期）→ 回写插件索引；每次对账把观测到的任务块 ID 记入索引
+  `docBlockId`。任务块被删/移出人物文档 → 该事项置 `docMissing`（显式不可达呈现），写侧
+  **不再自动重建**（不复活用户删掉的块）；插件侧显式改动（改标题/改期/状态变更）清除标记，
+  下次同步重建；对账发现块重新出现即清除标记恢复跟踪。索引里从无 `docBlockId` 的事项
+  （从未同步/跨工作空间迁入）不判缺失。两端冲突以文档为准，不做自动互相覆盖。
   **完成跟进不自动写互动；记录互动也不悄悄完成跟进**（与 follow-ups.json 同一纪律）。
 - **失败语义**：文档侧同步失败**不阻断**插件库写入（console 记录，BACKLOG 记录改进项）；
   读侧对账（人物详情打开时）以文档为准单向收敛插件库，不回写文档。

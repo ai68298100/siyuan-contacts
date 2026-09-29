@@ -17,6 +17,10 @@ export interface FollowUpItem {
     createdAt: number;
     updatedAt: number;
     closedAt?: number;
+    /** B07-a：最近一次对账观测到的文档任务块 ID（块消失后清空） */
+    docBlockId?: string;
+    /** B07-a：文档任务块已被删除/移出（显式不可达，写侧不自动重建；插件侧显式改动清除） */
+    docMissing?: boolean;
 }
 
 export interface FollowUpStore {
@@ -92,7 +96,9 @@ function isFollowUpItem(raw: unknown): raw is FollowUpItem {
         (item.status === "open" || item.status === "done" || item.status === "cancelled") &&
         typeof item.createdAt === "number" && Number.isFinite(item.createdAt) &&
         typeof item.updatedAt === "number" && Number.isFinite(item.updatedAt) &&
-        (item.closedAt === undefined || (typeof item.closedAt === "number" && Number.isFinite(item.closedAt)));
+        (item.closedAt === undefined || (typeof item.closedAt === "number" && Number.isFinite(item.closedAt))) &&
+        (item.docBlockId === undefined || (typeof item.docBlockId === "string" && item.docBlockId.length > 0)) &&
+        (item.docMissing === undefined || typeof item.docMissing === "boolean");
 }
 
 /** 写前检查：不丢弃损坏数据；版本或结构不兼容抛错（与互动库同纪律） */
@@ -134,11 +140,12 @@ export function appendFollowUp(store: FollowUpStore, item: FollowUpItem): Follow
     return { ...store, items: [...store.items, item] };
 }
 
-/** 就地字段更新（纯函数返回新 store）；找不到 id 返回原 store */
+/** 就地字段更新（纯函数返回新 store）；找不到 id 返回原 store。
+    docBlockId/docMissing 仅由 B07 对账路径写入 */
 export function updateFollowUp(
     store: FollowUpStore,
     id: string,
-    patch: Partial<Pick<FollowUpItem, "dueDate" | "status" | "title" | "updatedAt" | "closedAt">>,
+    patch: Partial<Pick<FollowUpItem, "dueDate" | "status" | "title" | "updatedAt" | "closedAt" | "docBlockId" | "docMissing">>,
 ): FollowUpStore {
     const index = store.items.findIndex((item) => item.id === id);
     if (index < 0) return store;

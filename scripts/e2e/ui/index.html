@@ -9,6 +9,10 @@
         --b3-theme-on-surface-light: #666; --b3-theme-primary: #6366f1;
         --b3-border-color: #ddd; --b3-list-hover: #eee; --b3-theme-error: #c00;
     }
+    /* 结果区必须换行：pre 默认不换行，超长用例名/错误栈会把布局视口撑到内容宽度，
+       移动仿真下 Chrome overview 缩小使 innerWidth 变成内容宽（>640），B09-2 等按
+       innerWidth 判定视口的用例误入桌面分支（2026-09-29 根修，历史 1560 偶发同源） */
+    #results { white-space: pre-wrap; word-break: break-all; }
 </style>
 <script>
     /* 宿主样式基线（C01）：?host=1 时注入真实思源 base.css + 官方主题变量

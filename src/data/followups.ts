@@ -56,14 +56,31 @@ export interface FollowUpPatch {
     dueDate?: string;
     status?: FollowUpItem["status"];
     title?: string;
+    /** B07-a：仅对账路径写入（须同时传 opts.fromReconcile，否则被忽略） */
+    docBlockId?: string | undefined;
+    docMissing?: boolean;
 }
 
-/** 状态/到期变更；done|cancelled 写 closedAt，重开清除；找不到 id 抛错 */
-export async function updateFollowUpRecord(plugin: Plugin, id: string, patch: FollowUpPatch): Promise<FollowUpItem> {
+export interface FollowUpPatchOptions {
+    /** B07-a：对账写入（文档为准）——允许 docBlockId/docMissing，且不清除 docMissing 标记 */
+    fromReconcile?: boolean;
+}
+
+/** 状态/到期变更；done|cancelled 写 closedAt，重开清除；找不到 id 抛错。
+    非对账的用户显式改动（改标题/改期/状态）清除 docMissing——用户重新意图该事项有任务块 */
+export async function updateFollowUpRecord(
+    plugin: Plugin,
+    id: string,
+    patch: FollowUpPatch,
+    options: FollowUpPatchOptions = {},
+): Promise<FollowUpItem> {
     return withStoreLock(FOLLOW_UP_STORAGE_KEY, async () => {
         const store = normalizeFollowUpStoreForWrite(await loadJsonStrict(plugin, FOLLOW_UP_STORAGE_KEY));
         const existing = store.items.find((item) => item.id === id);
         if (!existing) throw new Error("跟进事项不存在或已被删除");
+        const fromReconcile = options.fromReconcile === true;
+        const userEdited = !fromReconcile &&
+            (patch.dueDate !== undefined || patch.title !== undefined || patch.status !== undefined);
         const next: FollowUpItem = {
             ...existing,
             ...(patch.dueDate !== undefined ? { dueDate: patch.dueDate } : {}),
@@ -74,12 +91,15 @@ export async function updateFollowUpRecord(plugin: Plugin, id: string, patch: Fo
                     ...(patch.status === "open" ? { closedAt: undefined } : { closedAt: Date.now() }),
                 }
                 : {}),
+            ...(userEdited ? { docMissing: undefined } : {}),
             updatedAt: Date.now(),
         };
         const updated = updateFollowUp(store, id, {
             ...(patch.dueDate !== undefined ? { dueDate: next.dueDate } : {}),
             ...(patch.title !== undefined ? { title: next.title } : {}),
             ...(next.status !== existing.status ? { status: next.status, closedAt: next.closedAt } : {}),
+            ...(fromReconcile ? { docBlockId: patch.docBlockId, docMissing: patch.docMissing } : {}),
+            ...(userEdited ? { docMissing: undefined } : {}),
             updatedAt: next.updatedAt,
         });
         await saveJsonVerified(plugin, FOLLOW_UP_STORAGE_KEY, updated);

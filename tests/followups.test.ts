@@ -106,3 +106,23 @@ test("到期文案与人物过滤：逾期/今天/还有 N 天；closed 置后",
     ];
     assert.deepEqual(followUpsForPerson(items, "doc-1").map((entry) => entry.id), ["open-soon", "open-later", "closed"]);
 });
+
+test("B07-a 对账字段：updateFollowUp 支持 docBlockId/docMissing；归一化接受合法值、过滤非法值", () => {
+    let store = normalizeFollowUpStore({ schemaVersion: 1, items: [item({ id: "a" })] });
+    store = updateFollowUp(store, "a", { docBlockId: "blk-1", docMissing: false });
+    assert.equal(store.items[0].docBlockId, "blk-1");
+    store = updateFollowUp(store, "a", { docMissing: true, docBlockId: undefined });
+    assert.equal(store.items[0].docMissing, true);
+    assert.equal(store.items[0].docBlockId, undefined);
+    /* 非法类型：读归一化过滤（坏条目整条丢弃），写前严格检查拒绝 */
+    assert.throws(() => normalizeFollowUpStoreForWrite({
+        schemaVersion: 1,
+        items: [item({ id: "bad" }), { ...item({ id: "ok" }), docBlockId: 42 }],
+    }), /存储内容损坏/);
+    const filtered = normalizeFollowUpStore({
+        schemaVersion: 1,
+        items: [{ ...item({ id: "ok" }), docBlockId: "blk-9", docMissing: true }, { ...item({ id: "bad" }), docMissing: "yes" }],
+    });
+    assert.deepEqual(filtered.items.map((entry) => entry.id), ["ok"]);
+    assert.equal(filtered.items[0].docMissing, true);
+});
