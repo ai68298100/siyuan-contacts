@@ -1523,3 +1523,25 @@
   断点扫描重拍有效（无视觉变更）。
 - P0 余项：B07/FUNC-01.3-b、FUNC-01.15 写入断点、FAST-01.3a、FUNC-01.8a 锚点消歧、
   CODE-02.1/02.4/02.5。
+
+## P0 数据可信 第 54 轮：CODE-02.1 关闭安全——busy 独立阻断（2026-09-30，续跑口令第 54 版驱动）
+
+- **缺陷定位**：`close-guard` 的脏聚合把 busy 与 dirty 混在一起（`busy() || !dirty()` 即跳过），
+  且作用域级 `requestClose` 只看脏聚合、从不查 busy——**busy 且不脏的挂起操作**（导出/迁移/
+  扫描/AI 等）在 X、Esc、遮罩、工作台切页四条路上都会被静默卸载；`hasBlocked` 无人调用。
+- **修复**：
+  1. `close-guard.ts`：新增 `resolveBusy`（自身 → 父链 → 孤儿作用域链上任一 busy 即阻断），
+     `createCloseScope.requestClose` 与注册表 `requestClose` 均**先查 busy 再看脏聚合**；
+     busy 阻断保持静默（与旧版一致），失败草稿与步骤保持可见。
+  2. SettingsView 守卫 busy 补全：迁移预览/恢复、锚点扫描、字段重建、体检、互动/名册/跟进/
+     迁移包四类导出、跟进导入预览、提醒恢复——此前只覆盖偏好/重绑/映射/互动导入。
+  3. CaptureDialog（svelteDialog 直挂）：关闭/取消/完成三按钮接 `useCloseGuard` 守卫
+     （busy = 主流程或 AI 分析挂起时静默阻断）。
+- **验证**：svelte-check/tsc 0 错误 0 警告；单测 194/194；三套 UI 回归**桌面 84 / 移动 85 /
+  宿主 84 全绿**（+1 smoke「busy 独立阻断」：Workbench 新建联系人创建挂起（门控内核响应）
+  时点 × 不卸载弹窗、草稿保持可见，完成后正常关闭；既有脏草稿三选一/保存并离开用例回归
+  通过）；`pnpm run build` + `check:release` 全 PASS；52 景基线 + 断点扫描重拍有效（无视觉
+  变更）。smoke 踩坑补记：**input() 后依赖该输入的 disabled 按钮必须先 await tick 再点**；
+  用例失败后的 body 级守卫弹窗会泄漏到下一用例（finally 里清理 `.lvct-closeguard`）。
+- P0 余项：B07/FUNC-01.3-b、FUNC-01.15 写入断点、FAST-01.3a、FUNC-01.8a 锚点消歧、
+  CODE-02.4/02.5。

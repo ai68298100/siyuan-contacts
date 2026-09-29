@@ -4,6 +4,7 @@
     import type { CapturePreview, CaptureResult } from "../../services/capture";
     import type { ContactsPluginFacade } from "../../types";
     import ViewState from "../ViewState.svelte";
+    import { useCloseGuard } from "../close-guard";
     import { CheckCircle2, Sparkles } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
 
@@ -42,6 +43,14 @@
     let aiRelationNote: string = $state("");
     let extrasError: string = $state("");
     let step: 1 | 2 | 3 = $state(1);
+    /* CODE-02.1：捕获挂起（主流程/AI 分析）期间关闭按钮静默阻断——失败草稿与步骤保持可见 */
+    const guardedClose = useCloseGuard({
+        busy: () => running || aiRunning,
+        dirty: () => false,
+    });
+    function closeIfIdle(): void {
+        void guardedClose(onClose);
+    }
 
     const checkedIds = $derived(Object.entries(checked).filter(([, on]) => on).map(([id]) => id));
     const hasTarget = $derived(checkedIds.length > 0 || newNamesText.trim().length > 0);
@@ -200,7 +209,7 @@
     {#if loadError}
         <ViewState compact error title={text("captureLoadFail", "笔记分析失败")} description={loadError}>
             <button class="b3-button b3-button--outline" onclick={load}>{text("captureRetry", "重试")}</button>
-            <button class="b3-button b3-button--cancel" onclick={onClose}>关闭</button>
+            <button class="b3-button b3-button--cancel" onclick={closeIfIdle}>关闭</button>
         </ViewState>
     {:else if !preview}
         <ViewState compact loading title={text("captureAnalyzing", "正在分析笔记中的联系人")} />
@@ -229,7 +238,7 @@
             {/each}
         </div>
         <div class="lvct-form__actions">
-            <button class="b3-button b3-button--text" onclick={onClose}>{text("captureDone", "完成")}</button>
+            <button class="b3-button b3-button--text" onclick={closeIfIdle}>{text("captureDone", "完成")}</button>
         </div>
     {:else}
         <div class="lvct-capture__steps" aria-label="捕获进度">
@@ -363,7 +372,7 @@
         </p>
         {:else}
         <div class="lvct-form__actions">
-            <button class="b3-button b3-button--cancel" onclick={onClose}>{text("captureCancel", "取消")}</button>
+            <button class="b3-button b3-button--cancel" onclick={closeIfIdle}>{text("captureCancel", "取消")}</button>
             <button class="b3-button b3-button--text" onclick={() => (step = 2)} disabled={!hasTarget || aiRunning}>{text("captureNextConfirm", "下一步：确认记录")}</button>
         </div>
         {/if}

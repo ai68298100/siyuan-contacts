@@ -170,7 +170,11 @@
     });
     let errorText = $state("");
     const guardedClose = useCloseGuard({
-        busy: () => savingPreferences || rebinding || mappingBusy || importingInteractions,
+        /* CODE-02.1：全部挂起类操作（偏好/重绑/映射/互动与迁移导入导出/扫描/字段重建/体检/提醒恢复）期间不关 */
+        busy: () => savingPreferences || rebinding || mappingBusy || importingInteractions || previewingImport
+            || scanningAnchors || rebuilding || auditBusy || checking || dismissalsBusy
+            || exportingInteractions || exportingRoster || exportingFollowUps || exportingBundle
+            || previewingBundle || importingBundle || fuPreviewing || fuImporting,
         dirty: () => JSON.stringify(draft) !== JSON.stringify(savedDraft) || importText.trim().length > 0,
         changes: () => [
             ...(JSON.stringify(draft) !== JSON.stringify(savedDraft) ? [text("guardPrefsDraft", "显示偏好尚未保存")] : []),

@@ -76,7 +76,11 @@ function createRegistryScope(): CloseScope {
     return {
         hasBlocked: () => [...items].some((item) => item.busy()),
         dirtyChanges: () => aggregate(items),
-        requestClose: () => requestScopeClose(aggregate(items)),
+        /* CODE-02.1：busy 独立于脏草稿阻断——不脏也可能在写入/AI/迁移/扫描/导出中 */
+        requestClose: async () => {
+            if ([...items].some((item) => item.busy())) return false;
+            return requestScopeClose(aggregate(items));
+        },
         addItem: (item) => { items.add(item); allGuardItems.add(item); },
         removeItem: (item) => { items.delete(item); allGuardItems.delete(item); },
     };
@@ -98,8 +102,11 @@ export function createCloseScope(): CloseScope {
     const scope = createRegistryScope();
     const withParent = scope as CloseScope & ScopeInternals;
     withParent.parent = parent;
-    // 对话框的 X 按钮走「自身 → 父链 → 孤儿」解析：内容守卫按 snippet 语义落在根作用域
-    scope.requestClose = () => requestScopeClose(resolveSummary(withParent));
+    // 对话框的 X 按钮走「busy 阻断 → 自身 → 父链 → 孤儿」解析：内容守卫按 snippet 语义落在根作用域
+    scope.requestClose = async () => {
+        if (resolveBusy(withParent)) return false; /* CODE-02.1：忙碌即不关（静默），无论有无脏草稿 */
+        return requestScopeClose(resolveSummary(withParent));
+    };
     setContext(KEY, withParent);
     return scope;
 }
@@ -115,6 +122,18 @@ function resolveSummary(scope: CloseScope): CloseGuardSummary | null {
         current = current.parent;
     }
     return orphanScope.dirtyChanges();
+}
+
+/** CODE-02.1：作用域链上是否存在忙碌项——busy 不再依赖「恰好也脏」才阻断 */
+function resolveBusy(scope: CloseScope): boolean {
+    let current: (CloseScope & ScopeInternals) | undefined = scope as CloseScope & ScopeInternals;
+    const visited = new Set<CloseScope>();
+    while (current && !visited.has(current)) {
+        visited.add(current);
+        if (current.hasBlocked()) return true;
+        current = current.parent;
+    }
+    return orphanScope.hasBlocked();
 }
 
 /** 作用域关闭：有脏项先弹三选一；「保存并离开」执行聚合保存，失败留在原地 */

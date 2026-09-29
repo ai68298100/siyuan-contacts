@@ -817,6 +817,50 @@ await test("新建草稿关闭前三选一：取消保留草稿，放弃后关�
     }
 });
 
+await test("busy 独立阻断：创建挂起时关闭不卸载弹窗，完成后可正常关闭（CODE-02.1）", async () => {
+    let releaseCreate = () => {};
+    const createGate = new Promise((resolve) => { releaseCreate = resolve; });
+    let created = false;
+    kernel.handler = async (route) => {
+        if (route === "/api/filetree/createDocWithMd") { created = true; return createGate; }
+        if (route === "/api/av/renderAttributeView") {
+            const base = renderResult();
+            return created ? { view: { ...base.view, rows: [...base.view.rows, { id: "row-new5", cells: [
+                { value: { type: "block", keyID: "name", block: { id: "20260930000000-newdoc5", content: "挂起中的人" } } },
+            ] } ] } } : base;
+        }
+        if (route === "/api/av/addAttributeViewBlocks") return null;
+        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") return created ? { "20260930000000-newdoc5": "row-new5" } : {};
+        if (route === "/api/av/setAttributeViewBlockAttr") return null;
+        throw new Error(`busy 阻断用例不允许请求 ${route}`);
+    };
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadRecentInteractions: async () => ({}) },
+    } });
+    button("新建联系人").click();
+    await until(() => fixture.querySelector(".lvct-form input[type=text]"), "新建弹窗未打开");
+    input(fixture.querySelector(".lvct-form input[type=text]"), "挂起中的人");
+    await tick(); /* 创建按钮 disabled 随姓名输入解除，先等一轮再点 */
+    button("创建联系人").click();
+    await until(() => fixture.textContent.includes("创建中…"), `创建未进入挂起态：${fixture.querySelector(".lvct-dialog-panel")?.textContent?.slice(0, 150) ?? "弹窗已消失"}`);
+    /* 创建挂起（busy）时点 ×：即使没有可展示的脏聚合也必须阻断，弹窗与草稿保持可见 */
+    fixture.querySelector(".lvct-dialog-panel__close").click();
+    await tick();
+    await tick();
+    const pendingInput = fixture.querySelector(".lvct-form input[type=text]");
+    assert(pendingInput, "busy 期间弹窗被卸载（关闭未阻断）");
+    assert(pendingInput.value === "挂起中的人", "busy 期间草稿丢失");
+    releaseCreate("20260930000000-newdoc5");
+    await until(() => !fixture.textContent.includes("创建中…"), "创建未完成");
+    /* 完成后已保存：非忙非脏——创建成功回调自动关窗（或手动 × 可直接关闭），不得停留 */
+    const postClose = fixture.querySelector(".lvct-dialog-panel__close");
+    if (postClose) postClose.click();
+    await until(() => !fixture.querySelector(".lvct-dialog-panel"), "完成后弹窗未关闭");
+    document.body.querySelector(".lvct-closeguard")?.remove();
+});
+
 await test("新建草稿「保存并离开」：守卫内保存成功并关闭弹窗", async () => {
     let created = false;
     kernel.handler = async (route, body) => {
