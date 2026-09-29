@@ -30,6 +30,7 @@ import StatusNotice from "../StatusNotice.svelte";
         person,
         /** FUNC-01.7-a：数据变化代际（Workbench 广播）；变化时原地重载洞察与跟进（写入/编辑中跳过） */
         revision = 0,
+        onLoadOrgMemberships,
         onRecord,
         onDeleteInteraction,
         onLoadInsights,
@@ -57,6 +58,8 @@ import StatusNotice from "../StatusNotice.svelte";
         onDeleteInteraction?: (personDocId: string, eventId: string) => Promise<void>;
         /** 人物洞察（时间线+共同出席） */
         onLoadInsights: (docId: string) => Promise<import("../../services/insights").PersonInsights>;
+        /** B12：组织归属投影（可选：未接线时隐藏该区） */
+        onLoadOrgMemberships?: (docId: string) => Promise<import("../../services/org").PersonOrgMembershipView[]>;
         onOpenPersonDoc: (docId: string) => void;
         onNavigate: (person: ContactSummary) => void;
         navigationOrder?: readonly ContactSummary[];
@@ -338,6 +341,8 @@ import StatusNotice from "../StatusNotice.svelte";
 
     // ---- 跟进计划（F05） ----
     const followUpSupported = $derived(Boolean(onListFollowUps && onCreateFollowUp && onSetFollowUpStatus && onSnoozeFollowUp));
+    /* B12：组织归属区块（onLoadOrgMemberships 接线即显示） */
+    const orgSectionSupported = $derived(Boolean(onLoadOrgMemberships));
     let followUps: FollowUpItem[] = $state([]);
     let followUpsLoading = $state(true);
     let followUpTitle = $state("");
@@ -365,6 +370,21 @@ import StatusNotice from "../StatusNotice.svelte";
     }
 
     loadFollowUps();
+
+    /* ---- B12：组织归属投影（可选：未接线时隐藏该区） ---- */
+    let orgMemberships: import("../../services/org").PersonOrgMembershipView[] = $state([]);
+    async function loadOrgMemberships(): Promise<void> {
+        if (!onLoadOrgMemberships) return;
+        try {
+            orgMemberships = await onLoadOrgMemberships(current.docId);
+        } catch (error) {
+            /* 投影失败降级为空区块（console 留痕）；不阻断 Peek 其余分区 */
+            console.warn("[lvct] 组织归属投影读取失败", error);
+            orgMemberships = [];
+        }
+    }
+
+    loadOrgMemberships();
 
     /* FUNC-01.7-a：数据变化（跨窗口/宿主）→ 原地重载洞察与跟进；写入/操作挂起时跳过
        （Workbench 对草稿场景给出可见提示条），当前人物与输入草稿保留 */
@@ -564,6 +584,33 @@ import StatusNotice from "../StatusNotice.svelte";
         </div>
         <p class="ft__smaller ft__on-surface">记录后，首页"久未联系"会重新计时。</p>
     </section>
+
+    {#if orgSectionSupported}
+    <section class="lvct-detail__section">
+        <h4>{text("orgSectionTitle", "组织归属")}</h4>
+        {#if orgMemberships.length === 0}
+            <p class="ft__smaller ft__on-surface">{text("orgSectionEmpty", "未加入任何组织")}</p>
+        {:else}
+            <ul class="lvct-detail__timeline">
+                {#each orgMemberships as membership (membership.orgDocId + membership.status)}
+                    <li class="lvct-detail__timeline-row">
+                        <span class="lvct-detail__timeline-note">
+                            {membership.orgName}
+                            {#if membership.department}<span class="ft__smaller"> · {membership.department}</span>{/if}
+                            {#if membership.title}<span class="ft__smaller"> · {membership.title}</span>{/if}
+                        </span>
+                        <span class="lvct-chip {membership.status === "former" ? "lvct-bucket--stale" : "lvct-bucket--today"}">
+                            {membership.status === "former" ? text("orgMembershipFormer", "已离开") : text("orgMembershipActive", "在职/在学")}
+                        </span>
+                        {#if membership.joinedOn || membership.leftOn}
+                            <span class="ft__on-surface">{membership.joinedOn || "?"}{membership.leftOn ? ` – ${membership.leftOn}` : " –"}</span>
+                        {/if}
+                    </li>
+                {/each}
+            </ul>
+        {/if}
+    </section>
+    {/if}
 
     {#if followUpSupported}
     <section class="lvct-detail__section">

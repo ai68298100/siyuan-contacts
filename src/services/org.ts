@@ -131,6 +131,36 @@ export async function removeOrganizationMember(plugin: Plugin, id: string): Prom
     await removeOrgMembership(plugin, id);
 }
 
+export interface PersonOrgMembershipView {
+    orgDocId: string;
+    /** 组织名（标记区块扫描解析；组织文档不可达时为占位提示） */
+    orgName: string;
+    department: string;
+    title: string;
+    joinedOn: string;
+    leftOn: string;
+    status: OrgMembership["status"];
+}
+
+/** B12：某人的组织归属投影（成员记录 join 组织名；组织文档不可达给占位） */
+export async function listPersonOrgMemberships(
+    plugin: Plugin,
+    personDocId: string,
+): Promise<PersonOrgMembershipView[]> {
+    const memberships = (await membershipsByPerson(plugin)).get(personDocId) ?? [];
+    const orgs = await scanOrganizations();
+    const byDoc = new Map(orgs.map((org) => [org.docId, org.name]));
+    return memberships.map((membership) => ({
+        orgDocId: membership.orgDocId,
+        orgName: byDoc.get(membership.orgDocId) ?? "（组织文档不可达）",
+        department: membership.department,
+        title: membership.title,
+        joinedOn: membership.joinedOn,
+        leftOn: membership.leftOn,
+        status: membership.status,
+    }));
+}
+
 /** 组织列举（带成员记录）；扫描失败保持未知（上抛由调用方呈现） */
 export async function listOrganizationsWithMembers(
     plugin: Plugin,

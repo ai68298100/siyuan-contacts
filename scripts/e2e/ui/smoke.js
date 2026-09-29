@@ -13,7 +13,7 @@ import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
 import { applyContactCandidateFields, createContact, updateContactFields } from "../../../src/services/contacts";
 import { designateSelfIdentity } from "../../../src/services/self-identity";
-import { scanOrganizations, membershipsByOrganization } from "../../../src/services/org";
+import { scanOrganizations, membershipsByOrganization, listPersonOrgMemberships } from "../../../src/services/org";
 import { addOrgMembership } from "../../../src/data/org-membership";
 import OrgManagerDialog from "../../../src/components/org/OrgManagerDialog.svelte";
 import { addRelation, removeRelation } from "../../../src/services/relations";
@@ -1246,6 +1246,29 @@ await test("B11.3/B11.5 指定本人身份：显式改绑成功、未初始化�
     try { await designateSelfIdentity(plugin, settings, "row-gone"); } catch (e) { error = e.message; }
     assert(error.includes("不存在或已解绑"), `目标不存在未拦截：${error}`);
     assert(files.get("self-identity.json").selfDocId === "20260927000000-person2", "失败改绑污染了身份");
+});
+
+await test("B12 组织归属投影：Peek 组织区块按成员记录渲染（组织名/部门/职位/期间）", async () => {
+    invalidateRoster();
+    const orgMemberships = [
+        { orgDocId: "20260930000000-org0001", orgName: "测试公司", department: "研发部", title: "工程师", joinedOn: "2025-01-01", leftOn: "", status: "active" },
+        { orgDocId: "20260930000000-org0002", orgName: "母校学院", department: "", title: "", joinedOn: "2018-09-01", leftOn: "2022-06-30", status: "former" },
+    ];
+    const calls = [];
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person, onRecord: async () => {}, onLoadInsights: async () => emptyInsights(),
+        onLoadOrgMemberships: async (docId) => {
+            calls.push(docId);
+            return orgMemberships;
+        },
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+    } });
+    await until(() => calls.length >= 1, "组织归属未加载");
+    await until(() => fixture.textContent.includes("测试公司"), "组织归属区块未渲染组织名");
+    assert(fixture.textContent.includes("研发部") && fixture.textContent.includes("工程师"), "部门/职位未渲染");
+    assert(fixture.textContent.includes("2025-01-01 –") && fixture.textContent.includes("2022-06-30"), "期间未渲染");
+    assert(fixture.textContent.includes("在职/在学") && fixture.textContent.includes("已离开"), "状态未渲染");
+    assert(fixture.textContent.includes("母校学院"), "第二条归属未渲染");
 });
 
 await test("FUNC-01.8a 锚点消歧：首 AV 无关不采纳按字段证据取次 AV，歧义暂停写入，零匹配按新建", async () => {

@@ -36,6 +36,7 @@ import {
     listOrganizationMembers,
     addOrganizationMember,
     removeOrganizationMember,
+    listPersonOrgMemberships,
 } from "./services/org";
 import { exportMigrationBundle, importMigrationBundle, previewMigrationImport } from "./services/migration-bundle";
 import { loadViewPreferences, saveViewPreferences } from "./services/preferences";
@@ -466,6 +467,12 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     /** B13.3：移除组织成员记录 */
     async removeOrganizationMember(id: string) {
         await removeOrganizationMember(this, id);
+    }
+
+    /** B12：某人的组织归属投影（成员记录 join 组织名） */
+    async listPersonOrgMemberships(personDocId: string) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return listPersonOrgMemberships(this, personDocId);
     }
 
     /** B13.3：打开组织管理弹窗 */
