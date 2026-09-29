@@ -76,14 +76,17 @@ export async function fetchDocMarkdown(docId: string): Promise<{ hPath: string; 
 }
 
 /** 幂等写"带属性标记的单块"：有内容则更新/追加，无内容则删除。existingId 由调用方先查好（无查询则传 undefined）
- *  IAL 语法必须独占一行跟在块内容后（行尾式不会被解析为属性，spike/ial-probe 实证） */
+ *  IAL 语法必须独占一行跟在块内容后（行尾式不会被解析为属性，spike/ial-probe 实证）
+ *  attrValue 默认 "1"；B13 归档语义写 "archived"（扫描按值区分，见 DATA-CONTRACT §8） */
 export async function upsertMarkedBlock(
     rootId: string,
     attrName: string,
     markdown: string,
     existingId?: string,
+    attrValue: string = "1",
 ): Promise<void> {
-    const marked = markdown.length > 0 ? `${markdown}\n{: ${attrName}="1"}` : "";
+    if (!/^[\w-]+$/.test(attrValue)) throw new Error("attrValue 只允许字母数字下划线连字符");
+    const marked = markdown.length > 0 ? `${markdown}\n{: ${attrName}="${attrValue}"}` : "";
     if (!marked) {
         if (existingId) await deleteBlock(existingId);
         return;

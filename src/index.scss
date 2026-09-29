@@ -3508,6 +3508,21 @@
     gap: var(--lvct-sp-2);
 }
 
+/* B13.4 成员行内编辑表单 */
+.lvct-org-manager__member-edit {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-2);
+    width: 100%;
+
+    label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+    }
+}
+
 .lvct-org-manager__add {
     display: flex;
     gap: var(--lvct-sp-2);

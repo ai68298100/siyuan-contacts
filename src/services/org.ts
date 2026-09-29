@@ -11,12 +11,15 @@ import {
     loadOrgMembershipStore,
     loadOrgMembershipStoreBound,
     removeOrgMembership,
+    updateOrgMembership,
 } from "../data/org-membership";
-import type { OrgMembership } from "../domain/org-membership";
+import type { OrgMembership, OrgMembershipPatch } from "../domain/org-membership";
 import type { ContactsSettings } from "../domain/model";
 import { listContacts } from "./contacts";
 
 export const ORG_SECTION_ATTR = "custom-lvct-org";
+/** B13 归档语义：标记区块值 custom-lvct-org="archived" 表示组织已归档（文档与成员记录保留） */
+export const ORG_ARCHIVED_VALUE = "archived";
 
 export interface OrganizationSummary {
     docId: string;
@@ -24,15 +27,24 @@ export interface OrganizationSummary {
     name: string;
     hpath: string;
     notebookId: string;
+    /** B13：标记区块值为 archived（归档组织不进关系图/单位投影，文档与成员记录保留可恢复） */
+    archived: boolean;
 }
 
-/** 全库组织文档列举（单 SQL 找标记 + 单 SQL 取文档名，性能预算见 §4；零写入） */
+/** 解析标记区块 IAL 中的归档值；非 archived 值一律按活跃处理（向前兼容） */
+function isArchivedIal(ial: string): boolean {
+    const match = String(ial ?? "").match(new RegExp(`${ORG_SECTION_ATTR}="([^"]*)"`));
+    return match?.[1] === ORG_ARCHIVED_VALUE;
+}
+
+/** 全库组织文档列举（单 SQL 找标记含归档值 + 单 SQL 取文档名，性能预算见 §4；零写入） */
 export async function scanOrganizations(): Promise<OrganizationSummary[]> {
-    const roots = await querySql<{ root_id: string }>(
-        `SELECT DISTINCT root_id FROM blocks WHERE ial LIKE '%${ORG_SECTION_ATTR}="%'`,
+    const roots = await querySql<{ root_id: string; ial: string }>(
+        `SELECT DISTINCT root_id, ial FROM blocks WHERE ial LIKE '%${ORG_SECTION_ATTR}="%'`,
     );
     const ids = roots.map((row) => row.root_id).filter((id) => /^\d{14}-[0-9a-z]{7}$/.test(id));
     if (ids.length === 0) return [];
+    const archivedByRoot = new Map(roots.map((row) => [row.root_id, isArchivedIal(row.ial)]));
     const idList = ids.map((id) => `'${id}'`).join(",");
     const docs = await querySql<{ id: string; content: string; hpath: string; box: string }>(
         `SELECT id, content, hpath, box FROM blocks WHERE type='d' AND id IN (${idList})`,
@@ -42,6 +54,7 @@ export async function scanOrganizations(): Promise<OrganizationSummary[]> {
         name: doc.content,
         hpath: doc.hpath,
         notebookId: doc.box ?? "",
+        archived: archivedByRoot.get(doc.id) ?? false,
     }));
 }
 
@@ -54,7 +67,8 @@ export async function buildOrgDisplayByPerson(): Promise<Map<string, string>> {
         scanOrganizations(),
         loadOrgMembershipStoreBound(),
     ]);
-    const nameByDoc = new Map(orgs.map((org) => [org.docId, org.name]));
+    /* 单位行是活跃事实投影：归档组织不再参与（成员记录仍保留可核对） */
+    const nameByDoc = new Map(orgs.filter((org) => !org.archived).map((org) => [org.docId, org.name]));
     const byPerson = new Map<string, OrgMembership[]>();
     for (const membership of store.memberships) {
         const list = byPerson.get(membership.personDocId) ?? [];
@@ -197,7 +211,7 @@ export async function listOrganizationsWithMembers(
     return orgs.map((org) => ({ ...org, memberships: byOrg.get(org.docId) ?? [] }));
 }
 
-/** 新建组织：建文档 + 写 custom-lvct-org 标记区块。同名组织拒绝（防重复建档）。 */
+/** 新建组织：建文档 + 写 custom-lvct-org 标记区块。同名组织拒绝（防重复建档；含已归档同名——文档仍在）。 */
 export async function createOrganization(
     settings: ContactsSettings,
     name: string,
@@ -212,6 +226,30 @@ export async function createOrganization(
     if (!docId) throw new Error(`创建组织文档「${trimmed}」失败`);
     await upsertMarkedBlock(docId, ORG_SECTION_ATTR, `**组织**：${trimmed}`, undefined);
     return { docId };
+}
+
+/** 归档组织（B13）：标记区块值写为 archived——活跃分组不再列出，文档与成员记录保留可恢复。
+ *  标记块为插件管理区块，重写为标准文案（用户手改的标记块内容不保留）。 */
+export async function archiveOrganization(orgDocId: string): Promise<void> {
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(orgDocId)) throw new Error("orgDocId 不是合法的思源 ID");
+    const org = (await scanOrganizations()).find((item) => item.docId === orgDocId);
+    if (!org) throw new Error("组织不存在");
+    if (org.archived) throw new Error("组织已处于归档状态");
+    await upsertMarkedBlock(orgDocId, ORG_SECTION_ATTR, `**组织**：${org.name}`, undefined, ORG_ARCHIVED_VALUE);
+}
+
+/** 恢复归档组织（B13）：标记区块值写回活跃 */
+export async function restoreOrganization(orgDocId: string): Promise<void> {
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(orgDocId)) throw new Error("orgDocId 不是合法的思源 ID");
+    const org = (await scanOrganizations()).find((item) => item.docId === orgDocId);
+    if (!org) throw new Error("组织不存在");
+    if (!org.archived) throw new Error("组织不在归档状态");
+    await upsertMarkedBlock(orgDocId, ORG_SECTION_ATTR, `**组织**：${org.name}`, undefined);
+}
+
+/** 更新成员记录字段（B13.4：部门/职位/入职/离职/状态；身份字段不可变） */
+export async function updateOrganizationMember(plugin: Plugin, id: string, patch: OrgMembershipPatch): Promise<void> {
+    await updateOrgMembership(plugin, id, patch);
 }
 
 /** 供设置页/向导显示的组织锚点状态（只读） */

@@ -1093,12 +1093,76 @@ await test("B13.3 组织管理弹窗：新建组织、添加/移除成员经 fac
         "添加成员未生效",
     );
     assert(memberOps.length === 1 && memberOps[0].personDocId === "20260930000000-per0001", "成员未写入");
-    /* 移除成员 */
-    [...fixture.querySelectorAll(".lvct-org-manager__member")].find((node) => node.textContent.includes("张三"))
-        .querySelector("button").click();
+    /* 移除成员（B13.4 起行内含编辑与移除两个按钮，按文案定位） */
+    const removeRow = [...fixture.querySelectorAll(".lvct-org-manager__member")].find((node) => node.textContent.includes("张三"));
+    button("移除", removeRow).click();
     await until(() => !fixture.querySelector(".lvct-org-manager__member"), "移除成员未生效");
     assert(memberOps.length === 0, "移除未走 facade.removeOrganizationMember");
     assert(!closed, "成员操作不应关闭弹窗");
+});
+
+await test("B13.4/B13 组织成员字段编辑与归档恢复（facade 全链路）", async () => {
+    const memberRow = {
+        id: "20260930000000-mem0001", orgDocId: "20260930000000-org0001",
+        personDocId: "20260930000000-per0001", personName: "张三",
+        department: "", title: "", joinedOn: "", leftOn: "", status: "active",
+    };
+    let archived = false;
+    const updateCalls = [];
+    let archiveCalls = 0;
+    let restoreCalls = 0;
+    const facade = {
+        settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        listContacts: async () => [
+            { docId: "20260930000000-per0001", itemId: "row-p1", name: "张三", isSelf: false },
+        ],
+        listOrganizations: async () => [
+            { docId: "20260930000000-org0001", name: "曙光科技", hpath: "/曙光科技", notebookId: settings.notebookId, archived, memberships: [memberRow] },
+        ],
+        listOrganizationMembers: async () => [{ ...memberRow }],
+        updateOrganizationMember: async (id, patch) => {
+            updateCalls.push({ id, patch });
+            if (patch.department !== undefined) memberRow.department = patch.department;
+            if (patch.title !== undefined) memberRow.title = patch.title;
+            if (patch.joinedOn !== undefined) memberRow.joinedOn = patch.joinedOn;
+            if (patch.leftOn !== undefined) memberRow.leftOn = patch.leftOn;
+            if (patch.status !== undefined) memberRow.status = patch.status;
+        },
+        archiveOrganization: async () => { archiveCalls += 1; archived = true; },
+        restoreOrganization: async () => { restoreCalls += 1; archived = false; },
+    };
+    mounted = mount(OrgManagerDialog, { target: fixture, props: {
+        facade, i18n: undefined, onClose() {},
+    } });
+    await until(() => fixture.textContent.includes("曙光科技"), "组织列表未加载");
+    /* 成员字段编辑：进入表单 → 填写 → 保存走 facade.updateOrganizationMember */
+    button("编辑").click();
+    await until(() => fixture.querySelector('input[aria-label="部门"]'), "成员编辑表单未出现");
+    input(fixture.querySelector('input[aria-label="部门"]'), "研发部");
+    input(fixture.querySelector('input[aria-label="职位"]'), "工程师");
+    const statusSelect = fixture.querySelector('select[aria-label="状态"]');
+    statusSelect.value = "former";
+    statusSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    button("保存").click();
+    await until(() => updateCalls.length === 1, "成员更新未走 facade");
+    assert(updateCalls[0].id === "20260930000000-mem0001", "更新 id 错误");
+    assert(updateCalls[0].patch.department === "研发部" && updateCalls[0].patch.title === "工程师" && updateCalls[0].patch.status === "former", "更新补丁字段错误");
+    await until(() => fixture.textContent.includes("研发部"), "保存后成员行未刷新");
+    /* 归档：列表进归档分组，详情出现恢复按钮 */
+    button("归档组织").click();
+    await until(() => archiveCalls === 1, "归档未走 facade");
+    await until(() => fixture.textContent.includes("已归档（1）"), "归档分组未出现");
+    button("已归档（1）").click();
+    await until(() => [...fixture.querySelectorAll(".lvct-org-manager__org-item")].some((node) => node.textContent.includes("曙光科技")), "归档组织未在分组中显示");
+    [...fixture.querySelectorAll(".lvct-org-manager__org-item")]
+        .find((node) => node.textContent.includes("曙光科技")).click();
+    await tick();
+    await until(() => fixture.querySelector(".lvct-org-manager__detail")?.textContent.includes("恢复组织"), "归档组织详情未显示恢复按钮");
+    /* 恢复 */
+    button("恢复组织").click();
+    await until(() => restoreCalls === 1, "恢复未走 facade");
+    await until(() => !fixture.textContent.includes("已归档（1）"), "恢复后归档分组未消失");
 });
 
 await test("FAST-01.3a 识别目标裁决：名册失败自动重试仍失败返回 failed，恢复后 bound/unlinked 各归其位", async () => {

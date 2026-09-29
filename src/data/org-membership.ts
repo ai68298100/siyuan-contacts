@@ -5,8 +5,8 @@
  */
 import type { Plugin } from "siyuan";
 import { loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage";
-import { normalizeOrgMembershipStore, normalizeOrgMembershipStoreForWrite, appendMembership, removeMembership } from "../domain/org-membership";
-import type { OrgMembership, OrgMembershipStore } from "../domain/org-membership";
+import { normalizeOrgMembershipStore, normalizeOrgMembershipStoreForWrite, appendMembership, removeMembership, updateMembership } from "../domain/org-membership";
+import type { OrgMembership, OrgMembershipPatch, OrgMembershipStore } from "../domain/org-membership";
 import { newNodeId } from "../api/client";
 
 export const ORG_MEMBERSHIP_STORAGE_KEY = "org-membership.json";
@@ -71,5 +71,17 @@ export async function removeOrgMembership(plugin: Plugin, id: string): Promise<v
         const next = removeMembership(store, id);
         if (next === store) throw new Error(`成员记录 ${id} 不存在`);
         await saveJsonVerified(plugin, ORG_MEMBERSHIP_STORAGE_KEY, next);
+    });
+}
+
+/** 更新成员记录字段（B13.4；锁内严格读 + 写后回读）。找不到 id 或补丁非法抛错，身份字段不可变 */
+export async function updateOrgMembership(plugin: Plugin, id: string, patch: OrgMembershipPatch): Promise<void> {
+    await withStoreLock(ORG_MEMBERSHIP_STORAGE_KEY, async () => {
+        const store = normalizeOrgMembershipStoreForWrite(await loadJsonStrict(plugin, ORG_MEMBERSHIP_STORAGE_KEY));
+        const next = updateMembership(store, id, patch);
+        if (!next) throw new Error(`成员记录 ${id} 不存在或更新内容非法`);
+        if (next !== store) {
+            await saveJsonVerified(plugin, ORG_MEMBERSHIP_STORAGE_KEY, next);
+        }
     });
 }

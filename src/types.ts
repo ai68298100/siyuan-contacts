@@ -110,6 +110,12 @@ export interface ContactsPluginFacade {
     addOrganizationMember(orgDocId: string, personDocId: string, extra?: { department?: string; title?: string; joinedOn?: string }): Promise<void>;
     /** B13.3：移除组织成员记录 */
     removeOrganizationMember(id: string): Promise<void>;
+    /** B13.4：更新成员记录字段（部门/职位/入职/离职/状态；身份字段不可变） */
+    updateOrganizationMember(id: string, patch: import("./domain/org-membership").OrgMembershipPatch): Promise<void>;
+    /** B13：归档组织（标记区块值 archived；文档与成员记录保留可恢复） */
+    archiveOrganization(orgDocId: string): Promise<void>;
+    /** B13：恢复归档组织 */
+    restoreOrganization(orgDocId: string): Promise<void>;
     /** B12：某人的组织归属投影（成员记录 join 组织名） */
     listPersonOrgMemberships(personDocId: string): Promise<import("./services/org").PersonOrgMembershipView[]>;
     /** FUNC-01.14：AI 资料候选受限补丁写——只写补丁字段，最新名册回读逐字段冲突核对 */

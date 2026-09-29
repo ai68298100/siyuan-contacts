@@ -288,6 +288,13 @@ vCard 处理是**瞬态转换**（不落插件存储），但属性↔字段映�
   [{id, orgDocId, personDocId, department?, title?, joinedOn?, leftOn?, status: active|former}]}`——
   多人多组织多对多、同组织多段历史（以 membership id 区分）、离职/毕业置 former 不删除；
   personDocId/orgDocId 均须通过 ID 校验，非法条目归一化丢弃。
+- **B13.4 成员字段编辑（第 72 轮，2026-09-30）**：`updateOrgMembership(id, patch)` 锁内严格读 +
+  写后回读；patch 只含白名单字段（department/title/joinedOn/leftOn/status），**身份字段
+  （id/orgDocId/personDocId）不可变**；日期必须为空串或 YYYY-MM-DD，非法写前拒绝（绝不静默改写）。
+- **B13 组织归档语义（第 72 轮，2026-09-30）**：标记区块值 `custom-lvct-org="archived"` 表示归档
+  （活跃值为 `"1"`；其他值向前兼容按活跃处理）。归档 = 重写标记块 IAL 值（文档与成员记录保留，
+  可恢复）；归档组织不进关系图组织增强、不参与 B12 单位行投影，但成员记录仍可核对；
+  新建组织同名检查含已归档组织（文档还在）。标记块为插件管理区块，归档/恢复重写为标准文案。
 - **共同背景查询**（同单位/同学校同事）= 成员索引 JSON 查询投影，不经 AV relation；
   "与我的关系"等既有 related 语义保持纯人物间语义，组织维度不写入 related。
 - **捕获/搜索**：组织文档不出现在联系人名册与选人器；组织名搜索走标记区块扫描（后续增强）。

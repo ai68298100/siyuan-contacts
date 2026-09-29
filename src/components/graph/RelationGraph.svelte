@@ -270,8 +270,9 @@
             people = roster;
             if (Array.isArray(orgsResult)) {
                 const rosterIds = new Set(roster.map((person) => person.docId));
+                /* 归档组织不进关系图（B13 归档语义：活跃分组才是当前事实） */
                 orgOverlay = buildOrgAugmentation(
-                    orgsResult.map((org) => ({
+                    orgsResult.filter((org) => !org.archived).map((org) => ({
                         docId: org.docId,
                         name: org.name,
                         memberDocIds: org.memberships

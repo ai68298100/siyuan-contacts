@@ -5,6 +5,8 @@ import {
     normalizeOrgMembershipStoreForWrite,
     appendMembership,
     removeMembership,
+    applyMembershipPatch,
+    updateMembership,
 } from "../src/domain/org-membership.ts";
 import type { OrgMembership } from "../src/domain/org-membership.ts";
 
@@ -63,4 +65,30 @@ test("B13 append/remove：幂等增删（纯函数）", () => {
     assert.equal(store.memberships.length, 0);
     const unchanged = removeMembership(store, "missing");
     assert.equal(unchanged, store, "删除不存在 id 应原样返回");
+});
+
+test("B13.4 成员编辑：字段更新白名单与日期校验（写前拒绝）", () => {
+    const m = membership({ id: "20260930000000-m000002" });
+    const patched = applyMembershipPatch(m, { department: " 研发部 ", title: "工程师", joinedOn: "2024-01-02", status: "former" });
+    assert.ok(patched);
+    assert.equal(patched.department, "研发部");
+    assert.equal(patched.status, "former");
+    assert.equal(patched.id, m.id, "身份字段不可变");
+    assert.equal(patched.orgDocId, m.orgDocId);
+    assert.equal(patched.personDocId, m.personDocId);
+    // 非法日期写前拒绝；不修改原对象
+    assert.equal(applyMembershipPatch(m, { joinedOn: "2024/01/02" }), null);
+    assert.equal(applyMembershipPatch(m, { leftOn: "昨天" }), null);
+    assert.equal(applyMembershipPatch(m, { status: "paused" as never }), null);
+    assert.deepEqual(m, membership({ id: "20260930000000-m000002" }), "原对象不被修改");
+});
+
+test("B13.4 成员编辑：store 级更新与查无此 id", () => {
+    const m = membership({ id: "20260930000000-m000003" });
+    const store = appendMembership(normalizeOrgMembershipStore({ schemaVersion: 1, memberships: [] }), m);
+    const next = updateMembership(store, "20260930000000-m000003", { title: "顾问" });
+    assert.ok(next && next !== store);
+    assert.equal(next.memberships[0].title, "顾问");
+    assert.equal(updateMembership(store, "missing", { title: "x" }), null, "查无此 id 返回 null");
+    assert.equal(updateMembership(store, "20260930000000-m000003", { joinedOn: "bad" }), null, "非法补丁返回 null");
 });

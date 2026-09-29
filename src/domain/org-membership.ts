@@ -110,3 +110,41 @@ export function removeMembership(store: OrgMembershipStore, id: string): OrgMemb
     if (!store.memberships.some((existing) => existing.id === id)) return store;
     return { ...store, memberships: store.memberships.filter((existing) => existing.id !== id) };
 }
+
+/* ---------- B13.4 成员字段编辑：身份字段（id/orgDocId/personDocId）不可变 ---------- */
+
+export interface OrgMembershipPatch {
+    department?: string;
+    title?: string;
+    joinedOn?: string;
+    leftOn?: string;
+    status?: OrgMembershipStatus;
+}
+
+/**
+ * 成员记录字段更新（纯函数）：只拷贝白名单字段；日期必须为空串或 YYYY-MM-DD，
+ * 非法返回 null（写前拒绝，绝不静默改写）；department/title trim。
+ */
+export function applyMembershipPatch(membership: OrgMembership, patch: OrgMembershipPatch): OrgMembership | null {
+    const department = patch.department === undefined ? membership.department : patch.department.trim();
+    const title = patch.title === undefined ? membership.title : patch.title.trim();
+    const joinedOn = patch.joinedOn === undefined ? membership.joinedOn : patch.joinedOn;
+    const leftOn = patch.leftOn === undefined ? membership.leftOn : patch.leftOn;
+    if (joinedOn !== "" && !DATE_PATTERN.test(joinedOn)) return null;
+    if (leftOn !== "" && !DATE_PATTERN.test(leftOn)) return null;
+    const status = patch.status === undefined ? membership.status : patch.status;
+    if (status !== "active" && status !== "former") return null;
+    return { ...membership, department, title, joinedOn, leftOn, status };
+}
+
+/** 按 id 更新成员记录字段（纯函数返回新 store）；找不到 id 返回原 store */
+export function updateMembership(store: OrgMembershipStore, id: string, patch: OrgMembershipPatch): OrgMembershipStore | null {
+    const index = store.memberships.findIndex((existing) => existing.id === id);
+    if (index < 0) return null;
+    const updated = applyMembershipPatch(store.memberships[index], patch);
+    if (!updated) return null;
+    if (updated === store.memberships[index]) return store;
+    const memberships = [...store.memberships];
+    memberships[index] = updated;
+    return { ...store, memberships };
+}

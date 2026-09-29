@@ -37,6 +37,9 @@ import {
     listOrganizationMembers,
     addOrganizationMember,
     removeOrganizationMember,
+    updateOrganizationMember,
+    archiveOrganization,
+    restoreOrganization,
     listPersonOrgMemberships,
 } from "./services/org";
 import { exportMigrationBundle, importMigrationBundle, previewMigrationImport } from "./services/migration-bundle";
@@ -469,6 +472,21 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     /** B13.3：移除组织成员记录 */
     async removeOrganizationMember(id: string) {
         await removeOrganizationMember(this, id);
+    }
+
+    /** B13.4：更新成员记录字段（部门/职位/入职/离职/状态；身份字段不可变） */
+    async updateOrganizationMember(id: string, patch: import("./domain/org-membership").OrgMembershipPatch) {
+        await updateOrganizationMember(this, id, patch);
+    }
+
+    /** B13：归档组织（标记区块值 archived；文档与成员记录保留可恢复） */
+    async archiveOrganization(orgDocId: string) {
+        await archiveOrganization(orgDocId);
+    }
+
+    /** B13：恢复归档组织 */
+    async restoreOrganization(orgDocId: string) {
+        await restoreOrganization(orgDocId);
     }
 
     /** B12：某人的组织归属投影（成员记录 join 组织名） */

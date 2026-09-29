@@ -1912,3 +1912,27 @@
   ID 格式校验拒绝导致请求未发出——「fixture ID 后缀必须 7 位」坑位再次生效。
 - **B14 余项**：组织入口（组织节点开组织视图/组织范围收窄）、原生图面板真机核对（前端域）、
   真实图 siyuan:// 链接成边核对（B14.2 余项）、B14.10 宿主验收。
+
+## P1 业务主线 第 72 轮：B13.4 成员字段编辑 + B13 组织归档/恢复（2026-09-30，续跑口令第 74 版驱动）
+
+- **域层（domain/org-membership.ts）**：`applyMembershipPatch` 纯函数——patch 白名单
+  （department/title/joinedOn/leftOn/status），身份字段（id/orgDocId/personDocId）不可变；
+  日期空串或 YYYY-MM-DD 否则返回 null（写前拒绝）；department/title trim。
+  `updateMembership(store, id, patch)` 纯函数（查无 id/非法补丁返回 null）。
+- **数据层**：`updateOrgMembership`（锁内严格读 + 写后回读，与增删同纪律）。
+- **api/blocks.ts**：`upsertMarkedBlock` 增 `attrValue` 参数（默认 "1"，值白名单 `[\w-]+`）。
+- **服务层（services/org.ts）**：`scanOrganizations` SQL 投影加 ial，解析标记块值——
+  `custom-lvct-org="archived"` 为归档（其他值向前兼容按活跃），`OrganizationSummary.archived`；
+  `archiveOrganization`/`restoreOrganization`（重写标记块 IAL 值，标准文案；同名新建检查含
+  已归档）；`updateOrganizationMember` 薄封装。**活跃事实口径**：归档组织不进关系图组织增强、
+  不参与 B12 单位行投影；Peek 组织归属清单仍解析归档组织名（历史可核对）。
+- **facade**：updateOrganizationMember/archiveOrganization/restoreOrganization 三方法。
+- **弹窗（OrgManagerDialog）**：组织列表分活跃/已归档分组（折叠开关）；详情头部归档/恢复按钮；
+  成员行「编辑」→ 行内表单（部门/职位/加入日期 date/离开日期 date/状态 select）保存取消。
+- **验证**：单测 213/213（org-membership 新增 patch 与 store 更新 2 例）；三套 UI 桌面 98 /
+  移动 99 / 宿主 98 全绿（新增成员编辑+归档恢复用例：表单填写保存走 facade、补丁字段核对、
+  归档分组、恢复；修正既有移除用例的按钮定位——行内新增编辑按钮后按文案定位）；
+  collect-i18n 缺失 0（zh/en 各 16 键）；`pnpm run build` + `check:release` PASS；
+  真内核 contacts-flow 10/10、spike:init 21/21；52 景基线重拍 + 断点扫描有效。
+- **留后续**：组织改名（renameDoc 端点需先隔离 spike 实证）；组织入口进图谱/按组织收窄（B14）；
+  工作台组织视图。

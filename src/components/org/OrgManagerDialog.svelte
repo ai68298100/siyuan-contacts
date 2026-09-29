@@ -30,8 +30,18 @@
     let busy = $state(false);
     let loading = $state(true);
     let errorMessage = $state("");
+    /* B13：归档分组展示开关；B13.4 成员行内编辑 */
+    let showArchived = $state(false);
+    let editingMemberId = $state("");
+    let editDepartment = $state("");
+    let editTitle = $state("");
+    let editJoinedOn = $state("");
+    let editLeftOn = $state("");
+    let editStatus = $state<"active" | "former">("active");
 
     const currentOrg = $derived(orgs.find((org) => org.docId === currentOrgDocId) ?? null);
+    const activeOrgs = $derived(orgs.filter((org) => !org.archived));
+    const archivedOrgs = $derived(orgs.filter((org) => org.archived));
     /* 可添加成员 = 名册中未加入当前组织的人（本人档案也可加入组织：本人可以是某公司员工） */
     const addCandidates = $derived(
         roster.filter((person) => !members.some((member) => member.personDocId === person.docId)),
@@ -125,6 +135,57 @@
             await loadMembers();
         });
     }
+
+    /** B13.4：进入成员编辑（表单初始化自当前记录） */
+    function startEditMember(member: OrganizationMember): void {
+        editingMemberId = member.id;
+        editDepartment = member.department;
+        editTitle = member.title;
+        editJoinedOn = member.joinedOn;
+        editLeftOn = member.leftOn;
+        editStatus = member.status;
+    }
+
+    function cancelEditMember(): void {
+        editingMemberId = "";
+    }
+
+    /** B13.4：保存成员字段（部门/职位/入职/离职/状态；身份字段不可变） */
+    function saveEditMember(): void {
+        const id = editingMemberId;
+        if (!id || busy) return;
+        void run(async () => {
+            await facade.updateOrganizationMember(id, {
+                department: editDepartment,
+                title: editTitle,
+                joinedOn: editJoinedOn,
+                leftOn: editLeftOn,
+                status: editStatus,
+            });
+            editingMemberId = "";
+            await loadMembers();
+        });
+    }
+
+    /** B13：归档当前组织（文档与成员记录保留，可恢复） */
+    function archiveCurrentOrg(): void {
+        const docId = currentOrgDocId;
+        if (!docId || busy) return;
+        void run(async () => {
+            await facade.archiveOrganization(docId);
+            await loadOrgs(true);
+        });
+    }
+
+    /** B13：恢复归档组织 */
+    function restoreCurrentOrg(): void {
+        const docId = currentOrgDocId;
+        if (!docId || busy) return;
+        void run(async () => {
+            await facade.restoreOrganization(docId);
+            await loadOrgs(true);
+        });
+    }
 </script>
 
 <div class="lvct-dialog-root lvct-org-manager">
@@ -137,7 +198,7 @@
                 <p class="ft__smaller ft__on-surface">{text("orgEmpty", "暂无组织。输入名称新建第一个组织。")}</p>
             {:else}
                 <ul class="lvct-org-manager__orgs">
-                    {#each orgs as org (org.docId)}
+                    {#each activeOrgs as org (org.docId)}
                         <li>
                             <button
                                 type="button"
@@ -148,6 +209,25 @@
                         </li>
                     {/each}
                 </ul>
+                {#if archivedOrgs.length > 0}
+                    <button type="button" class="b3-button b3-button--text" onclick={() => (showArchived = !showArchived)}>
+                        {showArchived ? text("orgArchivedHide", "收起已归档") : text("orgArchivedShow", "已归档（{n}）", { n: archivedOrgs.length })}
+                    </button>
+                    {#if showArchived}
+                        <ul class="lvct-org-manager__orgs">
+                            {#each archivedOrgs as org (org.docId)}
+                                <li>
+                                    <button
+                                        type="button"
+                                        class="lvct-org-manager__org-item"
+                                        class:lvct-org-manager__org-item--active={org.docId === currentOrgDocId}
+                                        onclick={() => selectOrg(org.docId)}
+                                    >{org.name}<small>（{text("orgArchivedTag", "已归档")}）</small></button>
+                                </li>
+                            {/each}
+                        </ul>
+                    {/if}
+                {/if}
             {/if}
             <div class="lvct-org-manager__create">
                 <input
@@ -164,7 +244,16 @@
 
         <div class="lvct-org-manager__detail">
             {#if currentOrg}
-                <b>{currentOrg.name}</b>
+                <div class="fn__flex" style="align-items: center; gap: 8px;">
+                    <b class="fn__flex-1">{currentOrg.name}{currentOrg.archived ? text("orgArchivedTag", "（已归档）") : ""}</b>
+                    {#if currentOrg.archived}
+                        <button type="button" class="b3-button b3-button--text" disabled={busy}
+                            onclick={restoreCurrentOrg}>{text("orgRestore", "恢复组织")}</button>
+                    {:else}
+                        <button type="button" class="b3-button b3-button--cancel" disabled={busy}
+                            onclick={archiveCurrentOrg}>{text("orgArchive", "归档组织")}</button>
+                    {/if}
+                </div>
                 <div class="lvct-org-manager__members">
                     <b>{text("orgMembersTitle", "成员")}</b>
                     {#if members.length === 0}
@@ -173,13 +262,46 @@
                         <ul class="lvct-org-manager__member-list">
                             {#each members as member (member.id)}
                                 <li class="lvct-org-manager__member">
-                                    <span>{member.personName}{member.title ? ` · ${member.title}` : ""}{member.status === "former" ? text("orgFormer", "（已离开）") : ""}</span>
-                                    <button
-                                        type="button"
-                                        class="b3-button b3-button--cancel"
-                                        disabled={busy}
-                                        onclick={() => removeMember(member.id)}
-                                    >{text("orgMemberRemove", "移除")}</button>
+                                    {#if editingMemberId === member.id}
+                                        <div class="lvct-org-manager__member-edit">
+                                            <label>{text("orgMemberDeptLabel", "部门")}
+                                                <input class="b3-text-field fn__block" bind:value={editDepartment} disabled={busy}
+                                                    aria-label={text("orgMemberDeptLabel", "部门")} /></label>
+                                            <label>{text("orgMemberTitleLabel", "职位")}
+                                                <input class="b3-text-field fn__block" bind:value={editTitle} disabled={busy}
+                                                    aria-label={text("orgMemberTitleLabel", "职位")} /></label>
+                                            <label>{text("orgMemberJoinedLabel", "加入日期")}
+                                                <input class="b3-text-field fn__block" type="date" bind:value={editJoinedOn} disabled={busy}
+                                                    aria-label={text("orgMemberJoinedLabel", "加入日期")} /></label>
+                                            <label>{text("orgMemberLeftLabel", "离开日期")}
+                                                <input class="b3-text-field fn__block" type="date" bind:value={editLeftOn} disabled={busy}
+                                                    aria-label={text("orgMemberLeftLabel", "离开日期")} /></label>
+                                            <label>{text("orgMemberStatusLabel", "状态")}
+                                                <select class="b3-select fn__block" bind:value={editStatus} disabled={busy}
+                                                    aria-label={text("orgMemberStatusLabel", "状态")}>
+                                                    <option value="active">{text("orgStatusActive", "在职/在读")}</option>
+                                                    <option value="former">{text("orgStatusFormer", "已离开")}</option>
+                                                </select></label>
+                                            <div class="fn__flex" style="gap: 8px;">
+                                                <button type="button" class="b3-button b3-button--text" disabled={busy}
+                                                    onclick={saveEditMember}>{text("orgMemberSave", "保存")}</button>
+                                                <button type="button" class="b3-button b3-button--cancel" disabled={busy}
+                                                    onclick={cancelEditMember}>{text("orgMemberCancel", "取消")}</button>
+                                            </div>
+                                        </div>
+                                    {:else}
+                                        <span>{member.personName}{member.title ? ` · ${member.title}` : ""}{member.department ? `（${member.department}）` : ""}{member.status === "former" ? text("orgFormer", "（已离开）") : ""}</span>
+                                        <span class="fn__flex" style="gap: 4px;">
+                                            <button type="button" class="b3-button b3-button--text" disabled={busy}
+                                                onclick={() => startEditMember(member)}>{text("orgMemberEdit", "编辑")}</button>
+                                            <button
+                                                type="button"
+                                                class="b3-button b3-button--cancel"
+                                                disabled={busy}
+                                                onclick={() => removeMember(member.id)}
+                                            >{text("orgMemberRemove", "移除")}</button>
+                                        </span>
+                                    {/if}
                                 </li>
                             {/each}
                         </ul>
