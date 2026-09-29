@@ -1707,6 +1707,27 @@
 - **留后续**：名册表格视图的本人标识、捕获参与人语义（本人作为参与者是否记互动）、B11.5
   修复流程的完整预览 UI（与我的关系/共同组织影响预览）。
 
+## P1 业务主线 第 64 轮：B13.2 组织数据层与扫描实现（2026-09-30，续跑口令第 64 版驱动）
+
+- **org-membership.json 数据层（契约 §8 落地）**：
+  - `domain/org-membership.ts`（纯函数）：normalize（坏 ID/坏状态/**存在但非法的日期条目过滤**
+    而非静默改写空；按 id 去重）、写前严格检查（损坏整体拒绝）、append/remove 幂等纯函数。
+  - `data/org-membership.ts`：锁内追加/移除（严格读 + 写后回读）；loadOrgMembershipStore
+    严格展示读（失败上抛）。
+- **组织文档扫描**：`services/org.ts#scanOrganizations`——全笔记本 listNotebookDocs +
+  逐文档 `custom-lvct-org` 标记探测（SQL ial LIKE，root_id 判定），零写入；单笔记本/单文档
+  读取失败跳过不阻断（FUNC-01.8 同模式）；截断上限 1000 篇。成员聚合
+  `membershipsByOrganization/ByPerson`（按加入日排序）。
+- **验证**：svelte-check/tsc 0 错误 0 警告；单测 **202/202**（org-membership 3 例：归一过滤/
+  写前拒绝/幂等增删）；三套 UI 回归**桌面 92 / 移动 93 / 宿主 92 全绿**（+1 服务级 smoke
+  「组织扫描与成员索引」：标记区块扫描只认组织文档、成员 JSON 锁内追加两条、按组织聚合排序、
+  落盘形状正确）；`pnpm run build` + `check:release` 全 PASS；52 景基线 + 断点扫描重拍有效
+  （无视觉变更）。smoke 踩坑补记：**插入新测试时 old_string 锚点若含后续测试的 opening line
+  会吞掉对方开头——编辑后必须 node --check + 确认相邻测试完整**；**SQL mock 的分支匹配用
+  `includes` 时注意 LIKE 通配符字面量（`="%"` 与实际 `="%'` 不匹配，用稳定子串如属性名）**。
+- **P1 下一步**：B13.3 组织管理页面（组织列表/新建/成员维护 UI）+ 设置页组织锚点状态；
+  随后 B12 资料投影、B14 双图（B14.1 核对先行）。
+
 ## P1 业务主线 第 63 轮：B13.1a 跨库实证 + B13.1 组织契约定稿（2026-09-30，续跑口令第 63 版驱动）
 
 - **B13.1a 隔离内核实证（新 spike 脚本 scripts/spike/b13-org-spike.mjs，`pnpm spike:b13`，

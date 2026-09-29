@@ -13,6 +13,8 @@ import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
 import { applyContactCandidateFields, createContact, updateContactFields } from "../../../src/services/contacts";
 import { designateSelfIdentity } from "../../../src/services/self-identity";
+import { scanOrganizations, membershipsByOrganization } from "../../../src/services/org";
+import { addOrgMembership } from "../../../src/data/org-membership";
 import { addRelation, removeRelation } from "../../../src/services/relations";
 import { recordInteraction, deleteInteraction, loadInteractionStore } from "../../../src/data/interactions";
 import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
@@ -990,6 +992,47 @@ await test("FUNC-01.15 断点续做：残留文档复用不重建，字段失败
     catch (error) { dupError = error.message; }
     assert(dupError.includes("已存在"), `重试未按已存在拦截：${dupError}`);
     assert(createDocCalls === 0, "重试产生了重复文档");
+});
+
+await test("B13.2 组织扫描与成员索引：标记区块扫描发现组织，成员 JSON 锁内追加与聚合", async () => {
+    const files = new Map();
+    const plugin = { loadData: async (key) => files.get(key) ?? "", saveData: async (key, value) => { files.set(key, value); } };
+    files.set("contacts-settings.json", settings);
+    kernel.handler = async (route, body) => {
+        if (route === "/api/notebook/lsNotebooks") return { notebooks: [{ id: "20260930000000-book001", name: "B13_spike" }] };
+        if (route === "/api/query/sql") {
+            const stmt = String(body?.stmt ?? "");
+            if (stmt.includes("type='d'")) {
+                return [
+                    { id: "20260930000000-org0001", content: "测试公司", hpath: "/测试公司" },
+                    { id: "20260930000000-plain01", content: "普通笔记", hpath: "/普通笔记" },
+                ];
+            }
+            if (stmt.includes("custom-lvct-org=")) {
+                /* 仅组织文档（org0001）有标记区块；普通笔记探测返回空 */
+                return stmt.includes("20260930000000-org0001") ? [{ root_id: "20260930000000-org0001" }] : [];
+            }
+            return [];
+        }
+        throw new Error(`组织扫描用例不允许请求 ${route}`);
+    };
+    invalidateRoster();
+    const orgs = await scanOrganizations();
+    console.log("[lvct-debug] B13.2 scanOrganizations:", JSON.stringify(orgs), "notebook probe check:", kernel.handler === null);
+    assert(orgs.length === 1 && orgs[0].name === "测试公司" && orgs[0].docId === "20260930000000-org0001",
+        `组织扫描结果错误：${JSON.stringify(orgs)}`);
+
+    /* 成员索引：锁内追加两条（同组织不同人），聚合按组织分组 */
+    await addOrgMembership(plugin, { orgDocId: "20260930000000-org0001", personDocId: person.docId, department: "研发部", title: "工程师", joinedOn: "2026-01-01" });
+    await addOrgMembership(plugin, { orgDocId: "20260930000000-org0001", personDocId: "20260930000000-person9", title: "顾问", joinedOn: "2025-06-01" });
+    const byOrg = await membershipsByOrganization(plugin);
+    const list = byOrg.get("20260930000000-org0001") ?? [];
+    assert(list.length === 2, `组织聚合条数错误：${list.length}`);
+    assert(list[0].joinedOn === "2025-06-01" && list[1].joinedOn === "2026-01-01", "成员未按加入日排序");
+
+    /* 写后回读：损坏拒绝路径由域层单测覆盖，这里验证落盘形状 */
+    const stored = files.get("org-membership.json");
+    assert(stored.schemaVersion === 1 && stored.memberships.length === 2, "成员索引落盘形状错误");
 });
 
 await test("FAST-01.3a 识别目标裁决：名册失败自动重试仍失败返回 failed，恢复后 bound/unlinked 各归其位", async () => {
