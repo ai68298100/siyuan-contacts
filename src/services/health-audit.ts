@@ -6,19 +6,30 @@
  */
 import type { Plugin } from "siyuan";
 import { listContacts } from "./contacts";
-import { loadInteractionStore } from "../data/interactions";
-import { loadFollowUpStore } from "../data/followups";
+import { loadInteractionStoreStrict } from "../data/interactions";
+import { loadFollowUpStoreStrict } from "../data/followups";
 import { runHealthAudit, DEFAULT_LONG_INACTIVE_DAYS } from "../domain/health-audit";
 import type { AuditIssue } from "../domain/health-audit";
 import type { ContactsSettings } from "../domain/model";
 import { findDuplicatePairs } from "../domain/duplicate-check";
 
 export async function auditWorkspaceData(plugin: Plugin, settings: ContactsSettings): Promise<AuditIssue[]> {
-    const [people, store, followUpStore] = await Promise.all([
+    /* FUNC-01.12：插件库读取失败时指名受影响模块并中止体检，不得把故障当作空数据出报告 */
+    const [peopleResult, storeResult, followUpResult] = await Promise.allSettled([
         listContacts(settings),
-        loadInteractionStore(plugin),
-        loadFollowUpStore(plugin),
+        loadInteractionStoreStrict(plugin),
+        loadFollowUpStoreStrict(plugin),
     ]);
+    const failed: string[] = [];
+    if (peopleResult.status === "rejected") failed.push("名册");
+    if (storeResult.status === "rejected") failed.push("互动记录");
+    if (followUpResult.status === "rejected") failed.push("跟进计划");
+    if (failed.length > 0 || peopleResult.status !== "fulfilled" || storeResult.status !== "fulfilled" || followUpResult.status !== "fulfilled") {
+        throw new Error(`资料体检无法完成，以下数据读取失败：${failed.join("、") || "未知模块"}`);
+    }
+    const people = peopleResult.value;
+    const store = storeResult.value;
+    const followUpStore = followUpResult.value;
     const tombstoned = new Set(store.tombstones);
     const interactionCounts: Record<string, number> = {};
     const lastInteractionAt: Record<string, number> = {};

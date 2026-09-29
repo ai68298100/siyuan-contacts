@@ -14,6 +14,11 @@ export async function loadCadenceMap(plugin: Plugin): Promise<Record<string, Per
     return normalizeCadenceMap(await loadJson(plugin, CADENCE_STORAGE_KEY));
 }
 
+/** FUNC-01.12 严格展示读：键不存在返回空映射；读取失败/损坏抛错（首页据此显式降级提示） */
+export async function loadCadenceMapStrict(plugin: Plugin): Promise<Record<string, PersonCadence>> {
+    return normalizeCadenceMap(await loadJsonStrict(plugin, CADENCE_STORAGE_KEY));
+}
+
 /** 读某人的覆盖项；未登记返回 null（跟随全局） */
 export async function loadPersonCadence(plugin: Plugin, docId: string): Promise<PersonCadence | null> {
     const map = await loadCadenceMap(plugin);

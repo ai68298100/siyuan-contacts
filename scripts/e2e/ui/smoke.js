@@ -3157,6 +3157,54 @@ await test("向导：预检提示将复用的内容，失败后可继续并在�
     assert(attempts === 2, "续建未走第二次初始化");
 });
 
+await test("读取故障显式化：首页模块读取失败显示降级横幅（指名模块），重试成功后消失（FUNC-01.12）", async () => {
+    let calls = 0;
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadRecentInteractions: async () => ({}), loadDashboard: async () => {
+            calls += 1;
+            const base = {
+                people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+                stale: [], staleTotal: 0, neverContacted: 0, neverContactedItemIds: [],
+                followUps: [], actions: [], neverOrder: {},
+            };
+            return calls === 1 ? { ...base, readFailures: ["interactions", "followUps"] } : base;
+        } },
+    } });
+    await until(() => fixture.querySelector(".lvct-notice--error"), "读取失败横幅未显示");
+    assert(fixture.textContent.includes("互动记录") && fixture.textContent.includes("跟进计划"),
+        "横幅未指名受影响模块（互动记录/跟进计划）");
+    fixture.querySelector(".lvct-notice__action").click();
+    await until(() => calls >= 2 && !fixture.querySelector(".lvct-notice--error"), "重试后横幅未消失");
+    assert(calls === 2, "重试未按一次计");
+});
+
+await test("读取故障显式化：跟进计划读取失败显示错误态与重试，不冒充空待办（FUNC-01.12）", async () => {
+    let fail = true;
+    const items = [{ id: "fu-1", personDocId: person.docId, title: "召回提醒", dueDate: "2026-10-20", status: "open", createdAt: 1, updatedAt: 1 }];
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async () => {},
+        onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onDeleted() {}, onClose() {}, onChanged() {},
+        onListFollowUps: async () => {
+            if (fail) throw new Error("存储读取失败，操作已停止: follow-ups.json");
+            return items;
+        },
+        onCreateFollowUp: async () => { throw new Error("用例不涉及"); },
+        onSetFollowUpStatus: async () => {},
+        onSnoozeFollowUp: async () => {},
+    } });
+    await until(() => fixture.textContent.includes("跟进计划加载失败"), "跟进读取失败错误态未显示");
+    assert(fixture.textContent.includes("follow-ups.json"), "错误态未包含失败存储键");
+    assert(!fixture.textContent.includes("没有进行中的跟进计划"), "故障不得同时渲染空待办文案");
+    fail = false;
+    button("重试").click();
+    await until(() => fixture.textContent.includes("召回提醒"), "重试后未渲染跟进列表");
+    assert(!fixture.textContent.includes("跟进计划加载失败"), "成功后错误态未清除");
+});
+
 await pause(100);
 results.push({ name: "无未处理异常及响应式循环", ok: runtimeErrors.length === 0, detail: runtimeErrors.join("\n") });
 document.querySelector("#results").textContent = JSON.stringify(results, null, 2);

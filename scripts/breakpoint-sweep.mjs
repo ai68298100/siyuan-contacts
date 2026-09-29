@@ -1,5 +1,6 @@
 /** UX-01.10 断点扫描：主页面 × 390/640/1280 三档截图，供断点收敛核对（一次性脚本可复用）。 */
 import { createServer } from "vite";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
@@ -18,6 +19,11 @@ mkdirSync(outDir, { recursive: true });
 
 const server = await createServer({
     configFile: false, root, publicDir: false,
+    /* 夹具须显式挂 svelte 插件与 siyuan mock 别名（同 ui-smoke）：configFile:false 不加载根
+       vite.config，缺插件时 .svelte 被当裸 JS 解析、缺别名时 siyuan 包无法解析——
+       页面只剩 vite 报错浮层（2026-09-29 根修并补 title 校验） */
+    resolve: { alias: { siyuan: resolve(root, "scripts/e2e/ui/siyuan-mock.js") } },
+    plugins: [svelte()],
     server: { host: "127.0.0.1", port: 0, open: false },
 });
 await server.listen();
@@ -60,6 +66,19 @@ try {
     });
 
     await call("Page.enable");
+    /* 页面就绪以 title 为准（shot-workbench.html 置 READY/ERROR…），带病页面直接判失败 */
+    async function waitReady(label) {
+        for (let i = 0; i < 80; i++) {
+            const evaluated = await call("Runtime.evaluate", { expression: "document.title" });
+            const title = evaluated?.result?.value ?? "";
+            if (title === "READY" || title.startsWith("ERROR")) {
+                if (title !== "READY") throw new Error(`${label} 页面异常：${title}`);
+                return;
+            }
+            await new Promise((r) => setTimeout(r, 100));
+        }
+        throw new Error(`${label} 页面未就绪（title 超时）`);
+    }
     for (const width of widths) {
         for (const view of pages) {
             await call("Emulation.setDeviceMetricsOverride", {
@@ -68,7 +87,8 @@ try {
             await call("Page.navigate", {
                 url: `http://127.0.0.1:${port}/scripts/e2e/shot-workbench.html?view=${view}&theme=light&host=1`,
             });
-            await new Promise((r) => setTimeout(r, 1400));
+            await waitReady(`${view}@${width}`);
+            await new Promise((r) => setTimeout(r, 400));
             const shot = await call("Page.captureScreenshot", { format: "png" });
             writeFileSync(join(outDir, `${view}-${width}.png`), Buffer.from(shot.data, "base64"));
             console.log(`${view} @ ${width}`);

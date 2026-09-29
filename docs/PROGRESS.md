@@ -1350,3 +1350,32 @@
   单测 178/178；collect-i18n 0 缺失；NEXT-DEVELOPMENT-PLAN 相对链接与跨文档引用（18 处）核对存在。
 - 本地提交，不推送（推送/发版等作者当轮指令）。余项不变：集市 PR、真机核对、B05/C05 立项
   等作者输入；开发侧下一步按 NEXT-DEVELOPMENT-PLAN 从 P0 起步。
+
+## P0 数据可信 第 47 轮：FUNC-01.12 读取故障显式化 + 断点扫描夹具根修（2026-09-29，续跑口令第 47 版驱动）
+
+- **FUNC-01.12 严格展示读**（`data/`：interactions/followups/cadences/reminder-dismissals/registry
+  新增 `*Strict` 变体——键不存在返回空态、读取失败/损坏抛错）：首页仪表盘五模块逐个严格读，
+  失败聚合进 `DashboardData.readFailures`（指名模块 + 重试，受影响模块以空数据参与投影并明示
+  可能不完整）；互动时间线 `loadPersonInsights`、跟进 `listPersonFollowUps`/`previewFollowUpsImport`
+  改严格读（故障进入既有错误态，不再冒充空历史/空待办/虚报将新增）；资料体检
+  `auditWorkspaceData` 三源 allSettled，读故障指名「名册/互动记录/跟进计划」中止报告；
+  `syncAfterIdChange` 读失败显式跳过文档同步并留痕（B07 对账收口）。Peek 跟进区修复错误态与
+  「没有跟进计划」空态同屏的缺陷 + 重试先清错误态（`loadFollowUpError` 残留为 smoke 新用例暴露）。
+- **读语义入约**：DATA-CONTRACT §3 新增「展示读语义」段（容错读 vs 严格展示读、四表面纪律、
+  首次使用仍正常空态），follow-ups/cadences 两行同步。
+- **断点扫描夹具根修（门禁完整性）**：`breakpoint-sweep.mjs` 自 UX-01.10 创建起 vite server
+  未挂 svelte 插件、未别名 `siyuan`→mock（`configFile:false` 不加载根 vite.config），12 张
+  断点截图实际全是 vite 报错浮层且脚本不校验页面 title——**既往「扫描通过」从未拍到真实页面**。
+  本轮补 `plugins:[svelte()]` + `resolve.alias` + title READY/ERROR 轮询校验（页面异常即失败），
+  修复后 12 张经目检为真实页面（home@390、people@1280 抽查）。52 景基线脚本
+  （screenshot-settings）本就有插件与 title 校验，未受影响。
+- **i18n**：新增 9 对键（dashReadFailure、storeModule×5、fuLoadFailTitle、commonRetry 等），
+  collect-i18n 0 缺失。
+- **验证**：svelte-check/tsc 0 错误；单测 **179/179**（新增存储读语义用例：严格读区分键不存在
+  与读取失败）；三套 UI 回归 **桌面 78 / 移动 79 / 宿主 78 全绿**（新增两条 FUNC-01.12 smoke：
+  首页故障横幅指名模块且重试后消失；跟进读取失败显示错误态不冒充空待办、重试恢复）；
+  `pnpm run build` + `check:release` 全 PASS（package.zip 360592B）；52 景基线重拍 + 断点扫描
+  390/640/1280（修复后首跑，目检无漂移）。
+- **边界说明**：capture/interaction-import/migration/export-center 等其余容错读路径本轮不动
+  （归 FUNC-01.6/CODE-02 后续切片）；「读失败保留旧值重试」的完整形态归 FUNC-01.7 刷新通道，
+  本轮以 readFailures 显式降级承接。

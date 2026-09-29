@@ -10,7 +10,7 @@ import { toLocalDateKey } from "../domain/interactions";
 import {
     createFollowUpRecord,
     FOLLOW_UP_STORAGE_KEY,
-    loadFollowUpStore,
+    loadFollowUpStoreStrict,
     mergeFollowUpStore,
     readFollowUpStoreStrictInLock,
     updateFollowUpRecord,
@@ -50,13 +50,19 @@ export async function snoozeFollowUp(plugin: Plugin, id: string, option: SnoozeO
 
 /** 由跟进 id 反查人物文档后同步任务块（状态/改期变更共用） */
 async function syncAfterIdChange(plugin: Plugin, id: string): Promise<void> {
-    const store = await loadFollowUpStore(plugin);
-    const item = store.items.find((entry) => entry.id === id);
-    if (item) await syncFollowUpTasksToDoc(plugin, item.personDocId);
+    /* FUNC-01.12：库读取失败不得按空库跳过文档同步（会误判无任务），显式跳过并留痕；对账由 B07/FUNC-01.3 收口 */
+    try {
+        const store = await loadFollowUpStoreStrict(plugin);
+        const item = store.items.find((entry) => entry.id === id);
+        if (item) await syncFollowUpTasksToDoc(plugin, item.personDocId);
+    } catch (error) {
+        console.warn("[lvct] 跟进库读取失败，本次文档任务同步已跳过", error);
+    }
 }
 
+/** FUNC-01.12：读取失败抛错（详情页错误态重试），不得把故障呈现为空待办 */
 export async function listPersonFollowUps(plugin: Plugin, personDocId: string): Promise<FollowUpItem[]> {
-    const store = await loadFollowUpStore(plugin);
+    const store = await loadFollowUpStoreStrict(plugin);
     return followUpsForPersonFromStore(store, personDocId);
 }
 
@@ -110,7 +116,8 @@ function parseFollowUpBackup(text: string): FollowUpItem[] {
 
 export async function previewFollowUpsImport(plugin: Plugin, text: string): Promise<FollowUpImportPreview> {
     const incoming = parseFollowUpBackup(text);
-    const current = await loadFollowUpStore(plugin);
+    /* FUNC-01.12：当前库读取失败时中止预览，不得按空库虚报「将新增」数（导入本体为锁内严格读） */
+    const current = await loadFollowUpStoreStrict(plugin);
     const ids = new Set(current.items.map((item) => item.id));
     return {
         added: incoming.filter((item) => !ids.has(item.id)).length,

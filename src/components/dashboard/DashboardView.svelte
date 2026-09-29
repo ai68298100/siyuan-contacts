@@ -40,6 +40,19 @@
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
 
+    /** FUNC-01.12：readFailures 模块键 → 展示名 */
+    const MODULE_LABELS: Record<string, readonly [string, string]> = {
+        interactions: ["storeModuleInteractions", "互动记录"],
+        followUps: ["storeModuleFollowUps", "跟进计划"],
+        cadences: ["storeModuleCadences", "联系节奏"],
+        dismissals: ["storeModuleDismissals", "提醒暂缓"],
+        registry: ["storeModuleRegistry", "收编时间"],
+    };
+    function moduleLabel(key: string): string {
+        const entry = MODULE_LABELS[key];
+        return entry ? text(entry[0], entry[1]) : key;
+    }
+
     let data: DashboardData | null = $state(null);
     let errorText: string = $state("");
     let bridge = $state(detectCheckinBridge());
@@ -432,6 +445,14 @@
         <ViewState compact error title={text("dashLoadFailTitle", "仪表盘加载失败")} description={errorText}>
             <button class="b3-button b3-button--outline" onclick={refresh}>{text("dashReload", "重新加载")}</button>
         </ViewState>
+    {/if}
+    {#if data?.readFailures?.length}
+        <StatusNotice
+            error
+            message={text("dashReadFailure", "部分数据读取失败，以下模块可能显示不完整：{modules}", { modules: data.readFailures.map((key) => moduleLabel(key)).join("、") })}
+            actionLabel={text("dashReload", "重新加载")}
+            onAction={refresh}
+        />
     {/if}
     {#if !data && !errorText}
         <div class="lvct-dash__skeleton" aria-busy="true" aria-label={text("dashSkeletonLabel", "仪表盘加载中")}>

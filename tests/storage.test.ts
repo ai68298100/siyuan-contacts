@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { withStoreLock, storeLockConfig } from "../src/data/storage.ts";
+import { withStoreLock, storeLockConfig, loadJson, loadJsonStrict } from "../src/data/storage.ts";
+import type { Plugin } from "siyuan";
 
 async function withNavigator(value: unknown, action: () => Promise<void>): Promise<void> {
     const descriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
@@ -96,4 +97,13 @@ test("存储锁：取锁超时（AbortError）后以 steal 接管自愈，非中
     } finally {
         storeLockConfig.acquireTimeoutMs = previousTimeout;
     }
+});
+
+test("FUNC-01.12 读取语义：严格读区分键不存在与读取失败；容错读把失败降级为 null（调用方不得据此写空）", async () => {
+    const failing = { loadData: async () => { throw new Error("模拟磁盘故障"); } } as unknown as Plugin;
+    await assert.rejects(loadJsonStrict(failing, "broken.json"), /存储读取失败.*broken\.json/);
+    assert.equal(await loadJson(failing, "broken.json"), null, "容错读失败返回 null");
+    const missing = { loadData: async () => null } as unknown as Plugin;
+    assert.equal(await loadJsonStrict(missing, "absent.json"), null, "键不存在按 null 返回（正常空态）");
+    assert.equal(await loadJson(missing, "absent.json"), null);
 });

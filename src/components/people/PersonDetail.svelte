@@ -350,6 +350,7 @@ import StatusNotice from "../StatusNotice.svelte";
     async function loadFollowUps() {
         if (!onListFollowUps) return;
         followUpsLoading = true;
+        followUpError = ""; /* FUNC-01.12：重试先清错误态，成功后不得残留旧错误分支 */
         try {
             followUps = await onListFollowUps(current.docId);
         } catch (error) {
@@ -552,8 +553,12 @@ import StatusNotice from "../StatusNotice.svelte";
     {#if followUpSupported}
     <section class="lvct-detail__section">
         <h4>{text("fuSectionTitle", "跟进计划")}</h4>
-        {#if followUpError}<div class="lvct-form__error" role="alert">{followUpError}</div>{/if}
-        {#if followUpsLoading}
+        {#if followUpError}
+            <!-- FUNC-01.12：读取失败显式报错并可重试，不与「没有跟进计划」空态同时呈现 -->
+            <ViewState compact error title={text("fuLoadFailTitle", "跟进计划加载失败")} description={followUpError}>
+                <button type="button" class="b3-button b3-button--outline" onclick={loadFollowUps}>{text("commonRetry", "重试")}</button>
+            </ViewState>
+        {:else if followUpsLoading}
             <ViewState compact loading title={text("fuLoading", "正在加载跟进计划")} />
         {:else}
             {#if openFollowUps.length === 0}
@@ -681,7 +686,7 @@ import StatusNotice from "../StatusNotice.svelte";
             <ViewState compact loading title="正在加载互动记录" />
         {:else if insightsError}
             <ViewState compact error title="互动记录加载失败" description={insightsError}>
-                <button class="b3-button b3-button--outline" onclick={loadInsights}>重试</button>
+                <button class="b3-button b3-button--outline" onclick={loadInsights}>{text("commonRetry", "重试")}</button>
             </ViewState>
         {:else if filteredTimeline.length > 0}
             <div class="lvct-detail__timeline">

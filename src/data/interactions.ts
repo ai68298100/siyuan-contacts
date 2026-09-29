@@ -14,6 +14,14 @@ export async function loadInteractionStore(plugin: Plugin): Promise<InteractionS
     return normalizeInteractionStore(await loadJson(plugin, INTERACTION_STORAGE_KEY));
 }
 
+/**
+ * FUNC-01.12 严格展示读：键不存在返回空库（正常空态）；
+ * 读取失败/损坏抛错，不得归一为空（首页统计、时间线、体检据此显式报错）。
+ */
+export async function loadInteractionStoreStrict(plugin: Plugin): Promise<InteractionStore> {
+    return normalizeInteractionStore(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY));
+}
+
 export interface RecordInteractionInput {
     personDocId: string;
     note?: string;

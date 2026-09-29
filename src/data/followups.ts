@@ -21,6 +21,11 @@ export async function loadFollowUpStore(plugin: Plugin): Promise<FollowUpStore> 
     return normalizeFollowUpStore(await loadJson(plugin, FOLLOW_UP_STORAGE_KEY));
 }
 
+/** FUNC-01.12 严格展示读：键不存在返回空库；读取失败/损坏抛错，不得按空待办呈现 */
+export async function loadFollowUpStoreStrict(plugin: Plugin): Promise<FollowUpStore> {
+    return normalizeFollowUpStore(await loadJsonStrict(plugin, FOLLOW_UP_STORAGE_KEY));
+}
+
 export interface CreateFollowUpInput {
     personDocId: string;
     title?: string;

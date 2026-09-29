@@ -18,6 +18,11 @@ export async function loadReminderDismissals(plugin: Plugin): Promise<ReminderDi
     return normalizeDismissalStore(await loadJson(plugin, REMINDER_DISMISSALS_STORAGE_KEY)).dismissals;
 }
 
+/** FUNC-01.12 严格展示读：键不存在返回空列表；读取失败/损坏抛错（首页提醒据此显式降级提示） */
+export async function loadReminderDismissalsStrict(plugin: Plugin): Promise<ReminderDismissal[]> {
+    return normalizeDismissalStore(await loadJsonStrict(plugin, REMINDER_DISMISSALS_STORAGE_KEY)).dismissals;
+}
+
 async function readStoreStrict(plugin: Plugin): Promise<ReminderDismissalStore> {
     const raw = await loadJsonStrict(plugin, REMINDER_DISMISSALS_STORAGE_KEY);
     if (raw !== null && typeof raw === "object" && (raw as { schemaVersion?: unknown }).schemaVersion !== undefined
