@@ -161,6 +161,12 @@ export interface PersonOrgMembershipView {
     status: OrgMembership["status"];
 }
 
+/** B12：某人的单位显示串（组织名 · 部门；无成员记录返回空串） */
+export async function getOrgDisplayForDoc(personDocId: string): Promise<string> {
+    const display = await buildOrgDisplayByPerson();
+    return display.get(personDocId) ?? "";
+}
+
 /** B12：某人的组织归属投影（成员记录 join 组织名；组织文档不可达给占位） */
 export async function listPersonOrgMemberships(
     plugin: Plugin,

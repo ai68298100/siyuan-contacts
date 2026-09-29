@@ -15,6 +15,8 @@ export function buildMeetingBriefing(
     person: ContactSummary,
     roster: readonly ContactSummary[],
     events: readonly InteractionEvent[],
+    /** B12：可选的追加行（如「单位」组织归属投影），按传入顺序附加在末尾 */
+    extraRows: readonly MeetingBriefingItem[] = [],
 ): MeetingBriefingItem[] {
     const items: MeetingBriefingItem[] = [];
     const timeline = buildTimeline(events, person.docId);
@@ -45,5 +47,6 @@ export function buildMeetingBriefing(
             value: coAttendance.map((item) => `${item.name} ${item.count} 次`).join("、"),
         });
     }
+    items.push(...extraRows);
     return items;
 }

@@ -110,6 +110,7 @@
         birthday: { labelKey: "peopleBirthday", fallback: "生日" },
         recent: { labelKey: "peopleRecent", fallback: "最近互动" },
         tags: { labelKey: "peopleTags", fallback: "标签" },
+        org: { labelKey: "peopleColumnOrg", fallback: "单位" },
     };
     const columnLabel = (key: PeopleTableColumn) => text(columnLabels[key].labelKey, columnLabels[key].fallback);
 
@@ -878,6 +879,7 @@
                                     {:else if column === "wechat"}{person.wechat || "—"}
                                     {:else if column === "birthday"}{person.birthday ? `${person.birthday}${person.isLunar ? "（农历）" : ""}` : "—"}
                                     {:else if column === "recent"}{recent[person.docId]?.localDate ?? "—"}
+                                    {:else if column === "org"}{orgLines[person.docId] ?? "—"}
                                     {:else}{person.tags.join(" · ") || "—"}{/if}
                                 </td>
                             {/each}

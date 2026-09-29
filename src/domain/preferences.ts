@@ -9,11 +9,12 @@ export type DefaultView = "home" | "people" | "graph";
 export type PeopleSortMode = "name" | "group" | "birthday" | "recent";
 /** 联系人默认形态（F02）：卡片 / 表格 */
 export type PeopleViewMode = "card" | "table";
-/** 表格可选列（F02）。「姓名」是固定列，不参与显隐与排序，恒为首列。 */
-export type PeopleTableColumn = "group" | "phone" | "wechat" | "birthday" | "recent" | "tags";
+/** 表格可选列（F02）。「姓名」是固定列，不参与显隐与排序，恒为首列。
+ *  B12 新增「org」虚拟列：值来自成员索引投影（组织名 · 部门），不在数据库 fieldMap 中。 */
+export type PeopleTableColumn = "group" | "phone" | "wechat" | "birthday" | "recent" | "tags" | "org";
 
 /** 表格可选列的展示顺序默认值（常用常驻、次要折叠的排序基础） */
-export const PEOPLE_TABLE_COLUMNS: readonly PeopleTableColumn[] = ["group", "phone", "wechat", "birthday", "recent", "tags"];
+export const PEOPLE_TABLE_COLUMNS: readonly PeopleTableColumn[] = ["group", "phone", "wechat", "birthday", "recent", "tags", "org"];
 
 export interface ViewPreferences {
     readonly schemaVersion: number;

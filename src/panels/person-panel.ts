@@ -11,6 +11,7 @@ import { loadFollowUpStore } from "../data/followups";
 import { lastInteractionByPerson } from "../domain/interactions";
 import { buildMeetingBriefing } from "../domain/briefing";
 import type { MeetingBriefingItem } from "../domain/briefing";
+import { getOrgDisplayForDoc } from "../services/org";
 import { nextBirthday } from "../domain/occasions";
 import { svelteDialog } from "../libs/dialog";
 import { subscribeDataChanged } from "../libs/data-events";
@@ -86,7 +87,14 @@ async function updateStrip(context: PanelContext, protyle: ProtyleLike, rootId: 
         if (stripRequests.get(protyle.element) !== request || protyle.block?.rootID !== rootId || !protyle.element.isConnected) return;
         const lastInteraction = lastInteractionByPerson(interactionStore, [person]).get(person.docId);
         const birthday = person.birthday ? nextBirthday(person.birthday, person.isLunar) : undefined;
-        const briefing = buildMeetingBriefing(person, roster, interactionStore.events);
+        /* B12：简报追加「单位」组织归属行（失败降级为无该行） */
+        const orgLine = await getOrgDisplayForDoc(person.docId).catch(() => "");
+        const briefing = buildMeetingBriefing(
+            person,
+            roster,
+            interactionStore.events,
+            orgLine ? [{ label: "单位", value: orgLine }] : [],
+        );
         const openFollowUps = followUpStore.items.filter(
             (item) => item.personDocId === person.docId && item.status === "open",
         ).length;

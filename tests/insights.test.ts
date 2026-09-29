@@ -107,3 +107,14 @@ test("buildMeetingBriefing：没有事实数据时返回空简报", () => {
     const person: ContactSummary = { docId: "d-x", itemId: "i-x", name: "新人", phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false, group: "", tags: [], relatedItemIds: [] };
     assert.deepEqual(buildMeetingBriefing(person, [person], []), []);
 });
+
+test("buildMeetingBriefing：extraRows 追加在末尾（B12 简报单位行）", () => {
+    const people: ContactSummary[] = [
+        { docId: "d-a", itemId: "i-a", name: "甲", phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false, group: "", tags: [], relatedItemIds: [] },
+    ];
+    const rows = buildMeetingBriefing(people[0], people, [], [
+        { label: "单位", value: "测试公司 · 研发部" },
+    ]);
+    assert.deepEqual(rows, [{ label: "单位", value: "测试公司 · 研发部" }], "extraRows 应原样追加在末尾");
+    assert.deepEqual(buildMeetingBriefing(people[0], people, []), [], "缺省无追加行");
+});

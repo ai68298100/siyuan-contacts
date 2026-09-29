@@ -1728,6 +1728,24 @@
 - **P1 下一步**：B13.3 组织管理页面（组织列表/新建/成员维护 UI）+ 设置页组织锚点状态；
   随后 B12 资料投影、B14 双图（B14.1 核对先行）。
 
+## P1 业务主线 第 67 轮：B12 收尾投影——表格「单位」可选列 + 简报组织行 + 选人提示（2026-09-30，续跑口令第 65 版驱动）
+
+- **表格「单位」可选列**：`PeopleTableColumn` 新增 `"org"`（虚拟列，不在数据库 fieldMap）——
+  PEOPLE_TABLE_COLUMNS 默认集末位追加；PeopleView 表体按 `orgLines[docId]` 渲染
+  （组织名 · 部门，无记录显示 —）；列设置菜单/表头经既有 columnLabels 机制自动获得「单位」。
+- **简报组织行**：`buildMeetingBriefing` 增加可选 `extraRows` 参数（追加在末尾，不改既有行）；
+  person-panel 档案条简报传入「单位」行（值 = buildOrgDisplayByPerson 的 orgName · 部门，
+  失败降级为无该行）。
+- **选人提示**：Peek 关系候选 hint/keywords 追加组织归属串（buildOrgDisplayByPerson 一次性
+  加载；加载失败降级为无关键词）。
+- **验证**：svelte-check/tsc 0 错误 0 警告；单测 **202/202**（+1 buildMeetingBriefing
+  extraRows 用例）；三套 UI 回归**桌面 94 / 移动 95 / 宿主 94 全绿**；`pnpm run build` +
+  `check:release` 全 PASS；52 景基线 + 断点扫描重拍有效（列设置多「单位」选项、卡片单位行
+  仅在有成员记录时出现，正常态无漂移）。smoke 踩坑补记：**表格列偏好用例的「恢复默认」
+  断言列数 6 → 7（默认集新增 org 列）**。
+- **P1 下一步**：B14.1 原生图能力核对（隔离内核/真机勿臆造）→ B14 双图实现；B13 组织编辑/
+  详情/归档迭代；B12 简报导出与卡片排版细化留后续。
+
 ## P1 业务主线 第 65 轮：B13.3 组织管理页面（2026-09-30，续跑口令第 64 版驱动）
 
 - **服务扩展（services/org.ts）**：`listOrganizationsWithMembers`（扫描 + 成员聚合合并）、

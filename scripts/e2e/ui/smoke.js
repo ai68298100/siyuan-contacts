@@ -1839,7 +1839,7 @@ await test("表格列显隐与顺序偏好持久化，姓名列固定，恢复�
     button("列设置").click();
     await tick();
     [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "恢复默认显示").click();
-    await until(() => savedPrefs?.tableColumns.length === 6 && savedPrefs.peopleView === "card", "恢复默认未持久化");
+    await until(() => savedPrefs?.tableColumns.length === 7 && savedPrefs.peopleView === "card", "恢复默认未持久化");
     await until(() => !fixture.querySelector("table") && fixture.querySelector(".lvct-people__cards"), "恢复默认后未回到卡片视图");
 });
 
