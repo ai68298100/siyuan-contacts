@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildGraph, capGraph, groupColor, queryGraphRelations } from "../src/domain/graph.ts";
+import { buildGraph, buildOrgAugmentation, capGraph, groupColor, queryGraphRelations } from "../src/domain/graph.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
 import { shortestGraphPath, secondDegreeGraphIds } from "../src/domain/graph-path.ts";
 
@@ -154,4 +154,46 @@ test("capGraph：超限时按度数保留头部节点，只留两端存活的边
         );
     }
     assert.equal(capGraph(full, 10).truncated, false);
+});
+
+test("组织增强（B14.6）：成员边只连名册内人物，多段记录合并，kind/degree 正确", () => {
+    const roster = new Set(["d-1", "d-2", "d-3"]);
+    const augmentation = buildOrgAugmentation([
+        { docId: "org-1", name: "曙光科技", memberDocIds: ["d-1", "d-1", "ghost", "", "org-1", "d-2"] },
+        { docId: "org-2", name: "无成员组织", memberDocIds: [] },
+    ], roster);
+    assert.equal(augmentation.nodes.length, 2);
+    const org1 = augmentation.nodes.find((node) => node.id === "org-1");
+    assert.equal(org1?.kind, "org");
+    assert.equal(org1?.group, "组织");
+    assert.equal(org1?.degree, 2);
+    assert.deepEqual(
+        augmentation.edges.filter((edge) => edge.source === "org-1").map((edge) => edge.target).sort(),
+        ["d-1", "d-2"],
+    );
+    for (const edge of augmentation.edges) {
+        assert.equal(edge.kind, "member", "成员边必须标记 kind=member");
+        assert.notEqual(edge.target, edge.source, "不造自环");
+        assert.ok(roster.has(edge.target), "不连名册外人物");
+    }
+    assert.deepEqual(buildOrgAugmentation([], roster), { nodes: [], edges: [] });
+    assert.equal(buildOrgAugmentation([{ docId: "org-3", name: "", memberDocIds: ["d-1"] }], roster).nodes.length, 0, "无名可称的组织跳过");
+});
+
+test("组织增强不污染 related 图：成员边不进 buildGraph 产物，查询图保持纯 related", () => {
+    const people = [
+        person({ itemId: "i-1", docId: "d-1", name: "甲", relatedItemIds: [] }),
+        person({ itemId: "i-2", docId: "d-2", name: "乙", relatedItemIds: [] }),
+    ];
+    const related = buildGraph(people);
+    const augmentation = buildOrgAugmentation(
+        [{ docId: "org-1", name: "组织", memberDocIds: ["d-1", "d-2"] }],
+        new Set(["d-1", "d-2"]),
+    );
+    /* 关系查询只吃 related 图：甲乙同组织但没有显式 related → 无边、非二度 */
+    assert.equal(related.edges.length, 0);
+    assert.deepEqual(queryGraphRelations(related, "d-1", "d-2").commonIds, []);
+    const merged = [...related.edges, ...augmentation.edges];
+    assert.equal(merged.filter((edge) => edge.kind === "member").length, 2);
+    assert.equal(merged.filter((edge) => edge.kind === "related").length, 0);
 });

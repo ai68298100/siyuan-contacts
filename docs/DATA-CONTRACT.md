@@ -307,4 +307,12 @@ vCard 处理是**瞬态转换**（不落插件存储），但属性↔字段映�
   被过滤节点的边随之丢弃）、无向去重、自环丢弃；模式偏好 `view-preferences.json.graphMode`
   （"relations" | "native"，缺省 relations）。边语义在 UI 恒有标识：文档引用图边=块引用
   （双向一度含回链），与 related 关系边不同源、不互相推断（B14.8）。
+
+**B14.6 关系图组织增强契约（第 70 轮，2026-09-30）**：GraphNode 增 `kind`（person/org）、
+GraphEdge 增 `kind`（related/member）——**成员边与 related 边分源**：关系查询（一度/二度/共同/
+最短路径）只消费 buildGraph 的 related 图；`buildOrgAugmentation` 产物（组织节点 + 成员边）只
+叠加渲染。成员边数据源 = `org-membership.json` 中 **status=active** 的记录 join 名册 docId
+（former/悬空/已解绑不成边，多段记录合并）；组织节点 id=组织文档 ID、label=文档标题、
+固定色 ORG_NODE_COLOR（#8e5ad8）；画布成员边只连当前裁剪后画布内人物。组织维度照旧零写库
+（扫描 + JSON 投影，不写 related、不写数据库）。
 数据锚点重绑设置页扫描同步识别组织文档标记（与人物档案条同模式）。

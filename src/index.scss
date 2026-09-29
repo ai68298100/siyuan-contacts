@@ -2078,6 +2078,8 @@
     &--work i { background: var(--lvct-group-work); }
     &--school i { background: var(--lvct-group-school); }
     &--other i { background: var(--lvct-group-other); }
+    /* B14.6 组织节点（数据编码固定色，与画布 ORG_NODE_COLOR 一致） */
+    &--org i { background: #8e5ad8; border-radius: 2px; }
 }
 
 .lvct-text-danger {

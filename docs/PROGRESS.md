@@ -1864,3 +1864,27 @@
   `siyuan://blocks` 链接是否成边（B14.2 余项）。
 - **P1 下一步**：B13 组织详情/编辑/归档迭代；B14 余项——组织节点与组织成员边（B14.6）、
   全局图入口与规模说明（B14.8）、原生图真机核对。
+
+## P1 业务主线 第 70 轮：B14.6 自研图组织边——组织节点与成员边分源展示（2026-09-30，续跑口令第 72 版驱动）
+
+- **域层（src/domain/graph.ts）**：GraphNode 增 `kind?: "person" | "org"`、GraphEdge 增
+  `kind?: "related" | "member"`（buildGraph 显式标记 person/related，兼容既有投影）；
+  新纯函数 `buildOrgAugmentation(orgs, rosterDocIds)`——成员边只连名册内人物（悬空/已解绑
+  记录丢弃，不造悬空端点）、同人同组织多段记录合并一条边、组织节点 group="组织"
+  degree=有效成员边数；畸形输入跳过。固定色 `ORG_NODE_COLOR`（#8e5ad8，D-0002 色板纪律）。
+- **关键语义（B14.6 验收口径）**：**查询图与展示层分离**——关系查询（一度/二度/共同/最短
+  路径）仍只吃 buildGraph 的 related 图，组织增强产物只叠加渲染画布；「人物→组织→人物」
+  不会被算成二度关系（单测显式覆盖）。成员边在数据源头就按 status=active 过滤（former 不进图）。
+- **组件（RelationGraph 关系图模式）**：refresh 并行取名册与 `facade.listOrganizations()`
+  （组织读取失败降级纯人物图，不阻断）；组织节点方形（round-rectangle）、成员边虚线
+  （cytoscape style selector 按 data.kind），图例增「组织」项；工具栏新增「显示组织（n）」
+  开关（画布随开关重建）；成员边只连当前画布内人物（capGraph 裁剪后不造悬空端点）；
+  查询激活时组织节点与成员边自动 muted（不在查询可见集，视觉退场）；组织节点 tap/hover
+  不触发人物详情（无对应名册行）。native（文档引用）模式不受影响。
+- **验证**：单测 210/210（graph.test.ts 新增组织增强 2 例）；三套 UI 桌面 96 / 移动 97 /
+  宿主 96 全绿（新增组织增强用例：active 才成边、悬空不成节点、方形/虚线分源、开关隐藏
+  恢复、查询退场、组织节点不触发详情）；collect-i18n 缺失 0；`pnpm run build` +
+  `check:release` PASS；真内核 contacts-flow 10/10、spike:init 21/21；52 景基线（40+host52）
+  重拍目检——「显示组织」开关与组织图例明暗布局正常；断点扫描有效。
+- **B14 余项**：B14.4 层级口径表述与组织入口、B14.8 全局图入口与裁剪说明、原生图面板
+  真机核对（前端域）、组织聚焦交互（组织节点点击开组织视图，需工作台通道）。

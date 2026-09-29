@@ -12,11 +12,15 @@ export interface GraphNode {
     group: string;
     /** 关系边数（用于节点大小） */
     degree: number;
+    /** B14.6 节点类型：person=联系人（默认）；org=组织文档（成员边挂接） */
+    kind?: "person" | "org";
 }
 
 export interface GraphEdge {
     source: string;
     target: string;
+    /** B14.6 边来源：related=显式关系（查询唯一依据）；member=组织成员（仅展示，不参与关系查询） */
+    kind?: "related" | "member";
 }
 
 export interface PersonGraph {
@@ -57,6 +61,7 @@ export function buildGraph(people: readonly ContactSummary[]): PersonGraph {
         label: person.name,
         group: person.group,
         degree: 0,
+        kind: "person" as const,
     }));
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
 
@@ -69,7 +74,7 @@ export function buildGraph(people: readonly ContactSummary[]): PersonGraph {
             const edgeKey = [person.docId, targetDocId].sort().join("~");
             if (seen.has(edgeKey)) continue;
             seen.add(edgeKey);
-            edges.push({ source: person.docId, target: targetDocId });
+            edges.push({ source: person.docId, target: targetDocId, kind: "related" as const });
             const source = nodeById.get(person.docId);
             const target = nodeById.get(targetDocId);
             if (source) source.degree += 1;
@@ -111,4 +116,49 @@ export const GROUP_COLORS: Readonly<Record<string, string>> = {
 
 export function groupColor(group: string): string {
     return GROUP_COLORS[group] ?? "#8f8f8f";
+}
+
+/* ---------- B14.6：组织节点与成员边增强（只进渲染层，不参与关系查询） ---------- */
+
+/** 组织增强输入：组织文档 + 参与成员边的人物文档 ID（调用方先按 status=active 过滤） */
+export interface OrgAugmentationInput {
+    docId: string;
+    name: string;
+    memberDocIds: readonly string[];
+}
+
+export interface GraphOrgAugmentation {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+}
+
+/** 组织节点固定色（数据编码固定色板，D-0002；与五个人群色相区分） */
+export const ORG_NODE_COLOR = "#8e5ad8";
+
+/**
+ * 组织节点 + 成员边构建。与 related 边分源：产物只叠加到画布渲染，
+ * 关系查询（一度/二度/共同/路径）仍只吃 buildGraph 的 related 图——
+ * 「人物→组织→人物」不会被算成二度关系（B14.6 验收口径）。
+ * 成员边只连名册内人物（已解绑/悬空记录丢弃，不造悬空端点）；
+ * 同人同组织多段成员记录合并为一条边；组织节点度数=有效成员边数。
+ */
+export function buildOrgAugmentation(
+    orgs: readonly OrgAugmentationInput[],
+    rosterDocIds: ReadonlySet<string>,
+): GraphOrgAugmentation {
+    const nodes: GraphNode[] = [];
+    const edges: GraphEdge[] = [];
+    for (const org of orgs ?? []) {
+        if (!org || typeof org.docId !== "string" || org.docId === "") continue;
+        if (typeof org.name !== "string" || org.name === "") continue;
+        const connected = new Set<string>();
+        for (const personDocId of org.memberDocIds ?? []) {
+            if (typeof personDocId !== "string" || personDocId === "" || personDocId === org.docId) continue;
+            if (!rosterDocIds.has(personDocId) || connected.has(personDocId)) continue;
+            connected.add(personDocId);
+            edges.push({ source: org.docId, target: personDocId, kind: "member" as const });
+        }
+        nodes.push({ id: org.docId, label: org.name, group: "组织", kind: "org" as const, degree: connected.size });
+    }
+    return { nodes, edges };
 }

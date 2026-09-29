@@ -192,6 +192,7 @@
   "graphFilterByGroup": "Filter by group",
   "graphAllGroups": "All groups",
   "graphIsolatedOnly": "People without relations ({n})",
+  "graphShowOrgs": "Show orgs ({n})",
   "graphFit": "Fit",
   "graphZoomIn": "Zoom in",
   "graphZoomOut": "Zoom out",

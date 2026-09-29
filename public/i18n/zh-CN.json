@@ -192,6 +192,7 @@
   "graphFilterByGroup": "按分组过滤",
   "graphAllGroups": "全部分组",
   "graphIsolatedOnly": "仅无关系人物（{n}）",
+  "graphShowOrgs": "显示组织（{n}）",
   "graphFit": "适应",
   "graphZoomIn": "放大",
   "graphZoomOut": "缩小",

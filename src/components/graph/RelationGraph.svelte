@@ -6,7 +6,8 @@
     import ViewState from "../ViewState.svelte";
     import { listContacts } from "../../services/contacts";
     import { loadNativePersonGraph, NativeGraphCenterMissingError } from "../../services/native-graph";
-    import { buildGraph, capGraph, GRAPH_MAX_NODES, groupColor, queryGraphRelations } from "../../domain/graph";
+    import { buildGraph, buildOrgAugmentation, capGraph, GRAPH_MAX_NODES, groupColor, ORG_NODE_COLOR, queryGraphRelations } from "../../domain/graph";
+    import type { GraphOrgAugmentation } from "../../domain/graph";
     import type { GraphViewMode, ViewPreferences } from "../../domain/preferences";
     import type { PersonGraph } from "../../domain/graph";
     import { shortestGraphPath, secondDegreeGraphIds } from "../../domain/graph-path";
@@ -54,6 +55,9 @@
     let nativeError = $state("");
     let nativeMissingCenter = $state(false);
     let nativeVersion = 0;
+    /* B14.6 组织增强：组织节点+成员边只叠加渲染，关系查询仍只按 related 边 */
+    let orgOverlay: GraphOrgAugmentation | null = $state(null);
+    let showOrgs = $state(true);
     let searchText: string = $state("");
     let groupFilter: string = $state("");
     let isolatedOnly = $state(false);
@@ -77,6 +81,7 @@
         { label: "同事", className: "work" },
         { label: "同学", className: "school" },
         { label: "其他", className: "other" },
+        { label: "组织", className: "org" },
     ] as const;
 
     const groups = $derived.by(() => [...new Set(people.map((person) => person.group).filter(Boolean))].sort());
@@ -248,8 +253,30 @@
         loading = true;
         errorText = "";
         try {
-            const result = await listContacts(settings);
-            if (version === refreshVersion) people = result;
+            /* B14.6：人物名册与组织增强并行取；组织读取失败降级为纯人物图（不阻断） */
+            const [roster, orgsResult] = await Promise.all([
+                listContacts(settings),
+                facade?.listOrganizations
+                    ? facade.listOrganizations().catch(() => "error" as const)
+                    : Promise.resolve(undefined),
+            ]);
+            if (version !== refreshVersion) return;
+            people = roster;
+            if (Array.isArray(orgsResult)) {
+                const rosterIds = new Set(roster.map((person) => person.docId));
+                orgOverlay = buildOrgAugmentation(
+                    orgsResult.map((org) => ({
+                        docId: org.docId,
+                        name: org.name,
+                        memberDocIds: org.memberships
+                            .filter((membership) => membership.status === "active")
+                            .map((membership) => membership.personDocId),
+                    })),
+                    rosterIds,
+                );
+            } else {
+                orgOverlay = null;
+            }
         } catch (error) {
             if (version === refreshVersion) errorText = error instanceof Error ? error.message : String(error);
         } finally {
@@ -385,13 +412,34 @@
                         label: node.label,
                         degree: node.degree,
                         group: node.group,
-                        color: groupColorValue(node.group),
+                        kind: node.kind ?? "person",
+                        color: node.kind === "org" ? ORG_NODE_COLOR : groupColorValue(node.group),
                     },
                     classes: searchNeedle ? "lvct-graph-hit" : "",
                 })),
                 ...capped.graph.edges.map((edge) => ({
-                    data: { source: edge.source, target: edge.target },
+                    data: { source: edge.source, target: edge.target, kind: edge.kind ?? "related" },
                 })),
+                /* B14.6 组织增强层（仅关系图模式）：成员边只连当前画布内人物，裁剪后不造悬空端点 */
+                ...(graphMode === "relations" && showOrgs && orgOverlay
+                    ? orgOverlay.nodes.map((node) => ({
+                        data: {
+                            id: node.id,
+                            label: node.label,
+                            degree: node.degree,
+                            group: node.group,
+                            kind: "org",
+                            color: ORG_NODE_COLOR,
+                        },
+                        classes: searchNeedle && node.label.toLowerCase().includes(searchNeedle) ? "lvct-graph-hit" : "",
+                    }))
+                    : []),
+                ...(graphMode === "relations" && showOrgs && orgOverlay
+                    ? orgOverlay.edges
+                        .filter((edge) => orgOverlay.nodes.some((node) => node.id === edge.source)
+                            && capped.graph.nodes.some((node) => node.id === edge.target))
+                        .map((edge) => ({ data: { source: edge.source, target: edge.target, kind: "member" } }))
+                    : []),
             ],
             // 同步完成布局，避免筛选/切页销毁画布后动画帧继续访问 renderer。
             layout: { name: "cose", animate: false, padding: 30 },
@@ -436,6 +484,9 @@
                 },
                 { selector: ".lvct-graph-muted", style: { opacity: 0.18 } },
                 { selector: ".lvct-graph-focus", style: { "border-color": palette.text, "border-width": 4 } },
+                /* B14.6：组织节点方形、成员边虚线——与 related 边视觉分源 */
+                { selector: 'node[kind = "org"]', style: { shape: "round-rectangle" } },
+                { selector: 'edge[kind = "member"]', style: { "line-style": "dashed" } },
             ],
         });
         graphInstance = instance;
@@ -504,6 +555,7 @@
                 {/each}
             </select>
             <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={isolatedOnly} />{text("graphIsolatedOnly", "仅无关系人物（{n}）", { n: isolatedIds.size })}</label>
+            <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={showOrgs} />{text("graphShowOrgs", "显示组织（{n}）", { n: orgOverlay?.nodes.length ?? 0 })}</label>
         {/if}
         <span class="ft__smaller ft__on-surface lvct-graph-legend">
             {#each groupLegend as group (group.label)}

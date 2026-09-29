@@ -1686,6 +1686,62 @@ await test("图谱文档引用模式：内核局部图按登记集合过滤，�
     assert(savedGraphMode === "relations", "切回后模式偏好未持久化");
 });
 
+await test("关系图组织增强：组织节点与成员边分源展示，开关隐藏，查询时组织退场（B14.6）", async () => {
+    const orgDocId = "20260930000000-org0001";
+    const ghostId = "20260930000000-ghost001";
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") return { view: { columns: renderResult().view.columns, rows: [{
+            id: person.docId, cells: [
+                { value: { type: "block", keyID: "name", block: { id: person.docId, content: person.name } } },
+                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+            ],
+        }] } };
+        throw new Error(`回归测试不允许请求 ${route}`);
+    };
+    let opened = "";
+    mounted = mount(RelationGraph, { target: fixture, props: {
+        settings,
+        preferences: DEFAULT_VIEW_PREFERENCES,
+        onPreferencesChange: async (next) => next,
+        facade: { listOrganizations: async () => [
+            { docId: orgDocId, name: "曙光科技", hpath: "/曙光科技", notebookId: "20260927000000-book001", memberships: [
+                { id: "m1", orgDocId, personDocId: person.docId, department: "", title: "", joinedOn: "", leftOn: "", status: "active" },
+                { id: "m2", orgDocId, personDocId: person.docId, department: "", title: "", joinedOn: "", leftOn: "", status: "former" },
+                { id: "m3", orgDocId, personDocId: ghostId, department: "", title: "", joinedOn: "", leftOn: "", status: "active" },
+            ] },
+        ] },
+        onOpenDetail(value) { opened = value.docId; },
+        onOpenPeople() {},
+    } });
+    const canvas = () => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy;
+    await until(() => (canvas()?.nodes().length ?? 0) > 0, "关系图未挂载");
+    await until(() => canvas()?.getElementById(orgDocId).nonempty(), "组织节点未挂载");
+    const cy = canvas();
+    assert(cy.getElementById(ghostId).empty(), "悬空成员不应产生节点");
+    assert(cy.edges().length === 1, "仅 active 且在名册的成员成边（former/悬空丢弃）");
+    assert(fixture.textContent.includes("显示组织（1）"), "组织开关计数错误");
+    assert(cy.getElementById(orgDocId).style("shape") === "round-rectangle", "组织节点未用方形区分");
+    /* 组织节点不触发人物详情 */
+    cy.getElementById(orgDocId).emit("tap");
+    await tick();
+    assert(opened === "", "组织节点不应触发人物详情");
+    /* 开关隐藏/恢复组织层（画布重建，实时取实例） */
+    const orgToggle = [...fixture.querySelectorAll(".lvct-graph-isolated")]
+        .find((node) => node.textContent.includes("显示组织"));
+    assert(orgToggle, "未找到组织开关");
+    orgToggle.querySelector("input").click();
+    await until(() => canvas()?.getElementById(orgDocId)?.empty(), "关闭开关后组织节点未消失");
+    orgToggle.querySelector("input").click();
+    await until(() => canvas()?.getElementById(orgDocId)?.nonempty(), "恢复开关后组织节点未回归");
+    /* 选关系中心 → 组织节点与成员边 muted（查询仍只按 related，组织退场） */
+    await pickOption("关系中心", person.name);
+    await until(() => canvas().getElementById(orgDocId).hasClass("lvct-graph-muted"), "查询激活时组织节点未退场");
+    assert(
+        canvas().edges().filter((edge) => edge.data("kind") === "member").every((edge) => edge.hasClass("lvct-graph-muted")),
+        "查询激活时成员边未退场",
+    );
+});
+
 await test("详情加载失败可重试，空记录可跳转记一笔，写入后时间线刷新", async () => {
     let fail = true;
     let recorded = false;
