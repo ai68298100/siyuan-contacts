@@ -213,6 +213,11 @@ storage.test.ts 故障注入覆盖「慢宿主不接管」「连续超时才接�
 
 ## 6. 端点行为备忘（v3.8.5 实测与文档的差异）
 
+- **请求边界纪律（CODE-02.6）**：所有内核请求经 `kernelPost` 有界等待（`kernelConfig.timeoutMs`，
+  默认 15s）——宿主挂起时以「`${route} 请求超时`」拒绝，**不自动重试**（写入类重试会产生重复块/
+  重复文档，重试由用户在界面显式发起）；思源 `fetchPost` 无中止能力，超时只放弃等待。协议异常
+  形状必须上抛、不得归一为空：`querySql` 非数组、`lsNotebooks` 缺 notebooks、
+  `getAttributeViewItemIDsByBoundIDs` 非映射对象均抛错（读故障显式化，防止「异常=空名册/空库」）。
 - `addAttributeViewKey`：`keyIcon` **必填**（文档称可选）。
 - `/api/transactions`：请求体顶层必须带 `reqId`。
 - `appendAttributeViewDetachedBlocksWithValues`：`blocksValues` 是**数组的数组**（每行直接是值数组），无 id 包装。

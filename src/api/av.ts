@@ -211,7 +211,11 @@ export async function mapBoundDocIds(avId: string, docIds: readonly string[]): P
         avID: avId,
         blockIDs: docIds,
     });
-    return data ?? {};
+    /* CODE-02.6：异常形状不得按「无绑定」处理（会把已有行误判为未绑定） */
+    if (data === null || typeof data !== "object" || Array.isArray(data)) {
+        throw new Error("/api/av/getAttributeViewItemIDsByBoundIDs 返回异常形状（非映射对象）");
+    }
+    return data;
 }
 
 /** 解绑行（绑定行只解绑，不删文档——spike 假设⑥） */

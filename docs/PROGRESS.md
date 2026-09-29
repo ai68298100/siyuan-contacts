@@ -1454,3 +1454,23 @@
   `check:release` 全 PASS；52 景基线 + 断点扫描重拍有效（无视觉变更）。
 - P0 余项：B07/FUNC-01.3-b、FUNC-01.7 刷新通道、FUNC-01.14 AI 候选安全写、FUNC-01.15 写入
   断点、FAST-01.3a、FUNC-01.8a 锚点消歧、CODE-02.1/02.4–02.6。
+
+## P0 数据可信 第 51 轮：CODE-02.6 API 边界（2026-09-30，续跑口令第 51 版驱动）
+
+- **有界请求**：`kernelPost` 全部内核请求经 `shared/async.ts#withTimeout` 限时
+  （`kernelConfig.timeoutMs` 默认 15s）——宿主挂起时以「`${route} 请求超时（…ms）`」拒绝。
+  **不自动重试**：fetchPost 无中止能力（超时只放弃等待）；且写入类请求自动重试会产生重复块/
+  重复文档——重试一律由用户在界面显式发起（与 01.12/01.7 的「失败可重试」口径一致）。
+- **形状异常上抛（不再归一为空）**：`querySql` 非数组（原 `?? []`）、`lsNotebooks` 缺
+  notebooks 数组（原 `?? []`，会引导重复建库）、`mapBoundDocIds` 非映射对象（原 `?? {}`，
+  会把已有行误判为未绑定）——三处协议异常均抛错，交由各页面既有错误态呈现；
+  合法空结果（空数组/空映射对象）不受影响。
+- **契约**：DATA-CONTRACT §6 新增「请求边界纪律」条目。
+- **测试**：新增 `tests/shared-async.test.ts` 3 例（透传/底层失败原样上抛/超时错误含路由与
+  上限），withTimeout 提取到 shared 层使超时机制可 node --test 直测（api 层因 siyuan 依赖
+  不可 bare import）。
+- **验证**：svelte-check/tsc 0 错误；单测 **191/191**；**真内核 E2E contacts-flow 10/10**
+  （传输层改动的实证门禁）；三套 UI 回归**桌面 80 / 移动 81 / 宿主 80 全绿**；
+  `pnpm run build` + `check:release` 全 PASS；52 景基线 + 断点扫描重拍有效（无视觉变更）。
+- P0 余项：B07/FUNC-01.3-b、FUNC-01.7 刷新通道、FUNC-01.14 AI 候选安全写、FUNC-01.15 写入
+  断点、FAST-01.3a、FUNC-01.8a 锚点消歧、CODE-02.1/02.4/02.5。

@@ -1,8 +1,11 @@
 /**
  * 内核 HTTP 传输层：api/ 目录是唯一允许发内核请求的地方。
  * 全部端点形状经 M0 spike 在 v3.8.5 真内核实证（scripts/spike/）。
+ * CODE-02.6 API 边界：请求有界（超时拒绝，不自动重试——写入重试会产生重复块），
+ * 协议异常形状上抛，不得归一为空结果（读故障显式化）。
  */
 import { fetchPost } from "siyuan";
+import { withTimeout } from "../shared/async";
 
 export interface KernelResponse<T> {
     code: number;
@@ -10,18 +13,25 @@ export interface KernelResponse<T> {
     data: T;
 }
 
+/** 内核请求等待上限；宿主卡顿时以超时拒绝，用户可在界面重试（写入严禁自动重试） */
+export const kernelConfig = { timeoutMs: 15_000 };
+
 function kernelPost<T>(route: string, body: Record<string, unknown> = {}): Promise<T> {
-    return new Promise((resolve, reject) => {
-        fetchPost(route, body, (response: { code?: number; msg?: string; data?: T }) => {
-            if (!response || typeof response.code !== "number") {
-                reject(new Error(`${route} 返回异常响应`));
-            } else if (response.code !== 0) {
-                reject(new Error(`${route} code=${response.code} msg=${response.msg || ""}`));
-            } else {
-                resolve(response.data as T);
-            }
-        });
-    });
+    return withTimeout(
+        () => new Promise<T>((resolve, reject) => {
+            fetchPost(route, body, (response: { code?: number; msg?: string; data?: T }) => {
+                if (!response || typeof response.code !== "number") {
+                    reject(new Error(`${route} 返回异常响应`));
+                } else if (response.code !== 0) {
+                    reject(new Error(`${route} code=${response.code} msg=${response.msg || ""}`));
+                } else {
+                    resolve(response.data as T);
+                }
+            });
+        }),
+        kernelConfig.timeoutMs,
+        route,
+    );
 }
 
 /**
@@ -47,8 +57,10 @@ export interface NotebookMeta {
 }
 
 export async function listNotebooks(): Promise<NotebookMeta[]> {
-    const data = await kernelPost<{ notebooks: NotebookMeta[] }>("/api/notebook/lsNotebooks", {});
-    return data?.notebooks ?? [];
+    const data = await kernelPost<{ notebooks?: NotebookMeta[] }>("/api/notebook/lsNotebooks", {});
+    /* CODE-02.6：缺 notebooks 字段是协议异常，不得按「没有笔记本」处理（会引导重复建库） */
+    if (!Array.isArray(data?.notebooks)) throw new Error("/api/notebook/lsNotebooks 返回异常形状（缺 notebooks 数组）");
+    return data.notebooks;
 }
 
 /** 思源在部分版本下 createNotebook 的返回值不是 ID，创建后统一重新列表获取（spike 结论） */
@@ -77,7 +89,9 @@ export interface DocRow {
 /** 跑一条只读 SQL；思源索引异步刷新，写后立刻查可能短暂滞后 */
 export async function querySql<T = Record<string, unknown>>(stmt: string): Promise<T[]> {
     const data = await kernelPost<T[]>("/api/query/sql", { stmt });
-    return Array.isArray(data) ? data : [];
+    /* CODE-02.6：非数组是协议异常（挂起/损坏响应），不得静默按空结果处理 */
+    if (!Array.isArray(data)) throw new Error("/api/query/sql 返回异常形状（非数组）");
+    return data;
 }
 
 /* ---------- block ---------- */
