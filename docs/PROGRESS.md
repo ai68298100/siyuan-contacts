@@ -1314,3 +1314,15 @@
   顺序对齐中文）；v0.3.0 段加视觉翻新句；Quick start 第 2 步补 paste-and-recognize。
 - **发布包**：package.zip 重建，dist/README 与源码 diff 核对一致；check:release 全 PASS；
   单测 178/178。
+
+## 发版 第 45 轮：v0.3.0 正式发布（2026-09-29，作者指令：发版）
+
+- **push**：main `19e62b5..2d42c48`（61 commits）推送成功。
+- **CI**：run #11（head 2d42c48）conclusion **success**。
+- **tag**：v0.3.0（annotated）已推送。
+- **GitHub Release**：https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.3.0
+  （REST API 创建，中文发布说明：新增/改进/安装/已知限制）；资产 package.zip 359530B
+  上传成功，**sha256 与本地构建完全一致**（5cea9118…8871）。
+- **集市**：按约定不代提交，fork bazaar → plugins.txt → PR 由作者择机执行（RELEASE.md §3）。
+- **文档状态**：CHANGELOG [0.3.0] 候选→已发布；RELEASE.md 头注与质量门禁版本行→已发布。
+- 后续待作者：集市 PR；真机核对（RELEASE.md 八条，含 B07 双向同步人工验收）。

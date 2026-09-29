@@ -1,6 +1,6 @@
 # 发布清单（RELEASE）
 
-> v0.2.1 已发布（F01–F16 已交付，证据见 `PROGRESS.md` 最新条目）；集市提交、真实宿主/真机/多窗口验收仍待处理。本文后续发布步骤只适用于下一版本或集市上架，改版本、推送、标签、Release 与集市提交均需用户明确授权。
+> v0.3.0 已发布（2026-09-29：main 推送 `2d42c48`、CI 绿、tag v0.3.0、Release https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.3.0 附 package.zip 359530B，sha256 与本地构建一致）；集市提交与真实宿主/真机/多窗口验收仍待处理。本文后续发布步骤只适用于下一版本或集市上架，改版本、推送、标签、Release 与集市提交均需用户明确授权。
 
 ## 1. 质量门禁（全部绿才发）
 
@@ -16,7 +16,7 @@ node scripts/e2e/load-check.mjs          # 隔离内核加载
 node scripts/e2e/contacts-flow.mjs       # 联系人流程 10/10
 ```
 
-- [x] 版本号：plugin.json 与 package.json 一致为 0.3.0（候选，待作者推送/发布；v0.2.1 已发布）
+- [x] 版本号：plugin.json 与 package.json 一致为 0.3.0，已发布（2026-09-29；v0.2.1 此前已发布）
 - [x] README.md / README.en-US.md 功能表与 v0.3.0 已交付功能一致（2026-09-29 中英能力清单已对齐）
 - [ ] icon.png/preview.png 终稿（当前为脚本生成的家庭视觉版，可请人重绘后替换，重跑 gen-icon 逻辑不变）
 
