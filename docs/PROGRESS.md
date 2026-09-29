@@ -1728,6 +1728,27 @@
 - **P1 下一步**：B13.3 组织管理页面（组织列表/新建/成员维护 UI）+ 设置页组织锚点状态；
   随后 B12 资料投影、B14 双图（B14.1 核对先行）。
 
+## P1 业务主线 第 65 轮：B13.3 组织管理页面（2026-09-30，续跑口令第 64 版驱动）
+
+- **服务扩展（services/org.ts）**：`listOrganizationsWithMembers`（扫描 + 成员聚合合并）、
+  `createOrganization`（createDocWithMd + custom-lvct-org 标记区块；同名拒绝）、
+  `listOrganizationMembers`（join 名册取姓名，解绑显示「（已解绑）」）、
+  `addOrganizationMember`/`removeOrganizationMember`（包装数据层）。
+- **UI**：新组件 `components/org/OrgManagerDialog.svelte`（svelteDialog 直挂，双栏布局：
+  左组织列表 + 新建输入，右成员明细 + 添加下拉/移除按钮）；样式入 index.scss
+  （`.lvct-org-manager*`）；facade 新增 listOrganizations/createOrganization/
+  listOrganizationMembers/addOrganizationMember/removeOrganizationMember（types + index.ts）；
+  index.ts `openOrgManagerDialog` + 命令「组织管理」入口；i18n org* 15 键中英。
+- **验证**：svelte-check/tsc 0 错误 0 警告；单测 202/202；collect-i18n 0 缺失；三套 UI 回归
+  **桌面 93 / 移动 94 / 宿主 93 全绿**（+1 UI smoke「组织管理弹窗」：新建组织走 facade、
+  添加成员写入、移除成员生效；select 用 change 事件 + 先 await tick 再点 disabled 按钮）；
+  **隔离内核 spike:init 21/21**；`pnpm run build` + `check:release` 全 PASS；52 景基线 +
+  断点扫描重拍有效（新弹窗不改变既有页面视觉）。smoke 踩坑补记：**select 元素 bind:value
+  监听 change 事件——input() 助手只派发 input 事件，select 赋值须手动 dispatch change**；
+  **新建后 currentOrgDocId 不能回落空串（会闪回「从左侧选择」分支致成员选择器消失）**。
+- **P1 下一步**：B12 资料投影（工作单位/学校来自成员关系）、B14 双图（B14.1 核对先行）；
+  组织编辑/详情页/归档恢复/工作台组织视图留 B13 后续迭代。
+
 ## P1 业务主线 第 63 轮：B13.1a 跨库实证 + B13.1 组织契约定稿（2026-09-30，续跑口令第 63 版驱动）
 
 - **B13.1a 隔离内核实证（新 spike 脚本 scripts/spike/b13-org-spike.mjs，`pnpm spike:b13`，

@@ -529,5 +529,20 @@
   "dashStatBirthdaysFt": "{n} in 30-day window",
   "dashStatNeverFt": "Plus {n} gone stale",
   "wizardProgressLabel": "Setup in progress",
-  "graphViewTools": "Graph view actions"
+  "graphViewTools": "Graph view actions",
+  "orgListTitle": "Organizations",
+  "orgLoading": "Loading organizations…",
+  "orgEmpty": "No organizations yet. Enter a name to create the first one.",
+  "orgCreatePlaceholder": "Organization name…",
+  "orgCreateLabel": "New organization name",
+  "orgCreate": "Create organization",
+  "orgMembersTitle": "Members",
+  "orgMembersEmpty": "No members. Add from below.",
+  "orgFormer": " (former)",
+  "orgMemberRemove": "Remove",
+  "orgAddMemberLabel": "Choose a contact to add",
+  "orgAddMemberPick": "Choose a contact…",
+  "orgMemberAdd": "Add member",
+  "orgPickHint": "Select an organization on the left to view members.",
+  "orgClose": "Close"
 }

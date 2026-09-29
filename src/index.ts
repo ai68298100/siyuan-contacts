@@ -9,6 +9,7 @@ import "./index.scss";
 
 import WorkbenchRoot from "./components/WorkbenchRoot.svelte";
 import CaptureDialog from "./components/capture/CaptureDialog.svelte";
+import OrgManagerDialog from "./components/org/OrgManagerDialog.svelte";
 import QuickFillDialog from "./components/people/QuickFillDialog.svelte";
 import AddPersonDialog from "./components/people/AddPersonDialog.svelte";
 import PersonEditDialog from "./components/people/PersonEditDialog.svelte";
@@ -29,6 +30,13 @@ import { reconcileFollowUpTasksFromDoc } from "./services/followup-sync";
 import { updateContactFields, applyContactCandidateFields, listContacts as listContactsService } from "./services/contacts";
 import { ensureSelfIdentity, designateSelfIdentity } from "./services/self-identity";
 import { loadSelfIdentity } from "./data/self-identity";
+import {
+    listOrganizationsWithMembers,
+    createOrganization,
+    listOrganizationMembers,
+    addOrganizationMember,
+    removeOrganizationMember,
+} from "./services/org";
 import { exportMigrationBundle, importMigrationBundle, previewMigrationImport } from "./services/migration-bundle";
 import { loadViewPreferences, saveViewPreferences } from "./services/preferences";
 import { exportInteractionJson } from "./services/interaction-export";
@@ -430,6 +438,48 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     async listContacts() {
         if (!this.settings) return [];
         return listContactsService(this.settings);
+    }
+
+    /** B13.3：组织列举（含成员记录） */
+    async listOrganizations() {
+        return listOrganizationsWithMembers(this);
+    }
+
+    /** B13.3：新建组织（文档 + custom-lvct-org 标记区块；同名拒绝） */
+    async createOrganization(name: string) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return createOrganization(this.settings, name);
+    }
+
+    /** B13.3：组织成员列举（join 名册姓名） */
+    async listOrganizationMembers(orgDocId: string) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return listOrganizationMembers(this, this.settings, orgDocId);
+    }
+
+    /** B13.3：添加组织成员（active） */
+    async addOrganizationMember(orgDocId: string, personDocId: string, extra?: { department?: string; title?: string; joinedOn?: string }) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        await addOrganizationMember(this, orgDocId, personDocId, extra);
+    }
+
+    /** B13.3：移除组织成员记录 */
+    async removeOrganizationMember(id: string) {
+        await removeOrganizationMember(this, id);
+    }
+
+    /** B13.3：打开组织管理弹窗 */
+    openOrgManagerDialog(): void {
+        if (!this.settings) {
+            showMessage("请先完成人脉工作空间初始化", 3000);
+            return;
+        }
+        svelteDialog({
+            title: this.i18n.orgManagerTitle ?? "组织管理",
+            width: "620px",
+            component: OrgManagerDialog,
+            props: { facade: this, i18n: this.i18n },
+        });
     }
 
     /** FUNC-01.14：AI 资料候选受限补丁写（只写补丁字段，最新名册回读逐字段冲突核对） */

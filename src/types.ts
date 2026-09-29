@@ -100,6 +100,16 @@ export interface ContactsPluginFacade {
     designateSelfIdentity(personItemId: string): Promise<import("./domain/self-identity").SelfIdentity>;
     /** B11.3：全量名册（设置页本人档案指定用） */
     listContacts(): Promise<import("./domain/person").ContactSummary[]>;
+    /** B13.3：组织列举（含成员记录） */
+    listOrganizations(): Promise<import("./services/org").OrganizationWithMembers[]>;
+    /** B13.3：新建组织（文档 + custom-lvct-org 标记区块；同名拒绝） */
+    createOrganization(name: string): Promise<{ docId: string }>;
+    /** B13.3：组织成员列举（join 名册姓名） */
+    listOrganizationMembers(orgDocId: string): Promise<import("./services/org").OrganizationMember[]>;
+    /** B13.3：添加组织成员（active） */
+    addOrganizationMember(orgDocId: string, personDocId: string, extra?: { department?: string; title?: string; joinedOn?: string }): Promise<void>;
+    /** B13.3：移除组织成员记录 */
+    removeOrganizationMember(id: string): Promise<void>;
     /** FUNC-01.14：AI 资料候选受限补丁写——只写补丁字段，最新名册回读逐字段冲突核对 */
     updatePersonCandidateFields(personItemId: string, patches: readonly import("./domain/contact-patch").CandidateFieldPatch[]): Promise<import("./services/contacts").CandidateFieldApplyResult>;
     /** 从笔记捕获：确认执行（互动事件 + 参与人区块 + 新人收编） */

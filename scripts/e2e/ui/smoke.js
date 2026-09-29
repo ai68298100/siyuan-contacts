@@ -15,6 +15,7 @@ import { applyContactCandidateFields, createContact, updateContactFields } from 
 import { designateSelfIdentity } from "../../../src/services/self-identity";
 import { scanOrganizations, membershipsByOrganization } from "../../../src/services/org";
 import { addOrgMembership } from "../../../src/data/org-membership";
+import OrgManagerDialog from "../../../src/components/org/OrgManagerDialog.svelte";
 import { addRelation, removeRelation } from "../../../src/services/relations";
 import { recordInteraction, deleteInteraction, loadInteractionStore } from "../../../src/data/interactions";
 import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
@@ -1033,6 +1034,74 @@ await test("B13.2 组织扫描与成员索引：标记区块扫描发现组织�
     /* 写后回读：损坏拒绝路径由域层单测覆盖，这里验证落盘形状 */
     const stored = files.get("org-membership.json");
     assert(stored.schemaVersion === 1 && stored.memberships.length === 2, "成员索引落盘形状错误");
+});
+
+await test("B13.3 组织管理弹窗：新建组织、添加/移除成员经 facade 全链路（B13.3）", async () => {
+    const createdOrgs = [];
+    const memberOps = [];
+    let nextOrgId = 0;
+    const facade = {
+        settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        listContacts: async () => [
+            { docId: "20260930000000-per0001", itemId: "row-p1", name: "张三", isSelf: false },
+            { docId: "20260930000000-per0002", itemId: "row-p2", name: "李四", isSelf: false },
+        ],
+        listOrganizations: async () => createdOrgs.map((org) => ({
+            ...org,
+            memberships: memberOps.filter((member) => member.orgDocId === org.docId),
+        })),
+        createOrganization: async (name) => {
+            if (createdOrgs.some((org) => org.name === name)) throw new Error(`组织「${name}」已存在`);
+            const docId = `20260930000000-org00${createdOrgs.length + 1}`;
+            createdOrgs.push({ docId, name, hpath: `/${name}`, notebookId: settings.notebookId });
+            return { docId };
+        },
+        listOrganizationMembers: async (orgDocId) => memberOps
+            .filter((member) => member.orgDocId === orgDocId)
+            .map((member) => ({ ...member, personName: member.personName })),
+        addOrganizationMember: async (orgDocId, personDocId, extra) => {
+            const name = personDocId === "20260930000000-per0001" ? "张三" : "李四";
+            memberOps.push({
+                id: `20260930000000-mem0${memberOps.length + 1}`,
+                orgDocId, personDocId, personName: name, title: extra?.title ?? "", status: "active",
+            });
+        },
+        removeOrganizationMember: async (id) => {
+            const index = memberOps.findIndex((member) => member.id === id);
+            if (index >= 0) memberOps.splice(index, 1);
+        },
+    };
+    let closed = false;
+    mounted = mount(OrgManagerDialog, { target: fixture, props: {
+        facade, i18n: undefined, onClose: () => { closed = true; },
+    } });
+    await until(() => fixture.textContent.includes("暂无组织"), "组织列表未加载");
+    /* 新建组织 */
+    input(fixture.querySelector(".lvct-org-manager__create input"), "测试公司");
+    await tick(); /* 等 bind:value 更新解除 disabled */
+    button("新建组织").click();
+    await until(() => fixture.textContent.includes("测试公司"), `新建组织未出现在列表：${fixture.querySelector(".lvct-org-manager")?.textContent?.slice(0, 200)}`);
+    assert(createdOrgs.length === 1, "新建未走 facade.createOrganization");
+    /* 添加成员 */
+    await until(() => fixture.querySelector(".lvct-org-manager__add select"), "添加成员选择器未出现");
+    const select = fixture.querySelector(".lvct-org-manager__add select");
+    select.value = "20260930000000-per0001";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    await tick();
+    button("添加成员").click();
+    await tick();
+    await until(
+        () => [...fixture.querySelectorAll(".lvct-org-manager__member")].some((node) => node.textContent.includes("张三")),
+        "添加成员未生效",
+    );
+    assert(memberOps.length === 1 && memberOps[0].personDocId === "20260930000000-per0001", "成员未写入");
+    /* 移除成员 */
+    [...fixture.querySelectorAll(".lvct-org-manager__member")].find((node) => node.textContent.includes("张三"))
+        .querySelector("button").click();
+    await until(() => !fixture.querySelector(".lvct-org-manager__member"), "移除成员未生效");
+    assert(memberOps.length === 0, "移除未走 facade.removeOrganizationMember");
+    assert(!closed, "成员操作不应关闭弹窗");
 });
 
 await test("FAST-01.3a 识别目标裁决：名册失败自动重试仍失败返回 failed，恢复后 bound/unlinked 各归其位", async () => {

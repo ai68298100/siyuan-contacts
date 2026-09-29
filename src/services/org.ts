@@ -4,11 +4,12 @@
  * 组织维度不写 related；扫描读取失败保持未知（不静默按无组织处理）。
  */
 import type { Plugin } from "siyuan";
-import { listNotebookDocs } from "../api/blocks";
-import { listNotebooks, querySql } from "../api/client";
-import { loadOrgMembershipStore } from "../data/org-membership";
+import { listNotebookDocs, upsertMarkedBlock } from "../api/blocks";
+import { createDocWithMd, listNotebooks, querySql } from "../api/client";
+import { addOrgMembership, loadOrgMembershipStore, removeOrgMembership } from "../data/org-membership";
 import type { OrgMembership } from "../domain/org-membership";
 import type { ContactsSettings } from "../domain/model";
+import { listContacts } from "./contacts";
 
 export const ORG_SECTION_ATTR = "custom-lvct-org";
 
@@ -83,6 +84,79 @@ export async function membershipsByPerson(
         list.sort((a, b) => a.joinedOn.localeCompare(b.joinedOn) || a.id.localeCompare(b.id));
     }
     return byPerson;
+}
+
+export interface OrganizationWithMembers extends OrganizationSummary {
+    memberships: OrgMembership[];
+}
+
+export interface OrganizationMember extends OrgMembership {
+    /** 名册解析出的人物姓名；解绑后为「（已解绑）」 */
+    personName: string;
+}
+
+/** 组织成员列举（join 名册取姓名）；人物已解绑显示「（已解绑）」 */
+export async function listOrganizationMembers(
+    plugin: Plugin,
+    settings: ContactsSettings,
+    orgDocId: string,
+): Promise<OrganizationMember[]> {
+    const memberships = (await membershipsByOrganization(plugin)).get(orgDocId) ?? [];
+    const roster = await listContacts(settings);
+    const byDoc = new Map(roster.map((person) => [person.docId, person.name]));
+    return memberships.map((membership) => ({
+        ...membership,
+        personName: byDoc.get(membership.personDocId) ?? "（已解绑）",
+    }));
+}
+
+/** 添加组织成员（active；id 锁内生成，重复添加幂等） */
+export async function addOrganizationMember(
+    plugin: Plugin,
+    orgDocId: string,
+    personDocId: string,
+    extra: { department?: string; title?: string; joinedOn?: string } = {},
+): Promise<void> {
+    await addOrgMembership(plugin, {
+        orgDocId,
+        personDocId,
+        department: extra.department,
+        title: extra.title,
+        joinedOn: extra.joinedOn,
+    });
+}
+
+/** 移除组织成员记录（找不到 id 抛错） */
+export async function removeOrganizationMember(plugin: Plugin, id: string): Promise<void> {
+    await removeOrgMembership(plugin, id);
+}
+
+/** 组织列举（带成员记录）；扫描失败保持未知（上抛由调用方呈现） */
+export async function listOrganizationsWithMembers(
+    plugin: Plugin,
+): Promise<OrganizationWithMembers[]> {
+    const [orgs, byOrg] = await Promise.all([
+        scanOrganizations(),
+        membershipsByOrganization(plugin),
+    ]);
+    return orgs.map((org) => ({ ...org, memberships: byOrg.get(org.docId) ?? [] }));
+}
+
+/** 新建组织：建文档 + 写 custom-lvct-org 标记区块。同名组织拒绝（防重复建档）。 */
+export async function createOrganization(
+    settings: ContactsSettings,
+    name: string,
+): Promise<{ docId: string }> {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("组织名称不能为空");
+    const orgs = await scanOrganizations();
+    if (orgs.some((org) => org.name === trimmed)) {
+        throw new Error(`组织「${trimmed}」已存在`);
+    }
+    const docId = await createDocWithMd(settings.notebookId, `/${trimmed}`, `# ${trimmed}\n\n`);
+    if (!docId) throw new Error(`创建组织文档「${trimmed}」失败`);
+    await upsertMarkedBlock(docId, ORG_SECTION_ATTR, `**组织**：${trimmed}`, undefined);
+    return { docId };
 }
 
 /** 供设置页/向导显示的组织锚点状态（只读） */

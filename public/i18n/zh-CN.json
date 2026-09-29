@@ -529,5 +529,20 @@
   "dashStatBirthdaysFt": "窗口内共 {n} 人",
   "dashStatNeverFt": "另有久未联系 {n} 人",
   "wizardProgressLabel": "初始化进行中",
-  "graphViewTools": "图谱视图操作"
+  "graphViewTools": "图谱视图操作",
+  "orgListTitle": "组织",
+  "orgLoading": "正在加载组织…",
+  "orgEmpty": "暂无组织。输入名称新建第一个组织。",
+  "orgCreatePlaceholder": "组织名称…",
+  "orgCreateLabel": "新组织名称",
+  "orgCreate": "新建组织",
+  "orgMembersTitle": "成员",
+  "orgMembersEmpty": "暂无成员。从下方添加。",
+  "orgFormer": "（已离开）",
+  "orgMemberRemove": "移除",
+  "orgAddMemberLabel": "选择要添加的联系人",
+  "orgAddMemberPick": "选择联系人…",
+  "orgMemberAdd": "添加成员",
+  "orgPickHint": "从左侧选择一个组织查看成员。",
+  "orgClose": "关闭"
 }
