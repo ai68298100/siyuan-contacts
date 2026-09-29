@@ -1,0 +1,47 @@
+[
+  {
+    "name": "内核启动",
+    "ok": true,
+    "detail": "v3.8.6"
+  },
+  {
+    "name": "A /api/graph/getGraph",
+    "ok": null,
+    "detail": "status=200 code=0 msg= dataKeys=[reqId,box,nodes,links,conf]"
+  },
+  {
+    "name": "A /api/graph/getGraph",
+    "ok": null,
+    "detail": "status=200 code=-1 msg=Field [conf] is required dataKeys=[reqId]"
+  },
+  {
+    "name": "A /api/graph/getLocalGraph",
+    "ok": null,
+    "detail": "status=200 code=0 msg= dataKeys=[reqId,box,nodes,links,id,conf]"
+  },
+  {
+    "name": "A /api/graph/getLocalGraph",
+    "ok": null,
+    "detail": "status=200 code=-1 msg=Field [conf] is required dataKeys=[reqId]"
+  },
+  {
+    "name": "A /api/graph/getBlockGraph",
+    "ok": null,
+    "detail": "status=200 code=undefined msg= dataKeys=[]"
+  },
+  {
+    "name": "B refs 表作为图数据源（节点=文档，边=refs）",
+    "ok": true,
+    "detail": "edges=[\"20260930061232-3glmy5n\",\"20260930061232-0rrbviz\"]"
+  },
+  {
+    "name": "C 打开原生图面板",
+    "ok": null,
+    "detail": "内核 API 无此端点（通道A 探测仅 graph 查询类）；原生图为前端渲染，插件侧需经前端 API/协议（留真机核对）"
+  },
+  {
+    "name": "D 反向边（回链）自动维护",
+    "ok": true,
+    "detail": "docB 回链来源=[\"20260930061232-n367rdx\"]"
+  }
+]

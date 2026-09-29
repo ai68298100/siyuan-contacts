@@ -49,7 +49,7 @@ B05/C05 完整人物间有向/互逆/强度关系库继续延期。「与我的�
 | B12.1 基础资料 | 工作单位、学校在 UI 中如何从成员记录投影；相对本人称谓的多值语义、清空和来源 | 明确**唯一事实源**及思源数据库列与成员记录的写入/回读规则；旧列不被覆盖 |
 | B13.1 组织与成员 | ✅ **契约定稿（2026-09-30，PROGRESS 第 63 轮）**：据 B13.1a 实证收窄选项后定稿——组织 = 文档 + `custom-lvct-org` 标记区块（不进联系人数据库、不混行）；成员关系 = 插件 JSON `org-membership.json`（membership id 多对多/多段历史/active-former）；共同背景 = JSON 查询投影。契约已入 DATA-CONTRACT §8 | 文档 ID、成员记录 ID 各自区分；唯一事实源、索引/投影、迁移契约已入 §8 |
 | B13.1a 内核实证 | ✅ **已完成（2026-09-30，spike:b13 6 通道）**：**跨库 relation 被内核拒绝**（人员库 relation 写组织库行 itemID → setAttributeViewBlockAttr code=-1）；**跨 avID 双向配置破坏性**（transactions code=0 但配置后 relation 键定义丢失）；**detached 行不渲染**（isDetached:true 行不出现在 renderAttributeView）。三证据排除跨库/混行方案，锁定「文档+标记区块+JSON 索引」 | spike 脚本 scripts/spike/b13-org-spike.mjs（pnpm spike:b13），结果 b13-org-results.json；3/6 判定通过（通道6 悬空形态为信息性） |
-| B14.1 原生图能力 | 打开/嵌入、中心、局部/全局、文档 ID 集合、层级、过滤、刷新、各前端可用性分别核对 | 每项标明已实证/不支持/未知；公开接口及参数有隔离宿主证据，再确定实现路线 |
+| B14.1 原生图能力 | ✅ **已完成（2026-09-30，PROGRESS 第 68 轮，spike:b14 隔离内核）**：`/api/graph/getGraph` 与 `/api/graph/getLocalGraph` **存在且可用**（`conf: {type: {}}` 返回 code=0 + nodes/links/conf 图数据）；refs 表可作图数据源（边=块引用，回链自动维护）；**打开原生图面板为前端域**（内核无此端点，留真机核对）；getBlockGraph 空响应（未知/后续核对） | 证据表 scripts/spike/b14-graph-results.json（pnpm spike:b14）；**实现路线更新：原生图数据可经内核 API 读取**，自研渲染与原生数据可组合 |
 | B14.2 引用事实 | 比较现有 `[姓名](siyuan://blocks/…)`、思源块引用、数据库 relation 的 refs/反链和原生图节点边 | 实际图中看到预期边；若需改写格式，仅规划迁移插件标记区块并保留用户正文 |
 
 所有存储/字段变更先更新 DATA-CONTRACT 再编码；新宿主端点先隔离 spike 再进入 `src/api/`。本轮文档不提前指定组织一定采用第二数据库、跨库 relation 或插件 JSON，最终模型以实证和上述唯一事实源原则决定。

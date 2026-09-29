@@ -1809,3 +1809,24 @@
   块 markdown 的 data-av-id 解析后再验格式，不合法整块被静默跳过**。
 - **P0 仅余 1 项**：CODE-02.4 设置映射/字段续建（CODE-02.5 已于第 58 轮完成）。
   **扫描分页与截断提示留后续**（listNotebookDocs 现上限 1000）。
+
+## P1 业务主线 第 68 轮：B14.1 原生图能力核对（2026-09-30，续跑口令第 67 版驱动）
+
+- **新 spike**：`scripts/spike/b14-graph-spike.mjs`（隔离工作区 SiYuan-Renmai-B14-Spike，
+  结果 b14-graph-results.json，9 项证据；A/C 为信息性探测）。
+- **关键实证**：
+  1. **内核图查询端点存在且可用**：`/api/graph/getGraph`（全图）与 `/api/graph/getLocalGraph`
+     （局部图，按文档 id）带 `conf: {type: {}}` 时返回 code=0，data 含 box/nodes/links/conf
+     ——**原生图数据可经内核 API 读取**（推翻「图仅前端渲染」假设，B14 实现路线据此更新）。
+  2. 缺 `conf` 报「Field [conf] is required」；conf.type 传字符串报 unmarshal 错误（须为对象）。
+  3. `getBlockGraph` 空响应（未知/后续核对）。
+  4. **refs 表为可用图数据源**：块引用写入后 refs 表含 A→B/C 边；反向边（回链）自动维护。
+  5. **打开原生图面板属前端域**：内核 API 无此端点（原生图为前端渲染），插件侧需经前端
+     API/协议——留真机核对。
+- **B14 实现路线更新**：自研 Cytoscape 渲染 + 内核图 API 数据源可组合；「原生图数据不可经
+  API 获取」假设被证伪。
+- **验证**：spike 全程隔离工作区（kernel-safety 三件套）；数据构造先建目标文档再写块引用
+  （refs 索引才生效）；单测 202/202；`pnpm run build` + `check:release` 全 PASS。本轮为
+  spike 证据轮，无 src/ 变更。
+- **P1 下一步**：B12 收尾投影（表格可选列「单位」+ 简报组织行 + 选人提示关键词）；
+  B14 实现路线据证据细化后开工。
