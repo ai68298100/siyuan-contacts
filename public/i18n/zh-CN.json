@@ -509,5 +509,6 @@
   "dashStatRelationsFt": "人均 {n} 条",
   "dashStatBirthdaysFt": "窗口内共 {n} 人",
   "dashStatNeverFt": "另有久未联系 {n} 人",
-  "wizardProgressLabel": "初始化进行中"
+  "wizardProgressLabel": "初始化进行中",
+  "graphViewTools": "图谱视图操作"
 }

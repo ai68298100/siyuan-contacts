@@ -509,5 +509,6 @@
   "dashStatRelationsFt": "{n} per person",
   "dashStatBirthdaysFt": "{n} in 30-day window",
   "dashStatNeverFt": "Plus {n} gone stale",
-  "wizardProgressLabel": "Setup in progress"
+  "wizardProgressLabel": "Setup in progress",
+  "graphViewTools": "Graph view actions"
 }

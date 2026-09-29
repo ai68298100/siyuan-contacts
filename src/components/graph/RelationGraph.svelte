@@ -2,6 +2,7 @@
     /** 关系图谱：cytoscape 力导向布局，节点=联系人，边=related 关系，点击节点开文档 */
     import cytoscape from "cytoscape";
     import { onMount } from "svelte";
+    import { Scan, ZoomIn, ZoomOut, Network, RefreshCw } from "@lucide/svelte";
     import ViewState from "../ViewState.svelte";
     import { listContacts } from "../../services/contacts";
     import { buildGraph, capGraph, GRAPH_MAX_NODES, groupColor, queryGraphRelations } from "../../domain/graph";
@@ -300,6 +301,8 @@
 
         const instance = cytoscape({
             container,
+            /* 画布撑满工作台后，小图的 fit 放大不设上限会糊脸（UX-02.13） */
+            maxZoom: 2.5,
             elements: [
                 ...capped.graph.nodes.map((node) => ({
                     data: {
@@ -406,11 +409,6 @@
             {/each}
         </select>
         <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={isolatedOnly} />{text("graphIsolatedOnly", "仅无关系人物（{n}）", { n: isolatedIds.size })}</label>
-        <button class="b3-button b3-button--outline" onclick={() => graphInstance?.fit()}>{text("graphFit", "适应")}</button>
-        <button class="b3-button b3-button--outline" onclick={() => zoomBy(1.2)}>{text("graphZoomIn", "放大")}</button>
-        <button class="b3-button b3-button--outline" onclick={() => zoomBy(1 / 1.2)}>{text("graphZoomOut", "缩小")}</button>
-        <button class="b3-button b3-button--outline" onclick={relayout}>{text("graphRelayout", "重新布局")}</button>
-        <button class="b3-button b3-button--outline" onclick={refresh}>{text("graphRefresh", "刷新")}</button>
         <span class="ft__smaller ft__on-surface lvct-graph-legend">
             {#each groupLegend as group (group.label)}
                 <span class={`lvct-graph-legend__item lvct-graph-legend__item--${group.className}`}><i></i>{group.label}</span>
@@ -511,6 +509,14 @@
     {:else}
         <div class="lvct-graph-view__canvas-wrap">
             <div class="lvct-graph-view__canvas" bind:this={container}></div>
+            <!-- UX-02.13 视图操作收进画布右下角浮动簇（地图应用范式），工具栏只留筛选 -->
+            <div class="lvct-graph__fab" role="toolbar" aria-label={text("graphViewTools", "图谱视图操作")}>
+                <button class="lvct-graph__fab-btn" title={text("graphFit", "适应")} aria-label={text("graphFit", "适应")} onclick={() => graphInstance?.fit()}><Scan size={15} /></button>
+                <button class="lvct-graph__fab-btn" title={text("graphZoomIn", "放大")} aria-label={text("graphZoomIn", "放大")} onclick={() => zoomBy(1.2)}><ZoomIn size={15} /></button>
+                <button class="lvct-graph__fab-btn" title={text("graphZoomOut", "缩小")} aria-label={text("graphZoomOut", "缩小")} onclick={() => zoomBy(1 / 1.2)}><ZoomOut size={15} /></button>
+                <button class="lvct-graph__fab-btn" title={text("graphRelayout", "重新布局")} aria-label={text("graphRelayout", "重新布局")} onclick={relayout}><Network size={15} /></button>
+                <button class="lvct-graph__fab-btn" title={text("graphRefresh", "刷新")} aria-label={text("graphRefresh", "刷新")} onclick={refresh}><RefreshCw size={15} /></button>
+            </div>
             {#if hoveredPerson}
                 <div
                     class="lvct-graph-view__hover-card"
