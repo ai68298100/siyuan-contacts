@@ -1283,3 +1283,22 @@
   构建，晚于最后一次 src 变更 1924373）；src/public 自此无变更（git diff 为空）；check:release
   复跑全 PASS。CHANGELOG 不打进 dist，本次补条无需重建。
 - 结论：0.3.0 候选内容与变更日志完全对齐，发布材料就绪。
+
+## 存储锁守护 第 43 轮：Web Lock 假死根因修复（2026-09-29）
+
+- **根因定位**（此前仅绕锁规避）：`navigator.locks.request` 没有超时机制——临界区内
+  任何一个 await 挂住（宿主卡顿、桩未决等），锁即被永久占用，后续同键请求无限排队，
+  呈现「interaction-templates.json Web Lock held 不释放」。偶发性与具体操作无关。
+- **修复**（`src/data/storage.ts`）：取锁带 5 秒中止信号（AbortController + signal）；
+  超时判定持有方疑似挂死后以 **steal 模式接管**（原持有方按规范让位），把无限等待转为
+  一次性自愈；非中止类锁错误照常抛出不绕过保护（契约语义不变）。超时值可配置
+  （`storeLockConfig.acquireTimeoutMs`）。正常并发下排队语义不变。
+- **撤绕锁**：迁移包模板合并恢复 `saveTemplatesStore` 锁内写（此前 workaround 手工读改写），
+  跨窗口安全恢复；清理两个失效导入。
+- **契约**：DATA-CONTRACT §3 锁纪律补记守护语义。
+- **测试**：storage.test.ts 适配真实 `request(name, options, callback)` 三参签名（原 mock 是
+  旧双参形态）+ 新增「超时 steal 接管自愈」用例（30ms 可配置超时）；单测 178/178。
+- **佐证**：本轮宿主套首跑即复现一次锁假死失败（exit 1），修复后复跑 76/76 通过——
+  与病灶吻合。
+- 验证：svelte-check 0 错误；单测 178/178；桌面 76/76、移动 77/77、宿主基线 76/76；
+  截图 52/52；构建 + check:release 通过。

@@ -10,11 +10,10 @@ import { exportFollowUpsJson } from "./followups";
 import { loadCadenceMap, mergeCadenceMap } from "../data/cadences";
 import { loadReminderDismissals, mergeReminderDismissals } from "../data/reminder-dismissals";
 import { loadRegistry, mergeRegistryEntries } from "../data/registry";
-import { TEMPLATES_STORAGE_KEY, loadTemplatesStore } from "../data/templates";
+import { loadTemplatesStore, saveTemplatesStore } from "../data/templates";
 import { normalizeTemplates } from "../domain/interaction-templates";
 import { importInteractionJson } from "./interaction-import";
 import { mergeFollowUpStore } from "../data/followups";
-import { saveJsonVerified } from "../data/storage";
 import { normalizeFollowUpStore } from "../domain/followups";
 
 const BUNDLE_SCHEMA_VERSION = 1;
@@ -153,8 +152,8 @@ export async function importMigrationBundle(plugin: Plugin, text: string): Promi
     if (Array.isArray(modules.templates?.templates)) {
         const incoming = normalizeTemplates(modules.templates!.templates);
         if (incoming.length > 0) {
-            /* 模板锁（interaction-templates.json）在回归环境偶发 held 不释放（已知问题，BACKLOG 记录），
-               恢复为单用户低频操作，此处绕锁手工读改写；单用户并发风险可接受 */
+            /* 锁守护（withStoreLock 5s 超时 + steal 接管）落地后回归锁内写；
+               此前因回归环境偶发锁假死曾绕锁手工读改写（已修复根因） */
             const store = await loadTemplatesStore(plugin);
             const byId = new Map((store?.templates ?? []).map((template) => [template.id, template]));
             let added = 0;
@@ -163,8 +162,7 @@ export async function importMigrationBundle(plugin: Plugin, text: string): Promi
                 byId.set(template.id, template);
                 added += 1;
             }
-            const mergedList = [...byId.values()].slice(0, 50);
-            await saveJsonVerified(plugin, TEMPLATES_STORAGE_KEY, { schemaVersion: 1, templates: mergedList });
+            await saveTemplatesStore(plugin, [...byId.values()].slice(0, 50));
             result.modules.push({ key: "templates", label: "备注模板", merged: added });
         }
     }

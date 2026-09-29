@@ -42,10 +42,40 @@ export async function saveJsonVerified(plugin: Plugin, key: string, value: unkno
 
 /**
  * 读-改-写临界区。无 Web Locks 时按键在本上下文排队，不提供跨窗口排他。
+ *
+ * 锁守护（回归环境曾现「锁 held 不释放」假死）：navigator.locks.request 无超时，
+ * 持有方临界区内任一 await 挂死即整键不可用。因此取锁带 5 秒中止信号；超时判定
+ * 持有方疑似挂死后以 steal 模式接管（原持有方释放时按规范让位），把无限等待
+ * 转为一次性自愈。正常并发下排队语义不变。
  */
+/** 取锁等待上限（可按环境调整；测试里缩短以验证接管路径） */
+export const storeLockConfig = { acquireTimeoutMs: 5_000 };
+
+function isAbortError(error: unknown): boolean {
+    return typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError";
+}
+
+function requestLockGuarded<T>(name: string, fn: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), storeLockConfig.acquireTimeoutMs);
+        navigator.locks!.request(name, { signal: controller.signal }, fn).then(
+            (value) => { clearTimeout(timer); resolve(value); },
+            (error) => { clearTimeout(timer); reject(error); },
+        );
+    });
+}
+
 export async function withStoreLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
     if (typeof navigator !== "undefined" && navigator.locks?.request) {
-        return navigator.locks.request(`lvct-${key}`, fn);
+        const name = `lvct-${key}`;
+        try {
+            return await requestLockGuarded(name, fn);
+        } catch (error) {
+            if (!isAbortError(error)) throw error;
+            console.warn(`[lvct] 存储锁等待超时，疑似持有方挂死，接管继续: ${key}`);
+            return navigator.locks.request(name, { steal: true }, fn);
+        }
     }
     const previous = localQueues.get(key) ?? Promise.resolve();
     const task = previous.then(fn);

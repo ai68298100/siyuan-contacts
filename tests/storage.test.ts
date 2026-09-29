@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { withStoreLock } from "../src/data/storage.ts";
+import { withStoreLock, storeLockConfig } from "../src/data/storage.ts";
 
 async function withNavigator(value: unknown, action: () => Promise<void>): Promise<void> {
     const descriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
@@ -56,18 +56,44 @@ test("存储降级：失败传递原错误，后续排队任务和新任务仍�
     });
 });
 
-test("存储锁：支持浏览器锁时使用固定命名，锁失败不绕过保护", async () => {
+test("存储锁：支持浏览器锁时使用固定命名（options+回调真实签名），锁失败不绕过保护", async () => {
     let name = "";
-    await withNavigator({ locks: { request: async (key: string, action: () => Promise<number>) => {
+    let sawSignal = false;
+    await withNavigator({ locks: { request: async (key: string, options: { signal: AbortSignal }, action: () => Promise<number>) => {
         name = key;
+        sawSignal = options?.signal instanceof AbortSignal;
         return action();
     } } }, async () => {
         assert.equal(await withStoreLock("events", async () => 7), 7);
         assert.equal(name, "lvct-events");
+        assert.equal(sawSignal, true);
     });
     let ran = false;
     await withNavigator({ locks: { request: async () => { throw new Error("锁不可用"); } } }, async () => {
         await assert.rejects(withStoreLock("events", async () => { ran = true; }), /锁不可用/);
         assert.equal(ran, false);
     });
+});
+
+test("存储锁：取锁超时（AbortError）后以 steal 接管自愈，非中止错误照常抛出", async () => {
+    const previousTimeout = storeLockConfig.acquireTimeoutMs;
+    storeLockConfig.acquireTimeoutMs = 30;
+    try {
+        const calls: string[] = [];
+        await withNavigator({ locks: { request: (key: string, options: { signal?: AbortSignal; steal?: boolean }, action: () => Promise<string>) => {
+            if (options?.steal) {
+                calls.push("steal");
+                return action();
+            }
+            calls.push("guarded");
+            return new Promise((_resolve, reject) => {
+                options?.signal?.addEventListener("abort", () => reject(new DOMException("The operation was aborted.", "AbortError")));
+            });
+        } } }, async () => {
+            assert.equal(await withStoreLock("stuck", async () => "healed"), "healed");
+            assert.deepEqual(calls, ["guarded", "steal"]);
+        });
+    } finally {
+        storeLockConfig.acquireTimeoutMs = previousTimeout;
+    }
 });
