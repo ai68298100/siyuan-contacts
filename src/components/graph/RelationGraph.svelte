@@ -5,10 +5,10 @@
     import { Scan, ZoomIn, ZoomOut, Network, RefreshCw } from "@lucide/svelte";
     import ViewState from "../ViewState.svelte";
     import { listContacts } from "../../services/contacts";
-    import { loadNativePersonGraph, NativeGraphCenterMissingError } from "../../services/native-graph";
+    import { loadNativePersonGraph, loadNativeRegisteredGraph, NativeGraphCenterMissingError } from "../../services/native-graph";
     import { buildGraph, buildOrgAugmentation, capGraph, GRAPH_MAX_NODES, groupColor, ORG_NODE_COLOR, queryGraphRelations } from "../../domain/graph";
     import type { GraphOrgAugmentation } from "../../domain/graph";
-    import type { GraphViewMode, ViewPreferences } from "../../domain/preferences";
+    import type { GraphViewMode, NativeGraphScope, ViewPreferences } from "../../domain/preferences";
     import type { PersonGraph } from "../../domain/graph";
     import { shortestGraphPath, secondDegreeGraphIds } from "../../domain/graph-path";
     import { renderGraphResultMarkdown } from "../../domain/graph-export";
@@ -55,6 +55,12 @@
     let nativeError = $state("");
     let nativeMissingCenter = $state(false);
     let nativeVersion = 0;
+    /* B14.8 引用图范围（B14.5 重开保留）：self=本人中心一度；person=指定联系人中心；global=全部登记文档 */
+    // svelte-ignore state_referenced_locally
+    let nativeScope: NativeGraphScope = $state(preferences.nativeScope);
+    // svelte-ignore state_referenced_locally
+    let nativeCenterDocId = $state(preferences.nativeCenterDocId);
+    let nativeSelfDocId = $state("");
     /* B14.6 组织增强：组织节点+成员边只叠加渲染，关系查询仍只按 related 边 */
     let orgOverlay: GraphOrgAugmentation | null = $state(null);
     let showOrgs = $state(true);
@@ -295,7 +301,7 @@
         }
     }
 
-    /** B14 原生模式加载：中心=本人档案，getLocalGraph 双向一度，登记集合过滤（B14.3）。失败显式降级 */
+    /** B14 原生模式加载：范围由 nativeScope 决定（B14.8），登记集合过滤（B14.3）。失败显式降级 */
     async function loadNativeGraph() {
         const version = ++nativeVersion;
         nativeLoading = true;
@@ -303,7 +309,18 @@
         nativeMissingCenter = false;
         try {
             const identity = facade ? await facade.loadSelfIdentity() : null;
-            const graph = await loadNativePersonGraph(settings, identity);
+            nativeSelfDocId = identity?.selfDocId ?? "";
+            let graph: PersonGraph;
+            if (nativeScope === "global") {
+                graph = await loadNativeRegisteredGraph(settings, identity);
+            } else {
+                /* person 模式中心失效（人物已删）回退本人中心 */
+                let centerDocId: string | undefined;
+                if (nativeScope === "person" && nativeCenterDocId !== "" && people.some((person) => person.docId === nativeCenterDocId)) {
+                    centerDocId = nativeCenterDocId;
+                }
+                graph = await loadNativePersonGraph(settings, identity, centerDocId ? { centerDocId } : undefined);
+            }
             if (version === nativeVersion) nativeGraph = graph;
         } catch (error) {
             if (version !== nativeVersion) return;
@@ -320,9 +337,57 @@
 
     $effect(() => {
         if (graphMode !== "native") return;
+        nativeScope;
+        nativeCenterDocId;
         revision;
         void loadNativeGraph();
     });
+
+    /** B14.8：切换引用图范围并持久化（B14.5 重开保留）；保存失败不阻断本次切换 */
+    async function switchNativeScope(next: string) {
+        const scope: NativeGraphScope = next === "global" ? "global" : next === "person" ? "person" : "self";
+        if (nativeScope === scope) return;
+        nativeScope = scope;
+        try {
+            await onPreferencesChange({ ...preferences, nativeScope, nativeCenterDocId });
+        } catch (error) {
+            console.warn("[lvct] 引用图范围偏好保存失败", error);
+        }
+    }
+
+    async function pickNativeCenter(docId: string) {
+        nativeCenterDocId = docId;
+        try {
+            await onPreferencesChange({ ...preferences, nativeScope, nativeCenterDocId: docId });
+        } catch (error) {
+            console.warn("[lvct] 引用图中心偏好保存失败", error);
+        }
+    }
+
+    /** 范围说明的实际生效中心（B14.9 状态如实）：person 模式失效时回退「我自己」 */
+    const nativeCenterName = $derived.by(() => {
+        if (nativeScope !== "person") return "";
+        const chosen = nativeCenterDocId;
+        if (chosen !== "") {
+            const person = people.find((item) => item.docId === chosen);
+            if (person) return person.name;
+        }
+        return "";
+    });
+    /* B14.3 纳入/排除数：图内登记文档数与图外联系人（含本人）数 */
+    const nativeRangeStats = $derived.by(() => {
+        if (!nativeGraph) return null;
+        const inside = new Set(nativeGraph.nodes.map((node) => node.id));
+        const selfId = nativeSelfDocId;
+        const outside = people.filter((person) => !inside.has(person.docId)).length
+            + (selfId !== "" && !inside.has(selfId) ? 1 : 0);
+        return { inside: nativeGraph.nodes.length, outside };
+    });
+    const nativeCenterItems = $derived(people.map((person) => ({
+        id: person.docId,
+        label: person.name,
+        hint: [person.group, ...person.tags].filter(Boolean).join(" · ") || undefined,
+    })));
 
     function zoomBy(factor: number) {
         if (graphInstance) graphInstance.zoom(graphInstance.zoom() * factor);
@@ -435,10 +500,13 @@
                     }))
                     : []),
                 ...(graphMode === "relations" && showOrgs && orgOverlay
-                    ? orgOverlay.edges
-                        .filter((edge) => orgOverlay.nodes.some((node) => node.id === edge.source)
-                            && capped.graph.nodes.some((node) => node.id === edge.target))
-                        .map((edge) => ({ data: { source: edge.source, target: edge.target, kind: "member" } }))
+                    ? (() => {
+                        const layer = orgOverlay;
+                        return layer.edges
+                            .filter((edge) => layer.nodes.some((node) => node.id === edge.source)
+                                && capped.graph.nodes.some((node) => node.id === edge.target))
+                            .map((edge) => ({ data: { source: edge.source, target: edge.target, kind: "member" } }));
+                    })()
                     : []),
             ],
             // 同步完成布局，避免筛选/切页销毁画布后动画帧继续访问 renderer。
@@ -546,6 +614,23 @@
         <input class="b3-text-field fn__flex-1" type="search" placeholder={text("graphSearchPlaceholder", "搜索节点…")} aria-label={text("graphSearchNodes", "搜索关系图谱节点")} bind:value={searchText} />
         {#if searchNeedle}<span class="ft__smaller ft__on-surface">{graphMode === "native" ? text("graphNativeHitCount", "命中 {n} 个节点", { n: nativeHitCount }) : text("graphHitCount", "命中 {n} 人", { n: filteredPeople.length })}</span>{/if}
         {#if graphMode === "native"}
+            <select class="b3-select" value={nativeScope} aria-label={text("graphNativeScopeLabel", "引用图范围")}
+                onchange={(event) => void switchNativeScope(event.currentTarget.value)}>
+                <option value="self">{text("graphNativeScopeSelf", "以本人为中心（一度引用）")}</option>
+                <option value="person">{text("graphNativeScopePerson", "以联系人为中心（一度引用）")}</option>
+                <option value="global">{text("graphNativeScopeGlobal", "全部登记文档")}</option>
+            </select>
+            {#if nativeScope === "person"}
+                <!-- B03 可搜索选人器：中心人物（B14.8 中心保留） -->
+                <PersonPicker
+                    items={nativeCenterItems}
+                    value={nativeCenterDocId}
+                    placeholder={text("graphPickNone", "未选择")}
+                    emptyText={text("graphPickerEmpty", "当前图内没有匹配的人物")}
+                    ariaLabel={text("graphNativePickCenter", "中心人物")}
+                    onSelect={(id) => void pickNativeCenter(id)}
+                />
+            {/if}
             <span class="ft__smaller ft__on-surface">{text("graphNativeEdgeNote", "边=文档间块引用（双向一度，含回链），非 related 关系")}</span>
         {:else}
             <select class="b3-select" bind:value={groupFilter} aria-label={text("graphFilterByGroup", "按分组过滤")}>
@@ -632,6 +717,21 @@
                 {/if}
             </div>
         {/if}
+    {/if}
+
+    {#if graphMode === "native" && !nativeLoading && !nativeMissingCenter && nativeError === ""}
+        <div class="ft__smaller ft__on-surface lvct-graph-note" role="status">
+            {#if nativeScope === "global"}
+                {text("graphNativeScopeGlobalDesc", "全部登记文档之间的文档引用（不是整库图）")}
+            {:else if nativeCenterName}
+                {text("graphNativeScopePersonDesc", "以 {name} 为中心的一度文档引用（含回链）", { name: nativeCenterName })}
+            {:else}
+                {text("graphNativeScopeSelfDesc", "以「我自己」为中心的一度文档引用（含回链）")}
+            {/if}
+            {#if nativeRangeStats}
+                {" "}{text("graphNativeRangeStats", "纳入 {in} 个登记文档 · 图外 {out} 位联系人暂无引用", { in: nativeRangeStats.inside, out: nativeRangeStats.outside })}
+            {/if}
+        </div>
     {/if}
 
     {#if truncated}

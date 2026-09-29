@@ -14,6 +14,8 @@ export type PeopleViewMode = "card" | "table";
 export type PeopleTableColumn = "group" | "phone" | "wechat" | "birthday" | "recent" | "tags" | "org";
 /** 图谱数据源模式（B14.5）：relations=关系图（related 边）；native=文档引用图（内核图数据，边=块引用） */
 export type GraphViewMode = "relations" | "native";
+/** 文档引用图范围（B14.8/B14.4）：self=以本人为中心一度；person=以指定联系人为中心一度；global=全部登记文档 */
+export type NativeGraphScope = "self" | "person" | "global";
 
 /** 表格可选列的展示顺序默认值（常用常驻、次要折叠的排序基础） */
 export const PEOPLE_TABLE_COLUMNS: readonly PeopleTableColumn[] = ["group", "phone", "wechat", "birthday", "recent", "tags", "org"];
@@ -31,6 +33,10 @@ export interface ViewPreferences {
     readonly tableColumns: PeopleTableColumn[];
     /** 图谱数据源模式（B14.5）：重开工作台仍使用用户选定模式 */
     readonly graphMode: GraphViewMode;
+    /** 文档引用图范围（B14.8）：中心语义与 global 入口，重开保留 */
+    readonly nativeScope: NativeGraphScope;
+    /** 文档引用图中心人物文档 ID（nativeScope="person" 时生效；失效由加载侧回退本人） */
+    readonly nativeCenterDocId: string;
     /** 保存的联系人视图（F04）：规则快照，应用时重新求值 */
     readonly savedViews: readonly SavedView[];
     /** 打开工作台时的关注摘要开关（F08） */
@@ -52,6 +58,8 @@ export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
     peopleView: "card",
     tableColumns: [...PEOPLE_TABLE_COLUMNS],
     graphMode: "relations",
+    nativeScope: "self",
+    nativeCenterDocId: "",
     savedViews: [],
     summaryEnabled: true,
     summaryDismissedOn: "",
@@ -72,6 +80,10 @@ function isPeopleViewMode(value: unknown): value is PeopleViewMode {
 
 function isGraphViewMode(value: unknown): value is GraphViewMode {
     return value === "relations" || value === "native";
+}
+
+function isNativeGraphScope(value: unknown): value is NativeGraphScope {
+    return value === "self" || value === "person" || value === "global";
 }
 
 function boundedDays(value: unknown, fallback: number): number {
@@ -107,6 +119,9 @@ export function normalizeViewPreferences(raw: unknown): ViewPreferences {
         // 旧偏好缺字段取默认；已有值仍逐键校验
         tableColumns: record.tableColumns === undefined ? [...DEFAULT_VIEW_PREFERENCES.tableColumns] : normalizeTableColumns(record.tableColumns),
         graphMode: isGraphViewMode(record.graphMode) ? record.graphMode : DEFAULT_VIEW_PREFERENCES.graphMode,
+        nativeScope: isNativeGraphScope(record.nativeScope) ? record.nativeScope : DEFAULT_VIEW_PREFERENCES.nativeScope,
+        // 中心文档 ID 透传字符串；加载侧按名册校验，失效回退本人
+        nativeCenterDocId: typeof record.nativeCenterDocId === "string" ? record.nativeCenterDocId : "",
         // 旧偏好缺字段取空列表；已有值逐条归一化
         savedViews: record.savedViews === undefined ? [] : normalizeSavedViews(record.savedViews),
         summaryEnabled: typeof record.summaryEnabled === "boolean" ? record.summaryEnabled : DEFAULT_VIEW_PREFERENCES.summaryEnabled,

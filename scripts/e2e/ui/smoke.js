@@ -1742,6 +1742,94 @@ await test("关系图组织增强：组织节点与成员边分源展示，开�
     );
 });
 
+await test("引用图范围切换：联系为中心一度、全部登记文档、范围说明与偏好持久化（B14.8）", async () => {
+    const selfDocId = "20260930000000-self002";
+    const contactA = "20260930000000-persa01";
+    const contactB = "20260930000000-persb01";
+    const stranger = "20260930000000-strange2";
+    const nameRows = [
+        { id: selfDocId, name: "我自己" },
+        { id: contactA, name: "中心人物甲" },
+        { id: contactB, name: "联系人乙" },
+    ];
+    const localCalls = [];
+    let globalCalls = 0;
+    kernel.handler = async (route, body) => {
+        if (route === "/api/av/renderAttributeView") return { view: { columns: renderResult().view.columns, rows: nameRows.map((row) => ({
+            id: row.id, cells: [
+                { value: { type: "block", keyID: "name", block: { id: row.id, content: row.name } } },
+                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+            ],
+        })) } };
+        if (route === "/api/graph/getLocalGraph") {
+            localCalls.push(body.id);
+            const around = body.id === contactA
+                ? { nodes: [{ id: contactA, label: "中心人物甲" }, { id: contactB, label: "联系人乙" }], links: [{ from: contactA, to: contactB, ref: true }] }
+                : { nodes: [{ id: selfDocId, label: "我自己" }], links: [] };
+            return {
+                id: body.id,
+                nodes: around.nodes.map((node) => ({ ...node, type: "NodeDocument", refs: 0, defs: 0 })),
+                links: around.links,
+            };
+        }
+        if (route === "/api/graph/getGraph") {
+            globalCalls += 1;
+            return {
+                nodes: [
+                    { id: selfDocId, label: "我自己", type: "NodeDocument", refs: 0, defs: 0 },
+                    { id: contactA, label: "中心人物甲", type: "NodeDocument", refs: 0, defs: 0 },
+                    { id: contactB, label: "联系人乙", type: "NodeDocument", refs: 0, defs: 0 },
+                    { id: stranger, label: "无关笔记", type: "NodeDocument", refs: 9, defs: 9 },
+                ],
+                links: [
+                    { from: selfDocId, to: contactA, ref: true },
+                    { from: selfDocId, to: stranger, ref: true },
+                ],
+            };
+        }
+        throw new Error(`回归测试不允许请求 ${route}`);
+    };
+    let currentPrefs = { ...DEFAULT_VIEW_PREFERENCES };
+    let savedNativeScope = "";
+    let savedCenter = "";
+    mounted = mount(RelationGraph, { target: fixture, props: {
+        settings,
+        preferences: currentPrefs,
+        onPreferencesChange: async (next) => { currentPrefs = next; savedNativeScope = next.nativeScope; savedCenter = next.nativeCenterDocId; return next; },
+        facade: { loadSelfIdentity: async () => ({ selfDocId, createdAt: "2026-09-30T00:00:00Z" }), listOrganizations: async () => [] },
+        onOpenDetail() {},
+        onOpenPeople() {},
+    } });
+    const nativeCanvas = () => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy;
+    button("文档引用").click();
+    await until(() => localCalls.length === 1 && localCalls[0] === selfDocId, "默认中心不是本人档案");
+    await until(() => fixture.textContent.includes("以「我自己」为中心"), "self 范围说明缺失");
+    /* 切联系人为中心（未选人时回退本人中心） */
+    const scopeSelect = fixture.querySelector('select[aria-label="引用图范围"]');
+    assert(scopeSelect, "未找到范围选择器");
+    scopeSelect.value = "person";
+    scopeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await until(() => savedNativeScope === "person", "范围偏好未持久化");
+    await pickOption("中心人物", "联系人乙");
+    await tick();
+    /* scope 切 person 未选人时先回退本人中心一次，选中后才是中心联系人请求 */
+    await until(
+        () => localCalls.length === 3 && localCalls[1] === selfDocId && localCalls[2] === contactB,
+        `中心联系人请求未发出 localCalls=${JSON.stringify(localCalls)} savedCenter=${savedCenter}`,
+    );
+    await until(() => fixture.textContent.includes("以 联系人乙 为中心"), "person 范围说明缺失");
+    assert(savedCenter === contactB, "中心人物偏好未持久化");
+    /* 全部登记文档：getGraph + 登记集合过滤 */
+    scopeSelect.value = "global";
+    scopeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await until(() => globalCalls === 1, "全局图请求未发出");
+    await until(() => fixture.textContent.includes("不是整库图"), "global 范围说明缺失");
+    await until(() => (nativeCanvas()?.nodes().length ?? 0) === 3, "无关笔记未被登记集合过滤");
+    assert(nativeCanvas().edges().length === 1, "被过滤节点的边未丢弃");
+    await until(() => fixture.textContent.includes("纳入 3 个登记文档"), "纳入数说明错误");
+    assert(fixture.textContent.includes("图外 0 位联系人暂无引用"), "图外数说明错误");
+});
+
 await test("详情加载失败可重试，空记录可跳转记一笔，写入后时间线刷新", async () => {
     let fail = true;
     let recorded = false;

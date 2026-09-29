@@ -72,3 +72,15 @@ test("显示偏好：图谱数据源模式归一化（B14.5，缺省关系图）
     assert.equal(normalizeViewPreferences({}).graphMode, DEFAULT_VIEW_PREFERENCES.graphMode);
     assert.equal(normalizeViewPreferences({ graphMode: "cytoscape" }).graphMode, DEFAULT_VIEW_PREFERENCES.graphMode);
 });
+
+test("显示偏好：引用图范围与中心人物持久化（B14.8，缺省本人中心）", () => {
+    assert.equal(normalizeViewPreferences({ nativeScope: "global" }).nativeScope, "global");
+    assert.equal(normalizeViewPreferences({ nativeScope: "person", nativeCenterDocId: "20260930000000-contact1" }).nativeCenterDocId, "20260930000000-contact1");
+    // 旧偏好缺字段：范围回退 self、中心为空
+    const legacy = normalizeViewPreferences({});
+    assert.equal(legacy.nativeScope, DEFAULT_VIEW_PREFERENCES.nativeScope);
+    assert.equal(legacy.nativeCenterDocId, "");
+    // 非法范围不采用；中心非字符串丢弃
+    assert.equal(normalizeViewPreferences({ nativeScope: "universe" }).nativeScope, DEFAULT_VIEW_PREFERENCES.nativeScope);
+    assert.equal(normalizeViewPreferences({ nativeCenterDocId: 42 }).nativeCenterDocId, "");
+});

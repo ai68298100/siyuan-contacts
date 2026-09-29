@@ -315,4 +315,10 @@ GraphEdge 增 `kind`（related/member）——**成员边与 related 边分源**
 （former/悬空/已解绑不成边，多段记录合并）；组织节点 id=组织文档 ID、label=文档标题、
 固定色 ORG_NODE_COLOR（#8e5ad8）；画布成员边只连当前裁剪后画布内人物。组织维度照旧零写库
 （扫描 + JSON 投影，不写 related、不写数据库）。
+**B14.8 引用图范围契约（第 71 轮，2026-09-30）**：`view-preferences.json` 新增 `nativeScope`
+（"self" | "person" | "global"，缺省 "self"）与 `nativeCenterDocId`（person 模式中心文档 ID，
+非法值丢弃、失效由加载侧回退本人）。范围语义：self/person=以指定文档为中心的 getLocalGraph
+（双向一度，B14.4 人物入口默认口径）；global=getGraph 全图 + 登记集合过滤（本人+联系人，
+**不纳入组织文档**——文档引用边与成员边语义不同源，组织入口随 B13 后续单独设计）。
+UI 范围说明行必须如实标注实际生效范围与纳入/图外统计，global 模式恒注明「不是整库图」（B14.9）。
 数据锚点重绑设置页扫描同步识别组织文档标记（与人物档案条同模式）。
