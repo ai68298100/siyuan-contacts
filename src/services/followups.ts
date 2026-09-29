@@ -17,11 +17,22 @@ import {
     updateFollowUpRecord,
 } from "../data/followups";
 import { syncFollowUpTasksToDoc } from "./followup-sync";
+import type { FollowUpSyncReport } from "./followup-sync";
 
 export type { FollowUpItem, FollowUpStatus, SnoozeOption } from "../domain/followups";
 
 function assertDateKey(dueDate: string, label: string): void {
     if (!isValidDateKey(dueDate)) throw new Error(`${label}日期无效：需要真实存在的公历日期（YYYY-MM-DD）`);
+}
+
+/** B07-b：文档任务块同步失败上浮为「已保存但同步失败」复合错误——插件库写入不回退，
+ *  用户重开人物详情时对账+同步自动补做；失败不伪装成功。 */
+function assertSyncReported(report: FollowUpSyncReport): void {
+    if (report.failed.length === 0) return;
+    const first = report.failed[0];
+    throw new Error(
+        `跟进已保存，但 ${report.failed.length} 个文档任务块同步失败（${first.action}：${first.message}）；重新打开该人物详情会自动补同步`,
+    );
 }
 
 export async function createFollowUp(
@@ -31,8 +42,8 @@ export async function createFollowUp(
     if (!input.personDocId) throw new Error("缺少人物文档 ID");
     assertDateKey(input.dueDate, "计划");
     const item = await createFollowUpRecord(plugin, { personDocId: input.personDocId, title: input.title, dueDate: input.dueDate });
-    /* B07：文档任务块为事实源——插件库变更后同步到人物文档（失败不阻断，sync 内部 console 记录） */
-    await syncFollowUpTasksToDoc(plugin, input.personDocId);
+    /* B07：文档任务块为事实源——插件库变更后同步到人物文档；同步失败不回退创建，按复合错误上浮 */
+    assertSyncReported(await syncFollowUpTasksToDoc(plugin, input.personDocId));
     return item;
 }
 
@@ -52,13 +63,17 @@ export async function snoozeFollowUp(plugin: Plugin, id: string, option: SnoozeO
 /** 由跟进 id 反查人物文档后同步任务块（状态/改期变更共用） */
 async function syncAfterIdChange(plugin: Plugin, id: string): Promise<void> {
     /* FUNC-01.12：库读取失败不得按空库跳过文档同步（会误判无任务），显式跳过并留痕；对账由 B07/FUNC-01.3 收口 */
+    let store: FollowUpStore;
     try {
-        const store = await loadFollowUpStoreStrict(plugin);
-        const item = store.items.find((entry) => entry.id === id);
-        if (item) await syncFollowUpTasksToDoc(plugin, item.personDocId);
+        store = await loadFollowUpStoreStrict(plugin);
     } catch (error) {
         console.warn("[lvct] 跟进库读取失败，本次文档任务同步已跳过", error);
+        return;
     }
+    const item = store.items.find((entry) => entry.id === id);
+    if (!item) return;
+    /* B07-b：同步分项失败以复合错误上浮（插件库已写入，不回退） */
+    assertSyncReported(await syncFollowUpTasksToDoc(plugin, item.personDocId));
 }
 
 /** FUNC-01.12：读取失败抛错（详情页错误态重试），不得把故障呈现为空待办 */

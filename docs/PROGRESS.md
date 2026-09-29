@@ -1545,3 +1545,27 @@
   用例失败后的 body 级守卫弹窗会泄漏到下一用例（finally 里清理 `.lvct-closeguard`）。
 - P0 余项：B07/FUNC-01.3-b、FUNC-01.15 写入断点、FAST-01.3a、FUNC-01.8a 锚点消歧、
   CODE-02.4/02.5。
+
+## P0 数据可信 第 55 轮：B07/FUNC-01.3-b 同步失败分项报告（2026-09-30，续跑口令第 55 版驱动）
+
+- **原状**：`syncFollowUpTasksToDoc` 整个流程一个 try/catch——任一任务块写失败即中断其余
+  计划，失败只进 console（失败伪装成功；一阻断多）。
+- **修复（B07-b）**：
+  1. **逐计划隔离 + 分项报告**：每个 plan（insert/update/done/delete）独立 try/catch，返回
+     `FollowUpSyncReport { applied, failed[{followUpId, action, message}] }`；骨架失败
+     （设置/名册/块扫描）整批记 failed（followUpId="*"）。
+  2. **重试安全**：insert 是「插块 + 挂关联键」两步——挂键失败即删除刚插的块再报失败，
+     重试不会因无关联键的孤儿块产生重复块。
+  3. **失败上浮（复合错误）**：createFollowUp / setFollowUpStatus / snoozeFollowUp 把分项
+     失败上抛为「跟进已保存，但 N 个文档任务块同步失败（action：message）；重新打开该人物
+     详情会自动补同步」——插件库写入不回退、失败不伪装成功；重开详情的对账+同步即重试入口。
+- **契约**：DATA-CONTRACT §3.1 失败语义改写（逐计划隔离/分项报告/复合错误/重试安全）。
+- **验证**：svelte-check/tsc 0 错误 0 警告；单测 194/194；三套 UI 回归**桌面 85 / 移动 86 /
+  宿主 85 全绿**（+1 服务级 smoke：注入 updateBlock 失败 → 分项报告指名 fu-s1/update 且
+  applied=1、失败计划零部分写入；解除注入重试 → applied=1 且 fu-s2 块不重复；打勾注入 →
+  复合错误上抛且插件库 status=done 不回退）；`pnpm run build` + `check:release` 全 PASS；
+  52 景基线 + 断点扫描重拍有效（无视觉变更）。smoke 踩坑补记：**insertBlock 的 mock 返回须为
+  事务形状 `[{doOperations:[{id}]}]`（appendBlockMd 经 firstOperationId 取 ID）；fake 块 ID
+  必须过 `^\d{14}-[0-9a-z]{7}$` 校验（setBlockAttrs/marker 先验格式）**。
+- **P0 余 4 项**：FUNC-01.15 写入断点、FAST-01.3a 识别目标失败、FUNC-01.8a 锚点消歧、
+  CODE-02.4/02.5。CODE-02.11（全量对账）随 B07 系列后续收口。

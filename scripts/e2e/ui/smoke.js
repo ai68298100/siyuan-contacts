@@ -16,7 +16,7 @@ import { recordInteraction, deleteInteraction, loadInteractionStore } from "../.
 import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
 import { captureFromDoc } from "../../../src/services/capture";
 import { exportInteractionJson } from "../../../src/services/interaction-export";
-import { createFollowUp, exportFollowUpsJson, importFollowUpsJson, previewFollowUpsImport } from "../../../src/services/followups";
+import { createFollowUp, exportFollowUpsJson, importFollowUpsJson, previewFollowUpsImport, setFollowUpStatus } from "../../../src/services/followups";
 import { reconcileFollowUpTasksFromDoc, syncFollowUpTasksToDoc } from "../../../src/services/followup-sync";
 import { emitDataChanged } from "../../../src/libs/data-events";
 import { loadFollowUpStore, createFollowUpRecord } from "../../../src/data/followups";
@@ -859,6 +859,69 @@ await test("busy 独立阻断：创建挂起时关闭不卸载弹窗，完成后
     if (postClose) postClose.click();
     await until(() => !fixture.querySelector(".lvct-dialog-panel"), "完成后弹窗未关闭");
     document.body.querySelector(".lvct-closeguard")?.remove();
+});
+
+await test("B07-b 同步失败分项：单块失败不阻断其余，复合错误不回退，重试只补缺失不重复", async () => {
+    const files = new Map();
+    const plugin = { loadData: async (key) => files.get(key) ?? "", saveData: async (key, value) => { files.set(key, value); } };
+    files.set("contacts-settings.json", settings);
+    files.set("follow-ups.json", { schemaVersion: 1, items: [
+        { id: "fu-s1", personDocId: person.docId, title: "改期项", dueDate: "2026-10-02", status: "open", createdAt: 1, updatedAt: 1, docBlockId: "20260930000000-blks001" },
+        { id: "fu-s2", personDocId: person.docId, title: "新插入项", dueDate: "2026-10-03", status: "open", createdAt: 1, updatedAt: 1 },
+    ] });
+    const docBlocks = { "20260930000000-blks001": { followUpId: "fu-s1", markdown: "- [ ] 旧标题 📅2026-10-01" } };
+    let failUpdates = true; /* 首轮注入：fu-s1 的 updateBlock 失败 */
+    let appendCount = 0;
+    kernel.handler = async (route, body) => {
+        if (route === "/api/query/sql") {
+            return Object.entries(docBlocks).map(([id, block]) => ({ id, ial: `custom-lvct-followup="${block.followUpId}"`, markdown: block.markdown }));
+        }
+        if (route === "/api/block/updateBlock") {
+            if (failUpdates) throw new Error("updateBlock 注入失败");
+            docBlocks[body.id].markdown = body.data;
+            return { code: 0 };
+        }
+        if (route === "/api/block/insertBlock") {
+            appendCount += 1;
+            const newId = `20260930000000-blknew${appendCount}`;
+            docBlocks[newId] = { followUpId: "", markdown: body.data };
+            return [{ doOperations: [{ id: newId }] }];
+        }
+        if (route === "/api/attr/setBlockAttrs") {
+            const entry = docBlocks[body.id];
+            if (entry) entry.followUpId = body.attrs["custom-lvct-followup"];
+            return { code: 0 };
+        }
+        return { code: 0 };
+    };
+
+    /* 首轮同步：fu-s1 更新失败（注入），fu-s2 插入成功——分项报告互不阻断 */
+    const report = await syncFollowUpTasksToDoc(plugin, person.docId);
+    assert(report.failed.length === 1 && report.failed[0].followUpId === "fu-s1" && report.failed[0].action === "update",
+        `分项报告错误：${JSON.stringify(report)}`);
+    assert(report.applied === 1, `失败阻断了其余计划：${JSON.stringify(report)}`);
+    assert(docBlocks["20260930000000-blks001"].markdown.includes("旧标题"), "失败计划不应部分写入");
+
+    /* 重试：解除注入 → 只补失败项，不产生重复块 */
+    failUpdates = false;
+    const retry = await syncFollowUpTasksToDoc(plugin, person.docId);
+    assert(retry.failed.length === 0 && retry.applied === 1, `重试报告错误：${JSON.stringify(retry)}`);
+    const s2Blocks = Object.values(docBlocks).filter((block) => block.followUpId === "fu-s2").length;
+    assert(s2Blocks === 1, `重试产生重复块：${s2Blocks} 个 fu-s2 块`);
+
+    /* mutator 复合错误：状态变更的文档打勾失败 → 抛「已保存，但…」且插件库不回退 */
+    kernel.handler = async (route) => {
+        if (route === "/api/query/sql") {
+            return Object.entries(docBlocks).map(([id, block]) => ({ id, ial: `custom-lvct-followup="${block.followUpId}"`, markdown: block.markdown }));
+        }
+        if (route === "/api/block/updateTaskListItemMarker") throw new Error("打勾注入失败");
+        return { code: 0 };
+    };
+    let composite = "";
+    try { await setFollowUpStatus(plugin, "fu-s1", "done"); } catch (error) { composite = error.message; }
+    assert(composite.includes("跟进已保存，但") && composite.includes("打勾注入失败"), `复合错误缺失：${composite}`);
+    const afterFail = await loadFollowUpStore(plugin);
+    assert(afterFail.items.find((item) => item.id === "fu-s1").status === "done", "复合错误回退了插件库写入");
 });
 
 await test("新建草稿「保存并离开」：守卫内保存成功并关闭弹窗", async () => {
