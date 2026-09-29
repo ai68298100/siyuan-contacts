@@ -18,6 +18,7 @@ import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/e
 import { captureFromDoc, resolveRecognizeTarget } from "../../../src/services/capture";
 import { exportInteractionJson } from "../../../src/services/interaction-export";
 import { createFollowUp, exportFollowUpsJson, importFollowUpsJson, previewFollowUpsImport, setFollowUpStatus } from "../../../src/services/followups";
+import { loadSelfIdentity } from "../../../src/data/self-identity";
 import { reconcileFollowUpTasksFromDoc, syncFollowUpTasksToDoc } from "../../../src/services/followup-sync";
 import { emitDataChanged } from "../../../src/libs/data-events";
 import { loadFollowUpStore, createFollowUpRecord } from "../../../src/data/followups";
@@ -3545,9 +3546,13 @@ await test("初始化（全新）：物化传 createIfNotExist、九字段按序
     let notebooks = [];
     const fieldKeys = [];
     let saved = "";
+    let createDocCalls = 0;
+    let boundSelfDoc = "";
+    let boundSelfRow = "";
+    const store = {}; /* 按键隔离的宿主存储（真实 loadData(key) 语义，B11 身份与设置互不覆盖） */
     const plugin = {
-        loadData: async () => (saved === "" ? "" : JSON.parse(JSON.stringify(saved))),
-        saveData: async (_key, value) => { saved = JSON.parse(JSON.stringify(value)); },
+        loadData: async (key) => (store[key] === undefined ? "" : JSON.parse(JSON.stringify(store[key]))),
+        saveData: async (key, value) => { store[key] = JSON.parse(JSON.stringify(value)); },
     };
     kernel.handler = async (route, body) => {
         calls.push([route, body]);
@@ -3556,19 +3561,35 @@ await test("初始化（全新）：物化传 createIfNotExist、九字段按序
             notebooks = [{ id: "20260928000000-book001", name: body.name }];
             return null;
         }
-        if (route === "/api/filetree/createDocWithMd") return "20260928000000-host001";
+        if (route === "/api/filetree/createDocWithMd") {
+            createDocCalls += 1;
+            return createDocCalls === 1 ? "20260928000000-host001" : "20260928000000-doc0002";
+        }
         if (route === "/api/block/insertBlock") return [{ doOperations: [{ id: "20260928000000-block01" }] }];
         if (route === "/api/av/renderAttributeView") {
+            const rows = boundSelfDoc
+                ? [{ id: boundSelfRow, cells: [{ value: { type: "block", keyID: "name", block: { id: boundSelfDoc, content: "我自己" } } }] }]
+                : [];
             return { view: { columns: [
                 { id: "col-pk", name: "Primary Key", type: "block" },
                 { id: "col-sel", name: "Select", type: "select" },
-            ], rows: [] } };
+            ], rows } };
         }
         if (route === "/api/av/addAttributeViewKey") {
             fieldKeys.push({ name: body.keyName, previous: body.previousKeyID });
             return null;
         }
         if (route === "/api/transactions") return [];
+        if (route === "/api/query/sql") return [];
+        if (route === "/api/av/addAttributeViewBlocks") {
+            boundSelfDoc = body.srcs[0].id;
+            boundSelfRow = "20260928000000-row0001";
+            return null;
+        }
+        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") {
+            return boundSelfDoc ? { [boundSelfDoc]: boundSelfRow } : {};
+        }
+        if (route === "/api/av/setAttributeViewBlockAttr") return { code: 0 };
         throw new Error(`全新初始化不允许请求 ${route}`);
     };
     const steps = [];
@@ -3585,8 +3606,13 @@ await test("初始化（全新）：物化传 createIfNotExist、九字段按序
     assert(Object.keys(settings2.fieldMap).length === FIELD_SPECS.length, "fieldMap 未含全部字段");
     assert(settings2.hostDocId === "20260928000000-host001" && settings2.dbBlockId === "20260928000000-block01"
         && settings2.avId && settings2.notebookId === "20260928000000-book001", "锚点落盘错误");
-    assert(saved.hostDocId === settings2.hostDocId, "设置未写回宿主存储");
-    assert(steps[0] === "wizardStepNotebookCreate" && steps.includes("wizardStepDone"), `进度步骤异常：${steps.join(",")}`);
+    assert(store["contacts-settings.json"].hostDocId === settings2.hostDocId, "设置未写回宿主存储");
+    assert(steps[0] === "wizardStepNotebookCreate" && steps.includes("wizardStepSelfCreate")
+        && steps.includes("wizardStepDone"), `进度步骤异常：${steps.join(",")}`);
+    /* B11：本人档案「我自己」默认建立并标记身份（幂等标记落盘） */
+    assert(createDocCalls === 2, `本人建档应复用建文档通道恰好一次：${createDocCalls}`);
+    const identity = await loadSelfIdentity(plugin);
+    assert(identity && identity.selfDocId === "20260928000000-doc0002", `本人身份未标记：${JSON.stringify(identity)}`);
 });
 
 await test("初始化（续建）：复用笔记本/宿主文档/数据库/已有列，不重复建不重配双向", async () => {
@@ -3605,6 +3631,7 @@ await test("初始化（续建）：复用笔记本/宿主文档/数据库/已�
         { id: "col-related", name: "相关人", type: "relation" },
         { id: "col-back", name: "被相关人", type: "relation" },
     ];
+    let selfBound = false; /* B11：绑定完成后名册才出现「我自己」（此前出现会被查重拦截） */
     kernel.handler = async (route, body) => {
         calls.push([route, body]);
         if (route === "/api/notebook/lsNotebooks") return { notebooks: [{ id: "20260928000000-book002", name: "人脉" }] };
@@ -3613,13 +3640,28 @@ await test("初始化（续建）：复用笔记本/宿主文档/数据库/已�
                 return [{ id: "20260928000000-block02", parent_id: "20260928000000-host002",
                     markdown: '<div data-type="NodeAttributeView" data-av-id="20260928000000-av00002" data-av-type="table"></div>' }];
             }
-            return [{ id: "20260928000000-host002", content: "联系人总表", hpath: "/联系人总表" }];
+            /* B11：预置上次尝试残留的未绑定「我自己」文档 → 断点续做复用，不新建 */
+            return [
+                { id: "20260928000000-host002", content: "联系人总表", hpath: "/联系人总表" },
+                { id: "20260928000000-self001", content: "我自己", hpath: "/我自己" },
+            ];
         }
-        if (route === "/api/av/renderAttributeView") return { view: { columns, rows: [] } };
+        if (route === "/api/av/renderAttributeView") {
+            const rows = selfBound
+                ? [{ id: "20260928000000-rowfw01", cells: [{ value: { type: "block", keyID: "name", block: { id: "20260928000000-self001", content: "我自己" } } }] }]
+                : [];
+            return { view: { columns, rows } };
+        }
         if (route === "/api/av/addAttributeViewKey") {
             fieldKeys.push(body.keyName);
             return null;
         }
+        if (route === "/api/av/addAttributeViewBlocks") {
+            if (body.srcs.some((src) => src.id === "20260928000000-self001")) selfBound = true;
+            return null;
+        }
+        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") return selfBound ? { "20260928000000-self001": "20260928000000-rowfw01" } : {};
+        if (route === "/api/av/setAttributeViewBlockAttr") return { code: 0 };
         throw new Error(`续建不允许请求 ${route}`);
     };
     const snapshot = await inspectWorkspace("人脉");
@@ -3644,6 +3686,11 @@ await test("初始化（续建）：复用笔记本/宿主文档/数据库/已�
     assert(settings2.avId === "20260928000000-av00002" && settings2.notebookId === "20260928000000-book002", "续建锚点错误");
     assert(steps[0] === "wizardStepNotebookReuse" && steps.includes("wizardStepFieldsKept")
         && steps.includes("wizardStepRelationKept"), `续建进度未体现复用：${steps.join(",")}`);
+    /* B11：残留「我自己」文档被断点复用（不新建），身份标记落盘 */
+    assert(!routes.includes("/api/filetree/createDocWithMd"), "续建本人档案未复用残留文档（重复建文档）");
+    const identity = await loadSelfIdentity(plugin);
+    assert(identity && identity.selfDocId === "20260928000000-self001"
+        && identity.selfItemId === "20260928000000-rowfw01", `本人身份未标记：${JSON.stringify(identity)} steps=${JSON.stringify(steps)}`);
 });
 
 await test("向导：预检提示将复用的内容，失败后可继续并在续建成功时回调", async () => {

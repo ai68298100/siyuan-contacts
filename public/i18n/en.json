@@ -460,6 +460,7 @@
   "wizardStepRelationCreate": "Configuring the two-way “{name}” relation…",
   "wizardStepRelationKept": "Two-way relation already configured; skipping…",
   "wizardStepSettings": "Saving workspace settings…",
+  "wizardStepSelfCreate": "Creating your own profile \"{name}\"…",
   "wizardStepDone": "Setup complete ✔",
   "navGraphShort": "Graph",
   "stripFollowUpsOpen": "{n} open follow-ups",

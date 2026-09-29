@@ -6,6 +6,8 @@
  */
 import type { Plugin } from "siyuan";
 import { listContacts } from "./contacts";
+import { loadSelfIdentity } from "../data/self-identity";
+import { excludeSelf } from "../domain/self-identity";
 import { loadInteractionStoreStrict } from "../data/interactions";
 import { loadFollowUpStoreStrict } from "../data/followups";
 import { runHealthAudit, DEFAULT_LONG_INACTIVE_DAYS } from "../domain/health-audit";
@@ -27,7 +29,7 @@ export async function auditWorkspaceData(plugin: Plugin, settings: ContactsSetti
     if (failed.length > 0 || peopleResult.status !== "fulfilled" || storeResult.status !== "fulfilled" || followUpResult.status !== "fulfilled") {
         throw new Error(`资料体检无法完成，以下数据读取失败：${failed.join("、") || "未知模块"}`);
     }
-    const people = peopleResult.value;
+    const people = excludeSelf(peopleResult.value, await loadSelfIdentity(plugin).catch(() => null)); /* B11.4：普通体检默认排除本人 */
     const store = storeResult.value;
     const followUpStore = followUpResult.value;
     const tombstoned = new Set(store.tombstones);

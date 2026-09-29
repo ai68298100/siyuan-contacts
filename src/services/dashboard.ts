@@ -14,6 +14,8 @@ import { toLocalDateKey } from "../domain/interactions";
 import { loadReminderDismissalsStrict } from "../data/reminder-dismissals";
 import { isDismissed } from "../domain/reminder-dismissals";
 import { ensureRegistryEntriesSaved, loadRegistryStrict } from "../data/registry";
+import { loadSelfIdentity } from "../data/self-identity";
+import { excludeSelf } from "../domain/self-identity";
 import { isWithinGrace } from "../domain/registry";
 import { buildActionCards } from "../domain/action-list";
 import type { ActionCard, ActionPersonInput } from "../domain/action-list";
@@ -111,13 +113,17 @@ export async function loadDashboard(
     options: DashboardOptions = DEFAULT_DASHBOARD_OPTIONS,
 ): Promise<DashboardData> {
     const readFailures: string[] = [];
-    const [people, store, followUpStore, cadences, dismissals] = await Promise.all([
+    const [peopleAll, store, followUpStore, cadences, dismissals, identity] = await Promise.all([
         listContacts(settings),
         readModule(readFailures, "interactions", () => loadInteractionStoreStrict(plugin), emptyStore()),
         readModule(readFailures, "followUps", () => loadFollowUpStoreStrict(plugin), emptyFollowUpStore()),
         readModule(readFailures, "cadences", () => loadCadenceMapStrict(plugin), {}),
         readModule(readFailures, "dismissals", () => loadReminderDismissalsStrict(plugin), []),
+        readModule(readFailures, "self", () => loadSelfIdentity(plugin), null),
     ]);
+    /* B11.4：本人不是"待联系对象"——首页统计与行动清单排除本人（名册本身仍保留并标识）。
+       身份读取失败按模块降级（readFailures 指名 self，横幅提示），不静默按无本人处理 */
+    const people = excludeSelf(peopleAll, identity);
     const today = toLocalDateKey(new Date());
     // C02：首次发现补记收编时间（幂等，失败按缺失降级）；宽限期内不计入「从未互动」提醒
     await ensureRegistryEntriesSaved(plugin, people.map((person) => person.docId), today);

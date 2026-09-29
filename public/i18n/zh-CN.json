@@ -460,6 +460,7 @@
   "wizardStepRelationCreate": "配置「{name}」双向关联…",
   "wizardStepRelationKept": "双向关联已存在，跳过配置…",
   "wizardStepSettings": "保存工作空间设置…",
+  "wizardStepSelfCreate": "建立本人档案「{name}」…",
   "wizardStepDone": "初始化完成 ✔",
   "navGraphShort": "关系图",
   "stripFollowUpsOpen": "待跟进 {n}",

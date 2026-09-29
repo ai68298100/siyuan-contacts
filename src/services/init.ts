@@ -22,6 +22,7 @@ import type { FieldKey } from "../domain/fields";
 import { normalizeSettings, SETTINGS_STORAGE_KEY, SETTINGS_STORE_VERSION } from "../domain/model";
 import type { ContactsSettings } from "../domain/model";
 import { loadJson, saveJsonVerified } from "../data/storage";
+import { ensureSelfIdentity, SELF_PERSON_NAME } from "./self-identity";
 import type { Plugin } from "siyuan";
 
 /** 进度以 i18n 键 + 插值上报，由向导渲染文案（服务层不产出成品句子） */
@@ -264,6 +265,16 @@ export async function initializeWorkspace(
         initializedAt: new Date().toISOString(),
     };
     await persistSettings(plugin, settings);
+
+    /* B11：数据库确认后默认建立首个本人档案「我自己」并标记身份（幂等续建；
+       失败不阻断初始化——身份可稍后在设置页指定，B11.3） */
+    onProgress({ key: "wizardStepSelfCreate", values: { name: SELF_PERSON_NAME } });
+    try {
+        await ensureSelfIdentity(plugin, settings);
+    } catch (error) {
+        console.warn("[lvct] 本人档案建立失败（初始化继续）", error);
+    }
+
     onProgress({ key: "wizardStepDone" });
     return settings;
 }

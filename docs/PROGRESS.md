@@ -1658,6 +1658,35 @@
 - **下一阶段**：转 P1 业务主线——B11 本人档案 → B13 组织 → B12 资料 → B14 双图；开工前
   先过契约门槛（B11.1/B12.1/B13.1/B14.1–14.2，先 DATA-CONTRACT 再编码）。
 
+## P1 业务主线 第 61 轮：B11 本人档案——契约 + 身份层 + 初始化默认建档 + 使用规则排除（2026-09-30，续跑口令第 61 版驱动）
+
+- **契约先行（DATA-CONTRACT §3 新键）**：`self-identity.json`（schemaVersion 1）——
+  `{selfDocId, selfItemId, createdAt}`，本人身份的**唯一事实源**（稳定文档 ID 识别，不经设置
+  锚点）；使用规则（B11.4）：本人在名册保留并标识，首页统计/行动清单/普通体检默认排除本人；
+  改动身份属 B11.5 修复流程，`saveSelfIdentity` 拒绝对不同 selfDocId 的静默改绑。
+- **实现**：
+  1. `domain/self-identity.ts`（纯函数）：normalize（ID 严格校验）、isSelfDoc、excludeSelf。
+  2. `data/self-identity.ts`：loadSelfIdentity（严格展示读）、saveSelfIdentity（锁内 +
+      写后回读 + 拒绝静默改绑 SelfIdentityConflictError）。
+  3. `services/self-identity.ts#ensureSelfIdentity`（幂等）：标记已存在 → 核验名册仍含
+     （丢失仅告警，改绑走 B11.5）；无标记 → 同名已绑定联系人复用该行 / createContact 断点
+     语义新建「我自己」（空草稿仅姓名）→ 写标记；SelfIdentityConflict 并发窗口重读。
+  4. `initializeWorkspace`：设置落盘后 `wizardStepSelfCreate` 步骤调用 ensureSelfIdentity，
+     **失败降级不阻断初始化**（console 记录，身份可后续指定）。
+  5. **使用规则排除**：loadDashboard 读取身份（readModule "self" 降级横幅指名），
+     `excludeSelf` 摘除本人后投影统计/行动/提醒；auditWorkspaceData 同样排除（普通体检）。
+- **验证**：svelte-check/tsc 0 错误 0 警告；单测 **199/199**（self-identity 2 例）；三套 UI
+  回归**桌面 90 / 移动 91 / 宿主 90 全绿**：两个 init 真流程 smoke 扩展——全新初始化断言
+  「我自己」建档（createDocWithMd 恰好 2 次：宿主+本人）+ wizardStepSelfCreate 步骤 +
+  身份标记落盘；续建初始化断言残留「我自己」文档复用（createDocWithMd 零调用）+ 绑行 +
+  身份落盘；`node scripts/collect-i18n.mjs` 0 缺失（wizardStepSelfCreate 中英）；**隔离内核
+  spike:init 21/21**；`pnpm run build` + `check:release` 全 PASS；52 景基线 + 断点扫描重拍
+  有效（无视觉变更）。smoke 踩坑补记：**identity 的 selfDocId/selfItemId 都必须过
+  ^\d{14}-[0-9a-z]{7}$（7 位后缀）——normalize 静默拒绝不合法 ID 表现为「身份未标记：null」；
+  init 测试的宿主 plugin 存储必须按键隔离（key-less loadData 会让身份写入覆盖设置）**。
+- **留后续（B11 未完部分）**：名册/卡片「本人」标识徽标；B11.3 旧库升级设置页入口（指定已有
+  文档/联系人）；B11.5 换绑/找回修复流程；捕获选人排除本人确认。跨窗口排他 Host pending。
+
 ## P0 数据可信 第 59 轮：FUNC-01.8a 锚点扫描消歧（2026-09-30，续跑口令第 58 版驱动）
 
 - **缺陷定位**：`inspectWorkspace` 对文档内数据库块取 `avBlocks[0]`——同名总表里**首个 AV 是
