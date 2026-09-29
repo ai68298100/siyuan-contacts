@@ -72,6 +72,8 @@ export interface ContactSummary {
     tags: string[];
     /** 相关人 itemID 列表（M3 图谱直接消费） */
     relatedItemIds: string[];
+    /** B11：该条目是本人档案（名册投影时按 self-identity 标记） */
+    isSelf?: boolean;
 }
 
 /** 渲染响应的一行 → 联系人摘要。纯函数，逐单元格容错（缺值/未知字段跳过） */

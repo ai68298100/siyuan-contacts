@@ -11,6 +11,8 @@ import { isRosterFresh, rosterFromRender, ROSTER_TTL_MS } from "../domain/roster
 import type { RosterEntry } from "../domain/roster";
 import type { ContactsSettings } from "../domain/model";
 import type { ContactSummary } from "../domain/person";
+import { isSelfDoc } from "../domain/self-identity";
+import { loadSelfIdentityBound } from "../data/self-identity";
 
 let cache: RosterEntry | null = null;
 let cacheKey: string | null = null;
@@ -41,6 +43,14 @@ export async function getRoster(settings: ContactsSettings): Promise<ContactSumm
         try {
             const rendered = await renderView(settings.avId, settings.dbBlockId);
             const people = rosterFromRender(rendered, fieldMap);
+            /* B11.4：名册保留并标识本人——isSelf 供卡片徽标/选人器排除等投影使用；
+               身份读取失败或未装配按无标记降级（roster 不因身份层故障而失败） */
+            const identity = await loadSelfIdentityBound().catch(() => null);
+            if (identity) {
+                for (const person of people) {
+                    if (isSelfDoc(identity, person.docId)) person.isSelf = true;
+                }
+            }
             // 已失效或被新配置的请求取代时，仅返回给原调用方，不回填共享缓存。
             if (request.generation === generation && pending === request) {
                 cache = { people, avId: settings.avId, fetchedAt: Date.now() };

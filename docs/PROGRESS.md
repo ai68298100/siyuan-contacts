@@ -1687,6 +1687,26 @@
 - **留后续（B11 未完部分）**：名册/卡片「本人」标识徽标；B11.3 旧库升级设置页入口（指定已有
   文档/联系人）；B11.5 换绑/找回修复流程；捕获选人排除本人确认。跨窗口排他 Host pending。
 
+## P1 业务主线 第 62 轮：B11 收尾——标识徽标 + 选人排除 + 设置页指定入口（2026-09-30，续跑口令第 62 版驱动）
+
+- **名册投影标识**：`getRoster` 渲染后按身份存储标记 `isSelf`（data 层新增
+  `loadSelfIdentityBound` + `bindSelfIdentityStorage` 模块级绑定，index.ts onload 装配；
+  未装配/读取失败按无标记降级，roster 不因身份层故障失败）；`ContactSummary` 增可选 `isSelf`。
+- **PersonCard 徽标**：isSelf 时姓名旁显示「本人」chip。
+- **选人排除**：Peek 关系候选（relationCandidates）过滤 isSelf——不给本人建"与自己"的关系。
+- **设置页 B11.3/B11.5 入口（通用分区）**：「本人档案」区块——状态展示（未建立 → 创建按钮走
+  createSelfProfile 幂等；已建立 → 显示联系人姓名）+ **改绑指定**：listContacts 下拉选人 →
+  designateSelfIdentity 显式改绑（服务层新增：目标必须在名册、allowRebind 覆盖、createdAt 保留、
+  目标不存在零改动）；facade 新增 loadSelfIdentity/createSelfProfile/designateSelfIdentity/
+  listContacts 四方法（types + index.ts 实现）。
+- **验证**：svelte-check/tsc 0 错误 0 警告；单测 199/199；collect-i18n 0 缺失（self* 10 键
+  中英）；三套 UI 回归**桌面 91 / 移动 92 / 宿主 91 全绿**（+1 服务级 smoke「指定本人身份」：
+  显式改绑成功且 createdAt 保留、目标不存在零改动零污染）；**隔离内核 spike:init 21/21**；
+  `pnpm run build` + `check:release` 全 PASS；52 景基线 + 断点扫描重拍（settings-general 新增
+  本人档案区块入照，布局正常目检通过）。
+- **留后续**：名册表格视图的本人标识、捕获参与人语义（本人作为参与者是否记互动）、B11.5
+  修复流程的完整预览 UI（与我的关系/共同组织影响预览）。
+
 ## P0 数据可信 第 59 轮：FUNC-01.8a 锚点扫描消歧（2026-09-30，续跑口令第 58 版驱动）
 
 - **缺陷定位**：`inspectWorkspace` 对文档内数据库块取 `avBlocks[0]`——同名总表里**首个 AV 是

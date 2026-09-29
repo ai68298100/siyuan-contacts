@@ -241,7 +241,7 @@ import StatusNotice from "../StatusNotice.svelte";
             .filter((item): item is ContactSummary => Boolean(item)),
     );
     const candidates = $derived(
-        others.filter((item) => item.itemId !== current.itemId && !current.relatedItemIds.includes(item.itemId)),
+        others.filter((item) => item.itemId !== current.itemId && !item.isSelf && !current.relatedItemIds.includes(item.itemId)),
     );
     const orderedPeople = $derived(navigationOrder ?? others);
     const currentIndex = $derived(orderedPeople.findIndex((item) => item.itemId === current.itemId));

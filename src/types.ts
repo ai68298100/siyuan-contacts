@@ -92,6 +92,14 @@ export interface ContactsPluginFacade {
     previewCapture(docId: string): Promise<CapturePreview>;
     /** FAST-01.4：按全字段更新联系人资料（编辑弹窗语义，空=清空） */
     updatePersonFields(personItemId: string, draft: import("./domain/person").ContactDraft): Promise<void>;
+    /** B11：本人身份读取（null = 未建立） */
+    loadSelfIdentity(): Promise<import("./domain/self-identity").SelfIdentity | null>;
+    /** B11.3：确保本人档案「我自己」存在（幂等；失败返回 null） */
+    createSelfProfile(): Promise<import("./domain/self-identity").SelfIdentity | null>;
+    /** B11.3/B11.5：把本人身份显式指定到一名已有联系人（显式改绑，原资料保留） */
+    designateSelfIdentity(personItemId: string): Promise<import("./domain/self-identity").SelfIdentity>;
+    /** B11.3：全量名册（设置页本人档案指定用） */
+    listContacts(): Promise<import("./domain/person").ContactSummary[]>;
     /** FUNC-01.14：AI 资料候选受限补丁写——只写补丁字段，最新名册回读逐字段冲突核对 */
     updatePersonCandidateFields(personItemId: string, patches: readonly import("./domain/contact-patch").CandidateFieldPatch[]): Promise<import("./services/contacts").CandidateFieldApplyResult>;
     /** 从笔记捕获：确认执行（互动事件 + 参与人区块 + 新人收编） */

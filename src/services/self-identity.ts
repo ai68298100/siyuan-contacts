@@ -54,3 +54,20 @@ export async function ensureSelfIdentity(plugin: Plugin, settings: ContactsSetti
         return null;
     }
 }
+
+/** B11.3/B11.5：把本人身份显式指定到一名已有联系人（设置页修复/旧库升级入口）。
+ *  与幂等建档不同：这里**允许改绑**（调用方已确认预览影响），但目标必须真实存在于名册。 */
+export async function designateSelfIdentity(
+    plugin: Plugin,
+    settings: ContactsSettings,
+    personItemId: string,
+): Promise<SelfIdentity> {
+    invalidateRoster();
+    const roster = await listContacts(settings);
+    const person = roster.find((entry) => entry.itemId === personItemId);
+    if (!person) throw new Error("目标联系人不存在或已解绑，身份未改动");
+    return await saveSelfIdentity(plugin, {
+        selfDocId: person.docId,
+        selfItemId: person.itemId,
+    }, { allowRebind: true });
+}

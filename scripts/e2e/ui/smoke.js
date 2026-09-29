@@ -12,6 +12,7 @@ import SettingsView from "../../../src/components/SettingsView.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
 import { applyContactCandidateFields, createContact, updateContactFields } from "../../../src/services/contacts";
+import { designateSelfIdentity } from "../../../src/services/self-identity";
 import { addRelation, removeRelation } from "../../../src/services/relations";
 import { recordInteraction, deleteInteraction, loadInteractionStore } from "../../../src/data/interactions";
 import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
@@ -1104,6 +1105,35 @@ await test("CODE-02.4 编辑写前预校验：非法生日/邮箱零写入，逐
     catch (e) { error = e.message; }
     assert(error.includes("字段写入失败") && error.includes("微信"), `逐字段失败未上浮：${error}`);
     assert(setCellCount >= 7, "其余字段未写入");
+});
+
+await test("B11.3/B11.5 指定本人身份：显式改绑成功、未初始化拒绝、目标不存在零改动", async () => {
+    const files = new Map();
+    files.set("contacts-settings.json", settings);
+    files.set("self-identity.json", { schemaVersion: 1, selfDocId: "20260927000000-person1", selfItemId: "row-1", createdAt: "2026-09-30" });
+    const plugin = { loadData: async (key) => files.get(key) ?? "", saveData: async (key, value) => { files.set(key, value); } };
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") {
+            const base = renderResult();
+            return { view: { ...base.view, rows: [...base.view.rows, { id: "row-2", cells: [
+                { value: { type: "block", keyID: "name", block: { id: "20260927000000-person2", content: "回归测试乙" } } },
+            ] } ] } };
+        }
+        throw new Error(`指定身份用例不允许请求 ${route}`);
+    };
+    invalidateRoster();
+    /* 显式改绑到 person2 → 成功且 createdAt 保留原始标记日期 */
+    const identity = await designateSelfIdentity(plugin, settings, "row-2");
+    assert(identity.selfDocId === "20260927000000-person2" && identity.selfItemId === "row-2",
+        `显式改绑失败：${JSON.stringify(identity)}`);
+    assert(identity.createdAt === "2026-09-30", "改绑丢失了原始 createdAt");
+    const stored = files.get("self-identity.json");
+    assert(stored.selfDocId === "20260927000000-person2", "改绑未落盘");
+    /* 目标不存在 → 报错且原身份保留 */
+    let error = "";
+    try { await designateSelfIdentity(plugin, settings, "row-gone"); } catch (e) { error = e.message; }
+    assert(error.includes("不存在或已解绑"), `目标不存在未拦截：${error}`);
+    assert(files.get("self-identity.json").selfDocId === "20260927000000-person2", "失败改绑污染了身份");
 });
 
 await test("FUNC-01.8a 锚点消歧：首 AV 无关不采纳按字段证据取次 AV，歧义暂停写入，零匹配按新建", async () => {

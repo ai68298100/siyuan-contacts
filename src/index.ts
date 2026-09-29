@@ -14,6 +14,7 @@ import AddPersonDialog from "./components/people/AddPersonDialog.svelte";
 import PersonEditDialog from "./components/people/PersonEditDialog.svelte";
 import { parseContactText } from "./domain/quick-fill";
 import { invalidateRoster } from "./services/roster";
+import { bindSelfIdentityStorage } from "./data/self-identity";
 import { initializeWorkspace, inspectWorkspace, loadSettings, scanAnchorCandidates } from "./services/init";
 import { configureCloseGuardI18n } from "./components/close-guard";
 import type { InitProgressStep, WorkspaceSnapshot } from "./services/init";
@@ -25,7 +26,9 @@ import { loadPersonInsights } from "./services/insights";
 import { checkSettingsHealth, rebuildMissingFields, rebindSettings, repairFieldMap } from "./services/settings-health";
 import { auditWorkspaceData } from "./services/health-audit";
 import { reconcileFollowUpTasksFromDoc } from "./services/followup-sync";
-import { updateContactFields, applyContactCandidateFields } from "./services/contacts";
+import { updateContactFields, applyContactCandidateFields, listContacts as listContactsService } from "./services/contacts";
+import { ensureSelfIdentity, designateSelfIdentity } from "./services/self-identity";
+import { loadSelfIdentity } from "./data/self-identity";
 import { exportMigrationBundle, importMigrationBundle, previewMigrationImport } from "./services/migration-bundle";
 import { loadViewPreferences, saveViewPreferences } from "./services/preferences";
 import { exportInteractionJson } from "./services/interaction-export";
@@ -97,6 +100,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     async onload() {
         const frontend = getFrontend();
         this.isMobile = frontend === "mobile" || frontend === "browser-mobile";
+        bindSelfIdentityStorage(this); /* B11：roster 投影的 isSelf 标记依赖身份存储 */
 
         this.addIcons(`<symbol id="iconLvContacts" viewBox="0 0 32 32">
 <path d="M12 4c3.314 0 6 2.686 6 6s-2.686 6-6 6-6-2.686-6-6 2.686-6 6-6zM12 6.4A3.6 3.6 0 1 0 12 13.6 3.6 3.6 0 0 0 12 6.4z"/>
@@ -403,6 +407,29 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     async updatePersonFields(personItemId: string, draft: import("./domain/person").ContactDraft) {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
         await updateContactFields(this.settings, personItemId, draft);
+    }
+
+    /** B11：本人身份读取（null = 未建立） */
+    async loadSelfIdentity() {
+        return loadSelfIdentity(this);
+    }
+
+    /** B11.3：确保本人档案「我自己」存在（幂等；失败返回 null 不抛） */
+    async createSelfProfile() {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return ensureSelfIdentity(this, this.settings);
+    }
+
+    /** B11.3/B11.5：把本人身份显式指定到一名已有联系人（显式改绑） */
+    async designateSelfIdentity(personItemId: string) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return designateSelfIdentity(this, this.settings, personItemId);
+    }
+
+    /** B11.3：全量名册（设置页本人档案指定用；未初始化返回空） */
+    async listContacts() {
+        if (!this.settings) return [];
+        return listContactsService(this.settings);
     }
 
     /** FUNC-01.14：AI 资料候选受限补丁写（只写补丁字段，最新名册回读逐字段冲突核对） */

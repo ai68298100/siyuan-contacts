@@ -53,6 +53,70 @@
 
     let activeSection: SectionId = $state("general");
     let health: SettingsHealth | null = $state(null);
+
+    /* B11.3/B11.5：本人档案状态与显式改绑入口（通用分区） */
+    let selfIdentity: import("../domain/self-identity").SelfIdentity | null = $state(null);
+    let identityLoading = $state(true);
+    let selfDesignateTarget = $state("");
+    let selfBusy = $state(false);
+    let selfMessage = $state("");
+    let selfRoster: import("../domain/person").ContactSummary[] = $state([]);
+    const selfDisplayName = $derived.by(() => {
+        const identity = selfIdentity;
+        if (!identity) return "";
+        const person = selfRoster.find((item) => item.docId === identity.selfDocId);
+        return person ? person.name : identity.selfDocId;
+    });
+    const designationCandidates = $derived(
+        selfRoster.filter((person) => !selfIdentity || person.docId !== selfIdentity.selfDocId),
+    );
+
+    async function refreshSelfSection() {
+        if (typeof facade.loadSelfIdentity !== "function") return;
+        try {
+            selfIdentity = await facade.loadSelfIdentity();
+            if (typeof facade.listContacts === "function") {
+                selfRoster = await facade.listContacts();
+            }
+        } catch (error) {
+            selfMessage = error instanceof Error ? error.message : String(error);
+        }
+    }
+    $effect(() => { void refreshSelfSection(); });
+
+    async function createSelf() {
+        if (selfBusy || typeof facade.createSelfProfile !== "function") return;
+        selfBusy = true;
+        selfMessage = "";
+        try {
+            selfIdentity = await facade.createSelfProfile();
+            selfMessage = selfIdentity
+                ? text("selfCreated", "已创建本人档案「我自己」并标记身份")
+                : text("selfCreateFailed", "本人档案建立失败，请稍后重试");
+            await refreshSelfSection();
+        } catch (error) {
+            selfMessage = error instanceof Error ? error.message : String(error);
+        } finally {
+            selfBusy = false;
+        }
+    }
+
+    async function designateSelf() {
+        if (selfBusy || !selfDesignateTarget || typeof facade.designateSelfIdentity !== "function") return;
+        selfBusy = true;
+        selfMessage = "";
+        try {
+            selfIdentity = await facade.designateSelfIdentity(selfDesignateTarget);
+            selfDesignateTarget = "";
+            selfMessage = text("selfDesignated", "本人身份已改绑到所选联系人（原资料保留）");
+            await refreshSelfSection();
+        } catch (error) {
+            selfMessage = error instanceof Error ? error.message : String(error);
+        } finally {
+            selfBusy = false;
+        }
+    }
+
     let checking = $state(false);
     // FUNC-01.4 资料体检：只读巡检，结果按类列出（缺字段/悬空关系/孤儿互动等）
     let auditIssues: AuditIssue[] | null = $state(null);
@@ -589,6 +653,37 @@
                         <div><b>联系人总表</b><small>数据库宿主文档</small></div>
                         <button class="b3-button b3-button--text" onclick={() => facade.openHostDoc()}>打开文档</button>
                     </div>
+
+                    <!-- B11.3/B11.5：本人档案状态与显式指定入口（改绑需经此确认，不静默） -->
+                    <div class="lvct-settings__row">
+                        <div><b>{text("selfSectionTitle", "本人档案")}</b>
+                            <small>{text("selfSectionDesc", "「我自己」的身份标记，统计与提醒默认排除本人")}</small>
+                        </div>
+                        {#if identityLoading}
+                            <span class="lvct-settings__status">…</span>
+                        {:else if selfIdentity}
+                            <span class="lvct-settings__status">{selfDisplayName}</span>
+                        {:else}
+                            <button class="b3-button b3-button--text" disabled={selfBusy} onclick={createSelf}>
+                                {selfBusy ? "…" : text("selfCreate", "创建本人档案「我自己」")}</button>
+                        {/if}
+                    </div>
+                    {#if selfIdentity}
+                        <div class="lvct-settings__row">
+                            <span>{text("selfDesignateLabel", "把本人身份改绑到其他已有联系人（保留原资料）")}</span>
+                            <span>
+                                <select class="b3-select" bind:value={selfDesignateTarget}>
+                                    <option value="">{text("selfDesignatePick", "选择联系人…")}</option>
+                                    {#each designationCandidates as person (person.itemId)}
+                                        <option value={person.itemId}>{person.name}</option>
+                                    {/each}
+                                </select>
+                                <button class="b3-button b3-button--outline" disabled={selfBusy || !selfDesignateTarget}
+                                    onclick={designateSelf}>{text("selfDesignate", "改绑本人身份")}</button>
+                            </span>
+                        </div>
+                        {#if selfMessage}<div class="lvct-form__error" role="status">{selfMessage}</div>{/if}
+                    {/if}
 
                     <div class="lvct-settings__form-grid">
                         <label class="lvct-form__item">
