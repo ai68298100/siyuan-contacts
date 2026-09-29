@@ -47,6 +47,22 @@ export function filterContacts(people: readonly ContactSummary[], query: string,
  * 新建联系人：按姓名查重（renderAttributeView 精确名匹配），不存在才建文档绑行。
  * 注意 createDocWithMd 对同路径会再建新文档，防重必须走联系人查询而非文档 ID。
  */
+/** FUNC-01.15：找上次建档尝试可能残留的「未绑定同名文档」——复用而非重建（重试不产生重复文档）。
+ *  探测失败按无残留处理（不阻断正常建档）；已绑定的同名文档不在此列（查重已按名册拦截）。 */
+async function findResumableDocId(settings: ContactsSettings, name: string): Promise<string> {
+    try {
+        const docs = await listNotebookDocs(settings.notebookId);
+        const candidates = docs.filter((doc) => doc.content.trim() === name);
+        for (const candidate of candidates) {
+            const bound = (await mapBoundDocIds(settings.avId, [candidate.id]))[candidate.id];
+            if (!bound) return candidate.id;
+        }
+    } catch {
+        /* 残留探测失败：按无残留继续正常建档 */
+    }
+    return "";
+}
+
 export async function createContact(settings: ContactsSettings, draft: ContactDraft): Promise<ContactSummary> {
     const errors = validateDraft(draft);
     if (errors.length > 0) throw new Error(errors.join("；"));
@@ -57,18 +73,34 @@ export async function createContact(settings: ContactsSettings, draft: ContactDr
         throw new Error(`联系人「${name}」已存在`);
     }
 
-    const docId = await createDocWithMd(settings.notebookId, `/${settings.notebookName}/${name}`, `# ${name}\n\n`);
-    if (!docId) throw new Error(`创建人物文档「${name}」失败`);
-
-    const bound = await mapBoundDocIds(settings.avId, [docId]);
-    if (!bound[docId]) {
-        // 未绑定（全新或同名未收编文档）→ 绑行为联系人
-        await bindDocsAsRows(settings.avId, settings.dbBlockId, [{ id: docId, content: name }]);
+    /* FUNC-01.15 断点续做：有残留未绑定文档则复用（createDocWithMd 不再调用，不产生重复文档） */
+    let docId = await findResumableDocId(settings, name);
+    if (!docId) {
+        docId = await createDocWithMd(settings.notebookId, `/${settings.notebookName}/${name}`, `# ${name}\n\n`);
+        if (!docId) throw new Error(`创建人物文档「${name}」失败`);
     }
-    const itemId = (await mapBoundDocIds(settings.avId, [docId]))[docId];
-    if (!itemId) throw new Error(`「${name}」绑定数据库失败（未获得行 ID）`);
 
-    await writeDraftCells(settings, itemId, draft);
+    /* 绑行幂等：已绑直接复用行 ID（上次尝试可能已完成绑定） */
+    let itemId = (await mapBoundDocIds(settings.avId, [docId]))[docId];
+    if (!itemId) {
+        await bindDocsAsRows(settings.avId, settings.dbBlockId, [{ id: docId, content: name }]);
+        itemId = (await mapBoundDocIds(settings.avId, [docId]))[docId];
+    }
+    if (!itemId) {
+        throw new Error(`「${name}」绑定数据库失败（未获得行 ID）；人物文档 ${docId} 已保留，直接重试将复用该文档续做`);
+    }
+
+    /* 行已落库：先失效名册再写字段——字段失败后的重试会被「已存在」正确拦截（不重复建档） */
+    invalidateRoster();
+
+    /* 逐字段写入（隔离）：失败字段清单上浮为复合错误——已建文档/行保留，重试补写失败字段 */
+    const failedFields = await writeDraftCells(settings, itemId, draft);
+    if (failedFields.length > 0) {
+        throw new Error(
+            `「${name}」资料字段写入失败：${failedFields.join("、")}；人物文档与数据库行（${itemId}）已保留，该联系人已存在——请在编辑资料中补写失败字段（重试新建会被同名拦截，不产生重复文档）`,
+        );
+    }
+
     invalidateRoster();
     const summaries = await getRoster(settings);
     const created = summaries.find((item) => item.docId === docId);
@@ -76,50 +108,61 @@ export async function createContact(settings: ContactsSettings, draft: ContactDr
     return created;
 }
 
-/** 草稿 → 单元格写入（不含查重/建行）。vCard 批量导入复用同一套写入语义。 */
-export async function writeDraftCells(settings: ContactsSettings, itemId: string, draft: ContactDraft): Promise<void> {
+/** 草稿 → 单元格写入（不含查重/建行）。vCard 批量导入复用同一套写入语义。
+ *  FUNC-01.15：逐字段隔离——单字段失败不阻断其余，返回失败字段清单（含原因）由调用方上浮；
+ *  setCell 本身幂等，重试直接补写失败字段即可。 */
+export async function writeDraftCells(settings: ContactsSettings, itemId: string, draft: ContactDraft): Promise<string[]> {
     const key = (field: FieldKey) => settings.fieldMap[field];
     const trimOrNull = (value: string) => {
         const trimmed = value.trim();
         return trimmed.length > 0 ? trimmed : null;
     };
+    const failedFields: string[] = [];
+    const run = async (label: string, task: Promise<unknown>): Promise<void> => {
+        try {
+            await task;
+        } catch (error) {
+            failedFields.push(`${label}（${error instanceof Error ? error.message : String(error)}）`);
+        }
+    };
 
-    const writes: Promise<unknown>[] = [];
+    const writes: Promise<void>[] = [];
     const phone = trimOrNull(draft.phone);
-    if (phone) writes.push(setCell(settings.avId, key("phone"), itemId, { type: "phone", value: { phone: { content: phone } } }));
+    if (phone) writes.push(run("电话", setCell(settings.avId, key("phone"), itemId, { type: "phone", value: { phone: { content: phone } } })));
 
     const email = trimOrNull(draft.email);
-    if (email) writes.push(setCell(settings.avId, key("email"), itemId, { type: "email", value: { email: { content: email } } }));
+    if (email) writes.push(run("邮箱", setCell(settings.avId, key("email"), itemId, { type: "email", value: { email: { content: email } } })));
 
     const wechat = trimOrNull(draft.wechat);
-    if (wechat) writes.push(setCell(settings.avId, key("wechat"), itemId, { type: "text", value: { text: { content: wechat } } }));
+    if (wechat) writes.push(run("微信", setCell(settings.avId, key("wechat"), itemId, { type: "text", value: { text: { content: wechat } } })));
 
     const website = trimOrNull(draft.website);
-    if (website) writes.push(setCell(settings.avId, key("website"), itemId, { type: "url", value: { url: { content: website } } }));
+    if (website) writes.push(run("网站", setCell(settings.avId, key("website"), itemId, { type: "url", value: { url: { content: website } } })));
 
     const birthdayMs = draft.birthday ? birthdayToMs(draft.birthday) : null;
     if (birthdayMs !== null) {
-        writes.push(setCell(settings.avId, key("birthday"), itemId, {
+        writes.push(run("生日", setCell(settings.avId, key("birthday"), itemId, {
             type: "date",
             value: { date: { content: birthdayMs, isNotEmpty: true, isNotTime: true } },
-        }));
+        })));
     }
     if (draft.isLunar) {
-        writes.push(setCell(settings.avId, key("lunarBirthday"), itemId, { type: "checkbox", value: { checkbox: { checked: true } } }));
+        writes.push(run("农历标记", setCell(settings.avId, key("lunarBirthday"), itemId, { type: "checkbox", value: { checkbox: { checked: true } } })));
     }
     if (draft.group.trim()) {
-        writes.push(setCell(settings.avId, key("group"), itemId, {
+        writes.push(run("分组", setCell(settings.avId, key("group"), itemId, {
             type: "select",
             value: { mSelect: [{ content: draft.group.trim(), color: "1" }] },
-        }));
+        })));
     }
     if (draft.tags.length > 0) {
-        writes.push(setCell(settings.avId, key("tags"), itemId, {
+        writes.push(run("标签", setCell(settings.avId, key("tags"), itemId, {
             type: "mSelect",
             value: { mSelect: draft.tags.filter((tag) => tag.trim()).map((tag, index) => ({ content: tag.trim(), color: String((index % 9) + 1) })) },
-        }));
+        })));
     }
     await Promise.all(writes);
+    return failedFields;
 }
 
 export { PRESET_GROUPS };

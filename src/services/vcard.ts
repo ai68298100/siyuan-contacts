@@ -152,7 +152,8 @@ export async function importVcfContacts(
             continue;
         }
         try {
-            await writeDraftCells(settings, itemId, item.plan.draft);
+            const failedFields = await writeDraftCells(settings, itemId, item.plan.draft);
+            if (failedFields.length > 0) throw new Error(`字段写入失败：${failedFields.join("、")}`);
             report.imported += 1;
             results.push({ planIndex: item.planIndex, name: item.plan.draft.name, status: "imported" });
         } catch (error) {
@@ -202,7 +203,8 @@ export async function retryVcfContacts(
             const itemMap = await mapBoundDocIds(settings.avId, [docId]);
             const itemId = itemMap[docId];
             if (!itemId) throw new Error("未获得行 ID");
-            await writeDraftCells(settings, itemId, plan.draft);
+            const failedFields = await writeDraftCells(settings, itemId, plan.draft);
+            if (failedFields.length > 0) throw new Error(`字段写入失败：${failedFields.join("、")}`);
             results.push({ planIndex, name: plan.contact.name, status: "imported" });
         } catch (error) {
             results.push({ planIndex, name: plan.contact.name, status: "unknown", reason: error instanceof Error ? error.message : String(error) });

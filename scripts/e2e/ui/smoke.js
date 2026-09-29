@@ -11,7 +11,7 @@ import PeopleView from "../../../src/components/people/PeopleView.svelte";
 import SettingsView from "../../../src/components/SettingsView.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
-import { applyContactCandidateFields } from "../../../src/services/contacts";
+import { applyContactCandidateFields, createContact } from "../../../src/services/contacts";
 import { recordInteraction, deleteInteraction, loadInteractionStore } from "../../../src/data/interactions";
 import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
 import { captureFromDoc } from "../../../src/services/capture";
@@ -922,6 +922,71 @@ await test("B07-b 同步失败分项：单块失败不阻断其余，复合错�
     assert(composite.includes("跟进已保存，但") && composite.includes("打勾注入失败"), `复合错误缺失：${composite}`);
     const afterFail = await loadFollowUpStore(plugin);
     assert(afterFail.items.find((item) => item.id === "fu-s1").status === "done", "复合错误回退了插件库写入");
+});
+
+await test("FUNC-01.15 断点续做：残留文档复用不重建，字段失败上浮可定位且重试不重复建档", async () => {
+    invalidateRoster();
+    let createDocCalls = 0;
+    let rowCount = 0;
+    let failPhone = false;
+    const staged = { "断点甲": "20260930000000-doc0001", "断点乙": "20260930000000-doc0002" };
+    const boundNames = new Set();
+    const bindings = {};
+    const cellWrites = [];
+    const draftOf = (name, phone) => ({ name, phone, email: "", wechat: "", website: "", birthday: "", isLunar: false, group: "", tags: [] });
+    kernel.handler = async (route, body) => {
+        if (route === "/api/query/sql") {
+            /* findResumableDocId 残留探测：只返回尚未绑定的同名遗留文档 */
+            return Object.entries(staged)
+                .filter(([name]) => !boundNames.has(name))
+                .map(([name, id]) => ({ id, content: name }));
+        }
+        if (route === "/api/filetree/createDocWithMd") { createDocCalls += 1; return "20260930000000-doc9999"; }
+        if (route === "/api/av/renderAttributeView") {
+            const base = renderResult();
+            const rows = [...base.view.rows];
+            for (const [name, id] of Object.entries(staged)) {
+                if (boundNames.has(name) && bindings[id]) {
+                    rows.push({ id: bindings[id], cells: [{ value: { type: "block", keyID: "name", block: { id, content: name } } }] });
+                }
+            }
+            return { view: { ...base.view, rows } };
+        }
+        if (route === "/api/av/addAttributeViewBlocks") {
+            const docId = body.srcs[0].id;
+            boundNames.add(body.srcs[0].content);
+            rowCount += 1;
+            bindings[docId] = `row-new${rowCount}`;
+            return { code: 0 };
+        }
+        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") return { ...bindings };
+        if (route === "/api/av/setAttributeViewBlockAttr") {
+            if (body.keyID === "phone" && failPhone) { failPhone = false; throw new Error("phone 注入失败"); }
+            cellWrites.push({ keyID: body.keyID, itemID: body.itemID });
+            return { code: 0 };
+        }
+        throw new Error(`断点续做用例不允许请求 ${route}`);
+    };
+
+    /* 场景 A：上次尝试残留的未绑定文档 → 复用（createDocWithMd 零调用）→ 绑行 + 写字段完成 */
+    const created = await createContact(settings, draftOf("断点甲", "13800001234"));
+    assert(createDocCalls === 0, "残留文档未被复用（重复调用了建文档）");
+    assert(created.docId === "20260930000000-doc0001", `未复用残留文档：${created.docId}`);
+
+    /* 场景 B：绑行成功但字段写入失败 → 复合错误指名字段与保留行；重试被「已存在」拦截且零新建 */
+    failPhone = true;
+    invalidateRoster();
+    let composite = "";
+    try { await createContact(settings, draftOf("断点乙", "13900002222")); }
+    catch (error) { composite = error.message; }
+    assert(composite.includes("资料字段写入失败") && composite.includes("电话") && composite.includes("row-new"),
+        `字段失败上浮缺失：${composite}`);
+    invalidateRoster();
+    let dupError = "";
+    try { await createContact(settings, draftOf("断点乙", "13900002222")); }
+    catch (error) { dupError = error.message; }
+    assert(dupError.includes("已存在"), `重试未按已存在拦截：${dupError}`);
+    assert(createDocCalls === 0, "重试产生了重复文档");
 });
 
 await test("新建草稿「保存并离开」：守卫内保存成功并关闭弹窗", async () => {
