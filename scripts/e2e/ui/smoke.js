@@ -14,7 +14,7 @@ import { getRoster, invalidateRoster } from "../../../src/services/roster";
 import { applyContactCandidateFields, createContact } from "../../../src/services/contacts";
 import { recordInteraction, deleteInteraction, loadInteractionStore } from "../../../src/data/interactions";
 import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
-import { captureFromDoc } from "../../../src/services/capture";
+import { captureFromDoc, resolveRecognizeTarget } from "../../../src/services/capture";
 import { exportInteractionJson } from "../../../src/services/interaction-export";
 import { createFollowUp, exportFollowUpsJson, importFollowUpsJson, previewFollowUpsImport, setFollowUpStatus } from "../../../src/services/followups";
 import { reconcileFollowUpTasksFromDoc, syncFollowUpTasksToDoc } from "../../../src/services/followup-sync";
@@ -987,6 +987,30 @@ await test("FUNC-01.15 断点续做：残留文档复用不重建，字段失败
     catch (error) { dupError = error.message; }
     assert(dupError.includes("已存在"), `重试未按已存在拦截：${dupError}`);
     assert(createDocCalls === 0, "重试产生了重复文档");
+});
+
+await test("FAST-01.3a 识别目标裁决：名册失败自动重试仍失败返回 failed，恢复后 bound/unlinked 各归其位", async () => {
+    invalidateRoster();
+    let failRoster = true;
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") {
+            if (failRoster) throw new Error("名册渲染注入失败");
+            return renderResult();
+        }
+        throw new Error(`识别裁决用例不允许请求 ${route}`);
+    };
+    /* 名册持续失败 → failed：调用方必须取消识别（零写入），不得按新建目标处理 */
+    const failed = await resolveRecognizeTarget(settings, "20260927000000-person1");
+    assert(failed.status === "failed", `持续失败未返回 failed：${JSON.stringify(failed)}`);
+    /* 恢复后：文档已绑定人物 → bound（落到原人物） */
+    failRoster = false;
+    invalidateRoster();
+    const bound = await resolveRecognizeTarget(settings, "20260927000000-person1");
+    assert(bound.status === "bound" && bound.person.docId === "20260927000000-person1",
+        `已绑定文档未裁决为 bound：${JSON.stringify(bound)}`);
+    /* 普通笔记（未绑定） → unlinked（明确新建） */
+    const unlinked = await resolveRecognizeTarget(settings, "20260930000000-note01");
+    assert(unlinked.status === "unlinked", `普通笔记未裁决为 unlinked：${JSON.stringify(unlinked)}`);
 });
 
 await test("新建草稿「保存并离开」：守卫内保存成功并关闭弹窗", async () => {

@@ -33,6 +33,33 @@ export async function previewCapture(settings: ContactsSettings, docId: string):
     return { docName: docName ?? "", linked };
 }
 
+export type RecognizeTargetResolution =
+    | { status: "bound"; person: ContactSummary }
+    | { status: "unlinked" }
+    | { status: "failed" };
+
+/**
+ * FAST-01.3a：识别目标裁决。名册读取失败时自动重试一次（清半途状态后再读），仍失败返回
+ * failed——调用方必须停止目标选择（零写入），**不得按「普通笔记新建」处理**（会把已绑定
+ * 人物的笔记建成重复联系人）；普通笔记（名册正常且未绑定）明确返回 unlinked。
+ */
+export async function resolveRecognizeTarget(settings: ContactsSettings, rootDocId: string): Promise<RecognizeTargetResolution> {
+    const find = async (): Promise<ContactSummary | null> =>
+        (await getRoster(settings)).find((item) => item.docId === rootDocId) ?? null;
+    try {
+        const person = await find();
+        return person ? { status: "bound", person } : { status: "unlinked" };
+    } catch {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+    try {
+        const person = await find();
+        return person ? { status: "bound", person } : { status: "unlinked" };
+    } catch {
+        return { status: "failed" };
+    }
+}
+
 export interface CaptureOptions {
     /** 确认要记录互动的已有联系人（文档 ID） */
     personDocIds: readonly string[];

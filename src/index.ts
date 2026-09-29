@@ -13,13 +13,13 @@ import QuickFillDialog from "./components/people/QuickFillDialog.svelte";
 import AddPersonDialog from "./components/people/AddPersonDialog.svelte";
 import PersonEditDialog from "./components/people/PersonEditDialog.svelte";
 import { parseContactText } from "./domain/quick-fill";
-import { getRoster, invalidateRoster } from "./services/roster";
+import { invalidateRoster } from "./services/roster";
 import { initializeWorkspace, inspectWorkspace, loadSettings, scanAnchorCandidates } from "./services/init";
 import { configureCloseGuardI18n } from "./components/close-guard";
 import type { InitProgressStep, WorkspaceSnapshot } from "./services/init";
 import { loadDashboard, DEFAULT_DASHBOARD_OPTIONS } from "./services/dashboard";
 import { deleteInteraction, recordInteraction, loadInteractionStore } from "./data/interactions";
-import { captureFromDoc, previewCapture } from "./services/capture";
+import { captureFromDoc, previewCapture, resolveRecognizeTarget } from "./services/capture";
 import { extractFromDoc } from "./services/ai-extract";
 import { loadPersonInsights } from "./services/insights";
 import { checkSettingsHealth, rebuildMissingFields, rebindSettings, repairFieldMap } from "./services/settings-health";
@@ -249,10 +249,14 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
             showMessage("未识别到可填充的资料字段（原文已保留，未做任何写入）", 3000);
             return;
         }
-        let person: ContactSummary | null = null;
-        try {
-            person = (await getRoster(this.settings)).find((item) => item.docId === rootDocId) ?? null;
-        } catch { /* 名册读取失败按新建目标处理 */ }
+        /* FAST-01.3a：识别目标裁决——名册读取失败（自动重试一次仍失败）时整单取消：零写入、
+           零弹窗，不按「普通笔记新建」处理（会把已绑定人物的笔记建成重复联系人） */
+        const resolution = await resolveRecognizeTarget(this.settings, rootDocId);
+        if (resolution.status === "failed") {
+            showMessage("人脉名册读取失败，本次识别已取消（未做任何写入）；请稍后重新触发「识别资料」", 6000);
+            return;
+        }
+        const person = resolution.status === "bound" ? resolution.person : null;
         const existing = person
             ? { name: person.name, phone: person.phone, email: person.email, wechat: person.wechat, website: person.website, birthday: person.birthday, group: person.group, tags: person.tags }
             : { name: "", phone: "", email: "", wechat: "", website: "", birthday: "", group: "", tags: [] as string[] };
