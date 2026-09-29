@@ -125,3 +125,46 @@ export function reconcileFieldMap(
         lastColumnId: columns.at(-1)?.id ?? "",
     };
 }
+
+export interface FieldMapProblem {
+    key: FieldKey;
+    message: string;
+}
+
+/** CODE-02.4：fieldMap 结构校验（纯函数）——必需键、重复映射，提供列清单时再核对
+ *  存在性与类型一致。问题清单供设置页健康检查呈现「修复态」，不在此处静默自愈。 */
+export function validateFieldMap(
+    fieldMap: Partial<Record<FieldKey, string>>,
+    columns?: readonly AvColumnLike[],
+): FieldMapProblem[] {
+    const problems: FieldMapProblem[] = [];
+    const byColumn = new Map<string, FieldKey[]>();
+    for (const spec of FIELD_SPECS) {
+        const columnId = fieldMap[spec.key];
+        if (!columnId) {
+            problems.push({ key: spec.key, message: `${spec.nameZh} 缺少列映射` });
+            continue;
+        }
+        const keys = byColumn.get(columnId) ?? [];
+        keys.push(spec.key);
+        byColumn.set(columnId, keys);
+    }
+    for (const [columnId, keys] of byColumn) {
+        if (keys.length > 1) {
+            problems.push({ key: keys[0], message: `列 ${columnId} 被重复映射为 ${keys.join("、")}` });
+        }
+    }
+    if (columns) {
+        for (const spec of FIELD_SPECS) {
+            const columnId = fieldMap[spec.key];
+            if (!columnId) continue;
+            const column = columns.find((item) => item.id === columnId);
+            if (!column) {
+                problems.push({ key: spec.key, message: `${spec.nameZh} 映射的列 ${columnId} 不存在于当前数据库` });
+            } else if (column.type !== spec.type) {
+                problems.push({ key: spec.key, message: `${spec.nameZh} 需要 ${spec.type} 类型，当前列是 ${column.type}` });
+            }
+        }
+    }
+    return problems;
+}

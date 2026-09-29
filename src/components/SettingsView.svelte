@@ -844,9 +844,15 @@
 
                     {#if health}
                         <div class:lvct-settings__health--ok={health.ok} class="lvct-settings__health">
-                            <b>{health.ok ? "字段完整" : `发现 ${health.missing.length} 个字段缺失`}</b>
+                            <b>{health.ok ? "字段完整" : `发现字段问题：缺失 ${health.missing.length} 项、结构异常 ${health.problems.length} 项`}</b>
                             <span>当前数据库列：{health.columns}</span>
                         </div>
+                        {#if health.problems.length > 0}
+                            <!-- CODE-02.4：结构问题（重复映射/列不存在/类型不一致）以修复态呈现，不静默自愈 -->
+                            <ul class="lvct-settings__missing">
+                                {#each health.problems as item (item.key + item.message)}<li>{item.message}</li>{/each}
+                            </ul>
+                        {/if}
                         {#if health.missing.length > 0}
                             <ul class="lvct-settings__missing">
                                 {#each health.missing as item (item.key)}<li>{item.expectedName} · {item.keyId} · {item.type}</li>{/each}

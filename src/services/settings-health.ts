@@ -1,6 +1,6 @@
 import { addField, configureSelfRelationTwoWay, renderView } from "../api/av";
 import { newNodeId } from "../api/client";
-import { FIELD_SPECS, reconcileFieldMap } from "../domain/fields.ts";
+import { FIELD_SPECS, reconcileFieldMap, validateFieldMap } from "../domain/fields.ts";
 import type { FieldKey } from "../domain/fields";
 import type { ContactsSettings } from "../domain/model";
 import { persistSettings } from "./init";
@@ -24,6 +24,8 @@ export interface SettingsHealth {
     ok: boolean;
     columns: number;
     missing: MissingField[];
+    /** CODE-02.4：fieldMap 结构问题（重复映射/列不存在/类型不一致），修复态呈现 */
+    problems: { key: string; message: string }[];
     availableColumns: HealthColumn[];
 }
 
@@ -45,10 +47,15 @@ export async function checkSettingsHealth(settings: ContactsSettings): Promise<S
             keyId: settings.fieldMap[spec.key] ?? "（未记录）",
             type: spec.type,
         }));
+    /* CODE-02.4：结构问题（重复映射/列不存在/类型不一致）——「缺少列映射」已由 missing 覆盖，滤除避免重复 */
+    const problems = validateFieldMap(settings.fieldMap, rendered.view.columns)
+        .filter((problem) => !problem.message.includes("缺少列映射"))
+        .map((problem) => ({ key: problem.key as string, message: problem.message }));
     return {
-        ok: missing.length === 0,
+        ok: missing.length === 0 && problems.length === 0,
         columns: rendered.view.columns.length,
         missing,
+        problems,
         availableColumns: rendered.view.columns.map((column) => ({ id: column.id, name: column.name, type: column.type })),
     };
 }

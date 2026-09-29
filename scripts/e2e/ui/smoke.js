@@ -11,7 +11,7 @@ import PeopleView from "../../../src/components/people/PeopleView.svelte";
 import SettingsView from "../../../src/components/SettingsView.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
-import { applyContactCandidateFields, createContact } from "../../../src/services/contacts";
+import { applyContactCandidateFields, createContact, updateContactFields } from "../../../src/services/contacts";
 import { addRelation, removeRelation } from "../../../src/services/relations";
 import { recordInteraction, deleteInteraction, loadInteractionStore } from "../../../src/data/interactions";
 import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
@@ -1069,6 +1069,42 @@ await test("CODE-02.5 关系并发：写前回读防丢边，幂等不重写，�
     assert(relatedOfA.includes("row-b") && relatedOfA.includes("row-c"), "区块失败影响了关系数据");
 });
 
+await test("CODE-02.4 编辑写前预校验：非法生日/邮箱零写入，逐字段失败复合错误不回退", async () => {
+    let setCellCount = 0;
+    let failWechat = true;
+    kernel.handler = async (route, body) => {
+        if (route === "/api/av/setAttributeViewBlockAttr") {
+            if (body.keyID === "wechat" && failWechat) throw new Error("微信注入失败");
+            setCellCount += 1;
+            return { code: 0 };
+        }
+        if (route === "/api/av/renderAttributeView") return renderResult();
+        return { code: 0 };
+    };
+    const draftOf = (over) => ({ name: "回归测试甲", phone: "13900001111", email: "a@b.com", wechat: "", website: "", birthday: "", isLunar: false, group: "", tags: [], ...over });
+
+    /* 非法生日（格式合法但不存在的日期）→ 预校验拒绝：零写入、旧值不被清空 */
+    let error = "";
+    try { await updateContactFields(settings, "row-1", draftOf({ birthday: "2026-02-30" })); }
+    catch (e) { error = e.message; }
+    assert(error.includes("未做任何写入") && error.includes("生日"), `非法生日未拦截：${error}`);
+    assert(setCellCount === 0, "非法生日仍产生了写入");
+
+    /* 非法邮箱 → 同样零写入 */
+    error = "";
+    try { await updateContactFields(settings, "row-1", draftOf({ email: "not-an-email" })); }
+    catch (e) { error = e.message; }
+    assert(error.includes("未做任何写入") && error.includes("邮箱"), `非法邮箱未拦截：${error}`);
+    assert(setCellCount === 0, "非法邮箱仍产生了写入");
+
+    /* 逐字段隔离：微信写入失败 → 复合错误指名字段，其余字段已写入 */
+    error = "";
+    try { await updateContactFields(settings, "row-1", draftOf({})); }
+    catch (e) { error = e.message; }
+    assert(error.includes("字段写入失败") && error.includes("微信"), `逐字段失败未上浮：${error}`);
+    assert(setCellCount >= 7, "其余字段未写入");
+});
+
 await test("FUNC-01.8a 锚点消歧：首 AV 无关不采纳按字段证据取次 AV，歧义暂停写入，零匹配按新建", async () => {
     const hostDocId = "20260927000000-host001";
     const CONTACT_COLUMNS = [
@@ -1569,8 +1605,8 @@ await test("设置页可按列类型手动恢复字段映射并拒绝空提交",
         checkSettingsHealth: async () => {
             checked = true;
             return checked && repaired
-                ? { ok: true, columns: columns.length, missing: [], availableColumns: columns }
-                : { ok: false, columns: columns.length, missing: [{ key: "phone", expectedName: "电话", keyId: "old-phone", type: "phone" }], availableColumns: columns };
+                ? { ok: true, columns: columns.length, missing: [], problems: [], availableColumns: columns }
+                : { ok: false, columns: columns.length, missing: [{ key: "phone", expectedName: "电话", keyId: "old-phone", type: "phone" }], problems: [], availableColumns: columns };
         },
         repairFieldMap: async (patch) => { repaired = patch; return { ...settings, fieldMap: { ...settings.fieldMap, ...patch } }; },
         rebuildMissingFields: async () => settings,
@@ -1595,7 +1631,7 @@ await test("设置页可按列类型手动恢复字段映射并拒绝空提交",
     dataNav.click();
     await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent.trim() === "检查字段健康"), "数据与字段分区未显示");
     button("检查字段健康").click();
-    await until(() => fixture.textContent.includes("发现 1 个字段缺失"), "健康检查结果未展示");
+    await until(() => fixture.textContent.includes("缺失 1 项"), "健康检查结果未展示");
     const mapping = fixture.querySelector(".lvct-settings__mapping select");
     assert(mapping, "缺失字段没有映射选择器");
     mapping.value = "phone-renamed";
@@ -3199,7 +3235,7 @@ await test("设置页导出中心显示数量与范围，失败不下载可重�
             },
             exportInteractionJson: async () => "{}",
             saveViewPreferences: async (value) => value,
-            checkSettingsHealth: async () => ({ ok: true, columns: 9, missing: [], availableColumns: [] }),
+            checkSettingsHealth: async () => ({ ok: true, columns: 9, missing: [], problems: [], availableColumns: [] }),
             rebuildMissingFields: async () => settings,
             rebindSettings: async () => settings,
             repairFieldMap: async () => settings,

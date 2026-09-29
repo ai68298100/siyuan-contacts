@@ -174,7 +174,7 @@
         openPersonDoc() {}, openHostDoc() {}, openDoc() {}, openSettings() {},
         loadViewPreferences: async () => preferences,
         loadExportSummary: async () => ({ people: people.length, interactions: 0 }),
-        checkSettingsHealth: async () => ({ ok: true, issues: [], fieldMap: settings.fieldMap }),
+        checkSettingsHealth: async () => ({ ok: true, issues: [], problems: [], fieldMap: settings.fieldMap }),
         runHealthAudit: async () => [],
         rebuildMissingFields: async () => settings,
         rebindSettings: async () => settings,

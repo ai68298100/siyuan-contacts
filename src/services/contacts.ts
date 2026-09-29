@@ -170,31 +170,52 @@ export { PRESET_GROUPS };
 /**
  * 编辑资料：全字段更新（含清空语义）。
  * 空字符串/空数组的写入即清空对应单元格——编辑弹窗依赖此语义。
+ * CODE-02.4：写前与新建共用同一套预校验（validateDraft + 真实生日日期）——非法生日/邮箱
+ * 在任何写入前拒绝（旧值不被清空）；字段写入逐项隔离，失败清单以复合错误上浮
+ * （其余字段已更新，失败字段可直接重试保存补写）。
  */
 export async function updateContactFields(settings: ContactsSettings, itemId: string, draft: ContactDraft): Promise<void> {
+    const errors = validateDraft(draft);
+    if (errors.length > 0) throw new Error(`资料校验失败，未做任何写入：${errors.join("；")}`);
+    if (draft.birthday && birthdayToMs(draft.birthday) === null) {
+        throw new Error(`资料校验失败，未做任何写入：生日不是真实存在的公历日期（${draft.birthday}）`);
+    }
+
     const key = (field: FieldKey) => settings.fieldMap[field];
     const text = (value: string) => value.trim();
-    const writes: Promise<unknown>[] = [
-        setCell(settings.avId, key("phone"), itemId, { type: "phone", value: { phone: { content: text(draft.phone) } } }),
-        setCell(settings.avId, key("email"), itemId, { type: "email", value: { email: { content: text(draft.email) } } }),
-        setCell(settings.avId, key("wechat"), itemId, { type: "text", value: { text: { content: text(draft.wechat) } } }),
-        setCell(settings.avId, key("website"), itemId, { type: "url", value: { url: { content: text(draft.website) } } }),
-        setCell(settings.avId, key("lunarBirthday"), itemId, { type: "checkbox", value: { checkbox: { checked: draft.isLunar } } }),
-        setCell(settings.avId, key("group"), itemId, {
+    const failedFields: string[] = [];
+    const run = async (label: string, task: Promise<unknown>): Promise<void> => {
+        try {
+            await task;
+        } catch (error) {
+            failedFields.push(`${label}（${error instanceof Error ? error.message : String(error)}）`);
+        }
+    };
+
+    const writes: Promise<void>[] = [
+        run("电话", setCell(settings.avId, key("phone"), itemId, { type: "phone", value: { phone: { content: text(draft.phone) } } })),
+        run("邮箱", setCell(settings.avId, key("email"), itemId, { type: "email", value: { email: { content: text(draft.email) } } })),
+        run("微信", setCell(settings.avId, key("wechat"), itemId, { type: "text", value: { text: { content: text(draft.wechat) } } })),
+        run("网站", setCell(settings.avId, key("website"), itemId, { type: "url", value: { url: { content: text(draft.website) } } })),
+        run("农历标记", setCell(settings.avId, key("lunarBirthday"), itemId, { type: "checkbox", value: { checkbox: { checked: draft.isLunar } } })),
+        run("分组", setCell(settings.avId, key("group"), itemId, {
             type: "select",
             value: { mSelect: draft.group.trim() ? [{ content: draft.group.trim(), color: "1" }] : [] },
-        }),
-        setCell(settings.avId, key("tags"), itemId, {
+        })),
+        run("标签", setCell(settings.avId, key("tags"), itemId, {
             type: "mSelect",
             value: { mSelect: draft.tags.filter((tag) => tag.trim()).map((tag, index) => ({ content: tag.trim(), color: String((index % 9) + 1) })) },
-        }),
+        })),
     ];
     const birthdayMs = draft.birthday ? birthdayToMs(draft.birthday) : null;
-    writes.push(setCell(settings.avId, key("birthday"), itemId, {
+    writes.push(run("生日", setCell(settings.avId, key("birthday"), itemId, {
         type: "date",
         value: { date: birthdayMs !== null ? { content: birthdayMs, isNotEmpty: true, isNotTime: true } : { content: 0, isNotEmpty: false } },
-    }));
+    })));
     await Promise.all(writes);
+    if (failedFields.length > 0) {
+        throw new Error(`字段写入失败：${failedFields.join("、")}；其余字段已更新，可直接重新保存补写失败字段`);
+    }
     invalidateRoster();
 }
 
