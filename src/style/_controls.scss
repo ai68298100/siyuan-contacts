@@ -139,7 +139,9 @@
         .lvct-dash__rowmenu,
         .lvct-people__colmenu,
         .lvct-people__moremenu,
-        .lvct-graph-view__hover-card {
+        .lvct-graph-view__hover-card,
+        .lvct-dialog-mask,
+        .lvct-dialog-panel {
             transition-duration: 0.01ms !important;
             animation: none !important;
         }

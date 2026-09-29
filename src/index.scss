@@ -1184,6 +1184,8 @@
     border: 1px solid var(--lvct-border-subtle);
     border-radius: var(--lvct-r-lg);
     background: var(--lvct-bg-surface);
+    /* UX-02.10 与全局卡片阴影语言统一 */
+    box-shadow: var(--lvct-shadow-1);
 
     h2 {
         margin: 0 0 var(--lvct-sp-1);
@@ -1222,6 +1224,8 @@
     justify-content: space-between;
     gap: var(--lvct-sp-3);
     min-height: 44px;
+    /* UX-02.10 行距呼吸 + 分隔线内缩（iOS 分组列表观感） */
+    padding: var(--lvct-sp-1) 0;
     border-top: 1px solid var(--lvct-border-subtle);
 
     div { min-width: 0; }
@@ -1710,8 +1714,14 @@
     z-index: var(--lvct-z-dialog);
     padding: var(--lvct-sp-4);
     box-sizing: border-box;
+    animation: lvct-fade-in var(--lvct-dur-base) var(--lvct-ease);
 }
 
+@keyframes lvct-fade-in {
+    from { opacity: 0; }
+}
+
+/* UX-02.9 对话框入场：桌面缩放淡入；≤640px bottom-sheet 滑入；Peek 右滑入 */
 .lvct-dialog-panel {
     background: var(--lvct-bg-elevated);
     border: 1px solid var(--lvct-border-strong);
@@ -1722,6 +1732,28 @@
     overflow: auto;
     padding: var(--lvct-sp-4);
     box-sizing: border-box;
+    animation: lvct-dialog-in var(--lvct-dur-base) var(--lvct-ease-spring);
+}
+
+@keyframes lvct-dialog-in {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(10px);
+    }
+}
+
+@keyframes lvct-sheet-in {
+    from {
+        transform: translateY(100%);
+    }
+}
+
+@media (max-width: 640px) {
+
+    .lvct-dialog-panel,
+    .lvct-dialog-panel--wide {
+        animation-name: lvct-sheet-in;
+    }
 }
 
 .lvct-dialog-panel--wide {

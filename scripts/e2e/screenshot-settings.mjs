@@ -96,7 +96,12 @@ async function capture({ url, outFile, size }) {
             spawn("taskkill", ["/pid", String(browser.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
             await pause(300);
         }
-        rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+        try {
+            rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+        } catch {
+            /* 句柄偶发释放慢：残留目录下次运行统一清理，不判失败 */
+            console.warn(`临时目录清理失败（残留无害）：${profile}`);
+        }
     }
 }
 
