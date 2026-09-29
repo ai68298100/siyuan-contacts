@@ -33,27 +33,20 @@ export async function ensureRegistryEntriesSaved(plugin: Plugin, docIds: readonl
     }
 }
 
-/** C08 迁移包恢复：包内条目覆盖合并（同 docId 覆盖、新增补入）；非法条目由归一化丢弃 */
+/** C08 迁移包恢复：包内条目覆盖合并（同 docId 覆盖、新增补入）；非法条目由归一化丢弃。
+    FUNC-01.6-c：不吞异常——读/写失败上抛，由迁移包服务逐模块报告，不冒充「合并 0 条」成功 */
 export async function mergeRegistryEntries(
     plugin: Plugin,
     incoming: Record<string, string>,
 ): Promise<number> {
-    console.log("[reg] merge start");
-    try {
-        return await withStoreLock(REGISTRY_STORAGE_KEY, async () => {
-            console.log("[reg] lock acquired");
-            const store = normalizeRegistryStore(await loadJsonStrict(plugin, REGISTRY_STORAGE_KEY));
-            let merged = 0;
-            for (const [docId, date] of Object.entries(incoming)) {
-                store.registeredAt[docId] = date;
-                merged += 1;
-            }
-            await saveJsonVerified(plugin, REGISTRY_STORAGE_KEY, { schemaVersion: 1, registeredAt: store.registeredAt });
-            console.log("[reg] saved");
-            return merged;
-        });
-    } catch {
-        /* 恢复失败不阻断其他模块，交由调用方计数口径 */
-        return 0;
-    }
+    return withStoreLock(REGISTRY_STORAGE_KEY, async () => {
+        const store = normalizeRegistryStore(await loadJsonStrict(plugin, REGISTRY_STORAGE_KEY));
+        let merged = 0;
+        for (const [docId, date] of Object.entries(incoming)) {
+            store.registeredAt[docId] = date;
+            merged += 1;
+        }
+        await saveJsonVerified(plugin, REGISTRY_STORAGE_KEY, { schemaVersion: 1, registeredAt: store.registeredAt });
+        return merged;
+    });
 }

@@ -473,6 +473,36 @@ await test("完整迁移包：六模块导出→恢复预览→确认合并，�
     assert(rejected, "坏包应被拒绝");
 });
 
+await test("迁移恢复单模块失败可见、不阻断其他模块且不污染坏库（C08/FUNC-01.6-b/c）", async () => {
+    const files = new Map();
+    const plugin = {
+        loadData: async (key) => files.get(key) ?? "",
+        saveData: async (key, value) => { files.set(key, value); },
+    };
+    kernel.handler = async () => ({ code: 0 });
+    /* 预置未知版本的模板库：模板模块恢复必须显式失败，其他模块照常合并，坏库不被覆盖 */
+    files.set("interaction-templates.json", { schemaVersion: 2, templates: [] });
+    await recordInteraction(plugin, { personDocId: "20260927000000-person1", source: "manual", note: "恢复前互动" });
+
+    const bundleText = await exportMigrationBundle(plugin);
+    const bundle = JSON.parse(bundleText);
+    bundle.modules.templates = { schemaVersion: 1, templates: [{ id: "tpl-new", name: "包内模板", content: "y" }] };
+    /* 向包内注入一条库中没有的互动：证明失败模块之外照常发生真实合并 */
+    bundle.modules.interactions.events.push({
+        id: "evt-extra", personDocId: "20260927000000-person2", occurredAt: 1, localDate: "2026-09-29", source: "manual",
+    });
+    const result = await importMigrationBundle(plugin, JSON.stringify(bundle));
+
+    assert(result.failed.length === 1 && result.failed[0].key === "templates",
+        `失败模块未报告：${JSON.stringify(result.failed)}`);
+    assert(result.failed[0].message.includes("模板"), `失败原因不可读：${result.failed[0].message}`);
+    assert(result.modules.some((module) => module.key === "interactions" && module.merged === 1),
+        `互动模块被失败阻断或未真实合并：${JSON.stringify(result.modules)}`);
+    assert(result.modules.some((module) => module.key === "cadences") && result.modules.some((module) => module.key === "registry"),
+        "失败后的其余模块未继续执行");
+    assert(files.get("interaction-templates.json").schemaVersion === 2, "损坏模板库被恢复覆盖污染");
+});
+
 await test("移动端人物卡片内容自适应，min-height 收缩且空 chips 收起（B09-2）", async () => {
     kernel.handler = async (route) => {
         if (route === "/api/av/renderAttributeView") return renderResult();

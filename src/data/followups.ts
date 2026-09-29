@@ -95,17 +95,21 @@ export async function readFollowUpStoreStrictInLock(plugin: Plugin): Promise<{ r
     });
 }
 
-/** 锁内合并写入（恢复用）：现状优先按 id，新增条目追加；写后回读验证 */
-export async function mergeFollowUpStore(plugin: Plugin, incoming: readonly FollowUpItem[]): Promise<{ added: number; skipped: number }> {
+/** 锁内合并写入（恢复用）：现状优先按 id，新增条目追加；写后回读验证；返回受影响人物供任务同步 */
+export async function mergeFollowUpStore(plugin: Plugin, incoming: readonly FollowUpItem[]): Promise<{ added: number; skipped: number; personDocIds: string[] }> {
     return withStoreLock(FOLLOW_UP_STORAGE_KEY, async () => {
         const store = normalizeFollowUpStoreForWrite(await loadJsonStrict(plugin, FOLLOW_UP_STORAGE_KEY));
         const existingIds = new Set(store.items.map((item) => item.id));
         const additions = incoming.filter((item) => !existingIds.has(item.id));
-        if (additions.length === 0) return { added: 0, skipped: incoming.length };
+        if (additions.length === 0) return { added: 0, skipped: incoming.length, personDocIds: [] };
         let merged = store;
         for (const item of additions) merged = appendFollowUp(merged, item);
         await saveJsonVerified(plugin, FOLLOW_UP_STORAGE_KEY, merged);
-        return { added: additions.length, skipped: incoming.length - additions.length };
+        return {
+            added: additions.length,
+            skipped: incoming.length - additions.length,
+            personDocIds: [...new Set(additions.map((item) => item.personDocId))],
+        };
     });
 }
 

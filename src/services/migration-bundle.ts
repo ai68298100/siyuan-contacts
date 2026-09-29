@@ -10,11 +10,12 @@ import { exportFollowUpsJson } from "./followups";
 import { loadCadenceMap, mergeCadenceMap } from "../data/cadences";
 import { loadReminderDismissals, mergeReminderDismissals } from "../data/reminder-dismissals";
 import { loadRegistry, mergeRegistryEntries } from "../data/registry";
-import { loadTemplatesStore, saveTemplatesStore } from "../data/templates";
+import { loadTemplatesStore, mergeTemplatesStore } from "../data/templates";
 import { normalizeTemplates } from "../domain/interaction-templates";
 import { importInteractionJson } from "./interaction-import";
 import { mergeFollowUpStore } from "../data/followups";
 import { normalizeFollowUpStore } from "../domain/followups";
+import { syncFollowUpTasksToDoc } from "./followup-sync";
 
 const BUNDLE_SCHEMA_VERSION = 1;
 export const MIGRATION_BUNDLE_STORAGE_KEY = "lvct-migration-bundle";
@@ -98,20 +99,35 @@ export function previewMigrationImport(text: string): MigrationModulePreview[] {
     return previews;
 }
 
+export interface MigrationModuleFailure {
+    key: MigrationModulePreview["key"];
+    label: string;
+    message: string;
+}
+
 export interface MigrationImportResult {
     modules: { key: MigrationModulePreview["key"]; label: string; merged: number }[];
+    /** FUNC-01.6-b：合并失败模块（含原因）；失败不阻断其他模块，也不得报整包成功 */
+    failed: MigrationModuleFailure[];
     /** 跟进合并/互动合并各自的跳过数（现状优先未计入 merged） */
     skipped: { followUps: number; interactions: number };
 }
 
-/** 确认导入：逐模块合并（互动/跟进复用既有合并纪律），失败模块不阻断其他模块 */
+/** 确认导入：逐模块合并（互动/跟进复用既有合并纪律），失败模块记录原因不阻断其他模块 */
 export async function importMigrationBundle(plugin: Plugin, text: string): Promise<MigrationImportResult> {
     previewMigrationImport(text); /* 合并前再校验一次包合法性 */
     const modules = parseBundle(text).modules as BundleModules;
-    const result: MigrationImportResult = { modules: [], skipped: { followUps: 0, interactions: 0 } };
+    const result: MigrationImportResult = { modules: [], failed: [], skipped: { followUps: 0, interactions: 0 } };
+    const runModule = async (key: MigrationModulePreview["key"], label: string, run: () => Promise<void>): Promise<void> => {
+        try {
+            await run();
+        } catch (error) {
+            result.failed.push({ key, label, message: error instanceof Error ? error.message : String(error) });
+        }
+    };
 
     if (Array.isArray(modules.interactions?.events)) {
-        try {
+        await runModule("interactions", "互动事件", async () => {
             const summary = await importInteractionJson(plugin, JSON.stringify({
                 schemaVersion: 1,
                 events: modules.interactions!.events,
@@ -119,12 +135,10 @@ export async function importMigrationBundle(plugin: Plugin, text: string): Promi
             }));
             result.modules.push({ key: "interactions", label: "互动事件", merged: summary.added });
             result.skipped.interactions = summary.skipped;
-        } catch (error) {
-            console.warn("[lvct] 迁移包互动模块导入失败:", error);
-        }
+        });
     }
     if (Array.isArray(modules.followUps?.items)) {
-        try {
+        await runModule("followUps", "跟进事项", async () => {
             const incoming = normalizeFollowUpStore({
                 schemaVersion: 1,
                 items: modules.followUps!.items,
@@ -133,38 +147,39 @@ export async function importMigrationBundle(plugin: Plugin, text: string): Promi
             const summary = await mergeFollowUpStore(plugin, incoming.items);
             result.modules.push({ key: "followUps", label: "跟进事项", merged: summary.added });
             result.skipped.followUps = summary.skipped;
-        } catch (error) {
-            console.warn("[lvct] 迁移包跟进模块导入失败:", error);
-        }
+            /* FUNC-01.6-b：恢复后对新增人物触发安全任务同步（settings 未初始化/文档不可达在 sync 内降级） */
+            for (const personDocId of summary.personDocIds) {
+                await syncFollowUpTasksToDoc(plugin, personDocId);
+            }
+        });
     }
     if (modules.cadences?.cadences && typeof modules.cadences.cadences === "object") {
-        const merged = await mergeCadenceMap(plugin, modules.cadences.cadences as Record<string, { days: number; paused: boolean }>);
-        result.modules.push({ key: "cadences", label: "联系节奏", merged });
+        await runModule("cadences", "联系节奏", async () => {
+            const merged = await mergeCadenceMap(plugin, modules.cadences!.cadences as Record<string, { days: number; paused: boolean }>);
+            result.modules.push({ key: "cadences", label: "联系节奏", merged });
+        });
     }
     if (Array.isArray(modules.reminderDismissals?.dismissals)) {
-        const merged = await mergeReminderDismissals(plugin, modules.reminderDismissals.dismissals as never[]);
-        result.modules.push({ key: "reminderDismissals", label: "提醒暂缓", merged });
+        await runModule("reminderDismissals", "提醒暂缓", async () => {
+            const merged = await mergeReminderDismissals(plugin, modules.reminderDismissals!.dismissals as never[]);
+            result.modules.push({ key: "reminderDismissals", label: "提醒暂缓", merged });
+        });
     }
     if (modules.registry?.registeredAt && typeof modules.registry.registeredAt === "object") {
-        const merged = await mergeRegistryEntries(plugin, modules.registry.registeredAt as Record<string, string>);
-        result.modules.push({ key: "registry", label: "收编时间索引", merged });
+        await runModule("registry", "收编时间索引", async () => {
+            const merged = await mergeRegistryEntries(plugin, modules.registry!.registeredAt as Record<string, string>);
+            result.modules.push({ key: "registry", label: "收编时间索引", merged });
+        });
     }
     if (Array.isArray(modules.templates?.templates)) {
-        const incoming = normalizeTemplates(modules.templates!.templates);
-        if (incoming.length > 0) {
-            /* 锁守护（withStoreLock 5s 超时 + steal 接管）落地后回归锁内写；
-               此前因回归环境偶发锁假死曾绕锁手工读改写（已修复根因） */
-            const store = await loadTemplatesStore(plugin);
-            const byId = new Map((store?.templates ?? []).map((template) => [template.id, template]));
-            let added = 0;
-            for (const template of incoming) {
-                if (byId.has(template.id)) continue;
-                byId.set(template.id, template);
-                added += 1;
+        await runModule("templates", "备注模板", async () => {
+            const incoming = normalizeTemplates(modules.templates!.templates);
+            if (incoming.length > 0) {
+                /* FUNC-01.6-c：读取、合并、保存同一存储锁临界区（并发恢复不丢模板） */
+                const added = await mergeTemplatesStore(plugin, incoming);
+                result.modules.push({ key: "templates", label: "备注模板", merged: added });
             }
-            await saveTemplatesStore(plugin, [...byId.values()].slice(0, 50));
-            result.modules.push({ key: "templates", label: "备注模板", merged: added });
-        }
+        });
     }
     return result;
 }

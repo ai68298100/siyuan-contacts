@@ -1379,3 +1379,29 @@
 - **边界说明**：capture/interaction-import/migration/export-center 等其余容错读路径本轮不动
   （归 FUNC-01.6/CODE-02 后续切片）；「读失败保留旧值重试」的完整形态归 FUNC-01.7 刷新通道，
   本轮以 readFailures 显式降级承接。
+
+## P0 数据可信 第 48 轮：FUNC-01.6/C08 备份恢复可靠性 a+b+c（2026-09-29，续跑口令第 48 版驱动）
+
+- **a 单项备份往返**：跟进备份解析从 services 下沉域层 `domain/followup-backup.ts`，
+  **rawStore 三形态兼容**——字符串（文本快照）/对象（真实宿主 loadData 返回已解析对象，此前
+  直接抛「原始快照损坏」）/null·空串（空快照）；损坏字符串与未知版本仍拒绝（零写入）。
+- **b 六模块逐项可靠**：`importMigrationBundle` 六模块全部 try/catch 隔离，结果新增
+  `failed: {key,label,message}[]`（此前互动/跟进失败只进 console、cadences/reminderDismissals/
+  registry/templates 一处抛错中断后续全部模块）——失败指名模块与原因、不阻断其他模块、
+  不报整包成功；设置页恢复完成消息追加「恢复失败模块：…」；跟进恢复对新增条目人物
+  触发 B07 写侧安全任务同步（settings 未初始化/文档不可达在 sync 内降级）。
+- **c 并发与异常纪律**：新增 `data/templates.ts#mergeTemplatesStore`——模板恢复的读取、
+  按 id 现状优先合并、保存收进**同一存储锁临界区**（此前锁外读改写，两窗口并发恢复可丢模板）；
+  `mergeRegistryEntries` 去掉吞异常 return 0（此前锁失败冒充「合并 0 条」成功），失败上抛
+  交由服务层逐模块报告；顺带清理 [reg] 调试日志。
+- **契约**：DATA-CONTRACT §3 follow-ups 行补 rawStore 三形态；lvct-migration-bundle 行补
+  逐模块失败可见/模板同锁合并/坏库不污染/恢复后任务同步。
+- **验证**：svelte-check/tsc 0 错误；单测 **182/182**（新增 followup-backup 3 例：对象/字符串
+  往返、损坏拒绝、版本拒绝、裸库兼容）；三套 UI 回归**桌面 79 / 移动 80 / 宿主 79 全绿**
+  （新增 smoke「迁移恢复单模块失败可见、不阻断其他模块且不污染坏库」——预置 schemaVersion:2
+  坏模板库，断言 failed 指名 templates、互动包内新增真实合并 +1、其余模块继续执行、坏库未被覆盖）；
+  `pnpm run build` + `check:release` 全 PASS（package.zip 360694B）；52 景基线重拍全 OK +
+  断点扫描 390/640/1280（夹具 title 校验生效），设置页正常态目检无漂移（失败提示仅故障态渲染）。
+- CODE-02.2/02.3（迁移可靠性）随本切片一并交付，计划表已标注。P0 余项：B07/FUNC-01.3 对账、
+  FUNC-01.7 刷新通道、FUNC-01.13 锁接管审计、FUNC-01.14 AI 候选安全写、FUNC-01.15 写入断点、
+  FAST-01.3a、FUNC-01.8a 锚点消歧、CODE-02.1/02.4–02.6。

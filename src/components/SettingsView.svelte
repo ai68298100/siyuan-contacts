@@ -365,7 +365,11 @@
         try {
             const result = await facade.importMigrationBundle(bundlePreviewText);
             const summary = result.modules.map((module) => `${module.label} +${module.merged}`).join("、") || "没有可合并的模块";
-            bundleMessage = `迁移恢复完成：${summary}${result.skipped.interactions + result.skipped.followUps > 0 ? `（现状优先跳过 ${result.skipped.interactions + result.skipped.followUps} 条）` : ""}`;
+            /* FUNC-01.6-b：失败模块必须可见（指名模块与原因），不把部分失败报成整包成功 */
+            const failedNote = result.failed.length > 0
+                ? `；恢复失败模块：${result.failed.map((module) => `${module.label}（${module.message}）`).join("、")}`
+                : "";
+            bundleMessage = `迁移恢复完成：${summary}${result.skipped.interactions + result.skipped.followUps > 0 ? `（现状优先跳过 ${result.skipped.interactions + result.skipped.followUps} 条）` : ""}${failedNote}`;
             bundlePreview = null;
             bundlePreviewText = "";
             onInteractionsUpdated();
