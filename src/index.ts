@@ -25,7 +25,7 @@ import { loadPersonInsights } from "./services/insights";
 import { checkSettingsHealth, rebuildMissingFields, rebindSettings, repairFieldMap } from "./services/settings-health";
 import { auditWorkspaceData } from "./services/health-audit";
 import { reconcileFollowUpTasksFromDoc } from "./services/followup-sync";
-import { updateContactFields } from "./services/contacts";
+import { updateContactFields, applyContactCandidateFields } from "./services/contacts";
 import { exportMigrationBundle, importMigrationBundle, previewMigrationImport } from "./services/migration-bundle";
 import { loadViewPreferences, saveViewPreferences } from "./services/preferences";
 import { exportInteractionJson } from "./services/interaction-export";
@@ -399,6 +399,12 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     async updatePersonFields(personItemId: string, draft: import("./domain/person").ContactDraft) {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
         await updateContactFields(this.settings, personItemId, draft);
+    }
+
+    /** FUNC-01.14：AI 资料候选受限补丁写（只写补丁字段，最新名册回读逐字段冲突核对） */
+    async updatePersonCandidateFields(personItemId: string, patches: readonly import("./domain/contact-patch").CandidateFieldPatch[]) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return applyContactCandidateFields(this.settings, personItemId, patches);
     }
 
     async captureDoc(docId: string, options: Parameters<typeof captureFromDoc>[3]) {

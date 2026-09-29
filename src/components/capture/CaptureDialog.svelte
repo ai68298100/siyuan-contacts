@@ -37,7 +37,7 @@
     let aiMatchedIds: string[] = $state([]);
     let aiUnknownNames: string[] = $state([]);
     // FAST-01.4：AI 结构化候选（资料补充/建跟进），勾选确认后写入；关系候选仅展示不写库
-    let aiProfileCandidates: { personDocId: string; personItemId: string; personName: string; field: string; value: string; checked: boolean }[] = $state([]);
+    let aiProfileCandidates: { personDocId: string; personItemId: string; personName: string; field: import("../../domain/ai-extract").ProfileField; value: string; checked: boolean }[] = $state([]);
     let aiFollowUpCandidates: { personDocId: string; personName: string; title: string; dueDate: string; checked: boolean }[] = $state([]);
     let aiRelationNote: string = $state("");
     let extrasError: string = $state("");
@@ -135,24 +135,23 @@
     /** C07/FUNC：主捕获完成后执行勾选的资料补充与建跟进（失败不阻断主结果，单独提示） */
     async function applyAiExtras(): Promise<void> {
         extrasError = "";
+        /* FUNC-01.14：受限补丁写——只写勾选字段，服务层以最新名册逐字段冲突核对；
+           快照仅用于提供冲突核对的基准值，绝不再作为全字段写入的打底 */
         for (const candidate of aiProfileCandidates) {
             if (!candidate.checked) continue;
             try {
-                /* AI 候选只补缺失字段：以名册快照打底（updatePersonFields 全字段写入） */
                 const person = preview?.linked.find((entry) => entry.docId === candidate.personDocId)
                     ?? outcomeSnapshot().find((entry) => entry.docId === candidate.personDocId);
-                const draft = {
-                    name: person?.name ?? candidate.personName,
-                    phone: candidate.field === "phone" ? candidate.value : person?.phone ?? "",
-                    wechat: candidate.field === "wechat" ? candidate.value : person?.wechat ?? "",
-                    email: candidate.field === "email" ? candidate.value : person?.email ?? "",
-                    website: candidate.field === "website" ? candidate.value : person?.website ?? "",
-                    birthday: candidate.field === "birthday" ? candidate.value : person?.birthday ?? "",
-                    isLunar: person?.isLunar ?? false,
-                    group: person?.group ?? "",
-                    tags: [...(person?.tags ?? [])],
-                };
-                await facade.updatePersonFields(candidate.personItemId, draft);
+                const result = await facade.updatePersonCandidateFields(candidate.personItemId, [
+                    {
+                        field: candidate.field,
+                        value: candidate.value,
+                        baseline: person?.[candidate.field] ?? "",
+                    },
+                ]);
+                if (result.conflicts.length > 0) {
+                    extrasError = `资料候选未写入（${candidate.personName} 的 ${result.conflicts.join("、")} 已被其他窗口修改，请打开资料核对后手动确认）`;
+                }
             } catch (error) {
                 extrasError = `资料补充失败（${candidate.personName}）：${error instanceof Error ? error.message : String(error)}`;
                 return;

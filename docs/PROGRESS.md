@@ -1499,3 +1499,27 @@
 - **边界**：跨窗口 onDataChanged 投递依赖宿主逐窗口推送，仍 Host pending；FUNC-01.7-b
   （设置锚点与偏好刷新、多窗口事件来源核对）未动。P0 余项：B07-b、FUNC-01.14 AI 候选安全写、
   FUNC-01.15 写入断点、FAST-01.3a、FUNC-01.8a 锚点消歧、CODE-02.1/02.4/02.5。
+
+## P0 数据可信 第 53 轮：FUNC-01.14 AI 资料候选安全写（2026-09-30，续跑口令第 53 版驱动）
+
+- **风险定位**：CaptureDialog `applyAiExtras` 以**弹窗打开时的名册快照**打底组装全字段 draft，
+  经 `updatePersonFields`（编辑弹窗全字段语义，空=清空）写入——快照滞后的几分钟里其他窗口
+  改过的分组/标签/生日等会被**静默回退**，正是「旧快照逐条全字段覆盖」。
+- **修复（受限补丁 + 最新值裁决）**：
+  - 域层 `domain/contact-patch.ts#resolveCandidateFields`（纯函数）：逐字段对照「当前库值」
+    与「候选依据的快照基准」——一致且不同值 → apply；已是候选值 → skip（幂等）；基准缺失
+    （快照后字段被并发改动且与候选不同）→ **conflict 跳过并提示核对，不覆盖**；空候选/未知
+    字段兜底忽略。电话+邮箱同勾各自裁决互不影响。
+  - 服务层 `applyContactCandidateFields`：写前 `invalidateRoster()` 回读**最新名册**，只对
+    apply 字段出 `setCell`（其余字段零触碰——并发字段被回退在结构上不可能）；birthday 候选
+    严格公历校验；写后失效名册。
+  - CaptureDialog 改走新 facade `updatePersonCandidateFields(itemId, patches)`（patches 携带
+    快照基准值）；conflict 时提示「{字段} 已被其他窗口修改，请打开资料核对后手动确认」；
+    updatePersonFields 全字段语义保留给编辑弹窗（用户所见即所写，语义正确）。
+- **验证**：svelte-check/tsc 0 错误 0 警告；单测 **194/194**（contact-patch 3 例）；三套 UI
+  回归**桌面 83 / 移动 84 / 宿主 83 全绿**（+1 服务级 smoke：kernel mock 下并发电话判冲突
+  零写入、安全邮箱照常写入且 keyID/itemID 正确；既有 AI 候选 smoke 改受限补丁断言——补丁
+  只含勾选字段且携带快照基准）；`pnpm run build` + `check:release` 全 PASS；52 景基线 +
+  断点扫描重拍有效（无视觉变更）。
+- P0 余项：B07/FUNC-01.3-b、FUNC-01.15 写入断点、FAST-01.3a、FUNC-01.8a 锚点消歧、
+  CODE-02.1/02.4/02.5。

@@ -90,8 +90,10 @@ export interface ContactsPluginFacade {
     saveViewPreferences(preferences: ViewPreferences): Promise<ViewPreferences>;
     /** 从笔记捕获：预览出链指向的联系人 */
     previewCapture(docId: string): Promise<CapturePreview>;
-    /** FAST-01.4：按全字段更新联系人资料（AI 资料候选确认后补录用） */
+    /** FAST-01.4：按全字段更新联系人资料（编辑弹窗语义，空=清空） */
     updatePersonFields(personItemId: string, draft: import("./domain/person").ContactDraft): Promise<void>;
+    /** FUNC-01.14：AI 资料候选受限补丁写——只写补丁字段，最新名册回读逐字段冲突核对 */
+    updatePersonCandidateFields(personItemId: string, patches: readonly import("./domain/contact-patch").CandidateFieldPatch[]): Promise<import("./services/contacts").CandidateFieldApplyResult>;
     /** 从笔记捕获：确认执行（互动事件 + 参与人区块 + 新人收编） */
     captureDoc(docId: string, options: CaptureOptions): Promise<CaptureResult>;
     /** AI 抽取本页人名/日期/地点（需思源内置 AI；结果须经确认 UI） */

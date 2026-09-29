@@ -11,6 +11,7 @@ import PeopleView from "../../../src/components/people/PeopleView.svelte";
 import SettingsView from "../../../src/components/SettingsView.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
+import { applyContactCandidateFields } from "../../../src/services/contacts";
 import { recordInteraction, deleteInteraction, loadInteractionStore } from "../../../src/data/interactions";
 import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
 import { captureFromDoc } from "../../../src/services/capture";
@@ -2420,7 +2421,7 @@ await test("AI 结构化候选：分组勾选确认，资料补充/建跟进写�
         group: "朋友", tags: [], relatedItemIds: [],
     });
     const 甲 = personOf("寿星甲");
-    const fieldWrites = [];
+    const patchCalls = [];
     const followUpWrites = [];
     const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
         docId: settings.hostDocId,
@@ -2440,7 +2441,10 @@ await test("AI 结构化候选：分组勾选确认，资料补充/建跟进写�
                 matched: [甲],
                 unknownNames: [],
             }),
-            updatePersonFields: async (itemId, draft) => fieldWrites.push({ itemId, draft }),
+            updatePersonCandidateFields: async (itemId, patches) => {
+                patchCalls.push({ itemId, patches });
+                return { applied: patches.map((patch) => patch.field), skipped: [], conflicts: [] };
+            },
             createFollowUp: async (docId, title, dueDate) => followUpWrites.push({ docId, title, dueDate }),
         },
     } });
@@ -2456,13 +2460,38 @@ await test("AI 结构化候选：分组勾选确认，资料补充/建跟进写�
         await tick();
         button("记录互动并写入参与人员", dialog.dialog.element).click();
         await until(() => dialog.dialog.element.textContent.includes("AI 候选的资料补充与建跟进已完成"), "AI 候选写入未完成");
-        assert(fieldWrites.length === 1 && fieldWrites[0].draft.phone === "13800001234", "资料候选未写入");
-        /* 只补缺失：其余字段以名册快照打底不被清空 */
-        assert(fieldWrites[0].draft.group === "朋友", "全字段写入未以现有值打底");
+        /* FUNC-01.14：受限补丁——只携带勾选字段（电话）+ 快照基准值（冲突核对用），其余字段零触碰 */
+        assert(patchCalls.length === 1, "资料候选未走受限补丁写入");
+        assert(patchCalls[0].patches.length === 1 && patchCalls[0].patches[0].field === "phone"
+            && patchCalls[0].patches[0].value === "13800001234" && patchCalls[0].patches[0].baseline === "",
+            "补丁应只含电话字段且携带快照基准值（fixture 电话为空）");
         assert(followUpWrites.length === 1 && followUpWrites[0].title === "回传资料" && followUpWrites[0].dueDate === "2026-10-06", "跟进候选未写入");
     } finally {
         if (dialog.dialog.element.isConnected) dialog.close();
     }
+});
+
+await test("AI 候选安全写：并发改动判冲突不覆盖，安全字段照常写入（FUNC-01.14）", async () => {
+    invalidateRoster();
+    const cellWrites = [];
+    kernel.handler = async (route, body) => {
+        if (route === "/api/av/renderAttributeView") return renderResult();
+        if (route === "/api/av/setAttributeViewBlockAttr") {
+            cellWrites.push({ keyID: body.keyID, itemID: body.itemID, value: JSON.stringify(body.value) });
+            return { code: 0 };
+        }
+        throw new Error(`回归测试不允许请求 ${route}`);
+    };
+    /* 名册最新值：person1 电话为空；电话候选以过期基准（13800001234）提交 → 冲突不写；
+       邮箱候选基准为空与最新一致 → 写入。同一人多字段互不影响。 */
+    const result = await applyContactCandidateFields(settings, "row-1", [
+        { field: "phone", value: "13866667777", baseline: "13800001234" },
+        { field: "email", value: "new@x.com", baseline: "" },
+    ]);
+    assert(result.conflicts.length === 1 && result.conflicts[0] === "phone", `并发改动未判冲突：${JSON.stringify(result)}`);
+    assert(result.applied.length === 1 && result.applied[0] === "email", "安全字段未写入");
+    assert(cellWrites.length === 1 && cellWrites[0].keyID === "email" && cellWrites[0].itemID === "row-1"
+        && cellWrites[0].value.includes("new@x.com"), `写入越界或形状错误：${JSON.stringify(cellWrites)}`);
 });
 
 await test("快速切换文档不会插入旧人物档案条，独立档案条有明暗主题令牌", async () => {

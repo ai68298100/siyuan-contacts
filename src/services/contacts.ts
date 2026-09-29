@@ -10,6 +10,8 @@ import type { ContactsSettings } from "../domain/model";
 import { birthdayToMs, validateDraft } from "../domain/person";
 import type { ContactDraft, ContactSummary } from "../domain/person";
 import type { FieldKey } from "../domain/fields";
+import { resolveCandidateFields } from "../domain/contact-patch";
+import type { CandidateFieldPatch } from "../domain/contact-patch";
 import { matchesFolderPrefix } from "../domain/import";
 
 const PRESET_GROUPS = ["家人", "朋友", "同事", "同学", "其他"] as const;
@@ -151,6 +153,59 @@ export async function updateContactFields(settings: ContactsSettings, itemId: st
     }));
     await Promise.all(writes);
     invalidateRoster();
+}
+
+export interface CandidateFieldApplyResult {
+    applied: string[];
+    skipped: string[];
+    conflicts: string[];
+}
+
+/**
+ * FUNC-01.14：AI 资料候选安全写。与 updateContactFields（编辑弹窗全字段语义）不同：
+ * 只写补丁字段（其余字段零触碰，并发/他人字段不可能被回退）；写前失效名册回读**最新值**
+ * 逐字段裁决（快照后字段被并发改动且与候选不同 → conflict 跳过并提示，不覆盖）；
+ * 同一人多字段（电话+邮箱）各写各的互不影响。
+ */
+export async function applyContactCandidateFields(
+    settings: ContactsSettings,
+    itemId: string,
+    patches: readonly CandidateFieldPatch[],
+): Promise<CandidateFieldApplyResult> {
+    invalidateRoster(); /* 候选依据的是 UI 快照——裁决必须基于最新名册 */
+    const roster = await getRoster(settings);
+    const person = roster.find((entry) => entry.itemId === itemId);
+    if (!person) throw new Error("联系人不存在或已解绑，资料候选未写入");
+    const outcomes = resolveCandidateFields(
+        { phone: person.phone, wechat: person.wechat, email: person.email, website: person.website, birthday: person.birthday },
+        patches,
+    );
+    const key = (field: string) => settings.fieldMap[field as FieldKey];
+    for (const outcome of outcomes) {
+        if (outcome.action !== "apply") continue;
+        if (outcome.field === "birthday") {
+            const birthdayMs = birthdayToMs(outcome.value);
+            if (birthdayMs === null) throw new Error(`生日候选不是有效的 YYYY-MM-DD 公历日期：${outcome.value}`);
+            await setCell(settings.avId, key("birthday"), itemId, {
+                type: "date",
+                value: { date: { content: birthdayMs, isNotEmpty: true, isNotTime: true } },
+            });
+        } else if (outcome.field === "phone") {
+            await setCell(settings.avId, key("phone"), itemId, { type: "phone", value: { phone: { content: outcome.value } } });
+        } else if (outcome.field === "email") {
+            await setCell(settings.avId, key("email"), itemId, { type: "email", value: { email: { content: outcome.value } } });
+        } else if (outcome.field === "wechat") {
+            await setCell(settings.avId, key("wechat"), itemId, { type: "text", value: { text: { content: outcome.value } } });
+        } else {
+            await setCell(settings.avId, key("website"), itemId, { type: "url", value: { url: { content: outcome.value } } });
+        }
+    }
+    if (outcomes.some((outcome) => outcome.action === "apply")) invalidateRoster();
+    return {
+        applied: outcomes.filter((outcome) => outcome.action === "apply").map((outcome) => outcome.field),
+        skipped: outcomes.filter((outcome) => outcome.action === "skip").map((outcome) => outcome.field),
+        conflicts: outcomes.filter((outcome) => outcome.action === "conflict").map((outcome) => outcome.field),
+    };
 }
 
 /**
