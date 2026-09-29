@@ -1219,3 +1219,19 @@
   警告不再崩套，残留目录下次运行统一清理；复跑 52/52 零警告。
 - 验证：svelte-check 0 错误；单测 177/177；桌面 76/76、移动 77/77、宿主基线 76/76；
   截图 52/52；断点扫描正常；构建 + check:release 通过；暗色设置页目检通过。
+
+## UX-02.12 第 38 轮：批次 4（截图目检驱动）第一轮（2026-09-29）
+
+- **目检发现并修复两处**：
+  - **Peek 详情键值 label 竖排**：`.lvct-detail__fields dt` 宽 3.5em 装不下「下次生日」四字
+    （竖排折行）。改 4.5em + nowrap；截图确认一行。
+  - **向导预检框与 CTA**：容器 text-align:center 导致 ✓ 清单悬挂居中难读——plan 框改左对齐；
+    主 CTA「开始初始化」原是 b3-button--text 文字链样式，改 `.lvct-wizard__cta` 块级品牌渐变
+    主按钮（min-width 200px 居中）。
+- **孤儿截图清理（误导源）**：shots/ 目录混有 12 个旧版脚本遗留文件（desktop-data/general、
+  settings-* 无主题后缀、workbench-viewsmenu-* 等，mtime 数小时前），目检时误当现状。
+  已删除；当前脚本稳定产出 52 景。
+- **quickfill/viewsmenu 复查**：quickfill 弹窗（遮罩模糊+渐变主钮）正常；viewsmenu 玻璃浮层
+  由 host-pop-viewsmenu 景覆盖（旧文件名景已由脚本改版移除，非缺失）。
+- 验证：svelte-check 0 错误；单测 177/177；桌面 76/76、移动 77/77、宿主基线 76/76；
+  截图 52/52；断点扫描正常；构建 + check:release 通过；peek/wizard 修复后截图目检通过。

@@ -155,7 +155,7 @@
         </div>
     {/if}
 
-    <button class="b3-button b3-button--text" onclick={run} disabled={running || notebookName.trim().length === 0}>
+    <button class="b3-button lvct-wizard__cta" onclick={run} disabled={running || notebookName.trim().length === 0}>
         {running
             ? text("wizardRunning", "正在初始化…")
             : failed

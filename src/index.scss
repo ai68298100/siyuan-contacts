@@ -281,8 +281,7 @@
 .lvct-wizard__progress {
     height: 6px;
     border-radius: var(--lvct-r-pill);
-    background: var(--lvct-bg-hover);
-    overflow: hidden;
+    background: var(--lvct-bg-hover);    overflow: hidden;
 
     i {
         display: block;
@@ -354,6 +353,13 @@
     font-size: 13px;
 }
 
+/* UX-02.13 向导主 CTA：块级品牌渐变按钮（原为文字链样式，主行动不突出） */
+.lvct-wizard__cta {
+    align-self: center;
+    min-width: 200px;
+    min-height: 38px;
+}
+
 .lvct-wizard__error {
     border: 1px solid var(--lvct-danger);
     background: var(--lvct-danger-soft);
@@ -381,6 +387,8 @@
     font-size: 13px;
     color: var(--lvct-text-2);
     word-break: break-all;
+    /* UX-02.13 预检清单左对齐（容器 text-align:center 会导致 ✓ 行悬挂居中难读） */
+    text-align: left;
 
     p {
         margin: 0;
@@ -2432,9 +2440,10 @@
     }
 
     dt {
-        width: 3.5em;
+        width: 4.5em;
         color: var(--lvct-text-2);
         flex-shrink: 0;
+        white-space: nowrap;
     }
 
     dd {
