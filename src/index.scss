@@ -623,6 +623,17 @@
 }
 
 // F11 会面简报
+/* UX-02.13 详情行内录入行：按钮禁止压缩竖排（「添加计划」曾在移动端被挤成竖排）。
+   日期输入保持可收缩（min-content 兜底），不可设 shrink:0——会叠加移动端 width:0 消失。 */
+.lvct-detail__record {
+    gap: var(--lvct-sp-2);
+
+    > .b3-button {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+}
+
 .lvct-detail__briefing-row {
     display: flex;
     align-items: center;
@@ -3150,10 +3161,6 @@
 
 /* ---------- 详情记互动 ---------- */
 
-.lvct-detail__record {
-    gap: 8px;
-}
-
 /* ---------- 移动端 ---------- */
 
 @media (max-width: 640px) {
@@ -3371,7 +3378,8 @@
         > button { min-width: 0; }
     }
     .lvct-detail__record { min-width: 0; }
-    .lvct-detail__record > input { min-width: 0; width: 0; }
+    /* 只压标题文本框；date 若被清零会整只消失（UX-02.13 复盘） */
+    .lvct-detail__record > input[type="text"] { min-width: 0; width: 0; }
     .lvct-detail > .lvct-form__actions { flex-wrap: wrap; }
 }
 
