@@ -40,6 +40,7 @@ import {
     updateOrganizationMember,
     archiveOrganization,
     restoreOrganization,
+    renameOrganization,
     listPersonOrgMemberships,
 } from "./services/org";
 import { exportMigrationBundle, importMigrationBundle, previewMigrationImport } from "./services/migration-bundle";
@@ -487,6 +488,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     /** B13：恢复归档组织 */
     async restoreOrganization(orgDocId: string) {
         await restoreOrganization(orgDocId);
+    }
+
+    /** B13.4：组织改名（同名检查；标记块文案同步，归档值保持） */
+    async renameOrganization(orgDocId: string, name: string) {
+        await renameOrganization(orgDocId, name);
     }
 
     /** B12：某人的组织归属投影（成员记录 join 组织名） */

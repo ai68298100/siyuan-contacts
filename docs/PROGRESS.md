@@ -1936,3 +1936,25 @@
   真内核 contacts-flow 10/10、spike:init 21/21；52 景基线重拍 + 断点扫描有效。
 - **留后续**：组织改名（renameDoc 端点需先隔离 spike 实证）；组织入口进图谱/按组织收窄（B14）；
   工作台组织视图。
+
+## P1 业务主线 第 73 轮：组织改名（renameDoc 实证+落地）+ B13.5 双向编辑最小版（2026-09-30，续跑口令第 75 版驱动）
+
+- **spike:b13 通道7/7b（隔离内核，b13-org-results.json 8 项）**：`/api/filetree/renameDoc`
+  实证——**path 参数必须是物理路径 `/{docId}.sy`**（传 hpath 报 invalid document path）；
+  返回 {code,msg,data}；改名后 blocks.content（文档标题）更新，**custom-lvct-org 标记块
+  IAL 保留**（rename 不动正文）。通道3/4/5 结果与历史结论一致（跨库 relation 被拒）。
+- **api/client.ts**：`renameDoc(notebookId, docId, title)`——ID 校验 + 物理路径拼装。
+- **服务层**：`renameOrganization(orgDocId, name)`——同名检查（不含自身、含归档）
+  → renameDoc → 标记块文案同步新名（`**组织**：新名`，**归档值保持**）。同名即当前名直接返回。
+- **facade**：renameOrganization + openOrgManagerDialog 补类型声明。
+- **弹窗（OrgManagerDialog）**：详情头部「改名」按钮 → 行内输入（Enter 提交/取消）；
+  **i18n 修正**：创建区输入框 aria-label「新组织名称」→「新建组织名称」（原与改名框
+  aria-label 撞车，querySelector 会错配——用例第一跑即暴露）。
+- **B13.5 双向编辑最小版**：PersonDetail 组织归属区标题行「管理归属」按钮（可选 prop
+  onOpenOrgManager，未接线不显示）→ facade.openOrgManagerDialog()；Workbench 已接线。
+- **验证**：单测 213/213；三套 UI 桌面 99 / 移动 100 / 宿主 99 全绿（新增改名用例：
+  全链路参数核对+列表刷新+同名拒绝错误显示；扩展 B12 归属用例：管理按钮接线回调/未接线隐藏）；
+  collect-i18n 缺失 0；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 10/10、
+  spike:init 21/21；52 景基线重拍 + 断点扫描有效。
+- **留后续**：B13.5a 组织页入口（WorkbenchView 扩展）、B13.5 双向编辑完整版（人物详情内
+  直接增删归属）、B14 组织入口、真机核对。

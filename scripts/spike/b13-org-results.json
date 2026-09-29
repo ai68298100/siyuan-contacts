@@ -7,12 +7,12 @@
   {
     "name": "通道1 双库创建",
     "ok": true,
-    "detail": "person=20260930000000-p58n10r org=20260930000000-og0fswm"
+    "detail": "person=20260930000000-prcm0p6 org=20260930000000-oheyqw8"
   },
   {
     "name": "通道2 绑行与 detached 行",
     "ok": true,
-    "detail": "personRows=2 orgRows=2 orgMain=20260930042849-yk7j5r8 detached=无"
+    "detail": "personRows=2 orgRows=2 orgMain=20260930073509-xernxah detached=无"
   },
   {
     "name": "通道3 跨库 relation 写读（显式 itemID 目标）",
@@ -28,5 +28,15 @@
     "name": "通道5 跨库双向数据互通（org 设值 person 可见）",
     "ok": false,
     "detail": "oWrite=-1 personBlockIDs=[]"
+  },
+  {
+    "name": "通道7 renameDoc 组织改名",
+    "ok": true,
+    "detail": "code=0 content=测试公司改 标记块保留=true"
+  },
+  {
+    "name": "通道7b renameDoc 改回原名",
+    "ok": true,
+    "detail": "code=0 content=测试公司"
   }
 ]

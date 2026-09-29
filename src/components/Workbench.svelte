@@ -271,6 +271,7 @@
             onDeleteInteraction={(personDocId, eventId) => facade.deleteInteraction(personDocId, eventId)}
             onLoadInsights={(docId) => facade.loadPersonInsights(docId)}
             onLoadOrgMemberships={(docId) => facade.listPersonOrgMemberships(docId)}
+            onOpenOrgManager={() => facade.openOrgManagerDialog()}
             onListFollowUps={(docId) => facade.listPersonFollowUps(docId)}
             onCreateFollowUp={(docId, title, dueDate) => facade.createFollowUp(docId, title, dueDate)}
             onSetFollowUpStatus={(id, status) => facade.setFollowUpStatus(id, status)}

@@ -116,6 +116,10 @@ export interface ContactsPluginFacade {
     archiveOrganization(orgDocId: string): Promise<void>;
     /** B13：恢复归档组织 */
     restoreOrganization(orgDocId: string): Promise<void>;
+    /** B13.4：组织改名（同名检查；标记块文案同步，归档值保持） */
+    renameOrganization(orgDocId: string, name: string): Promise<void>;
+    /** B13.3：打开组织管理弹窗（B13.5 人物详情维护入口复用） */
+    openOrgManagerDialog(): void;
     /** B12：某人的组织归属投影（成员记录 join 组织名） */
     listPersonOrgMemberships(personDocId: string): Promise<import("./services/org").PersonOrgMembershipView[]>;
     /** FUNC-01.14：AI 资料候选受限补丁写——只写补丁字段，最新名册回读逐字段冲突核对 */

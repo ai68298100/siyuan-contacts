@@ -77,6 +77,16 @@ export async function createDocWithMd(notebookId: string, hPath: string, markdow
     return kernelPost<string>("/api/filetree/createDocWithMd", { notebook: notebookId, path: hPath, markdown });
 }
 
+/**
+ * 文档改名（B13 组织改名）。spike:b13 通道7 实证（v3.8.6）：
+ * path 参数必须是物理路径 `/{docId}.sy`（传 hpath 报 invalid document path）；
+ * 改名后 blocks.content（文档标题）更新，正文与 custom-* 标记块 IAL 保留。
+ */
+export async function renameDoc(notebookId: string, docId: string, title: string): Promise<void> {
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(docId)) throw new Error("docId 不是合法的思源 ID");
+    await kernelPost("/api/filetree/renameDoc", { notebook: notebookId, path: `/${docId}.sy`, title });
+}
+
 /* ---------- SQL（仅用于文档/块查询；数据库没有 SQL 表，见 DATA-CONTRACT §1.5） ---------- */
 
 export interface DocRow {

@@ -239,6 +239,27 @@ async function main() {
             record("通道6 悬空跨库引用形态（信息性）", true,
                 `移除后 blockIDs=${JSON.stringify(relCell3?.blockIDs || [])} contents=${JSON.stringify(relCell3?.contents || []).slice(0, 200)}`);
         }
+
+        /* 通道7：组织改名前提——/api/filetree/renameDoc 行为（B13.4 余项实证）。
+           path 参数为物理路径 /{docId}.sy（hpath 报 invalid document path）。
+           先写 custom-lvct-org 标记块，验证改名后 IAL 保留（rename 不动正文）。 */
+        await flush();
+        await apiChecked("/api/block/insertBlock", {dataType: "markdown", parentID: orgDoc,
+            data: "**组织**：测试公司\n{: custom-lvct-org=\"1\"}"});
+        await flush();
+        const rename = await api("/api/filetree/renameDoc", {notebook: notebookID, path: "/" + orgDoc + ".sy", title: "测试公司改"});
+        await flush();
+        const renamedDoc = await apiChecked("/api/query/sql", {stmt: "SELECT id, content, hpath FROM blocks WHERE type='d' AND id = '" + orgDoc + "'"});
+        const markedAfter = await apiChecked("/api/query/sql", {stmt: "SELECT ial FROM blocks WHERE root_id = '" + orgDoc + "' AND ial LIKE '%custom-lvct-org=%'"});
+        const renamedOK = rename.code === 0 && renamedDoc[0]?.content === "测试公司改" && markedAfter.length > 0;
+        record("通道7 renameDoc 组织改名", renamedOK,
+            `code=${rename.code} content=${renamedDoc[0]?.content} 标记块保留=${markedAfter.length > 0}`);
+        /* 通道7b：改回原名（幂等性观察） */
+        const renameBack = await api("/api/filetree/renameDoc", {notebook: notebookID, path: "/" + orgDoc + ".sy", title: "测试公司"});
+        await flush();
+        const backDoc = await apiChecked("/api/query/sql", {stmt: "SELECT content FROM blocks WHERE type='d' AND id = '" + orgDoc + "'"});
+        record("通道7b renameDoc 改回原名", renameBack.code === 0 && backDoc[0]?.content === "测试公司",
+            `code=${renameBack.code} content=${backDoc[0]?.content}`);
     } finally {
         await flush().catch(() => {});
         try { await api("/api/system/exit", {force: true}); } catch { /* 内核可能已退出 */ }

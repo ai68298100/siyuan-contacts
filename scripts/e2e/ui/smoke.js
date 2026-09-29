@@ -1165,6 +1165,48 @@ await test("B13.4/B13 组织成员字段编辑与归档恢复（facade 全链路
     await until(() => !fixture.textContent.includes("已归档（1）"), "恢复后归档分组未消失");
 });
 
+await test("B13.4 组织改名：renameOrganization 全链路 + 同名拒绝显示错误", async () => {
+    let orgName = "曙光科技";
+    const renameCalls = [];
+    const facade = {
+        settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        listContacts: async () => [],
+        listOrganizations: async () => [
+            { docId: "20260930000000-org0001", name: orgName, hpath: `/${orgName}`, notebookId: settings.notebookId, archived: false, memberships: [] },
+            { docId: "20260930000000-org0002", name: "旧公司", hpath: "/旧公司", notebookId: settings.notebookId, archived: true, memberships: [] },
+        ],
+        listOrganizationMembers: async () => [],
+        renameOrganization: async (orgDocId, name) => {
+            renameCalls.push({ orgDocId, name });
+            if (name === "旧公司") throw new Error("组织「旧公司」已存在");
+            orgName = name;
+        },
+    };
+    mounted = mount(OrgManagerDialog, { target: fixture, props: {
+        facade, i18n: undefined, onClose() {},
+    } });
+    await until(() => fixture.textContent.includes("曙光科技"), "组织列表未加载");
+    /* 改名：进入行内编辑 → 填新名 → 保存走 facade */
+    button("改名").click();
+    await until(() => fixture.querySelector('input[aria-label="新组织名称"]'), "改名输入框未出现");
+    input(fixture.querySelector('input[aria-label="新组织名称"]'), "新曙光");
+    await tick(); /* bind:value 更新解除保存按钮 disabled */
+    button("保存名称").click();
+    await until(() => renameCalls.length === 1 && renameCalls[0].name === "新曙光", "改名未走 facade 或参数错误");
+    assert(renameCalls[0].orgDocId === "20260930000000-org0001", "改名目标 orgDocId 错误");
+    await until(() => fixture.textContent.includes("新曙光"), "改名后列表未刷新");
+    assert(renameCalls[0].orgDocId === "20260930000000-org0001", "改名目标 orgDocId 错误");
+    await until(() => fixture.textContent.includes("新曙光"), "改名后列表未刷新");
+    /* 同名拒绝：错误显示且保持编辑态 */
+    button("改名").click();
+    await until(() => fixture.querySelector('input[aria-label="新组织名称"]'), "改名输入框未再次出现");
+    input(fixture.querySelector('input[aria-label="新组织名称"]'), "旧公司");
+    await tick();
+    button("保存名称").click();
+    await until(() => fixture.querySelector(".lvct-form__error")?.textContent.includes("已存在"), "同名拒绝错误未显示");
+    assert(orgName === "新曙光", "被拒绝的改名不应生效");
+});
+
 await test("FAST-01.3a 识别目标裁决：名册失败自动重试仍失败返回 failed，恢复后 bound/unlinked 各归其位", async () => {
     invalidateRoster();
     let failRoster = true;
@@ -1330,6 +1372,28 @@ await test("B12 组织归属投影：Peek 组织区块按成员记录渲染（�
     assert(fixture.textContent.includes("2025-01-01 –") && fixture.textContent.includes("2022-06-30"), "期间未渲染");
     assert(fixture.textContent.includes("在职/在学") && fixture.textContent.includes("已离开"), "状态未渲染");
     assert(fixture.textContent.includes("母校学院"), "第二条归属未渲染");
+    /* B13.5 双向编辑最小版：接线 onOpenOrgManager 时显示「管理归属」按钮并回调 */
+    let orgManagerOpened = 0;
+    await unmount(mounted);
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person, onRecord: async () => {}, onLoadInsights: async () => emptyInsights(),
+        onLoadOrgMemberships: async () => orgMemberships,
+        onOpenOrgManager: () => { orgManagerOpened += 1; },
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+    } });
+    await until(() => fixture.textContent.includes("组织归属"), "组织归属区块未挂载");
+    button("管理归属").click();
+    await tick();
+    assert(orgManagerOpened === 1, "管理归属按钮未回调");
+    /* 未接线时按钮不显示 */
+    await unmount(mounted);
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person, onRecord: async () => {}, onLoadInsights: async () => emptyInsights(),
+        onLoadOrgMemberships: async () => orgMemberships,
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+    } });
+    await until(() => fixture.textContent.includes("组织归属"), "组织归属区块未挂载");
+    assert(![...fixture.querySelectorAll("button")].some((node) => node.textContent.includes("管理归属")), "未接线时不应显示管理按钮");
 });
 
 await test("FUNC-01.8a 锚点消歧：首 AV 无关不采纳按字段证据取次 AV，歧义暂停写入，零匹配按新建", async () => {

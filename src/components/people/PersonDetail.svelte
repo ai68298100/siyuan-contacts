@@ -31,6 +31,7 @@ import StatusNotice from "../StatusNotice.svelte";
         /** FUNC-01.7-a：数据变化代际（Workbench 广播）；变化时原地重载洞察与跟进（写入/编辑中跳过） */
         revision = 0,
         onLoadOrgMemberships,
+        onOpenOrgManager,
         onRecord,
         onDeleteInteraction,
         onLoadInsights,
@@ -60,6 +61,8 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadInsights: (docId: string) => Promise<import("../../services/insights").PersonInsights>;
         /** B12：组织归属投影（可选：未接线时隐藏该区） */
         onLoadOrgMemberships?: (docId: string) => Promise<import("../../services/org").PersonOrgMembershipView[]>;
+        /** B13.5 双向编辑最小版（可选）：打开组织管理弹窗维护归属；未接线时隐藏按钮 */
+        onOpenOrgManager?: () => void;
         onOpenPersonDoc: (docId: string) => void;
         onNavigate: (person: ContactSummary) => void;
         navigationOrder?: readonly ContactSummary[];
@@ -587,7 +590,14 @@ import StatusNotice from "../StatusNotice.svelte";
 
     {#if orgSectionSupported}
     <section class="lvct-detail__section">
-        <h4>{text("orgSectionTitle", "组织归属")}</h4>
+        <div class="fn__flex" style="align-items: center; gap: 8px;">
+            <h4 class="fn__flex-1">{text("orgSectionTitle", "组织归属")}</h4>
+            <!-- B13.5 双向编辑最小版：跳转组织管理弹窗维护归属（弹窗内可添加/编辑/移除） -->
+            {#if onOpenOrgManager}
+                <button type="button" class="b3-button b3-button--text" onclick={onOpenOrgManager}>
+                    {text("orgSectionManage", "管理归属")}</button>
+            {/if}
+        </div>
         {#if orgMemberships.length === 0}
             <p class="ft__smaller ft__on-surface">{text("orgSectionEmpty", "未加入任何组织")}</p>
         {:else}

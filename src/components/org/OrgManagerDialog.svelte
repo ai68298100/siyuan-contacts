@@ -38,6 +38,9 @@
     let editJoinedOn = $state("");
     let editLeftOn = $state("");
     let editStatus = $state<"active" | "former">("active");
+    /* B13.4 组织改名 */
+    let renaming = $state(false);
+    let renameValue = $state("");
 
     const currentOrg = $derived(orgs.find((org) => org.docId === currentOrgDocId) ?? null);
     const activeOrgs = $derived(orgs.filter((org) => !org.archived));
@@ -186,6 +189,28 @@
             await loadOrgs(true);
         });
     }
+
+    /** B13.4：组织改名（同名检查与标记块文案同步在服务层） */
+    function startRename(): void {
+        if (!currentOrg) return;
+        renameValue = currentOrg.name;
+        renaming = true;
+    }
+
+    function saveRename(): void {
+        const docId = currentOrgDocId;
+        const name = renameValue.trim();
+        if (!docId || !name || busy) return;
+        void run(async () => {
+            await facade.renameOrganization(docId, name);
+            renaming = false;
+            await loadOrgs(true);
+        });
+    }
+
+    function cancelRename(): void {
+        renaming = false;
+    }
 </script>
 
 <div class="lvct-dialog-root lvct-org-manager">
@@ -235,7 +260,7 @@
                     placeholder={text("orgCreatePlaceholder", "组织名称…")}
                     bind:value={newOrgName}
                     disabled={busy}
-                    aria-label={text("orgCreateLabel", "新组织名称")}
+                    aria-label={text("orgCreateLabel", "新建组织名称")}
                 />
                 <button class="b3-button b3-button--text" disabled={busy || !newOrgName.trim()} onclick={createOrg}>
                     {text("orgCreate", "新建组织")}</button>
@@ -244,16 +269,30 @@
 
         <div class="lvct-org-manager__detail">
             {#if currentOrg}
-                <div class="fn__flex" style="align-items: center; gap: 8px;">
-                    <b class="fn__flex-1">{currentOrg.name}{currentOrg.archived ? text("orgArchivedTag", "（已归档）") : ""}</b>
-                    {#if currentOrg.archived}
-                        <button type="button" class="b3-button b3-button--text" disabled={busy}
-                            onclick={restoreCurrentOrg}>{text("orgRestore", "恢复组织")}</button>
-                    {:else}
+                {#if renaming}
+                    <div class="fn__flex" style="gap: 8px; align-items: center;">
+                        <input class="b3-text-field fn__flex-1" bind:value={renameValue} disabled={busy}
+                            aria-label={text("orgRenameLabel", "新组织名称")}
+                            onkeydown={(event) => { if (event.key === "Enter") saveRename(); }} />
+                        <button type="button" class="b3-button b3-button--text" disabled={busy || !renameValue.trim()}
+                            onclick={saveRename}>{text("orgRenameSave", "保存名称")}</button>
                         <button type="button" class="b3-button b3-button--cancel" disabled={busy}
-                            onclick={archiveCurrentOrg}>{text("orgArchive", "归档组织")}</button>
-                    {/if}
-                </div>
+                            onclick={cancelRename}>{text("orgMemberCancel", "取消")}</button>
+                    </div>
+                {:else}
+                    <div class="fn__flex" style="align-items: center; gap: 8px;">
+                        <b class="fn__flex-1">{currentOrg.name}{currentOrg.archived ? text("orgArchivedTag", "（已归档）") : ""}</b>
+                        <button type="button" class="b3-button b3-button--text" disabled={busy}
+                            onclick={startRename}>{text("orgRename", "改名")}</button>
+                        {#if currentOrg.archived}
+                            <button type="button" class="b3-button b3-button--text" disabled={busy}
+                                onclick={restoreCurrentOrg}>{text("orgRestore", "恢复组织")}</button>
+                        {:else}
+                            <button type="button" class="b3-button b3-button--cancel" disabled={busy}
+                                onclick={archiveCurrentOrg}>{text("orgArchive", "归档组织")}</button>
+                        {/if}
+                    </div>
+                {/if}
                 <div class="lvct-org-manager__members">
                     <b>{text("orgMembersTitle", "成员")}</b>
                     {#if members.length === 0}

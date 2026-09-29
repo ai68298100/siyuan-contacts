@@ -5,7 +5,7 @@
  */
 import type { Plugin } from "siyuan";
 import { upsertMarkedBlock } from "../api/blocks";
-import { createDocWithMd, querySql } from "../api/client";
+import { createDocWithMd, querySql, renameDoc } from "../api/client";
 import {
     addOrgMembership,
     loadOrgMembershipStore,
@@ -250,6 +250,29 @@ export async function restoreOrganization(orgDocId: string): Promise<void> {
 /** 更新成员记录字段（B13.4：部门/职位/入职/离职/状态；身份字段不可变） */
 export async function updateOrganizationMember(plugin: Plugin, id: string, patch: OrgMembershipPatch): Promise<void> {
     await updateOrgMembership(plugin, id, patch);
+}
+
+/** 组织改名（B13.4 余项；spike:b13 通道7 实证 renameDoc 行为）：同名检查（不含自身、含归档）
+ *  → renameDoc 改文档标题（标记块 IAL 保留）→ 标记块文案同步新名（保持归档值）。 */
+export async function renameOrganization(orgDocId: string, name: string): Promise<void> {
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(orgDocId)) throw new Error("orgDocId 不是合法的思源 ID");
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("组织名称不能为空");
+    const orgs = await scanOrganizations();
+    const org = orgs.find((item) => item.docId === orgDocId);
+    if (!org) throw new Error("组织不存在");
+    if (orgs.some((item) => item.docId !== orgDocId && item.name === trimmed)) {
+        throw new Error(`组织「${trimmed}」已存在`);
+    }
+    if (org.name === trimmed) return;
+    await renameDoc(org.notebookId, orgDocId, trimmed);
+    await upsertMarkedBlock(
+        orgDocId,
+        ORG_SECTION_ATTR,
+        `**组织**：${trimmed}`,
+        undefined,
+        org.archived ? ORG_ARCHIVED_VALUE : "1",
+    );
 }
 
 /** 供设置页/向导显示的组织锚点状态（只读） */
