@@ -1611,3 +1611,22 @@
   人物；普通笔记 → unlinked）；`pnpm run build` + `check:release` 全 PASS；52 景基线 +
   断点扫描重拍有效（无视觉变更）。
 - **P0 余 2 项**：FUNC-01.8a 锚点消歧、CODE-02.4/02.5。
+
+## P0 数据可信 第 58 轮：CODE-02.5 关系并发安全（2026-09-30，续跑口令第 58 版驱动）
+
+- **缺陷定位**：`addRelation`/`removeRelation` 直接用**调用方快照**的 `relatedItemIds` 组装
+  relation 单元格写入——另一窗口在同人上新增的边会被快照值覆盖（静默丢边）；
+  `refreshSections` 整批一个 try/catch——一个文档区块失败即跳过其余文档的区块同步。
+- **修复**：
+  1. **写前回读**：`readFreshPerson`（失效名册 → 按 itemId 取最新联系人）——增删都基于
+     最新关系列表裁决与写入；调用方快照仅作身份标识。幂等语义不变（最新值已含/不含即跳过）。
+  2. **区块副作用逐文档隔离**：refreshSections 逐文档 try/catch，失败清单返回
+     （{docId, message}）并逐文档 console.warn 带补同步指引；docIds 去重；名册读取失败整批
+     记 failed。关系数据在数据库不受区块失败影响；对该人物的下一次关系编辑自然补同步。
+- **验证**：svelte-check/tsc 0 错误 0 警告；单测 194/194；三套 UI 回归**桌面 88 / 移动 89 /
+  宿主 88 全绿**（+1 服务级 smoke：过期快照建关系 → 写入包含并发既有乙边与新城（不丢边）；
+  幂等重建零重复写；甲区块注入失败 → 不抛出、relation 数据正确、甲区块尝试可见）；`pnpm run
+  build` + `check:release` 全 PASS；52 景基线 + 断点扫描重拍有效（无视觉变更）。smoke 踩坑
+  补记：**关系区块同步 smoke 的 fixture 文档 ID 后缀必须 7 位（findBlockIdByCustomAttr 先验
+  rootId 格式，不合法会被逐文档 catch 吞掉表现为「区块从未被尝试」）**。
+- **P0 余 2 项**：FUNC-01.8a 锚点消歧、CODE-02.4 设置映射/字段续建。

@@ -12,6 +12,7 @@ import SettingsView from "../../../src/components/SettingsView.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
 import { applyContactCandidateFields, createContact } from "../../../src/services/contacts";
+import { addRelation, removeRelation } from "../../../src/services/relations";
 import { recordInteraction, deleteInteraction, loadInteractionStore } from "../../../src/data/interactions";
 import { initExternalBridge, disposeExternalBridge } from "../../../src/bridge/external-bridge";
 import { captureFromDoc, resolveRecognizeTarget } from "../../../src/services/capture";
@@ -1011,6 +1012,61 @@ await test("FAST-01.3a 识别目标裁决：名册失败自动重试仍失败返
     /* 普通笔记（未绑定） → unlinked（明确新建） */
     const unlinked = await resolveRecognizeTarget(settings, "20260930000000-note01");
     assert(unlinked.status === "unlinked", `普通笔记未裁决为 unlinked：${JSON.stringify(unlinked)}`);
+});
+
+await test("CODE-02.5 关系并发：写前回读防丢边，幂等不重写，区块失败逐文档隔离", async () => {
+    invalidateRoster();
+    let relatedOfA = ["row-b"]; /* 内核当前值：甲已与乙有关系（另一窗口写入） */
+    let relatedWrites = 0;
+    let failSectionA = false;
+    const sectionInserts = [];
+    const docOf = { "row-a": "20260927000000-doca001", "row-b": "20260927000000-docb001", "row-c": "20260927000000-docc001" };
+    kernel.handler = async (route, body) => {
+        if (route === "/api/av/renderAttributeView") {
+            const rows = [
+                { id: "row-a", cells: [
+                    { value: { type: "block", keyID: "name", block: { id: docOf["row-a"], content: "关系甲" } } },
+                    { value: { type: "relation", keyID: "related", relation: { blockIDs: [...relatedOfA] } } },
+                ] },
+                { id: "row-b", cells: [{ value: { type: "block", keyID: "name", block: { id: docOf["row-b"], content: "关系乙" } } }] },
+                { id: "row-c", cells: [{ value: { type: "block", keyID: "name", block: { id: docOf["row-c"], content: "关系丙" } } }] },
+            ];
+            return { view: { columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })), rows } };
+        }
+        if (route === "/api/av/setAttributeViewBlockAttr") {
+            if (body.keyID === "related") {
+                relatedWrites += 1;
+                relatedOfA = [...body.value.relation.blockIDs];
+            }
+            return { code: 0 };
+        }
+        if (route === "/api/query/sql") return [];
+        if (route === "/api/block/insertBlock") {
+            sectionInserts.push(body.parentID);
+            if (failSectionA && body.parentID === docOf["row-a"]) throw new Error("区块注入失败");
+            return [{ doOperations: [{ id: `20260930000000-blk000${sectionInserts.length}` }] }];
+        }
+        return { code: 0 };
+    };
+    /* 调用方快照过期（relatedItemIds 为空），内核里甲已有乙的边——写前回读不得丢边 */
+    const staleA = { docId: docOf["row-a"], itemId: "row-a", name: "关系甲", phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false, group: "", tags: [], relatedItemIds: [] };
+    const 丙 = { docId: docOf["row-c"], itemId: "row-c", name: "关系丙", phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false, group: "", tags: [], relatedItemIds: [] };
+    await addRelation(settings, staleA, 丙);
+    assert(relatedOfA.includes("row-b") && relatedOfA.includes("row-c"),
+        `并发边被覆盖丢失：${JSON.stringify(relatedOfA)}`);
+    /* 幂等：重复建立同一关系不产生第二次写入 */
+    const writesBefore = relatedWrites;
+    await addRelation(settings, staleA, 丙);
+    assert(relatedWrites === writesBefore, "幂等建立仍重复写入 relation 单元格");
+    /* 区块失败逐文档隔离：甲的区块写失败 → 整个关系编辑不抛出、relation 数据不受影响
+       （甲的区块插入被尝试并失败；丙无边、其区块本为无操作） */
+    failSectionA = true;
+    await removeRelation(settings, staleA, 丙);
+    assert(relatedOfA.includes("row-b") && !relatedOfA.includes("row-c"), "解除关系写失败");
+    await addRelation(settings, staleA, 丙);
+    assert(sectionInserts.filter((parent) => parent === docOf["row-a"]).length >= 1,
+        "甲的区块同步未被尝试（隔离失效）");
+    assert(relatedOfA.includes("row-b") && relatedOfA.includes("row-c"), "区块失败影响了关系数据");
 });
 
 await test("新建草稿「保存并离开」：守卫内保存成功并关闭弹窗", async () => {
