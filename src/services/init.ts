@@ -69,20 +69,41 @@ export async function inspectWorkspace(notebookName: string): Promise<WorkspaceS
         const hostDoc = docs.find((doc) => doc.content === HOST_DOC_TITLE || doc.hpath === `/${HOST_DOC_TITLE}`);
         if (!hostDoc) continue;
         const avBlocks = await findAvBlocksInDoc(hostDoc.id);
-        const found = avBlocks[0];
-        if (!found) {
+        if (avBlocks.length === 0) {
+            /* 文档复用、数据库新建（首次引导的常规路径） */
             return { notebooks, notebook: candidate, hostDocId: hostDoc.id, dbBlockId: null, avId: null, existingFields: [] };
         }
-        const columns = await readColumnsOrEmpty(found.avId, found.dbBlockId);
-        const reconciled = reconcileFieldMap(columns);
+        /* FUNC-01.8a：不再取首个 AV——列全候选按字段证据评估；列读取失败保持未知
+           （matched=0，不采纳），避免把无关库当锚点补列 */
+        const evaluated = [];
+        for (const block of avBlocks) {
+            const columns = await readColumnsOrEmpty(block.avId, block.dbBlockId);
+            const reconciled = reconcileFieldMap(columns);
+            evaluated.push({ block, matched: reconciled.matched, fields: reconciled.fieldMap });
+        }
+        const withEvidence = evaluated.filter((entry) => entry.matched > 0);
+        if (withEvidence.length === 0) {
+            /* 全部 AV 均无字段证据（无关库）：不采纳、不补列——复用文档新建库 */
+            return { notebooks, notebook: candidate, hostDocId: hostDoc.id, dbBlockId: null, avId: null, existingFields: [] };
+        }
+        withEvidence.sort((a, b) => b.matched - a.matched);
+        const top = withEvidence[0];
+        const tied = withEvidence.filter((entry) => entry.matched === top.matched);
+        if (tied.length > 1) {
+            /* 歧义：暂停写入供选择——设置页锚点扫描（scanAnchorCandidates）列出全部候选手动重绑 */
+            const ids = tied.map((entry) => entry.block.avId).join("、");
+            throw new Error(
+                `检测到 ${tied.length} 个字段证据相同的候选数据库（${ids}），已暂停初始化以避免写错库；请在 设置 → 数据与字段 → 锚点扫描 中核对后手动重绑，再继续向导`,
+            );
+        }
         return {
             notebooks,
             notebook: candidate,
             hostDocId: hostDoc.id,
-            dbBlockId: found.dbBlockId,
-            avId: found.avId,
+            dbBlockId: top.block.dbBlockId,
+            avId: top.block.avId,
             existingFields: FIELD_SPECS
-                .filter((spec) => reconciled.fieldMap[spec.key])
+                .filter((spec) => top.fields[spec.key])
                 .map((spec) => spec.nameZh),
         };
     }

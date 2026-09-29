@@ -1069,6 +1069,60 @@ await test("CODE-02.5 关系并发：写前回读防丢边，幂等不重写，�
     assert(relatedOfA.includes("row-b") && relatedOfA.includes("row-c"), "区块失败影响了关系数据");
 });
 
+await test("FUNC-01.8a 锚点消歧：首 AV 无关不采纳按字段证据取次 AV，歧义暂停写入，零匹配按新建", async () => {
+    const hostDocId = "20260927000000-host001";
+    const CONTACT_COLUMNS = [
+        { id: "col-1", name: "生日", type: "date" },
+        { id: "col-2", name: "农历生日", type: "checkbox" },
+        { id: "col-3", name: "电话", type: "phone" },
+        { id: "col-4", name: "邮箱", type: "email" },
+        { id: "col-5", name: "微信", type: "text" },
+        { id: "col-6", name: "网站", type: "url" },
+        { id: "col-7", name: "分组", type: "select" },
+        { id: "col-8", name: "标签", type: "mSelect" },
+        { id: "col-9", name: "相关人", type: "relation" },
+    ];
+    const avBlocks = {
+        "20260927000000-avirel1": { markdown: 'data-av-id="20260927000000-avirel1"', columns: [{ id: "col-x", name: "待办事项", type: "text" }] },
+        "20260927000000-avcont1": { markdown: 'data-av-id="20260927000000-avcont1"', columns: CONTACT_COLUMNS },
+    };
+    kernel.handler = async (route, body) => {
+        if (route === "/api/notebook/lsNotebooks") return { notebooks: [{ id: "20260927000000-book001", name: "人脉" }] };
+        if (route === "/api/query/sql") {
+            const stmt = String(body?.stmt ?? "");
+            if (stmt.includes("type='d'")) return [{ id: hostDocId, content: "联系人总表", hpath: "/联系人总表" }];
+            if (stmt.includes("type = 'av'")) {
+                return Object.entries(avBlocks).map(([id, block]) => ({ id, parent_id: hostDocId, markdown: block.markdown }));
+            }
+            return [];
+        }
+        if (route === "/api/av/renderAttributeView") {
+            const block = avBlocks[body.id];
+            return { view: { columns: block ? block.columns : [] } };
+        }
+        throw new Error(`锚点消歧用例不允许请求 ${route}`);
+    };
+
+    /* 场景 1：首个 AV 无字段证据、次 AV 九字段全对回 → 采纳次 AV，绝不给无关库当锚点 */
+    const snapshot = await inspectWorkspace("人脉");
+    assert(snapshot.avId === "20260927000000-avcont1" && snapshot.dbBlockId === "20260927000000-avcont1",
+        `未按字段证据采纳联系人库：${JSON.stringify({ avId: snapshot.avId, dbBlockId: snapshot.dbBlockId })}`);
+    assert(snapshot.existingFields.length === 9, `字段证据未对回：${JSON.stringify(snapshot.existingFields)}`);
+
+    /* 场景 2：两个 AV 都有字段证据 → 歧义暂停写入（指引设置页锚点扫描手动选择） */
+    avBlocks["20260927000000-avirel1"].columns = CONTACT_COLUMNS;
+    let pauseError = "";
+    try { await inspectWorkspace("人脉"); } catch (error) { pauseError = error.message; }
+    assert(pauseError.includes("暂停初始化") && pauseError.includes("锚点扫描"), `歧义未暂停写入：${pauseError}`);
+
+    /* 场景 3：全部 AV 无字段证据 → 复用文档、不采纳任何无关库（新建库） */
+    avBlocks["20260927000000-avirel1"].columns = [{ id: "col-x", name: "待办事项", type: "text" }];
+    avBlocks["20260927000000-avcont1"].columns = [{ id: "col-y", name: "笔记存档", type: "text" }];
+    const fresh = await inspectWorkspace("人脉");
+    assert(fresh.hostDocId === hostDocId && fresh.avId === null && fresh.dbBlockId === null,
+        `零匹配未按新建处理：${JSON.stringify({ avId: fresh.avId, dbBlockId: fresh.dbBlockId })}`);
+});
+
 await test("新建草稿「保存并离开」：守卫内保存成功并关闭弹窗", async () => {
     let created = false;
     kernel.handler = async (route, body) => {
