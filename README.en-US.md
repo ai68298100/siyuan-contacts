@@ -15,6 +15,15 @@ English | [简体中文](README.md)
 
 ---
 
+## 🐴 Xiaolv plugin family
+
+Currently developed plugins:
+
+- **小驴雷切**
+- **小驴打卡**
+- **小驴人脉** (this project)
+- **小驴拾遗**
+
 ## Why this plugin
 
 Phone contacts only store numbers; sales CRMs only serve pipelines. **People are part of your notes** — attendees in meeting notes, friends from a party, day-to-day interactions in your journal. They should live in your knowledge base, not in yet another app.
@@ -72,6 +81,10 @@ pnpm check:release # package release gate
 ```
 
 See [AGENTS.md](AGENTS.md) for the development protocol, [docs/DATA-CONTRACT.md](docs/DATA-CONTRACT.md) for the storage contract and [docs/ROADMAP.md](docs/ROADMAP.md) for the roadmap. Changelog: [docs/CHANGELOG.md](docs/CHANGELOG.md). 中文文档见 [README.md](README.md)。
+
+## 🤝 Community
+
+QQ group: **871707735**
 
 ## 📄 License
 
