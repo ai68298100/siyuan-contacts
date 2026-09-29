@@ -1478,7 +1478,8 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
     };
     let opened;
     mounted = mount(RelationGraph, { target: fixture, props: {
-        settings, onOpenDetail(value) { opened = value.docId; }, onOpenPeople() {},
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, onPreferencesChange: async (next) => next,
+        onOpenDetail(value) { opened = value.docId; }, onOpenPeople() {},
     } });
     await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "图谱未挂载");
     const cy = fixture.querySelector(".lvct-graph-view__canvas")._cyreg.cy;
@@ -1586,7 +1587,8 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
 await test("图谱稳定挂载，悬停卡保留人物，筛选清空后可恢复", async () => {
     let opened;
     mounted = mount(RelationGraph, { target: fixture, props: {
-        settings, onOpenDetail: (value) => { opened = value; }, onOpenPeople() {},
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, onPreferencesChange: async (next) => next,
+        onOpenDetail: (value) => { opened = value; }, onOpenPeople() {},
     } });
     await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "图谱未挂载");
     const cy = fixture.querySelector(".lvct-graph-view__canvas")._cyreg.cy;
@@ -1601,6 +1603,87 @@ await test("图谱稳定挂载，悬停卡保留人物，筛选清空后可恢�
     assert(cy.destroyed(), "旧图谱没有销毁");
     button("清除筛选").click();
     await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "清除筛选后图谱未恢复");
+});
+
+await test("图谱文档引用模式：内核局部图按登记集合过滤，边语义提示与模式偏好持久化（B14.3/14.5/14.7）", async () => {
+    const selfDocId = "20260930000000-self001";
+    const contactA = "20260930000000-contact1";
+    const contactB = "20260930000000-contact2";
+    const stranger = "20260930000000-strange1";
+    const nameRows = [
+        { id: selfDocId, name: "我自己" },
+        { id: contactA, name: "引用甲" },
+        { id: contactB, name: "引用乙" },
+    ];
+    let localRequests = 0;
+    let savedGraphMode = "";
+    kernel.handler = async (route, body) => {
+        if (route === "/api/av/renderAttributeView") return { view: { columns: renderResult().view.columns, rows: nameRows.map((row) => ({
+            id: row.id, cells: [
+                { value: { type: "block", keyID: "name", block: { id: row.id, content: row.name } } },
+                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+            ],
+        })) } };
+        if (route === "/api/graph/getLocalGraph") {
+            localRequests += 1;
+            assert(body && body.id === selfDocId, "局部图中心不是本人档案");
+            assert(body.conf && typeof body.conf === "object", "getLocalGraph 请求缺 conf 对象（内核必填）");
+            /* 字段形状按 spike:b14 实证：节点 id/label/refs/defs，边 from/to */
+            return {
+                id: body.id,
+                nodes: [
+                    { id: selfDocId, label: "我自己", type: "NodeDocument", refs: 2, defs: 0 },
+                    { id: contactA, label: "引用甲", type: "NodeDocument", refs: 0, defs: 1 },
+                    { id: contactB, label: "引用乙", type: "NodeDocument", refs: 0, defs: 1 },
+                    { id: stranger, label: "无关笔记", type: "NodeDocument", refs: 9, defs: 9 },
+                ],
+                links: [
+                    { from: selfDocId, to: contactA, ref: true },
+                    { from: contactB, to: selfDocId, ref: true },
+                    { from: selfDocId, to: stranger, ref: true },
+                ],
+            };
+        }
+        throw new Error(`回归测试不允许请求 ${route}`);
+    };
+    let opened = "";
+    let currentPrefs = { ...DEFAULT_VIEW_PREFERENCES };
+    mounted = mount(RelationGraph, { target: fixture, props: {
+        settings,
+        preferences: currentPrefs,
+        onPreferencesChange: async (next) => { currentPrefs = next; savedGraphMode = next.graphMode; return next; },
+        facade: { loadSelfIdentity: async () => ({ selfDocId, createdAt: "2026-09-30T00:00:00Z" }) },
+        onOpenDetail(value) { opened = value.docId; },
+        onOpenPeople() {},
+    } });
+    await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "关系图未挂载");
+    button("文档引用").click();
+    await until(() => localRequests === 1, "未请求内核局部图");
+    await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "文档引用图未挂载");
+    /* 画布会随筛选重建，断言一律实时取最新实例 */
+    const nativeCanvas = () => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy;
+    await until(() => (nativeCanvas()?.nodes().length ?? 0) > 0, "引用图节点为空");
+    const nativeCy = nativeCanvas();
+    assert(nativeCy.getElementById(selfDocId).nonempty(), "中心本人节点缺失");
+    assert(nativeCy.getElementById(contactA).nonempty() && nativeCy.getElementById(contactB).nonempty(), "登记联系人节点缺失");
+    assert(!nativeCy.getElementById(stranger).nonempty(), "无关笔记未被登记集合过滤");
+    assert(nativeCy.edges().length === 2, "被过滤节点的边未随节点丢弃");
+    assert(fixture.textContent.includes("边=文档间块引用"), "边语义提示未显示");
+    assert(savedGraphMode === "native", "模式偏好未持久化");
+    const modeButtons = [...fixture.querySelectorAll(".lvct-graph-mode button")];
+    assert(modeButtons[1]?.getAttribute("aria-pressed") === "true", "文档引用按钮未标记按下态");
+    /* 搜索过滤走节点 label（画布重建后节点数变化） */
+    input(fixture.querySelector('input[type="search"]'), "引用甲");
+    await until(() => (nativeCanvas()?.nodes().length ?? 0) === 1, "引用图搜索未按节点过滤");
+    input(fixture.querySelector('input[type="search"]'), "");
+    await until(() => (nativeCanvas()?.nodes().length ?? 0) === 3, "引用图清空搜索未恢复");
+    /* 切回关系图：不应重复请求局部图 */
+    button("关系图").click();
+    await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "切回关系图未挂载");
+    await tick();
+    assert(localRequests === 1, "切回关系图不应重复请求局部图");
+    assert(modeButtons[0]?.getAttribute("aria-pressed") === "true", "切回后关系图按钮未恢复按下态");
+    assert(savedGraphMode === "relations", "切回后模式偏好未持久化");
 });
 
 await test("详情加载失败可重试，空记录可跳转记一笔，写入后时间线刷新", async () => {
@@ -2854,7 +2937,8 @@ await test("关系结果导出：路径链 Markdown、无路径兜底与图规�
     try {
         setupHandler(false);
         mounted = mount(RelationGraph, { target: fixture, props: {
-            settings, onOpenDetail() {}, onOpenPeople() {},
+            settings, preferences: DEFAULT_VIEW_PREFERENCES, onPreferencesChange: async (next) => next,
+            onOpenDetail() {}, onOpenPeople() {},
         } });
         await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "图谱未挂载");
         await pickOption("关系中心", "甲");
@@ -2875,7 +2959,8 @@ await test("关系结果导出：路径链 Markdown、无路径兜底与图规�
         invalidateRoster();
         await unmount(mounted);
         mounted = mount(RelationGraph, { target: fixture, props: {
-            settings, onOpenDetail() {}, onOpenPeople() {},
+            settings, preferences: DEFAULT_VIEW_PREFERENCES, onPreferencesChange: async (next) => next,
+            onOpenDetail() {}, onOpenPeople() {},
         } });
         await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "图谱重新挂载");
         await pickOption("关系中心", "甲");

@@ -295,4 +295,16 @@ vCard 处理是**瞬态转换**（不落插件存储），但属性↔字段映�
 **迁移与兼容**：不迁移任何既有数据；`org-membership.json` 为全新键，旧版本工作空间升级后为空。
 
 **B14 原生图能力（B14.1 spike 实证，2026-09-30）**：内核图查询端点 **`/api/graph/getGraph`（全图）与 `/api/graph/getLocalGraph`（局部图，按文档 id）存在且可用**——请求须带 `conf` 对象（`{type: {}}` 已验证返回 code=0 + data{box, nodes, links, conf}）；缺 conf 报「Field [conf] is required」。图数据 = nodes + links（含块引用边），refs 表（块引用索引）亦为可用图数据源且反向边自动维护；**打开原生图面板属前端域**（内核无此端点，真机核对留待）；`getBlockGraph` 空响应（未知）。组织维度不依赖原生图，B14 双图实现路线据此更新。
+
+**B14 图数据元素形状与双图落地（第 69 轮 spike 增补 + 实现，2026-09-30）**：
+- **元素字段（spike:b14 E 段 dump 实证，v3.8.6）**：节点 `{id, box, path, size, label, type, refs, defs}`；
+  **边 `{from, to, ref, arrows}`——方向字段是 `from`/`to`，不是 source/target**。节点 `refs`/`defs`
+  是内核全库计数，插件图内度数一律按保留边重算，不直接采用。
+- **getLocalGraph 口径为双向一度**：中心文档的出链与回链都在图内（A→B/C 与 D→A 同图）；
+  `conf.type` 各项 false 时返回文档级节点（type="NodeDocument"）。
+- **插件侧契约**：`api/graph.ts` 严格校验 nodes/links 数组形状（异常上抛，空图与读失败可区分）；
+  `domain/native-graph.ts` 登记集合过滤（B14.3：本人+联系人 docId 白名单，无关笔记不进图，
+  被过滤节点的边随之丢弃）、无向去重、自环丢弃；模式偏好 `view-preferences.json.graphMode`
+  （"relations" | "native"，缺省 relations）。边语义在 UI 恒有标识：文档引用图边=块引用
+  （双向一度含回链），与 related 关系边不同源、不互相推断（B14.8）。
 数据锚点重绑设置页扫描同步识别组织文档标记（与人物档案条同模式）。

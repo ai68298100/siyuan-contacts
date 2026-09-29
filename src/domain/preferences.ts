@@ -12,6 +12,8 @@ export type PeopleViewMode = "card" | "table";
 /** 表格可选列（F02）。「姓名」是固定列，不参与显隐与排序，恒为首列。
  *  B12 新增「org」虚拟列：值来自成员索引投影（组织名 · 部门），不在数据库 fieldMap 中。 */
 export type PeopleTableColumn = "group" | "phone" | "wechat" | "birthday" | "recent" | "tags" | "org";
+/** 图谱数据源模式（B14.5）：relations=关系图（related 边）；native=文档引用图（内核图数据，边=块引用） */
+export type GraphViewMode = "relations" | "native";
 
 /** 表格可选列的展示顺序默认值（常用常驻、次要折叠的排序基础） */
 export const PEOPLE_TABLE_COLUMNS: readonly PeopleTableColumn[] = ["group", "phone", "wechat", "birthday", "recent", "tags", "org"];
@@ -27,6 +29,8 @@ export interface ViewPreferences {
     readonly peopleView: PeopleViewMode;
     /** 表格可见列（有序）。归一化保证只含可选键、无重复且非空。 */
     readonly tableColumns: PeopleTableColumn[];
+    /** 图谱数据源模式（B14.5）：重开工作台仍使用用户选定模式 */
+    readonly graphMode: GraphViewMode;
     /** 保存的联系人视图（F04）：规则快照，应用时重新求值 */
     readonly savedViews: readonly SavedView[];
     /** 打开工作台时的关注摘要开关（F08） */
@@ -47,6 +51,7 @@ export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
     staleThresholdDays: 30,
     peopleView: "card",
     tableColumns: [...PEOPLE_TABLE_COLUMNS],
+    graphMode: "relations",
     savedViews: [],
     summaryEnabled: true,
     summaryDismissedOn: "",
@@ -63,6 +68,10 @@ function isPeopleSortMode(value: unknown): value is PeopleSortMode {
 
 function isPeopleViewMode(value: unknown): value is PeopleViewMode {
     return value === "card" || value === "table";
+}
+
+function isGraphViewMode(value: unknown): value is GraphViewMode {
+    return value === "relations" || value === "native";
 }
 
 function boundedDays(value: unknown, fallback: number): number {
@@ -97,6 +106,7 @@ export function normalizeViewPreferences(raw: unknown): ViewPreferences {
         peopleView: isPeopleViewMode(record.peopleView) ? record.peopleView : DEFAULT_VIEW_PREFERENCES.peopleView,
         // 旧偏好缺字段取默认；已有值仍逐键校验
         tableColumns: record.tableColumns === undefined ? [...DEFAULT_VIEW_PREFERENCES.tableColumns] : normalizeTableColumns(record.tableColumns),
+        graphMode: isGraphViewMode(record.graphMode) ? record.graphMode : DEFAULT_VIEW_PREFERENCES.graphMode,
         // 旧偏好缺字段取空列表；已有值逐条归一化
         savedViews: record.savedViews === undefined ? [] : normalizeSavedViews(record.savedViews),
         summaryEnabled: typeof record.summaryEnabled === "boolean" ? record.summaryEnabled : DEFAULT_VIEW_PREFERENCES.summaryEnabled,

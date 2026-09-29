@@ -1830,3 +1830,37 @@
   spike 证据轮，无 src/ 变更。
 - **P1 下一步**：B12 收尾投影（表格可选列「单位」+ 简报组织行 + 选人提示关键词）；
   B14 实现路线据证据细化后开工。
+
+## P1 业务主线 第 69 轮：B14 双图数据源落地——原生文档引用图模式（2026-09-30，续跑口令第 71 版驱动）
+
+- **spike:b14 增强**（隔离内核重跑，b14-graph-results.json 12 项证据）：
+  1. **图数据元素字段实证**：节点 `{id, label, type, refs, defs}`；**边 `{from, to, ref}`（不是
+     source/target）**——域层映射若按猜测编码会把所有边画丢，E 段 dump 阻止了该缺陷。
+  2. **getLocalGraph 为双向一度**：以 A 为中心返回 A/B/C/D 四节点——出链（A→B/C）与
+     回链（D→A）都在图内；`conf` 回填显示内核默认只收文档级节点（type 各项 false）。
+  3. getGraph 全图可用（13 节点样本）；`spike:b14` 脚本名注册进 package.json。
+- **实现（B14.3 范围契约 + B14.5 模式偏好 + B14.7 一度默认的插件内部分）**：
+  - `src/api/graph.ts`：`fetchLocalGraph`/`fetchGlobalGraph`，conf 必为对象、严格形状校验
+    （缺 nodes/links 数组即上抛，空图与读失败可区分）。
+  - `src/domain/native-graph.ts`：`mapNativeGraph` 纯函数——登记集合过滤（无关笔记不进图）、
+    from/to 映射、无向去重、自环/悬空丢弃、图内度数重算（不用内核全库 refs/defs 计数）、
+    docGroups 分组映射缺省「其他」。结构类型定义在域内（architecture 约束 domain 只引用自身）。
+  - `src/services/native-graph.ts`：`loadNativePersonGraph`——中心=本人档案（getLocalGraph），
+    allowedDocIds=名册+本人；未指定本人档案抛 `NativeGraphCenterMissingError`（独立降级提示）。
+  - `RelationGraph.svelte`：工具栏新增「关系图 / 文档引用」模式切换（aria-pressed）；native
+    模式隐藏 related 语义的关系查询面板与分组/孤立过滤器，显示边语义提示条（「边=文档间块
+    引用（双向一度，含回链），非 related 关系」，B14.8 标识）；搜索按节点 label/ID 过滤；
+    hover 卡显示「图内连接」而非关系度数；未建档/读失败/空引用图三分降级，均可重试。
+  - 偏好 `graphMode`（B14.5）：`ViewPreferences` 新字段，归一化非法值回退 relations；切换即保存，
+    重开工作台沿用（Workbench 走既有 saveViewPreferences 通道）。
+  - i18n：zh-CN/en 各补 13 键（graphMode* / graphNative*），collect-i18n 缺失 0。
+- **验证**：单测 208/208（新增 native-graph 4 例 + graphMode 归一化 1 例）；三套 UI 回归
+  桌面 95 / 移动 96 / 宿主 95 全绿（新增「文档引用模式过滤与偏好持久化」用例：mock
+  getLocalGraph 断言中心=本人、conf 对象、无关笔记被过滤、被过滤节点的边丢弃、模式偏好保存、
+  切回不重复请求）；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 10/10、
+  spike:init 21/21（新增 api 文件不改既有端点）；52 景基线（40+host 52）重拍目检——工具栏
+  模式按钮明暗两版布局正常；断点扫描有效。
+- **Host pending（真机核对项，不计入本轮验收）**：原生图面板前端打开通道、真实宿主图中
+  `siyuan://blocks` 链接是否成边（B14.2 余项）。
+- **P1 下一步**：B13 组织详情/编辑/归档迭代；B14 余项——组织节点与组织成员边（B14.6）、
+  全局图入口与规模说明（B14.8）、原生图真机核对。

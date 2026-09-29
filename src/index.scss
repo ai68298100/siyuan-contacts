@@ -1928,6 +1928,14 @@
     overflow-wrap: anywhere;
 }
 
+/* B14.5 数据源模式切换（关系图 / 文档引用） */
+.lvct-graph-mode {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
 .lvct-graph-query__results {
     display: flex;
     flex-wrap: wrap;

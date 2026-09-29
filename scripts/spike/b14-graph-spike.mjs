@@ -130,8 +130,10 @@ async function main() {
         const docB = await apiChecked("/api/filetree/createDocWithMd", {notebook: notebookID, path: "/文档B", markdown: "# 文档B\n\n"});
         const docC = await apiChecked("/api/filetree/createDocWithMd", {notebook: notebookID, path: "/文档C", markdown: "# 文档C\n\n"});
         const docA = await apiChecked("/api/filetree/createDocWithMd", {notebook: notebookID, path: "/文档A", markdown: "# 文档A\n\n"});
+        const docD = await apiChecked("/api/filetree/createDocWithMd", {notebook: notebookID, path: "/文档D", markdown: "# 文档D\n\n"});
         const refMarkdown = "((" + docB + " '文档B'))\n((" + docC + " '文档C'))";
         await apiChecked("/api/block/insertBlock", {dataType: "markdown", parentID: docA, data: refMarkdown});
+        await apiChecked("/api/block/insertBlock", {dataType: "markdown", parentID: docD, data: "((" + docA + " '文档A'))"});
         await flush();
 
         /* A：候选内核 graph 端点探测（信息性——存在/参数要求都是证据） */
@@ -162,6 +164,21 @@ async function main() {
         const backRefs = await apiChecked("/api/query/sql", {stmt: "SELECT root_id FROM refs WHERE def_block_root_id = '" + docB + "'"});
         record("D 反向边（回链）自动维护", backRefs.some((row) => row.root_id === docA),
             `docB 回链来源=${JSON.stringify(backRefs.map((row) => row.root_id))}`);
+
+        /* E：图数据元素形状 dump（B14 域层映射硬前置——nodes/links 字段名必须实证，不得臆造）
+           同时验证 getLocalGraph 一度口径：docD→A 为入链，看局部图是否把回链画进来 */
+        const local = await apiChecked("/api/graph/getLocalGraph", {id: docA, conf: graphConf});
+        record("E getLocalGraph 数据形状", null,
+            `nodes=${local?.nodes?.length ?? null} 首节点=${JSON.stringify(local?.nodes?.[0] ?? null).slice(0, 260)} ` +
+            `首边=${JSON.stringify(local?.links?.[0] ?? null).slice(0, 180)} conf=${JSON.stringify(local?.conf ?? null).slice(0, 220)}`);
+        const localIds = new Set((local?.nodes ?? []).map((node) => node.id));
+        const localEdgePairs = (local?.links ?? []).map((link) => `${link.source ?? "?"}->${link.target ?? "?"}`);
+        record("E 局部图一度范围（入链回链是否纳入）", null,
+            `含A=${localIds.has(docA)} 含B=${localIds.has(docB)} 含C=${localIds.has(docC)} 含D=${localIds.has(docD)} edges=${JSON.stringify(localEdgePairs).slice(0, 240)}`);
+        const global = await apiChecked("/api/graph/getGraph", {conf: graphConf});
+        record("E getGraph 数据形状", null,
+            `nodes=${global?.nodes?.length ?? null} 首节点=${JSON.stringify(global?.nodes?.[0] ?? null).slice(0, 260)} ` +
+            `首边=${JSON.stringify(global?.links?.[0] ?? null).slice(0, 180)}`);
     } finally {
         await flush().catch(() => {});
         try { await api("/api/system/exit", {force: true}); } catch { /* 内核可能已退出 */ }

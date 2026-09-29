@@ -5,7 +5,10 @@
     import { Scan, ZoomIn, ZoomOut, Network, RefreshCw } from "@lucide/svelte";
     import ViewState from "../ViewState.svelte";
     import { listContacts } from "../../services/contacts";
+    import { loadNativePersonGraph, NativeGraphCenterMissingError } from "../../services/native-graph";
     import { buildGraph, capGraph, GRAPH_MAX_NODES, groupColor, queryGraphRelations } from "../../domain/graph";
+    import type { GraphViewMode, ViewPreferences } from "../../domain/preferences";
+    import type { PersonGraph } from "../../domain/graph";
     import { shortestGraphPath, secondDegreeGraphIds } from "../../domain/graph-path";
     import { renderGraphResultMarkdown } from "../../domain/graph-export";
     import { translateText } from "../../domain/translation";
@@ -21,6 +24,8 @@
         revision = 0,
         facade,
         i18n,
+        preferences,
+        onPreferencesChange,
         onOpenDetail,
         onOpenPeople,
     }: {
@@ -28,6 +33,9 @@
         revision?: number;
         facade?: ContactsPluginFacade;
         i18n?: Readonly<Record<string, string>>;
+        /** B14.5：图谱数据源模式保存在视图偏好中，重开仍用用户选定模式 */
+        preferences: ViewPreferences;
+        onPreferencesChange: (next: ViewPreferences) => Promise<ViewPreferences>;
         onOpenDetail: (person: ContactSummary) => void;
         onOpenPeople: () => void;
     } = $props();
@@ -39,6 +47,13 @@
     let loading: boolean = $state(true);
     let errorText: string = $state("");
     let truncated: boolean = $state(false);
+    // svelte-ignore state_referenced_locally
+    let graphMode: GraphViewMode = $state(preferences.graphMode);
+    let nativeGraph: PersonGraph | null = $state(null);
+    let nativeLoading = $state(false);
+    let nativeError = $state("");
+    let nativeMissingCenter = $state(false);
+    let nativeVersion = 0;
     let searchText: string = $state("");
     let groupFilter: string = $state("");
     let isolatedOnly = $state(false);
@@ -90,6 +105,23 @@
     });
     const searchNeedle = $derived(searchText.trim().toLowerCase());
     const displayed = $derived(capGraph(buildGraph(filteredPeople)));
+    /* B14 原生模式：搜索只按节点 label/ID 过滤，再统一走规模裁剪 */
+    const nativeFiltered = $derived.by((): PersonGraph => {
+        const graph = nativeGraph ?? { nodes: [], edges: [] };
+        if (!searchNeedle) return graph;
+        const kept = graph.nodes.filter((node) => node.label.toLowerCase().includes(searchNeedle) || node.id.toLowerCase().includes(searchNeedle));
+        const keptIds = new Set(kept.map((node) => node.id));
+        return { nodes: kept, edges: graph.edges.filter((edge) => keptIds.has(edge.source) && keptIds.has(edge.target)) };
+    });
+    const nativeDisplayed = $derived(capGraph(nativeFiltered));
+    const nativeHitCount = $derived(nativeFiltered.nodes.length);
+    /* native 模式 hover 卡的图内连接数（related 度数在引用图语境不适用，B14.8 边来源标识）；-1=非本模式。
+       先取局部快照：svelte-check 对 $state 跨表达式不收窄（既有坑位） */
+    const hoveredNativeDegree = $derived.by(() => {
+        const person = hoveredPerson;
+        if (graphMode !== "native" || !nativeGraph || !person) return -1;
+        return nativeGraph.nodes.find((node) => node.id === person.docId)?.degree ?? 0;
+    });
     const relations = $derived(queryGraphRelations(displayed.graph, focusId, compareId));
     const secondMode = $derived.by(() => !compareId && relationDepth === "second");
     const secondIds = $derived(secondMode ? secondDegreeGraphIds(displayed.graph, focusId) : []);
@@ -225,6 +257,46 @@
         }
     }
 
+    /** B14.5：切换数据源模式并持久化偏好；保存失败不阻断本次切换（下次重开回落上次成功保存值） */
+    async function switchGraphMode(mode: GraphViewMode) {
+        if (graphMode === mode) return;
+        graphMode = mode;
+        try {
+            await onPreferencesChange({ ...preferences, graphMode: mode });
+        } catch (error) {
+            console.warn("[lvct] 图谱模式偏好保存失败", error);
+        }
+    }
+
+    /** B14 原生模式加载：中心=本人档案，getLocalGraph 双向一度，登记集合过滤（B14.3）。失败显式降级 */
+    async function loadNativeGraph() {
+        const version = ++nativeVersion;
+        nativeLoading = true;
+        nativeError = "";
+        nativeMissingCenter = false;
+        try {
+            const identity = facade ? await facade.loadSelfIdentity() : null;
+            const graph = await loadNativePersonGraph(settings, identity);
+            if (version === nativeVersion) nativeGraph = graph;
+        } catch (error) {
+            if (version !== nativeVersion) return;
+            nativeGraph = null;
+            if (error instanceof NativeGraphCenterMissingError) {
+                nativeMissingCenter = true;
+            } else {
+                nativeError = error instanceof Error ? error.message : String(error);
+            }
+        } finally {
+            if (version === nativeVersion) nativeLoading = false;
+        }
+    }
+
+    $effect(() => {
+        if (graphMode !== "native") return;
+        revision;
+        void loadNativeGraph();
+    });
+
     function zoomBy(factor: number) {
         if (graphInstance) graphInstance.zoom(graphInstance.zoom() * factor);
     }
@@ -293,8 +365,11 @@
     }
 
     $effect(() => {
-        if (!container || people.length === 0) return;
-        const capped = displayed;
+        if (!container) return;
+        /* B14：数据源按模式切换——关系图用名册投影，文档引用图用内核局部图（均走规模裁剪） */
+        if (graphMode === "relations" && people.length === 0) return;
+        if (graphMode === "native" && (nativeLoading || nativeMissingCenter || nativeError !== "")) return;
+        const capped = graphMode === "native" ? nativeDisplayed : displayed;
         truncated = capped.truncated;
         if (capped.graph.nodes.length === 0) return;
         const palette = themeColors();
@@ -400,15 +475,36 @@
 
 <div class="lvct-graph-view">
     <div class="lvct-people__toolbar fn__flex">
+        <!-- B14.5 数据源模式：关系图（related 边）/ 文档引用图（内核原生图数据） -->
+        <div class="lvct-graph-mode" role="group" aria-label={text("graphModeLabel", "图谱数据源")}>
+            <button
+                class="b3-button b3-button--small"
+                class:b3-button--outline={graphMode === "relations"}
+                class:b3-button--text={graphMode !== "relations"}
+                aria-pressed={graphMode === "relations"}
+                onclick={() => void switchGraphMode("relations")}
+            >{text("graphModeRelations", "关系图")}</button>
+            <button
+                class="b3-button b3-button--small"
+                class:b3-button--outline={graphMode === "native"}
+                class:b3-button--text={graphMode !== "native"}
+                aria-pressed={graphMode === "native"}
+                onclick={() => void switchGraphMode("native")}
+            >{text("graphModeNative", "文档引用")}</button>
+        </div>
         <input class="b3-text-field fn__flex-1" type="search" placeholder={text("graphSearchPlaceholder", "搜索节点…")} aria-label={text("graphSearchNodes", "搜索关系图谱节点")} bind:value={searchText} />
-        {#if searchNeedle}<span class="ft__smaller ft__on-surface">{text("graphHitCount", "命中 {n} 人", { n: filteredPeople.length })}</span>{/if}
-        <select class="b3-select" bind:value={groupFilter} aria-label={text("graphFilterByGroup", "按分组过滤")}>
-            <option value="">{text("graphAllGroups", "全部分组")}</option>
-            {#each groups as group (group)}
-                <option value={group}>{group}</option>
-            {/each}
-        </select>
-        <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={isolatedOnly} />{text("graphIsolatedOnly", "仅无关系人物（{n}）", { n: isolatedIds.size })}</label>
+        {#if searchNeedle}<span class="ft__smaller ft__on-surface">{graphMode === "native" ? text("graphNativeHitCount", "命中 {n} 个节点", { n: nativeHitCount }) : text("graphHitCount", "命中 {n} 人", { n: filteredPeople.length })}</span>{/if}
+        {#if graphMode === "native"}
+            <span class="ft__smaller ft__on-surface">{text("graphNativeEdgeNote", "边=文档间块引用（双向一度，含回链），非 related 关系")}</span>
+        {:else}
+            <select class="b3-select" bind:value={groupFilter} aria-label={text("graphFilterByGroup", "按分组过滤")}>
+                <option value="">{text("graphAllGroups", "全部分组")}</option>
+                {#each groups as group (group)}
+                    <option value={group}>{group}</option>
+                {/each}
+            </select>
+            <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={isolatedOnly} />{text("graphIsolatedOnly", "仅无关系人物（{n}）", { n: isolatedIds.size })}</label>
+        {/if}
         <span class="ft__smaller ft__on-surface lvct-graph-legend">
             {#each groupLegend as group (group.label)}
                 <span class={`lvct-graph-legend__item lvct-graph-legend__item--${group.className}`}><i></i>{group.label}</span>
@@ -417,7 +513,7 @@
         <span class="fn__flex-1"></span>
     </div>
 
-    {#if !loading && !errorText && displayed.graph.nodes.length > 0}
+    {#if graphMode === "relations" && !loading && !errorText && displayed.graph.nodes.length > 0}
         <div class="lvct-graph-query">
             <label>{text("graphCenterLabel", "关系中心")}
                 <!-- B03 可搜索选人器：输入即筛替换全量长列表 -->
@@ -488,13 +584,31 @@
 
     {#if truncated}
         <div class="ft__smaller ft__on-surface lvct-graph-note">
-            {text("graphTruncatedNote", "联系人超过 {max}，当前只展示关系最多的 {max} 人（用分组筛选或搜索缩小范围可看全）。", { max: GRAPH_MAX_NODES })}
+            {#if graphMode === "native"}
+                {text("graphNativeTruncated", "引用图超过 {max} 个节点，只展示连接最多的 {max} 个（搜索可缩小范围）。", { max: GRAPH_MAX_NODES })}
+            {:else}
+                {text("graphTruncatedNote", "联系人超过 {max}，当前只展示关系最多的 {max} 人（用分组筛选或搜索缩小范围可看全）。", { max: GRAPH_MAX_NODES })}
+            {/if}
         </div>
     {/if}
 
     {#if errorText}
         <ViewState error title={text("graphLoadFailTitle", "图谱加载失败")} description={errorText}>
             <button class="b3-button b3-button--outline" onclick={refresh}>{text("graphReload", "重新加载")}</button>
+        </ViewState>
+    {:else if graphMode === "native" && nativeMissingCenter}
+        <ViewState title={text("graphNativeNoCenterTitle", "还没有本人档案")} description={text("graphNativeNoCenterDesc", "文档引用图以本人档案为中心。请先在设置中建立或指定「我自己」。")}>
+            <button class="b3-button b3-button--outline" onclick={() => void loadNativeGraph()}>{text("graphReload", "重新加载")}</button>
+        </ViewState>
+    {:else if graphMode === "native" && nativeError}
+        <ViewState error title={text("graphNativeLoadFailTitle", "文档引用图加载失败")} description={nativeError}>
+            <button class="b3-button b3-button--outline" onclick={() => void loadNativeGraph()}>{text("graphReload", "重新加载")}</button>
+        </ViewState>
+    {:else if graphMode === "native" && nativeLoading}
+        <ViewState loading title={text("graphNativeLoading", "正在读取文档引用图")} />
+    {:else if graphMode === "native" && nativeDisplayed.graph.nodes.length === 0}
+        <ViewState title={text("graphNativeEmptyTitle", "暂无文档引用")} description={text("graphNativeEmptyDesc", "在笔记中用块引用链接联系人文档后，这里会显示引用网络。")}>
+            <button class="b3-button b3-button--outline" onclick={() => void loadNativeGraph()}>{text("graphReload", "重新加载")}</button>
         </ViewState>
     {:else if loading}
         <ViewState loading title={text("graphLoadingTitle", "正在加载关系图谱")} />
@@ -530,7 +644,11 @@
                         <b>{hoveredPerson.name}</b>
                         {#if hoveredPerson.group}<span class="lvct-chip lvct-chip--group">{hoveredPerson.group}</span>{/if}
                     </div>
-                    <div class="ft__smaller ft__on-surface">{text("graphDegreeLabel", "关系度数：{n}", { n: hoveredPerson.relatedItemIds.length })}</div>
+                    {#if hoveredNativeDegree >= 0}
+                        <div class="ft__smaller ft__on-surface">{text("graphNativeDegree", "图内连接：{n}", { n: hoveredNativeDegree })}</div>
+                    {:else}
+                        <div class="ft__smaller ft__on-surface">{text("graphDegreeLabel", "关系度数：{n}", { n: hoveredPerson.relatedItemIds.length })}</div>
+                    {/if}
                     {#if hoveredPerson.phone}<div class="ft__smaller ft__on-surface">{text("graphPhoneLabel", "电话：{n}", { n: hoveredPerson.phone })}</div>{/if}
                     {#if hoveredPerson.tags.length > 0}<div class="ft__smaller ft__on-surface">{text("graphTagsLabel", "标签：{n}", { n: hoveredPerson.tags.join(" · ") })}</div>{/if}
                     {#if facade}

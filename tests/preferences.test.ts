@@ -64,3 +64,11 @@ test("显示偏好：摘要开关与当日忽略标记归一化", () => {
     // 非法日期串归一化为空串
     assert.equal(normalizeViewPreferences({ summaryDismissedOn: "09/28" }).summaryDismissedOn, "");
 });
+
+test("显示偏好：图谱数据源模式归一化（B14.5，缺省关系图）", () => {
+    assert.equal(normalizeViewPreferences({ graphMode: "native" }).graphMode, "native");
+    assert.equal(normalizeViewPreferences({ graphMode: "relations" }).graphMode, "relations");
+    // 旧偏好缺字段回退默认；非法值不采用
+    assert.equal(normalizeViewPreferences({}).graphMode, DEFAULT_VIEW_PREFERENCES.graphMode);
+    assert.equal(normalizeViewPreferences({ graphMode: "cytoscape" }).graphMode, DEFAULT_VIEW_PREFERENCES.graphMode);
+});
