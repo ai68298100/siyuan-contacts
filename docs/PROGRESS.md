@@ -1474,3 +1474,28 @@
   `pnpm run build` + `check:release` 全 PASS；52 景基线 + 断点扫描重拍有效（无视觉变更）。
 - P0 余项：B07/FUNC-01.3-b、FUNC-01.7 刷新通道、FUNC-01.14 AI 候选安全写、FUNC-01.15 写入
   断点、FAST-01.3a、FUNC-01.8a 锚点消歧、CODE-02.1/02.4/02.5。
+
+## P0 数据可信 第 52 轮：FUNC-01.7-a 数据刷新通道（2026-09-30，续跑口令第 52 版驱动）
+
+- **现状盘点**：骨架已在（onDataChanged → 防抖 → libs/data-events 广播 → Workbench 订阅
+  bump revision → 三个视图订阅 revision；roster 服务自带 pending 去重 + generation 回填保护）。
+  四个缺口补齐：
+  1. **onDataChanged 先失效名册**（index.ts）：事件到达立即 `invalidateRoster()`（缓存可随时
+     重建，不等 30s TTL），防抖只针对 UI 刷新。
+  2. **PeopleView 请求代际**：名册刷新与最近互动读取各带代际——乱序响应丢弃（最近互动读取
+     无共享缓存去重，是真实乱序暴露面）；刷新失败保留旧列表内容，仅横幅提示可重试。
+  3. **已开 Peek 订阅**：PersonDetail 新增 `revision` prop（Workbench 传入 dataRevision）——
+     变化时原地重载洞察与跟进；busy/followUpBusy（操作挂起）时跳过，当前人物、筛选与输入
+     草稿保留；首挂载不重复加载（untrack 快照初始代际，svelte 0 警告）。
+  4. **档案条订阅**：person-panel 登记活跃注入（Map: protyle element → context/rootId），订阅
+     同一数据事件——名册缓存先失效，再对已连接的档案条逐条重渲染（既有 stripRequests 代际
+     挡乱序；元素断连即清理登记）。
+- **验证**：svelte-check/tsc 0 错误 0 警告；单测 191/191（本轮无域层新增）；三套 UI 回归
+  **桌面 82 / 移动 83 / 宿主 82 全绿**（+2 smoke：①乱序防护——门控慢响应后发数据变化事件，
+  新数据先落位、迟到的 60 天前旧响应被代际丢弃；②已开 Peek 随 emitDataChanged 原地重载洞察
+  与跟进；既有「空闲刷新/草稿编辑提示」用例回归通过）；`pnpm run build` + `check:release`
+  全 PASS；52 景基线 + 断点扫描重拍有效（正常态无视觉变更）。smoke 踩坑记录：smoke.js 是
+  纯 JS——TS 的非空断言 `!.`、确定赋值 `!:`、`as unknown as` 都会 SyntaxError 整页瘫痪。
+- **边界**：跨窗口 onDataChanged 投递依赖宿主逐窗口推送，仍 Host pending；FUNC-01.7-b
+  （设置锚点与偏好刷新、多窗口事件来源核对）未动。P0 余项：B07-b、FUNC-01.14 AI 候选安全写、
+  FUNC-01.15 写入断点、FAST-01.3a、FUNC-01.8a 锚点消歧、CODE-02.1/02.4/02.5。

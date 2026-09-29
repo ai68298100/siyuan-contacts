@@ -4,7 +4,7 @@
  * 判定走名册缓存（rootID 是否为联系人文档），非联系人文档不注入、零 DOM 干扰。
  * 本模块是 protyle DOM 与组件层之间的 glue，位于 panels/（视图层之上）。
  */
-import { getRoster } from "../services/roster";
+import { getRoster, invalidateRoster } from "../services/roster";
 import { loadInteractionStore } from "../data/interactions";
 import type { InteractionEvent } from "../domain/interactions";
 import { loadFollowUpStore } from "../data/followups";
@@ -13,6 +13,7 @@ import { buildMeetingBriefing } from "../domain/briefing";
 import type { MeetingBriefingItem } from "../domain/briefing";
 import { nextBirthday } from "../domain/occasions";
 import { svelteDialog } from "../libs/dialog";
+import { subscribeDataChanged } from "../libs/data-events";
 import PersonEditDialog from "../components/people/PersonEditDialog.svelte";
 import { translateText } from "../domain/translation";
 import type { Plugin } from "siyuan";
@@ -21,6 +22,9 @@ import type { ContactSummary } from "../domain/person";
 
 const STRIP_CLASS = "lvct-doc-strip";
 const stripRequests = new WeakMap<HTMLElement, number>();
+/** FUNC-01.7-a：已注入档案条的活跃文档登记——数据变化时原地重渲染（不整页刷新） */
+const activeStrips = new Map<HTMLElement, { context: PanelContext; protyle: ProtyleLike; rootId: string }>();
+let dataSubscription: (() => void) | null = null;
 
 export interface PanelContext {
     plugin: Plugin;
@@ -37,21 +41,44 @@ type ProtyleEvent = { detail?: { protyle?: ProtyleLike } };
 
 /** protyle 事件入口（loaded-protyle-static/dynamic、switch-protyle） */
 export function handleProtyleEvent(context: PanelContext, event: ProtyleEvent): void {
+    ensureDataSubscription();
     const protyle = event.detail?.protyle;
     if (!protyle?.element || !context.settings) return;
     const rootId = protyle.block?.rootID ?? "";
     void updateStrip(context, protyle, rootId);
 }
 
+/** 数据变化（含跨窗口）：名册缓存立即失效，活跃档案条逐个重渲染（乱序由 stripRequests 代际挡） */
+function ensureDataSubscription(): void {
+    if (dataSubscription) return;
+    dataSubscription = subscribeDataChanged(() => {
+        invalidateRoster();
+        for (const [element, entry] of [...activeStrips]) {
+            if (!element.isConnected) {
+                activeStrips.delete(element);
+                continue;
+            }
+            void updateStrip(entry.context, entry.protyle, entry.rootId);
+        }
+    });
+}
+
 async function updateStrip(context: PanelContext, protyle: ProtyleLike, rootId: string): Promise<void> {
     const request = (stripRequests.get(protyle.element) ?? 0) + 1;
     stripRequests.set(protyle.element, request);
     protyle.element.querySelector(`.${STRIP_CLASS}`)?.remove();
-    if (!rootId || !context.settings) return;
+    if (!rootId || !context.settings) {
+        activeStrips.delete(protyle.element);
+        return;
+    }
     try {
         const roster = await getRoster(context.settings);
         const person = roster.find((item) => item.docId === rootId);
-        if (!person) return;
+        if (!person) {
+            activeStrips.delete(protyle.element);
+            return;
+        }
+        activeStrips.set(protyle.element, { context, protyle, rootId });
         const [interactionStore, followUpStore] = await Promise.all([
             loadInteractionStore(context.plugin),
             loadFollowUpStore(context.plugin),

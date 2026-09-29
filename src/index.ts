@@ -13,7 +13,7 @@ import QuickFillDialog from "./components/people/QuickFillDialog.svelte";
 import AddPersonDialog from "./components/people/AddPersonDialog.svelte";
 import PersonEditDialog from "./components/people/PersonEditDialog.svelte";
 import { parseContactText } from "./domain/quick-fill";
-import { getRoster } from "./services/roster";
+import { getRoster, invalidateRoster } from "./services/roster";
 import { initializeWorkspace, inspectWorkspace, loadSettings, scanAnchorCandidates } from "./services/init";
 import { configureCloseGuardI18n } from "./components/close-guard";
 import type { InitProgressStep, WorkspaceSnapshot } from "./services/init";
@@ -325,11 +325,13 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     /**
      * 覆写 onDataChanged：不覆写时宿主在同步 dataChange 后会整插件重载（打卡库 D-222）。
-     * FUNC-01.7：防抖合并后广播给本窗口工作台原地刷新（libs/data-events）；
-     * 跨窗口投递依赖宿主对每个窗口实例的推送（Host pending）。
+     * FUNC-01.7-a：先失效名册缓存（缓存可随时重建，不等 30s TTL），再防抖合并广播给
+     * 本窗口工作台/档案条原地刷新（libs/data-events）；跨窗口投递依赖宿主对每个窗口
+     * 实例的推送（Host pending）。
      */
     onDataChanged() {
         console.debug("[lvct] storage data changed");
+        invalidateRoster();
         if (this.dataChangeTimer) window.clearTimeout(this.dataChangeTimer);
         this.dataChangeTimer = window.setTimeout(() => {
             this.dataChangeTimer = 0;

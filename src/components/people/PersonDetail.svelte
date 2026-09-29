@@ -1,5 +1,6 @@
 <script lang="ts">
     /** 人物详情 Peek：档案字段、互动与关系列表（增删，内核自动维护双向回链） */
+    import { untrack } from "svelte";
     import { listContacts, removeContact } from "../../services/contacts";
     import { addRelation, removeRelation, refreshPerson } from "../../services/relations";
 import LvctDialog from "../LvctDialog.svelte";
@@ -27,6 +28,8 @@ import StatusNotice from "../StatusNotice.svelte";
         settings,
         i18n,
         person,
+        /** FUNC-01.7-a：数据变化代际（Workbench 广播）；变化时原地重载洞察与跟进（写入/编辑中跳过） */
+        revision = 0,
         onRecord,
         onDeleteInteraction,
         onLoadInsights,
@@ -48,6 +51,7 @@ import StatusNotice from "../StatusNotice.svelte";
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
         person: ContactSummary;
+        revision?: number;
         /** 记一笔互动（facade.recordInteraction） */
         onRecord: (personDocId: string, note?: string) => Promise<void>;
         onDeleteInteraction?: (personDocId: string, eventId: string) => Promise<void>;
@@ -361,6 +365,17 @@ import StatusNotice from "../StatusNotice.svelte";
     }
 
     loadFollowUps();
+
+    /* FUNC-01.7-a：数据变化（跨窗口/宿主）→ 原地重载洞察与跟进；写入/操作挂起时跳过
+       （Workbench 对草稿场景给出可见提示条），当前人物与输入草稿保留 */
+    let lastSeenRevision = untrack(() => revision);
+    $effect(() => {
+        if (revision === lastSeenRevision) return;
+        lastSeenRevision = revision;
+        if (busy || followUpBusy) return;
+        void loadInsights();
+        void loadFollowUps();
+    });
 
     async function createFollowUp() {
         if (followUpBusy || !onCreateFollowUp) return;

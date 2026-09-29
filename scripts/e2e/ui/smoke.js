@@ -17,6 +17,7 @@ import { captureFromDoc } from "../../../src/services/capture";
 import { exportInteractionJson } from "../../../src/services/interaction-export";
 import { createFollowUp, exportFollowUpsJson, importFollowUpsJson, previewFollowUpsImport } from "../../../src/services/followups";
 import { reconcileFollowUpTasksFromDoc, syncFollowUpTasksToDoc } from "../../../src/services/followup-sync";
+import { emitDataChanged } from "../../../src/libs/data-events";
 import { loadFollowUpStore, createFollowUpRecord } from "../../../src/data/followups";
 import { loadTemplatesStore, saveTemplatesStore } from "../../../src/data/templates";
 import { exportMigrationBundle, previewMigrationImport, importMigrationBundle } from "../../../src/services/migration-bundle";
@@ -179,6 +180,87 @@ await test("数据变化通知：空闲时原地刷新，草稿编辑中刷新�
     window.dispatchEvent(new CustomEvent("lvct-data-changed"));
     await until(() => fixture.textContent.includes("数据已在其他窗口更新"), "编辑中数据变化未给出可见提示");
     assert(fixture.querySelector(".lvct-form input[type=text]")?.value === "跨窗口编辑中", "提示后草稿丢失");
+});
+
+await test("数据刷新乱序防护：慢的旧互动响应不得覆盖新数据（FUNC-01.7-a）", async () => {
+    let recentCalls = 0;
+    let releaseFirst = () => {};
+    const firstGate = new Promise((resolve) => { releaseFirst = resolve; });
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") return renderResult();
+        throw new Error(`回归测试不允许请求 ${route}`);
+    };
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings,
+            loadRecentInteractions: async () => {
+                recentCalls += 1;
+                if (recentCalls === 1) return firstGate;
+                return { "20260927000000-person1": { occurredAt: 1, localDate: "2026-09-29" } };
+            },
+            loadDashboard: async () => ({
+                people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+                stale: [], staleTotal: 0, neverContacted: 0, neverContactedItemIds: [],
+                followUps: [], actions: [], neverOrder: {},
+            }),
+        },
+    } });
+    await until(() => [...fixture.querySelectorAll(".lvct-workbench__nav-text")].some((node) => node.textContent?.trim() === "联系人"), "导航未渲染");
+    const peopleNav = [...fixture.querySelectorAll(".lvct-workbench__nav-text")]
+        .find((node) => node.textContent?.trim() === "联系人");
+    assert(peopleNav && peopleNav.closest("button"), "未找到联系人导航按钮");
+    peopleNav.closest("button").click();
+    await until(() => fixture.querySelector(".lvct-person-card"), "名册未渲染");
+    assert(fixture.textContent.includes("暂无互动"), "初始未拿到互动数据应显示暂无互动");
+    emitDataChanged();
+    await until(() => fixture.textContent.includes("昨天互动"), "数据变化未带来新互动数据");
+    /* 迟到的旧响应（60 天前）必须在代际守卫处丢弃 */
+    releaseFirst({ "20260927000000-person1": { occurredAt: 0, localDate: "2026-08-01" } });
+    await tick();
+    await tick();
+    await tick();
+    assert(fixture.textContent.includes("昨天互动"), "慢的旧响应覆盖了新数据（乱序未挡）");
+    assert(!fixture.textContent.includes("60 天前互动"), "旧响应内容出现在列表中（乱序未挡）");
+});
+
+await test("数据刷新：已打开的 Peek 随数据变化原地重载洞察与跟进（FUNC-01.7-a）", async () => {
+    let insightsCalls = 0;
+    let followUpCalls = 0;
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") return renderResult();
+        return { code: 0 };
+    };
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadRecentInteractions: async () => ({}),
+            loadDashboard: async () => ({
+                people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+                stale: [], staleTotal: 0, neverContacted: 0, neverContactedItemIds: [],
+                followUps: [], actions: [], neverOrder: {},
+            }),
+            loadPersonInsights: async () => { insightsCalls += 1; return { timeline: [], coAttendance: [], totalEvents: 0 }; },
+            listPersonFollowUps: async () => {
+                followUpCalls += 1;
+                return [{ id: "fu-peek-1", personDocId: person.docId, title: "跨窗口跟进", dueDate: "2026-10-30", status: "open", createdAt: 1, updatedAt: 1 }];
+            },
+            createFollowUp: async () => { throw new Error("用例不涉及"); },
+            setFollowUpStatus: async () => {},
+            snoozeFollowUp: async () => {},
+        },
+    } });
+    await until(() => [...fixture.querySelectorAll(".lvct-workbench__nav-text")].some((node) => node.textContent?.trim() === "联系人"), "导航未渲染");
+    const detailNav = [...fixture.querySelectorAll(".lvct-workbench__nav-text")]
+        .find((node) => node.textContent?.trim() === "联系人");
+    assert(detailNav && detailNav.closest("button"), "未找到联系人导航按钮");
+    detailNav.closest("button").click();
+    await until(() => fixture.querySelector(".lvct-person-card"), "名册未渲染");
+    fixture.querySelector(".lvct-person-card").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await until(() => insightsCalls >= 1 && followUpCalls >= 1, "Peek 未加载洞察与跟进");
+    emitDataChanged();
+    await until(() => insightsCalls >= 2 && followUpCalls >= 2, "Peek 未随数据变化原地重载");
+    assert(fixture.textContent.includes("跨窗口跟进"), "重载后跟进列表未渲染");
 });
 
 await test("粘贴并识别：分组预览、勾选回填草稿、冲突默认不覆盖（FAST-01.1）", async () => {

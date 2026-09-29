@@ -94,6 +94,7 @@
     // svelte-ignore state_referenced_locally
     let sortMode: "name" | "group" | "birthday" | "recent" = $state(initialSort);
     let recent: Record<string, { occurredAt: number; localDate: string }> = $state({});
+    let recentGeneration = 0;
     let recentError = $state("");
     // svelte-ignore state_referenced_locally
     let viewMode: "cards" | "table" = $state(preferences.peopleView === "table" ? "table" : "cards");
@@ -402,24 +403,40 @@
     const selectedPeople = $derived(people.filter((person) => selectedIds.includes(person.itemId)));
     const allVisibleSelected = $derived(visible.length > 0 && visible.every((person) => selectedIds.includes(person.itemId)));
 
+    /* FUNC-01.7-a 请求代际：revision 连续变化时只有最新一次刷新落位，乱序响应丢弃 */
+    let refreshGeneration = 0;
     async function refresh() {
+        const request = ++refreshGeneration;
         loading = true;
         errorText = "";
         try {
-            people = await listContacts(settings);
+            const next = await listContacts(settings);
+            if (request !== refreshGeneration) return; /* 旧响应不得覆盖新数据 */
+            people = next;
             const available = new Set(people.map((person) => person.itemId));
             selectedIds = selectedIds.filter((itemId) => available.has(itemId));
         } catch (error) {
+            if (request !== refreshGeneration) return;
+            /* 刷新失败保留旧列表内容，仅以横幅提示（可再次刷新重试） */
             errorText = error instanceof Error ? error.message : String(error);
         } finally {
-            loading = false;
+            if (request === refreshGeneration) loading = false;
         }
     }
 
     $effect(() => {
         revision;
         void refresh();
-        void loadRecentInteractions().then((value) => { recent = value; recentError = ""; }).catch((error) => { recentError = error instanceof Error ? error.message : String(error); });
+        /* FUNC-01.7-a 请求代际：recent 读取无共享缓存去重，须自行挡乱序响应 */
+        const request = ++recentGeneration;
+        void loadRecentInteractions().then((value) => {
+            if (request !== recentGeneration) return;
+            recent = value;
+            recentError = "";
+        }).catch((error) => {
+            if (request !== recentGeneration) return;
+            recentError = error instanceof Error ? error.message : String(error);
+        });
     });
 
     function toggleTag(tag: string) {

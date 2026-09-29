@@ -259,6 +259,7 @@
             settings={currentSettings}
             i18n={facade.i18n}
             person={detailPerson}
+            revision={dataRevision}
             onRecord={(personDocId, note) => facade.recordInteraction(personDocId, note)}
             onDeleteInteraction={(personDocId, eventId) => facade.deleteInteraction(personDocId, eventId)}
             onLoadInsights={(docId) => facade.loadPersonInsights(docId)}
