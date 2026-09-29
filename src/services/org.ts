@@ -4,9 +4,14 @@
  * 组织维度不写 related；扫描读取失败保持未知（不静默按无组织处理）。
  */
 import type { Plugin } from "siyuan";
-import { listNotebookDocs, upsertMarkedBlock } from "../api/blocks";
-import { createDocWithMd, listNotebooks, querySql } from "../api/client";
-import { addOrgMembership, loadOrgMembershipStore, removeOrgMembership } from "../data/org-membership";
+import { upsertMarkedBlock } from "../api/blocks";
+import { createDocWithMd, querySql } from "../api/client";
+import {
+    addOrgMembership,
+    loadOrgMembershipStore,
+    loadOrgMembershipStoreBound,
+    removeOrgMembership,
+} from "../data/org-membership";
 import type { OrgMembership } from "../domain/org-membership";
 import type { ContactsSettings } from "../domain/model";
 import { listContacts } from "./contacts";
@@ -21,35 +26,49 @@ export interface OrganizationSummary {
     notebookId: string;
 }
 
-/** 全库组织文档扫描（零写入）：custom-lvct-org 标记区块所在文档 = 组织。
- *  单笔记本/单文档读取失败不阻断整体（与 FUNC-01.8 锚点扫描同模式）；截断上限 1000 篇。 */
+/** 全库组织文档列举（单 SQL 找标记 + 单 SQL 取文档名，性能预算见 §4；零写入） */
 export async function scanOrganizations(): Promise<OrganizationSummary[]> {
-    const summaries: OrganizationSummary[] = [];
-    const seen = new Set<string>();
-    const notebooks = await listNotebooks();
-    for (const notebook of notebooks) {
-        let docs;
-        try {
-            docs = await listNotebookDocs(notebook.id);
-        } catch {
-            continue; /* 单笔记本读取失败不阻断整体扫描 */
-        }
-        for (const doc of docs) {
-            if (seen.has(doc.id)) continue;
-            seen.add(doc.id);
-            try {
-                const rows = await querySql<{ root_id: string }>(
-                    `SELECT DISTINCT root_id FROM blocks WHERE root_id = '${doc.id}' AND ial LIKE '%${ORG_SECTION_ATTR}="%' LIMIT 1`,
-                );
-                if (rows.length > 0) {
-                    summaries.push({ docId: doc.id, name: doc.content, hpath: doc.hpath, notebookId: notebook.id });
-                }
-            } catch {
-                continue; /* 单文档探测失败不影响其余 */
-            }
-        }
+    const roots = await querySql<{ root_id: string }>(
+        `SELECT DISTINCT root_id FROM blocks WHERE ial LIKE '%${ORG_SECTION_ATTR}="%'`,
+    );
+    const ids = roots.map((row) => row.root_id).filter((id) => /^\d{14}-[0-9a-z]{7}$/.test(id));
+    if (ids.length === 0) return [];
+    const idList = ids.map((id) => `'${id}'`).join(",");
+    const docs = await querySql<{ id: string; content: string; hpath: string; box: string }>(
+        `SELECT id, content, hpath, box FROM blocks WHERE type='d' AND id IN (${idList})`,
+    );
+    return docs.map((doc) => ({
+        docId: doc.id,
+        name: doc.content,
+        hpath: doc.hpath,
+        notebookId: doc.box ?? "",
+    }));
+}
+
+/**
+ * B12：人物 → 单位显示串（active 优先，其次最近一条成员记录）。
+ * 形态：组织名 或 组织名 · 部门。供联系人卡片/选人提示等投影。
+ */
+export async function buildOrgDisplayByPerson(): Promise<Map<string, string>> {
+    const [orgs, store] = await Promise.all([
+        scanOrganizations(),
+        loadOrgMembershipStoreBound(),
+    ]);
+    const nameByDoc = new Map(orgs.map((org) => [org.docId, org.name]));
+    const byPerson = new Map<string, OrgMembership[]>();
+    for (const membership of store.memberships) {
+        const list = byPerson.get(membership.personDocId) ?? [];
+        list.push(membership);
+        byPerson.set(membership.personDocId, list);
     }
-    return summaries;
+    const display = new Map<string, string>();
+    for (const [personDocId, list] of byPerson) {
+        const active = list.find((membership) => membership.status === "active") ?? list[list.length - 1];
+        const orgName = nameByDoc.get(active.orgDocId);
+        if (!orgName) continue;
+        display.set(personDocId, active.department ? `${orgName} · ${active.department}` : orgName);
+    }
+    return display;
 }
 
 /** 成员关系查询：按组织聚合（active 在前、former 在后，各按加入日排序） */

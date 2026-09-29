@@ -1003,15 +1003,13 @@ await test("B13.2 组织扫描与成员索引：标记区块扫描发现组织�
         if (route === "/api/notebook/lsNotebooks") return { notebooks: [{ id: "20260930000000-book001", name: "B13_spike" }] };
         if (route === "/api/query/sql") {
             const stmt = String(body?.stmt ?? "");
-            if (stmt.includes("type='d'")) {
-                return [
-                    { id: "20260930000000-org0001", content: "测试公司", hpath: "/测试公司" },
-                    { id: "20260930000000-plain01", content: "普通笔记", hpath: "/普通笔记" },
-                ];
+            if (stmt.includes("ial LIKE '%custom-lvct-org")) {
+                /* 标记区块根文档：只有组织文档命中 */
+                return [{ root_id: "20260930000000-org0001" }];
             }
-            if (stmt.includes("custom-lvct-org=")) {
-                /* 仅组织文档（org0001）有标记区块；普通笔记探测返回空 */
-                return stmt.includes("20260930000000-org0001") ? [{ root_id: "20260930000000-org0001" }] : [];
+            if (stmt.includes("type='d'") && stmt.includes("id IN")) {
+                /* 按 ID 批量取组织文档名 */
+                return [{ id: "20260930000000-org0001", content: "测试公司", hpath: "/测试公司", box: "20260930000000-book001" }];
             }
             return [];
         }
@@ -1019,7 +1017,6 @@ await test("B13.2 组织扫描与成员索引：标记区块扫描发现组织�
     };
     invalidateRoster();
     const orgs = await scanOrganizations();
-    console.log("[lvct-debug] B13.2 scanOrganizations:", JSON.stringify(orgs), "notebook probe check:", kernel.handler === null);
     assert(orgs.length === 1 && orgs[0].name === "测试公司" && orgs[0].docId === "20260930000000-org0001",
         `组织扫描结果错误：${JSON.stringify(orgs)}`);
 

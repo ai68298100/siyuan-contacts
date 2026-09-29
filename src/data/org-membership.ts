@@ -11,6 +11,24 @@ import { newNodeId } from "../api/client";
 
 export const ORG_MEMBERSHIP_STORAGE_KEY = "org-membership.json";
 
+/** 模块级插件绑定：无 plugin 句柄的调用方（如 B12 单位投影）经此读取；
+ *  由 index.ts onload 调用 bindOrgMembershipStorage 装配。未装配按空索引处理。 */
+let membershipPlugin: Plugin | undefined;
+
+export function bindOrgMembershipStorage(plugin: Plugin): void {
+    membershipPlugin = plugin;
+}
+
+/** 绑定插件的严格展示读（B12 单位投影用；FUNC-01.12：失败上抛） */
+export async function loadOrgMembershipStoreBound(): Promise<OrgMembershipStore> {
+    return normalizeOrgMembershipStore(await loadJsonStrict(requireBound(), ORG_MEMBERSHIP_STORAGE_KEY));
+}
+
+function requireBound(): Plugin {
+    if (!membershipPlugin) throw new Error("org-membership 存储尚未绑定插件实例");
+    return membershipPlugin;
+}
+
 /** 严格展示读（FUNC-01.12）：读取失败/损坏抛错，不按空索引处理 */
 export async function loadOrgMembershipStore(plugin: Plugin): Promise<OrgMembershipStore> {
     return normalizeOrgMembershipStore(await loadJsonStrict(plugin, ORG_MEMBERSHIP_STORAGE_KEY));

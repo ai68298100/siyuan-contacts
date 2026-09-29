@@ -16,6 +16,7 @@ import PersonEditDialog from "./components/people/PersonEditDialog.svelte";
 import { parseContactText } from "./domain/quick-fill";
 import { invalidateRoster } from "./services/roster";
 import { bindSelfIdentityStorage } from "./data/self-identity";
+import { bindOrgMembershipStorage } from "./data/org-membership";
 import { initializeWorkspace, inspectWorkspace, loadSettings, scanAnchorCandidates } from "./services/init";
 import { configureCloseGuardI18n } from "./components/close-guard";
 import type { InitProgressStep, WorkspaceSnapshot } from "./services/init";
@@ -110,6 +111,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const frontend = getFrontend();
         this.isMobile = frontend === "mobile" || frontend === "browser-mobile";
         bindSelfIdentityStorage(this); /* B11：roster 投影的 isSelf 标记依赖身份存储 */
+        bindOrgMembershipStorage(this); /* B12：卡片「单位」行依赖成员索引 */
 
         this.addIcons(`<symbol id="iconLvContacts" viewBox="0 0 32 32">
 <path d="M12 4c3.314 0 6 2.686 6 6s-2.686 6-6 6-6-2.686-6-6 2.686-6 6-6zM12 6.4A3.6 3.6 0 1 0 12 13.6 3.6 3.6 0 0 0 12 6.4z"/>

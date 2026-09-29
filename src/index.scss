@@ -1428,6 +1428,7 @@
 }
 .lvct-person-card__top { display: flex; align-items: center; gap: var(--lvct-sp-2); min-width: 0; }
 .lvct-person-card__sub { color: var(--lvct-text-3); font-size: var(--lvct-fs-caption); margin-top: 3px; }
+.lvct-person-card__org { color: var(--lvct-text-3); font-size: var(--lvct-fs-caption); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lvct-person-card__tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: auto; }
 .lvct-person-card__open-doc, .lvct-people__open-doc {
     border: 0;

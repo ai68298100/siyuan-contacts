@@ -13,6 +13,7 @@
         onToggleSelected,
         onOpenPersonDoc,
         recent,
+        orgLine = "",
     }: {
         person: ContactSummary;
         onOpen: (person: ContactSummary) => void;
@@ -21,6 +22,8 @@
         onToggleSelected?: (selected: boolean) => void;
         onOpenPersonDoc?: (docId: string) => void;
         recent?: { occurredAt: number; localDate: string };
+        /** B12：单位显示串（组织名 · 部门，来自成员索引投影） */
+        orgLine?: string;
     } = $props();
 
     function telHref(phone: string): string {
@@ -69,6 +72,9 @@
         <div class="lvct-person-card__sub">
             {#if birthday}{birthday.label}生日 · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}{person.isLunar ? " · 农历" : ""}{:else}生日未填写{/if}
         </div>
+        {#if orgLine}
+            <div class="lvct-person-card__org" aria-label="单位">{orgLine}</div>
+        {/if}
     </div>
     {#if onOpenPersonDoc}<button type="button" class="lvct-person-card__open-doc" title={`打开 ${person.name} 的文档`} aria-label={`打开 ${person.name} 的文档`} onclick={(event) => { event.stopPropagation(); onOpenPersonDoc(person.docId); }}><ExternalLink size={16}/></button>{/if}
     </div>

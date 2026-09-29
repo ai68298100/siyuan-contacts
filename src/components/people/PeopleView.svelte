@@ -1,6 +1,7 @@
 <script lang="ts">
     /** 联系人视图：名册缓存 + 客户端过滤/分页 + 卡片/表格双形态；详情弹窗由 Workbench 统一承载 */
     import { batchUpdateContacts, listContacts, filterContacts, PAGE_SIZE, PRESET_GROUPS, removeContacts } from "../../services/contacts";
+    import { buildOrgDisplayByPerson } from "../../services/org";
     import { exportVcfText } from "../../services/vcard";
     import { nextBirthday } from "../../domain/occasions";
     import type { ContactSummary } from "../../domain/person";
@@ -405,6 +406,8 @@
 
     /* FUNC-01.7-a 请求代际：revision 连续变化时只有最新一次刷新落位，乱序响应丢弃 */
     let refreshGeneration = 0;
+    /* B12：人物 → 单位显示串（来自 org-membership 成员索引；加载失败降级为空） */
+    let orgLines: Record<string, string> = $state({});
     async function refresh() {
         const request = ++refreshGeneration;
         loading = true;
@@ -437,6 +440,13 @@
             if (request !== recentGeneration) return;
             recentError = error instanceof Error ? error.message : String(error);
         });
+        /* B12：单位显示串（失败降级为空——卡片不显示单位行，不阻断名册） */
+        void buildOrgDisplayByPerson().then((display) => {
+            if (request !== recentGeneration) return;
+            const next: Record<string, string> = {};
+            for (const [docId, line] of display) next[docId] = line;
+            orgLines = next;
+        }).catch(() => {});
     });
 
     function toggleTag(tag: string) {
@@ -820,6 +830,7 @@
             {#each visible as person (person.itemId)}
                 <PersonCard
                     {person}
+                    orgLine={orgLines[person.docId]}
                     selected={selectedIds.includes(person.itemId)}
                     active={activePersonId === person.itemId}
                     recent={recent[person.docId]}
