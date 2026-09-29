@@ -44,12 +44,19 @@ export async function saveJsonVerified(plugin: Plugin, key: string, value: unkno
  * 读-改-写临界区。无 Web Locks 时按键在本上下文排队，不提供跨窗口排他。
  *
  * 锁守护（回归环境曾现「锁 held 不释放」假死）：navigator.locks.request 无超时，
- * 持有方临界区内任一 await 挂死即整键不可用。因此取锁带 5 秒中止信号；超时判定
- * 持有方疑似挂死后以 steal 模式接管（原持有方释放时按规范让位），把无限等待
- * 转为一次性自愈。正常并发下排队语义不变。
+ * 持有方临界区内任一 await 挂死即整键不可用。因此取锁带中止信号；**连续
+ * stealAfterWaits+1 次超时才判定持有方真挂死**，以 steal 模式接管自愈——挂死者
+ * 不会再写入，接管不丢其数据；首次超时后先按原样重新排队（宽限），正常慢写
+ * （大库慢回读）在宽限内完成即被串行化，不与接管者的读改写重叠（FUNC-01.13）。
+ * 非中止类锁错误照常抛出不绕过保护（契约语义不变）。超时与宽限次数可配置
+ * （storeLockConfig），测试里缩短以验证接管路径。
  */
-/** 取锁等待上限（可按环境调整；测试里缩短以验证接管路径） */
-export const storeLockConfig = { acquireTimeoutMs: 5_000 };
+/** 取锁等待上限与接管宽限（可按环境调整；测试里缩短以验证接管路径） */
+export const storeLockConfig = {
+    acquireTimeoutMs: 5_000,
+    /** 首次超时后的宽限重试次数：连续 N+1 次超时才 steal（0 = 首次超时立即接管） */
+    stealAfterWaits: 1,
+};
 
 function isAbortError(error: unknown): boolean {
     return typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError";
@@ -69,11 +76,16 @@ function requestLockGuarded<T>(name: string, fn: () => Promise<T>): Promise<T> {
 export async function withStoreLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
     if (typeof navigator !== "undefined" && navigator.locks?.request) {
         const name = `lvct-${key}`;
-        try {
-            return await requestLockGuarded(name, fn);
-        } catch (error) {
-            if (!isAbortError(error)) throw error;
-            console.warn(`[lvct] 存储锁等待超时，疑似持有方挂死，接管继续: ${key}`);
+        let aborts = 0;
+        while (true) {
+            try {
+                return await requestLockGuarded(name, fn);
+            } catch (error) {
+                if (!isAbortError(error)) throw error;
+                aborts += 1;
+                if (aborts <= storeLockConfig.stealAfterWaits) continue; /* 宽限：先按原样重新排队 */
+            }
+            console.warn(`[lvct] 存储锁连续 ${aborts} 次等待超时，判定持有方挂死，接管继续: ${key}`);
             return navigator.locks.request(name, { steal: true }, fn);
         }
     }

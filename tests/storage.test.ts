@@ -76,7 +76,7 @@ test("存储锁：支持浏览器锁时使用固定命名（options+回调真实
     });
 });
 
-test("存储锁：取锁超时（AbortError）后以 steal 接管自愈，非中止错误照常抛出", async () => {
+test("存储锁：连续超时（AbortError）后以 steal 接管自愈，非中止错误照常抛出", async () => {
     const previousTimeout = storeLockConfig.acquireTimeoutMs;
     storeLockConfig.acquireTimeoutMs = 30;
     try {
@@ -92,10 +92,58 @@ test("存储锁：取锁超时（AbortError）后以 steal 接管自愈，非中
             });
         } } }, async () => {
             assert.equal(await withStoreLock("stuck", async () => "healed"), "healed");
+            /* 默认 stealAfterWaits=1：连续两次超时才判定挂死接管（首次超时先宽限重排队） */
+            assert.deepEqual(calls, ["guarded", "guarded", "steal"]);
+        });
+    } finally {
+        storeLockConfig.acquireTimeoutMs = previousTimeout;
+    }
+});
+
+test("FUNC-01.13 锁宽限：首次超时后持有方完成让位，宽限重试正常获得锁（慢宿主不被接管、不重叠）", async () => {
+    const previousTimeout = storeLockConfig.acquireTimeoutMs;
+    storeLockConfig.acquireTimeoutMs = 30;
+    try {
+        const calls: string[] = [];
+        await withNavigator({ locks: { request: (key: string, options: { signal?: AbortSignal; steal?: boolean }, action: () => Promise<string>) => {
+            if (options?.steal) { calls.push("steal"); return action(); }
+            calls.push("guarded");
+            if (calls.filter((entry) => entry === "guarded").length === 1) {
+                /* 慢持有方：挂住到被中止才让位（模拟大库慢回读在宽限内完成） */
+                return new Promise<string>((_resolve, reject) => {
+                    options?.signal?.addEventListener("abort", () => reject(new DOMException("The operation was aborted.", "AbortError")));
+                });
+            }
+            return action();
+        } } }, async () => {
+            assert.equal(await withStoreLock("slow-holder", async () => "ok"), "ok");
+            assert.deepEqual(calls, ["guarded", "guarded"], "首次超时必须走宽限重排队，不得 steal");
+        });
+    } finally {
+        storeLockConfig.acquireTimeoutMs = previousTimeout;
+    }
+});
+
+test("FUNC-01.13 锁宽限：stealAfterWaits=0 保持「首次超时立即接管」旧行为（可配置）", async () => {
+    const previousTimeout = storeLockConfig.acquireTimeoutMs;
+    const previousWaits = storeLockConfig.stealAfterWaits;
+    storeLockConfig.acquireTimeoutMs = 30;
+    storeLockConfig.stealAfterWaits = 0;
+    try {
+        const calls: string[] = [];
+        await withNavigator({ locks: { request: (key: string, options: { signal?: AbortSignal; steal?: boolean }, action: () => Promise<string>) => {
+            if (options?.steal) { calls.push("steal"); return action(); }
+            calls.push("guarded");
+            return new Promise((_resolve, reject) => {
+                options?.signal?.addEventListener("abort", () => reject(new DOMException("The operation was aborted.", "AbortError")));
+            });
+        } } }, async () => {
+            assert.equal(await withStoreLock("instant-steal", async () => "fast"), "fast");
             assert.deepEqual(calls, ["guarded", "steal"]);
         });
     } finally {
         storeLockConfig.acquireTimeoutMs = previousTimeout;
+        storeLockConfig.stealAfterWaits = previousWaits;
     }
 });
 
