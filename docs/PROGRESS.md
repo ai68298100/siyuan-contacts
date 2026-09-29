@@ -1707,6 +1707,29 @@
 - **留后续**：名册表格视图的本人标识、捕获参与人语义（本人作为参与者是否记互动）、B11.5
   修复流程的完整预览 UI（与我的关系/共同组织影响预览）。
 
+## P1 业务主线 第 63 轮：B13.1a 跨库实证 + B13.1 组织契约定稿（2026-09-30，续跑口令第 63 版驱动）
+
+- **B13.1a 隔离内核实证（新 spike 脚本 scripts/spike/b13-org-spike.mjs，`pnpm spike:b13`，
+  v3.8.6 隔离工作区，结果 b13-org-results.json）**：
+  - **跨库 relation 被内核拒绝**：人员库 relation 单元格写组织库行 itemID →
+    `setAttributeViewBlockAttr` code=-1。
+  - **跨 avID 双向配置破坏性**：`/api/transactions updateAttrViewColRelation` 跨 avID 返回
+    code=0，但配置后人员库 relation 键的 `key.relation` **定义丢失**（getAttributeView 读回
+    undefined）——比拒绝更危险，坐实"组织不使用跨库 relation"。
+  - **detached 行不渲染**：`isDetached:true` 提交后 renderAttributeView 不返回该行——组织
+    条目不能依赖 detached 行呈现。
+- **B13.1 组织契约定稿（DATA-CONTRACT 新增 §8）**：选项收窄后采用**「组织文档 + 标记区块 +
+  插件 JSON 成员索引」**——组织 = 文档（标题即名称）+ `custom-lvct-org` 标记区块，不进联系人
+  数据库；成员关系 = 新键 `org-membership.json`（membership id 多对多/同组织多段历史/
+  active|former）；共同背景 = JSON 查询投影；组织维度**不写入 related**（保持纯人物间语义）；
+  旧版本工作空间升级后为空、无迁移。铁律"新持久化先补契约再实现"——org-membership 实现留
+  下一轮（B13.2 组织初始化与健康检查起步）。
+- **验证**：svelte-check/tsc 0 错误 0 警告；单测 199/199；collect-i18n 0 缺失；spike:b13
+  6 通道（3 判定 + 1 信息性，2 关键 FAIL 即实证结论本身）；`pnpm run build` + `check:release`
+  全 PASS。本轮为 spike+契约轮，无 src/ 与视觉变更（UI 回归沿用第 62 轮结果）。
+- **P1 下一步**：B13.2 组织初始化与健康检查（org-membership.json 实现 + 标记区块扫描），
+  随后 B13.3 组织管理页面。
+
 ## P0 数据可信 第 59 轮：FUNC-01.8a 锚点扫描消歧（2026-09-30，续跑口令第 58 版驱动）
 
 - **缺陷定位**：`inspectWorkspace` 对文档内数据库块取 `avBlocks[0]`——同名总表里**首个 AV 是

@@ -29,6 +29,7 @@
     "test:ui:host": "cross-env LVCT_UI_HOST=1 node scripts/e2e/ui-smoke.mjs",
     "spike": "node scripts/spike/av-spike.mjs",
     "spike:init": "node scripts/spike/init-resume-spike.mjs",
+    "spike:b13": "node scripts/spike/b13-org-spike.mjs",
     "spike:task": "node scripts/spike/task-item-spike.mjs"
   },
   "devDependencies": {

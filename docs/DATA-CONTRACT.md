@@ -266,3 +266,31 @@ vCard 处理是**瞬态转换**（不落插件存储），但属性↔字段映�
 - 导入查重：与名册精确同名（或同批次在前项同名）默认跳过（D-0007 同源语义），UI 预览标注。
 - 导入批量路径写放大与收编同款：逐篇建文档（内核单文档语义）→ 绑行 200/批 → 一次批量映射 → 逐人写单元格。
 - 支持 QP（QUOTED-PRINTABLE）编码值解码（UTF-8/GBK 字符集，含无空格续行的软换行变体）。
+
+## 8. 组织建模（B13.1 设计定稿，基于 B13.1a 隔离内核实证）
+
+**实证结论（scripts/spike/b13-org-spike.mjs，v3.8.6 隔离内核，2026-09-30）**：
+
+- **跨库 relation 不被支持**：人员库 relation 单元格写入组织库行 itemID，`setAttributeViewBlockAttr`
+  直接拒绝（code=-1）；`/api/transactions updateAttrViewColRelation` 跨 avID 配置"双向"虽然返回
+  code=0，但配置后人员库 relation 键的 `key.relation` 定义**丢失**（getAttributeView 读回 undefined）
+  ——属破坏性操作，组织建模**禁止使用跨库 relation**。
+- **detached 行不渲染**：`addAttributeViewBlocks isDetached:true` 提交后 `renderAttributeView`
+  不返回该行——无文档的组织条目不能依赖 AV 行呈现。
+- 同库 relation（此前相关人已实证）不受影响；组织与联系人若同库混行会污染名册投影（名册渲染全部行）。
+
+**设计定稿（选项收窄后采用"组织文档 + 标记区块 + 插件 JSON 成员索引"）**：
+
+- **组织** = 一篇思源文档（标题即组织名，支持改名）+ 文档内 `custom-lvct-org` 标记区块（形态与
+  人物档案条一致：组织类型/部门数/成员数徽标 + 简要信息）。组织不进入联系人数据库——不与人员
+  混行、不占用 fieldMap；组织列表 = 标记区块扫描（与 FUNC-01.8 锚点扫描同模式，支持续建找回）。
+- **成员关系** = 插件 JSON `org-membership.json`（新键，schemaVersion 1）：`{memberships:
+  [{id, orgDocId, personDocId, department?, title?, joinedOn?, leftOn?, status: active|former}]}`——
+  多人多组织多对多、同组织多段历史（以 membership id 区分）、离职/毕业置 former 不删除；
+  personDocId/orgDocId 均须通过 ID 校验，非法条目归一化丢弃。
+- **共同背景查询**（同单位/同学校同事）= 成员索引 JSON 查询投影，不经 AV relation；
+  "与我的关系"等既有 related 语义保持纯人物间语义，组织维度不写入 related。
+- **捕获/搜索**：组织文档不出现在联系人名册与选人器；组织名搜索走标记区块扫描（后续增强）。
+
+**迁移与兼容**：不迁移任何既有数据；`org-membership.json` 为全新键，旧版本工作空间升级后为空。
+数据锚点重绑设置页扫描同步识别组织文档标记（与人物档案条同模式）。

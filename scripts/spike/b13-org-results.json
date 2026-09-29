@@ -1,0 +1,32 @@
+[
+  {
+    "name": "内核启动",
+    "ok": true,
+    "detail": "v3.8.6"
+  },
+  {
+    "name": "通道1 双库创建",
+    "ok": true,
+    "detail": "person=20260930000000-p58n10r org=20260930000000-og0fswm"
+  },
+  {
+    "name": "通道2 绑行与 detached 行",
+    "ok": true,
+    "detail": "personRows=2 orgRows=2 orgMain=20260930042849-yk7j5r8 detached=无"
+  },
+  {
+    "name": "通道3 跨库 relation 写读（显式 itemID 目标）",
+    "ok": false,
+    "detail": "write=-1 blockIDs=[]"
+  },
+  {
+    "name": "通道4 跨库双向配置",
+    "ok": false,
+    "detail": "txn=0 personRel=undefined orgRel=undefined"
+  },
+  {
+    "name": "通道5 跨库双向数据互通（org 设值 person 可见）",
+    "ok": false,
+    "detail": "oWrite=-1 personBlockIDs=[]"
+  }
+]
