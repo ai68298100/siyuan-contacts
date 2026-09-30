@@ -2438,3 +2438,23 @@
 - **留后续**：D-35 余项（aria-describedby/aria-invalid 逐字段绑定、首个失败控件焦点——
   需逐表单梳理，随表单统一 U-14 通道）；D-32 余项（InitWizard label-ID 关联）；
   D-31 焦点环令牌化（CSS 设计系统）；B13.8 真机投递；V-05 真机向余项；B12 主线（作者定优先级）。
+
+## 可访问性 第 96 轮：D-31 焦点环令牌化（2026-10-01，续跑口令第 97 版驱动）
+
+- **令牌**：_tokens.scss 新增 `--lvct-focus-ring-color`（→accent）、`--lvct-focus-ring-width`（2px）、
+  `--lvct-focus-ring-offset`（2px）——焦点环颜色/宽度/偏移令牌化，明暗主题自动跟随 accent 变量。
+- **全局兜底**：`.lvct-tab-root :focus-visible, .lvct-dialog-root :focus-visible` 补默认焦点环——
+  Tab 到无自有 focus-visible 样式的插件交互元素时仍可见（b3 原生 focus 样式在插件自绘背景上
+  可能不可辨）；有自有规则的元素由更高优先级覆盖；不影响鼠标点击（focus-visible 仅键盘触发）。
+- **D-31 证据元素补齐**：`.lvct-person-card__open-doc` / `.lvct-people__open-doc`（人物卡打开文档
+  按钮）与 `.lvct-detail__relation-name` / `.lvct-detail__relation-remove`（关系名称/移除按钮）
+  补 `:focus-visible`（自绘按钮此前完全无焦点指示，键盘用户不可见）。
+- **硬编码收敛**：6 处 `outline: 2px solid var(--lvct-accent)` 换令牌引用
+  （`var(--lvct-focus-ring-width) solid var(--lvct-focus-ring-color)`）。
+- **修复**：relation-remove 编辑时截断了原 `&:hover` 块与 `font-size: 13px` 导致 SCSS 编译
+  失败（三套 UI 全超时），已补回并确认编译通过。
+- **验证**：单测 221/221；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；`pnpm check`
+  0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 13/13、spike:init 21/21；
+  52 景基线 + 20 景断点矩阵重拍有效（focus-visible 仅键盘触发，静态景无变化）。
+- **留后续**：D-31 余项（对比度实测、最小触控尺寸令牌化——随 D-26 全量验收）；D-35 余项
+  （aria-describedby 逐字段绑定）；B13.8 真机投递；V-05 真机向余项；B12 主线（作者定优先级）。

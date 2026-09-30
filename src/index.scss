@@ -9,6 +9,15 @@
     overflow: auto;
 }
 
+/* D-31：全局键盘焦点环兜底——Tab 到无自有 focus-visible 样式的插件交互元素时
+   仍可见（b3 原生 focus 样式在插件自绘背景上可能不可辨）；有自有规则的元素由
+   更高优先级覆盖。不影响鼠标点击（focus-visible 仅键盘触发）。 */
+.lvct-tab-root :focus-visible,
+.lvct-dialog-root :focus-visible {
+    outline: var(--lvct-focus-ring-width) solid var(--lvct-focus-ring-color);
+    outline-offset: var(--lvct-focus-ring-offset);
+}
+
 /* ---------- 工作台 ---------- */
 
 .lvct-workbench {
@@ -474,7 +483,7 @@
     &:hover { color: var(--lvct-text-1); }
 
     &:focus-visible {
-        outline: 2px solid var(--lvct-accent);
+        outline: var(--lvct-focus-ring-width) solid var(--lvct-focus-ring-color);
         outline-offset: 1px;
     }
 
@@ -1428,7 +1437,7 @@
         border-color: var(--lvct-accent);
         background: var(--lvct-accent-soft);
     }
-    &:focus-visible { outline: 2px solid var(--lvct-accent); outline-offset: 2px; }
+    &:focus-visible { outline: var(--lvct-focus-ring-width) solid var(--lvct-focus-ring-color); outline-offset: var(--lvct-focus-ring-offset); }
 }
 .lvct-person-card__top { display: flex; align-items: center; gap: var(--lvct-sp-2); min-width: 0; }
 .lvct-person-card__sub { color: var(--lvct-text-3); font-size: var(--lvct-fs-caption); margin-top: 3px; }
@@ -1445,6 +1454,13 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+
+    /* D-31：键盘焦点环（自绘按钮此前无 focus-visible，键盘用户不可见） */
+    &:focus-visible {
+        outline: var(--lvct-focus-ring-width) solid var(--lvct-focus-ring-color);
+        outline-offset: var(--lvct-focus-ring-offset);
+        border-radius: var(--lvct-r-sm);
+    }
 }
 .lvct-notice {
     display: flex;
@@ -2013,7 +2029,7 @@
     }
 
     &:focus-visible {
-        outline: 2px solid var(--lvct-accent);
+        outline: var(--lvct-focus-ring-width) solid var(--lvct-focus-ring-color);
         outline-offset: 1px;
     }
 }
@@ -2574,6 +2590,12 @@
     &:hover {
         background: var(--lvct-bg-hover);
     }
+
+    /* D-31：键盘焦点环 */
+    &:focus-visible {
+        outline: var(--lvct-focus-ring-width) solid var(--lvct-focus-ring-color);
+        outline-offset: calc(-1 * var(--lvct-focus-ring-offset));
+    }
 }
 
 .lvct-detail__relation-remove {
@@ -2588,6 +2610,12 @@
     &:hover {
         background: var(--lvct-danger-soft);
         color: var(--lvct-danger);
+    }
+
+    /* D-31：键盘焦点环 */
+    &:focus-visible {
+        outline: var(--lvct-focus-ring-width) solid var(--lvct-focus-ring-color);
+        outline-offset: calc(-1 * var(--lvct-focus-ring-offset));
     }
 }
 
