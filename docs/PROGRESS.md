@@ -2256,3 +2256,28 @@
   52 景基线重拍目检（peek 景：「添加计划/添加归属」完整可见，底部说明文字不再截断）+ 断点扫描有效。
 - **留后续**：V-05 布局矩阵（宿主×容器宽度×视口，200% 缩放/旋转/长文字复核）；QuickFill 守卫
   与 D-40 接入；K-02 余项；B13 余项（B13.7/B13.8/B13.9、B13.5b 分页）；B14 真机核对；B11 余项。
+
+## 布局与守卫批 第 87 轮：QuickFill 草稿守卫 + V-05 第一批/宿主基线根修（2026-10-01，续跑口令第 88 版驱动）
+
+- **QuickFillDialog 草稿守卫（D-40 语义补齐）**：粘贴未识别、或识别结果未应用即关闭=丢草稿——
+  补 useCloseGuard（dirty=有待应用识别结果/非空粘贴；apply 是完成动作不拦），LvctDialog onClose
+  与两处「取消」按钮统一走 guardedClose；**index.ts 裸挂载 close 幂等化**（onApply/onClose 先后
+  到达防双重 unmount，N-08 同源竞态）。新增 smoke 用例：空粘贴直关/粘贴未识别守卫/预览未应用守卫
+  /父表单不受浮层关闭影响。
+- **V-05 第一批：断点矩阵扩展 + 宿主基线根修**：
+  - `breakpoint-sweep` 加 575px 档与 peek 场景（5 页 × 4 宽度 = 20 景）；shot 夹具补组织区样例
+    （长组织名/期间文本/同伴行），Peek 组织归属/共同背景首次进入布局基线。
+  - **根修（V-15 类）**：sweep 页面带 host=1 但其 vite **未挂 hostBaselinePlugin**——/__host/*.css
+    404、近似宿主样式又被夹具移除 → **b3 桥接令牌全部解析为空**（面板透明、页面内容透出交叠）。
+    补挂后 sweep 首次以真实思源 base.css + daylight 主题变量出图；诊断经临时 CDP 探针实证
+    （--b3-theme-background 根域为空 → --lvct-bg-elevated guaranteed-invalid → 透明）。
+    本机真实安装布局为 `<root>/resources/appearance|stage`，既有资源解析两布局兼容已覆盖。
+  - **实证结果**：peek@390/575/1280 真宿主 CSS 下组织归属长行换行整齐、共同背景/添加表单无裁切
+    不重叠——V-02 余项「575px Peek 复核」就此收口；home/people@575 与五入口底栏均正常。
+- **验证**：单测 218/218；三套 UI 桌面 **113** / 移动 **116** / 宿主 **113** 全绿（+1 QuickFill
+  守卫用例）；`pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow
+  10/10、spike:init 21/21；52 景基线重拍目检（peek 景带组织样例，400px 下长名换行整齐）+
+  20 景断点矩阵重拍目检（真宿主 CSS 下 peek@390/575/1280、home@390、people@575 抽查正常）。
+- **留后续**：V-05 余项（200% 文本缩放、旋转、暗色宿主主题矩阵——真机向）；「组织归属/跟进计划
+  边界重叠」用户实图复核（真机）；QuickFill 真机三路径并入 D-40 核对清单；K-02 余项；B13 余项；
+  B14 真机核对项；B11 余项。

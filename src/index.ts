@@ -283,7 +283,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const container = document.createElement("div");
         container.className = "lvct-dialog-root";
         document.body.appendChild(container);
+        /* N-08：onApply 与 onClose 可能先后到达——幂等关闭防双重 unmount */
+        let quickFillClosed = false;
         const close = () => {
+            if (quickFillClosed) return;
+            quickFillClosed = true;
             unmount(component);
             container.remove();
         };

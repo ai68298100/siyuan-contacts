@@ -167,6 +167,21 @@
         savePersonCadence: async (docId, cadence) => {
             if (cadence === null) cadenceOverrides.delete(docId); else cadenceOverrides.set(docId, cadence);
         },
+        /* B13/V-05：Peek 组织区样例（长组织名/期间文本/同伴行，供布局矩阵核对） */
+        listPersonOrgMemberships: async (docId) => docId === people[0].docId ? [{
+            id: "mem-shot-1", orgDocId: "20260101000000-orgshot1", orgName: "曙光科技（原晨曦信息技术有限公司）",
+            department: "研发中心平台架构部", title: "高级工程师", joinedOn: "2021-03-01", leftOn: "", status: "active",
+        }] : [],
+        listOrganizations: async () => [
+            { docId: "20260101000000-orgshot1", name: "曙光科技（原晨曦信息技术有限公司）", hpath: "/曙光科技", notebookId: settings.notebookId, archived: false, memberships: [] },
+        ],
+        listCommonOrgBackground: async (docId) => docId === people[0].docId ? [{
+            orgDocId: "20260101000000-orgshot1", orgName: "曙光科技（原晨曦信息技术有限公司）",
+            peers: [
+                { docId: people[1].docId, name: people[1].name, overlapText: "2021-03-01 ~ 至今", samePeriod: true, contact: summary(people[1]) },
+                { docId: people[2].docId, name: people[2].name, overlapText: "? ~ 2022-06-30", samePeriod: false, contact: summary(people[2]) },
+            ],
+        }] : [],
         listTemplates: async () => templates,
         saveTemplates: async (next) => { templates.splice(0, templates.length, ...next); return templates; },
         saveViewPreferences: async (next) => { Object.assign(preferences, next); return preferences; },

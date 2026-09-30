@@ -4135,6 +4135,46 @@ await test("V-02 组织弹窗宽屏布局：长组织名省略不溢出，成员
     }
 });
 
+await test("QuickFill 粘贴草稿关闭守卫：未识别/未应用关闭经确认放弃，应用后不拦", async () => {
+    mounted = mount(AddPersonDialog, { target: fixture, props: {
+        settings, onCreated() {}, onClose() {},
+    } });
+    await until(() => fixture.querySelector('input[placeholder="联系人文档名将以此为题"]'), "新建表单未加载");
+    button("粘贴并识别").click();
+    await until(() => fixture.querySelector(".lvct-qf__input"), "粘贴识别浮层未打开");
+    const qfPanel = fixture.querySelector(".lvct-qf").closest(".lvct-dialog-panel");
+    const qfCancel = () => [...qfPanel.querySelectorAll("button")].find((node) => node.textContent.trim() === "取消");
+    /* 空粘贴：取消直接关（无草稿） */
+    qfCancel().click();
+    await tick();
+    assert(!fixture.querySelector(".lvct-qf"), "空粘贴取消未直接关闭");
+    /* 粘贴未识别：关闭经守卫 */
+    button("粘贴并识别").click();
+    await until(() => fixture.querySelector(".lvct-qf__input"), "二次打开浮层失败");
+    const qfPanel2 = fixture.querySelector(".lvct-qf").closest(".lvct-dialog-panel");
+    const textarea = qfPanel2.querySelector(".lvct-qf__input");
+    input(textarea, "张三\n手机：13800138000");
+    await tick();
+    [...qfPanel2.querySelectorAll("button")].find((node) => node.textContent.trim() === "取消").click();
+    await until(() => document.querySelector(".lvct-closeguard"), "粘贴草稿关闭未触发守卫");
+    [...document.querySelectorAll(".lvct-closeguard button")].find((node) => node.dataset.choice === "discard").click();
+    await until(() => !fixture.querySelector(".lvct-qf"), "守卫放弃后浮层未关闭");
+    assert(fixture.querySelector('input[placeholder="联系人文档名将以此为题"]'), "父表单不应随浮层关闭");
+    /* 识别后有结果未应用：关闭经守卫；应用到表单是完成动作不拦 */
+    button("粘贴并识别").click();
+    await until(() => fixture.querySelector(".lvct-qf__input"), "三次打开浮层失败");
+    const qfPanel3 = fixture.querySelector(".lvct-qf").closest(".lvct-dialog-panel");
+    input(qfPanel3.querySelector(".lvct-qf__input"), "李四\n手机：13900139000");
+    await tick();
+    [...qfPanel3.querySelectorAll("button")].find((node) => node.textContent.trim() === "识别").click();
+    await until(() => [...qfPanel3.querySelectorAll("button")].some((node) => node.textContent.includes("应用到表单")), "识别预览未出现");
+    [...qfPanel3.querySelectorAll("button")].find((node) => node.textContent.trim() === "取消").click();
+    await until(() => document.querySelector(".lvct-closeguard"), "未应用结果关闭未触发守卫");
+    [...document.querySelectorAll(".lvct-closeguard button")].find((node) => node.dataset.choice === "discard").click();
+    await until(() => !fixture.querySelector(".lvct-qf"), "预览态守卫放弃后浮层未关闭");
+    assert(!document.querySelector(".lvct-closeguard"), "守卫弹窗未清理");
+});
+
 await test("AI 结构化候选：分组勾选确认，资料补充/建跟进写入且不越契约（FAST-01.4）", async () => {
     const personOf = (name) => ({
         docId: `20260927000000-${name}0000`, itemId: `row-${name}`, name,

@@ -4,6 +4,7 @@
     import { parseContactText, CONTACT_TEMPLATE } from "../../domain/quick-fill";
     import type { QuickFillItem, QuickFillResult } from "../../domain/quick-fill";
     import LvctDialog from "../LvctDialog.svelte";
+    import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
 
     let {
@@ -137,9 +138,23 @@
         onApply(patch);
         onClose();
     }
+
+    /* V-02/D-40 语义补齐：粘贴未识别、或识别结果未应用即关闭=丢草稿，经守卫确认放弃。
+       apply() 是完成动作，直接 onClose 不拦（调用方在 onApply 后自行关闭）。 */
+    function hasUnsavedDraft(): boolean {
+        if (previewed) return visibleItems().length > 0;
+        return pasteText.trim().length > 0;
+    }
+    const guardedClose = useCloseGuard({
+        busy: () => false,
+        dirty: () => hasUnsavedDraft(),
+    });
+    function requestClose(): void {
+        void guardedClose(onClose);
+    }
 </script>
 
-<LvctDialog title={text("qfTitle", "粘贴并识别")} onClose={onClose}>
+<LvctDialog title={text("qfTitle", "粘贴并识别")} onClose={requestClose}>
     <div class="lvct-qf">
         {#if !previewed}
             <p class="ft__smaller ft__on-surface">
@@ -152,7 +167,7 @@
                 placeholder={text("qfPlaceholder", "张三\n手机：13800138000\n微信：zhang_san\n邮箱：a@example.com")}
                 bind:value={pasteText}></textarea>
             <div class="lvct-form__actions">
-                <button class="b3-button b3-button--cancel" onclick={onClose}>{text("formCancel", "取消")}</button>
+                <button class="b3-button b3-button--cancel" onclick={requestClose}>{text("formCancel", "取消")}</button>
                 <button class="b3-button" disabled={pasteText.trim().length === 0} onclick={recognize}>{text("qfRecognize", "识别")}</button>
             </div>
         {:else}
@@ -187,7 +202,7 @@
                 </div>
             {/if}
             <div class="lvct-form__actions">
-                <button class="b3-button b3-button--cancel" onclick={onClose}>{text("formCancel", "取消")}</button>
+                <button class="b3-button b3-button--cancel" onclick={requestClose}>{text("formCancel", "取消")}</button>
                 <button class="b3-button" disabled={checked.size === 0} onclick={apply}>
                     {text("qfApply", "应用到表单（{n}）", { n: checked.size })}
                 </button>
