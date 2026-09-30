@@ -118,6 +118,8 @@ export interface ContactsPluginFacade {
     restoreOrganization(orgDocId: string): Promise<void>;
     /** B13.4：组织改名（同名检查；标记块文案同步，归档值保持） */
     renameOrganization(orgDocId: string, name: string): Promise<void>;
+    /** B13.9：移除悬空的 org-links 区块（体检修复入口；逐块隔离返回失败清单） */
+    removeOrgLinkBlocks(blockIds: readonly string[]): Promise<Array<{ id: string; message: string }>>;
     /** B13.3：打开组织管理弹窗（B13.5 人物详情维护入口复用；B13.6a 可携目标组织定位，目标缺失回退首个） */
     openOrgManagerDialog(initialOrgDocId?: string): void;
     /** B12：某人的组织归属投影（成员记录 join 组织名） */

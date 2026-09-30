@@ -55,6 +55,10 @@
     let renameValue = $state("");
     /* H-14/H-29：成员加载代际守卫版本号 */
     let memberLoadVersion = 0;
+    /* B13.5b：成员列表增量渲染（每次加载更多一页；切换组织/成员变动时重置或展开） */
+    const MEMBER_PAGE_SIZE = 50;
+    let memberVisibleCount = $state(MEMBER_PAGE_SIZE);
+    const visibleMembers = $derived(members.slice(0, memberVisibleCount));
 
     /* H-29：关闭守卫——改名/成员编辑中的草稿需经确认放弃；写入中直接阻断关闭。
        D-40：宿主 X/Esc/遮罩经同一守卫路由（通道由 libs/dialog 注入），不再直销毁。 */
@@ -88,6 +92,8 @@
     async function loadMembers(): Promise<void> {
         /* H-14/H-29：请求代际守卫——快速切换组织时，迟到的旧成员响应不得覆盖当前组织 */
         const version = ++memberLoadVersion;
+        /* B13.5b：换组织后分页从头渲染 */
+        memberVisibleCount = MEMBER_PAGE_SIZE;
         if (!currentOrgDocId) {
             if (version === memberLoadVersion) members = [];
             return;
@@ -180,6 +186,8 @@
             await facade.addOrganizationMember(currentOrgDocId, addPersonId, { department, title });
             addPersonId = "";
             await loadMembers();
+            /* B13.5b：新增成员排在列表尾部——展开全部分页使其可见 */
+            memberVisibleCount = Math.max(memberVisibleCount, members.length);
         });
     }
 
@@ -188,6 +196,8 @@
         void run(async () => {
             await facade.removeOrganizationMember(id);
             await loadMembers();
+            /* B13.5b：总数减少后收敛分页游标 */
+            memberVisibleCount = Math.min(memberVisibleCount, Math.max(members.length, MEMBER_PAGE_SIZE));
         });
     }
 
@@ -362,8 +372,11 @@
                     {#if members.length === 0}
                         <p class="ft__smaller ft__on-surface">{text("orgMembersEmpty", "暂无成员。从下方添加。")}</p>
                     {:else}
+                        {#if members.length > memberVisibleCount}
+                            <p class="ft__smaller ft__on-surface">{text("orgMembersShown", "已显示 {shown} / 共 {total} 名成员", { shown: memberVisibleCount, total: members.length })}</p>
+                        {/if}
                         <ul class="lvct-org-manager__member-list">
-                            {#each members as member (member.id)}
+                            {#each visibleMembers as member (member.id)}
                                 <li class="lvct-org-manager__member">
                                     {#if editingMemberId === member.id}
                                         <div class="lvct-org-manager__member-edit">
@@ -413,6 +426,11 @@
                                 </li>
                             {/each}
                         </ul>
+                        {#if members.length > memberVisibleCount}
+                            <!-- B13.5b：大名册增量渲染（先渲染前 N 名，避免一次挂载全部 DOM） -->
+                            <button type="button" class="b3-button b3-button--text" onclick={() => (memberVisibleCount += MEMBER_PAGE_SIZE)}>
+                                {text("orgMembersMore", "加载更多（还有 {n} 名）", { n: members.length - memberVisibleCount })}</button>
+                        {/if}
                     {/if}
                     <div class="lvct-org-manager__add">
                         <select class="b3-select fn__block" bind:value={addPersonId} disabled={busy}

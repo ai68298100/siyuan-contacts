@@ -1097,6 +1097,38 @@ await test("B13.2 组织扫描与成员索引：标记区块扫描发现组织�
     assert(stored.schemaVersion === 1 && stored.memberships.length === 2, "成员索引落盘形状错误");
 });
 
+await test("B13.5b 组织成员列表分页：首屏 50 名、加载更多展开、切换组织重置", async () => {
+    const members = Array.from({ length: 60 }, (_, index) => ({
+        id: `20260930000000-mem${String(index + 1).padStart(4, "0")}`,
+        orgDocId: "20260930000000-org0001",
+        personDocId: `20260930000000-per${String(index + 1).padStart(4, "0")}`.slice(0, 22),
+        personName: `成员${index + 1}`,
+        department: "", title: "", joinedOn: "", leftOn: "", status: "active",
+    }));
+    const facade = {
+        settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        listContacts: async () => [],
+        listOrganizations: async () => [
+            { docId: "20260930000000-org0001", name: "曙光科技", hpath: "/曙光科技", notebookId: settings.notebookId, archived: false, memberships: [] },
+            { docId: "20260930000000-org0002", name: "旧校", hpath: "/旧校", notebookId: settings.notebookId, archived: false, memberships: [] },
+        ],
+        listOrganizationMembers: async (orgDocId) => (orgDocId === "20260930000000-org0001" ? members : []),
+    };
+    mounted = mount(OrgManagerDialog, { target: fixture, props: {
+        facade, i18n: undefined, initialOrgDocId: "20260930000000-org0001", onClose() {},
+    } });
+    await until(() => fixture.textContent.includes("已显示 50 / 共 60 名成员"), "分页计数未显示");
+    const memberRows = () => fixture.querySelectorAll(".lvct-org-manager__member").length;
+    assert(memberRows() === 50, `首屏应渲染 50 名：${memberRows()}`);
+    button("加载更多（还有 10 名）").click();
+    await until(() => memberRows() === 60, "加载更多未展开剩余成员");
+    await until(() => !fixture.querySelector(".lvct-org-manager__member-list + button"), "全部展开后加载按钮未消失");
+    /* 切换组织 → 分页重置（空组织） */
+    [...fixture.querySelectorAll(".lvct-org-manager__org-item")]
+        .find((node) => node.textContent.includes("旧校")).click();
+    await until(() => fixture.textContent.includes("暂无成员"), "切换组织后未重置");
+});
+
 await test("B13.7 人物文档组织归属链接区块：添加/归档恢复对账与失败隔离", async () => {
     const files = new Map();
     files.set("org-membership.json", { schemaVersion: 1, memberships: [] });
@@ -1223,8 +1255,61 @@ await test("B13.9 第二批 组织体检逐条修复：孤儿移除/重复转 fo
         [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("保留最早一条，其余转为已离开")).click();
         await until(() => formerUpdates.length === 1 && formerUpdates[0].id === "20260930000000-mem0010"
             && formerUpdates[0].patch.status === "former", "重复在职未保留最早转 former");
-        await until(() => fixture.textContent.includes("已将 1 条重复在职记录"), "重复修复消息未显示");
-        await until(() => fixture.textContent.includes("未发现资料质量问题"), "修复后体检未重跑");
+    await until(() => fixture.textContent.includes("已将 1 条重复在职记录"), "重复修复消息未显示");
+    await until(() => fixture.textContent.includes("未发现资料质量问题"), "修复后体检未重跑");
+    } finally {
+        window.confirm = originalConfirm;
+    }
+});
+
+await test("B13.9 悬空 org-links 区块：体检指名并一键清理（facade 全链路）", async () => {
+    const removedBlocks = [];
+    const remaining = new Set(["20260930000000-blk0003", "20260930000000-blk0004"]);
+    let blk0004Failed = false;
+    const facade = {
+        settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        runHealthAudit: async () => {
+            if (remaining.size === 0) return [];
+            return [{
+                kind: "danglingOrgLinks", reason: "悬空区块检测",
+                itemIds: [...remaining],
+                samples: [`人物 ${[...remaining][0].slice(-6)}`],
+            }];
+        },
+        loadExportSummary: async () => ({ people: 0, interactions: 0 }),
+        removeOrgLinkBlocks: async (blockIds) => {
+            const failures = [];
+            for (const id of blockIds) {
+                if (id === "20260930000000-blk0004" && !blk0004Failed) {
+                    blk0004Failed = true; /* 首次清理注入单块失败 → 消息可重试 */
+                    failures.push({ id, message: "模拟删除失败" });
+                    continue;
+                }
+                remaining.delete(id);
+                removedBlocks.push(id);
+            }
+            return failures;
+        },
+    };
+    mounted = mount(SettingsView, { target: fixture, props: {
+        facade, settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {}, onInteractionsUpdated() {},
+    } });
+    [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes("数据与字段")).click();
+    await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent.trim() === "运行资料体检"), "数据与字段分区未显示");
+    button("运行资料体检").click();
+    await until(() => fixture.textContent.includes("悬空区块检测"), "悬空区块报告未渲染");
+    const originalConfirm = window.confirm;
+    window.confirm = () => true;
+    try {
+        /* 首次清理注入单块失败 → 消息可重试；重试成功 → 体检重跑清洁 */
+        [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("清理这 2 个悬空区块")).click();
+        await until(() => fixture.textContent.includes("已清理 1 个，1 个失败可重试"), "部分失败消息未显示");
+        await until(() => fixture.textContent.includes("清理这 1 个悬空区块"), "重跑后剩余悬空未指名");
+        [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("清理这 1 个悬空区块")).click();
+        await until(() => removedBlocks.length === 2, "重试未清理剩余区块");
+        await until(() => fixture.textContent.includes("已清理 1 个悬空区块"), "清理成功消息未显示");
+        await until(() => fixture.textContent.includes("未发现资料质量问题"), "清理后体检未重跑");
     } finally {
         window.confirm = originalConfirm;
     }

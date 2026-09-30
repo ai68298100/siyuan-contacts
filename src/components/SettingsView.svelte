@@ -317,8 +317,22 @@
             auditFixing = false;
         }
     }
-    async function fixDuplicateOrgActives() {
-        if (auditFixing || typeof facade.listOrganizations !== "function" || typeof facade.updateOrganizationMember !== "function") return;
+    async function fixDanglingOrgLinks(issue: AuditIssue) {
+        if (auditFixing || issue.itemIds.length === 0 || typeof facade.removeOrgLinkBlocks !== "function") return;
+        if (!window.confirm(`将移除 ${issue.itemIds.length} 个悬空的「所属组织」链接区块（仅删插件标记块，不动正文）。确认执行？`)) return;
+        auditFixing = true;
+        auditFixMessage = "";
+        try {
+            const failures = await facade.removeOrgLinkBlocks(issue.itemIds);
+            auditFixMessage = failures.length > 0
+                ? `已清理 ${issue.itemIds.length - failures.length} 个，${failures.length} 个失败可重试`
+                : `已清理 ${issue.itemIds.length} 个悬空区块`;
+            await runDataAudit();
+        } finally {
+            auditFixing = false;
+        }
+    }
+    async function fixDuplicateOrgActives() {        if (auditFixing || typeof facade.listOrganizations !== "function" || typeof facade.updateOrganizationMember !== "function") return;
         auditFixing = true;
         auditFixMessage = "";
         try {
@@ -1094,6 +1108,9 @@
                                         {:else if issue.kind === "invertedMembershipPeriod"}
                                             <button type="button" class="b3-button b3-button--text"
                                                 onclick={() => facade.openOrgManagerDialog()}>打开组织管理修正</button>
+                                        {:else if issue.kind === "danglingOrgLinks"}
+                                            <button type="button" class="b3-button b3-button--text" disabled={auditFixing}
+                                                onclick={() => void fixDanglingOrgLinks(issue)}>清理这 {issue.itemIds.length} 个悬空区块</button>
                                         {/if}
                                     </li>
                                 {/each}

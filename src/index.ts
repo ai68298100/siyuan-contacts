@@ -41,6 +41,7 @@ import {
     archiveOrganization,
     restoreOrganization,
     renameOrganization,
+    removeOrgLinkBlocks,
     listPersonOrgMemberships,
     listCommonOrgBackground,
 } from "./services/org";
@@ -498,6 +499,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     /** B13.4：组织改名（同名检查；标记块文案同步，归档值保持） */
     async renameOrganization(orgDocId: string, name: string) {
         await renameOrganization(orgDocId, name);
+    }
+
+    /** B13.9：移除悬空的 org-links 区块（体检修复入口；逐块隔离返回失败清单） */
+    async removeOrgLinkBlocks(blockIds: readonly string[]) {
+        return removeOrgLinkBlocks(blockIds);
     }
 
     /** B12：某人的组织归属投影（成员记录 join 组织名） */

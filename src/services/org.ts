@@ -4,7 +4,7 @@
  * 组织维度不写 related；扫描读取失败保持未知（不静默按无组织处理）。
  */
 import type { Plugin } from "siyuan";
-import { upsertMarkedBlock, findBlockIdByCustomAttr } from "../api/blocks";
+import { upsertMarkedBlock, findBlockIdByCustomAttr, deleteBlock } from "../api/blocks";
 import { createDocWithMd, querySql, renameDoc } from "../api/client";
 import {
     addOrgMembership,
@@ -277,6 +277,27 @@ export async function updateOrganizationMember(plugin: Plugin, id: string, patch
 /* ---------- B13.7 人物文档组织归属链接区块（契约 §8：active × 活跃组织投影，单标记块幂等） ---------- */
 
 export const ORG_LINKS_SECTION_ATTR = "custom-lvct-org-links";
+
+/** B13.9/B13.5b：全库 org-links 区块反查（root_id → 块 id；单 SQL，悬空检测数据源） */
+export async function findOrgLinkBlocks(): Promise<Map<string, string>> {
+    const rows = await querySql<{ root_id: string; id: string }>(
+        `SELECT root_id, id FROM blocks WHERE ial LIKE '%${ORG_LINKS_SECTION_ATTR}="%'`,
+    );
+    return new Map(rows.map((row) => [row.root_id, row.id] as const));
+}
+
+/** 移除悬空的 org-links 区块（逐块隔离，失败清单；供体检修复按钮调用） */
+export async function removeOrgLinkBlocks(blockIds: readonly string[]): Promise<Array<{ id: string; message: string }>> {
+    const failures: Array<{ id: string; message: string }> = [];
+    for (const blockId of blockIds) {
+        try {
+            await deleteBlock(blockId);
+        } catch (error) {
+            failures.push({ id: blockId, message: error instanceof Error ? error.message : String(error) });
+        }
+    }
+    return failures;
+}
 
 /** 某人物文档的组织归属链接区块对账（区块失败上抛，由逐文档隔离层接住） */
 export async function syncPersonOrgLinksSection(plugin: Plugin, personDocId: string): Promise<void> {

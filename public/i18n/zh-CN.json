@@ -617,6 +617,8 @@
   "orgCreate": "新建组织",
   "orgMembersTitle": "成员",
   "orgMembersEmpty": "暂无成员。从下方添加。",
+  "orgMembersShown": "已显示 {shown} / 共 {total} 名成员",
+  "orgMembersMore": "加载更多（还有 {n} 名）",
   "orgFormer": "（已离开）",
   "orgMemberRemove": "移除",
   "orgAddMemberLabel": "选择要添加的联系人",

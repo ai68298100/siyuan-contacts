@@ -9,6 +9,7 @@ import {
     updateMembership,
     buildCommonOrgBackground,
     buildOrgLinksSection,
+    findDanglingOrgLinks,
 } from "../src/domain/org-membership.ts";
 import type { OrgMembership } from "../src/domain/org-membership.ts";
 
@@ -247,4 +248,19 @@ test("B13.7 组织归属链接区块：链接/括注拼接与空条目移除语�
     );
     // 空条目 → 空串（调用方据此移除区块）
     assert.equal(buildOrgLinksSection([]), "");
+});
+
+test("B13.9 悬空 org-links 区块：无 active 成员记录的文档列入清理清单", () => {
+    const blockRoots = new Map([
+        ["20260930000000-per0001", "20260930000000-blk0001"],
+        ["20260930000000-per0002", "20260930000000-blk0002"],
+        ["20260930000000-pergone1", "20260930000000-blk0003"],
+    ]);
+    const active = new Set(["20260930000000-per0001"]); /* per0002 只有 former 记录 → 也算悬空 */
+    const dangling = findDanglingOrgLinks(blockRoots, active);
+    assert.deepEqual(dangling.map((entry) => entry.blockId), [
+        "20260930000000-blk0002",
+        "20260930000000-blk0003",
+    ]);
+    assert.equal(dangling[0].rootId, "20260930000000-per0002");
 });

@@ -10,6 +10,7 @@
 import type { ContactSummary } from "./person";
 import type { FollowUpItem } from "./followups";
 import type { OrgMembership } from "./org-membership";
+import { findDanglingOrgLinks } from "./org-membership.ts";
 
 export type AuditIssueKind =
     | "missingPhone"
@@ -27,7 +28,8 @@ export type AuditIssueKind =
     | "unreachableOrg"
     | "invertedMembershipPeriod"
     | "duplicateActiveMembership"
-    | "conflictingOrgMarkers";
+    | "conflictingOrgMarkers"
+    | "danglingOrgLinks";
 
 export interface AuditIssue {
     kind: AuditIssueKind;
@@ -172,6 +174,10 @@ export interface OrgAuditInput {
     personNames: ReadonlyMap<string, string>;
     /** 组织 docId → 标记块数量（>1 = 冲突标记，H-22；缺省不检查） */
     markerCounts?: ReadonlyMap<string, number>;
+    /** 文档 rootId → org-links 块 id（SQL 反查；缺省不检查悬空） */
+    orgLinkBlockRoots?: ReadonlyMap<string, string>;
+    /** 有 active 成员记录的人物 docId 集合（悬空判定基准） */
+    activePersonDocIds?: ReadonlySet<string>;
 }
 
 /**
@@ -233,6 +239,13 @@ export function runOrgHealthAudit(input: OrgAuditInput): AuditIssue[] {
         .map(([docId, count]) => ({ id: docId, label: `${orgLabel(docId)}（${count} 个标记块）` }));
     if (conflicts.length) {
         issues.push(toIssue("conflictingOrgMarkers", "以下组织文档存在多个组织标记块，归档状态投影已不可靠；请只保留一个标记块（多余的手工删除）", conflicts));
+    }
+
+    /* B13.9 第二批：悬空 org-links 区块（历史对账失败残留，可一键清理） */
+    const dangling = findDanglingOrgLinks(input.orgLinkBlockRoots ?? new Map(), input.activePersonDocIds ?? new Set());
+    if (dangling.length > 0) {
+        issues.push(toIssue("danglingOrgLinks", "以下人物文档残留「所属组织」链接区块，但已无任何在职成员记录（历史对账失败残留）；可一键清理这些区块",
+            dangling.map((entry) => ({ id: entry.blockId, label: `人物 ${entry.rootId.slice(-6)}` }))));
     }
 
     return issues;

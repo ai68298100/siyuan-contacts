@@ -175,6 +175,23 @@ export function buildOrgLinksSection(entries: readonly OrgLinkEntry[]): string {
     return `**所属组织**：${links.join("、")}`;
 }
 
+/**
+ * B13.9 悬空 org-links 区块判定（纯函数）：文档存在归属链接区块、但该人物已无任何
+ * active 成员记录＝悬空（历史对账失败残留）。返回待清理的块 ID 清单。
+ */
+export function findDanglingOrgLinks(
+    /** 文档 rootId → org-links 块 id（SQL 反查结果） */
+    blockRoots: ReadonlyMap<string, string>,
+    /** 有 active 成员记录的人物 docId 集合 */
+    activePersonDocIds: ReadonlySet<string>,
+): { blockId: string; rootId: string }[] {
+    const dangling: { blockId: string; rootId: string }[] = [];
+    for (const [rootId, blockId] of blockRoots) {
+        if (!activePersonDocIds.has(rootId)) dangling.push({ rootId, blockId });
+    }
+    return dangling;
+}
+
 /* ---------- B13.6 共同背景：同组织联系人投影（纯展示，零写入，不写 related/称谓） ---------- */
 
 export interface CommonOrgPeer {

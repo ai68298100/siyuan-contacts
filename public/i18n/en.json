@@ -617,6 +617,8 @@
   "orgCreate": "Create organization",
   "orgMembersTitle": "Members",
   "orgMembersEmpty": "No members. Add from below.",
+  "orgMembersShown": "Showing {shown} of {total} members",
+  "orgMembersMore": "Load more ({n} more)",
   "orgFormer": " (former)",
   "orgMemberRemove": "Remove",
   "orgAddMemberLabel": "Choose a contact to add",
