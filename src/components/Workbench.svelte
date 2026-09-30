@@ -167,7 +167,14 @@
             <button class="lvct-workbench__nav-item" disabled><span class="lvct-workbench__nav-icon" aria-hidden="true"><Sparkles size={16}/></span><span class="lvct-workbench__nav-text">{text("navSuggestions", "建议")}</span></button>
         </nav>
         <div class="lvct-workbench__sidebar-footer">
-            <button class="lvct-workbench__nav-item" title={text("openSettings", "打开插件设置")} onclick={() => selectView("settings")}>
+            <!-- V-03：设置是移动底部导航第五入口——与视图项同持当前态与 aria-current -->
+            <button
+                class="lvct-workbench__nav-item"
+                class:lvct-workbench__nav-item--active={current === "settings"}
+                aria-current={current === "settings" ? "page" : undefined}
+                title={text("openSettings", "打开插件设置")}
+                onclick={() => selectView("settings")}
+            >
                 <span class="lvct-workbench__nav-icon" aria-hidden="true"><Settings size={16}/></span><span class="lvct-workbench__nav-text">{text("navSettings", "设置")}</span>
             </button>
         </div>

@@ -3219,15 +3219,30 @@
     .lvct-workbench__nav {
         flex: 1;
         flex-direction: row;
+        justify-content: space-around;
+        align-items: stretch;
         min-width: 0;
-        overflow-x: auto;
+        /* V-03：五入口一屏均布，不再横向滚动溢出隐藏（390px 下组织/设置曾不可达） */
+        overflow-x: visible;
+        gap: 0;
     }
 
     .lvct-workbench__nav-item {
+        flex: 1 1 0;
+        min-width: 0;
+        flex-direction: column;
+        justify-content: center;
+        gap: 2px;
         width: auto;
         min-height: var(--lvct-touch-min-mobile);
-        padding: var(--lvct-sp-2) var(--lvct-sp-3);
+        padding: var(--lvct-sp-1) var(--lvct-sp-1);
         white-space: nowrap;
+
+        .lvct-workbench__nav-text {
+            flex: none;
+            text-align: center;
+            font-size: var(--lvct-fs-micro);
+        }
     }
 
 
@@ -3254,6 +3269,8 @@
         margin: 0;
         padding: 0;
         border: 0;
+        /* V-03：与视图项同宽（第五入口等分） */
+        flex: 1 1 0;
     }
 
     .lvct-workbench__main {

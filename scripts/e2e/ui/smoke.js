@@ -44,11 +44,52 @@ import englishMessages from "../../../public/i18n/en.json";
 
 const fixture = document.querySelector("#fixture");
 const results = [];
-const runtimeErrors = [];
 const pause = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
-window.addEventListener("error", (event) => runtimeErrors.push(event.message));
-window.addEventListener("unhandledrejection", (event) => runtimeErrors.push(String(event.reason)));
 const assert = (ok, message) => { if (!ok) throw new Error(message); };
+
+/* K-01/K-02：console 契约门禁——逐用例收集 warn/error 与未捕获异常，
+   预期内（读故障显式化等失败路径）按前缀 allowlist 放行；其余（含 fixture
+   缺 facade 方法的 "is not a function" TypeError——即使混在预期警告的参数里）
+   使对应场景失败。前缀清单=src/ 全部 console.warn/error 首参（新增失败路径
+   警告时须同步登记）。 */
+const EXPECTED_CONSOLE_PREFIXES = [
+    "[lvct] 共同背景读取失败",
+    "[lvct] 图谱模式偏好保存失败",
+    "[lvct] 引用图中心偏好保存失败",
+    "[lvct] 引用图范围偏好保存失败",
+    "[lvct] 归属候选读取失败",
+    "[lvct] 本人档案建立失败（初始化继续",
+    "[lvct] 本人身份核验的名册读取失败",
+    "[lvct] 档案条渲染失败",
+    "[lvct] 相关人物区块同步失败",
+    "[lvct] 组织归属投影读取失败",
+    "[lvct] 跟进任务块对账失败",
+    "[lvct] 跟进库读取失败，本次文档任务同步已跳过",
+    "顺延单条逾期跟进失败",
+    "[lvct] 仪表盘模块读取失败，已显式降级:",
+    "[lvct] 存储锁连续",
+    "[lvct] 本人文档 ",
+    "[lvct] 跟进任务块同步分项失败",
+];
+const consoleRecords = [];
+const stringifyConsoleArg = (value) => (value instanceof Error ? `${value.name}: ${value.message}` : String(value));
+for (const level of ["warn", "error"]) {
+    const original = console[level].bind(console);
+    console[level] = (...args) => {
+        consoleRecords.push(args.map(stringifyConsoleArg).join(" "));
+        original(...args);
+    };
+}
+window.addEventListener("error", (event) => consoleRecords.push(`[window.error] ${event.message}`));
+window.addEventListener("unhandledrejection", (event) => consoleRecords.push(`[unhandledrejection] ${String(event.reason)}`));
+/** 门禁裁决：返回当前用例的违规 console 记录（空数组=通过） */
+function consoleViolations() {
+    return consoleRecords.filter((line) => {
+        const allowlisted = EXPECTED_CONSOLE_PREFIXES.some((prefix) => line.startsWith(prefix));
+        /* 预期警告里混入缺方法 TypeError 仍判违规（K-01：fixture 必须补齐 facade 契约） */
+        return !allowlisted || line.includes("is not a function");
+    });
+}
 async function until(predicate, message) {
     const deadline = Date.now() + 4000;
     while (!predicate()) {
@@ -123,13 +164,23 @@ function resetKernel() {
 let mounted;
 async function test(name, action) {
     resetKernel();
+    consoleRecords.length = 0;
     (window.__cases = window.__cases || []).push(name);
+    let failed = false;
     try {
         await action();
-        results.push({ name, ok: true });
     } catch (error) {
+        failed = true;
         results.push({ name, ok: false, detail: error.stack });
     } finally {
+        /* K-01/K-02：非预期 console 输出/未捕获异常使本用例失败（预期警告按前缀放行，
+           缺 facade 方法的 TypeError 即使混在预期警告参数里也判违规） */
+        const violations = consoleViolations();
+        if (!failed && violations.length > 0) {
+            results.push({ name, ok: false, detail: `K-01/K-02 非预期 console 输出：\n${violations.join("\n")}` });
+        } else if (!failed) {
+            results.push({ name, ok: true });
+        }
         if (mounted) await unmount(mounted);
         mounted = undefined;
         fixture.replaceChildren();
@@ -249,6 +300,10 @@ await test("数据刷新：已打开的 Peek 随数据变化原地重载洞察�
         settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
         onPreferencesUpdated() {}, onOpenPersonDoc() {},
         facade: { settings, loadRecentInteractions: async () => ({}),
+            /* K-01：Peek 组织区块的 facade 契约（缺方法即门禁违规） */
+            listPersonOrgMemberships: async () => [],
+            listCommonOrgBackground: async () => [],
+            listOrganizations: async () => [],
             loadDashboard: async () => ({
                 people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
                 stale: [], staleTotal: 0, neverContacted: 0, neverContactedItemIds: [],
@@ -1665,6 +1720,10 @@ await test("英文工作台导航与标题跟随语言资源，缺失文案回�
         settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: window.innerWidth <= 640,
         onPreferencesUpdated() {}, onOpenPersonDoc() {},
         facade: { settings, i18n: { ...englishMessages, navOrganizations: "" },
+            /* K-01：Peek 组织区块的 facade 契约（缺方法即门禁违规） */
+            listPersonOrgMemberships: async () => [],
+            listCommonOrgBackground: async () => [],
+            listOrganizations: async () => [],
             loadDashboard: async () => ({ people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
                 stale: [{ person }], neverContacted: 1, neverContactedItemIds: [person.itemId] }),
             loadPersonInsights: async () => emptyInsights(),
@@ -1954,6 +2013,10 @@ if (window.innerWidth <= 640) {
                 settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
                 loadDashboard: async () => ({ people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
                     stale: [{ person }], neverContacted: 1, neverContactedItemIds: [person.itemId] }),
+                /* K-01：Peek 组织区块的 facade 契约（缺方法即门禁违规） */
+                listPersonOrgMemberships: async () => [],
+                listCommonOrgBackground: async () => [],
+                listOrganizations: async () => [],
                 loadPersonInsights: async () => emptyInsights(),
                 loadRecentInteractions: async () => ({}),
                 recordInteraction: async () => {},
@@ -1963,6 +2026,17 @@ if (window.innerWidth <= 640) {
         const sidebar = fixture.querySelector(".lvct-workbench__sidebar");
         assert(getComputedStyle(sidebar).position === "fixed", "移动端导航没有固定在底部");
         assert(getComputedStyle(sidebar).bottom === "0px", "移动端导航没有贴近底部");
+        /* V-03：五入口一屏均布——组织与设置一触可达、不横向溢出、设置持当前态 */
+        const enabledNavs = [...sidebar.querySelectorAll(".lvct-workbench__nav-item")].filter((node) => !node.disabled);
+        assert(enabledNavs.length === 5, `底部导航应为 5 个可用入口（含设置）：${enabledNavs.length}`);
+        assert(enabledNavs.every((node) => node.getBoundingClientRect().right <= window.innerWidth + 1), "底部导航项溢出视口（V-03）");
+        assert(enabledNavs.some((node) => node.textContent.includes("组织")), "组织入口不在底部导航（V-03 溢出隐藏）");
+        const settingsNav = enabledNavs.find((node) => node.textContent.includes("设置"));
+        assert(settingsNav && settingsNav.getAttribute("aria-current") !== "page", "非当前页设置不应标 aria-current");
+        settingsNav.click();
+        await until(() => fixture.querySelector("h1")?.textContent === "设置", "底部导航设置入口未切换视图");
+        assert(settingsNav.getAttribute("aria-current") === "page", "设置当前态 aria-current 缺失（V-03）");
+        assert(settingsNav.className.includes("lvct-workbench__nav-item--active"), "设置当前态样式缺失（V-03）");
         const peopleNav = [...fixture.querySelectorAll(".lvct-workbench__nav-item")].find((node) => node.textContent.includes("联系人"));
         assert(peopleNav, "未找到移动端联系人导航");
         peopleNav.click();
@@ -2012,6 +2086,10 @@ if (window.innerWidth <= 640) {
                 settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
                 loadDashboard: async () => ({ people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
                     stale: [{ person }], neverContacted: 1, neverContactedItemIds: [person.itemId] }),
+                /* K-01：Peek 组织区块的 facade 契约（缺方法即门禁违规） */
+                listPersonOrgMemberships: async () => [],
+                listCommonOrgBackground: async () => [],
+                listOrganizations: async () => [],
                 loadPersonInsights: async () => emptyInsights(),
                 loadRecentInteractions: async () => ({}),
                 recordInteraction: async () => {},
@@ -2531,6 +2609,10 @@ await test("从首页打开详情并记录互动后，首页统计同步刷新",
                     { kind: "stale", label: "从未互动", bucket: "stale", neverContacted: true },
                 ] }] };
         }, loadPersonInsights: async () => emptyInsights(),
+        /* K-01：Peek 组织区块的 facade 契约（缺方法即门禁违规） */
+        listPersonOrgMemberships: async () => [],
+        listCommonOrgBackground: async () => [],
+        listOrganizations: async () => [],
         recordInteraction: async () => { recorded = true; }, openHostDoc() {},
     };
     mounted = mount(Workbench, { target: fixture, props: {
@@ -4972,6 +5054,7 @@ await test("读取故障显式化：跟进计划读取失败显示错误态与�
 });
 
 await pause(100);
-results.push({ name: "无未处理异常及响应式循环", ok: runtimeErrors.length === 0, detail: runtimeErrors.join("\n") });
+/* 旧「无未处理异常」全局汇总已由逐用例 K-01/K-02 console 门禁取代（window.error/
+   unhandledrejection 逐用例归责，测试内联注错不再被静默放行）。 */
 document.querySelector("#results").textContent = JSON.stringify(results, null, 2);
 await fetch("/__ui_report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(results) });

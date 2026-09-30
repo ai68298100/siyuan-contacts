@@ -2207,3 +2207,28 @@
 - **留后续**：D-40 真实宿主三路径核对（Host pending）+ 其余直挂弹窗（AddPerson/PersonEdit/VCard/
   QuickFill）逐个接入；V-02/V-03（组织弹窗挤压、底部导航五入口溢出）与 V-05+ 布局矩阵；
   K-01/K-02 smoke fixture 契约门禁；B13 余项；B14 真机核对项；B11 余项。
+
+## 缺陷修复批 第 85 轮：V-03 移动底部导航 + K-01/K-02 smoke 契约门禁（2026-10-01，续跑口令第 86 版驱动）
+
+- **V-03（P0）移动底部导航五入口可达**：曾 `.lvct-workbench__nav` 横向 `overflow:auto`——390px 下
+  组织项被溢出隐藏、设置在独立 footer 且无当前态。重排为五入口一屏均布：导航项改竖排
+  （图标上/短标签下，`--lvct-fs-micro`），`space-around` 等分且 footer 同宽（flex 1 1 0），
+  溢出滚动移除；设置按钮补 `--active` 类与 `aria-current="page"`（视图项同款，非当前页不标）。
+- **K-01/K-02 smoke 契约门禁**：原「无未处理异常」全局汇总（套件级一次性判定）升级为**逐用例
+  console 门禁**——
+  - 逐用例收集 `console.warn`/`error`（经包装器，原样透传）与 `window.error`/`unhandledrejection`；
+  - 裁决规则：首参命中前缀 allowlist（=src/ 全部 17 处失败路径警告，含共同背景/归属候选/组织投影
+    读取失败、偏好保存失败、跟进对账/同步分项失败、存储锁接管等）放行；**allowlist 行内混入
+    "is not a function" TypeError 仍判违规**（fixture 缺 facade 方法即使被组件 catch 后以预期警告
+    形态出现也必须失败——K-01 核心）；非预期警告/未捕获异常指名用例失败。
+  - 门禁首跑即暴露 5 个用例的 fixture 缺口（桌面 3 + 移动 2：开 Peek 的 Workbench 夹具缺
+    `listPersonOrgMemberships/listCommonOrgBackground/listOrganizations`，此前被预期警告掩护、
+    组织区块静默降级为空仍报 PASS）——已全部补齐契约 stub；旧全局汇总用例删除（职责并入门禁）。
+- **验证**：单测 218/218；三套 UI 桌面 **109** / 移动 **112** / 宿主 **109** 全绿（各 -1=旧全局
+  汇总用例并入门禁；移动含新 V-03 断言：5 入口均布/不溢出/组织在列/设置 aria-current 与 active
+  切换）；`pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 10/10、
+  spike:init 21/21；52 景基线重拍目检（people-mobile 景：五入口全可见、联系人项高亮当前态）+
+  断点扫描有效。
+- **留后续**：V-02（组织弹窗/详情字段挤压，关联 H-01/H-02）与 V-05（宿主×容器宽度布局矩阵）；
+  K-02 完整形态（每个故障注入场景声明预期错误对象与恢复动作——当前门禁已覆盖非预期错误部分）；
+  D-40 余项（其余弹窗接入+真机三路径）；B13 余项；B14 真机核对项；B11 余项。
