@@ -1,5 +1,6 @@
 <script lang="ts">
     /** 联系人视图：名册缓存 + 客户端过滤/分页 + 卡片/表格双形态；详情弹窗由 Workbench 统一承载 */
+    import { tick } from "svelte";
     import { batchUpdateContacts, listContacts, filterContacts, PAGE_SIZE, PRESET_GROUPS, removeContacts } from "../../services/contacts";
     import { buildOrgDisplayByPerson } from "../../services/org";
     import { exportVcfText } from "../../services/vcard";
@@ -192,6 +193,17 @@
     let completing: boolean = $state(false);
     // B09-1：移动端「筛选与整理」底部弹层
     let mobileSheetOpen: boolean = $state(false);
+    /* D-37：移动筛选 sheet 焦点管理——打开时迁入、关闭时恢复到触发按钮 */
+    let mobileSheetEl: HTMLElement | undefined = $state();
+    let mobileSheetReturnFocus: HTMLElement | undefined = $state();
+    function openMobileSheet() {
+        mobileSheetOpen = true;
+        tick().then(() => mobileSheetEl?.focus());
+    }
+    function closeMobileSheet() {
+        mobileSheetOpen = false;
+        tick().then(() => mobileSheetReturnFocus?.focus());
+    }
     let batchOpen: boolean = $state(false);
     let batchBusy: boolean = $state(false);
     let batchError: string = $state("");
@@ -736,25 +748,36 @@
         {:else}
             <button class="b3-button b3-button--text" onclick={() => (adding = true)} aria-label={text("peopleCreate", "新建联系人")}><UserPlus size={16}/>{text("peopleCreate", "新建")}</button>
             <button
+                type="button"
                 class="b3-button b3-button--outline"
                 aria-label={text("peopleMobileTools", "筛选与整理")}
                 aria-expanded={mobileSheetOpen}
-                onclick={() => (mobileSheetOpen = true)}
+                bind:this={mobileSheetReturnFocus}
+                onclick={openMobileSheet}
             ><SlidersHorizontal size={16}/>{text("peopleMobileTools", "筛选与整理")}{isExtraFilterActive(extraFilter) ? " ·" : ""}</button>
         {/if}
     </div>
     {#if isMobile && mobileSheetOpen}
-        <div class="lvct-dialog-mask" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) mobileSheetOpen = false; }}></div>
-        <div class="lvct-sheet" role="dialog" aria-label="筛选与整理">
+        <!-- D-37：移动筛选 sheet 补无障碍（aria-modal + 焦点迁入/恢复 + Esc 关闭） -->
+        <div class="lvct-dialog-mask" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) closeMobileSheet(); }}></div>
+        <div
+            class="lvct-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label={text("peopleMobileTools", "筛选与整理")}
+            tabindex="-1"
+            bind:this={mobileSheetEl}
+            onkeydown={(event) => { if (event.key === "Escape") { event.stopPropagation(); closeMobileSheet(); } }}
+        >
             <div class="lvct-sheet__bar">
                 <b>{text("peopleMobileTools", "筛选与整理")}</b>
-                <button type="button" class="b3-button b3-button--text" onclick={() => (mobileSheetOpen = false)}>{text("dashCollapse", "收起")}</button>
+                <button type="button" class="b3-button b3-button--text" onclick={closeMobileSheet}>{text("dashCollapse", "收起")}</button>
             </div>
             <div class="lvct-sheet__body">
                 {@render viewMenuControl()}
                 {@render filterControls()}
                 {@render actionControls()}
-                <button class="b3-button b3-button--outline" onclick={() => { mobileSheetOpen = false; adding = true; }}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
+                <button type="button" class="b3-button b3-button--outline" onclick={() => { closeMobileSheet(); adding = true; }}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
             </div>
         </div>
     {/if}

@@ -549,6 +549,13 @@ await test("移动端工具栏收纳：常驻搜索/视图切换/新建，其余
     groupSelect.dispatchEvent(new Event("change", { bubbles: true }));
     await tick();
     await until(() => fixture.textContent.includes("共 1 人"), "弹层内分组筛选未生效");
+    // D-37：sheet 无障碍——aria-modal、打开焦点迁入、Esc 关闭并恢复触发按钮焦点
+    const sheet = fixture.querySelector(".lvct-sheet");
+    assert(sheet.getAttribute("aria-modal") === "true", "弹层缺 aria-modal");
+    await until(() => document.activeElement === sheet, "焦点未迁入弹层");
+    sheet.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await until(() => !fixture.querySelector(".lvct-sheet"), "Esc 未关闭弹层");
+    await until(() => document.activeElement === tools, "焦点未恢复到触发按钮");
 });
 
 await test("行动区一键建跟进与处置撤销（C07/C06）", async () => {

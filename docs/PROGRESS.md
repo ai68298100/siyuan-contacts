@@ -2504,3 +2504,22 @@
   24 景断点矩阵重拍有效。
 - **留后续**：G-07 余项（按需展开证据、分桶导航——当前一屏平铺已够用，大桶分页留大规模演进）；
   B13.8 真机投递实证；V-05 真机向余项；V-16 余项（组织管理弹窗景）；B12 主线（作者定优先级）。
+
+## 可访问性 第 100 轮：D-37 移动筛选 sheet 焦点管理（2026-10-01，续跑口令第 101 版驱动）
+
+- **D-37（P1，关联 D-19）**：移动筛选 sheet（`PeopleView.svelte` `lvct-sheet`）补无障碍——
+  sheet 加 `aria-modal="true"` + `tabindex="-1"` + `bind:this={mobileSheetEl}`；
+  打开走 `openMobileSheet`（`tick` 后 `focus()` 迁入 sheet 本体），关闭走 `closeMobileSheet`
+  （`tick` 后焦点恢复到触发按钮）——三条关闭路径统一收口：收起按钮、遮罩点击、
+  sheet 本体 `keydown` Escape（`stopPropagation` 防穿透）。触发按钮补 `type="button"` +
+  `bind:this={mobileSheetReturnFocus}`；sheet 内「新建联系人」也改走 `closeMobileSheet`
+  保持关闭路径单一。`tick` 从 svelte 导入（原文件无 svelte 运行时导入）。
+- **测试锚定**：smoke 移动套件既有 sheet 用例扩展——断言 `aria-modal`、打开后
+  `document.activeElement` 迁入 sheet、Esc 关闭弹层、焦点恢复到触发按钮（4 项）。
+- **验证**：单测 222/222；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；
+  `pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow
+  13/13、spike:init 21/21；56 景基线重拍有效。
+- **留后续**：D-37 余项（焦点循环 Tab 圈定——控件全为原生可聚焦元素且遮罩拦点击，
+  键盘穿出风险低，留真机读屏验证后再定）；D-31 余项（对比度实测）；V-16 余项
+  （组织管理弹窗景）；H-05 余项（多选→H-07）；G-07 余项（证据展开）；B13.8 真机
+  投递实证（作者）；B12 主线（作者定优先级）。
