@@ -22,9 +22,21 @@ export class NativeGraphCenterMissingError extends Error {
 export interface NativePersonGraphOptions {
     /** 中心文档 ID；缺省用本人档案（B14.4 人物入口默认一度） */
     centerDocId?: string;
+    /** B14.8 按组织收窄：在登记集合内再取交集（中心节点始终保留） */
+    restrictDocIds?: ReadonlySet<string>;
 }
 
-/** 以指定（或本人）文档为中心的局部图，登记集合过滤 */
+/** 收窄交集：保留中心（如有），其余节点必须同时命中收窄集合 */
+function applyRestrict(allowedDocIds: Set<string>, restrictDocIds?: ReadonlySet<string>, keepId?: string): Set<string> {
+    if (!restrictDocIds) return allowedDocIds;
+    const restricted = new Set<string>();
+    for (const id of allowedDocIds) {
+        if ((keepId !== undefined && id === keepId) || restrictDocIds.has(id)) restricted.add(id);
+    }
+    return restricted;
+}
+
+/** 以指定（或本人）文档为中心的局部图，登记集合过滤（可按组织收窄） */
 export async function loadNativePersonGraph(
     settings: ContactsSettings,
     identity: SelfIdentity | null,
@@ -33,7 +45,11 @@ export async function loadNativePersonGraph(
     if (!identity || identity.selfDocId === "") throw new NativeGraphCenterMissingError();
     const centerDocId = options?.centerDocId ?? identity.selfDocId;
     const roster = await listContacts(settings);
-    const allowedDocIds = new Set<string>([identity.selfDocId, ...roster.map((person) => person.docId)]);
+    const allowedDocIds = applyRestrict(
+        new Set<string>([identity.selfDocId, ...roster.map((person) => person.docId)]),
+        options?.restrictDocIds,
+        centerDocId,
+    );
     const docGroups = new Map(roster.map((person) => [person.docId, person.group] as const));
     const native = await fetchLocalGraph(centerDocId);
     return mapNativeGraph(native, { allowedDocIds, docGroups });
@@ -47,11 +63,14 @@ export async function loadNativePersonGraph(
 export async function loadNativeRegisteredGraph(
     settings: ContactsSettings,
     identity: SelfIdentity | null,
+    restrictDocIds?: ReadonlySet<string>,
 ): Promise<PersonGraph> {
     const roster = await listContacts(settings);
-    const allowedDocIds = new Set<string>(roster.map((person) => person.docId));
+    const allowedDocIds = applyRestrict(new Set<string>(roster.map((person) => person.docId)), restrictDocIds);
     const docGroups = new Map(roster.map((person) => [person.docId, person.group] as const));
-    if (identity && identity.selfDocId !== "") allowedDocIds.add(identity.selfDocId);
+    if (identity && identity.selfDocId !== "" && (!restrictDocIds || restrictDocIds.has(identity.selfDocId))) {
+        allowedDocIds.add(identity.selfDocId);
+    }
     const native = await fetchGlobalGraph();
     return mapNativeGraph(native, { allowedDocIds, docGroups });
 }

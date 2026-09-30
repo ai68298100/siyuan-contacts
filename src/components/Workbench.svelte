@@ -234,6 +234,7 @@
                     }}
                     onOpenDetail={openDetail}
                     onOpenPeople={() => selectView("people")}
+                    onOpenOrgs={() => selectView("orgs")}
                 />
             {:else if current === "orgs"}
                 <OrgsView

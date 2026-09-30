@@ -29,6 +29,7 @@
         onPreferencesChange,
         onOpenDetail,
         onOpenPeople,
+        onOpenOrgs,
     }: {
         settings: ContactsSettings;
         revision?: number;
@@ -39,6 +40,8 @@
         onPreferencesChange: (next: ViewPreferences) => Promise<ViewPreferences>;
         onOpenDetail: (person: ContactSummary) => void;
         onOpenPeople: () => void;
+        /** B14 组织入口（可选）：点击组织节点跳转组织视图；未接线时组织节点点击无动作 */
+        onOpenOrgs?: () => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -64,6 +67,8 @@
     /* B14.6 组织增强：组织节点+成员边只叠加渲染，关系查询仍只按 related 边 */
     let orgOverlay: GraphOrgAugmentation | null = $state(null);
     let showOrgs = $state(true);
+    /* B14.8 按组织收窄（会话态：组织可能被归档/改名，不持久化） */
+    let orgNarrowId = $state("");
     let searchText: string = $state("");
     let groupFilter: string = $state("");
     let isolatedOnly = $state(false);
@@ -73,6 +78,8 @@
     let compareId = $state("");
     let queryMode: "common" | "path" = $state("common");
     let hoveredPerson: ContactSummary | null = $state(null);
+    /* B14：组织节点 hover 卡（与人物 hover 互斥） */
+    let hoveredOrg: { id: string; label: string; degree: number } | null = $state(null);
     let hoverInsights: PersonInsights | null = $state(null);
     let hoverInsightsLoading = $state(false);
     let hoverInsightsError = $state(false);
@@ -103,15 +110,26 @@
     }));
     const fullGraph = $derived(buildGraph(people));
     const isolatedIds = $derived(new Set(fullGraph.nodes.filter((node) => node.degree === 0).map((node) => node.id)));
+    /* B14.8 按组织收窄：选中组织后画布人物=该组织成员（成员边来自组织覆盖层） */
+    const narrowedDocIds = $derived.by(() => {
+        if (orgNarrowId === "" || !orgOverlay) return null;
+        const ids = new Set<string>();
+        for (const edge of orgOverlay.edges) {
+            if (edge.source === orgNarrowId) ids.add(edge.target);
+        }
+        return ids;
+    });
     const filteredPeople = $derived.by(() => {
         const needle = searchText.trim().toLowerCase();
+        const restrict = narrowedDocIds;
         return people.filter((person) => {
             const matchesGroup = !groupFilter || person.group === groupFilter;
             const matchesSearch = !needle || [person.name, person.phone, person.wechat, person.email, ...person.tags]
                 .join(" ")
                 .toLowerCase()
                 .includes(needle);
-            return matchesGroup && matchesSearch && (!isolatedOnly || isolatedIds.has(person.docId));
+            return matchesGroup && matchesSearch && (!isolatedOnly || isolatedIds.has(person.docId))
+                && (!restrict || restrict.has(person.docId));
         });
     });
     const searchNeedle = $derived(searchText.trim().toLowerCase());
@@ -311,16 +329,21 @@
         try {
             const identity = facade ? await facade.loadSelfIdentity() : null;
             nativeSelfDocId = identity?.selfDocId ?? "";
+            /* B14.8 按组织收窄：白名单与该组织成员取交集（中心保留） */
+            const restrict = narrowedDocIds;
             let graph: PersonGraph;
             if (nativeScope === "global") {
-                graph = await loadNativeRegisteredGraph(settings, identity);
+                graph = await loadNativeRegisteredGraph(settings, identity, restrict ?? undefined);
             } else {
                 /* person 模式中心失效（人物已删）回退本人中心 */
                 let centerDocId: string | undefined;
                 if (nativeScope === "person" && nativeCenterDocId !== "" && people.some((person) => person.docId === nativeCenterDocId)) {
                     centerDocId = nativeCenterDocId;
                 }
-                graph = await loadNativePersonGraph(settings, identity, centerDocId ? { centerDocId } : undefined);
+                graph = await loadNativePersonGraph(settings, identity, {
+                    centerDocId,
+                    restrictDocIds: restrict ?? undefined,
+                });
             }
             if (version === nativeVersion) nativeGraph = graph;
         } catch (error) {
@@ -406,6 +429,7 @@
         hoverTimer = undefined;
         clearHoverTimer = undefined;
         hoveredPerson = null;
+        hoveredOrg = null;
         hoverInsights = null;
         hoverInsightsLoading = false;
         hoverInsightsError = false;
@@ -418,13 +442,34 @@
         if (clearHoverTimer) clearTimeout(clearHoverTimer);
         clearHoverTimer = setTimeout(() => {
             hoveredPerson = null;
+            hoveredOrg = null;
             clearHoverTimer = undefined;
         }, 220);
     }
 
     function scheduleHover(event: cytoscape.EventObject) {
-        const person = people.find((item) => item.docId === event.target.id());
-        if (!person) return;
+        const docId = event.target.id();
+        const person = people.find((item) => item.docId === docId);
+        if (!person) {
+            /* B14：组织节点 hover 卡（名称+成员连接数+跳转入口） */
+            const orgNode = orgOverlay?.nodes.find((node) => node.id === docId);
+            if (!orgNode) return;
+            if (hoverTimer) clearTimeout(hoverTimer);
+            if (clearHoverTimer) clearTimeout(clearHoverTimer);
+            const position = event.renderedPosition ?? event.target.renderedPosition();
+            hoverTimer = setTimeout(() => {
+                const width = container?.clientWidth ?? 420;
+                const height = container?.clientHeight ?? 360;
+                hoverPosition = {
+                    x: Math.min(Math.max(8, position.x + 16), Math.max(8, width - 228)),
+                    y: Math.min(Math.max(8, position.y + 16), Math.max(8, height - 150)),
+                };
+                hoveredPerson = null;
+                hoveredOrg = { id: orgNode.id, label: orgNode.label, degree: orgNode.degree };
+                hoverTimer = undefined;
+            }, 300);
+            return;
+        }
         if (hoverTimer) clearTimeout(hoverTimer);
         if (clearHoverTimer) clearTimeout(clearHoverTimer);
         const position = event.renderedPosition ?? event.target.renderedPosition();
@@ -486,9 +531,10 @@
                 ...capped.graph.edges.map((edge) => ({
                     data: { source: edge.source, target: edge.target, kind: edge.kind ?? "related" },
                 })),
-                /* B14.6 组织增强层（仅关系图模式）：成员边只连当前画布内人物，裁剪后不造悬空端点 */
+                /* B14.6 组织增强层（仅关系图模式）：成员边只连当前画布内人物，裁剪后不造悬空端点；
+                   B14.8 收窄时只画所选组织节点 */
                 ...(graphMode === "relations" && showOrgs && orgOverlay
-                    ? orgOverlay.nodes.map((node) => ({
+                    ? orgOverlay.nodes.filter((node) => orgNarrowId === "" || node.id === orgNarrowId).map((node) => ({
                         data: {
                             id: node.id,
                             label: node.label,
@@ -569,6 +615,13 @@
             if (person) {
                 clearHover();
                 onOpenDetail(person);
+                return;
+            }
+            /* B14 组织入口：组织节点点击跳组织视图 */
+            const orgNode = orgOverlay?.nodes.find((node) => node.id === docId);
+            if (orgNode && onOpenOrgs) {
+                clearHover();
+                onOpenOrgs();
             }
         });
         instance.on("mouseover", "node", scheduleHover);
@@ -614,6 +667,15 @@
         </div>
         <input class="b3-text-field fn__flex-1" type="search" placeholder={text("graphSearchPlaceholder", "搜索节点…")} aria-label={text("graphSearchNodes", "搜索关系图谱节点")} bind:value={searchText} />
         {#if searchNeedle}<span class="ft__smaller ft__on-surface">{graphMode === "native" ? text("graphNativeHitCount", "命中 {n} 个节点", { n: nativeHitCount }) : text("graphHitCount", "命中 {n} 人", { n: filteredPeople.length })}</span>{/if}
+        {#if orgOverlay && orgOverlay.nodes.length > 0}
+            <!-- B14.8 按组织收窄：两模式共享（画布人物/登记白名单收窄到所选组织成员） -->
+            <select class="b3-select" bind:value={orgNarrowId} aria-label={text("graphOrgNarrowLabel", "按组织收窄")}>
+                <option value="">{text("graphOrgNarrowAll", "全部组织")}</option>
+                {#each orgOverlay.nodes as org (org.id)}
+                    <option value={org.id}>{org.label}</option>
+                {/each}
+            </select>
+        {/if}
         {#if graphMode === "native"}
             <select class="b3-select" value={nativeScope} aria-label={text("graphNativeScopeLabel", "引用图范围")}
                 onchange={(event) => void switchNativeScope(event.currentTarget.value)}>
@@ -729,6 +791,9 @@
             {:else}
                 {text("graphNativeScopeSelfDesc", "以「我自己」为中心的一度文档引用（含回链）")}
             {/if}
+            {#if orgNarrowId !== "" && narrowedDocIds}
+                {text("graphNativeNarrowed", "（仅 {n} 位所选组织成员）", { n: narrowedDocIds.size })}
+            {/if}
             {#if nativeRangeStats}
                 {" "}{text("graphNativeRangeStats", "纳入 {in} 个登记文档 · 图外 {out} 位联系人暂无引用", { in: nativeRangeStats.inside, out: nativeRangeStats.outside })}
             {/if}
@@ -784,7 +849,26 @@
                 <button class="lvct-graph__fab-btn" title={text("graphRelayout", "重新布局")} aria-label={text("graphRelayout", "重新布局")} onclick={relayout}><Network size={15} /></button>
                 <button class="lvct-graph__fab-btn" title={text("graphRefresh", "刷新")} aria-label={text("graphRefresh", "刷新")} onclick={refresh}><RefreshCw size={15} /></button>
             </div>
-            {#if hoveredPerson}
+            {#if hoveredOrg}
+                <div
+                    class="lvct-graph-view__hover-card"
+                    role="dialog"
+                    tabindex="-1"
+                    style={`left:${hoverPosition.x}px;top:${hoverPosition.y}px`}
+                    onmouseenter={() => clearHoverTimer && clearTimeout(clearHoverTimer)}
+                    onmouseleave={scheduleClearHover}
+                >
+                    <div class="lvct-graph-view__hover-name">
+                        <b>{hoveredOrg.label}</b>
+                        <span class="lvct-chip lvct-chip--group">{text("graphOrgChip", "组织")}</span>
+                    </div>
+                    <div class="ft__smaller ft__on-surface">{text("graphOrgHoverMembers", "图内成员连接：{n}", { n: hoveredOrg.degree })}</div>
+                    {#if onOpenOrgs}
+                        <button class="b3-button b3-button--text" onclick={() => { const open = onOpenOrgs; clearHover(); open(); }}>
+                            {text("graphOrgHoverOpen", "打开组织视图")}</button>
+                    {/if}
+                </div>
+            {:else if hoveredPerson}
                 <div
                     class="lvct-graph-view__hover-card"
                     role="dialog"

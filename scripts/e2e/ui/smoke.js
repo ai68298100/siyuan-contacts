@@ -1629,6 +1629,87 @@ await test("新工作台可按入口指定的初始视图打开", async () => {
     assert(fixture.querySelector(".lvct-settings"), "初始设置页内容未挂载");
 });
 
+await test("B14.8 按组织收窄：关系图人物与组织节点收窄、文档引用图白名单收窄与范围说明", async () => {
+    const selfDocId = "20260930000000-self003";
+    const memberA = "20260930000000-memba001";
+    const memberB = "20260930000000-membb001";
+    const outsider = "20260930000000-outsi001";
+    const orgDocId = "20260930000000-orgn0001";
+    const nameRows = [
+        { id: selfDocId, name: "我自己" },
+        { id: memberA, name: "组织成员甲" },
+        { id: memberB, name: "组织成员乙" },
+        { id: outsider, name: "圈外人" },
+    ];
+    const localCalls = [];
+    kernel.handler = async (route, body) => {
+        if (route === "/api/av/renderAttributeView") return { view: { columns: renderResult().view.columns, rows: nameRows.map((row) => ({
+            id: row.id, cells: [
+                { value: { type: "block", keyID: "name", block: { id: row.id, content: row.name } } },
+                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+            ],
+        })) } };
+        if (route === "/api/graph/getLocalGraph") {
+            localCalls.push({ id: body.id, restrict: body.conf ? undefined : undefined });
+            return {
+                id: body.id,
+                nodes: [
+                    { id: selfDocId, label: "我自己", type: "NodeDocument", refs: 2, defs: 0 },
+                    { id: memberA, label: "组织成员甲", type: "NodeDocument", refs: 0, defs: 1 },
+                    { id: memberB, label: "组织成员乙", type: "NodeDocument", refs: 0, defs: 1 },
+                    { id: outsider, label: "圈外人", type: "NodeDocument", refs: 0, defs: 0 },
+                ],
+                links: [
+                    { from: selfDocId, to: memberA, ref: true },
+                    { from: selfDocId, to: memberB, ref: true },
+                    { from: selfDocId, to: outsider, ref: true },
+                ],
+            };
+        }
+        throw new Error(`回归测试不允许请求 ${route}`);
+    };
+    let openedOrgs = 0;
+    let currentPrefs = { ...DEFAULT_VIEW_PREFERENCES };
+    mounted = mount(RelationGraph, { target: fixture, props: {
+        settings,
+        preferences: currentPrefs,
+        onPreferencesChange: async (next) => { currentPrefs = next; return next; },
+        facade: { loadSelfIdentity: async () => ({ selfDocId, createdAt: "2026-09-30T00:00:00Z" }), listOrganizations: async () => [
+            { docId: orgDocId, name: "收窄科技", hpath: "/收窄科技", notebookId: settings.notebookId, archived: false, memberships: [
+                { id: "20260930000000-nmem0001", orgDocId, personDocId: memberA, department: "", title: "", joinedOn: "", leftOn: "", status: "active" },
+                { id: "20260930000000-nmem0002", orgDocId, personDocId: memberB, department: "", title: "", joinedOn: "", leftOn: "", status: "active" },
+            ] },
+        ] },
+        onOpenDetail() {},
+        onOpenPeople() {},
+        onOpenOrgs: () => { openedOrgs += 1; },
+    } });
+    const canvas = () => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy;
+    await until(() => (canvas()?.nodes().length ?? 0) > 0, "关系图未挂载");
+    await until(() => canvas().getElementById(orgDocId).nonempty(), "组织节点未挂载");
+    /* 组织节点点击 → 跳组织视图回调 */
+    canvas().getElementById(orgDocId).emit("tap");
+    await tick();
+    assert(openedOrgs === 1, "组织节点点击未触发跳转回调");
+    /* 按组织收窄：画布人物只剩组织成员，组织节点只剩该组织 */
+    const narrowSelect = fixture.querySelector('select[aria-label="按组织收窄"]');
+    assert(narrowSelect, "收窄选择器未出现");
+    narrowSelect.value = orgDocId;
+    narrowSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    await until(() => (canvas()?.nodes().length ?? 0) === 3, "收窄后画布节点数错误（应为组织+2 成员）");
+    assert(canvas().getElementById(outsider).empty(), "圈外人未被收窄过滤");
+    await until(() => canvas().edges().length === 2, "收窄后成员边数错误（组织→甲/乙）");
+    assert(canvas().edges().every((edge) => edge.data("kind") === "member"), "收窄后画布应只剩成员边");
+    /* 文档引用模式收窄：范围说明标注组织成员数 */
+    button("文档引用").click();
+    await until(() => localCalls.length >= 1, "局部图请求未发出");
+    await until(() => fixture.textContent.includes("仅 2 位所选组织成员"), "收窄范围说明缺失");
+    const nativeCanvasLive = () => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy;
+    await until(() => (nativeCanvasLive()?.nodes().length ?? 0) === 3, "引用图收窄节点数错误（本人+2 成员）");
+    assert(nativeCanvasLive().getElementById(outsider).empty(), "引用图圈外人未被收窄过滤");
+});
+
 await test("B13.5a 组织视图：侧栏入口、卡片渲染（活跃/归档/成员数）、管理入口与初始视图直开", async () => {
     let managerOpened = 0;
     const facade = {

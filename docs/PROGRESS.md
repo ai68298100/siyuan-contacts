@@ -2002,3 +2002,23 @@
   S11~S13/影响预览/规模留真机与后续）。
 - **留后续**：组织入口进图谱（组织节点点击跳组织视图/按组织收窄，B14 余项）、S11 跨窗口
   外部编辑刷新、S12/S13 真机核验、B13.5b 查询规模、B13.6 共同背景。
+
+## P1 业务主线 第 76 轮：B14 组织入口进图谱——组织节点跳转与按组织收窄（2026-09-30，续跑口令第 78 版驱动）
+
+- **组织节点入口（B14 × B13.5a 衔接）**：RelationGraph 新可选 prop `onOpenOrgs`（Workbench 接
+  `selectView("orgs")`）——关系图组织节点点击跳转组织视图；组织节点 hover 卡（组织名 + 组织
+  chip + 图内成员连接数 + 「打开组织视图」按钮），与人物 hover 卡互斥（hoveredOrg 状态随
+  clearHover/scheduleClearHover 清理）。
+- **按组织收窄（B14.8）**：工具栏收窄 select（两模式共享，orgOverlay 有组织时显示；
+  会话态不持久化——组织可能被归档/改名）：
+  - relations 模式：filteredPeople 收窄到所选组织成员（成员边来自组织覆盖层），
+    组织增强层只画所选组织节点；
+  - native 模式：`loadNativePersonGraph`/`loadNativeRegisteredGraph` 增 `restrictDocIds`
+    （登记集合取交集，**中心节点始终保留**；global 模式本人仅在其命中收窄集时保留）；
+    范围说明行追加「（仅 N 位所选组织成员）」（B14.9 状态如实）。
+- **验证**：单测 213/213；三套 UI 桌面 102 / 移动 103 / 宿主 102 全绿（新增收窄用例：
+  组织节点点击回调、relations 收窄后画布=组织+2 成员且只剩 member 边、native 收窄范围说明
+  与白名单过滤）；collect-i18n 缺失 0（zh/en 各 7 键）；`pnpm run build` + `check:release`
+  PASS；真内核 contacts-flow 10/10、spike:init 21/21；52 景基线重拍 + 断点扫描有效。
+- **留后续**：原生图面板真机核对（前端域）、siyuan:// 链接成边核对（B14.2）、B14.10 宿主验收、
+  B13.5b 查询规模、B13.6 共同背景、S11 跨窗口刷新。
