@@ -3377,7 +3377,8 @@
     }
     .lvct-detail__header {
         display: grid;
-        grid-template-columns: 38px minmax(0, 1fr);
+        /* V-04：首列 auto 适配头像令牌（--lvct-avatar-lg，56px）——曾固定 38px 使头像压住姓名 */
+        grid-template-columns: auto minmax(0, 1fr);
         align-items: center;
     }
     .lvct-detail__header-actions {

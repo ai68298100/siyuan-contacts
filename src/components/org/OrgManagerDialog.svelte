@@ -17,6 +17,7 @@
         i18n,
         initialOrgDocId = "",
         onOpenPerson,
+        hostCloseChannel,
         onClose,
     }: {
         facade: ContactsPluginFacade;
@@ -25,6 +26,8 @@
         initialOrgDocId?: string;
         /** B13.6a：成员「查看详情」跨弹窗导航（缺省隐藏入口；已解绑成员无入口） */
         onOpenPerson?: (person: ContactSummary) => void;
+        /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
+        hostCloseChannel?: { request?: (close: () => void) => void };
         onClose: () => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
@@ -54,10 +57,14 @@
     let memberLoadVersion = 0;
 
     /* H-29：关闭守卫——改名/成员编辑中的草稿需经确认放弃；写入中直接阻断关闭。
-       宿主 X/Esc/遮罩直销毁是 svelteDialog 结构性缺口（所有直挂弹窗共有，独立项跟进） */
+       D-40：宿主 X/Esc/遮罩经同一守卫路由（通道由 libs/dialog 注入），不再直销毁。 */
     const guardedClose = useCloseGuard({
         busy: () => busy,
         dirty: () => renaming || editingMemberId !== "",
+    });
+    $effect(() => {
+        /* 返回 Promise 供拦截层做重入门（三选一期间不再重复拦截） */
+        if (hostCloseChannel) hostCloseChannel.request = (close) => guardedClose(close);
     });
 
     const currentOrg = $derived(orgs.find((org) => org.docId === currentOrgDocId) ?? null);

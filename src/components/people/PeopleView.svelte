@@ -645,12 +645,17 @@
     <div class="lvct-people__toolbar fn__flex">
         {#if !isMobile}
             {@render viewMenuControl()}
-            <input
-                class="b3-text-field fn__flex-1"
-                type="text"
-                placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
-                bind:value={searchText}
-            />
+        {/if}
+        <!-- V-01：搜索输入全断点常驻（移动端曾无搜索入口，只能靠标签/筛选找人）；
+             移动端经工具栏换行占满整行（index.scss 媒体查询 flex-basis:100%） -->
+        <input
+            class="b3-text-field fn__flex-1"
+            type="text"
+            placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
+            aria-label={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
+            bind:value={searchText}
+        />
+        {#if !isMobile}
             {@render filterControls()}
         {/if}
         <span class="lvct-people__viewtoggle">

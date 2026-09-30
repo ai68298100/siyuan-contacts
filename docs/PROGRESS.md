@@ -2179,3 +2179,31 @@
   spike:init 21/21；52 景基线重拍 + 断点扫描有效（settings-general 景目检：本人档案行已显创建入口）。
 - **留后续**：svelteDialog 宿主关闭通道守卫（结构性，独立轮）；V-01~V-04 移动布局缺陷批；K-01/K-02
   smoke fixture 契约门禁；B13.7/B13.8/B13.9、B13.5b 分页（H-04/H-06/G-08）；B14 真机核对项；B11 余项。
+
+## 缺陷修复批 第 84 轮：D-40 宿主关闭通道守卫 + V-01/V-04 移动布局（2026-10-01，续跑口令第 85 版驱动）
+
+- **D-40（P1 结构）svelteDialog 宿主关闭通道守卫**：宿主 Dialog 的 X/Esc/遮罩曾直接 destroy 组件、
+  绕过 close-guard（V-19/H-29 修复了组件内按钮路径，宿主路径仍漏）。
+  - `libs/dialog.ts`：svelteDialog 向组件注入 `hostCloseChannel`；组件把自身守卫挂到
+    `channel.request` 后，本层 capture 拦截宿主关闭动作（遮罩/关闭钮=元素级 capture 先于目标冒泡；
+    Esc=window capture 先于宿主处理器）并路由到同一守卫——干净态直接关、脏草稿走三选一、busy 静默阻断。
+    重入门按「守卫浮层在场」判定（无时序敏感 pending 标志——曾用 Promise finally 复位，
+    微任务时序导致二次 Esc 穿透，已废弃）；守卫浮层打开期间由其自身 Esc 逻辑接管。
+    组件未挂接 request 时拦截器空转（其余直挂弹窗保持宿主原行为，可逐个接入）。
+    卸载时移除监听（destroyCallback 链）。
+  - `CaptureDialog`/`OrgManagerDialog` 挂接通道（本轮两处；其余直挂弹窗随各自轮次接入）。
+  - `siyuan-mock.js` Dialog 对齐真实宿主 DOM（`.b3-dialog__scrim`/`.b3-dialog__close`）并模拟宿主
+    「遮罩/关闭钮/Esc 直接 destroy」原行为，使拦截可端到端断言；**真实宿主三路径核对 Host pending**。
+- **V-01（P0）移动端联系人页常驻搜索**：搜索输入移出 `!isMobile` 分支全断点渲染（B09-1 的 CSS
+  早已预留整行 flex-basis，模板却从未在移动渲染）；补 aria-label；390px 下搜索占满整行、工具栏
+  换行不溢出。
+- **V-04（P0）移动端 Peek 头像压名**：`.lvct-detail__header` 移动网格首列由固定 `38px` 改 `auto`
+  （适配 `--lvct-avatar-lg`=56px 令牌）——任何头像尺寸/字体缩放下头像不再遮挡姓名与生日行。
+- **验证**：单测 218/218；三套 UI 桌面 **110** / 移动 **113** / 宿主 **110** 全绿（新增 3 用例：
+  D-40 遮罩/关闭钮/Esc 三路径+无草稿直关、V-01 移动搜索可见/整行/可过滤、V-04 头像 56px 与姓名
+  几何不重叠）；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 10/10、spike:init
+  21/21；52 景基线重拍（people-mobile/peek-mobile 景目检：搜索框整行、头像与姓名并排）+ 断点扫描
+  有效（偶发失败重跑即过）。
+- **留后续**：D-40 真实宿主三路径核对（Host pending）+ 其余直挂弹窗（AddPerson/PersonEdit/VCard/
+  QuickFill）逐个接入；V-02/V-03（组织弹窗挤压、底部导航五入口溢出）与 V-05+ 布局矩阵；
+  K-01/K-02 smoke fixture 契约门禁；B13 余项；B14 真机核对项；B11 余项。

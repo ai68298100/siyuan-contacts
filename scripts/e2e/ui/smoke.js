@@ -1973,6 +1973,65 @@ if (window.innerWidth <= 640) {
         assert(panel.getBoundingClientRect().width >= window.innerWidth - 20, `移动端 Peek 没有占满视口：${getComputedStyle(panel).width} / ${window.innerWidth}px`);
         assert(Number.parseFloat(getComputedStyle(panel).paddingBottom) > 0, "移动端 Peek 没有底部内距");
     });
+
+    await test("V-01 移动端联系人页常驻搜索输入：可见、占整行、可过滤", async () => {
+        const rosterRows = [
+            { id: "doc-a", name: "搜索甲", group: "朋友", tags: ["球友"] },
+            { id: "doc-b", name: "搜索乙", group: "同事", tags: [] },
+        ];
+        const rowOf = (row) => ({ id: `item-${row.id}`, cells: [
+            { value: { type: "block", keyID: "name", block: { id: row.id, content: row.name } } },
+            { value: { keyID: "group", mSelect: [{ content: row.group }] } },
+            { value: { keyID: "tags", mSelect: row.tags.map((tag) => ({ content: tag })) } },
+        ] });
+        kernel.handler = async (route) => {
+            if (route === "/api/av/renderAttributeView") return { view: { columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })), rows: rosterRows.map(rowOf) } };
+            throw new Error(`回归测试不允许请求 ${route}`);
+        };
+        mounted = mount(PeopleView, { target: fixture, props: {
+            settings, preferences: DEFAULT_VIEW_PREFERENCES,
+            loadRecentInteractions: async () => ({}),
+            revision: 0, initialSort: "name", isMobile: true,
+            onOpenDetail() {}, onOpenPersonDoc() {},
+            onPreferencesChange: async (next) => next,
+        } });
+        await until(() => fixture.querySelector(".lvct-person-card"), "名册未渲染");
+        const search = fixture.querySelector('.lvct-people__toolbar input[type="text"]');
+        assert(search, "移动端无搜索输入（V-01）");
+        const box = search.getBoundingClientRect();
+        assert(box.width > 0 && box.right <= window.innerWidth + 1, `搜索输入溢出视口：right=${box.right}`);
+        input(search, "搜索甲");
+        await until(() => fixture.textContent.includes("共 1 人"), "移动搜索未过滤名册");
+    });
+
+    await test("V-04 移动端 Peek 头部：头像不再压住姓名（网格首列适配头像令牌）", async () => {
+        mounted = mount(Workbench, { target: fixture, props: {
+            settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: true,
+            onPreferencesUpdated() {}, onOpenPersonDoc() {},
+            facade: {
+                settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+                loadDashboard: async () => ({ people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+                    stale: [{ person }], neverContacted: 1, neverContactedItemIds: [person.itemId] }),
+                loadPersonInsights: async () => emptyInsights(),
+                loadRecentInteractions: async () => ({}),
+                recordInteraction: async () => {},
+            },
+        } });
+        await until(() => fixture.querySelector(".lvct-workbench__sidebar"), "移动工作台未加载");
+        const peopleNav = [...fixture.querySelectorAll(".lvct-workbench__nav-item")].find((node) => node.textContent.includes("联系人"));
+        assert(peopleNav, "未找到移动端联系人导航");
+        peopleNav.click();
+        await until(() => fixture.querySelector(".lvct-person-card"), "移动名册未渲染");
+        fixture.querySelector(".lvct-person-card").click();
+        await until(() => fixture.querySelector(".lvct-dialog-panel--peek"), "移动端详情 Peek 未打开");
+        const avatar = fixture.querySelector(".lvct-detail__avatar");
+        const nameEl = fixture.querySelector(".lvct-detail__id h3");
+        assert(avatar && nameEl, "Peek 头部未渲染");
+        const a = avatar.getBoundingClientRect();
+        const n = nameEl.getBoundingClientRect();
+        assert(a.width === 56, `头像尺寸应等于令牌 56px：${a.width}`);
+        assert(n.left >= a.right - 1, `头像压住姓名（V-04）：avatar.right=${a.right} name.left=${n.left}`);
+    });
 }
 
 await test("图谱邻接、共同联系人与最短路径不重建画布，筛选清理失效选择", async () => {
@@ -3823,6 +3882,70 @@ await test("V-19 捕获草稿关闭守卫：取消不再静默丢草稿，放弃
         await until(() => document.querySelector(".lvct-closeguard"), "二次关闭未触发守卫");
         [...document.querySelectorAll(".lvct-closeguard button")].find((node) => node.dataset.choice === "discard").click();
         await until(() => !dialog.dialog.element.isConnected, "放弃并离开未关闭弹窗");
+    } finally {
+        if (dialog.dialog.element.isConnected) dialog.close();
+        document.querySelector(".lvct-closeguard")?.remove();
+    }
+});
+
+await test("D-40 宿主关闭通道：遮罩/关闭钮/Esc 经守卫路由，不再直销毁；无草稿不拦", async () => {
+    const openWith = () => svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
+        docId: settings.hostDocId,
+        facade: {
+            viewPreferences: DEFAULT_VIEW_PREFERENCES,
+            previewCapture: async () => ({ docName: "测试笔记", linked: [person] }),
+            captureDoc: async () => ({ createdNames: [], createdDocIds: [], interactions: 1, attendeeBlockWritten: true }),
+        },
+    } });
+    const guardButton = (choice) => [...document.querySelectorAll(".lvct-closeguard button")]
+        .find((node) => node.dataset.choice === choice);
+    /* 遮罩路径：草稿中点遮罩 → 守卫出现而非直接销毁（mock 宿主行为=遮罩直接 destroy） */
+    let dialog = openWith();
+    try {
+        await until(() => dialog.dialog.element.textContent.includes("下一步：确认记录"), "捕获未加载");
+        const nameInput = dialog.dialog.element.querySelector('input[placeholder="王五 赵六"]');
+        input(nameInput, "王五");
+        await tick();
+        dialog.dialog.element.querySelector(".b3-dialog__scrim")
+            .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await until(() => document.querySelector(".lvct-closeguard"), "遮罩点击未路由到守卫（D-40）");
+        assert(dialog.dialog.element.isConnected, "遮罩点击直接销毁了弹窗");
+        guardButton("discard").click();
+        await until(() => !dialog.dialog.element.isConnected, "守卫放弃后未关闭");
+    } finally {
+        if (dialog.dialog.element.isConnected) dialog.close();
+        document.querySelector(".lvct-closeguard")?.remove();
+    }
+    /* 关闭钮 + Esc 路径：守卫取消保留草稿，Esc 再次进入守卫后放弃 */
+    dialog = openWith();
+    try {
+        await until(() => dialog.dialog.element.textContent.includes("下一步：确认记录"), "捕获未加载(2)");
+        const nameInput = dialog.dialog.element.querySelector('input[placeholder="王五 赵六"]');
+        input(nameInput, "王五");
+        await tick();
+        dialog.dialog.element.querySelector(".b3-dialog__close")
+            .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await until(() => document.querySelector(".lvct-closeguard"), "关闭钮点击未路由到守卫");
+        guardButton("cancel").click();
+        await tick();
+        assert(dialog.dialog.element.isConnected, "守卫取消后弹窗不应关闭");
+        assert(nameInput.value === "王五", "宿主路径守卫取消丢了草稿");
+        nameInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        await until(() => document.querySelector(".lvct-closeguard"), "Esc 未路由到守卫");
+        guardButton("discard").click();
+        await until(() => !dialog.dialog.element.isConnected, "Esc 守卫放弃后未关闭");
+    } finally {
+        if (dialog.dialog.element.isConnected) dialog.close();
+        document.querySelector(".lvct-closeguard")?.remove();
+    }
+    /* 无草稿：Esc 直接关闭（拦截只路由守卫，不吞宿主关闭） */
+    dialog = openWith();
+    try {
+        await until(() => dialog.dialog.element.textContent.includes("下一步：确认记录"), "捕获未加载(3)");
+        dialog.dialog.element.querySelector('input[placeholder="王五 赵六"]')
+            .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        await until(() => !dialog.dialog.element.isConnected, "无草稿 Esc 未直接关闭");
+        assert(!document.querySelector(".lvct-closeguard"), "无草稿不应弹守卫");
     } finally {
         if (dialog.dialog.element.isConnected) dialog.close();
         document.querySelector(".lvct-closeguard")?.remove();

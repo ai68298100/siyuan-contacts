@@ -12,11 +12,14 @@
         facade,
         i18n,
         docId,
+        hostCloseChannel,
         onClose,
     }: {
         facade: ContactsPluginFacade;
         i18n?: Readonly<Record<string, string>>;
         docId: string;
+        /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
+        hostCloseChannel?: { request?: (close: () => void) => void };
         onClose: () => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
@@ -74,6 +77,11 @@
     function closeIfIdle(): void {
         void guardedClose(onClose);
     }
+    /* D-40：宿主 X/Esc/遮罩经同一守卫路由（通道由 libs/dialog 注入）；
+       返回 Promise 供拦截层做重入门（三选一期间不再重复拦截） */
+    $effect(() => {
+        if (hostCloseChannel) hostCloseChannel.request = (close) => guardedClose(close);
+    });
 
     const checkedIds = $derived(Object.entries(checked).filter(([, on]) => on).map(([id]) => id));
     const hasTarget = $derived(checkedIds.length > 0 || newNamesText.trim().length > 0);
