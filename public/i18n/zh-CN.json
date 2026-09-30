@@ -537,6 +537,8 @@
   "selfSectionTitle": "本人档案",
   "selfSectionDesc": "「我自己」的身份标记，统计与提醒默认排除本人",
   "selfCreate": "创建本人档案「我自己」",
+  "selfLoadFailed": "本人档案读取失败",
+  "selfRetry": "重试",
   "selfCreated": "已创建本人档案「我自己」并标记身份",
   "selfCreateFailed": "本人档案建立失败，请稍后重试",
   "selfDesignateLabel": "把本人身份改绑到其他已有联系人（保留原资料）",

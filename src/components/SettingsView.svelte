@@ -54,9 +54,12 @@
     let activeSection: SectionId = $state("general");
     let health: SettingsHealth | null = $state(null);
 
-    /* B11.3/B11.5：本人档案状态与显式改绑入口（通用分区） */
+    /* B11.3/B11.5：本人档案状态与显式改绑入口（通用分区）。
+       D-15：加载必须有终态（loading→ready/failed），失败显式呈现可重试——
+       identityLoading 永真曾把状态/创建入口永远遮在「…」之后 */
     let selfIdentity: import("../domain/self-identity").SelfIdentity | null = $state(null);
     let identityLoading = $state(true);
+    let identityError = $state("");
     let selfDesignateTarget = $state("");
     let selfBusy = $state(false);
     let selfMessage = $state("");
@@ -72,14 +75,21 @@
     );
 
     async function refreshSelfSection() {
-        if (typeof facade.loadSelfIdentity !== "function") return;
+        if (typeof facade.loadSelfIdentity !== "function") {
+            identityLoading = false;
+            return;
+        }
+        identityLoading = true;
+        identityError = "";
         try {
             selfIdentity = await facade.loadSelfIdentity();
             if (typeof facade.listContacts === "function") {
                 selfRoster = await facade.listContacts();
             }
         } catch (error) {
-            selfMessage = error instanceof Error ? error.message : String(error);
+            identityError = error instanceof Error ? error.message : String(error);
+        } finally {
+            identityLoading = false;
         }
     }
     $effect(() => { void refreshSelfSection(); });
@@ -661,6 +671,11 @@
                         </div>
                         {#if identityLoading}
                             <span class="lvct-settings__status">…</span>
+                        {:else if identityError}
+                            <!-- D-15：读取失败显式化（不是「未绑定」），可重试 -->
+                            <span class="lvct-settings__status" role="alert">{text("selfLoadFailed", "本人档案读取失败")}</span>
+                            <button class="b3-button b3-button--text" onclick={() => void refreshSelfSection()}>
+                                {text("selfRetry", "重试")}</button>
                         {:else if selfIdentity}
                             <span class="lvct-settings__status">{selfDisplayName}</span>
                         {:else}

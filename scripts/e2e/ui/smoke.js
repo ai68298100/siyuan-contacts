@@ -1360,6 +1360,31 @@ await test("B11.3/B11.5 指定本人身份：显式改绑成功、未初始化�
     assert(files.get("self-identity.json").selfDocId === "20260927000000-person2", "失败改绑污染了身份");
 });
 
+await test("D-15 本人档案加载状态机：失败显式可重试不伪装未绑定，成功显示身份", async () => {
+    let failLoad = true;
+    let loadCalls = 0;
+    const facade = {
+        settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        loadSelfIdentity: async () => {
+            loadCalls += 1;
+            if (failLoad) throw new Error("身份存储读取失败");
+            return { schemaVersion: 1, selfDocId: "20260927000000-person1", selfItemId: "20260927000000-row0001", createdAt: "2026-09-30" };
+        },
+        listContacts: async () => [person],
+    };
+    mounted = mount(SettingsView, { target: fixture, props: {
+        facade, settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {}, onInteractionsUpdated() {},
+    } });
+    await until(() => fixture.textContent.includes("本人档案读取失败"), "加载失败未显式呈现（D-15 曾永遮「…」）");
+    assert([...fixture.querySelectorAll("button")].some((node) => node.textContent.trim() === "重试"), "失败态缺重试入口");
+    assert(![...fixture.querySelectorAll("button")].some((node) => node.textContent.includes("创建本人档案")), "读取失败不得伪装成未绑定");
+    failLoad = false;
+    button("重试").click();
+    await until(() => fixture.textContent.includes("回归测试甲"), "重试后未显示本人身份");
+    assert(loadCalls >= 2, "重试未重新读取");
+});
+
 await test("B12 组织归属投影：Peek 组织区块按成员记录渲染（组织名/部门/职位/期间）", async () => {
     invalidateRoster();
     const orgMemberships = [
@@ -1877,6 +1902,49 @@ await test("B13.6a 组织弹窗按目标组织定位打开 + 成员查看详情�
     assert(closed, "导航后组织弹窗未关闭");
 });
 
+await test("H-29 组织弹窗切换目标隔离草稿：改名框/已选联系人跨组清空，关闭经守卫", async () => {
+    let closed = false;
+    const facade = {
+        settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        listContacts: async () => [
+            { docId: "20260930000000-per0001", itemId: "row-p1", name: "张三", isSelf: false },
+            { docId: "20260930000000-per0002", itemId: "row-p2", name: "李四", isSelf: false },
+        ],
+        listOrganizations: async () => [
+            { docId: "20260930000000-org0001", name: "甲公司", hpath: "/甲公司", notebookId: settings.notebookId, archived: false, memberships: [] },
+            { docId: "20260930000000-org0002", name: "乙公司", hpath: "/乙公司", notebookId: settings.notebookId, archived: false, memberships: [] },
+        ],
+        listOrganizationMembers: async () => [],
+    };
+    mounted = mount(OrgManagerDialog, { target: fixture, props: {
+        facade, i18n: undefined, onClose: () => { closed = true; },
+    } });
+    await until(() => fixture.textContent.includes("甲公司"), "组织列表未加载");
+    /* 组织 A 进入改名草稿 + 选中要添加的联系人 */
+    button("改名").click();
+    await until(() => fixture.querySelector('input[aria-label="新组织名称"]'), "改名输入框未出现");
+    input(fixture.querySelector('input[aria-label="新组织名称"]'), "甲公司改");
+    const addSelect = () => fixture.querySelector(".lvct-org-manager__add select");
+    addSelect().value = "20260930000000-per0001";
+    addSelect().dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    /* 切到组织 B：A 的草稿态必须被隔离（旧实现 saveRename 按 B 的 orgDocId 落笔=跨组织误写） */
+    [...fixture.querySelectorAll(".lvct-org-manager__org-item")]
+        .find((node) => node.textContent.includes("乙公司")).click();
+    await tick();
+    assert(!fixture.querySelector('input[aria-label="新组织名称"]'), "切组未关闭改名草稿");
+    assert(addSelect().value === "", "切组未清空已选联系人");
+    assert(fixture.querySelector(".lvct-org-manager__detail")?.textContent.includes("乙公司"), "切组后详情未切换");
+    /* 组织 B 再次进入改名后点关闭：守卫出现 → 放弃并离开 */
+    button("改名").click();
+    await until(() => fixture.querySelector('input[aria-label="新组织名称"]'), "B 改名输入框未出现");
+    button("关闭").click();
+    await until(() => document.querySelector(".lvct-closeguard"), "改名草稿中关闭未弹守卫（H-29）");
+    [...document.querySelectorAll(".lvct-closeguard button")].find((node) => node.dataset.choice === "discard").click();
+    await until(() => closed, "放弃并离开未关闭弹窗");
+    assert(!document.querySelector(".lvct-closeguard"), "关闭后守卫弹窗未清理");
+});
+
 if (window.innerWidth <= 640) {
     await test("移动视口显示底部导航，Peek 详情占满屏幕并保留安全区内距", async () => {
         mounted = mount(Workbench, { target: fixture, props: {
@@ -2132,6 +2200,94 @@ await test("图谱文档引用模式：内核局部图按登记集合过滤，�
     assert(localRequests === 1, "切回关系图不应重复请求局部图");
     assert(modeButtons[0]?.getAttribute("aria-pressed") === "true", "切回后关系图按钮未恢复按下态");
     assert(savedGraphMode === "relations", "切回后模式偏好未持久化");
+});
+
+await test("B14.11/B14.14 引用图：原生模式切组织收窄即时重载；指定人物中心不要求本人档案", async () => {
+    const selfDocId = "20260930000000-self001";
+    const contactA = "20260930000000-cont001";
+    const contactB = "20260930000000-cont002";
+    const orgDocId = "20260930000000-org0001";
+    const nameRows = [
+        { id: selfDocId, name: "我自己" },
+        { id: contactA, name: "重载甲" },
+        { id: contactB, name: "重载乙" },
+    ];
+    let localRequests = 0;
+    let lastCenter = "";
+    kernel.handler = async (route, body) => {
+        if (route === "/api/av/renderAttributeView") return { view: { columns: renderResult().view.columns, rows: nameRows.map((row) => ({
+            id: row.id, cells: [
+                { value: { type: "block", keyID: "name", block: { id: row.id, content: row.name } } },
+                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+            ],
+        })) } };
+        if (route === "/api/graph/getLocalGraph") {
+            localRequests += 1;
+            lastCenter = body.id;
+            return {
+                id: body.id,
+                nodes: nameRows.map((row) => ({ id: row.id, label: row.name, type: "NodeDocument", refs: 1, defs: 0 })),
+                links: [
+                    { from: selfDocId, to: contactA, ref: true },
+                    { from: contactA, to: contactB, ref: true },
+                ],
+            };
+        }
+        throw new Error(`回归测试不允许请求 ${route}`);
+    };
+    mounted = mount(RelationGraph, { target: fixture, props: {
+        settings,
+        preferences: { ...DEFAULT_VIEW_PREFERENCES, graphMode: "native", nativeScope: "self" },
+        onPreferencesChange: async (next) => next,
+        facade: {
+            loadSelfIdentity: async () => ({ selfDocId, createdAt: "2026-10-01T00:00:00Z" }),
+            listOrganizations: async () => [
+                { docId: orgDocId, name: "重载科技", hpath: "/重载科技", notebookId: settings.notebookId, archived: false, memberships: [
+                    { id: "20260930000000-nmem0001", orgDocId, personDocId: contactA, department: "", title: "", joinedOn: "", leftOn: "", status: "active" },
+                ] },
+            ],
+        },
+        onOpenDetail() {},
+        onOpenPeople() {},
+    } });
+    const nativeCanvas = () => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy;
+    await until(() => (nativeCanvas()?.nodes().length ?? 0) === 3, "引用图初始节点错误");
+    const narrowSelect = () => fixture.querySelector('select[aria-label="按组织收窄"]');
+    await until(() => narrowSelect(), "收窄选择器未出现");
+    /* B14.11：原生模式下切换组织收窄 → 立即重载（旧响应作废），画布收窄为中心+组织成员 */
+    const beforeNarrow = localRequests;
+    narrowSelect().value = orgDocId;
+    narrowSelect().dispatchEvent(new Event("change", { bubbles: true }));
+    await until(() => localRequests > beforeNarrow, "切换组织收窄未触发重载（B14.11 曾不追踪筛选）");
+    await until(() => (nativeCanvas()?.nodes().length ?? 0) === 2, "收窄后画布未更新（应为中心+组织成员）");
+    assert(nativeCanvas().getElementById(contactB).empty(), "组织外联系人未被收窄过滤");
+    assert(nativeCanvas().getElementById(contactA).nonempty(), "组织成员节点缺失");
+    await until(() => fixture.textContent.includes("仅 1 位所选组织成员"), "收窄范围说明缺失");
+    /* 清空收窄 → 重载恢复全登记范围 */
+    narrowSelect().value = "";
+    narrowSelect().dispatchEvent(new Event("change", { bubbles: true }));
+    await until(() => (nativeCanvas()?.nodes().length ?? 0) === 3, "清空收窄未恢复画布");
+    /* B14.14：指定人物中心 + 本人档案缺失（未建档）→ 仍可加载人物局部图 */
+    await unmount(mounted);
+    mounted = undefined;
+    fixture.replaceChildren();
+    localRequests = 0;
+    lastCenter = "";
+    let identityCalls = 0;
+    mounted = mount(RelationGraph, { target: fixture, props: {
+        settings,
+        preferences: { ...DEFAULT_VIEW_PREFERENCES, graphMode: "native", nativeScope: "person", nativeCenterDocId: contactA },
+        onPreferencesChange: async (next) => next,
+        facade: {
+            loadSelfIdentity: async () => { identityCalls += 1; return null; },
+            listOrganizations: async () => [],
+        },
+        onOpenDetail() {},
+        onOpenPeople() {},
+    } });
+    await until(() => localRequests >= 1 && lastCenter === contactA, "指定人物中心未用于局部图请求（B14.14 曾被本人档案缺失阻断）");
+    await until(() => (nativeCanvas()?.nodes().length ?? 0) === 3, "无本人档案时人物中心图节点错误");
+    assert(identityCalls >= 1, "服务未回读本人身份（缺失应降级不阻断）");
 });
 
 await test("关系图组织增强：组织节点与成员边分源展示，开关隐藏，查询时组织退场（B14.6）", async () => {
@@ -2906,6 +3062,49 @@ await test("联系节奏：覆盖阈值进入久未联系，暂停隐藏，清�
     assert((await loadPersonCadence(plugin, docId)) === null, "清除后仍读到覆盖项");
 });
 
+await test("C-32 本周生日统计按原始事实计算：窗口截断与暂缓不漏报不降数", async () => {
+    invalidateRoster();
+    // 名册：单人生日 5 天后（week 桶，落在未来 7 天内）
+    const pad = (value) => String(value).padStart(2, "0");
+    const future = new Date();
+    future.setDate(future.getDate() + 5);
+    const birthdayMs = new Date(future.getFullYear(), future.getMonth(), future.getDate()).getTime();
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") {
+            return { view: { columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })), rows: [{
+                id: person.itemId,
+                cells: [
+                    { value: { type: "block", keyID: "name", block: { id: person.docId, content: person.name } } },
+                    { value: { keyID: "birthday", type: "date", date: { content: birthdayMs, isNotEmpty: true, isNotTime: true } } },
+                ],
+            }] } };
+        }
+        throw new Error(`C-32 用例不允许请求 ${route}`);
+    };
+    // 提醒暂缓存于对象式插件替身（生日暂缓到远期，覆盖呈现层）
+    const untilFar = (() => { const d = new Date(); d.setDate(d.getDate() + 365);
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; })();
+    const files = new Map([["reminder-dismissals.json", { schemaVersion: 1, dismissals: [] }]]);
+    const plugin = {
+        loadData: async (key) => files.get(key) ?? "",
+        saveData: async (key, value) => { files.set(key, value); },
+    };
+    const options = { staleThresholdDays: 30, birthdayWindowDays: 3 };
+    // 窗口 3 天：呈现列表被截断为空，但本周统计不漏（旧实现先截断后计数会得 0）
+    const narrow = await loadDashboard(plugin, settings, options);
+    assert(narrow.birthdays.length === 0, "窗口 3 天未截断呈现列表");
+    assert(narrow.birthdaysThisWeek === 1, `窗口小于 7 天漏报本周生日：${narrow.birthdaysThisWeek}`);
+    // 暂缓生日：呈现继续隐藏，本周统计不下降（暂缓只屏蔽呈现）
+    files.set("reminder-dismissals.json", { schemaVersion: 1, dismissals: [{ personDocId: person.docId, kind: "birthday", until: untilFar }] });
+    const dismissed = await loadDashboard(plugin, settings, options);
+    assert(dismissed.birthdays.length === 0, "暂缓未屏蔽呈现列表");
+    assert(dismissed.birthdaysThisWeek === 1, `暂缓让本周生日统计下降：${dismissed.birthdaysThisWeek}`);
+    // 撤销暂缓 + 窗口 30：呈现恢复，统计一致
+    files.set("reminder-dismissals.json", { schemaVersion: 1, dismissals: [] });
+    const wide = await loadDashboard(plugin, settings, { staleThresholdDays: 30, birthdayWindowDays: 30 });
+    assert(wide.birthdays.length === 1 && wide.birthdaysThisWeek === 1, "窗口 30 天未呈现本周生日");
+});
+
 await test("人物联系节奏设置：显示当前规则，自定义/暂停/清除并持久化", async () => {
     let savedCadence;
     let savedDocId;
@@ -3593,6 +3792,40 @@ await test("原生捕获弹窗可完成并关闭，继承主题令牌", async ()
         assert(!dialog.dialog.element.isConnected, "完成按钮未关闭弹窗");
     } finally {
         if (dialog.dialog.element.isConnected) dialog.close();
+    }
+});
+
+await test("V-19 捕获草稿关闭守卫：取消不再静默丢草稿，放弃/取消两态可用", async () => {
+    const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
+        docId: settings.hostDocId,
+        facade: {
+            viewPreferences: DEFAULT_VIEW_PREFERENCES,
+            previewCapture: async () => ({ docName: "测试笔记", linked: [person] }),
+            captureDoc: async () => ({ createdNames: [], createdDocIds: [], interactions: 1, attendeeBlockWritten: true }),
+        },
+    } });
+    try {
+        await until(() => dialog.dialog.element.textContent.includes("下一步：确认记录"), "捕获未加载");
+        /* 制造草稿：填写新人名单（AI 回填/手工修改都偏离基线） */
+        const nameInput = dialog.dialog.element.querySelector('input[placeholder="王五 赵六"]');
+        assert(nameInput, "新人名单输入框未找到");
+        input(nameInput, "王五");
+        await tick();
+        button("取消", dialog.dialog.element).click();
+        await until(() => document.querySelector(".lvct-closeguard"), "脏草稿未触发关闭守卫（V-19 曾 dirty 固定 false）");
+        /* 取消 → 留在原地，草稿保留 */
+        [...document.querySelectorAll(".lvct-closeguard button")].find((node) => node.dataset.choice === "cancel").click();
+        await tick();
+        assert(dialog.dialog.element.isConnected, "守卫取消后弹窗不应关闭");
+        assert(nameInput.value === "王五", "守卫取消丢了草稿");
+        /* 放弃并离开 → 关闭弹窗 */
+        button("取消", dialog.dialog.element).click();
+        await until(() => document.querySelector(".lvct-closeguard"), "二次关闭未触发守卫");
+        [...document.querySelectorAll(".lvct-closeguard button")].find((node) => node.dataset.choice === "discard").click();
+        await until(() => !dialog.dialog.element.isConnected, "放弃并离开未关闭弹窗");
+    } finally {
+        if (dialog.dialog.element.isConnected) dialog.close();
+        document.querySelector(".lvct-closeguard")?.remove();
     }
 });
 

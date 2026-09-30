@@ -323,14 +323,14 @@
     /** B14 原生模式加载：范围由 nativeScope 决定（B14.8），登记集合过滤（B14.3）。失败显式降级 */
     async function loadNativeGraph() {
         const version = ++nativeVersion;
+        /* B14.11：收窄集合在首个 await 前快照——请求与本触发状态一致，effect 也可追踪 */
+        const restrict = narrowedDocIds;
         nativeLoading = true;
         nativeError = "";
         nativeMissingCenter = false;
         try {
             const identity = facade ? await facade.loadSelfIdentity() : null;
             nativeSelfDocId = identity?.selfDocId ?? "";
-            /* B14.8 按组织收窄：白名单与该组织成员取交集（中心保留） */
-            const restrict = narrowedDocIds;
             let graph: PersonGraph;
             if (nativeScope === "global") {
                 graph = await loadNativeRegisteredGraph(settings, identity, restrict ?? undefined);
@@ -364,6 +364,8 @@
         nativeScope;
         nativeCenterDocId;
         revision;
+        narrowedDocIds; /* B14.11：组织收窄变化必须触发重载；旧响应经版本守卫丢弃 */
+        if (nativeScope === "person") people.length; /* person 中心需对名册校验——名册晚到时重触发（B14.11 同类） */
         void loadNativeGraph();
     });
 

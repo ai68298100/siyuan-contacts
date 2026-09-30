@@ -129,8 +129,11 @@ export async function loadDashboard(
     await ensureRegistryEntriesSaved(plugin, people.map((person) => person.docId), today);
     const registry = await readModule(readFailures, "registry", () => loadRegistryStrict(plugin), EMPTY_REGISTRY);
     const graceDays = options.reminderGraceDays ?? 0;
-    // B08：提醒暂缓只屏蔽呈现——生日与久未联系提醒行过滤，统计与名单口径保持真实
-    const birthdays = upcomingBirthdays(people)
+    // B08：提醒暂缓只屏蔽呈现——生日与久未联系提醒行过滤，统计与名单口径保持真实。
+    // C-32：`birthdaysThisWeek` 按原始事实计算（不经提醒窗口截断、不受暂缓影响）——
+    // 窗口小于 7 天时本周生日不得漏报，暂缓生日不得让本周统计下降（FUNC-01.2a 口径）
+    const birthdaysAll = upcomingBirthdays(people);
+    const birthdays = birthdaysAll
         .filter((item) => item.projection.daysUntil <= options.birthdayWindowDays)
         .filter((item) => !isDismissed(dismissals, item.person.docId, "birthday", today));
     const staleAll = staleContacts(store, people, options.staleThresholdDays, new Date(), cadences);
@@ -192,7 +195,7 @@ export async function loadDashboard(
         people: people.length,
         relations: Math.round(people.reduce((sum, person) => sum + person.relatedItemIds.length, 0) / 2),
         birthdays,
-        birthdaysThisWeek: birthdays.filter((item) => item.bucket === "today" || item.bucket === "week").length,
+        birthdaysThisWeek: birthdaysAll.filter((item) => item.bucket === "today" || item.bucket === "week").length,
         stale: staleRemindable,
         staleTotal: staleAll.length,
         neverContacted: neverContactedPeople.length,

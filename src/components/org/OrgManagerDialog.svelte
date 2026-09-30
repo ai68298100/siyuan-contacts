@@ -6,6 +6,7 @@
     import { tick } from "svelte";
     import { translateText } from "../../domain/translation";
     import { subscribeDataChanged } from "../../libs/data-events";
+    import { useCloseGuard } from "../close-guard";
     import type { ContactsPluginFacade } from "../../types";
     import type { OrganizationWithMembers, OrganizationMember } from "../../services/org";
     import type { ContactSummary } from "../../domain/person";
@@ -49,6 +50,15 @@
     /* B13.4 组织改名 */
     let renaming = $state(false);
     let renameValue = $state("");
+    /* H-14/H-29：成员加载代际守卫版本号 */
+    let memberLoadVersion = 0;
+
+    /* H-29：关闭守卫——改名/成员编辑中的草稿需经确认放弃；写入中直接阻断关闭。
+       宿主 X/Esc/遮罩直销毁是 svelteDialog 结构性缺口（所有直挂弹窗共有，独立项跟进） */
+    const guardedClose = useCloseGuard({
+        busy: () => busy,
+        dirty: () => renaming || editingMemberId !== "",
+    });
 
     const currentOrg = $derived(orgs.find((org) => org.docId === currentOrgDocId) ?? null);
     const activeOrgs = $derived(orgs.filter((org) => !org.archived));
@@ -69,11 +79,14 @@
     }
 
     async function loadMembers(): Promise<void> {
+        /* H-14/H-29：请求代际守卫——快速切换组织时，迟到的旧成员响应不得覆盖当前组织 */
+        const version = ++memberLoadVersion;
         if (!currentOrgDocId) {
-            members = [];
+            if (version === memberLoadVersion) members = [];
             return;
         }
-        members = await facade.listOrganizationMembers(currentOrgDocId);
+        const result = await facade.listOrganizationMembers(currentOrgDocId);
+        if (version === memberLoadVersion) members = result;
     }
 
     $effect(() => {
@@ -123,6 +136,12 @@
         if (busy || docId === currentOrgDocId) return;
         currentOrgDocId = docId;
         errorMessage = "";
+        /* H-29：切换目标前隔离未保存状态——A 组织的改名草稿/已选联系人/成员编辑
+           不得带进 B 组织（saveRename 按当前 currentOrgDocId 落笔，混带即跨组织误写） */
+        renaming = false;
+        renameValue = "";
+        addPersonId = "";
+        editingMemberId = "";
         void (async () => {
             try {
                 await loadMembers();
@@ -405,6 +424,7 @@
     </div>
     {#if errorMessage}<div class="lvct-form__error" role="alert">{errorMessage}</div>{/if}
     <div class="lvct-org-manager__footer">
-        <button class="b3-button b3-button--cancel" onclick={onClose}>{text("orgClose", "关闭")}</button>
+        <!-- H-29：关闭走守卫（busy 阻断；改名/成员编辑草稿经确认放弃） -->
+        <button class="b3-button b3-button--cancel" onclick={() => void guardedClose(onClose)}>{text("orgClose", "关闭")}</button>
     </div>
 </div>

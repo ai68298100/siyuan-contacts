@@ -43,10 +43,33 @@
     let aiRelationNote: string = $state("");
     let extrasError: string = $state("");
     let step: 1 | 2 | 3 = $state(1);
+    /* V-19：关闭守卫的真实脏态——与载入完成时的基线比对（识别勾选/新人名单/日期/地点/备注）。
+       AI 回填与手工修改都使当前值偏离基线（关闭需经守卫确认放弃）；主捕获成功后草稿已被
+       消费（result 就绪），关闭不再拦截。 */
+    let dirtyBaseline = { checkedIds: [] as string[], newNames: "", date: toLocalDateKey(), place: "", note: "" };
+    function markClean(): void {
+        dirtyBaseline = {
+            checkedIds: Object.entries(checked).filter(([, on]) => on).map(([id]) => id),
+            newNames: newNamesText,
+            date,
+            place,
+            note,
+        };
+    }
+    function hasUnsavedDraft(): boolean {
+        if (result) return false;
+        const baseIds = new Set(dirtyBaseline.checkedIds);
+        if (checkedIds.length !== dirtyBaseline.checkedIds.length) return true;
+        if (checkedIds.some((id) => !baseIds.has(id))) return true;
+        return newNamesText.trim() !== dirtyBaseline.newNames.trim()
+            || date !== dirtyBaseline.date
+            || place.trim() !== dirtyBaseline.place.trim()
+            || note.trim() !== dirtyBaseline.note.trim();
+    }
     /* CODE-02.1：捕获挂起（主流程/AI 分析）期间关闭按钮静默阻断——失败草稿与步骤保持可见 */
     const guardedClose = useCloseGuard({
         busy: () => running || aiRunning,
-        dirty: () => false,
+        dirty: () => hasUnsavedDraft(),
     });
     function closeIfIdle(): void {
         void guardedClose(onClose);
@@ -74,6 +97,8 @@
             aiProfileCandidates = [];
             aiFollowUpCandidates = [];
             aiRelationNote = "";
+            /* V-19：初始勾选不算草稿——基线在此刻落定（重试重载同样复基线） */
+            markClean();
         } catch (error) {
             loadError = error instanceof Error ? error.message : String(error);
         }
