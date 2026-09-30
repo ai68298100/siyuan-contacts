@@ -8,6 +8,7 @@
     import RelationGraph from "./graph/RelationGraph.svelte";
     import DashboardView from "./dashboard/DashboardView.svelte";
     import LvctDialog from "./LvctDialog.svelte";
+    import OrgsView from "./org/OrgsView.svelte";
     import { createCloseScope, anyDirtyChanges } from "./close-guard";
     import { House, UsersRound, Network, Settings, Building2, Sparkles, UserPlus } from "@lucide/svelte";
     import SettingsView from "./SettingsView.svelte";
@@ -47,12 +48,14 @@
         { id: "home", label: text("navHome", "首页"), shortLabel: text("navHome", "首页"), enabled: true },
         { id: "people", label: text("navPeople", "联系人"), shortLabel: text("navPeople", "联系人"), enabled: true },
         { id: "graph", label: text("navGraph", "关系图谱"), shortLabel: text("navGraphShort", "关系图"), enabled: true },
+        { id: "orgs", label: text("navOrganizations", "组织"), shortLabel: text("navOrganizations", "组织"), enabled: true },
     ]);
 
     const viewMeta: Record<ViewId, { title: string; subtitle: string }> = $derived({
         home: { title: text("navHome", "首页"), subtitle: text("homeSubtitle", "今天该关注谁") },
         people: { title: text("navPeople", "联系人"), subtitle: text("peopleSubtitle", "管理你的联系人与资料") },
         graph: { title: text("navGraph", "关系图谱"), subtitle: text("graphSubtitle", "查看人际关系网络") },
+        orgs: { title: text("navOrganizations", "组织"), subtitle: text("orgsSubtitle", "公司与学校等归属维度") },
         settings: { title: text("navSettings", "设置"), subtitle: text("settingsSubtitle", "检查数据锚点与插件行为") },
     });
 
@@ -103,7 +106,7 @@
     onMount(() => {
         const handleRequestedView = (event: Event) => {
             const view = (event as CustomEvent<{ view?: string }>).detail?.view;
-            if (view === "home" || view === "people" || view === "graph" || view === "settings") {
+            if (view === "home" || view === "people" || view === "graph" || view === "orgs" || view === "settings") {
                 selectView(view);
             }
         };
@@ -148,11 +151,10 @@
                     aria-current={current === view.id ? "page" : undefined}
                     onclick={() => selectView(view.id)}
                 >
-                    <span class="lvct-workbench__nav-icon" aria-hidden="true">{#if view.id === "home"}<House size={16}/>{:else if view.id === "people"}<UsersRound size={16}/>{:else}<Network size={16}/>{/if}</span><span class="lvct-workbench__nav-text">{isMobile ? view.shortLabel : view.label}</span>
-                </button>
+            <span class="lvct-workbench__nav-icon" aria-hidden="true">{#if view.id === "home"}<House size={16}/>{:else if view.id === "people"}<UsersRound size={16}/>{:else if view.id === "orgs"}<Building2 size={16}/>{:else}<Network size={16}/>{/if}</span><span class="lvct-workbench__nav-text">{isMobile ? view.shortLabel : view.label}</span>
+            </button>
             {/each}
             <span class="lvct-workbench__nav-label lvct-workbench__nav-label--secondary">{text("navUpcoming", "即将推出")}</span>
-            <button class="lvct-workbench__nav-item" disabled><span class="lvct-workbench__nav-icon" aria-hidden="true"><Building2 size={16}/></span><span class="lvct-workbench__nav-text">{text("navOrganizations", "组织")}</span></button>
             <button class="lvct-workbench__nav-item" disabled><span class="lvct-workbench__nav-icon" aria-hidden="true"><Sparkles size={16}/></span><span class="lvct-workbench__nav-text">{text("navSuggestions", "建议")}</span></button>
         </nav>
         <div class="lvct-workbench__sidebar-footer">
@@ -232,6 +234,13 @@
                     }}
                     onOpenDetail={openDetail}
                     onOpenPeople={() => selectView("people")}
+                />
+            {:else if current === "orgs"}
+                <OrgsView
+                    {facade}
+                    revision={dataRevision}
+                    i18n={facade.i18n}
+                    onOpenOrgManager={() => facade.openOrgManagerDialog()}
                 />
             {:else if current === "settings"}
                 <SettingsView

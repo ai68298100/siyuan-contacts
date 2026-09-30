@@ -15,7 +15,7 @@ import type { InteractionImportDiff } from "./domain/interaction-backup";
 import type { ExportSummary } from "./services/export-center";
 import type { InitProgressStep, WorkspaceSnapshot } from "./services/init";
 
-export type WorkbenchView = "home" | "people" | "graph" | "settings";
+export type WorkbenchView = "home" | "people" | "graph" | "orgs" | "settings";
 
 /**
  * 插件实例暴露给组件层的结构化视图（避免组件 import 插件入口造成循环依赖）。

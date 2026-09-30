@@ -3508,6 +3508,52 @@
     gap: var(--lvct-sp-2);
 }
 
+/* B13.5 组织视图卡片网格 */
+.lvct-orgs-view {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-2);
+    min-height: 0;
+
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: var(--lvct-sp-2);
+        align-content: start;
+        overflow: auto;
+    }
+
+    &__card {
+        display: flex;
+        flex-direction: column;
+        gap: var(--lvct-sp-1);
+        padding: var(--lvct-sp-2);
+        border: 1px solid var(--lvct-border-subtle);
+        border-radius: var(--lvct-radius, 8px);
+        min-width: 0;
+
+        &--archived { opacity: 0.66; }
+    }
+
+    &__card-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+    }
+
+    &__card-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__card-actions {
+        display: flex;
+        justify-content: flex-end;
+    }
+}
+
 /* B13.5 人物详情内添加归属表单 */
 .lvct-org-add {
     display: flex;

@@ -1982,3 +1982,23 @@
   断言「列表移除」别用全 fixture 文本（候选下拉 option 仍含该名），锁定 timeline 容器。
 - **留后续**：B13.5a 组织页入口（WorkbenchView 扩展，横切默认页偏好/移动 Dialog）、
   B13.5b 查询规模、B13.6 共同背景、B14 组织入口、真机核对。
+
+## P1 业务主线 第 75 轮：B13.5a 组织页入口——工作台组织视图（2026-09-30，续跑口令第 77 版驱动）
+
+- **OrgsView.svelte（新建 src/components/org/）**：组织卡片网格（活跃在前按名称 zh 序、
+  归档垫底降透明度 + 已归档徽标）；概要统计条（共 N 个组织 / M 个已归档）；在职成员数
+  （former 不计入）；管理动作统一经「组织管理」按钮打开既有弹窗（视图保持只读卡片，
+  编辑语义全部在弹窗内承载，避免双处编辑）；空态引导新建；读取失败 ViewState 可重试。
+- **工作台接入（横切清单全落）**：`WorkbenchView`/`DefaultView` 增 `"orgs"`；侧栏「组织」
+  从「即将推出」disabled 占位升级为正式导航项（Building2 图标，移除占位按钮）；
+  viewMeta 补组织标题/副标题；`lvct-workbench-view` 事件白名单含 orgs（openWorkbench("orgs")/
+  initialView: "orgs" 可直开）；设置页「默认打开页面」加组织选项；移动端底部导航随 views
+  循环自动包含（shortLabel 同名）。
+- **验证**：单测 213/213；三套 UI 桌面 101 / 移动 102 / 宿主 101 全绿（新增组织视图用例：
+  侧栏入口切换、概要/卡片/活跃成员数（former 不计）/归档徽标、组织管理按钮回调、
+  initialView 直开）；collect-i18n 缺失 0（zh/en 各 11 键）；`pnpm run build` +
+  `check:release` PASS；真内核 contacts-flow 10/10、spike:init 21/21；52 景基线重拍目检
+  （侧栏组织项入正式导航布局正常）+ 断点扫描有效；PAGE-STATUS P-11 表更新（S1~S5/S9 落账，
+  S11~S13/影响预览/规模留真机与后续）。
+- **留后续**：组织入口进图谱（组织节点点击跳组织视图/按组织收窄，B14 余项）、S11 跨窗口
+  外部编辑刷新、S12/S13 真机核验、B13.5b 查询规模、B13.6 共同背景。

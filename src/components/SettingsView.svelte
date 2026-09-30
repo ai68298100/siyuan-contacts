@@ -692,6 +692,7 @@
                                 <option value="home">首页</option>
                                 <option value="people">联系人</option>
                                 <option value="graph">关系图谱</option>
+                                <option value="orgs">组织</option>
                             </select>
                         </label>
                         <label class="lvct-form__item">

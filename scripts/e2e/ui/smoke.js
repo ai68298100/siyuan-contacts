@@ -1629,6 +1629,44 @@ await test("新工作台可按入口指定的初始视图打开", async () => {
     assert(fixture.querySelector(".lvct-settings"), "初始设置页内容未挂载");
 });
 
+await test("B13.5a 组织视图：侧栏入口、卡片渲染（活跃/归档/成员数）、管理入口与初始视图直开", async () => {
+    let managerOpened = 0;
+    const facade = {
+        settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        listContacts: async () => [],
+        listOrganizations: async () => [
+            { docId: "20260930000000-org0001", name: "曙光科技", hpath: "/曙光科技", notebookId: settings.notebookId, archived: false, memberships: [
+                { status: "active" }, { status: "former" },
+            ] },
+            { docId: "20260930000000-org0002", name: "旧校", hpath: "/旧校", notebookId: settings.notebookId, archived: true, memberships: [] },
+        ],
+        loadDashboard: async () => ({ people: 0, relations: 0, birthdays: [], birthdaysThisWeek: 0, stale: [], neverContacted: 0, neverContactedItemIds: [] }),
+        openOrgManagerDialog: () => { managerOpened += 1; },
+    };
+    const baseProps = {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {}, facade,
+    };
+    mounted = mount(Workbench, { target: fixture, props: baseProps });
+    await until(() => fixture.querySelector("h1")?.textContent === "首页", "工作台未加载");
+    /* 侧栏组织入口切换视图（原「即将推出」占位已升级为真视图） */
+    navButton(["组织"]).click();
+    await until(() => fixture.querySelector("h1")?.textContent === "组织", "侧栏组织入口未切换视图");
+    await until(() => fixture.textContent.includes("共 2 个组织"), "组织概要未渲染");
+    await until(() => fixture.textContent.includes("曙光科技"), "组织卡片未渲染");
+    assert(fixture.textContent.includes("1 名在职/在读成员"), "活跃成员数错误（former 不计）");
+    assert(fixture.textContent.includes("已归档"), "归档徽标缺失");
+    /* 管理入口打开组织管理弹窗 */
+    button("组织管理").click();
+    await tick();
+    assert(managerOpened === 1, "组织管理按钮未回调");
+    /* 初始视图直开组织 */
+    await unmount(mounted);
+    mounted = mount(Workbench, { target: fixture, props: { ...baseProps, initialView: "orgs" } });
+    await until(() => fixture.querySelector("h1")?.textContent === "组织", "初始视图未直接打开组织");
+    await until(() => fixture.textContent.includes("曙光科技"), "初始组织视图卡片未渲染");
+});
+
 if (window.innerWidth <= 640) {
     await test("移动视口显示底部导航，Peek 详情占满屏幕并保留安全区内距", async () => {
         mounted = mount(Workbench, { target: fixture, props: {

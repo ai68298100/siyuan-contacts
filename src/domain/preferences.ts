@@ -5,7 +5,7 @@ import type { SavedView } from "./saved-views";
 export const VIEW_PREFERENCES_STORAGE_KEY = "view-preferences.json";
 export const VIEW_PREFERENCES_VERSION = 1;
 
-export type DefaultView = "home" | "people" | "graph";
+export type DefaultView = "home" | "people" | "graph" | "orgs";
 export type PeopleSortMode = "name" | "group" | "birthday" | "recent";
 /** 联系人默认形态（F02）：卡片 / 表格 */
 export type PeopleViewMode = "card" | "table";
@@ -67,7 +67,7 @@ export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
 };
 
 function isDefaultView(value: unknown): value is DefaultView {
-    return value === "home" || value === "people" || value === "graph";
+    return value === "home" || value === "people" || value === "graph" || value === "orgs";
 }
 
 function isPeopleSortMode(value: unknown): value is PeopleSortMode {
