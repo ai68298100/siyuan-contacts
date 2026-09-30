@@ -1,12 +1,18 @@
 // 仅供隔离 UI 回归：没有网络请求，也不读写思源数据。
+// K-02：faultLog 挂在 kernel 对象上——vite 对 alias 与相对路径可能产生两个模块实例，
+// 挂对象属性才能与 smoke.js 共享同一份故障日志（kernel 引用是共享锚点）。
 export const kernel = {
     handler: async () => { throw new Error("未配置测试请求"); },
+    faultLog: [],
 };
 
 export function fetchPost(route, body, callback) {
     Promise.resolve().then(() => kernel.handler(route, body)).then(
         (data) => callback({ code: 0, data }),
-        (error) => callback({ code: -1, msg: error.message }),
+        (error) => {
+            kernel.faultLog.push({ route, message: String(error?.message ?? error) });
+            callback({ code: -1, msg: error.message });
+        },
     );
 }
 

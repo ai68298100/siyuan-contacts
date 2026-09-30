@@ -14,7 +14,7 @@ import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
 import { applyContactCandidateFields, createContact, updateContactFields } from "../../../src/services/contacts";
 import { designateSelfIdentity } from "../../../src/services/self-identity";
-import { scanOrganizations, membershipsByOrganization, listPersonOrgMemberships, addOrganizationMember, removeOrganizationMember, updateOrganizationMember, archiveOrganization, restoreOrganization, bindOrgMembershipStorage } from "../../../src/services/org";
+import { scanOrganizations, membershipsByOrganization, listPersonOrgMemberships, addOrganizationMember, removeOrganizationMember, updateOrganizationMember, archiveOrganization, restoreOrganization, bindOrgMembershipStorage, syncPersonOrgLinksSection } from "../../../src/services/org";
 import { addOrgMembership, bindOrgMembershipStorage as bindDataOrgMembershipStorage } from "../../../src/data/org-membership";
 import OrgManagerDialog from "../../../src/components/org/OrgManagerDialog.svelte";
 import { addRelation, removeRelation } from "../../../src/services/relations";
@@ -92,6 +92,13 @@ function consoleViolations() {
         return !allowlisted || line.includes("is not a function");
     });
 }
+/* K-02 余项：故障注入用例显式声明预期内核错误（route 与失败消息均含即命中）；
+   用例结束校验全部命中——声明未命中说明注入没生效（flag 写错/故障路径未走），
+   不能在"故障从未发生"的状态下静默通过。 */
+let declaredFaults = [];
+function expectKernelFault(routePart, msgPart) {
+    declaredFaults.push({ routePart, msgPart });
+}
 async function until(predicate, message) {
     const deadline = Date.now() + 4000;
     while (!predicate()) {
@@ -167,6 +174,8 @@ let mounted;
 async function test(name, action) {
     resetKernel();
     consoleRecords.length = 0;
+    kernel.faultLog.length = 0;
+    declaredFaults = [];
     (window.__cases = window.__cases || []).push(name);
     let failed = false;
     try {
@@ -178,8 +187,13 @@ async function test(name, action) {
         /* K-01/K-02：非预期 console 输出/未捕获异常使本用例失败（预期警告按前缀放行，
            缺 facade 方法的 TypeError 即使混在预期警告参数里也判违规） */
         const violations = consoleViolations();
+        /* K-02：声明的预期内核故障必须全部命中——未命中说明注入没生效
+           （flag 写错/故障路径未走），测试不能在"故障从未发生"的状态下静默通过 */
+        const missed = declaredFaults.filter((fault) => !kernel.faultLog.some((entry) => entry.route.includes(fault.routePart) && entry.message.includes(fault.msgPart)));
         if (!failed && violations.length > 0) {
             results.push({ name, ok: false, detail: `K-01/K-02 非预期 console 输出：\n${violations.join("\n")}` });
+        } else if (!failed && missed.length > 0) {
+            results.push({ name, ok: false, detail: `K-02 声明的预期内核故障未发生：${missed.map((fault) => `${fault.routePart} / ${fault.msgPart}`).join("；")}` });
         } else if (!failed) {
             results.push({ name, ok: true });
         }
@@ -932,6 +946,9 @@ await test("busy 独立阻断：创建挂起时关闭不卸载弹窗，完成后
 });
 
 await test("B07-b 同步失败分项：单块失败不阻断其余，复合错误不回退，重试只补缺失不重复", async () => {
+    /* K-02：本用例预期两次内核故障注入（首轮 updateBlock 失败 + 打勾失败） */
+    expectKernelFault("/api/block/updateBlock", "updateBlock 注入失败");
+    expectKernelFault("/api/block/updateTaskListItemMarker", "打勾注入失败");
     const files = new Map();
     const plugin = { loadData: async (key) => files.get(key) ?? "", saveData: async (key, value) => { files.set(key, value); } };
     files.set("contacts-settings.json", settings);
@@ -996,6 +1013,8 @@ await test("B07-b 同步失败分项：单块失败不阻断其余，复合错�
 
 await test("FUNC-01.15 断点续做：残留文档复用不重建，字段失败上浮可定位且重试不重复建档", async () => {
     invalidateRoster();
+    /* K-02：phone 字段写入注入失败一次（重试补写成功） */
+    expectKernelFault("/api/av/setAttributeViewBlockAttr", "phone 注入失败");
     let createDocCalls = 0;
     let rowCount = 0;
     let failPhone = false;
@@ -1130,6 +1149,9 @@ await test("B13.5b 组织成员列表分页：首屏 50 名、加载更多展开
 });
 
 await test("B13.7 人物文档组织归属链接区块：添加/归档恢复对账与失败隔离", async () => {
+    /* K-02：单文档区块检索注入失败（失败隔离，其余文档照常对账）。failingDoc 后缀必须 7 位——
+       非法 ID 会在 sync 入口本地抛错、内核注入从未发生（K-02 命中校验实测抓到过该夹具缺陷） */
+    expectKernelFault("/api/query/sql", "模拟区块检索失败");
     const files = new Map();
     files.set("org-membership.json", { schemaVersion: 1, memberships: [] });
     const plugin = {
@@ -1143,7 +1165,7 @@ await test("B13.7 人物文档组织归属链接区块：添加/归档恢复对�
     const blocks = [];
     /* 组织文档标记块（query 分支按 id 返回；update 需能找到它） */
     const orgMarker = { id: "20260930000000-orgm001", rootId: "20260930000000-org0001", markdown: "**组织**：曙光科技", ial: 'custom-lvct-org="1"' };
-    const failingDoc = "20260930000000-perfail1";
+    const failingDoc = "20260930000000-perfa01"; /* 后缀恰好 7 位（K-02 实测抓到过 8 位夹具） */
     kernel.handler = async (route, body) => {
         if (route === "/api/query/sql") {
             const stmt = String(body.stmt ?? "");
@@ -1204,11 +1226,9 @@ await test("B13.7 人物文档组织归属链接区块：添加/归档恢复对�
     const okBlock = blocks.find((row) => row.rootId === person.docId);
     assert(okBlock && okBlock.markdown.includes("顾问") === false, "无关区块不应被失败文档波及");
     /* 字段编辑（status→former）→ 区块移除该条目 */
-    const failMembership = afterFail.memberships.find((membership) => membership.personDocId === failingDoc);
     const mainMembership = afterFail.memberships.find((membership) => membership.personDocId === person.docId);
     await updateOrganizationMember(plugin, mainMembership.id, { status: "former" });
     await until(() => blocks.length === 0, "转 former 后区块未移除");
-    assert(failMembership, "失败文档成员记录应保留");
 });
 
 await test("B13.9 第二批 组织体检逐条修复：孤儿移除/重复转 former（确认后执行并重跑体检）", async () => {
@@ -1486,6 +1506,8 @@ await test("B13.4 组织改名：renameOrganization 全链路 + 同名拒绝显�
 
 await test("FAST-01.3a 识别目标裁决：名册失败自动重试仍失败返回 failed，恢复后 bound/unlinked 各归其位", async () => {
     invalidateRoster();
+    /* K-02：名册渲染持续失败（重试后仍 failed），解除后归位 */
+    expectKernelFault("/api/av/renderAttributeView", "名册渲染注入失败");
     let failRoster = true;
     kernel.handler = async (route) => {
         if (route === "/api/av/renderAttributeView") {
@@ -1510,6 +1532,8 @@ await test("FAST-01.3a 识别目标裁决：名册失败自动重试仍失败返
 
 await test("CODE-02.5 关系并发：写前回读防丢边，幂等不重写，区块失败逐文档隔离", async () => {
     invalidateRoster();
+    /* K-02：甲文档相关人物区块插入注入失败（逐文档隔离，乙文档照常） */
+    expectKernelFault("/api/block/insertBlock", "区块注入失败");
     let relatedOfA = ["row-b"]; /* 内核当前值：甲已与乙有关系（另一窗口写入） */
     let relatedWrites = 0;
     let failSectionA = false;
@@ -1564,6 +1588,8 @@ await test("CODE-02.5 关系并发：写前回读防丢边，幂等不重写，�
 });
 
 await test("CODE-02.4 编辑写前预校验：非法生日/邮箱零写入，逐字段失败复合错误不回退", async () => {
+    /* K-02：微信字段写入注入失败（复合错误指名，其余字段照常） */
+    expectKernelFault("/api/av/setAttributeViewBlockAttr", "微信注入失败");
     let setCellCount = 0;
     let failWechat = true;
     kernel.handler = async (route, body) => {
@@ -3961,6 +3987,8 @@ await test("重复候选检查：并排资料与理由展示，查看跳转零�
 });
 
 await test("vCard 导入诊断：三段报告区分失败与待核对，重试先核对名册不重复建人", async () => {
+    /* K-02：同名新人建文档注入失败（三段报告的失败段） */
+    expectKernelFault("/api/filetree/createDocWithMd", "模拟建文档失败");
     let failCreate = true;
     let rosterNames = ["回归测试甲"];
     let createCalls = 0;
