@@ -99,6 +99,17 @@ let declaredFaults = [];
 function expectKernelFault(routePart, msgPart) {
     declaredFaults.push({ routePart, msgPart });
 }
+/* K-02 余项：facade 层失败注入（不走内核的 mock 失败/部分失败返回）的同思路声明。
+   与内核机制的区别：facade mock 是用例自有对象，注入点就在用例代码里——
+   注入处调 recordFacadeFault 登记，用例结束校验声明的失败全部登记过。 */
+let facadeFaultLog = [];
+let declaredFacadeFaults = [];
+function recordFacadeFault(method, message) {
+    facadeFaultLog.push({ method, message });
+}
+function expectFacadeFailure(methodPart, msgPart) {
+    declaredFacadeFaults.push({ methodPart, msgPart });
+}
 async function until(predicate, message) {
     const deadline = Date.now() + 4000;
     while (!predicate()) {
@@ -175,7 +186,9 @@ async function test(name, action) {
     resetKernel();
     consoleRecords.length = 0;
     kernel.faultLog.length = 0;
+    facadeFaultLog.length = 0;
     declaredFaults = [];
+    declaredFacadeFaults = [];
     (window.__cases = window.__cases || []).push(name);
     let failed = false;
     try {
@@ -190,10 +203,14 @@ async function test(name, action) {
         /* K-02：声明的预期内核故障必须全部命中——未命中说明注入没生效
            （flag 写错/故障路径未走），测试不能在"故障从未发生"的状态下静默通过 */
         const missed = declaredFaults.filter((fault) => !kernel.faultLog.some((entry) => entry.route.includes(fault.routePart) && entry.message.includes(fault.msgPart)));
+        /* K-02 余项：facade 层失败注入的同思路命中校验 */
+        const missedFacade = declaredFacadeFaults.filter((fault) => !facadeFaultLog.some((entry) => entry.method.includes(fault.methodPart) && entry.message.includes(fault.msgPart)));
         if (!failed && violations.length > 0) {
             results.push({ name, ok: false, detail: `K-01/K-02 非预期 console 输出：\n${violations.join("\n")}` });
         } else if (!failed && missed.length > 0) {
             results.push({ name, ok: false, detail: `K-02 声明的预期内核故障未发生：${missed.map((fault) => `${fault.routePart} / ${fault.msgPart}`).join("；")}` });
+        } else if (!failed && missedFacade.length > 0) {
+            results.push({ name, ok: false, detail: `K-02 声明的预期 facade 失败未发生：${missedFacade.map((fault) => `${fault.methodPart} / ${fault.msgPart}`).join("；")}` });
         } else if (!failed) {
             results.push({ name, ok: true });
         }
@@ -1283,6 +1300,8 @@ await test("B13.9 第二批 组织体检逐条修复：孤儿移除/重复转 fo
 });
 
 await test("B13.9 悬空 org-links 区块：体检指名并一键清理（facade 全链路）", async () => {
+    /* K-02 余项：facade 层失败注入的显式声明（首次清理注入 blk0004 删除失败） */
+    expectFacadeFailure("removeOrgLinkBlocks", "模拟删除失败");
     const removedBlocks = [];
     const remaining = new Set(["20260930000000-blk0003", "20260930000000-blk0004"]);
     let blk0004Failed = false;
@@ -1303,6 +1322,7 @@ await test("B13.9 悬空 org-links 区块：体检指名并一键清理（facade
                 if (id === "20260930000000-blk0004" && !blk0004Failed) {
                     blk0004Failed = true; /* 首次清理注入单块失败 → 消息可重试 */
                     failures.push({ id, message: "模拟删除失败" });
+                    recordFacadeFault("removeOrgLinkBlocks", "模拟删除失败");
                     continue;
                 }
                 remaining.delete(id);

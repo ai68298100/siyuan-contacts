@@ -2408,3 +2408,18 @@
   52 景基线 + 20 景断点矩阵重拍有效（纯测试基建，无产物变更）。
 - **留后续**：facade 层失败注入（不走内核的 mock 失败）可按同思路加声明；其余用例随回归逐步补；
   K-02 场景清单随新故障用例增长。
+
+## 测试基建 第 94 轮：K-02 余项——facade 层失败注入声明（2026-10-01，续跑口令第 95 版驱动）
+
+- **机制**：smoke 新增 `expectFacadeFailure(methodPart, msgPart)` 声明 API + `recordFacadeFault(method,
+  message)` 登记 API + `facadeFaultLog` 用例级日志——与内核机制（第 93 轮）同思路，但登记由
+  **用例 mock 注入处主动调用**（facade mock 是用例自有对象，无统一拦截点）；用例结束校验声明
+  的 facade 失败全部登记过，未命中即失败。
+- **覆盖**：B13.9 悬空用例的 `removeOrgLinkBlocks` 部分失败注入补声明 + mock 注入处登记。
+  全量排查确认其余 facade throw 均为"用例不涉及"负向守卫（非故障注入），无需声明。
+- **K-02 状态**：内核级（第 93 轮）+ facade 级（本轮）两层声明机制齐备；新故障用例随回归逐步补。
+- **验证**：单测 221/221；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；`pnpm check`
+  0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 13/13、spike:init 21/21；
+  52 景基线 + 20 景断点矩阵重拍有效（纯测试基建，无产物变更）。
+- **留后续**：新故障用例随回归补声明（内核级 expectKernelFault / facade 级 expectFacadeFailure）；
+  B13.8 真机投递实证；V-05 真机向余项；H-05 余项（多选批量归 H-07 通道）；B14 真机核对项；B11 余项。
