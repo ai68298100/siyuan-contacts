@@ -1,9 +1,11 @@
 <script lang="ts">
     /** B13.3 组织管理：组织列表/新建/成员维护（svelteDialog 直挂）。
      *  数据经 facade（listOrganizations/createOrganization/listOrganizationMembers/
-     *  addOrganizationMember/removeOrganizationMember/listContacts），写入语义在 services/org。 */
+     *  addOrganizationMember/removeOrganizationMember/listContacts），写入语义在 services/org。
+     *  B13.6a：initialOrgDocId 定位打开（卡片入口携目标组织）；onOpenPerson 成员跨弹窗导航。 */
     import { tick } from "svelte";
     import { translateText } from "../../domain/translation";
+    import { subscribeDataChanged } from "../../libs/data-events";
     import type { ContactsPluginFacade } from "../../types";
     import type { OrganizationWithMembers, OrganizationMember } from "../../services/org";
     import type { ContactSummary } from "../../domain/person";
@@ -12,10 +14,16 @@
     let {
         facade,
         i18n,
+        initialOrgDocId = "",
+        onOpenPerson,
         onClose,
     }: {
         facade: ContactsPluginFacade;
         i18n?: Readonly<Record<string, string>>;
+        /** B13.6a：打开时定位到的组织（卡片入口携带；目标不存在回退首个组织） */
+        initialOrgDocId?: string;
+        /** B13.6a：成员「查看详情」跨弹窗导航（缺省隐藏入口；已解绑成员无入口） */
+        onOpenPerson?: (person: ContactSummary) => void;
         onClose: () => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
@@ -49,11 +57,14 @@
     const addCandidates = $derived(
         roster.filter((person) => !members.some((member) => member.personDocId === person.docId)),
     );
+    /* B13.6a：docId → 联系人（成员「查看详情」入口的资格判断与导航载荷） */
+    const contactsByDoc = $derived(new Map(roster.map((person) => [person.docId, person] as const)));
 
-    async function loadOrgs(keepSelection: boolean = true): Promise<void> {
+    async function loadOrgs(keepSelection: boolean = true, preferDocId: string = ""): Promise<void> {
         orgs = await facade.listOrganizations();
         if (keepSelection && orgs.some((org) => org.docId === currentOrgDocId)) return;
-        currentOrgDocId = orgs[0]?.docId ?? "";
+        const preferred = preferDocId ? orgs.find((org) => org.docId === preferDocId) : undefined;
+        currentOrgDocId = preferred?.docId ?? orgs[0]?.docId ?? "";
         await loadMembers();
     }
 
@@ -70,13 +81,28 @@
             loading = true;
             try {
                 roster = await facade.listContacts();
-                await loadOrgs(false);
+                await loadOrgs(false, initialOrgDocId);
             } catch (error) {
                 errorMessage = error instanceof Error ? error.message : String(error);
             } finally {
                 loading = false;
             }
         })();
+    });
+
+    /* S11（H-23 窗口内通道）：外部数据变化后原地刷新组织与成员——busy/编辑/改名中跳过
+       （草稿与写入保护），刷新失败保留旧列表（读故障不伪装为空）。跨窗口投递 Host pending。 */
+    $effect(() => {
+        return subscribeDataChanged(() => {
+            if (busy || editingMemberId || renaming) return;
+            void (async () => {
+                try {
+                    await loadOrgs(true);
+                } catch {
+                    /* 保留当前快照，等待下一次变化或用户重开 */
+                }
+            })();
+        });
     });
 
     async function run(task: () => Promise<void>): Promise<void> {
@@ -211,6 +237,16 @@
     function cancelRename(): void {
         renaming = false;
     }
+
+    /** B13.6a：成员跨弹窗导航——先经回调让工作台打开人物详情，再关闭本弹窗
+     *  （宿主级弹窗压在 Peek 之上，必须先关才能看到详情）。 */
+    function openMemberDetail(personDocId: string): void {
+        if (busy) return;
+        const contact = contactsByDoc.get(personDocId);
+        if (!contact) return;
+        onOpenPerson?.(contact);
+        onClose();
+    }
 </script>
 
 <div class="lvct-dialog-root lvct-org-manager">
@@ -331,6 +367,11 @@
                                     {:else}
                                         <span>{member.personName}{member.title ? ` · ${member.title}` : ""}{member.department ? `（${member.department}）` : ""}{member.status === "former" ? text("orgFormer", "（已离开）") : ""}</span>
                                         <span class="fn__flex" style="gap: 4px;">
+                                            {#if onOpenPerson && contactsByDoc.has(member.personDocId)}
+                                                <!-- B13.6a 同组织同伴开详情（与人物详情共同背景同语义；已解绑无入口） -->
+                                                <button type="button" class="b3-button b3-button--text" disabled={busy}
+                                                    onclick={() => openMemberDetail(member.personDocId)}>{text("orgCommonOpen", "查看详情")}</button>
+                                            {/if}
                                             <button type="button" class="b3-button b3-button--text" disabled={busy}
                                                 onclick={() => startEditMember(member)}>{text("orgMemberEdit", "编辑")}</button>
                                             <button

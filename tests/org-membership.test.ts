@@ -161,3 +161,71 @@ test("B13.6 共同背景：组织名解析与归档组织纳入", () => {
     });
     assert.equal(unknown[0].orgName, "（组织文档不可达）");
 });
+
+test("B13.5b 共同背景：同人多段收录一次取最早交集；多组织输出保持归属顺序", () => {
+    const selfId = "20260930000000-self001";
+    const peerA = "20260930000000-peer0001";
+    const peerB = "20260930000000-peer0002";
+    const org1 = "20260930000000-org0001";
+    const org2 = "20260930000000-org0002";
+    const m = (over: Partial<OrgMembership>): OrgMembership => ({
+        id: "20260930000000-m000001", orgDocId: org1, personDocId: selfId,
+        department: "", title: "", joinedOn: "", leftOn: "", status: "active", ...over,
+    });
+    const index = new Map<string, readonly OrgMembership[]>([
+        [selfId, [
+            m({ orgDocId: org1, joinedOn: "2020-01-01", leftOn: "2022-01-01" }),
+            m({ id: "20260930000000-m000002", orgDocId: org1, joinedOn: "2024-01-01", leftOn: "" }),
+            m({ id: "20260930000000-m000003", orgDocId: org2, joinedOn: "2024-06-01", leftOn: "" }),
+        ]],
+        // 甲在 org1 两段：第一段不相交（2018~2019），第二段与本人大段相交 → 收录一次取该交集
+        [peerA, [
+            m({ id: "20260930000000-m000004", orgDocId: org1, personDocId: peerA, joinedOn: "2018-01-01", leftOn: "2019-01-01" }),
+            m({ id: "20260930000000-m000005", orgDocId: org1, personDocId: peerA, joinedOn: "2021-01-01", leftOn: "2023-01-01" }),
+        ]],
+        [peerB, [m({ id: "20260930000000-m000006", orgDocId: org2, personDocId: peerB, joinedOn: "2025-01-01", leftOn: "" })]],
+    ]);
+    const background = buildCommonOrgBackground({
+        personDocId: selfId,
+        membershipIndex: index,
+        namesByDoc: new Map([[peerA, "甲"], [peerB, "乙"]]),
+    });
+    assert.deepEqual(background.map((entry) => entry.orgDocId), [org1, org2], "组织顺序随本人归属记录顺序");
+    const [org1Entry, org2Entry] = background;
+    assert.equal(org1Entry.peers.length, 1, "甲在 org1 多段只收录一次");
+    assert.equal(org1Entry.peers[0].docId, peerA);
+    assert.equal(org1Entry.peers[0].overlapText, "2021-01-01 ~ 2022-01-01", "重叠取最早起点的交集");
+    assert.equal(org1Entry.peers[0].samePeriod, true, "双方加入时间已知 → 同期");
+    assert.equal(org2Entry.peers.length, 1);
+    assert.equal(org2Entry.peers[0].docId, peerB);
+    assert.equal(org2Entry.peers[0].overlapText, "2025-01-01 ~ 至今");
+});
+
+test("B13.5b 共同背景规模：3000 名同组织同伴一次索引查询零重复零丢失", () => {
+    const selfId = "20260930000000-self001";
+    const org1 = "20260930000000-org0001";
+    const index = new Map<string, readonly OrgMembership[]>([
+        [selfId, [{
+            id: "20260930000000-m000001", orgDocId: org1, personDocId: selfId,
+            department: "", title: "", joinedOn: "2020-01-01", leftOn: "", status: "active",
+        }]],
+    ]);
+    const names = new Map<string, string>();
+    for (let i = 0; i < 3000; i += 1) {
+        const peerDocId = `20260930000000-peer${String(i).padStart(4, "0")}`;
+        names.set(peerDocId, `同僚${i}`);
+        index.set(peerDocId, [{
+            id: `20260930000000-m${String(i).padStart(7, "0")}`.slice(0, 22),
+            orgDocId: org1, personDocId: peerDocId,
+            department: "", title: "", joinedOn: "2021-01-01", leftOn: "", status: "active",
+        }]);
+    }
+    const background = buildCommonOrgBackground({ personDocId: selfId, membershipIndex: index, namesByDoc: names });
+    assert.equal(background.length, 1);
+    const peers = background[0].peers;
+    assert.equal(peers.length, 3000, "3000 名同组织同伴全部收录");
+    assert.equal(new Set(peers.map((peer) => peer.docId)).size, 3000, "同伴零重复");
+    assert.ok(peers.every((peer) => peer.samePeriod), "全员加入时间已知 → 全部同期");
+    assert.equal(peers[0].docId, "20260930000000-peer0000", "同伴顺序稳定（索引首现序）");
+    assert.equal(peers[2999].docId, "20260930000000-peer2999");
+});

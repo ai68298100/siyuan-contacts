@@ -71,6 +71,13 @@ function input(node, value) {
     node.value = value;
     node.dispatchEvent(new Event("input", { bubbles: true }));
 }
+/** 相对今天的本地日期键（YYYY-MM-DD）。夹具写死日期会被翻日/翻月击穿（2026-10-01 两个用例假阴性的教训）。 */
+function pastDate(daysAgo) {
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    const pad = (value) => String(value).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
 /** B03 可搜索选人器驱动：按 aria-label 打开浮层，按候选名筛选后点选第一项 */
 async function pickOption(label, name) {
     const trigger = [...fixture.querySelectorAll(".lvct-picker__trigger")]
@@ -204,7 +211,7 @@ await test("数据刷新乱序防护：慢的旧互动响应不得覆盖新数�
             loadRecentInteractions: async () => {
                 recentCalls += 1;
                 if (recentCalls === 1) return firstGate;
-                return { "20260927000000-person1": { occurredAt: 1, localDate: "2026-09-29" } };
+                return { "20260927000000-person1": { occurredAt: 1, localDate: pastDate(1) } };
             },
             loadDashboard: async () => ({
                 people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
@@ -223,7 +230,7 @@ await test("数据刷新乱序防护：慢的旧互动响应不得覆盖新数�
     emitDataChanged();
     await until(() => fixture.textContent.includes("昨天互动"), "数据变化未带来新互动数据");
     /* 迟到的旧响应（60 天前）必须在代际守卫处丢弃 */
-    releaseFirst({ "20260927000000-person1": { occurredAt: 0, localDate: "2026-08-01" } });
+    releaseFirst({ "20260927000000-person1": { occurredAt: 0, localDate: pastDate(60) } });
     await tick();
     await tick();
     await tick();
@@ -1325,12 +1332,14 @@ await test("CODE-02.4 编辑写前预校验：非法生日/邮箱零写入，逐
 await test("B11.3/B11.5 指定本人身份：显式改绑成功、未初始化拒绝、目标不存在零改动", async () => {
     const files = new Map();
     files.set("contacts-settings.json", settings);
-    files.set("self-identity.json", { schemaVersion: 1, selfDocId: "20260927000000-person1", selfItemId: "row-1", createdAt: "2026-09-30" });
+    /* selfItemId 必须满足 ID 模式（归一按非法丢弃→createdAt 回落今天；曾因夹具 "row-1"
+       非法 + 恰逢同日而假通过，2026-10-01 翻日暴露） */
+    files.set("self-identity.json", { schemaVersion: 1, selfDocId: "20260927000000-person1", selfItemId: "20260927000000-row0001", createdAt: "2026-09-30" });
     const plugin = { loadData: async (key) => files.get(key) ?? "", saveData: async (key, value) => { files.set(key, value); } };
     kernel.handler = async (route) => {
         if (route === "/api/av/renderAttributeView") {
             const base = renderResult();
-            return { view: { ...base.view, rows: [...base.view.rows, { id: "row-2", cells: [
+            return { view: { ...base.view, rows: [...base.view.rows, { id: "20260927000000-row0002", cells: [
                 { value: { type: "block", keyID: "name", block: { id: "20260927000000-person2", content: "回归测试乙" } } },
             ] } ] } };
         }
@@ -1338,8 +1347,8 @@ await test("B11.3/B11.5 指定本人身份：显式改绑成功、未初始化�
     };
     invalidateRoster();
     /* 显式改绑到 person2 → 成功且 createdAt 保留原始标记日期 */
-    const identity = await designateSelfIdentity(plugin, settings, "row-2");
-    assert(identity.selfDocId === "20260927000000-person2" && identity.selfItemId === "row-2",
+    const identity = await designateSelfIdentity(plugin, settings, "20260927000000-row0002");
+    assert(identity.selfDocId === "20260927000000-person2" && identity.selfItemId === "20260927000000-row0002",
         `显式改绑失败：${JSON.stringify(identity)}`);
     assert(identity.createdAt === "2026-09-30", "改绑丢失了原始 createdAt");
     const stored = files.get("self-identity.json");
@@ -1779,6 +1788,7 @@ await test("B14.8 按组织收窄：关系图人物与组织节点收窄、文�
 
 await test("B13.5a 组织视图：侧栏入口、卡片渲染（活跃/归档/成员数）、管理入口与初始视图直开", async () => {
     let managerOpened = 0;
+    let managerOpenedWith;
     const facade = {
         settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
         listContacts: async () => [],
@@ -1789,7 +1799,7 @@ await test("B13.5a 组织视图：侧栏入口、卡片渲染（活跃/归档/�
             { docId: "20260930000000-org0002", name: "旧校", hpath: "/旧校", notebookId: settings.notebookId, archived: true, memberships: [] },
         ],
         loadDashboard: async () => ({ people: 0, relations: 0, birthdays: [], birthdaysThisWeek: 0, stale: [], neverContacted: 0, neverContactedItemIds: [] }),
-        openOrgManagerDialog: () => { managerOpened += 1; },
+        openOrgManagerDialog: (orgDocId) => { managerOpened += 1; managerOpenedWith = orgDocId; },
     };
     const baseProps = {
         settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
@@ -1808,11 +1818,63 @@ await test("B13.5a 组织视图：侧栏入口、卡片渲染（活跃/归档/�
     button("组织管理").click();
     await tick();
     assert(managerOpened === 1, "组织管理按钮未回调");
+    /* B13.6a：组织卡片「管理」必须携目标 orgDocId（不落默认首个组织） */
+    button("管理").click();
+    await tick();
+    assert(managerOpened === 2, "卡片管理按钮未回调");
+    assert(managerOpenedWith === "20260930000000-org0001", `卡片管理未携带目标组织：${managerOpenedWith}`);
     /* 初始视图直开组织 */
     await unmount(mounted);
     mounted = mount(Workbench, { target: fixture, props: { ...baseProps, initialView: "orgs" } });
     await until(() => fixture.querySelector("h1")?.textContent === "组织", "初始视图未直接打开组织");
     await until(() => fixture.textContent.includes("曙光科技"), "初始组织视图卡片未渲染");
+});
+
+await test("B13.6a 组织弹窗按目标组织定位打开 + 成员查看详情跨弹窗导航（已解绑无入口）", async () => {
+    const memberBound = { id: "20260930000000-mem0001", orgDocId: "20260930000000-org0002",
+        personDocId: "20260930000000-per0001", personName: "张三",
+        department: "", title: "", joinedOn: "", leftOn: "", status: "active" };
+    const memberUnbound = { id: "20260930000000-mem0002", orgDocId: "20260930000000-org0002",
+        personDocId: "20260930000000-per0009", personName: "（已解绑）",
+        department: "", title: "", joinedOn: "", leftOn: "", status: "former" };
+    const memberCalls = [];
+    let openedPerson = null;
+    let closed = false;
+    const facade = {
+        settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        listContacts: async () => [{ docId: "20260930000000-per0001", itemId: "row-p1", name: "张三", isSelf: false }],
+        listOrganizations: async () => [
+            { docId: "20260930000000-org0001", name: "曙光科技", hpath: "/曙光科技", notebookId: settings.notebookId, archived: false, memberships: [] },
+            { docId: "20260930000000-org0002", name: "旧校", hpath: "/旧校", notebookId: settings.notebookId, archived: true, memberships: [memberBound, memberUnbound] },
+        ],
+        listOrganizationMembers: async (orgDocId) => {
+            memberCalls.push(orgDocId);
+            return orgDocId === "20260930000000-org0002" ? [{ ...memberBound }, { ...memberUnbound }] : [];
+        },
+    };
+    mounted = mount(OrgManagerDialog, { target: fixture, props: {
+        facade, i18n: undefined, initialOrgDocId: "20260930000000-org0002",
+        onOpenPerson: (person) => { openedPerson = { docId: person.docId, name: person.name }; },
+        onClose: () => { closed = true; },
+    } });
+    await until(
+        () => fixture.querySelector(".lvct-org-manager__detail")?.textContent.includes("张三"),
+        "未定位到指定组织（落到了默认首个组织）",
+    );
+    assert(memberCalls[0] === "20260930000000-org0002", `首载成员查询目标错误：${memberCalls[0]}`);
+    const memberRows = () => [...fixture.querySelectorAll(".lvct-org-manager__member")];
+    const boundRow = memberRows().find((node) => node.textContent.includes("张三"));
+    const unboundRow = memberRows().find((node) => node.textContent.includes("已解绑"));
+    assert(boundRow, "在册成员行未渲染");
+    assert(unboundRow, "已解绑成员行未渲染");
+    assert([...boundRow.querySelectorAll("button")].some((node) => node.textContent.trim() === "查看详情"), "在册成员缺查看详情入口");
+    assert(![...unboundRow.querySelectorAll("button")].some((node) => node.textContent.trim() === "查看详情"), "已解绑成员不应有查看详情入口");
+    /* 点击查看详情 → onOpenPerson 携联系人字段 + 组织弹窗关闭（跨弹窗导航到工作台人物详情） */
+    [...boundRow.querySelectorAll("button")].find((node) => node.textContent.trim() === "查看详情").click();
+    await tick();
+    assert(openedPerson && openedPerson.docId === "20260930000000-per0001" && openedPerson.name === "张三",
+        `查看详情未携联系人回调：${JSON.stringify(openedPerson)}`);
+    assert(closed, "导航后组织弹窗未关闭");
 });
 
 if (window.innerWidth <= 640) {

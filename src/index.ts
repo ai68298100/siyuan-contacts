@@ -508,8 +508,8 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         return listCommonOrgBackground(this, this.settings, personDocId);
     }
 
-    /** B13.3：打开组织管理弹窗 */
-    openOrgManagerDialog(): void {
+    /** B13.3：打开组织管理弹窗（B13.6a：携目标组织定位；成员行可跨弹窗导航到工作台人物详情） */
+    openOrgManagerDialog(initialOrgDocId?: string): void {
         if (!this.settings) {
             showMessage("请先完成人脉工作空间初始化", 3000);
             return;
@@ -518,7 +518,16 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
             title: this.i18n.orgManagerTitle ?? "组织管理",
             width: "620px",
             component: OrgManagerDialog,
-            props: { facade: this, i18n: this.i18n },
+            props: {
+                facade: this,
+                i18n: this.i18n,
+                initialOrgDocId,
+                onOpenPerson: (person: unknown) => {
+                    /* 组织弹窗为宿主级弹窗，人物详情 Peek 由工作台承载：
+                       经窗口事件交给已挂载的工作台打开（组织弹窗先于 Peek 关闭，避免遮挡） */
+                    window.dispatchEvent(new CustomEvent("lvct-workbench-person", { detail: { person } }));
+                },
+            },
         });
     }
 

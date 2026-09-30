@@ -16,7 +16,8 @@
         facade: ContactsPluginFacade;
         revision?: number;
         i18n?: Readonly<Record<string, string>>;
-        onOpenOrgManager: () => void;
+        /** B13.6a：工具栏入口不携参；组织卡片「管理」必须携目标 orgDocId（不落默认首个组织） */
+        onOpenOrgManager: (orgDocId?: string) => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -60,7 +61,7 @@
             {text("orgsViewSummary", "共 {total} 个组织，{archived} 个已归档。成员的加入与离开在组织管理中维护。", { total: orgs.length, archived: orgs.filter((org) => org.archived).length })}
         </span>
         <span class="fn__flex-1"></span>
-        <button type="button" class="b3-button b3-button--text" onclick={onOpenOrgManager}>
+        <button type="button" class="b3-button b3-button--text" onclick={() => onOpenOrgManager()}>
             <Plus size={15} />{text("orgsManage", "组织管理")}
         </button>
     </div>
@@ -74,7 +75,7 @@
     {:else if sortedOrgs.length === 0}
         <ViewState title={text("orgsEmptyTitle", "还没有组织")}
             description={text("orgsEmptyDesc", "在组织管理中新建组织（公司/学校等），再为联系人登记归属。")}>
-            <button type="button" class="b3-button b3-button--outline" onclick={onOpenOrgManager}>{text("orgsCreateFirst", "新建组织")}</button>
+            <button type="button" class="b3-button b3-button--outline" onclick={() => onOpenOrgManager()}>{text("orgsCreateFirst", "新建组织")}</button>
         </ViewState>
     {:else}
         <div class="lvct-orgs-view__grid">
@@ -89,7 +90,8 @@
                         {text("orgsCardMembers", "{n} 名在职/在读成员", { n: activeCountOf(org) })}
                     </div>
                     <div class="lvct-orgs-view__card-actions">
-                        <button type="button" class="b3-button b3-button--text" onclick={onOpenOrgManager}>
+                        <button type="button" class="b3-button b3-button--text"
+                            onclick={() => onOpenOrgManager(org.docId)}>
                             {text("orgsManageOrg", "管理")}</button>
                     </div>
                 </div>

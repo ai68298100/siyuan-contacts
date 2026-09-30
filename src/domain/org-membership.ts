@@ -202,6 +202,8 @@ function startKnown(membership: OrgMembership): boolean {
  * - 排除本人；双方多段记录任一交集非空即收录，重叠文本取最大交集；
  * - samePeriod 仅在双方 joinedOn 均已知时为 true——时间未知只展示同组织事实，不推断「同期」；
  * - 不写 related、不产生称谓、零写入（B13.6 验收口径）。
+ * - B13.5b 查询规模：一次遍历建「组织 → 成员记录」索引后按组织直取候选，同伴查重用
+ *   Set——不再对每段归属全索引扫描、不对 peers 做线性 some；输出语义与全量扫描一致。
  */
 export function buildCommonOrgBackground(options: {
     personDocId: string;
@@ -215,7 +217,23 @@ export function buildCommonOrgBackground(options: {
     const { personDocId, membershipIndex, namesByDoc, orgNames, contactsByDoc } = options;
     const ownRecords = membershipIndex.get(personDocId) ?? [];
     if (ownRecords.length === 0) return [];
+    /* 组织 →（人物 → 该组织成员记录）：键序沿用 membershipIndex 首现序，保证同伴顺序稳定 */
+    const membersByOrg = new Map<string, Map<string, OrgMembership[]>>();
+    for (const [peerDocId, peerRecords] of membershipIndex) {
+        if (peerDocId === personDocId) continue;
+        for (const record of peerRecords) {
+            let byPerson = membersByOrg.get(record.orgDocId);
+            if (!byPerson) {
+                byPerson = new Map();
+                membersByOrg.set(record.orgDocId, byPerson);
+            }
+            const list = byPerson.get(peerDocId);
+            if (list) list.push(record);
+            else byPerson.set(peerDocId, [record]);
+        }
+    }
     const byOrg = new Map<string, CommonOrgBackground>();
+    const seenPeersByOrg = new Map<string, Set<string>>();
     for (const own of ownRecords) {
         const ownRange = membershipRange(own);
         let entry = byOrg.get(own.orgDocId);
@@ -226,13 +244,15 @@ export function buildCommonOrgBackground(options: {
                 peers: [],
             };
             byOrg.set(own.orgDocId, entry);
+            seenPeersByOrg.set(own.orgDocId, new Set());
         }
-        for (const [peerDocId, peerRecords] of membershipIndex) {
-            if (peerDocId === personDocId) continue;
-            if (entry.peers.some((peer) => peer.docId === peerDocId)) continue;
+        const seenPeers = seenPeersByOrg.get(own.orgDocId)!;
+        const candidates = membersByOrg.get(own.orgDocId);
+        if (!candidates) continue;
+        for (const [peerDocId, peerRecords] of candidates) {
+            if (seenPeers.has(peerDocId)) continue;
             let best: { range: { start: string; end: string }; samePeriod: boolean } | null = null;
             for (const peerRecord of peerRecords) {
-                if (peerRecord.orgDocId !== own.orgDocId) continue;
                 const intersection = rangeIntersection(ownRange, membershipRange(peerRecord));
                 if (!intersection) continue;
                 const candidate = {
@@ -244,6 +264,7 @@ export function buildCommonOrgBackground(options: {
             if (!best) continue;
             const peerName = namesByDoc.get(peerDocId);
             if (!peerName) continue;
+            seenPeers.add(peerDocId);
             entry.peers.push({
                 docId: peerDocId,
                 name: peerName,

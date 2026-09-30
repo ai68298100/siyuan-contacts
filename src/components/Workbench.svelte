@@ -111,7 +111,16 @@
             }
         };
         window.addEventListener("lvct-workbench-view", handleRequestedView);
-        return () => window.removeEventListener("lvct-workbench-view", handleRequestedView);
+        // B13.6a：组织管理弹窗成员「查看详情」跨弹窗导航（弹窗先关，Peek 由本层打开）
+        const handleRequestedPerson = (event: Event) => {
+            const person = (event as CustomEvent<{ person?: ContactSummary }>).detail?.person;
+            if (person?.docId) void openDetail(person);
+        };
+        window.addEventListener("lvct-workbench-person", handleRequestedPerson);
+        return () => {
+            window.removeEventListener("lvct-workbench-view", handleRequestedView);
+            window.removeEventListener("lvct-workbench-person", handleRequestedPerson);
+        };
     });
 
     // FUNC-01.7：跨窗口/宿主数据变化 → 防抖合并后 bump revision 原地刷新（筛选与 Peek 上下文保留）；
@@ -241,7 +250,7 @@
                     {facade}
                     revision={dataRevision}
                     i18n={facade.i18n}
-                    onOpenOrgManager={() => facade.openOrgManagerDialog()}
+                    onOpenOrgManager={(orgDocId) => facade.openOrgManagerDialog(orgDocId)}
                 />
             {:else if current === "settings"}
                 <SettingsView
