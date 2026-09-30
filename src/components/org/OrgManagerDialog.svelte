@@ -7,6 +7,7 @@
     import { translateText } from "../../domain/translation";
     import { subscribeDataChanged } from "../../libs/data-events";
     import { useCloseGuard } from "../close-guard";
+    import PersonPicker from "../people/PersonPicker.svelte";
     import type { ContactsPluginFacade } from "../../types";
     import type { OrganizationWithMembers, OrganizationMember } from "../../services/org";
     import type { ContactSummary } from "../../domain/person";
@@ -78,6 +79,13 @@
     const addCandidates = $derived(
         roster.filter((person) => !members.some((member) => member.personDocId === person.docId)),
     );
+    /* H-05：选人器候选（姓名/电话/微信/邮箱搜索） */
+    const addCandidateItems = $derived(addCandidates.map((person) => ({
+        id: person.docId,
+        label: person.name,
+        hint: person.group || undefined,
+        keywords: `${person.phone} ${person.wechat} ${person.email}`.toLowerCase(),
+    })));
     /* B13.6a：docId → 联系人（成员「查看详情」入口的资格判断与导航载荷） */
     const contactsByDoc = $derived(new Map(roster.map((person) => [person.docId, person] as const)));
 
@@ -433,13 +441,16 @@
                         {/if}
                     {/if}
                     <div class="lvct-org-manager__add">
-                        <select class="b3-select fn__block" bind:value={addPersonId} disabled={busy}
-                            aria-label={text("orgAddMemberLabel", "选择要添加的联系人")}>
-                            <option value="">{text("orgAddMemberPick", "选择联系人…")}</option>
-                            {#each addCandidates as person (person.itemId)}
-                                <option value={person.docId}>{person.name}</option>
-                            {/each}
-                        </select>
+                        <!-- H-05：原生 select 换可搜索选人器（姓名/电话/微信/邮箱筛选，长名册不靠滚动） -->
+                        <PersonPicker
+                            items={addCandidateItems}
+                            value={addPersonId}
+                            placeholder={text("orgAddMemberPick", "选择联系人…")}
+                            ariaLabel={text("orgAddMemberLabel", "选择要添加的联系人")}
+                            disabled={busy}
+                            {i18n}
+                            onSelect={(id) => (addPersonId = id)}
+                        />
                         <button class="b3-button b3-button--text" disabled={busy || !addPersonId} onclick={addMember}>
                             {text("orgMemberAdd", "添加成员")}</button>
                     </div>

@@ -1361,13 +1361,8 @@ await test("B13.3 组织管理弹窗：新建组织、添加/移除成员经 fac
     button("新建组织").click();
     await until(() => fixture.textContent.includes("测试公司"), `新建组织未出现在列表：${fixture.querySelector(".lvct-org-manager")?.textContent?.slice(0, 200)}`);
     assert(createdOrgs.length === 1, "新建未走 facade.createOrganization");
-    /* 添加成员 */
-    await until(() => fixture.querySelector(".lvct-org-manager__add select"), "添加成员选择器未出现");
-    const select = fixture.querySelector(".lvct-org-manager__add select");
-    select.value = "20260930000000-per0001";
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-    await tick();
-    await tick();
+    /* 添加成员（H-05：可搜索选人器——按姓名筛选后点选） */
+    await pickOption("选择要添加的联系人", "张三");
     button("添加成员").click();
     await tick();
     await until(
@@ -2207,20 +2202,20 @@ await test("H-29 组织弹窗切换目标隔离草稿：改名框/已选联系�
         facade, i18n: undefined, onClose: () => { closed = true; },
     } });
     await until(() => fixture.textContent.includes("甲公司"), "组织列表未加载");
-    /* 组织 A 进入改名草稿 + 选中要添加的联系人 */
+    /* 组织 A 进入改名草稿 + 选中要添加的联系人（H-05 选人器：点选首候选） */
     button("改名").click();
     await until(() => fixture.querySelector('input[aria-label="新组织名称"]'), "改名输入框未出现");
     input(fixture.querySelector('input[aria-label="新组织名称"]'), "甲公司改");
-    const addSelect = () => fixture.querySelector(".lvct-org-manager__add select");
-    addSelect().value = "20260930000000-per0001";
-    addSelect().dispatchEvent(new Event("change", { bubbles: true }));
+    await pickOption("选择要添加的联系人", "张三");
     await tick();
     /* 切到组织 B：A 的草稿态必须被隔离（旧实现 saveRename 按 B 的 orgDocId 落笔=跨组织误写） */
     [...fixture.querySelectorAll(".lvct-org-manager__org-item")]
         .find((node) => node.textContent.includes("乙公司")).click();
     await tick();
     assert(!fixture.querySelector('input[aria-label="新组织名称"]'), "切组未关闭改名草稿");
-    assert(addSelect().value === "", "切组未清空已选联系人");
+    /* H-05：选人器已选值随切组清空（触发器回落占位文案） */
+    const addTriggerText = fixture.querySelector(".lvct-picker__trigger")?.textContent?.trim() ?? "";
+    assert(addTriggerText.includes("选择联系人…"), `切组未清空已选联系人：${addTriggerText}`);
     assert(fixture.querySelector(".lvct-org-manager__detail")?.textContent.includes("乙公司"), "切组后详情未切换");
     /* 组织 B 再次进入改名后点关闭：守卫出现 → 放弃并离开 */
     button("改名").click();
