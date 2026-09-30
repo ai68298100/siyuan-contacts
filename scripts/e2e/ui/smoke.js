@@ -3991,9 +3991,8 @@ await test("重复候选检查：并排资料与理由展示，查看跳转零�
         onPreferencesChange: async (next) => next,
     } });
     await until(() => fixture.querySelectorAll(".lvct-people__cards > *").length === 3, "名册未加载 3 人");
-    // 整理按钮带候选角标
-    assert(button("整理 ·1"), "整理按钮未显示候选角标");
-    button("整理 ·1").click();
+    // 整理按钮点击时按需计算候选并打开弹窗（D-38：不再预计算角标）
+    button("整理").click();
     await until(() => fixture.textContent.includes("匹配规则"), "候选面板未显示规则说明");
     assert(fixture.textContent.includes("电话相同：13826110427"), "电话理由缺失");
     assert(fixture.textContent.includes("邮箱相同：a@x.com"), "邮箱理由缺失");

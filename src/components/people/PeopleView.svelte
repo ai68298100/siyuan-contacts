@@ -91,7 +91,20 @@
     let activeViewName = $state("");
     let viewHint = $state("");
     let dupOpen = $state(false);
-    const duplicatePairs: DuplicatePair[] = $derived(findDuplicatePairs(people));
+    /* D-38/G-07：重复检查延迟到用户打开「整理」时再执行——$derived 立即计算会在
+       每次名册更新时做 O(k²) 扫描阻塞交互；候选在打开弹窗时按需计算、刷新名册后失效。 */
+    let duplicatePairs: DuplicatePair[] = $state([]);
+    let dupCheckedRoster = ""; /* 上次计算时的名册签名（长度+首尾 docId），变更即失效 */
+
+    /** D-38：打开整理弹窗时按需计算重复候选（用户触发，非名册每次更新都算） */
+    function openDupDialog() {
+        const signature = `${people.length}:${people[0]?.docId ?? ""}:${people[people.length - 1]?.docId ?? ""}`;
+        if (signature !== dupCheckedRoster) {
+            duplicatePairs = findDuplicatePairs(people);
+            dupCheckedRoster = signature;
+        }
+        dupOpen = true;
+    }
     // svelte-ignore state_referenced_locally
     let sortMode: "name" | "group" | "birthday" | "recent" = $state(initialSort);
     let recent: Record<string, { occurredAt: number; localDate: string }> = $state({});
@@ -636,8 +649,9 @@
         </span>
     {/snippet}
     {#snippet actionControls()}
-        <button class="b3-button b3-button--outline" onclick={() => (dupOpen = true)}>
-            {text("peopleCleanup", "整理")}{duplicatePairs.length > 0 ? ` ·${duplicatePairs.length}` : ""}
+        <!-- D-38：整理按钮不再预计算候选数（·N 徽标移除），点击时按需计算 -->
+        <button class="b3-button b3-button--outline" onclick={openDupDialog}>
+            {text("peopleCleanup", "整理")}
         </button>
         <button class="b3-button b3-button--outline" onclick={() => (importing = true)}><FolderInput size={16}/>{text("peopleImportDocs", "导入已有文档")}</button>
         <button class="b3-button b3-button--outline" onclick={() => (vcarding = true)}><ContactRound size={16}/>{text("peopleVcard", "vCard 导入/导出")}</button>
@@ -726,7 +740,7 @@
                 aria-label={text("peopleMobileTools", "筛选与整理")}
                 aria-expanded={mobileSheetOpen}
                 onclick={() => (mobileSheetOpen = true)}
-            ><SlidersHorizontal size={16}/>{text("peopleMobileTools", "筛选与整理")}{isExtraFilterActive(extraFilter) || duplicatePairs.length > 0 ? " ·" : ""}</button>
+            ><SlidersHorizontal size={16}/>{text("peopleMobileTools", "筛选与整理")}{isExtraFilterActive(extraFilter) ? " ·" : ""}</button>
         {/if}
     </div>
     {#if isMobile && mobileSheetOpen}
