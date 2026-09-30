@@ -7,6 +7,7 @@ import {
     removeMembership,
     applyMembershipPatch,
     updateMembership,
+    buildCommonOrgBackground,
 } from "../src/domain/org-membership.ts";
 import type { OrgMembership } from "../src/domain/org-membership.ts";
 
@@ -91,4 +92,72 @@ test("B13.4 成员编辑：store 级更新与查无此 id", () => {
     assert.equal(next.memberships[0].title, "顾问");
     assert.equal(updateMembership(store, "missing", { title: "x" }), null, "查无此 id 返回 null");
     assert.equal(updateMembership(store, "20260930000000-m000003", { joinedOn: "bad" }), null, "非法补丁返回 null");
+});
+
+test("B13.6 共同背景：重叠期间与同期推断（时间未知不推断）", () => {
+    const selfId = "20260930000000-self001";
+    const peerA = "20260930000000-peer0001";
+    const peerB = "20260930000000-peer0002";
+    const peerC = "20260930000000-peer0003";
+    const org1 = "20260930000000-org0001";
+    const org2 = "20260930000000-org0002";
+    const m = (over: Partial<OrgMembership>): OrgMembership => ({
+        id: "20260930000000-m000001", orgDocId: org1, personDocId: selfId,
+        department: "", title: "", joinedOn: "", leftOn: "", status: "active", ...over,
+    });
+    const index = new Map<string, readonly OrgMembership[]>([
+        [selfId, [
+            m({ orgDocId: org1, joinedOn: "2023-01-01", leftOn: "" }),
+            m({ id: "20260930000000-m000002", orgDocId: org2, joinedOn: "2020-01-01", leftOn: "2021-12-31" }),
+        ]],
+        [peerA, [m({ id: "20260930000000-m000003", orgDocId: org1, personDocId: peerA, joinedOn: "2024-06-01", leftOn: "2025-05-31" })]],
+        // 同组织但 joinedOn 未知：收录为同组织，不推断同期
+        [peerB, [m({ id: "20260930000000-m000004", orgDocId: org1, personDocId: peerB, joinedOn: "" })]],
+        // 期间不相交：不收录
+        [peerC, [m({ id: "20260930000000-m000005", orgDocId: org2, personDocId: peerC, joinedOn: "2023-01-01" })]],
+    ]);
+    const names = new Map([[peerA, "甲"], [peerB, "乙"], [peerC, "丙"], [selfId, "我自己"]]);
+    const background = buildCommonOrgBackground({ personDocId: selfId, membershipIndex: index, namesByDoc: names });
+    assert.equal(background.length, 1, "org2 与丙期间不相交，唯一背景应是 org1");
+    const org1Entry = background[0];
+    assert.equal(org1Entry.orgDocId, org1);
+    assert.equal(org1Entry.peers.length, 2, "只有甲乙同 org1 有交集");
+    const peerAEntry = org1Entry.peers.find((peer) => peer.docId === peerA);
+    assert.ok(peerAEntry);
+    assert.equal(peerAEntry.samePeriod, true, "双方加入时间已知且交集非空 → 同期");
+    assert.equal(peerAEntry.overlapText, "2024-06-01 ~ 2025-05-31");
+    const peerBEntry = org1Entry.peers.find((peer) => peer.docId === peerB);
+    assert.ok(peerBEntry);
+    assert.equal(peerBEntry.samePeriod, false, "对方加入时间未知 → 不推断同期");
+    assert.equal(peerBEntry.overlapText, "2023-01-01 ~ 至今");
+    // 空成员记录 → 空背景
+    assert.deepEqual(buildCommonOrgBackground({ personDocId: peerC, membershipIndex: new Map(), namesByDoc: names }), []);
+});
+
+test("B13.6 共同背景：组织名解析与归档组织纳入", () => {
+    const selfId = "20260930000000-self001";
+    const peerA = "20260930000000-peer0001";
+    const org1 = "20260930000000-org0001";
+    const m = (over: Partial<OrgMembership>): OrgMembership => ({
+        id: "20260930000000-m000001", orgDocId: org1, personDocId: selfId,
+        department: "", title: "", joinedOn: "", leftOn: "", status: "former", ...over,
+    });
+    const index = new Map<string, readonly OrgMembership[]>([
+        [selfId, [m({ joinedOn: "2020-01-01", leftOn: "2022-01-01" })]],
+        [peerA, [m({ id: "20260930000000-m000002", orgDocId: org1, personDocId: peerA, joinedOn: "2021-01-01", leftOn: "" })]],
+    ]);
+    const background = buildCommonOrgBackground({
+        personDocId: selfId,
+        membershipIndex: index,
+        namesByDoc: new Map([[peerA, "甲"]]),
+        orgNames: new Map([[org1, "旧东家"]]),
+    });
+    assert.equal(background.length, 1);
+    assert.equal(background[0].orgName, "旧东家");
+    assert.equal(background[0].peers[0].overlapText, "2021-01-01 ~ 2022-01-01");
+    // 未知组织名降级占位
+    const unknown = buildCommonOrgBackground({
+        personDocId: selfId, membershipIndex: index, namesByDoc: new Map([[peerA, "甲"]]),
+    });
+    assert.equal(unknown[0].orgName, "（组织文档不可达）");
 });

@@ -14,6 +14,8 @@ import {
     updateOrgMembership,
 } from "../data/org-membership";
 import type { OrgMembership, OrgMembershipPatch } from "../domain/org-membership";
+import { buildCommonOrgBackground } from "../domain/org-membership";
+import type { CommonOrgBackground } from "../domain/org-membership";
 import type { ContactsSettings } from "../domain/model";
 import { listContacts } from "./contacts";
 
@@ -253,6 +255,29 @@ export async function restoreOrganization(orgDocId: string): Promise<void> {
 /** 更新成员记录字段（B13.4：部门/职位/入职/离职/状态；身份字段不可变） */
 export async function updateOrganizationMember(plugin: Plugin, id: string, patch: OrgMembershipPatch): Promise<void> {
     await updateOrgMembership(plugin, id, patch);
+}
+
+/**
+ * B13.6 共同背景：当前人物与哪些联系人同组织（重叠期间/同期口径，零写入）。
+ * 历史事实口径：含 former 成员与归档组织（与单位行的活跃口径不同）。
+ * 名册读取失败上抛（读故障显式化）。
+ */
+export async function listCommonOrgBackground(
+    plugin: Plugin,
+    settings: ContactsSettings,
+    personDocId: string,
+): Promise<CommonOrgBackground[]> {
+    const [index, orgs, roster] = await Promise.all([
+        membershipsByPerson(plugin),
+        scanOrganizations(),
+        listContacts(settings),
+    ]);
+    return buildCommonOrgBackground({
+        personDocId,
+        membershipIndex: index,
+        namesByDoc: new Map(roster.map((person) => [person.docId, person.name] as const)),
+        orgNames: new Map(orgs.map((org) => [org.docId, org.name] as const)),
+    });
 }
 
 /** 组织改名（B13.4 余项；spike:b13 通道7 实证 renameDoc 行为）：同名检查（不含自身、含归档）

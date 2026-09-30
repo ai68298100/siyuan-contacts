@@ -35,6 +35,7 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadOrgCandidates,
         onAddOrgMembership,
         onRemoveOrgMembership,
+        onLoadCommonOrgs,
         onRecord,
         onDeleteInteraction,
         onLoadInsights,
@@ -72,6 +73,8 @@ import StatusNotice from "../StatusNotice.svelte";
         onAddOrgMembership?: (personDocId: string, orgDocId: string, extra?: { department?: string; title?: string; joinedOn?: string }) => Promise<void>;
         /** B13.5：移除一条组织归属（membership id） */
         onRemoveOrgMembership?: (membershipId: string) => Promise<void>;
+        /** B13.6：共同背景投影（同组织联系人；未接线时隐藏该区） */
+        onLoadCommonOrgs?: (docId: string) => Promise<import("../../domain/org-membership").CommonOrgBackground[]>;
         onOpenPersonDoc: (docId: string) => void;
         onNavigate: (person: ContactSummary) => void;
         navigationOrder?: readonly ContactSummary[];
@@ -462,6 +465,24 @@ import StatusNotice from "../StatusNotice.svelte";
 
     loadOrgCandidates();
 
+    /* ---- B13.6 共同背景投影（只读展示，零写入；失败降级隐藏） ---- */
+    const commonOrgsSupported = $derived(Boolean(onLoadCommonOrgs));
+    let commonOrgs: import("../../domain/org-membership").CommonOrgBackground[] = $state([]);
+    let commonOrgsFailed = $state(false);
+    async function loadCommonOrgs(): Promise<void> {
+        if (!onLoadCommonOrgs) return;
+        try {
+            commonOrgs = await onLoadCommonOrgs(current.docId);
+            commonOrgsFailed = false;
+        } catch (error) {
+            console.warn("[lvct] 共同背景读取失败", error);
+            commonOrgs = [];
+            commonOrgsFailed = true;
+        }
+    }
+
+    loadCommonOrgs();
+
     /* FUNC-01.7-a：数据变化（跨窗口/宿主）→ 原地重载洞察与跟进；写入/操作挂起时跳过
        （Workbench 对草稿场景给出可见提示条），当前人物与输入草稿保留 */
     let lastSeenRevision = untrack(() => revision);
@@ -716,6 +737,31 @@ import StatusNotice from "../StatusNotice.svelte";
                     onclick={() => void addOrgMembership()}>{text("orgAddSubmit", "添加归属")}</button>
             </div>
             {#if addOrgError}<div class="lvct-form__error" role="alert">{addOrgError}</div>{/if}
+        {/if}
+    </section>
+    {/if}
+
+    {#if commonOrgsSupported && (commonOrgs.length > 0 || commonOrgsFailed)}
+    <section class="lvct-detail__section">
+        <h4>{text("orgCommonTitle", "共同背景")}</h4>
+        {#if commonOrgsFailed}
+            <p class="ft__smaller ft__on-surface">{text("orgCommonFailed", "共同背景读取失败，可在数据刷新后重试。")}</p>
+        {:else}
+            {#each commonOrgs as entry (entry.orgDocId)}
+                <div class="lvct-org-common">
+                    <b>{entry.orgName}</b>
+                    {#each entry.peers as peer (peer.docId)}
+                        <div class="lvct-org-common__peer">
+                            <span>{peer.name}</span>
+                            <span class="lvct-chip {peer.samePeriod ? "lvct-bucket--today" : "lvct-bucket--stale"}">
+                                {peer.samePeriod ? text("orgCommonSamePeriod", "同期") : text("orgCommonSameOrg", "同组织")}
+                            </span>
+                            <span class="ft__smaller ft__on-surface">{peer.overlapText}</span>
+                        </div>
+                    {/each}
+                </div>
+            {/each}
+            <p class="ft__smaller ft__on-surface">{text("orgCommonNote", "依据为组织成员记录；加入时间未知者只标「同组织」，不推断同期。")}</p>
         {/if}
     </section>
     {/if}

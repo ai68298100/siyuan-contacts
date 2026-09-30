@@ -3554,6 +3554,21 @@
     }
 }
 
+/* B13.6 共同背景 */
+.lvct-org-common {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: var(--lvct-sp-2);
+
+    &__peer {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+}
+
 /* B13.5 人物详情内添加归属表单 */
 .lvct-org-add {
     display: flex;

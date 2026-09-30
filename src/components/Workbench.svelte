@@ -281,6 +281,7 @@
             onDeleteInteraction={(personDocId, eventId) => facade.deleteInteraction(personDocId, eventId)}
             onLoadInsights={(docId) => facade.loadPersonInsights(docId)}
             onLoadOrgMemberships={(docId) => facade.listPersonOrgMemberships(docId)}
+            onLoadCommonOrgs={(docId) => facade.listCommonOrgBackground(docId)}
             onOpenOrgManager={() => facade.openOrgManagerDialog()}
             onLoadOrgCandidates={async () => (await facade.listOrganizations())
                 .filter((org) => !org.archived).map((org) => ({ docId: org.docId, name: org.name }))}

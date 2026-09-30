@@ -122,6 +122,8 @@ export interface ContactsPluginFacade {
     openOrgManagerDialog(): void;
     /** B12：某人的组织归属投影（成员记录 join 组织名） */
     listPersonOrgMemberships(personDocId: string): Promise<import("./services/org").PersonOrgMembershipView[]>;
+    /** B13.6：共同背景（同组织联系人，重叠期间/同期口径，零写入） */
+    listCommonOrgBackground(personDocId: string): Promise<import("./domain/org-membership").CommonOrgBackground[]>;
     /** FUNC-01.14：AI 资料候选受限补丁写——只写补丁字段，最新名册回读逐字段冲突核对 */
     updatePersonCandidateFields(personItemId: string, patches: readonly import("./domain/contact-patch").CandidateFieldPatch[]): Promise<import("./services/contacts").CandidateFieldApplyResult>;
     /** 从笔记捕获：确认执行（互动事件 + 参与人区块 + 新人收编） */

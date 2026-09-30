@@ -1468,6 +1468,52 @@ await test("B13.5 双向编辑完整版：人物详情内添加/移除组织归�
     );
 });
 
+await test("B13.6 共同背景：同组织联系人按重叠期间展示（同期/同组织区分，失败降级）", async () => {
+    const background = [
+        {
+            orgDocId: "20260930000000-org0001", orgName: "测试公司",
+            peers: [
+                { docId: "20260930000000-peer0001", name: "同期同事甲", overlapText: "2024-06-01 ~ 2025-05-31", samePeriod: true },
+                { docId: "20260930000000-peer0002", name: "时间未知乙", overlapText: "2023-01-01 ~ 至今", samePeriod: false },
+            ],
+        },
+    ];
+    let fail = true;
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person, onRecord: async () => {}, onLoadInsights: async () => emptyInsights(),
+        onLoadCommonOrgs: async () => {
+            if (fail) throw new Error("共同背景读取失败");
+            return background;
+        },
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+    } });
+    /* 失败降级：区块显示提示而非空白 */
+    await until(() => fixture.textContent.includes("共同背景读取失败"), "共同背景失败未降级提示");
+    /* 恢复：同期/同组织 chip 与期间文本 */
+    await unmount(mounted);
+    fail = false;
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person, onRecord: async () => {}, onLoadInsights: async () => emptyInsights(),
+        onLoadCommonOrgs: async () => background,
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+    } });
+    await until(() => fixture.textContent.includes("测试公司"), "共同背景组织名未渲染");
+    await until(() => fixture.textContent.includes("同期同事甲"), "同期同伴未渲染");
+    assert(fixture.textContent.includes("2024-06-01 ~ 2025-05-31"), "重叠期间未渲染");
+    const chips = [...fixture.querySelectorAll(".lvct-org-common__peer .lvct-chip")].map((node) => node.textContent.trim());
+    assert(chips.includes("同期") && chips.includes("同组织"), `同期/同组织 chip 缺失：${chips.join(",")}`);
+    assert(fixture.textContent.includes("不推断同期"), "口径说明缺失");
+    /* 无背景时不渲染区块（onLoadCommonOrgs 接线但数据为空） */
+    await unmount(mounted);
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person, onRecord: async () => {}, onLoadInsights: async () => emptyInsights(),
+        onLoadCommonOrgs: async () => [],
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+    } });
+    await tick();
+    assert(!fixture.textContent.includes("共同背景"), "空背景不应渲染区块");
+});
+
 await test("FUNC-01.8a 锚点消歧：首 AV 无关不采纳按字段证据取次 AV，歧义暂停写入，零匹配按新建", async () => {
     const hostDocId = "20260927000000-host001";
     const CONTACT_COLUMNS = [

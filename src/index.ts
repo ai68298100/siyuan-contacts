@@ -42,6 +42,7 @@ import {
     restoreOrganization,
     renameOrganization,
     listPersonOrgMemberships,
+    listCommonOrgBackground,
 } from "./services/org";
 import { exportMigrationBundle, importMigrationBundle, previewMigrationImport } from "./services/migration-bundle";
 import { loadViewPreferences, saveViewPreferences } from "./services/preferences";
@@ -499,6 +500,12 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     async listPersonOrgMemberships(personDocId: string) {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
         return listPersonOrgMemberships(this, personDocId);
+    }
+
+    /** B13.6：共同背景（同组织联系人，重叠期间/同期口径，零写入） */
+    async listCommonOrgBackground(personDocId: string) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return listCommonOrgBackground(this, this.settings, personDocId);
     }
 
     /** B13.3：打开组织管理弹窗 */
