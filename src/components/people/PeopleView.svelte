@@ -10,7 +10,7 @@
     import type { PeopleTableColumn, ViewPreferences } from "../../domain/preferences";
     import { applyPeopleFilters, EMPTY_PEOPLE_FILTER, isExtraFilterActive, matchTags } from "../../domain/people-filters";
     import type { PeopleFilterState } from "../../domain/people-filters";
-    import { findDuplicatePairs } from "../../domain/duplicate-check";
+    import { findDuplicatePairs, DUPLICATE_PAIRS_LIMIT } from "../../domain/duplicate-check";
     import type { DuplicatePair } from "../../domain/duplicate-check";
     import { findSavedViewByName, missingTags, normalizeSavedViews } from "../../domain/saved-views";
     import type { SavedView, SavedViewQuery } from "../../domain/saved-views";
@@ -100,7 +100,7 @@
     function openDupDialog() {
         const signature = `${people.length}:${people[0]?.docId ?? ""}:${people[people.length - 1]?.docId ?? ""}`;
         if (signature !== dupCheckedRoster) {
-            duplicatePairs = findDuplicatePairs(people);
+            duplicatePairs = findDuplicatePairs(people, DUPLICATE_PAIRS_LIMIT);
             dupCheckedRoster = signature;
         }
         dupOpen = true;
@@ -990,6 +990,10 @@
                 {#if duplicatePairs.length === 0}
                     <ViewState compact icon="✓" title="没有发现疑似重复" description="当前名册没有按规则命中的候选组合。" />
                 {:else}
+                    {#if duplicatePairs.length >= DUPLICATE_PAIRS_LIMIT}
+                        <!-- G-07：候选已达展示上限，提示截断 -->
+                        <p class="ft__smaller ft__on-surface" role="status">候选较多，仅展示前 {DUPLICATE_PAIRS_LIMIT} 对；建议先修正已列出的重复后再重新检查。</p>
+                    {/if}
                     {#each duplicatePairs as pair (pair.a.itemId + "::" + pair.b.itemId)}
                         <div class="lvct-dup__pair">
                             <div class="lvct-dup__reasons">

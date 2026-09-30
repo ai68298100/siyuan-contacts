@@ -301,7 +301,7 @@
 - G-04：发布包加入 JS/CSS/压缩体积预算、移动冷启动跟踪；在宿主不允许相对 chunk 的前提下验证拆包边界。
 - G-05：`check:release` 校验 zip 条目白名单、路径穿越、dist/zip 哈希、旧 CSS/嵌套残留和安装包可回读。
 - G-06：以 `plugin.json` 的最低思源版本对应的真实 Chromium/WebView 做加载和核心流程回归；核对 `ESNext`、`Object.hasOwn`、`replaceAll` 等运行时要求，必要时补兼容层并固定发布门禁。
-- G-07（P1，关联 C-20）：重复检查延迟到用户打开“整理”时再执行；`findDuplicatePairs` 对每个同名/同号桶两两配对会产生 O(k²) 结果，500 个同名约 124,750 对、约 60 MiB heap，1 万个同名理论近 5,000 万对。先按键聚类/计数，大桶分页和上限提示，按需展开证据，真机设内存/时延预算。证据 `PeopleView.svelte:94`、`domain/duplicate-check.ts:53-89`。
+- G-07（P1，关联 C-20）：**核心已完成（2026-10-01，PROGRESS 第 90/99 轮）**——第 90 轮延迟到用户触发（D-38）；第 99 轮 `findDuplicatePairs` 加 `maxPairs` 参数（默认 500）+ `DUPLICATE_PAIRS_LIMIT` 导出，达上限停止生成防爆内存，UI 截断提示。**余项：按需展开证据、分桶导航——留大规模演进。** 原登记：重复检查延迟到用户打开"整理"时再执行；`findDuplicatePairs` 对每个同名/同号桶两两配对会产生 O(k²) 结果，500 个同名约 124,750 对、约 60 MiB heap，1 万个同名理论近 5,000 万对。先按键聚类/计数，大桶分页和上限提示，按需展开证据，真机设内存/时延预算。
 - G-08（P1，关联 C-20/D-07）：联系人“加载更多”目前只增加 `visibleCount`，旧卡片/行留在 DOM；大列表改窗口化或分页释放旧行，保持滚动、焦点和选择锚点。批量选择由 `selectedIds.includes` 改派生 Set：纯循环 10k 可见×10k 已选约 73ms，Set 查找约 0.2ms（不含 DOM），还要测 1k/10k 卡片、表格和移动实际交互。证据 `PeopleView.svelte:198,224,405-406,830-895`。
 - G-09（P1）：共同组织背景按 `orgDocId` 建成员索引并用 peer Set 去重，避免目标人每段历史都扫全员再线性 `peers.some`。本机纯函数合成样本 10k 人、目标人 1/5/10 段约 110/551/1163ms；保留同期/期间语义与稳定顺序，补 benchmark 和真实移动宿主预算。证据 `domain/org-membership.ts:218-257`。
 - G-10（P1）：首页行动清单把生日和久未联系投影按 `docId` 建 Map，一次联结到名册；当前对每人各做两次 `.find`，名册增长时为 O(N²)。验证 1k/10k 无重复卡、三源计数和读取失败语义。证据 `services/dashboard.ts:170-176`。
