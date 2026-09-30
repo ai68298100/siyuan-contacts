@@ -8,6 +8,7 @@ import { buildExtractionPrompt, parseExtraction } from "../domain/ai-extract.ts"
 import type { ExtractionResult } from "../domain/ai-extract";
 import type { ContactSummary } from "../domain/person";
 import type { ContactsSettings } from "../domain/model";
+import { getRoster } from "./roster";
 
 export type { ExtractionResult };
 
@@ -23,7 +24,6 @@ export interface AiExtractOutcome {
 
 /** 抽取全流程：读笔记 → 组装提示（附带名册名单帮助 AI 对齐）→ 调 AI → 解析 → 与名册对账 */
 export async function extractFromDoc(settings: ContactsSettings, docId: string): Promise<AiExtractOutcome> {
-    const { getRoster } = await import("./roster");
     const roster = await getRoster(settings);
     const { content } = await fetchDocMarkdown(docId);
     const reply = await aiChat(buildExtractionPrompt(content, roster.map((person) => person.name)));

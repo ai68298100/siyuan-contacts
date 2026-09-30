@@ -29,6 +29,18 @@ check("package.zip 存在且非空", fs.existsSync(zip) && fs.statSync(zip).size
 check("icon.png ≤ 64KiB（集市限制）", fs.statSync(path.join(root, "icon.png")).size <= 64 * 1024, `${fs.statSync(path.join(root, "icon.png")).size}B`);
 check("preview.png ≤ 512KiB（集市限制）", fs.statSync(path.join(root, "preview.png")).size <= 512 * 1024, `${fs.statSync(path.join(root, "preview.png")).size}B`);
 
+/* v0.4.0 事故防线：源码动态 import 会让 Rollup 拆出独立 chunk，index.js 顶层出现
+   require("./xxx.cjs")——宿主插件 loader 的 require 只认 "siyuan"，加载即抛错
+   （表现为顶栏无入口按钮，v0.4.0 实证）。此处强制：dist 只允许单 js 文件，
+   且 index.js 的 require 仅限 "siyuan"。 */
+const distFiles = fs.readdirSync(dist, { recursive: false });
+const extraJs = distFiles.filter((name) => /\.cjs$|\.mjs$/.test(name) || (/\.js$/.test(name) && name !== "index.js"));
+check("dist 无独立 js chunk（宿主 require shim 不解析相对路径）", extraJs.length === 0, extraJs.join(",") || "仅 index.js");
+const indexJs = fs.readFileSync(path.join(dist, "index.js"), "utf8");
+const requiredIds = [...indexJs.matchAll(/\brequire\(\s*(["'])([^"']+)\1\s*\)/g)].map((match) => match[2]);
+const foreignRequires = [...new Set(requiredIds.filter((id) => id !== "siyuan"))];
+check("index.js require 仅限 siyuan", foreignRequires.length === 0, foreignRequires.join(",") || `共 ${requiredIds.length} 处均为 siyuan`);
+
 if (failures.length > 0) {
     console.error(`\n发布门禁未通过：${failures.length} 项`);
     process.exit(1);

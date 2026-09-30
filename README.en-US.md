@@ -60,7 +60,7 @@ Lv Contacts makes **every contact a regular SiYuan document** (bidirectional lin
 3. Restart SiYuan → Settings → Marketplace → Download → enable **Lv Contacts**
 - Requires **SiYuan ≥ 3.8.5**. Marketplace submission is deferred.
 
-The source is **v0.4.0** (data-trust hardening plus three major capabilities on top of v0.3.0 — self profile, organizations and the dual graph, see [CHANGELOG](docs/CHANGELOG.md)):
+The source is **v0.4.1** (a load-fix on top of v0.4.0 plus data-trust hardening and three major capabilities over v0.3.0 — self profile, organizations and the dual graph, see [CHANGELOG](docs/CHANGELOG.md)):
 
 - **Self profile (B11)** — auto-created "Myself" document + identity mark + roster exclusion + rebinding from Settings
 - **Organizations (B13)** — org documents with a membership index (multiple orgs / tenures / active-former), workspace orgs view, org manager dialog (rename / archive-restore / member editing), direct membership editing in person detail, common-background projection

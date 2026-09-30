@@ -4,7 +4,7 @@
  */
 import type { Plugin } from "siyuan";
 import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage";
-import { appendEvent, emptyStore, normalizeInteractionStore, normalizeInteractionStoreForWrite, toLocalDateKey } from "../domain/interactions";
+import { appendEvent, emptyStore, normalizeInteractionStore, normalizeInteractionStoreForWrite, removeEvent, toLocalDateKey } from "../domain/interactions";
 import type { InteractionEvent, InteractionStore } from "../domain/interactions";
 import { newNodeId } from "../api/client";
 
@@ -64,12 +64,11 @@ export async function recordInteractionWithResult(
 export async function deleteInteraction(plugin: Plugin, eventId: string, expectedPersonDocId?: string): Promise<InteractionStore> {
     return withStoreLock(INTERACTION_STORAGE_KEY, async () => {
         const store = normalizeInteractionStoreForWrite(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY));
-        const event = store.events.find((item) => item.id === eventId);
-        if (event && expectedPersonDocId !== undefined && event.personDocId !== expectedPersonDocId) {
-            throw new Error("互动记录不属于当前人物，操作已停止");
-        }
-        const { removeEvent } = await import("../domain/interactions");
-        const next = removeEvent(store, eventId);
+    const event = store.events.find((item) => item.id === eventId);
+    if (event && expectedPersonDocId !== undefined && event.personDocId !== expectedPersonDocId) {
+        throw new Error("互动记录不属于当前人物，操作已停止");
+    }
+    const next = removeEvent(store, eventId);
         if (next !== store) {
             await saveJsonVerified(plugin, INTERACTION_STORAGE_KEY, next);
         }

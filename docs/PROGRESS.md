@@ -2081,3 +2081,27 @@
 - **集市**：按约定不代提交，fork bazaar → plugins.txt → PR 由作者择机执行（RELEASE.md §3）。
 - **文档状态**：CHANGELOG [0.4.0] 已发布；RELEASE.md 头注 v0.4.0。
 - 后续待作者：集市 PR；真机核对（RELEASE.md 八条 + B14 原生图两项：面板通道、链接成边）。
+
+## 紧急修复 第 80 轮：v0.4.0 加载失败排查与 v0.4.1 修复（2026-09-30，作者报告：安装后顶栏无入口按钮）
+
+- **现象**：真实宿主安装 v0.4.0 后顶栏无「小驴人脉」按钮（插件完全未加载）。
+- **根因链**（对比 v0.3.0 发布资产定位）：
+  1. `data/interactions.ts:71` 与 `services/ai-extract.ts:26` 存在两处**运行期动态
+     `import()`**（M4/v0.2b 时代引入，为 v0.3.0 之前遗留）；
+  2. 构建 `formats:["cjs"]` 单入口下，v0.3.0 的产物把动态 import **内联**（发布包单
+     index.js，仅 `require("siyuan")`）；v0.4.0 构建却被 Rollup **拆出独立 chunk**
+     `interactions-CKAlhuu7.cjs`，index.js 顶层出现 `require("./interactions-xxx.cjs")`；
+  3. 宿主插件 loader 提供的 require 只解析 `siyuan`，顶层相对 require 加载即抛错 →
+     插件未初始化 → 顶栏/侧栏/右键菜单全部缺失。
+  4. 工具链验证：以当前 node_modules 重建 v0.3.0 tag 仍为单文件 → 拆分由 47~78 轮的
+     源码图变化触发（非依赖漂移）；CI 与隔离回归均用 mock loader，真实宿主才会暴露。
+- **修复**：两处动态 import 改静态导入（均无循环依赖：前者与同文件既有静态导入同模块；
+  后者目标 services/roster 不反向依赖 ai-extract）。
+- **防线（防再次带病发版）**：`check:release` 新增两项门禁——dist 禁止独立 js chunk、
+  index.js 的 require 仅限 `siyuan`；架构守门测试新增「全 src 禁运行期动态 import」
+  （type 位置 import() 不受限）。
+- **验证**：clean 重建产物回到 v0.3.0 同款单文件形态（10 文件、仅 require("siyuan")，
+  新门禁双 PASS）；单测 216/216（+1 架构用例）；三套 UI 103/104/103；真内核
+  contacts-flow 10/10、spike:init 21/21；发布包 package.zip sha256 `de3b9fc1…`。
+- **版本**：0.4.1（CHANGELOG [0.4.1] 待发布占位；README 中英版本段已更新）。**本地
+  commit，push/tag/Release 待作者授权。**

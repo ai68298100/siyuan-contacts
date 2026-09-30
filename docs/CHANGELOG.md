@@ -2,6 +2,20 @@
 
 所有显著变更记录于此。格式参考 Keep a Changelog；版本号遵循语义化版本。
 
+## [0.4.1] — 2026-09-30（待发布：授权后更新此行与 Release 链接）
+
+v0.4.0 的紧急修复版：修复插件在真实宿主中无法加载（顶栏无入口按钮）的问题。
+
+### 修复
+
+- **插件加载失败**（v0.4.0 回归）：`data/interactions.ts` 与 `services/ai-extract.ts` 中的
+  两处运行期动态 `import()` 在 CJS 产物中被 Rollup 拆成独立 chunk，`index.js` 顶层出现
+  `require("./interactions-xxx.cjs")`——宿主插件 loader 的 require 只认 `siyuan`，
+  加载即抛错（v0.3.0 发布产物中动态 import 均被内联，故未暴露）。两处已改为静态导入
+  （均无循环依赖：其一与同文件既有静态导入同模块，其二目标模块不反向依赖本模块）。
+- **防线**：`check:release` 新增产物形态门禁（dist 禁止独立 js chunk、index.js 的 require
+  仅限 siyuan）；架构守门测试新增「全 src 禁运行期动态 import」。
+
 ## [0.4.0] — 2026-09-30（已发布：https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.4.0）
 
 v0.3.0 之后的第一个功能版本：P0 数据可信十四项收口 + 本人档案 / 组织模块 / 双图谱

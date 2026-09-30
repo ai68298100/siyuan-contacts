@@ -98,3 +98,20 @@ test("组件不得直接发内核请求（必须经 api/ 层）", () => {
         }
     }
 });
+
+test("全 src 禁运行期动态 import（v0.4.0 事故防线：CJS 产物会拆出 require 相对 chunk，宿主 loader 加载即失败）", () => {
+    for (const file of listFiles(SRC, ".ts").concat(listFiles(SRC, ".svelte"))) {
+        const content = fs.readFileSync(file, "utf8");
+        /* type 位置的 import("@/...") 是编译期擦除的类型引用，不受限；
+           运行期动态 import 形如 await import(…) / = import(…) / => import(…) */
+        const runtime = content
+            .split(/\r?\n/)
+            .filter((line) => !/^\s*(import type |\*\/)/.test(line))
+            .join("\n");
+        const dynamic = [...runtime.matchAll(/(?:await|=|=>)\s*import\s*\(/g)].map((match) => match.index);
+        assert.ok(
+            dynamic.length === 0,
+            `${file} 含运行期动态 import（${dynamic.length} 处）——CJS 构建会拆出独立 chunk，宿主 require 无法解析相对路径导致插件加载失败；请改为静态导入`,
+        );
+    }
+});
