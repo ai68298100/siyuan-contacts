@@ -1,6 +1,6 @@
 # 发布清单（RELEASE）
 
-> v0.4.0 已发布（2026-09-30：main 推送至 `50157ed`（CI run 36654358981 绿）、tag v0.4.0、Release https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.4.0 附 package.zip 382151B，sha256 `242a73df…` 与本地构建一致）；集市提交与真实宿主/真机/多窗口验收仍待处理。本文后续发布步骤只适用于下一版本或集市上架，改版本、推送、标签、Release 与集市提交均需用户明确授权。
+> v0.4.1 已发布（2026-09-30：main 推送至 `bfe46f2`（CI run 36663898002 绿）、tag v0.4.1、Release https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.4.1 附 package.zip 380856B，sha256 `de3b9fc1…` 与本地构建一致；v0.4.0 因动态 import 拆 chunk 在真实宿主加载失败，已被本版取代）；集市提交与真实宿主/真机/多窗口验收仍待处理。本文后续发布步骤只适用于下一版本或集市上架，改版本、推送、标签、Release 与集市提交均需用户明确授权。
 
 ## 1. 质量门禁（全部绿才发）
 

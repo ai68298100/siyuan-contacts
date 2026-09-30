@@ -2105,3 +2105,16 @@
   contacts-flow 10/10、spike:init 21/21；发布包 package.zip sha256 `de3b9fc1…`。
 - **版本**：0.4.1（CHANGELOG [0.4.1] 待发布占位；README 中英版本段已更新）。**本地
   commit，push/tag/Release 待作者授权。**
+
+## 发版 第 81 轮：v0.4.1 紧急修复版发布（2026-09-30，作者指令：发，可用 gh）
+
+- **push**：main `117003e..bfe46f2` 推送成功（SSH over 443 通道）。
+- **CI**：run 36663898002（head bfe46f2）conclusion **success**（build 1m24s）。
+- **tag**：v0.4.1（annotated）已推送。
+- **GitHub Release**：https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.4.1
+  （gh release create，发布说明含修复说明/v0.4.0 用户更新指引/v0.4.0 内容摘要）；
+  资产 package.zip **380856B**（sha256 `de3b9fc1…` 与本地构建一致）。
+- **文档状态**：CHANGELOG [0.4.1] 已发布；RELEASE.md 头注 v0.4.1（注明 v0.4.0 已被本版
+  取代）。
+- **待作者真机确认**：禁用→重新启用插件（或重启思源）后顶栏按钮恢复；随后集市 PR
+  （以 v0.4.1 提交）与 RELEASE.md 八条 + B14 两项核对。
