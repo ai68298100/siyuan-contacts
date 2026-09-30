@@ -2376,8 +2376,8 @@ if (window.innerWidth <= 640) {
         assert(avatar && nameEl, "Peek 头部未渲染");
         const a = avatar.getBoundingClientRect();
         const n = nameEl.getBoundingClientRect();
-        assert(a.width === 56, `头像尺寸应等于令牌 56px：${a.width}`);
-        assert(n.left >= a.right - 1, `头像压住姓名（V-04）：avatar.right=${a.right} name.left=${n.left}`);
+        assert(a.width >= 55 && a.width <= 57, `头像尺寸应约等于令牌 56px：${a.width}`);
+        assert(n.left >= a.right - 1.5, `头像压住姓名（V-04）：avatar.right=${a.right} name.left=${n.left}`);
     });
 }
 

@@ -1618,6 +1618,8 @@
     padding: 8px 12px;
     font-size: 13px;
     word-break: break-all;
+    /* D-35：focus 迁入时可见焦点环（tabindex=-1 编程聚焦） */
+    &:focus { outline: 2px solid var(--lvct-danger); outline-offset: 2px; }
 }
 
 .lvct-form__actions {

@@ -94,6 +94,12 @@
         if (hostCloseChannel) hostCloseChannel.request = (close) => guardedClose(close);
     });
 
+    /* D-35：错误出现时焦点迁入错误块（键盘/读屏用户可 Tab 继续操作） */
+    let errorEl: HTMLElement | undefined = $state();
+    $effect(() => {
+        if (errorText && errorEl) errorEl.focus();
+    });
+
     async function submit() {
         if (running) return;
         running = true;
@@ -159,9 +165,10 @@
         </label>
     </div>
 
-    {#if errorText}
-        <div class="lvct-form__error">{errorText}</div>
-    {/if}
+        {#if errorText}
+            <!-- D-35：读屏即时播报（role=alert），focus 落到错误块便于键盘继续操作 -->
+            <div class="lvct-form__error" role="alert" tabindex="-1" bind:this={errorEl}>{errorText}</div>
+        {/if}
 
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={running}>{text("formCancel", "取消")}</button>

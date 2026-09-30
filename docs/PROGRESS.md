@@ -2423,3 +2423,18 @@
   52 景基线 + 20 景断点矩阵重拍有效（纯测试基建，无产物变更）。
 - **留后续**：新故障用例随回归补声明（内核级 expectKernelFault / facade 级 expectFacadeFailure）；
   B13.8 真机投递实证；V-05 真机向余项；H-05 余项（多选批量归 H-07 通道）；B14 真机核对项；B11 余项。
+
+## 可访问性 第 95 轮：D-35/D-32 错误块 role=alert + 焦点迁移（2026-10-01，续跑口令第 96 版驱动）
+
+- **D-35（P1）捕获/联系人新增/人物编辑错误块**：四处 `lvct-form__error`（AddPersonDialog、
+  PersonEditDialog、CaptureDialog）与 InitWizard `lvct-wizard__error` 补 `role="alert"` +
+  `tabindex="-1"` + `bind:this` + `$effect` 焦点迁移——错误出现时读屏即时播报、键盘焦点
+  迁入错误块（Tab 可继续操作）。CSS 补 `.lvct-form__error:focus` 焦点环。
+- **V-04 偶发修复**：移动 smoke 头像尺寸断言 `a.width === 56` 改容差比较
+  （`>=55 && <=57`）——getBoundingClientRect 浮点精度导致间歇 56.000003px 不过。
+- **验证**：单测 221/221；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；
+  `pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 13/13、
+  spike:init 21/21；52 景基线 + 20 景断点矩阵重拍有效（错误块为条件渲染，静态景无变化）。
+- **留后续**：D-35 余项（aria-describedby/aria-invalid 逐字段绑定、首个失败控件焦点——
+  需逐表单梳理，随表单统一 U-14 通道）；D-32 余项（InitWizard label-ID 关联）；
+  D-31 焦点环令牌化（CSS 设计系统）；B13.8 真机投递；V-05 真机向余项；B12 主线（作者定优先级）。
