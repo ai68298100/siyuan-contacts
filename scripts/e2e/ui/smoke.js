@@ -1354,8 +1354,8 @@ await test("B11.3/B11.5 指定本人身份：显式改绑成功、未初始化�
 await test("B12 组织归属投影：Peek 组织区块按成员记录渲染（组织名/部门/职位/期间）", async () => {
     invalidateRoster();
     const orgMemberships = [
-        { orgDocId: "20260930000000-org0001", orgName: "测试公司", department: "研发部", title: "工程师", joinedOn: "2025-01-01", leftOn: "", status: "active" },
-        { orgDocId: "20260930000000-org0002", orgName: "母校学院", department: "", title: "", joinedOn: "2018-09-01", leftOn: "2022-06-30", status: "former" },
+        { id: "20260930000000-mem0a01", orgDocId: "20260930000000-org0001", orgName: "测试公司", department: "研发部", title: "工程师", joinedOn: "2025-01-01", leftOn: "", status: "active" },
+        { id: "20260930000000-mem0a02", orgDocId: "20260930000000-org0002", orgName: "母校学院", department: "", title: "", joinedOn: "2018-09-01", leftOn: "2022-06-30", status: "former" },
     ];
     const calls = [];
     mounted = mount(PersonDetail, { target: fixture, props: {
@@ -1394,6 +1394,78 @@ await test("B12 组织归属投影：Peek 组织区块按成员记录渲染（�
     } });
     await until(() => fixture.textContent.includes("组织归属"), "组织归属区块未挂载");
     assert(![...fixture.querySelectorAll("button")].some((node) => node.textContent.includes("管理归属")), "未接线时不应显示管理按钮");
+});
+
+await test("B13.5 双向编辑完整版：人物详情内添加/移除组织归属（facade 全链路）", async () => {
+    let nextMemberId = 2;
+    const memberships = [
+        { id: "20260930000000-mem0001", orgDocId: "20260930000000-org0001", orgName: "测试公司", department: "研发部", title: "工程师", joinedOn: "2025-01-01", leftOn: "", status: "active" },
+    ];
+    const candidates = [
+        { docId: "20260930000000-org0001", name: "测试公司" },
+        { docId: "20260930000000-org0002", name: "新公司" },
+    ];
+    const addCalls = [];
+    const removeCalls = [];
+    let changedCount = 0;
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person, onRecord: async () => {}, onLoadInsights: async () => emptyInsights(),
+        onLoadOrgMemberships: async () => [...memberships],
+        onLoadOrgCandidates: async () => candidates,
+        onAddOrgMembership: async (docId, orgDocId, extra) => {
+            addCalls.push({ docId, orgDocId, extra });
+            const target = candidates.find((item) => item.docId === orgDocId);
+            memberships.push({
+                id: `20260930000000-mem000${nextMemberId}`, orgDocId,
+                orgName: target?.name ?? "", department: extra?.department ?? "",
+                title: extra?.title ?? "", joinedOn: extra?.joinedOn ?? "", leftOn: "", status: "active",
+            });
+            nextMemberId += 1;
+        },
+        onRemoveOrgMembership: async (id) => {
+            removeCalls.push(id);
+            const index = memberships.findIndex((item) => item.id === id);
+            if (index >= 0) memberships.splice(index, 1);
+        },
+        onChanged: () => { changedCount += 1; },
+        onOpenPersonDoc() {}, onNavigate() {}, onDeleted() {}, onClose() {},
+    } });
+    await until(() => fixture.textContent.includes("组织归属"), "组织归属区块未挂载");
+    /* 候选过滤：已加入的测试公司不进下拉，只有新公司 */
+    const orgSelect = fixture.querySelector('select[aria-label="选择要加入的组织"]');
+    assert(orgSelect, "添加归属表单未出现");
+    const optionTexts = [...orgSelect.querySelectorAll("option")].map((node) => node.textContent);
+    assert(!optionTexts.some((text) => text.includes("测试公司")), "已加入组织不应出现在候选");
+    assert(optionTexts.some((text) => text.includes("新公司")), "未加入组织应出现在候选");
+    /* 添加归属：选组织+填部门 → 走 facade（personDocId/orgDocId 分传）→ 刷新 + onChanged */
+    orgSelect.value = "20260930000000-org0002";
+    orgSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    input(fixture.querySelector('input[aria-label="归属部门"]'), "市场部");
+    await tick();
+    button("添加归属").click();
+    await until(() => addCalls.length === 1, "添加归属未走 facade");
+    assert(addCalls[0].docId === person.docId && addCalls[0].orgDocId === "20260930000000-org0002", "添加归属参数错误");
+    assert(addCalls[0].extra.department === "市场部", "部门参数错误");
+    await until(() => fixture.textContent.includes("新公司"), "添加后归属列表未刷新");
+    assert(changedCount >= 1, "添加归属未触发 onChanged");
+    /* 移除归属：按 membership id 走 facade（等添加流程的 busy 释放后再点） */
+    const removeBtnLive = () => [...fixture.querySelectorAll('button[aria-label^="移除归属"]')][0];
+    await until(() => removeBtnLive() && !removeBtnLive().disabled, "移除按钮未解除禁用");
+    const removeBtn = removeBtnLive();
+    assert(removeBtn, "移除归属按钮未出现");
+    removeBtn.click();
+    await until(
+        () => removeCalls.length === 1 && removeCalls[0] === "20260930000000-mem0001",
+        `移除未按 membership id 走 facade calls=${JSON.stringify(removeCalls)}`,
+    );
+    await until(
+        () => {
+            const timeline = fixture.querySelector(".lvct-detail__timeline");
+            return Boolean(timeline) && timeline.textContent.includes("新公司") && !timeline.textContent.includes("测试公司");
+        },
+        `移除后归属列表未刷新 calls=${JSON.stringify(removeCalls)} err=${fixture.querySelector(".lvct-form__error")?.textContent ?? ""}`,
+    );
 });
 
 await test("FUNC-01.8a 锚点消歧：首 AV 无关不采纳按字段证据取次 AV，歧义暂停写入，零匹配按新建", async () => {

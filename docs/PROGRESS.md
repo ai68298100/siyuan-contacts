@@ -1958,3 +1958,27 @@
   spike:init 21/21；52 景基线重拍 + 断点扫描有效。
 - **留后续**：B13.5a 组织页入口（WorkbenchView 扩展）、B13.5 双向编辑完整版（人物详情内
   直接增删归属）、B14 组织入口、真机核对。
+
+## P1 业务主线 第 74 轮：B13.5 双向编辑完整版——人物详情内直接增删组织归属（2026-09-30，续跑口令第 76 版驱动）
+
+- **视图扩展（services/org.ts）**：`PersonOrgMembershipView` 增 `id`（成员记录 ID，
+  人物详情内移除归属的定位键）；组织候选由 Workbench 从 `listOrganizations` 过滤归档后投影。
+- **PersonDetail**：三个可选 props——`onLoadOrgCandidates`（活跃组织候选）、
+  `onAddOrgMembership(personDocId, orgDocId, extra)`（**personDocId 与 orgDocId 分传**，
+  首版签名漏传 orgDocId 在写用例时即纠正）、`onRemoveOrgMembership(membershipId)`；
+  组织归属区新增添加表单（组织下拉/部门/职位/加入日期）与每条归属的移除按钮；
+  候选自动排除已加入组织（含 former 历史，防重复建档）；操作成功后清表单、刷新归属与
+  候选并 `onChanged()`（联动名册单位投影刷新）；失败行内显示可重试。
+- **Workbench 接线**：候选=活跃组织投影；添加直通 `facade.addOrganizationMember`；
+  移除直通 `facade.removeOrganizationMember`。
+- **验证**：单测 213/213（无新域函数）；三套 UI 桌面 100 / 移动 101 / 宿主 100 全绿
+  （新增双向编辑用例：候选过滤已加入组织、添加参数 personDocId/orgDocId/部门核对、
+  移除按 membership id、onChanged 触发；B12 归属用例 mock 数据补 id 适配 keyed each）；
+  collect-i18n 缺失 0（zh/en 各 9 键）；`pnpm run build` + `check:release` PASS；
+  真内核 contacts-flow 10/10、spike:init 21/21；52 景基线重拍目检（Peek 组织归属区
+  管理入口+表单布局正常）+ 断点扫描有效。
+- **用例坑位新增**：mock 列表加载返回同一数组引用时 Svelte $state 同引用赋值不触发更新——
+  mock 必须返回副本；await tick() 后异步 busy 链可能未释放，操作按钮前用 until 等 disabled 解除；
+  断言「列表移除」别用全 fixture 文本（候选下拉 option 仍含该名），锁定 timeline 容器。
+- **留后续**：B13.5a 组织页入口（WorkbenchView 扩展，横切默认页偏好/移动 Dialog）、
+  B13.5b 查询规模、B13.6 共同背景、B14 组织入口、真机核对。

@@ -3508,6 +3508,18 @@
     gap: var(--lvct-sp-2);
 }
 
+/* B13.5 人物详情内添加归属表单 */
+.lvct-org-add {
+    display: flex;
+    gap: var(--lvct-sp-2);
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: var(--lvct-sp-2);
+
+    .b3-select { max-width: 180px; }
+    .b3-text-field { max-width: 130px; }
+}
+
 /* B13.4 成员行内编辑表单 */
 .lvct-org-manager__member-edit {
     display: flex;

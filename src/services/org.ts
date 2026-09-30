@@ -165,6 +165,8 @@ export async function removeOrganizationMember(plugin: Plugin, id: string): Prom
 }
 
 export interface PersonOrgMembershipView {
+    /** 成员记录 ID（B13.5 双向编辑：人物详情内移除归属的定位键） */
+    id: string;
     orgDocId: string;
     /** 组织名（标记区块扫描解析；组织文档不可达时为占位提示） */
     orgName: string;
@@ -190,6 +192,7 @@ export async function listPersonOrgMemberships(
     const orgs = await scanOrganizations();
     const byDoc = new Map(orgs.map((org) => [org.docId, org.name]));
     return memberships.map((membership) => ({
+        id: membership.id,
         orgDocId: membership.orgDocId,
         orgName: byDoc.get(membership.orgDocId) ?? "（组织文档不可达）",
         department: membership.department,

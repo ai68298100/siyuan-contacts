@@ -32,6 +32,9 @@ import StatusNotice from "../StatusNotice.svelte";
         revision = 0,
         onLoadOrgMemberships,
         onOpenOrgManager,
+        onLoadOrgCandidates,
+        onAddOrgMembership,
+        onRemoveOrgMembership,
         onRecord,
         onDeleteInteraction,
         onLoadInsights,
@@ -61,8 +64,14 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadInsights: (docId: string) => Promise<import("../../services/insights").PersonInsights>;
         /** B12：组织归属投影（可选：未接线时隐藏该区） */
         onLoadOrgMemberships?: (docId: string) => Promise<import("../../services/org").PersonOrgMembershipView[]>;
-        /** B13.5 双向编辑最小版（可选）：打开组织管理弹窗维护归属；未接线时隐藏按钮 */
+        /** B13.5 双向编辑（可选）：打开组织管理弹窗维护归属；未接线时隐藏按钮 */
         onOpenOrgManager?: () => void;
+        /** B13.5 双向编辑完整版（可选）：归属候选（活跃组织）；未接线时隐藏添加表单 */
+        onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string }>>;
+        /** B13.5：为当前人物添加组织归属（orgDocId 单独传递，避免与 personDocId 混淆） */
+        onAddOrgMembership?: (personDocId: string, orgDocId: string, extra?: { department?: string; title?: string; joinedOn?: string }) => Promise<void>;
+        /** B13.5：移除一条组织归属（membership id） */
+        onRemoveOrgMembership?: (membershipId: string) => Promise<void>;
         onOpenPersonDoc: (docId: string) => void;
         onNavigate: (person: ContactSummary) => void;
         navigationOrder?: readonly ContactSummary[];
@@ -389,6 +398,70 @@ import StatusNotice from "../StatusNotice.svelte";
 
     loadOrgMemberships();
 
+    /* ---- B13.5 双向编辑完整版：人物详情内直接添加/移除组织归属 ---- */
+    const orgAddSupported = $derived(Boolean(onLoadOrgCandidates && onAddOrgMembership));
+    const orgRemoveSupported = $derived(Boolean(onRemoveOrgMembership));
+    let orgCandidates: ReadonlyArray<{ docId: string; name: string }> = $state([]);
+    let addOrgDocId = $state("");
+    let addOrgDepartment = $state("");
+    let addOrgTitle = $state("");
+    let addOrgJoinedOn = $state("");
+    let addOrgBusy = $state(false);
+    let addOrgError = $state("");
+    /* 候选 = 活跃组织 − 已加入（含历史 former 记录的组织也在已加入之列，避免重复建档） */
+    const orgCandidateOptions = $derived(
+        orgCandidates.filter((org) => !orgMemberships.some((membership) => membership.orgDocId === org.docId)),
+    );
+    async function loadOrgCandidates(): Promise<void> {
+        if (!onLoadOrgCandidates) return;
+        try {
+            orgCandidates = await onLoadOrgCandidates();
+        } catch (error) {
+            console.warn("[lvct] 归属候选读取失败", error);
+            orgCandidates = [];
+        }
+    }
+    async function addOrgMembership(): Promise<void> {
+        if (!onAddOrgMembership || addOrgBusy || addOrgDocId === "") return;
+        addOrgBusy = true;
+        addOrgError = "";
+        try {
+            await onAddOrgMembership(current.docId, addOrgDocId, {
+                department: addOrgDepartment.trim(),
+                title: addOrgTitle.trim(),
+                joinedOn: addOrgJoinedOn,
+            });
+            addOrgDocId = "";
+            addOrgDepartment = "";
+            addOrgTitle = "";
+            addOrgJoinedOn = "";
+            onChanged();
+            await loadOrgMemberships();
+            await loadOrgCandidates();
+        } catch (error) {
+            addOrgError = error instanceof Error ? error.message : String(error);
+        } finally {
+            addOrgBusy = false;
+        }
+    }
+    async function removeOrgMembership(membershipId: string): Promise<void> {
+        if (!onRemoveOrgMembership || addOrgBusy) return;
+        addOrgBusy = true;
+        addOrgError = "";
+        try {
+            await onRemoveOrgMembership(membershipId);
+            onChanged();
+            await loadOrgMemberships();
+            await loadOrgCandidates();
+        } catch (error) {
+            addOrgError = error instanceof Error ? error.message : String(error);
+        } finally {
+            addOrgBusy = false;
+        }
+    }
+
+    loadOrgCandidates();
+
     /* FUNC-01.7-a：数据变化（跨窗口/宿主）→ 原地重载洞察与跟进；写入/操作挂起时跳过
        （Workbench 对草稿场景给出可见提示条），当前人物与输入草稿保留 */
     let lastSeenRevision = untrack(() => revision);
@@ -602,7 +675,7 @@ import StatusNotice from "../StatusNotice.svelte";
             <p class="ft__smaller ft__on-surface">{text("orgSectionEmpty", "未加入任何组织")}</p>
         {:else}
             <ul class="lvct-detail__timeline">
-                {#each orgMemberships as membership (membership.orgDocId + membership.status)}
+                {#each orgMemberships as membership (membership.id)}
                     <li class="lvct-detail__timeline-row">
                         <span class="lvct-detail__timeline-note">
                             {membership.orgName}
@@ -615,9 +688,34 @@ import StatusNotice from "../StatusNotice.svelte";
                         {#if membership.joinedOn || membership.leftOn}
                             <span class="ft__on-surface">{membership.joinedOn || "?"}{membership.leftOn ? ` – ${membership.leftOn}` : " –"}</span>
                         {/if}
+                        {#if orgRemoveSupported}
+                            <button type="button" class="b3-button b3-button--cancel" disabled={addOrgBusy}
+                                aria-label={text("orgMembershipRemoveLabel", "移除归属 {name}", { name: membership.orgName })}
+                                onclick={() => void removeOrgMembership(membership.id)}>{text("orgMembershipRemove", "移除")}</button>
+                        {/if}
                     </li>
                 {/each}
             </ul>
+        {/if}
+        {#if orgAddSupported}
+            <div class="lvct-org-add">
+                <select class="b3-select" bind:value={addOrgDocId} disabled={addOrgBusy}
+                    aria-label={text("orgAddOrgLabel", "选择要加入的组织")}>
+                    <option value="">{text("orgAddOrgPick", "选择组织…")}</option>
+                    {#each orgCandidateOptions as org (org.docId)}
+                        <option value={org.docId}>{org.name}</option>
+                    {/each}
+                </select>
+                <input class="b3-text-field" placeholder={text("orgMemberDeptLabel", "部门")} bind:value={addOrgDepartment}
+                    disabled={addOrgBusy} aria-label={text("orgAddDeptLabel", "归属部门")} />
+                <input class="b3-text-field" placeholder={text("orgMemberTitleLabel", "职位")} bind:value={addOrgTitle}
+                    disabled={addOrgBusy} aria-label={text("orgAddTitleLabel", "归属职位")} />
+                <input class="b3-text-field" type="date" bind:value={addOrgJoinedOn} disabled={addOrgBusy}
+                    aria-label={text("orgAddJoinedLabel", "加入日期")} />
+                <button type="button" class="b3-button b3-button--text" disabled={addOrgBusy || addOrgDocId === ""}
+                    onclick={() => void addOrgMembership()}>{text("orgAddSubmit", "添加归属")}</button>
+            </div>
+            {#if addOrgError}<div class="lvct-form__error" role="alert">{addOrgError}</div>{/if}
         {/if}
     </section>
     {/if}

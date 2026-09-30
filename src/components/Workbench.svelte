@@ -272,6 +272,10 @@
             onLoadInsights={(docId) => facade.loadPersonInsights(docId)}
             onLoadOrgMemberships={(docId) => facade.listPersonOrgMemberships(docId)}
             onOpenOrgManager={() => facade.openOrgManagerDialog()}
+            onLoadOrgCandidates={async () => (await facade.listOrganizations())
+                .filter((org) => !org.archived).map((org) => ({ docId: org.docId, name: org.name }))}
+            onAddOrgMembership={(personDocId, orgDocId, extra) => facade.addOrganizationMember(personDocId, orgDocId, extra)}
+            onRemoveOrgMembership={(id) => facade.removeOrganizationMember(id)}
             onListFollowUps={(docId) => facade.listPersonFollowUps(docId)}
             onCreateFollowUp={(docId, title, dueDate) => facade.createFollowUp(docId, title, dueDate)}
             onSetFollowUpStatus={(id, status) => facade.setFollowUpStatus(id, status)}
