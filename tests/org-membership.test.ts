@@ -8,6 +8,7 @@ import {
     applyMembershipPatch,
     updateMembership,
     buildCommonOrgBackground,
+    buildOrgLinksSection,
 } from "../src/domain/org-membership.ts";
 import type { OrgMembership } from "../src/domain/org-membership.ts";
 
@@ -228,4 +229,22 @@ test("B13.5b 共同背景规模：3000 名同组织同伴一次索引查询零�
     assert.ok(peers.every((peer) => peer.samePeriod), "全员加入时间已知 → 全部同期");
     assert.equal(peers[0].docId, "20260930000000-peer0000", "同伴顺序稳定（索引首现序）");
     assert.equal(peers[2999].docId, "20260930000000-peer2999");
+});
+
+test("B13.7 组织归属链接区块：链接/括注拼接与空条目移除语义", () => {
+    // 部门职位齐全 → （部门 · 职位）；只其一 → 单括注；皆无 → 无括注
+    assert.equal(
+        buildOrgLinksSection([
+            { orgDocId: "20260930000000-org0001", orgName: "曙光科技", department: "研发中心", title: "高级工程师" },
+            { orgDocId: "20260930000000-org0002", orgName: "母校学院", department: "计算机系", title: "" },
+            { orgDocId: "20260930000000-org0003", orgName: "兴趣社团", department: "", title: "会长" },
+            { orgDocId: "20260930000000-org0004", orgName: "行业协会", department: "", title: "" },
+        ]),
+        "**所属组织**：[曙光科技](siyuan://blocks/20260930000000-org0001)（研发中心 · 高级工程师）、"
+        + "[母校学院](siyuan://blocks/20260930000000-org0002)（计算机系）、"
+        + "[兴趣社团](siyuan://blocks/20260930000000-org0003)（会长）、"
+        + "[行业协会](siyuan://blocks/20260930000000-org0004)",
+    );
+    // 空条目 → 空串（调用方据此移除区块）
+    assert.equal(buildOrgLinksSection([]), "");
 });

@@ -254,6 +254,43 @@ async function main() {
         record("参与人员区块写入", attendees.length === 1 && (attendees[0].markdown || "").includes(`siyuan://blocks/${zhang.docId}`),
             `blocks=${attendees.length}`);
 
+        // B13.7 组织归属链接区块：人物文档单标记块（services/org.ts 同序列）——写入/原地更新保 IAL/移除
+        const orgDoc = await apiChecked("/api/filetree/createDocWithMd", {
+            notebook: ctx.notebookId, path: "/曙光科技", markdown: "# 曙光科技\n\n",
+        });
+        await api("/api/block/insertBlock", {dataType: "markdown", parentID: orgDoc, data: `**组织**：曙光科技\n{: custom-lvct-org="1"}`});
+        const ORG_LINKS_ATTR = "custom-lvct-org-links";
+        const orgLinksMd = `**所属组织**：[曙光科技](siyuan://blocks/${orgDoc})（研发部 · 工程师）\n{: ${ORG_LINKS_ATTR}="1"}`;
+        const orgLinksIns = await api("/api/block/insertBlock", {dataType: "markdown", parentID: zhang.docId, data: orgLinksMd});
+        if (orgLinksIns.code !== 0) throw new Error(`组织链接区块插入失败: ${orgLinksIns.msg}`);
+        const orgLinksBlockId = (orgLinksIns.data?.[0]?.doOperations ?? orgLinksIns.data?.[0]?.operations)?.[0]?.id;
+        await apiChecked("/api/sqlite/flushTransaction");
+        const orgLinksFound = await apiChecked("/api/query/sql", {
+            stmt: `SELECT id, markdown, ial FROM blocks WHERE root_id = '${zhang.docId}' AND ial LIKE '%${ORG_LINKS_ATTR}="%' LIMIT 1`,
+        });
+        record("组织归属链接区块写入",
+            orgLinksFound.length === 1 && (orgLinksFound[0].markdown || "").includes(`siyuan://blocks/${orgDoc}`),
+            `blocks=${orgLinksFound.length}`);
+        // 改名同步走整块更新：markdown 换新、IAL 关联键保留
+        await api("/api/block/updateBlock", {
+            id: orgLinksBlockId, dataType: "markdown",
+            data: `**所属组织**：[新曙光](siyuan://blocks/${orgDoc})（研发部 · 工程师）\n{: ${ORG_LINKS_ATTR}="1"}`,
+        });
+        await apiChecked("/api/sqlite/flushTransaction");
+        const renamedFound = await apiChecked("/api/query/sql", {
+            stmt: `SELECT id, markdown, ial FROM blocks WHERE root_id = '${zhang.docId}' AND ial LIKE '%${ORG_LINKS_ATTR}="%' LIMIT 1`,
+        });
+        record("组织链接区块原地更新保 IAL",
+            renamedFound.length === 1 && renamedFound[0].id === orgLinksBlockId
+                && (renamedFound[0].markdown || "").includes("新曙光") && (renamedFound[0].ial || "").includes(ORG_LINKS_ATTR),
+            `ial=${(renamedFound[0]?.ial || "").slice(0, 60)}`);
+        await api("/api/block/deleteBlock", {id: orgLinksBlockId});
+        await apiChecked("/api/sqlite/flushTransaction");
+        const orgLinksGone = await apiChecked("/api/query/sql", {
+            stmt: `SELECT id FROM blocks WHERE root_id = '${zhang.docId}' AND ial LIKE '%${ORG_LINKS_ATTR}="%' LIMIT 1`,
+        });
+        record("组织链接区块移除干净", orgLinksGone.length === 0, `left=${orgLinksGone.length}`);
+
         const failures = results.filter((r) => !r.ok);
         exitCode = failures.length > 0 ? 1 : 0;
         console.log(`\n== 联系人流程验证：${results.length - failures.length}/${results.length} 通过 ==`);

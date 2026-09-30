@@ -14,8 +14,8 @@ import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
 import { applyContactCandidateFields, createContact, updateContactFields } from "../../../src/services/contacts";
 import { designateSelfIdentity } from "../../../src/services/self-identity";
-import { scanOrganizations, membershipsByOrganization, listPersonOrgMemberships } from "../../../src/services/org";
-import { addOrgMembership } from "../../../src/data/org-membership";
+import { scanOrganizations, membershipsByOrganization, listPersonOrgMemberships, addOrganizationMember, removeOrganizationMember, updateOrganizationMember, archiveOrganization, restoreOrganization, bindOrgMembershipStorage } from "../../../src/services/org";
+import { addOrgMembership, bindOrgMembershipStorage as bindDataOrgMembershipStorage } from "../../../src/data/org-membership";
 import OrgManagerDialog from "../../../src/components/org/OrgManagerDialog.svelte";
 import { addRelation, removeRelation } from "../../../src/services/relations";
 import { recordInteraction, deleteInteraction, loadInteractionStore } from "../../../src/data/interactions";
@@ -64,6 +64,7 @@ const EXPECTED_CONSOLE_PREFIXES = [
     "[lvct] 档案条渲染失败",
     "[lvct] 相关人物区块同步失败",
     "[lvct] 组织归属投影读取失败",
+    "[lvct] 组织归属区块同步失败（",
     "[lvct] 跟进任务块对账失败",
     "[lvct] 跟进库读取失败，本次文档任务同步已跳过",
     "顺延单条逾期跟进失败",
@@ -1094,6 +1095,88 @@ await test("B13.2 组织扫描与成员索引：标记区块扫描发现组织�
     /* 写后回读：损坏拒绝路径由域层单测覆盖，这里验证落盘形状 */
     const stored = files.get("org-membership.json");
     assert(stored.schemaVersion === 1 && stored.memberships.length === 2, "成员索引落盘形状错误");
+});
+
+await test("B13.7 人物文档组织归属链接区块：添加/归档恢复对账与失败隔离", async () => {
+    const files = new Map();
+    files.set("org-membership.json", { schemaVersion: 1, memberships: [] });
+    const plugin = {
+        loadData: async (key) => files.get(key) ?? "",
+        saveData: async (key, value) => { files.set(key, value); },
+    };
+    /* 两层各有绑定：services（plugin0：归档/恢复/改名对账）+ data（loadOrgMembershipStoreBound） */
+    bindOrgMembershipStorage(plugin);
+    bindDataOrgMembershipStorage(plugin);
+    invalidateRoster();
+    const blocks = [];
+    /* 组织文档标记块（query 分支按 id 返回；update 需能找到它） */
+    const orgMarker = { id: "20260930000000-orgm001", rootId: "20260930000000-org0001", markdown: "**组织**：曙光科技", ial: 'custom-lvct-org="1"' };
+    const failingDoc = "20260930000000-perfail1";
+    kernel.handler = async (route, body) => {
+        if (route === "/api/query/sql") {
+            const stmt = String(body.stmt ?? "");
+            if (stmt.includes("custom-lvct-org-links")) {
+                if (stmt.includes(failingDoc)) throw new Error("模拟区块检索失败");
+                const rootId = stmt.match(/root_id = '(\d{14}-[0-9a-z]{7})'/)?.[1] ?? "";
+                return blocks.filter((row) => row.rootId === rootId);
+            }
+            if (stmt.includes('custom-lvct-org="')) {
+                /* 归档值随标记块文本派生（真实 IAL 内联在块尾） */
+                const archived = orgMarker.markdown.includes('custom-lvct-org="archived"');
+                return [{ id: orgMarker.id, root_id: orgMarker.rootId, ial: `custom-lvct-org="${archived ? "archived" : "1"}"` }];
+            }
+            if (stmt.includes("type='d'")) {
+                return [{ id: "20260930000000-org0001", content: "曙光科技", hpath: "/曙光科技", box: settings.notebookId }];
+            }
+            throw new Error(`B13.7 用例未预期的 SQL：${stmt.slice(0, 60)}`);
+        }
+        if (route === "/api/block/insertBlock") {
+            const blockId = `20260930000000-blk${String(blocks.length + 1).padStart(4, "0")}`;
+            blocks.push({ id: blockId, rootId: body.parentID, markdown: String(body.data ?? ""), ial: 'custom-lvct-org-links="1"' });
+            /* handler 返回内层 data（fetchPost mock 再包 {code,data}） */
+            return [{ doOperations: [{ id: blockId }] }];
+        }
+        if (route === "/api/block/updateBlock") {
+            if (body.id === orgMarker.id) {
+                orgMarker.markdown = String(body.data ?? "");
+                return {};
+            }
+            const record = blocks.find((row) => row.id === body.id);
+            if (!record) throw new Error("更新目标块不存在");
+            record.markdown = String(body.data ?? "");
+            return {};
+        }
+        if (route === "/api/block/deleteBlock") {
+            const index = blocks.findIndex((row) => row.id === body.id);
+            if (index >= 0) blocks.splice(index, 1);
+            return {};
+        }
+        throw new Error(`B13.7 用例不允许请求 ${route}`);
+    };
+    /* 添加成员 → 人物文档区块写入（active × 活跃组织，含部门职位括注） */
+    await addOrganizationMember(plugin, "20260930000000-org0001", person.docId, { department: "研发部", title: "工程师" });
+    const stored = files.get("org-membership.json");
+    assert(stored.memberships.length === 1, "成员未落盘");
+    await until(() => blocks.length === 1, "组织归属区块未写入");
+    assert(blocks[0].markdown.includes(`[曙光科技](siyuan://blocks/20260930000000-org0001)（研发部 · 工程师）`),
+        `区块文本错误：${blocks[0].markdown}`);
+    /* 归档 → 活跃投影移除该组织（区块删除）；恢复 → 区块回归 */
+    await archiveOrganization("20260930000000-org0001");
+    await until(() => blocks.length === 0, "归档后区块未移除");
+    await restoreOrganization("20260930000000-org0001");
+    await until(() => blocks.length === 1, "恢复后区块未回归");
+    /* 失败隔离：单人物文档区块失败不阻断成员事实（JSON 已落盘、可由下一次操作补同步） */
+    await addOrganizationMember(plugin, "20260930000000-org0001", failingDoc, { title: "顾问" });
+    const afterFail = files.get("org-membership.json");
+    assert(afterFail.memberships.length === 2, "区块失败不应回退成员事实");
+    const okBlock = blocks.find((row) => row.rootId === person.docId);
+    assert(okBlock && okBlock.markdown.includes("顾问") === false, "无关区块不应被失败文档波及");
+    /* 字段编辑（status→former）→ 区块移除该条目 */
+    const failMembership = afterFail.memberships.find((membership) => membership.personDocId === failingDoc);
+    const mainMembership = afterFail.memberships.find((membership) => membership.personDocId === person.docId);
+    await updateOrganizationMember(plugin, mainMembership.id, { status: "former" });
+    await until(() => blocks.length === 0, "转 former 后区块未移除");
+    assert(failMembership, "失败文档成员记录应保留");
 });
 
 await test("B13.3 组织管理弹窗：新建组织、添加/移除成员经 facade 全链路（B13.3）", async () => {

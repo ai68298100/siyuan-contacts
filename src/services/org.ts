@@ -4,7 +4,7 @@
  * 组织维度不写 related；扫描读取失败保持未知（不静默按无组织处理）。
  */
 import type { Plugin } from "siyuan";
-import { upsertMarkedBlock } from "../api/blocks";
+import { upsertMarkedBlock, findBlockIdByCustomAttr } from "../api/blocks";
 import { createDocWithMd, querySql, renameDoc } from "../api/client";
 import {
     addOrgMembership,
@@ -14,7 +14,7 @@ import {
     updateOrgMembership,
 } from "../data/org-membership";
 import type { OrgMembership, OrgMembershipPatch } from "../domain/org-membership";
-import { buildCommonOrgBackground } from "../domain/org-membership";
+import { buildCommonOrgBackground, buildOrgLinksSection } from "../domain/org-membership";
 import type { CommonOrgBackground } from "../domain/org-membership";
 import type { ContactsSettings } from "../domain/model";
 import { listContacts } from "./contacts";
@@ -159,11 +159,15 @@ export async function addOrganizationMember(
         title: extra.title,
         joinedOn: extra.joinedOn,
     });
+    /* B13.7：人物文档组织归属链接区块对账（区块失败不回退成员事实，逐文档告警可补同步） */
+    await refreshPersonOrgLinkSections(plugin, [personDocId]);
 }
 
 /** 移除组织成员记录（找不到 id 抛错） */
 export async function removeOrganizationMember(plugin: Plugin, id: string): Promise<void> {
+    const record = (await loadOrgMembershipStoreBound()).memberships.find((membership) => membership.id === id);
     await removeOrgMembership(plugin, id);
+    if (record) await refreshPersonOrgLinkSections(plugin, [record.personDocId]);
 }
 
 export interface PersonOrgMembershipView {
@@ -234,27 +238,79 @@ export async function createOrganization(
 }
 
 /** 归档组织（B13）：标记区块值写为 archived——活跃分组不再列出，文档与成员记录保留可恢复。
- *  标记块为插件管理区块，重写为标准文案（用户手改的标记块内容不保留）。 */
+ *  标记块为插件管理区块，重写为标准文案（用户手改的标记块内容不保留）。
+ *  B13.7：归档组织的成员从人物文档活跃投影区块移除（全员对账）。 */
 export async function archiveOrganization(orgDocId: string): Promise<void> {
     if (!/^\d{14}-[0-9a-z]{7}$/.test(orgDocId)) throw new Error("orgDocId 不是合法的思源 ID");
     const org = (await scanOrganizations()).find((item) => item.docId === orgDocId);
     if (!org) throw new Error("组织不存在");
     if (org.archived) throw new Error("组织已处于归档状态");
     await upsertMarkedBlock(orgDocId, ORG_SECTION_ATTR, `**组织**：${org.name}`, undefined, ORG_ARCHIVED_VALUE);
+    await refreshOrgMemberLinkSections(plugin0(), orgDocId);
 }
 
-/** 恢复归档组织（B13）：标记区块值写回活跃 */
+/** 恢复归档组织（B13）：标记区块值写回活跃；成员区块随活跃投影回归（全员对账） */
 export async function restoreOrganization(orgDocId: string): Promise<void> {
     if (!/^\d{14}-[0-9a-z]{7}$/.test(orgDocId)) throw new Error("orgDocId 不是合法的思源 ID");
     const org = (await scanOrganizations()).find((item) => item.docId === orgDocId);
     if (!org) throw new Error("组织不存在");
     if (!org.archived) throw new Error("组织不在归档状态");
     await upsertMarkedBlock(orgDocId, ORG_SECTION_ATTR, `**组织**：${org.name}`, undefined);
+    await refreshOrgMemberLinkSections(plugin0(), orgDocId);
 }
 
 /** 更新成员记录字段（B13.4：部门/职位/入职/离职/状态；身份字段不可变） */
 export async function updateOrganizationMember(plugin: Plugin, id: string, patch: OrgMembershipPatch): Promise<void> {
+    const record = (await loadOrgMembershipStoreBound()).memberships.find((membership) => membership.id === id);
     await updateOrgMembership(plugin, id, patch);
+    if (record) await refreshPersonOrgLinkSections(plugin, [record.personDocId]);
+}
+
+/* ---------- B13.7 人物文档组织归属链接区块（契约 §8：active × 活跃组织投影，单标记块幂等） ---------- */
+
+export const ORG_LINKS_SECTION_ATTR = "custom-lvct-org-links";
+
+/** 某人物文档的组织归属链接区块对账（区块失败上抛，由逐文档隔离层接住） */
+export async function syncPersonOrgLinksSection(plugin: Plugin, personDocId: string): Promise<void> {
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(personDocId)) throw new Error("personDocId 不是合法的思源 ID");
+    const memberships = (await membershipsByPerson(plugin)).get(personDocId) ?? [];
+    const nameByDoc = new Map((await scanOrganizations()).filter((org) => !org.archived).map((org) => [org.docId, org.name] as const));
+    const entries = memberships
+        .filter((membership) => membership.status === "active" && nameByDoc.has(membership.orgDocId))
+        .map((membership) => ({
+            orgDocId: membership.orgDocId,
+            orgName: nameByDoc.get(membership.orgDocId) ?? "",
+            department: membership.department,
+            title: membership.title,
+        }));
+    const markdown = buildOrgLinksSection(entries);
+    const existingId = await findBlockIdByCustomAttr(personDocId, ORG_LINKS_SECTION_ATTR);
+    await upsertMarkedBlock(personDocId, ORG_LINKS_SECTION_ATTR, markdown, existingId);
+}
+
+/** 组织归属变更后的区块对账（逐文档隔离：单文档失败不阻断其余，失败仅告警——
+ *  对该人物的下一次组织操作自然补同步；成员事实在成员索引，不受区块失败影响） */
+export async function refreshPersonOrgLinkSections(
+    plugin: Plugin,
+    docIds: readonly string[],
+): Promise<Array<{ docId: string; message: string }>> {
+    const failures: Array<{ docId: string; message: string }> = [];
+    for (const docId of [...new Set(docIds)]) {
+        try {
+            await syncPersonOrgLinksSection(plugin, docId);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            failures.push({ docId, message });
+            console.warn(`[lvct] 组织归属区块同步失败（${docId}）——对该人物重新执行组织操作可补同步`, error);
+        }
+    }
+    return failures;
+}
+
+/** 组织归档/恢复/改名后：该组织全部成员的区块对账（活跃投影/文本同步） */
+async function refreshOrgMemberLinkSections(plugin: Plugin, orgDocId: string): Promise<void> {
+    const members = (await membershipsByOrganization(plugin)).get(orgDocId) ?? [];
+    await refreshPersonOrgLinkSections(plugin, members.map((membership) => membership.personDocId));
 }
 
 /**
@@ -282,7 +338,8 @@ export async function listCommonOrgBackground(
 }
 
 /** 组织改名（B13.4 余项；spike:b13 通道7 实证 renameDoc 行为）：同名检查（不含自身、含归档）
- *  → renameDoc 改文档标题（标记块 IAL 保留）→ 标记块文案同步新名（保持归档值）。 */
+ *  → renameDoc 改文档标题（标记块 IAL 保留）→ 标记块文案同步新名（保持归档值）。
+ *  B13.7：成员人物文档的链接文本同步（链接目标 orgDocId 不变，全员对账）。 */
 export async function renameOrganization(orgDocId: string, name: string): Promise<void> {
     if (!/^\d{14}-[0-9a-z]{7}$/.test(orgDocId)) throw new Error("orgDocId 不是合法的思源 ID");
     const trimmed = name.trim();
@@ -302,6 +359,7 @@ export async function renameOrganization(orgDocId: string, name: string): Promis
         undefined,
         org.archived ? ORG_ARCHIVED_VALUE : "1",
     );
+    await refreshOrgMemberLinkSections(plugin0(), orgDocId);
 }
 
 /** 供设置页/向导显示的组织锚点状态（只读） */

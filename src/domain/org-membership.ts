@@ -149,6 +149,32 @@ export function updateMembership(store: OrgMembershipStore, id: string, patch: O
     return { ...store, memberships };
 }
 
+/* ---------- B13.7 人物文档组织归属链接区块（active × 活跃组织投影，契约 §8） ---------- */
+
+export interface OrgLinkEntry {
+    orgDocId: string;
+    orgName: string;
+    department: string;
+    title: string;
+}
+
+/**
+ * 组织归属链接区块文本（纯函数）：`**所属组织**：[名](siyuan://blocks/<id>)（部门 · 职位）、…`。
+ * 空条目返回空串（调用方据此移除区块）；部门/职位按存在性拼接，两者皆空不加括注。
+ * 组织名含 Markdown 语法字符的显示瑕疵与人物姓名同水位（C-14 通道统一处理，不在此转义）。
+ */
+export function buildOrgLinksSection(entries: readonly OrgLinkEntry[]): string {
+    if (entries.length === 0) return "";
+    const links = entries.map((entry) => {
+        const suffix = entry.department && entry.title ? `（${entry.department} · ${entry.title}）`
+            : entry.department ? `（${entry.department}）`
+            : entry.title ? `（${entry.title}）`
+            : "";
+        return `[${entry.orgName}](siyuan://blocks/${entry.orgDocId})${suffix}`;
+    });
+    return `**所属组织**：${links.join("、")}`;
+}
+
 /* ---------- B13.6 共同背景：同组织联系人投影（纯展示，零写入，不写 related/称谓） ---------- */
 
 export interface CommonOrgPeer {
