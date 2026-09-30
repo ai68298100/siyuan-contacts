@@ -628,6 +628,10 @@
 .lvct-detail__record {
     gap: var(--lvct-sp-2);
 
+    /* V-02：主输入允许收缩（flex 项 min-width:auto 曾把 shrink-0 按钮顶出 400px Peek
+       右缘裁切——跟进计划「添加计划」按钮实证）；按钮保持禁压缩。 */
+    > .fn__flex-1 { min-width: 0; }
+
     > .b3-button {
         flex-shrink: 0;
         white-space: nowrap;
@@ -3449,12 +3453,14 @@
 }
 
 .lvct-org-manager__list {
-    flex: 0 0 200px;
+    /* H-01：窄列随窗口自适应（原固定 200px，长组织名与列表受挤） */
+    flex: 0 0 clamp(200px, 28%, 300px);
     display: flex;
     flex-direction: column;
     gap: var(--lvct-sp-2);
     border-right: 1px solid var(--lvct-border-subtle);
     padding-right: var(--lvct-sp-3);
+    min-width: 0;
 }
 
 .lvct-org-manager__orgs {
@@ -3475,6 +3481,10 @@
     border-radius: var(--lvct-r-md);
     cursor: pointer;
     color: var(--lvct-text-1);
+    /* H-01：长组织名省略不破格（完整名经 title 提示） */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 
     small {
         color: var(--lvct-text-2);
@@ -3524,6 +3534,17 @@
     justify-content: space-between;
     align-items: center;
     gap: var(--lvct-sp-2);
+
+    /* H-01/V-02：长姓名/部门换行展示，动作按钮不挤压（操作区曾过窄） */
+    > span:first-child {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    > span.fn__flex {
+        flex-shrink: 0;
+    }
 }
 
 /* B13.5 组织视图卡片网格 */
@@ -3591,12 +3612,15 @@
 .lvct-org-add {
     display: flex;
     gap: var(--lvct-sp-2);
+    row-gap: var(--lvct-sp-1);
     align-items: center;
     flex-wrap: wrap;
     margin-top: var(--lvct-sp-2);
 
     .b3-select { max-width: 180px; }
     .b3-text-field { max-width: 130px; }
+    /* V-02：400px Peek 下动作不贴边裁切 */
+    .b3-button { flex-shrink: 0; }
 }
 
 /* B13.4 成员行内编辑表单 */

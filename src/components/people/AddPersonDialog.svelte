@@ -13,6 +13,7 @@
         settings,
         i18n,
         initial,
+        hostCloseChannel,
         onCreated,
         onClose,
     }: {
@@ -20,6 +21,8 @@
         i18n?: Readonly<Record<string, string>>;
         /** FAST-01.3：识别资料后预填的初始草稿（打开快照，不随外部变化） */
         initial?: ContactDraft;
+        /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
+        hostCloseChannel?: { request?: (close: () => void) => void };
         onCreated: (person: ContactSummary) => void;
         onClose: () => void;
     } = $props();
@@ -85,6 +88,10 @@
         dirty: () => !saved && (JSON.stringify(draft) !== JSON.stringify(emptyDraft()) || tagsText.trim().length > 0),
         changes: draftChanges,
         save: persist,
+    });
+    /* D-40：宿主 X/Esc/遮罩经同一守卫路由（返回 Promise 供拦截层重入门） */
+    $effect(() => {
+        if (hostCloseChannel) hostCloseChannel.request = (close) => guardedClose(close);
     });
 
     async function submit() {

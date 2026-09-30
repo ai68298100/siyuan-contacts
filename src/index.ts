@@ -516,7 +516,8 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         }
         svelteDialog({
             title: this.i18n.orgManagerTitle ?? "组织管理",
-            width: "620px",
+            /* H-01/V-02：宽屏响应式（原固定 620px 左栏挤迫）；min() 兼顾窄视口不溢出 */
+            width: "min(920px, 92vw)",
             component: OrgManagerDialog,
             props: {
                 facade: this,

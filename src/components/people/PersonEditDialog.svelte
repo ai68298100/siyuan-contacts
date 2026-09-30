@@ -13,12 +13,15 @@
         settings,
         i18n,
         person,
+        hostCloseChannel,
         onSaved,
         onClose,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
         person: ContactSummary;
+        /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
+        hostCloseChannel?: { request?: (close: () => void) => void };
         onSaved: () => void;
         onClose: () => void;
     } = $props();
@@ -103,6 +106,10 @@
         dirty: () => !saved && (JSON.stringify(draft) !== original || tagsText !== originalTags),
         changes: draftChanges,
         save: persist,
+    });
+    /* D-40：宿主 X/Esc/遮罩经同一守卫路由（返回 Promise 供拦截层重入门） */
+    $effect(() => {
+        if (hostCloseChannel) hostCloseChannel.request = (close) => guardedClose(close);
     });
 
     async function submit() {

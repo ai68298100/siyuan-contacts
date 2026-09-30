@@ -291,6 +291,7 @@
                                 type="button"
                                 class="lvct-org-manager__org-item"
                                 class:lvct-org-manager__org-item--active={org.docId === currentOrgDocId}
+                                title={org.name}
                                 onclick={() => selectOrg(org.docId)}
                             >{org.name}<small>（{org.memberships.length}）</small></button>
                         </li>
@@ -308,6 +309,7 @@
                                         type="button"
                                         class="lvct-org-manager__org-item"
                                         class:lvct-org-manager__org-item--active={org.docId === currentOrgDocId}
+                                        title={org.name}
                                         onclick={() => selectOrg(org.docId)}
                                     >{org.name}<small>（{text("orgArchivedTag", "已归档")}）</small></button>
                                 </li>

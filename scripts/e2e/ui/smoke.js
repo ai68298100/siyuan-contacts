@@ -3,6 +3,7 @@ import Workbench from "../../../src/components/Workbench.svelte";
 import PersonDetail from "../../../src/components/people/PersonDetail.svelte";
 import RelationGraph from "../../../src/components/graph/RelationGraph.svelte";
 import VCardDialog from "../../../src/components/people/VCardDialog.svelte";
+import AddPersonDialog from "../../../src/components/people/AddPersonDialog.svelte";
 import CaptureDialog from "../../../src/components/capture/CaptureDialog.svelte";
 import InitWizard from "../../../src/components/InitWizard.svelte";
 import ImportDialog from "../../../src/components/people/ImportDialog.svelte";
@@ -4031,6 +4032,106 @@ await test("D-40 宿主关闭通道：遮罩/关闭钮/Esc 经守卫路由，不
     } finally {
         if (dialog.dialog.element.isConnected) dialog.close();
         document.querySelector(".lvct-closeguard")?.remove();
+    }
+});
+
+await test("D-40 新建联系人弹窗接入宿主关闭路由：草稿中遮罩触发守卫（其余接入弹窗同构）", async () => {
+    const dialog = svelteDialog({ title: "新建联系人", component: AddPersonDialog, props: {
+        settings, onCreated() {}, onClose() {},
+    } });
+    try {
+        await until(() => dialog.dialog.element.querySelector('input[placeholder="联系人文档名将以此为题"]'), "新建表单未加载");
+        const nameInput = dialog.dialog.element.querySelector('input[placeholder="联系人文档名将以此为题"]');
+        input(nameInput, "守卫甲");
+        await tick();
+        dialog.dialog.element.querySelector(".b3-dialog__scrim")
+            .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await until(() => document.querySelector(".lvct-closeguard"), "新建草稿遮罩未路由守卫（D-40）");
+        assert(dialog.dialog.element.isConnected, "遮罩点击直接销毁了弹窗");
+        [...document.querySelectorAll(".lvct-closeguard button")].find((node) => node.dataset.choice === "discard").click();
+        await until(() => !dialog.dialog.element.isConnected, "守卫放弃后未关闭");
+    } finally {
+        if (dialog.dialog.element.isConnected) dialog.close();
+        document.querySelector(".lvct-closeguard")?.remove();
+    }
+});
+
+await test("V-02 Peek 400px 录入行不裁切：添加计划/添加归属按钮在面板右缘内", async () => {
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") return renderResult();
+        return { code: 0 };
+    };
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadRecentInteractions: async () => ({}),
+            listPersonOrgMemberships: async () => [],
+            listCommonOrgBackground: async () => [],
+            listOrganizations: async () => [],
+            loadDashboard: async () => ({ people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+                stale: [], staleTotal: 0, neverContacted: 0, neverContactedItemIds: [],
+                followUps: [], actions: [], neverOrder: {} }),
+            loadPersonInsights: async () => emptyInsights(),
+            listPersonFollowUps: async () => [],
+            createFollowUp: async () => { throw new Error("用例不涉及"); },
+            setFollowUpStatus: async () => {},
+            snoozeFollowUp: async () => {},
+            getPersonCadence: async () => null,
+            savePersonCadence: async () => {},
+        },
+    } });
+        await until(() => fixture.querySelector(".lvct-workbench__nav-item"), "工作台未加载");
+        const peopleNavItem = [...fixture.querySelectorAll(".lvct-workbench__nav-item")]
+            .find((node) => node.textContent.includes("联系人"));
+        peopleNavItem.click();
+        await until(() => fixture.querySelector(".lvct-person-card"), "名册未渲染");
+        fixture.querySelector(".lvct-person-card").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await until(() => fixture.querySelector(".lvct-dialog-panel--peek"), "Peek 未打开");
+        const panel = fixture.querySelector(".lvct-dialog-panel--peek");
+        await until(() => [...panel.querySelectorAll("button")].some((node) => node.textContent.includes("添加计划")), "跟进表单未渲染");
+    const panelRect = panel.getBoundingClientRect();
+    for (const label of ["添加计划", "添加归属"]) {
+        const actionButton = [...panel.querySelectorAll("button")].find((node) => node.textContent.includes(label));
+        assert(actionButton, `${label}按钮未找到`);
+        const rect = actionButton.getBoundingClientRect();
+        assert(rect.width > 0 && rect.right <= panelRect.right + 0.5,
+            `${label} 溢出 Peek 右缘（V-02）：btn.right=${rect.right} panel.right=${panelRect.right}`);
+    }
+});
+
+await test("V-02 组织弹窗宽屏布局：长组织名省略不溢出，成员行动作不被挤压", async () => {
+    const longName = "曙光科技（原晨曦信息技术有限公司全资子公司）";
+    const member = { id: "20260930000000-mem0001", orgDocId: "20260930000000-org0001",
+        personDocId: "20260930000000-per0001", personName: "超长成员姓名测试甲乙丙丁",
+        department: "研发中心平台架构部", title: "高级工程师", joinedOn: "", leftOn: "", status: "active" };
+    const facade = {
+        settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        listContacts: async () => [{ docId: "20260930000000-per0001", itemId: "row-p1", name: member.personName, isSelf: false }],
+        listOrganizations: async () => [
+            { docId: "20260930000000-org0001", name: longName, hpath: `/${longName}`, notebookId: settings.notebookId, archived: false, memberships: [member] },
+        ],
+        listOrganizationMembers: async () => [{ ...member }],
+    };
+    fixture.style.width = "920px"; /* 模拟加宽后的组织管理弹窗内容区 */
+    try {
+        mounted = mount(OrgManagerDialog, { target: fixture, props: {
+            facade, i18n: undefined, initialOrgDocId: "20260930000000-org0001", onClose() {},
+        } });
+        await until(() => fixture.querySelector(".lvct-org-manager__member"), "成员行未渲染");
+        const item = fixture.querySelector(".lvct-org-manager__org-item");
+        const listColumn = fixture.querySelector(".lvct-org-manager__list");
+        /* overflow:hidden 下 scrollWidth 仍含被裁内容——用几何与计算样式断言省略生效 */
+        assert(getComputedStyle(item).textOverflow === "ellipsis", "长组织名未启用省略号截断");
+        assert(item.title === longName, "长组织名缺 title 完整名提示");
+        assert(item.getBoundingClientRect().right <= listColumn.getBoundingClientRect().right + 0.5,
+            `长组织名溢出列表列：item.right=${item.getBoundingClientRect().right} list.right=${listColumn.getBoundingClientRect().right}`);
+        const row = fixture.querySelector(".lvct-org-manager__member");
+        const removeButton = [...row.querySelectorAll("button")].find((node) => node.textContent.trim() === "移除");
+        assert(removeButton, "移除按钮未找到");
+        assert(removeButton.getBoundingClientRect().right <= row.getBoundingClientRect().right + 0.5,
+            "成员动作按钮被挤出成员行（V-02）");
+    } finally {
+        fixture.style.width = "";
     }
 });
 
