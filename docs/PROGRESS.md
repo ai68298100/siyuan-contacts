@@ -2060,3 +2060,24 @@
 - **坑位新增**：Svelte 5 `$state` 深度代理化——组件传出的对象是 proxy 包装，smoke 断言
   回调参数与原始 mock 引用 `===` 必失败，须按字段比较。
 - **留后续**：组织视图侧共同背景入口、B13.5b 查询规模、S11 跨窗口刷新、B14 真机核对项。
+
+## 发版 第 79 轮：v0.4.0 正式发布（2026-09-30，作者指令：先发版）
+
+- **版本**：package.json + plugin.json → 0.4.0；README 中英（功能表增本人档案/组织归属/
+  双图谱，版本段更新）；CHANGELOG [0.4.0]（新增 B11/B13/B14/B12 + 加固 P0 十四项 + 已知
+  限制）；RELEASE.md 头注（commit 50157ed）。发布包 package.zip **382151B**，
+  sha256 `242a73df…` 与本地构建一致；check:release PASS。
+- **网络与通道**：github.com:443 间歇不可达（api.github.com 可达）；经作者提示启用
+  **gh CLI**（`C:\Program Files\GitHub CLI\gh.exe`，已认证 ai68298100）与
+  **SSH over 443**（ssh.github.com 认证成功）——origin pushurl 改为
+  `ssh://git@ssh.github.com:443/...`（fetch 保持 https），push/tag 稳定通行。
+- **push**：main `417beb8..50157ed`（38 commits）推送成功。
+- **CI**：run 36654358981（head 50157ed）conclusion **success**（build 1m26s；tag 无独立
+  workflow，main 绿即门禁）。
+- **tag**：v0.4.0（annotated）已推送。
+- **GitHub Release**：https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.4.0
+  （gh release create，中文发布说明：新增/加固/安装/已知限制）；资产 package.zip 382151B
+  上传成功，尺寸与本地构建一致。
+- **集市**：按约定不代提交，fork bazaar → plugins.txt → PR 由作者择机执行（RELEASE.md §3）。
+- **文档状态**：CHANGELOG [0.4.0] 已发布；RELEASE.md 头注 v0.4.0。
+- 后续待作者：集市 PR；真机核对（RELEASE.md 八条 + B14 原生图两项：面板通道、链接成边）。
