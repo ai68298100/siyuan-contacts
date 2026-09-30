@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isSuspiciousBirthday, runHealthAudit } from "../src/domain/health-audit.ts";
+import { isSuspiciousBirthday, runHealthAudit, runOrgHealthAudit } from "../src/domain/health-audit.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
 import type { FollowUpItem } from "../src/domain/followups.ts";
 
@@ -121,4 +121,52 @@ test("C04 余项：疑似重复对并入体检、长期无互动按阈值筛出"
     assert.ok(duplicateSuspect, "疑似重复项缺失");
     assert.deepEqual(duplicateSuspect.itemIds, ["row-dup-a"]);
     assert.ok(duplicateSuspect.samples[0].includes("张三"), "疑似重复样本应含人名");
+});
+
+test("B13.9 组织体检：孤儿成员/不可达组织/期间倒挂/重复在职/冲突标记与清洁样本", () => {
+    const membership = (over) => ({
+        id: "20260930000000-m000001", orgDocId: "20260930000000-org0001",
+        personDocId: "20260930000000-per0001", department: "", title: "",
+        joinedOn: "", leftOn: "", status: "active", ...over,
+    });
+    const rosterDocIds = new Set(["20260930000000-per0001"]);
+    const reachable = new Set(["20260930000000-org0001"]);
+    const orgNames = new Map([["20260930000000-org0001", "曙光科技"]]);
+    const personNames = new Map([["20260930000000-per0001", "张三"]]);
+
+    /* 清洁：全零 */
+    assert.deepEqual(runOrgHealthAudit({
+        memberships: [membership({ id: "20260930000000-m000009" })],
+        rosterDocIds, reachableOrgDocIds: reachable, orgNames, personNames,
+    }), []);
+
+    const issues = runOrgHealthAudit({
+        memberships: [
+            membership({ id: "20260930000000-m000001" }),
+            membership({ id: "20260930000000-m000002", personDocId: "20260930000000-pergone1", orgDocId: "20260930000000-orggone1" }),
+            membership({ id: "20260930000000-m000003", joinedOn: "2024-05-01", leftOn: "2024-01-01" }),
+            membership({ id: "20260930000000-m000004", title: "顾问" }),
+            membership({ id: "20260930000000-m000005", title: "顾问", joinedOn: "2023-01-01" }),
+        ],
+        rosterDocIds,
+        reachableOrgDocIds: reachable,
+        orgNames,
+        personNames,
+        markerCounts: new Map([["20260930000000-org0001", 2]]),
+    });
+    const byKind = new Map(issues.map((issue) => [issue.kind, issue]));
+    const orphan = byKind.get("orphanOrgMember");
+    assert.ok(orphan, "孤儿成员缺失");
+    assert.deepEqual(orphan.itemIds, ["20260930000000-m000002"]);
+    assert.ok(orphan.samples[0].includes("人物 rgone1"), "孤儿成员降级展示 docId 片段");
+    const unreachable = byKind.get("unreachableOrg");
+    assert.ok(unreachable && unreachable.itemIds.includes("20260930000000-orggone1"), "不可达组织缺失");
+    assert.ok(unreachable.samples[0].includes("组织文档 ggone1"), "不可达组织降级展示 docId 片段");
+    const inverted = byKind.get("invertedMembershipPeriod");
+    assert.ok(inverted && inverted.samples[0].includes("2024-05-01 ~ 2024-01-01"), "期间倒挂缺失");
+    const duplicate = byKind.get("duplicateActiveMembership");
+    assert.ok(duplicate && duplicate.samples[0].includes("4 条在职记录"), "重复在职缺失");
+    assert.equal(duplicate.itemIds[0], "20260930000000-m000001", "重复在职定位到首条记录");
+    const conflict = byKind.get("conflictingOrgMarkers");
+    assert.ok(conflict && conflict.samples[0].includes("2 个标记块"), "冲突标记缺失");
 });

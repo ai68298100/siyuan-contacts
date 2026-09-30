@@ -1000,7 +1000,7 @@
                     </div>
                     {#if auditIssues}
                         {#if auditIssues.length === 0}
-                            <p class="lvct-settings__inline-hint" role="status">未发现资料质量问题：缺字段、悬空关系、孤儿互动均为 0。</p>
+                            <p class="lvct-settings__inline-hint" role="status">未发现资料质量问题：缺字段、悬空关系、孤儿互动、组织成员与组织文档均为 0。</p>
                         {:else}
                             <ul class="lvct-settings__missing">
                                 {#each auditIssues as issue (issue.kind)}
@@ -1016,7 +1016,7 @@
                                 {/each}
                             </ul>
                         {/if}
-                        <p class="ft__smaller ft__on-surface">体检零写入；缺字段可在联系人页筛选补录，悬空关系可在联系人页安全解绑，人物文档被删后收编可归位互动。</p>
+                        <p class="ft__smaller ft__on-surface">体检零写入；缺字段可在联系人页筛选补录，悬空关系可在联系人页安全解绑，组织成员与期间可在组织管理中修正，人物文档被删后收编可归位互动。</p>
                     {:else}
                         <p class="lvct-settings__inline-hint">检查数据内容质量：缺关键字段、悬空关系、跟进/互动指向不存在的人物等。</p>
                     {/if}

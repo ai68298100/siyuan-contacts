@@ -9,6 +9,7 @@
 
 import type { ContactSummary } from "./person";
 import type { FollowUpItem } from "./followups";
+import type { OrgMembership } from "./org-membership";
 
 export type AuditIssueKind =
     | "missingPhone"
@@ -20,7 +21,13 @@ export type AuditIssueKind =
     | "unreachableFollowUp"
     | "orphanInteraction"
     | "duplicateSuspect"
-    | "longInactive";
+    | "longInactive"
+    /* B13.9 组织体检（第一批只读；修复由组织管理既有入口承担） */
+    | "orphanOrgMember"
+    | "unreachableOrg"
+    | "invertedMembershipPeriod"
+    | "duplicateActiveMembership"
+    | "conflictingOrgMarkers";
 
 export interface AuditIssue {
     kind: AuditIssueKind;
@@ -148,5 +155,85 @@ export function runHealthAudit(input: HealthAuditInput): AuditIssue[] {
     if (longInactive.length) {
         issues.push(toIssue("longInactive", `以下联系人有互动记录、但最近一次互动已超过 ${graceDays} 天（可在设置调整阈值视角）`, longInactive));
     }
+    return issues;
+}
+
+/* ---------- B13.9 组织体检（第一批只读；零写入，修复由组织管理既有入口承担） ---------- */
+
+export interface OrgAuditInput {
+    memberships: readonly OrgMembership[];
+    /** 名册 docId 集合（含本人——本人可加入组织） */
+    rosterDocIds: ReadonlySet<string>;
+    /** 可达组织 docId 集合（标记区块扫描结果，含归档） */
+    reachableOrgDocIds: ReadonlySet<string>;
+    /** 组织 docId → 名称（不可达时用 docId 片段降级展示） */
+    orgNames: ReadonlyMap<string, string>;
+    /** 人物 docId → 姓名（孤儿成员降级展示 docId 片段） */
+    personNames: ReadonlyMap<string, string>;
+    /** 组织 docId → 标记块数量（>1 = 冲突标记，H-22；缺省不检查） */
+    markerCounts?: ReadonlyMap<string, number>;
+}
+
+/**
+ * 组织维度体检（纯函数）：孤儿成员、组织文档不可达、期间倒挂、同人同组织重复在职、
+ * 冲突标记块。逐项给既有修复入口指引（组织管理弹窗编辑/移除）；不自动改写任何数据。
+ */
+export function runOrgHealthAudit(input: OrgAuditInput): AuditIssue[] {
+    const { memberships, rosterDocIds, reachableOrgDocIds, orgNames, personNames } = input;
+    const issues: AuditIssue[] = [];
+    const orgLabel = (docId: string) => orgNames.get(docId) ?? `组织文档 ${docId.slice(-6)}`;
+    const personLabel = (docId: string) => personNames.get(docId) ?? `人物 ${docId.slice(-6)}`;
+    const memberLabel = (membership: OrgMembership) =>
+        `${personLabel(membership.personDocId)} @ ${orgLabel(membership.orgDocId)}`;
+
+    const orphans = memberships
+        .filter((membership) => !rosterDocIds.has(membership.personDocId))
+        .map((membership) => ({ id: membership.id, label: memberLabel(membership) }));
+    if (orphans.length) {
+        issues.push(toIssue("orphanOrgMember", "以下成员记录的人物文档已不在名册（可能被解绑）；可在组织管理中移除该记录，重建人物后重新添加", orphans));
+    }
+
+    const unreachableCounts = new Map<string, number>();
+    for (const membership of memberships) {
+        if (reachableOrgDocIds.has(membership.orgDocId)) continue;
+        unreachableCounts.set(membership.orgDocId, (unreachableCounts.get(membership.orgDocId) ?? 0) + 1);
+    }
+    if (unreachableCounts.size > 0) {
+        issues.push(toIssue("unreachableOrg", "以下组织文档不可达（被删除或标记区块丢失）；成员记录保留可核对，重建同名组织文档并恢复标记后自动归位",
+            [...unreachableCounts].map(([docId, count]) => ({ id: docId, label: `${orgLabel(docId)}（${count} 条成员记录）` }))));
+    }
+
+    const inverted = memberships
+        .filter((membership) => membership.joinedOn !== "" && membership.leftOn !== "" && membership.joinedOn > membership.leftOn)
+        .map((membership) => ({ id: membership.id, label: `${memberLabel(membership)}（${membership.joinedOn} ~ ${membership.leftOn}）` }));
+    if (inverted.length) {
+        issues.push(toIssue("invertedMembershipPeriod", "以下成员记录的期间倒挂（加入晚于离开），可在组织管理中编辑修正", inverted));
+    }
+
+    const activeCounts = new Map<string, { count: number; sample: OrgMembership }>();
+    for (const membership of memberships) {
+        if (membership.status !== "active") continue;
+        const key = `${membership.personDocId}|${membership.orgDocId}`;
+        const entry = activeCounts.get(key);
+        if (entry) entry.count += 1;
+        else activeCounts.set(key, { count: 1, sample: membership });
+    }
+    const duplicates = [...activeCounts.values()]
+        .filter((entry) => entry.count > 1)
+        .map((entry) => ({
+            id: entry.sample.id,
+            label: `${memberLabel(entry.sample)}（${entry.count} 条在职记录）`,
+        }));
+    if (duplicates.length) {
+        issues.push(toIssue("duplicateActiveMembership", "以下同人同组织存在多条在职记录（可能重复添加），可在组织管理中保留一条、其余改为已离开或移除", duplicates));
+    }
+
+    const conflicts = [...(input.markerCounts ?? [])]
+        .filter(([, count]) => count > 1)
+        .map(([docId, count]) => ({ id: docId, label: `${orgLabel(docId)}（${count} 个标记块）` }));
+    if (conflicts.length) {
+        issues.push(toIssue("conflictingOrgMarkers", "以下组织文档存在多个组织标记块，归档状态投影已不可靠；请只保留一个标记块（多余的手工删除）", conflicts));
+    }
+
     return issues;
 }

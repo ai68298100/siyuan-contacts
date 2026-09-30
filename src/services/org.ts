@@ -60,6 +60,14 @@ export async function scanOrganizations(): Promise<OrganizationSummary[]> {
     }));
 }
 
+/** B13.9/H-22：各组织文档的标记块数量（>1 = 冲突标记，归档状态投影不可靠） */
+export async function countOrgMarkers(): Promise<Map<string, number>> {
+    const rows = await querySql<{ root_id: string; markers: number }>(
+        `SELECT root_id, COUNT(id) AS markers FROM blocks WHERE ial LIKE '%${ORG_SECTION_ATTR}="%' GROUP BY root_id`,
+    );
+    return new Map(rows.map((row) => [row.root_id, Number(row.markers)]));
+}
+
 /**
  * B12：人物 → 单位显示串（active 优先，其次最近一条成员记录）。
  * 形态：组织名 或 组织名 · 部门。供联系人卡片/选人提示等投影。
