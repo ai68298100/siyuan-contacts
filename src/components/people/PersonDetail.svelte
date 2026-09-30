@@ -751,12 +751,18 @@ import StatusNotice from "../StatusNotice.svelte";
                 <div class="lvct-org-common">
                     <b>{entry.orgName}</b>
                     {#each entry.peers as peer (peer.docId)}
+                        {@const contact = peer.contact}
                         <div class="lvct-org-common__peer">
                             <span>{peer.name}</span>
                             <span class="lvct-chip {peer.samePeriod ? "lvct-bucket--today" : "lvct-bucket--stale"}">
                                 {peer.samePeriod ? text("orgCommonSamePeriod", "同期") : text("orgCommonSameOrg", "同组织")}
                             </span>
                             <span class="ft__smaller ft__on-surface">{peer.overlapText}</span>
+                            {#if contact}
+                                <!-- B13.6 点击同伴开详情（onNavigate 即切换详情弹窗人物） -->
+                                <button type="button" class="b3-button b3-button--text"
+                                    onclick={() => onNavigate(contact)}>{text("orgCommonOpen", "查看详情")}</button>
+                            {/if}
                         </div>
                     {/each}
                 </div>

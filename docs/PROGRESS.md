@@ -2045,3 +2045,18 @@
   断点扫描有效。
 - **留后续**：共同背景点击同伴开详情（跨弹窗路由）、组织视图侧的共同背景入口、
   B13.5b 查询规模、B14 真机核对项（原生图面板/siyuan:// 链接成边/B14.10）。
+
+## P1 业务主线 第 78 轮：B13.6 共同背景点击同伴开详情（2026-09-30，续跑口令第 80 版驱动）
+
+- **域层**：`CommonOrgPeer` 增可选 `contact`（名册命中的 ContactSummary；解绑/不在名册时
+  缺省，UI 隐藏入口）；`buildCommonOrgBackground` 增 `contactsByDoc` 输入（名册 join）。
+- **服务层**：`listCommonOrgBackground` 组装 contactsByDoc=名册全量映射。
+- **PersonDetail**：同伴行「查看详情」按钮（仅 contact 存在时显示）→ 既有 `onNavigate`
+  通道（Workbench 即 openDetail，详情弹窗原地切换人物，detailKey 重置内部状态）。
+- **验证**：单测 215/215；三套 UI 桌面 103 / 移动 104 / 宿主 103 全绿（扩展共同背景用例：
+  有 contact 的同伴显示查看按钮并携带联系人回调 onNavigate；无 contact 的同伴不显示入口）；
+  collect-i18n 缺失 0（zh/en 各 1 键）；`pnpm run build` + `check:release` PASS；
+  真内核 contacts-flow 10/10、spike:init 21/21；52 景基线重拍 + 断点扫描有效。
+- **坑位新增**：Svelte 5 `$state` 深度代理化——组件传出的对象是 proxy 包装，smoke 断言
+  回调参数与原始 mock 引用 `===` 必失败，须按字段比较。
+- **留后续**：组织视图侧共同背景入口、B13.5b 查询规模、S11 跨窗口刷新、B14 真机核对项。

@@ -277,6 +277,7 @@ export async function listCommonOrgBackground(
         membershipIndex: index,
         namesByDoc: new Map(roster.map((person) => [person.docId, person.name] as const)),
         orgNames: new Map(orgs.map((org) => [org.docId, org.name] as const)),
+        contactsByDoc: new Map(roster.map((person) => [person.docId, person] as const)),
     });
 }
 

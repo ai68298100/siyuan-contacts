@@ -291,6 +291,7 @@
   "orgCommonSamePeriod": "Same period",
   "orgCommonSameOrg": "Same org",
   "orgCommonNote": "Based on org membership records; unknown join dates are marked \"same org\" only, not \"same period\".",
+  "orgCommonOpen": "View profile",
   "graphLoadFailTitle": "Failed to load the graph",
   "graphReload": "Reload",
   "graphLoadingTitle": "Loading the relationship graph",

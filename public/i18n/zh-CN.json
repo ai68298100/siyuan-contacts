@@ -291,6 +291,7 @@
   "orgCommonSamePeriod": "同期",
   "orgCommonSameOrg": "同组织",
   "orgCommonNote": "依据为组织成员记录；加入时间未知者只标「同组织」，不推断同期。",
+  "orgCommonOpen": "查看详情",
   "graphLoadFailTitle": "图谱加载失败",
   "graphReload": "重新加载",
   "graphLoadingTitle": "正在加载关系图谱",

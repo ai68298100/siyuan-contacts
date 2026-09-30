@@ -1469,15 +1469,21 @@ await test("B13.5 双向编辑完整版：人物详情内添加/移除组织归�
 });
 
 await test("B13.6 共同背景：同组织联系人按重叠期间展示（同期/同组织区分，失败降级）", async () => {
+    const peerContact = {
+        docId: "20260930000000-peer0001", itemId: "row-peer1", name: "同期同事甲",
+        phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
+        group: "同事", tags: [], relatedItemIds: [],
+    };
     const background = [
         {
             orgDocId: "20260930000000-org0001", orgName: "测试公司",
             peers: [
-                { docId: "20260930000000-peer0001", name: "同期同事甲", overlapText: "2024-06-01 ~ 2025-05-31", samePeriod: true },
+                { docId: "20260930000000-peer0001", name: "同期同事甲", overlapText: "2024-06-01 ~ 2025-05-31", samePeriod: true, contact: peerContact },
                 { docId: "20260930000000-peer0002", name: "时间未知乙", overlapText: "2023-01-01 ~ 至今", samePeriod: false },
             ],
         },
     ];
+    let navigatedTo = null;
     let fail = true;
     mounted = mount(PersonDetail, { target: fixture, props: {
         settings, person, onRecord: async () => {}, onLoadInsights: async () => emptyInsights(),
@@ -1495,7 +1501,8 @@ await test("B13.6 共同背景：同组织联系人按重叠期间展示（同�
     mounted = mount(PersonDetail, { target: fixture, props: {
         settings, person, onRecord: async () => {}, onLoadInsights: async () => emptyInsights(),
         onLoadCommonOrgs: async () => background,
-        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+        onNavigate: (target) => { navigatedTo = target; },
+        onOpenPersonDoc() {}, onChanged() {}, onDeleted() {}, onClose() {},
     } });
     await until(() => fixture.textContent.includes("测试公司"), "共同背景组织名未渲染");
     await until(() => fixture.textContent.includes("同期同事甲"), "同期同伴未渲染");
@@ -1503,6 +1510,20 @@ await test("B13.6 共同背景：同组织联系人按重叠期间展示（同�
     const chips = [...fixture.querySelectorAll(".lvct-org-common__peer .lvct-chip")].map((node) => node.textContent.trim());
     assert(chips.includes("同期") && chips.includes("同组织"), `同期/同组织 chip 缺失：${chips.join(",")}`);
     assert(fixture.textContent.includes("不推断同期"), "口径说明缺失");
+    /* B13.6 点击同伴开详情：有 contact 的同伴显示查看按钮并回调 onNavigate */
+    const peerRow = [...fixture.querySelectorAll(".lvct-org-common__peer")]
+        .find((node) => node.textContent.includes("同期同事甲"));
+    button("查看详情", peerRow).click();
+    await tick();
+    assert(
+        Boolean(navigatedTo) && navigatedTo.docId === peerContact.docId && navigatedTo.name === peerContact.name,
+        `查看详情未携带联系人回调 onNavigate navigatedTo=${JSON.stringify(navigatedTo)}`,
+    );
+    /* 无 contact 的同伴（解绑/不在名册）不显示入口 */
+    const unknownRow = [...fixture.querySelectorAll(".lvct-org-common__peer")]
+        .find((node) => node.textContent.includes("时间未知乙"));
+    assert(unknownRow && ![...unknownRow.querySelectorAll("button")].some((node) => node.textContent.includes("查看详情")),
+        "无联系人摘要的同伴不应显示查看入口");
     /* 无背景时不渲染区块（onLoadCommonOrgs 接线但数据为空） */
     await unmount(mounted);
     mounted = mount(PersonDetail, { target: fixture, props: {

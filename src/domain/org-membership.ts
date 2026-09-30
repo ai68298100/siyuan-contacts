@@ -158,6 +158,8 @@ export interface CommonOrgPeer {
     overlapText: string;
     /** 仅当双方加入时间均已知且期间有交集才为 true（时间未知不推断同期，B13.6 验收口径） */
     samePeriod: boolean;
+    /** 名册命中的联系人摘要（B13.6 点击同伴开详情；解绑/不在名册时缺省，UI 隐藏入口） */
+    contact?: import("./person").ContactSummary;
 }
 
 export interface CommonOrgBackground {
@@ -207,8 +209,10 @@ export function buildCommonOrgBackground(options: {
     namesByDoc: ReadonlyMap<string, string>;
     /** docId → 组织名（含归档组织——共同背景是历史事实，活跃口径过滤在调用方） */
     orgNames?: ReadonlyMap<string, string>;
+    /** docId → 联系人摘要（B13.6 点击同伴开详情；缺省时 UI 隐藏入口） */
+    contactsByDoc?: ReadonlyMap<string, import("./person").ContactSummary>;
 }): CommonOrgBackground[] {
-    const { personDocId, membershipIndex, namesByDoc, orgNames } = options;
+    const { personDocId, membershipIndex, namesByDoc, orgNames, contactsByDoc } = options;
     const ownRecords = membershipIndex.get(personDocId) ?? [];
     if (ownRecords.length === 0) return [];
     const byOrg = new Map<string, CommonOrgBackground>();
@@ -245,6 +249,7 @@ export function buildCommonOrgBackground(options: {
                 name: peerName,
                 overlapText: formatRange(best.range),
                 samePeriod: best.samePeriod,
+                contact: contactsByDoc?.get(peerDocId),
             });
         }
     }
