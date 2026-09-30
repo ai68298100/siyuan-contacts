@@ -1179,6 +1179,57 @@ await test("B13.7 人物文档组织归属链接区块：添加/归档恢复对�
     assert(failMembership, "失败文档成员记录应保留");
 });
 
+await test("B13.9 第二批 组织体检逐条修复：孤儿移除/重复转 former（确认后执行并重跑体检）", async () => {
+    const removed = [];
+    const formerUpdates = [];
+    let auditRound = 0;
+    const orgIssue = { kind: "orphanOrgMember", reason: "孤儿成员检测", itemIds: ["20260930000000-mem0001", "20260930000000-mem0002"], samples: ["甲 @ 曙光科技"] };
+    const dupIssue = { kind: "duplicateActiveMembership", reason: "重复在职检测", itemIds: ["20260930000000-mem0009"], samples: ["乙 @ 曙光科技（2 条在职记录）"] };
+    const facade = {
+        settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        runHealthAudit: async () => {
+            auditRound += 1;
+            if (auditRound === 1) return [orgIssue, dupIssue];
+            if (auditRound === 2) return [dupIssue]; /* 孤儿修复后重跑：仅剩重复项 */
+            return [];
+        },
+        loadExportSummary: async () => ({ people: 0, interactions: 0 }),
+        removeOrganizationMember: async (id) => { removed.push(id); },
+        updateOrganizationMember: async (id, patch) => { formerUpdates.push({ id, patch }); },
+        listOrganizations: async () => [
+            { docId: "20260930000000-org0001", name: "曙光科技", hpath: "/曙光科技", notebookId: settings.notebookId, archived: false, memberships: [
+                { id: "20260930000000-mem0009", personDocId: "20260930000000-per0002", orgDocId: "20260930000000-org0001", status: "active", joinedOn: "2023-01-01" },
+                { id: "20260930000000-mem0010", personDocId: "20260930000000-per0002", orgDocId: "20260930000000-org0001", status: "active", joinedOn: "2024-01-01" },
+            ] },
+        ],
+        openOrgManagerDialog() {},
+    };
+    mounted = mount(SettingsView, { target: fixture, props: {
+        facade, settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {}, onInteractionsUpdated() {},
+    } });
+    [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes("数据与字段")).click();
+    await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent.trim() === "运行资料体检"), "数据与字段分区未显示");
+    button("运行资料体检").click();
+    await until(() => fixture.textContent.includes("孤儿成员检测"), "体检报告未渲染");
+    const originalConfirm = window.confirm;
+    window.confirm = () => true;
+    try {
+        /* 孤儿成员：确认后逐条移除并重跑体检 */
+        [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("移除这 2 条成员记录")).click();
+        await until(() => removed.length === 2 && removed[0] === "20260930000000-mem0001", "孤儿成员未按报告移除");
+        await until(() => fixture.textContent.includes("已移除 2 条孤儿成员记录"), "孤儿修复消息未显示");
+        /* 重复在职：保留最早一条（mem0009），其余转 former */
+        [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("保留最早一条，其余转为已离开")).click();
+        await until(() => formerUpdates.length === 1 && formerUpdates[0].id === "20260930000000-mem0010"
+            && formerUpdates[0].patch.status === "former", "重复在职未保留最早转 former");
+        await until(() => fixture.textContent.includes("已将 1 条重复在职记录"), "重复修复消息未显示");
+        await until(() => fixture.textContent.includes("未发现资料质量问题"), "修复后体检未重跑");
+    } finally {
+        window.confirm = originalConfirm;
+    }
+});
+
 await test("B13.3 组织管理弹窗：新建组织、添加/移除成员经 facade 全链路（B13.3）", async () => {
     const createdOrgs = [];
     const memberOps = [];
@@ -1957,15 +2008,19 @@ await test("B14.8 按组织收窄：关系图人物与组织节点收窄、文�
 await test("B13.5a 组织视图：侧栏入口、卡片渲染（活跃/归档/成员数）、管理入口与初始视图直开", async () => {
     let managerOpened = 0;
     let managerOpenedWith;
+    let orgListLoads = 0;
     const facade = {
         settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
         listContacts: async () => [],
-        listOrganizations: async () => [
-            { docId: "20260930000000-org0001", name: "曙光科技", hpath: "/曙光科技", notebookId: settings.notebookId, archived: false, memberships: [
-                { status: "active" }, { status: "former" },
-            ] },
-            { docId: "20260930000000-org0002", name: "旧校", hpath: "/旧校", notebookId: settings.notebookId, archived: true, memberships: [] },
-        ],
+        listOrganizations: async () => {
+            orgListLoads += 1;
+            return [
+                { docId: "20260930000000-org0001", name: "曙光科技", hpath: "/曙光科技", notebookId: settings.notebookId, archived: false, memberships: [
+                    { status: "active" }, { status: "former" },
+                ] },
+                { docId: "20260930000000-org0002", name: "旧校", hpath: "/旧校", notebookId: settings.notebookId, archived: true, memberships: [] },
+            ];
+        },
         loadDashboard: async () => ({ people: 0, relations: 0, birthdays: [], birthdaysThisWeek: 0, stale: [], neverContacted: 0, neverContactedItemIds: [] }),
         openOrgManagerDialog: (orgDocId) => { managerOpened += 1; managerOpenedWith = orgDocId; },
     };
@@ -1991,6 +2046,10 @@ await test("B13.5a 组织视图：侧栏入口、卡片渲染（活跃/归档/�
     await tick();
     assert(managerOpened === 2, "卡片管理按钮未回调");
     assert(managerOpenedWith === "20260930000000-org0001", `卡片管理未携带目标组织：${managerOpenedWith}`);
+    /* B13.8：手动刷新入口触发重新加载 */
+    const beforeReload = orgListLoads;
+    button("重新加载").click();
+    await until(() => orgListLoads > beforeReload, "手动刷新未重新加载组织列表");
     /* 初始视图直开组织 */
     await unmount(mounted);
     mounted = mount(Workbench, { target: fixture, props: { ...baseProps, initialView: "orgs" } });

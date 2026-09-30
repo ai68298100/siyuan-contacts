@@ -61,6 +61,9 @@
             {text("orgsViewSummary", "共 {total} 个组织，{archived} 个已归档。成员的加入与离开在组织管理中维护。", { total: orgs.length, archived: orgs.filter((org) => org.archived).length })}
         </span>
         <span class="fn__flex-1"></span>
+        <!-- B13.8：手动对账入口（外部编辑无通知时，打开时对账 + 手动刷新兜底） -->
+        <button type="button" class="b3-button b3-button--text" onclick={() => void refresh()}>
+            {text("graphReload", "重新加载")}</button>
         <button type="button" class="b3-button b3-button--text" onclick={() => onOpenOrgManager()}>
             <Plus size={15} />{text("orgsManage", "组织管理")}
         </button>

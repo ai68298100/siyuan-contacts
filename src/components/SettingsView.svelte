@@ -291,6 +291,78 @@
         }
     }
 
+    /* B13.9 第二批：组织体检逐条修复（逐项确认；修复后重跑体检刷新报告）。
+       只覆盖可机械修复的两类；期间倒挂跳组织管理人工修正，不可达/冲突标记给指引无按钮。 */
+    let auditFixing = $state(false);
+    let auditFixMessage = $state("");
+    async function fixOrphanOrgMembers(issue: AuditIssue) {
+        if (auditFixing || issue.itemIds.length === 0 || typeof facade.removeOrganizationMember !== "function") return;
+        if (!window.confirm(`将移除 ${issue.itemIds.length} 条孤儿成员记录（人物文档已不在名册）。确认执行？`)) return;
+        auditFixing = true;
+        auditFixMessage = "";
+        try {
+            let failed = 0;
+            for (const id of issue.itemIds) {
+                try {
+                    await facade.removeOrganizationMember(id);
+                } catch {
+                    failed += 1; /* 逐条隔离：单条失败不阻断其余，可重试 */
+                }
+            }
+            auditFixMessage = failed > 0
+                ? `已移除 ${issue.itemIds.length - failed} 条，${failed} 条失败可重试`
+                : `已移除 ${issue.itemIds.length} 条孤儿成员记录`;
+            await runDataAudit();
+        } finally {
+            auditFixing = false;
+        }
+    }
+    async function fixDuplicateOrgActives() {
+        if (auditFixing || typeof facade.listOrganizations !== "function" || typeof facade.updateOrganizationMember !== "function") return;
+        auditFixing = true;
+        auditFixMessage = "";
+        try {
+            /* 从组织列举重导出重复在职组（报告只带每组首条 id，修复需整组）；
+               保留每组最早一条（加入日升序、记录 id 兜底），其余转「已离开」 */
+            const groups = new Map<string, { id: string; joinedOn: string }[]>();
+            for (const org of await facade.listOrganizations()) {
+                for (const membership of org.memberships) {
+                    if (membership.status !== "active") continue;
+                    const key = `${membership.personDocId}|${membership.orgDocId}`;
+                    const list = groups.get(key) ?? [];
+                    list.push({ id: membership.id, joinedOn: membership.joinedOn });
+                    groups.set(key, list);
+                }
+            }
+            const toFormer = [...groups.values()]
+                .filter((list) => list.length > 1)
+                .flatMap((list) => list
+                    .sort((a, b) => a.joinedOn.localeCompare(b.joinedOn) || a.id.localeCompare(b.id))
+                    .slice(1)
+                    .map((entry) => entry.id));
+            if (toFormer.length === 0) {
+                auditFixMessage = "未发现重复在职记录（可能已被修正）";
+                await runDataAudit();
+                return;
+            }
+            if (!window.confirm(`将保留每组最早一条在职记录，其余 ${toFormer.length} 条转为「已离开」。确认执行？`)) return;
+            let failed = 0;
+            for (const id of toFormer) {
+                try {
+                    await facade.updateOrganizationMember(id, { status: "former" });
+                } catch {
+                    failed += 1;
+                }
+            }
+            auditFixMessage = failed > 0
+                ? `已转换 ${toFormer.length - failed} 条，${failed} 条失败可重试`
+                : `已将 ${toFormer.length} 条重复在职记录转为「已离开」`;
+            await runDataAudit();
+        } finally {
+            auditFixing = false;
+        }
+    }
+
     async function runRebuild() {
         if (rebuilding) return;
         rebuilding = true;
@@ -1012,10 +1084,22 @@
                                                 查看这 {issue.itemIds.length} 人
                                             </button>
                                         {/if}
+                                        {#if issue.kind === "orphanOrgMember"}
+                                            <!-- B13.9 第二批：逐项确认修复（机械可修两类） -->
+                                            <button type="button" class="b3-button b3-button--text" disabled={auditFixing}
+                                                onclick={() => void fixOrphanOrgMembers(issue)}>移除这 {issue.itemIds.length} 条成员记录</button>
+                                        {:else if issue.kind === "duplicateActiveMembership"}
+                                            <button type="button" class="b3-button b3-button--text" disabled={auditFixing}
+                                                onclick={() => void fixDuplicateOrgActives()}>保留最早一条，其余转为已离开</button>
+                                        {:else if issue.kind === "invertedMembershipPeriod"}
+                                            <button type="button" class="b3-button b3-button--text"
+                                                onclick={() => facade.openOrgManagerDialog()}>打开组织管理修正</button>
+                                        {/if}
                                     </li>
                                 {/each}
                             </ul>
                         {/if}
+                        {#if auditFixMessage}<p class="lvct-settings__inline-hint" role="status">{auditFixMessage}</p>{/if}
                         <p class="ft__smaller ft__on-surface">体检零写入；缺字段可在联系人页筛选补录，悬空关系可在联系人页安全解绑，组织成员与期间可在组织管理中修正，人物文档被删后收编可归位互动。</p>
                     {:else}
                         <p class="lvct-settings__inline-hint">检查数据内容质量：缺关键字段、悬空关系、跟进/互动指向不存在的人物等。</p>
