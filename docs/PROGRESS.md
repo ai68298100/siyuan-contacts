@@ -2523,3 +2523,29 @@
   键盘穿出风险低，留真机读屏验证后再定）；D-31 余项（对比度实测）；V-16 余项
   （组织管理弹窗景）；H-05 余项（多选→H-07）；G-07 余项（证据展开）；B13.8 真机
   投递实证（作者）；B12 主线（作者定优先级）。
+
+## 测试基建 第 101 轮：V-26 第一批——settings 假截图修复 + 向导图标注入 + 去重门禁（2026-10-01，续跑口令第 102 版驱动）
+
+- **V-26（P1，关联 V-16/D-13/G-02）第一批**：
+  - **settings 假截图根修**：`shot-workbench.html` 的 `initialView` 三元链没有 settings
+    分支，`?view=settings` 落入 `people` 兜底——断点矩阵的 `settings-*` 与 `people-*`
+    字节相同（SHA256 逐宽核对属实），所谓设置断点图实际不是设置页。映射补
+    `view === "settings" ? "settings"`（Workbench 原生支持该视图），READY 判定补
+    `.lvct-settings` 选择器。重拍后 390/640/1280 三档 settings 哈希与 people 分离，
+    people-* 哈希不变（未扰动既有景），目检 settings-1280 为真实设置页。
+  - **向导图标注入**：InitWizard 的 logo `<use xlink:href="#iconLvContacts">` 依赖宿主
+    `addIcons` 注入，`shot-wizard.html` 未注入时渲染紫色空方块。夹具 body 补与
+    `src/index.ts` 一致的隐藏 `<symbol>`；重拍后 `wizard-reuse-desktop-light` 目检
+    logo 为双人形图标。
+  - **去重门禁**：`breakpoint-sweep.mjs` 拍摄完成后按宽分组做 SHA256 去重——同宽不同页
+    字节相同即判失败（正是本缺陷形态），当前 24 景全异。此门禁把「假截图」从评审依赖
+    人眼变成脚本失败。
+- **V-26 其余子项核对**：Peek fixture 缺共同背景 facade 一项已在前序轮补齐
+  （`listCommonOrgBackground` 在场）；逐景页面标识断言由「expected 选择器缺失→ERROR
+  title + role=alert 可见即失败 + V-26 字节去重」三层覆盖。
+- **验证**：单测 222/222；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；
+  `pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow
+  13/13、spike:init 21/21；断点矩阵 24 景重拍 + 去重门禁通过；56 景基线重拍全 OK。
+- **留后续**：V-26 余项（700/768/900 中间宽档未纳入矩阵——V-05 已选 390/575/640/1280
+  四档，是否加档留评审）；V-16 余项（组织管理弹窗景需 svelteDialog 交互触发）；B12
+  主线（B12.2/B12.3/B12.6 作者定优先级）；B13.8 真机投递实证（作者）。

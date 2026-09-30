@@ -1,5 +1,6 @@
 /** UX-01.10 断点扫描：主页面 × 390/575/640/1280 档截图 + Peek 场景（V-05 布局矩阵第一批：
  *  575px 补中间档——全屏 Peek/布局在手机与小屏平板之间曾无基线覆盖）。 */
+import { createHash } from "node:crypto";
 import { createServer } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -99,6 +100,19 @@ try {
             console.log(`${view} @ ${width}`);
         }
     }
+    /* V-26：同宽下不同页字节相同=视图映射假截图（settings-* 曾与 people-* 同哈希），直接判失败 */
+    const seen = new Map();
+    for (const view of pages) {
+        for (const width of widths) {
+            const digest = createHash("sha256")
+                .update(readFileSync(join(outDir, `${view}-${width}.png`)))
+                .digest("hex");
+            const key = `${width}#${digest}`;
+            if (seen.has(key)) throw new Error(`V-26 重复截图：${view}-${width} 与 ${seen.get(key)} 字节相同（视图映射假截图）`);
+            seen.set(key, `${view}-${width}`);
+        }
+    }
+    console.log(`V-26 去重校验：${seen.size} 景无跨页字节重复`);
     console.log("sweep done →", outDir);
 } finally {
     socket?.close();

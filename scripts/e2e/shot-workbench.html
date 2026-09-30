@@ -213,7 +213,8 @@
     };
     mount(Workbench, { target: document.getElementById("shot"), props: {
         facade, settings, preferences,
-        initialView: (view === "home" || view === "quickfill") ? "home" : view === "graph" ? "graph" : view === "orgs" ? "orgs" : "people",
+        /* V-26：settings 曾落入 people 兜底——断点矩阵 settings-* 与 people-* 字节相同 */
+        initialView: (view === "home" || view === "quickfill") ? "home" : view === "graph" ? "graph" : view === "orgs" ? "orgs" : view === "settings" ? "settings" : "people",
         isMobile: innerWidth <= 640, onPreferencesUpdated() {}, onOpenPersonDoc() {},
     } });
     setTimeout(() => {
@@ -246,6 +247,7 @@
             const expected = view === "home" ? ".lvct-dash__stats"
                 : view === "graph" ? ".lvct-graph-view__canvas"
                 : view === "orgs" ? ".lvct-orgs-view__card"
+                : view === "settings" ? ".lvct-settings"
                 : view === "table" ? ".lvct-people__table-wrap"
                 : view === "peek" ? ".lvct-detail"
                 : view === "viewsmenu" ? ".lvct-people__viewsmenu"
