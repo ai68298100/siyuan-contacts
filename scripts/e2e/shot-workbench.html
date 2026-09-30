@@ -172,8 +172,17 @@
             id: "mem-shot-1", orgDocId: "20260101000000-orgshot1", orgName: "曙光科技（原晨曦信息技术有限公司）",
             department: "研发中心平台架构部", title: "高级工程师", joinedOn: "2021-03-01", leftOn: "", status: "active",
         }] : [],
+        /* V-16：组织视图样例——多组织（活跃+归档）+ 成员计数供组织卡片网格核对 */
         listOrganizations: async () => [
-            { docId: "20260101000000-orgshot1", name: "曙光科技（原晨曦信息技术有限公司）", hpath: "/曙光科技", notebookId: settings.notebookId, archived: false, memberships: [] },
+            { docId: "20260101000000-orgshot1", name: "曙光科技（原晨曦信息技术有限公司）", hpath: "/曙光科技", notebookId: settings.notebookId, archived: false, memberships: [
+                { id: "mem-1", orgDocId: "20260101000000-orgshot1", personDocId: people[0].docId, status: "active", joinedOn: "2021-03-01" },
+                { id: "mem-2", orgDocId: "20260101000000-orgshot1", personDocId: people[1].docId, status: "active", joinedOn: "2022-06-01" },
+                { id: "mem-3", orgDocId: "20260101000000-orgshot1", personDocId: people[2].docId, status: "former", joinedOn: "2020-01-01", leftOn: "2023-06-30" },
+            ] },
+            { docId: "20260101000000-orgshot2", name: "母校学院", hpath: "/母校学院", notebookId: settings.notebookId, archived: false, memberships: [
+                { id: "mem-4", orgDocId: "20260101000000-orgshot2", personDocId: people[0].docId, status: "active", joinedOn: "2015-09-01" },
+            ] },
+            { docId: "20260101000000-orgshot3", name: "已注销工作室", hpath: "/已注销工作室", notebookId: settings.notebookId, archived: true, memberships: [] },
         ],
         listCommonOrgBackground: async (docId) => docId === people[0].docId ? [{
             orgDocId: "20260101000000-orgshot1", orgName: "曙光科技（原晨曦信息技术有限公司）",
@@ -204,7 +213,7 @@
     };
     mount(Workbench, { target: document.getElementById("shot"), props: {
         facade, settings, preferences,
-        initialView: (view === "home" || view === "quickfill") ? "home" : view === "graph" ? "graph" : "people",
+        initialView: (view === "home" || view === "quickfill") ? "home" : view === "graph" ? "graph" : view === "orgs" ? "orgs" : "people",
         isMobile: innerWidth <= 640, onPreferencesUpdated() {}, onOpenPersonDoc() {},
     } });
     setTimeout(() => {
@@ -236,6 +245,7 @@
         setTimeout(() => {
             const expected = view === "home" ? ".lvct-dash__stats"
                 : view === "graph" ? ".lvct-graph-view__canvas"
+                : view === "orgs" ? ".lvct-orgs-view__card"
                 : view === "table" ? ".lvct-people__table-wrap"
                 : view === "peek" ? ".lvct-detail"
                 : view === "viewsmenu" ? ".lvct-people__viewsmenu"

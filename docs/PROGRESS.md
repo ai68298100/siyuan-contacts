@@ -2458,3 +2458,19 @@
   52 景基线 + 20 景断点矩阵重拍有效（focus-visible 仅键盘触发，静态景无变化）。
 - **留后续**：D-31 余项（对比度实测、最小触控尺寸令牌化——随 D-26 全量验收）；D-35 余项
   （aria-describedby 逐字段绑定）；B13.8 真机投递；V-05 真机向余项；B12 主线（作者定优先级）。
+
+## 测试基建 第 97 轮：V-16 组织视图截图景（2026-10-01，续跑口令第 98 版驱动）
+
+- **V-16 部分**：截图夹具补组织页/组织管理景——
+  - shot-workbench.html：`initialView` 映射加 `"orgs"`；READY 判定选择器 `.lvct-orgs-view__card`；
+    夹具 `listOrganizations` 充实为三组织（活跃 2 + 归档 1）含成员计数，组织卡片网格非空白。
+  - screenshot-settings.mjs views 加 `"orgs"`（桌面/移动 × 明/暗 = 4 景新增）。
+  - breakpoint-sweep.mjs pages 加 `"orgs"`（390/575/640/1280 = 4 景新增）。
+- **效果**：组织视图首次入截图基线（V-16 缺口收口）；组织卡片、概要统计、归档徽标、
+  重新加载/组织管理按钮均入视觉回归覆盖。
+- **验证**：单测 221/221；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；`pnpm check`
+  0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 13/13、spike:init 21/21；
+  52 景基线重拍目检（workbench-orgs-desktop-light.png：3 组织卡片正常、归档徽标与统计正确）+
+  24 景断点矩阵（+4 orgs 景全 OK）。
+- **留后续**：组织管理弹窗截图景（需 svelteDialog 交互触发，较复杂可后续独立做）；
+  B13.8 真机投递实证；V-05 真机向余项；B12 主线（作者定优先级）；B11 余项。

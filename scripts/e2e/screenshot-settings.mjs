@@ -128,7 +128,7 @@ try {
             }
         }
     }
-    for (const view of selectedView ? [selectedView] : ["home", "people", "table", "peek", "graph", "quickfill"]) {
+    for (const view of selectedView ? [selectedView] : ["home", "people", "table", "peek", "graph", "orgs", "quickfill"]) {
         for (const [viewport, size] of [["desktop", "1280,900"], ["mobile", "390,844"]]) {
             for (const theme of ["light", "dark"]) {
                 const url = `http://127.0.0.1:${port}/scripts/e2e/shot-workbench.html?view=${view}&theme=${theme}`;
