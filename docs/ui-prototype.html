@@ -443,6 +443,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
     <button class="proto-nav__item" data-s="wizard"><span class="ic">⚑</span>初始化向导</button>
     <button class="proto-nav__item" data-s="settings"><span class="ic">⚙</span>设置页</button>
     <button class="proto-nav__item" data-s="docbar"><span class="ic">▤</span>人物文档档案条</button>
+    <button class="proto-nav__item" data-s="orgmgr"><span class="ic">▣</span>组织管理弹窗</button>
     <div class="proto-nav__sec">设计规范</div>
     <button class="proto-nav__item" data-s="color"><span class="ic">❖</span>色彩与令牌</button>
     <button class="proto-nav__item" data-s="type"><span class="ic">𝐓</span>字体 · 间距 · 动效</button>
@@ -1086,6 +1087,46 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
       </div>
     </section>
 
+    <!-- ========== 9.5 组织管理弹窗（V-16 余项：正式原型帧） ========== -->
+    <section class="screen" id="s-orgmgr">
+      <div class="note-box"><b>设计要点：</b>组织管理是组织维度的成员维护中枢（B13.3）——左列组织清单（活跃/已归档分组、新建入口固定底部），右侧当前组织详情（改名/归档恢复 + 成员行「姓名 · 职位（部门）」+ 查看详情/编辑/移除 + 可搜索选人添加）。卡片「管理」入口<b>携组织 ID 定位打开</b>（B13.6a，不落默认首个）；成员「查看详情」跨弹窗导航到工作台人物 Peek。事实源=组织成员索引 JSON，与联系人卡片「单位」行、共同背景同口径；人物文档侧仅维护 custom-lvct-org-links 单标记块投影（DATA-CONTRACT §8）。</div>
+      <div class="proto-status">✅ 已实现（v0.4.x：B13 组织维度）· 实屏基准：scripts/e2e/shots/workbench-orgmgr-*、breakpoints/orgmgr-*、host-pop-orgmgr</div>
+      <div class="frame">
+        <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">组织管理弹窗（桌面 min(920px, 92vw)）</span></div>
+        <div class="frame__body" style="min-height:440px; display:flex; align-items:center; justify-content:center; background:var(--bg-base)">
+          <div style="width:min(920px,92%); background:var(--bg-elevated); border:1px solid var(--border-strong); border-radius:10px; box-shadow:var(--shadow-2); overflow:hidden">
+            <div style="display:flex; align-items:center; padding:10px 16px; border-bottom:1px solid var(--border-subtle); font-weight:600">组织管理<div class="sp" style="flex:1"></div><span style="opacity:.6">✕</span></div>
+            <div style="display:flex; min-height:340px">
+              <div style="flex:0 0 250px; border-right:1px solid var(--border-subtle); padding:12px; display:flex; flex-direction:column; gap:6px; min-width:0">
+                <b>组织</b>
+                <button class="btn btn--sm" style="text-align:left; background:var(--accent-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">曙光科技（原晨曦信息技术…<small>（3）</small></button>
+                <button class="btn btn--sm" style="text-align:left; background:transparent">母校学院<small>（1）</small></button>
+                <button class="btn btn--sm" style="text-align:left; background:transparent; opacity:.6">已归档（1）▾</button>
+                <div class="sp" style="flex:1"></div>
+                <div class="input">组织名称…</div>
+                <button class="btn btn--sm">新建组织</button>
+              </div>
+              <div style="flex:1; padding:12px 16px; display:flex; flex-direction:column; gap:10px; min-width:0">
+                <div style="display:flex; align-items:center; gap:8px"><b style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">曙光科技（原晨曦信息技术有限公司）</b><button class="btn btn--sm">改名</button><button class="btn btn--sm btn--ghost">归档组织</button></div>
+                <b>成员</b>
+                <div style="display:flex; align-items:center; gap:8px"><span style="flex:1; min-width:0; overflow-wrap:anywhere">林晓梅 · 高级工程师（研发中心平台架构部）</span><span style="display:flex; gap:4px; flex-shrink:0"><button class="btn btn--sm btn--ghost">查看详情</button><button class="btn btn--sm btn--ghost">编辑</button><button class="btn btn--sm btn--ghost">移除</button></span></div>
+                <div style="display:flex; align-items:center; gap:8px"><span style="flex:1; min-width:0; overflow-wrap:anywhere">陈立群 · 教师（数学组）</span><span style="display:flex; gap:4px; flex-shrink:0"><button class="btn btn--sm btn--ghost">查看详情</button><button class="btn btn--sm btn--ghost">编辑</button><button class="btn btn--sm btn--ghost">移除</button></span></div>
+                <div style="display:flex; align-items:center; gap:8px; opacity:.6"><span style="flex:1; min-width:0; overflow-wrap:anywhere">郑好 · 摄影指导（已离开）</span><span style="display:flex; gap:4px; flex-shrink:0"><button class="btn btn--sm btn--ghost">移除</button></span></div>
+                <div style="display:flex; gap:8px; align-items:center"><div class="input" style="flex:1; min-width:0">选择要添加的联系人…</div><button class="btn btn--sm" style="flex-shrink:0">添加成员</button></div>
+                <div class="sp" style="flex:1"></div>
+                <div style="display:flex; justify-content:flex-end"><button class="btn btn--sm">关闭</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin-top:12px">
+        <div class="card" style="padding:12px"><b>移动端（≤640）</b><div class="meta" style="margin-top:6px; line-height:1.6">双栏纵向堆叠：组织列表转全宽（限高滚动）、详情区获得整行——成员行姓名与动作不折行不溢出（V-02 第 103 轮修复；实屏 breakpoints/orgmgr-390）。</div></div>
+        <div class="card" style="padding:12px"><b>空组织态</b><div class="meta" style="margin-top:6px; line-height:1.6">左列提示「暂无组织。输入名称新建第一个组织。」，新建入口仍固定底部；首组织建成后自动选中进入右列详情。</div></div>
+        <div class="card" style="padding:12px"><b>加载失败态</b><div class="meta" style="margin-top:6px; line-height:1.6">读取失败显示行内错误与重试，不以空态冒充失败（FUNC-01.12 语义）；重试前先清 error 防闪烁。</div></div>
+      </div>
+    </section>
+
     <!-- ========== 10. 色彩与令牌 ========== -->
     <section class="screen spec" id="s-color">
       <div class="proto-status">🎨 组件规范页（设计规格参照，非独立实现画面）</div>
@@ -1265,6 +1306,7 @@ const titles = {
   wizard: ["初始化向导", "一次性轻量流程 · 过程可见 · 失败可恢复"],
   settings: ["设置页", "六分区 · 字段健康检查 · AI 与隐私边界"],
   docbar: ["人物文档档案条", "插件 ⇄ 文档的双向出入口"],
+  orgmgr: ["组织管理弹窗", "成员维护中枢 · 携参定位打开 · 窄视口堆叠"],
   color: ["色彩与令牌", "设计令牌 → b3 变量映射 · 明暗双套分组色"],
   type: ["字体 · 间距 · 动效", "4pt 网格 · ≤250ms 动效 · 可访问性底线"],
   comp: ["组件规范", "可复用组件活样例与使用规则"],
