@@ -33,7 +33,7 @@ const server = await createServer({
 });
 await server.listen();
 const port = server.httpServer.address().port;
-const pages = ["home", "people", "peek", "graph", "orgs", "settings"];
+const pages = ["home", "people", "peek", "graph", "orgs", "orgmgr", "settings"];
 const widths = [390, 575, 640, 1280];
 
 const profile = mkdtempSync(join(tmpdir(), "bp-sweep-"));

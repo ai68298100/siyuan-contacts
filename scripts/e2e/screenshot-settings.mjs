@@ -128,7 +128,7 @@ try {
             }
         }
     }
-    for (const view of selectedView ? [selectedView] : ["home", "people", "table", "peek", "graph", "orgs", "quickfill"]) {
+    for (const view of selectedView ? [selectedView] : ["home", "people", "table", "peek", "graph", "orgs", "orgmgr", "quickfill"]) {
         for (const [viewport, size] of [["desktop", "1280,900"], ["mobile", "390,844"]]) {
             for (const theme of ["light", "dark"]) {
                 const url = `http://127.0.0.1:${port}/scripts/e2e/shot-workbench.html?view=${view}&theme=${theme}`;
@@ -152,6 +152,7 @@ try {
             ["shot-workbench.html?view=viewsmenu&host=1", "pop-viewsmenu", "mobile", "390,844"],
             ["shot-workbench.html?view=morefilter&host=1", "pop-morefilter", "desktop", "1280,900"],
             ["shot-workbench.html?view=colmenu&host=1", "pop-colmenu", "desktop", "1280,900"],
+            ["shot-workbench.html?view=orgmgr&host=1", "pop-orgmgr", "desktop", "1280,900"],
             ["shot-workbench.html?view=home&host=1", "workbench-home-dark", "desktop-dark", "1280,900"],
             ["shot-workbench.html?view=viewsmenu&host=1", "pop-viewsmenu-dark", "desktop-dark", "1280,900"],
         ];

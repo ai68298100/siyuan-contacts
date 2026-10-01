@@ -2549,3 +2549,32 @@
 - **留后续**：V-26 余项（700/768/900 中间宽档未纳入矩阵——V-05 已选 390/575/640/1280
   四档，是否加档留评审）；V-16 余项（组织管理弹窗景需 svelteDialog 交互触发）；B12
   主线（B12.2/B12.3/B12.6 作者定优先级）；B13.8 真机投递实证（作者）。
+
+## 基准治理 第 102 轮：V-16 余项——组织管理弹窗截图景 + mock Dialog 宿主 DOM 升级（2026-10-01，续跑口令第 103 版驱动）
+
+- **V-16 余项（P2）截图夹具部分收口**：
+  - `shot-workbench.html` 夹具补 `openOrgManagerDialog`——与 `index.ts` 同构
+    （svelteDialog + mock Dialog，宽 `min(920px, 92vw)`，initialOrgDocId 直传，
+    onOpenPerson 同走 `lvct-workbench-person` 窗口事件）；组织数据抽 `orgShotList`
+    供组织视图与弹窗景共用，成员 join 名册带 `personName`。
+  - 夹具组织 facade 补齐弹窗所需读写方法（listOrganizationMembers/listContacts/
+    create/add/remove/update/archive/restore/rename，写操作直接变更高夹具数组）。
+  - `orgmgr` 景：initialView 落组织视图 → 点首个组织卡「管理」→ 弹窗携参定位打开
+    （顺带可视验证 B13.6a 携参入口）；READY 断言 `.b3-dialog .lvct-org-manager`。
+    入断点矩阵 4 档（24→28 景）+ 基线套件 4 景（56→60）+ 宿主基线 1 景。
+- **mock Dialog 宿主 DOM 升级**（V-16 前置）：原 mock 只有 scrim+close+content 平铺，
+  无 `.b3-dialog__container` 包裹、无 `b3-dialog--open`——真实 base.css 的弹窗外观
+  （容器表面/居中/遮罩不透明度）全不生效，首拍弹窗内容散页。升级为宿主完整层级
+  （scrim + container[宽度/标题头/X 关闭 svg] + body + `--open` 常驻态）；
+  三套 UI 117/120/117 全绿（querySelector 兼容：`.b3-dialog__scrim/__close` 仍在）。
+  approx 样式块补 b3-dialog 外观近似（host=1 时撤下由真实 base.css 接管）。
+- **顺带发现（已登记不在本轮扩scope）**：orgmgr@390 弹窗成员行挤压——姓名逐字竖排
+  折行、查看详情/编辑与姓名重叠、改名/归档按钮溢出右缘；已记入 V-02 余项
+  （疑 flex min-width 类根因，同 Peek 400px），复现基线 breakpoints orgmgr-390.png。
+- **验证**：单测 222/222；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；
+  `pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow
+  13/13、spike:init 21/21；断点矩阵 28 景（含 V-26 去重门禁）+ 基线 60 景 + 宿主
+  12 景重拍；orgmgr 桌面/暗色/host 目检为真实弹窗（容器/标题头/X/遮罩齐备）。
+- **留后续**：V-02 余项（含 390px 弹窗挤压）；V-16 余项（原型页治理：正式原型帧 +
+  有意差异/版本/Host pending 标注）；B12 主线（作者定优先级）；B13.8 真机投递
+  实证（作者）。
