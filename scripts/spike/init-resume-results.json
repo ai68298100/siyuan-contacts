@@ -1,6 +1,6 @@
 {
   "kernel": "3.8.6",
-  "ranAt": "2026-10-01T00:14:10.259Z",
+  "ranAt": "2026-10-01T00:26:22.584Z",
   "results": [
     {
       "name": "内核启动",
@@ -25,17 +25,17 @@
     {
       "name": "通道10a：insertBlock(dom) data 为事务结果数组且可取其 id",
       "ok": true,
-      "detail": "{\"isArray\":true,\"id\":\"20261001081407-lheh8e1\",\"keys\":[\"0\"]}"
+      "detail": "{\"isArray\":true,\"id\":\"20261001082619-8f8h7ld\",\"keys\":[\"0\"]}"
     },
     {
       "name": "通道10b：insertBlock(markdown) 同上",
       "ok": true,
-      "detail": "{\"isArray\":true,\"id\":\"20261001081407-hxj8388\"}"
+      "detail": "{\"isArray\":true,\"id\":\"20261001082619-soee5oa\"}"
     },
     {
       "name": "通道11·现场：半成品（笔记本+宿主文档+未物化数据库块，无字段）",
       "ok": true,
-      "detail": "book=20261001081407-q05n6q4 host=20261001081407-em4x22f block=20261001081408-v6mt7kp"
+      "detail": "book=20261001082619-ii9pxp8 host=20261001082620-glnljpq block=20261001082620-q518mos"
     },
     {
       "name": "通道11a：续建补建九个字段、无重名列、双向回链列就位",
@@ -50,7 +50,7 @@
     {
       "name": "造现场",
       "ok": true,
-      "detail": "notebook=20261001081408-xku5t6c host=20261001081409-1svmfnc av=20261001081409-0pjb18n dbBlock=20261001081409-6hg1ut0"
+      "detail": "notebook=20261001082621-7pmh5lj host=20261001082621-exfb4ds av=20261001082622-doa7p4x dbBlock=20261001082622-m6vt1rk"
     },
     {
       "name": "通道1：笔记本内按标题找回宿主文档",
@@ -65,27 +65,27 @@
     {
       "name": "通道2：parent_id + type='av' 找回数据库块",
       "ok": true,
-      "detail": "children=[{\"content\":\"联系人总表\",\"id\":\"20261001081409-1tox981\",\"subtype\":\"h1\",\"type\":\"h\"},{\"content\":\"Table Primary Key Select 生日 相关人 被相关人\",\"id\":\"20261001081409-6hg1ut0\",\"subtype\":\"\",\"type\":\"av\"}]"
+      "detail": "children=[{\"content\":\"联系人总表\",\"id\":\"20261001082621-sp0s7t6\",\"subtype\":\"h1\",\"type\":\"h\"},{\"content\":\"Table Primary Key Select 生日 相关人 被相关人\",\"id\":\"20261001082622-m6vt1rk\",\"subtype\":\"\",\"type\":\"av\"}]"
     },
     {
       "name": "通道3a：blocks.markdown/ial 是否含 avID",
       "ok": true,
-      "detail": "[{\"content\":\"Table Primary Key Select 生日 相关人 被相关人\",\"ial\":\"{: id=\\\"20261001081409-6hg1ut0\\\" updated=\\\"20261001081409\\\"}\",\"id\":\"20261001081409-6hg1ut0\",\"markdown\":\"<div data-type=\\\"NodeAttributeView\\\" data-av-id=\\\"20261001081409-0pjb18n\\\" data-av-type=\\\"table\\\"></div>\",\"subtype\":\"\",\"type\":\"av\"}]"
+      "detail": "[{\"content\":\"Table Primary Key Select 生日 相关人 被相关人\",\"ial\":\"{: id=\\\"20261001082622-m6vt1rk\\\" updated=\\\"20261001082622\\\"}\",\"id\":\"20261001082622-m6vt1rk\",\"markdown\":\"<div data-type=\\\"NodeAttributeView\\\" data-av-id=\\\"20261001082622-doa7p4x\\\" data-av-type=\\\"table\\\"></div>\",\"subtype\":\"\",\"type\":\"av\"}]"
     },
     {
       "name": "通道3b：getBlockKramdown 是否含 avID",
       "ok": true,
-      "detail": "code=0 data={\"id\":\"20261001081409-6hg1ut0\",\"kramdown\":\"<div data-type=\\\"NodeAttributeView\\\" data-av-id=\\\"20261001081409-0pjb18n\\\" data-av-type=\\\"table\\\"></div>\\n{: id=\\\"20261001081409-6hg1ut0\\\" updated=\\\"20261001081409\\\"}\"}"
+      "detail": "code=0 data={\"id\":\"20261001082622-m6vt1rk\",\"kramdown\":\"<div data-type=\\\"NodeAttributeView\\\" data-av-id=\\\"20261001082622-doa7p4x\\\" data-av-type=\\\"table\\\"></div>\\n{: id=\\\"20261001082622-m6vt1rk\\\" updated=\\\"20261001082622\\\"}\"}"
     },
     {
       "name": "通道3c：getChildBlocks 是否含 avID",
       "ok": true,
-      "detail": "code=0 data=[{\"id\":\"20261001081409-6hg1ut0\",\"type\":\"av\",\"content\":\"Table Primary Key Select 生日 相关人 被相关人\",\"markdown\":\"<div data-type=\\\"NodeAttributeView\\\" data-av-id=\\\"20261001081409-0pjb18n\\\" data-av-type=\\\"table\\\"></div>\"},{\"id\":\"20261001081409-1tox981\",\"type\":\"h\",\"subType\":\"h1\",\"content\":\"联系人总表\",\"markdown\":\"# 联系人总表\"}]"
+      "detail": "code=0 data=[{\"id\":\"20261001082622-m6vt1rk\",\"type\":\"av\",\"content\":\"Table Primary Key Select 生日 相关人 被相关人\",\"markdown\":\"<div data-type=\\\"NodeAttributeView\\\" data-av-id=\\\"20261001082622-doa7p4x\\\" data-av-type=\\\"table\\\"></div>\"},{\"id\":\"20261001082621-sp0s7t6\",\"type\":\"h\",\"subType\":\"h1\",\"content\":\"联系人总表\",\"markdown\":\"# 联系人总表\"}]"
     },
     {
       "name": "通道4：renderView 列名→keyID 映射（含双向回链列）",
       "ok": true,
-      "detail": "[{\"id\":\"20261001081409-qlx1fi4\",\"name\":\"生日\",\"type\":\"date\"},{\"id\":\"20261001081409-ws69pmc\",\"name\":\"相关人\",\"type\":\"relation\"},{\"id\":\"20261001081409-3zjbxgv\",\"name\":\"Primary Key\",\"type\":\"block\"},{\"id\":\"20261001081409-o9o4eqm\",\"name\":\"Select\",\"type\":\"select\"},{\"id\":\"20261001081409-4wiy4ps\",\"name\":\"被相关人\",\"type\":\"relation\"}]"
+      "detail": "[{\"id\":\"20261001082622-vwgavhs\",\"name\":\"生日\",\"type\":\"date\"},{\"id\":\"20261001082622-a1ebmsn\",\"name\":\"相关人\",\"type\":\"relation\"},{\"id\":\"20261001082622-qyxzs69\",\"name\":\"Primary Key\",\"type\":\"block\"},{\"id\":\"20261001082622-96ob5qu\",\"name\":\"Select\",\"type\":\"select\"},{\"id\":\"20261001082622-5yp03u8\",\"name\":\"被相关人\",\"type\":\"relation\"}]"
     },
     {
       "name": "通道5：错误 avID+正确 blockID（createIfNotExist:false）",

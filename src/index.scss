@@ -3577,6 +3577,28 @@
     }
 }
 
+/* V-02：窄视口（≤640，与全局移动断点一致）弹窗双栏改纵向堆叠——
+   200px 固定左列在 390px 弹窗把成员区压到 ~130px（姓名逐字竖排折行、动作溢出右缘，
+   复现基线 breakpoints orgmgr-390.png）；堆叠后成员区获得整行宽度。 */
+@media (max-width: 640px) {
+    .lvct-org-manager__layout {
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .lvct-org-manager__list {
+        flex: 0 0 auto;
+        border-right: none;
+        padding-right: 0;
+        border-bottom: 1px solid var(--lvct-border-subtle);
+        padding-bottom: var(--lvct-sp-3);
+    }
+
+    .lvct-org-manager__orgs {
+        max-height: 180px;
+    }
+}
+
 /* B13.5 组织视图卡片网格 */
 .lvct-orgs-view {
     display: flex;
