@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>小驴人脉 · UI 原型与设计规范 v1.0</title>
+<title>小驴人脉 · UI 原型与设计规范 v1.1</title>
 <style>
 /* ============================================================
    设计令牌 (Design Tokens) —— 明暗双主题
@@ -430,7 +430,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
   <nav class="proto-nav">
     <div class="proto-nav__brand">
       <div class="proto-nav__logo">🫂</div>
-      <div><b>小驴人脉</b><span>UI 原型 · v1.0</span></div>
+      <div><b>小驴人脉</b><span>UI 原型 · v1.1</span></div>
     </div>
     <div class="proto-nav__sec">方案总览</div>
     <button class="proto-nav__item on" data-s="overview"><span class="ic">◎</span>设计策略与信息架构</button>
@@ -466,6 +466,16 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
     <!-- ========== 1. 方案总览 ========== -->
     <section class="screen on" id="s-overview">
       <div class="note-box">
+      <div class="proto-status">🏛 版本对照（V-16 治理，2026-10-01：原型 v1.1 ↔ 插件 v0.4.1）</div>
+        <b>原型与实现的版本对照：</b>
+        <ul style="margin:6px 0 0 18px; padding:0; line-height:1.7">
+          <li><b>已交付（旧稿曾标「二期」）：</b>组织维度已上线 v0.4.x——组织视图、组织管理弹窗（成员归属/字段编辑/归档恢复/改名/搜索化选人）、联系人卡片「单位」行、共同背景、组织体检与人物-组织双链区块；关系图谱双模式（关系图/文档引用）已上线；本人档案「我自己」已上线。</li>
+          <li><b>仍为规划：</b>「✨ 建议/智能简报」远期占位；「关系库（类型化/非对称关系）」二期规划。组织维度上线后，单位/学校的事实源=组织成员索引（B13），不再另建人物重复字段。</li>
+          <li><b>有意差异：</b>原型帧表达设计意图，非逐像素基准；实屏基准以版本库内 <code>scripts/e2e/shots/</code>（基线 60 景 + 断点矩阵 28 景）为准，视觉门禁只引用版本库内基准。</li>
+          <li><b>Host pending 边界：</b>真实宿主/真机核对项（D-40 宿主关闭三路径、B13.8 外部编辑投递、B14 原生图面板）在 PAGE-STATUS 与 ACTIVE-BACKLOG 登记，原型帧不代验收。</li>
+        </ul>
+      </div>
+      <div class="note-box">
       <div class="proto-status">📋 设计总览页（本页为设计说明，非实现画面）</div>
         <b>产品定位（源自仓库分析）：</b>在思源笔记内管理人脉——「一人一文档，数据库作主干」。联系人是普通思源文档（双链/搜索/同步照旧），结构化字段存思源原生数据库（AV），插件负责管理界面。<b>人物文档与数据库保留；互动与偏好需另行备份</b>。插件无遥测，AI 仅在主动操作时向用户配置端点发送内容，思源同步由用户控制。当前功能范围与后续批次见 <a href="PRODUCT-PLAN.md">产品总计划</a>；本原型不代表全部能力已实现。
       </div>
@@ -485,7 +495,8 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
               <div class="node">📄 人物文档档案条 <span class="tag"><span class="chip chip--ok">已上线</span></span></div>
               <div class="node">🔌 人员服务桥 window.LvContacts <span class="tag"><span class="chip chip--ok">协议 v1</span></span></div>
               <div class="node">⚙ 设置页（字段重建 / 提醒偏好 / AI 开关） <span class="tag"><span class="chip chip--hl">本原型补全</span></span></div>
-              <div class="node">🏢 组织维度 · 关系库（类型化/非对称） <span class="tag"><span class="chip chip--info">二期规划</span></span></div>
+              <div class="node">🏢 组织维度（组织视图/管理/单位行/共同背景） <span class="tag"><span class="chip chip--ok">已上线 v0.4</span></span></div>
+              <div class="node">🗄 关系库（类型化/非对称） <span class="tag"><span class="chip chip--info">二期规划</span></span></div>
               <div class="node">✨ 智能建议 / 问候起草 / 每日简报 <span class="tag"><span class="chip chip--info">远期规划</span></span></div>
             </div>
           </div>
@@ -497,7 +508,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
               ② <b>双向出入口</b>：人脉活在文档里——文档可进（档案条/反链），插件可出（打开文档/写参与人员区块）。
               ③ <b>渐进披露</b>：列表 → 侧栏 Peek → 完整文档三级详情深度，默认不打断当前任务。
               ④ <b>本地可信</b>：AI 一律显式触发、可关；所有外发行为在界面上明示。
-              ⑤ <b>为演进留白</b>：导航、筛选栏、设置分区按"组织/关系库/AI 建议"二期功能预留扩展位。
+              ⑤ <b>为演进留白</b>：导航、筛选栏、设置分区先为"组织"预留扩展位（v0.4 已启用），仍为"关系库、AI 建议"留位。
             </div>
           </div>
 
@@ -519,12 +530,12 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
         <div>
           <div class="spec">
             <h3>信息架构（导航模型）</h3>
-            <div class="ds">由"顶部三 Tab"改为<b>左侧栏导航</b>：对齐 Notion/Obsidian 范式，为二期"组织、智能建议"留位；设置从导航底部进入。</div>
+            <div class="ds">由"顶部三 Tab"改为<b>左侧栏导航</b>：对齐 Notion/Obsidian 范式，为扩展区留位（组织已上线 v0.4，智能建议远期）；设置从导航底部进入。</div>
             <div class="ia">
               <div class="node">🏠 首页 <span class="tag"><span class="chip">仪表盘 · 提醒 · 快捷操作</span></span></div>
               <div class="node">👥 联系人 <span class="tag"><span class="chip">卡片/表格 · 搜索筛选</span></span></div>
               <div class="node">✦ 关系图谱 <span class="tag"><span class="chip">全局关系可视化</span></span></div>
-              <div class="node">🏢 组织 <span class="tag"><span class="chip chip--info">二期占位</span></span></div>
+              <div class="node">🏢 组织 <span class="tag"><span class="chip chip--ok">已上线 v0.4</span></span></div>
               <div class="node">✨ 建议 <span class="tag"><span class="chip chip--info">远期占位</span></span></div>
               <div class="node">⚙ 设置（侧栏底部固定）</div>
             </div>
@@ -576,7 +587,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
 
     <!-- ========== 2. 首页仪表盘 ========== -->
     <section class="screen" id="s-home">
-      <div class="note-box"><b>设计要点：</b>首页回答"今天该关注谁"。统计卡可点击直达筛选结果；生日按 今天/7天内/30天内 分桶着色；久未联系卡内嵌「记一笔」快捷输入，10 秒完成一次互动记录。空态与骨架屏遵循组件规范。</div>
+      <div class="note-box"><b>设计要点：</b>首页回答"今天该关注谁"。统计卡可点击直达筛选结果；生日按 今天/7天内/30天内 分桶着色；久未联系卡内嵌「记一笔」快捷输入，10 秒完成一次互动记录。空态与骨架屏遵循组件规范。<b>已交付差异注记（V-16）：</b>实现版首页在统计卡下含「今日行动」分组（生日/逾期跟进/久未联系三类，单条处置+批量处置+暂缓与恢复），原型帧未逐项展开——以实屏基线 <code>scripts/e2e/shots/workbench-home-*.png</code> 为准。</div>
       <div class="proto-status">✅ 已实现（v0.3.0：统计/行动分组折叠/行内处置/查看全部）· 待优化：UX-01.5 视觉细节</div>
       <div class="frame">
         <div class="frame__bar"><span class="frame__dot" style="background:#f2707a"></span><span class="frame__dot" style="background:#f5a54b"></span><span class="frame__dot" style="background:#34c98e"></span><span class="frame__title">小驴人脉 · 工作台 — 桌面端 1280px</span></div>
@@ -588,7 +599,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
               <button class="side-item">👥 联系人<span class="badge chip">236</span></button>
               <button class="side-item">✦ 关系图谱</button>
               <div class="side-sec">扩展</div>
-              <button class="side-item" style="opacity:.45">🏢 组织 · 二期</button>
+              <button class="side-item">🏢 组织</button>
               <button class="side-item" style="opacity:.45">✨ 建议 · 远期</button>
               <div style="flex:1"></div>
               <button class="side-item">⚙ 设置</button>
@@ -648,7 +659,7 @@ kbd { background: var(--bg-active); border:1px solid var(--border-subtle); borde
 
     <!-- ========== 3. 联系人列表 ========== -->
     <section class="screen" id="s-people">
-      <div class="note-box"><b>设计要点：</b>统一主操作——卡片与表格点击均打开 <b>Peek 侧栏</b>，「打开文档」收敛为悬停出现的图标钮；工具栏支持搜索 + 分组/标签筛选 + 排序 + 视图切换；选中态支持批量操作（加分组、导出）。A 批增量（下图为目标状态，标注 F02/F03/F04 者为计划项）：<b>F03</b> 组合筛选（标签全部/任一、最近互动范围、从未联系，生效条件可逐项清除并显示人数）；<b>F04</b> 命名保存常用视图；<b>F02</b> 表格列显隐与顺序偏好，姓名与操作列不可隐藏。下方同时给出卡片与表格两种视图。</div>
+      <div class="note-box"><b>设计要点：</b>统一主操作——卡片与表格点击均打开 <b>Peek 侧栏</b>，「打开文档」收敛为悬停出现的图标钮；工具栏支持搜索 + 分组/标签筛选 + 排序 + 视图切换；选中态支持批量操作（加分组、导出）。A 批增量已全部上线（V-16 校准）：<b>F03</b> 组合筛选（标签全部/任一、最近互动范围、从未联系，生效条件可逐项清除并显示人数）；<b>F04</b> 命名保存常用视图；<b>F02</b> 表格列显隐与顺序偏好，姓名与操作列不可隐藏。下方同时给出卡片与表格两种视图。</div>
       <div class="proto-status">✅ 已实现（v0.3.0：卡片/表格/选人器/完整度筛选/串行补录/粘贴识别）· 待优化：UX-01.4 视觉细节</div>
 
       <div class="frame">
