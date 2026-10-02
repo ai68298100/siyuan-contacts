@@ -1,5 +1,7 @@
 # 下一阶段开发计划（v0.3.0 之后）
 
+> **Agent 执行入口：** 本文件用于产品计划、现状盘点和来源证据；实际开发顺序、状态、依赖和验收以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准。
+
 更新：2026-09-29。状态：**规划中，未进入实现**。本文件是下一阶段的现状盘点、执行顺序与验收索引；需求原文、历史反馈和产品决定分别见 [FEEDBACK-BACKLOG](FEEDBACK-BACKLOG.md) B11–B14/AUDIT-01/CODE-AUDIT-02/UI-AUDIT-02、[DECISIONS](DECISIONS.md) D-0021/D-0022，实际存储事实以 [DATA-CONTRACT](DATA-CONTRACT.md) 为准。F01–F16 和 v0.3.0 已交付能力不重复开发。下述「已实现」指源码与既有隔离验证，真实宿主/真机状态另记。
 
 ## 目标、优先级与边界
