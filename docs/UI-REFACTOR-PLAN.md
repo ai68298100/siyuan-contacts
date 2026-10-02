@@ -1,5 +1,7 @@
 # UI 改造排期表（UI-REFACTOR-PLAN）
 
+> **历史排期说明（2026-10-03）**：UI-01～UI-12 保留为历史范围、决策和验收记录，不等同于当前剩余任务。当前全页面设计基准为 [UI-SYSTEM-SPEC.md](UI-SYSTEM-SPEC.md) 与 [ui-prototype.html](ui-prototype.html)，新增设计和实现待办见 [FEEDBACK-BACKLOG.md 的 UX-03](FEEDBACK-BACKLOG.md#ux-03-全产品原型重构与-ui-系统落地高2026-10-03-新增)。本表旧页面清单、版本快照和排期不得覆盖当前源码、页面状态或宿主验收记录。
+
 > 事实源：docs/UI-HANDOFF.md §4；视觉蓝图：docs/ui-prototype.html；令牌：src/style/_tokens.scss。
 > 本表保留原有 12 项界面改造范围；当前产品范围和批次见 [PRODUCT-PLAN](PRODUCT-PLAN.md)。结构性改造不改变人物/互动契约；偏好新增必须先登记契约。
 > 表中人日和 M5 标签为原始排期记录，不代表当前剩余工期或验收状态。✅ 仅表示所列核心能力已实现，不表示全部原型像素/异常态已逐项验收；逐页差异按总计划质量线持续记录。
