@@ -776,7 +776,10 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     /** B13.3：新建组织（文档 + custom-lvct-org 标记区块；同名拒绝） */
     async createOrganization(name: string) {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
-        return createOrganization(this.settings, name, this);
+        const token = this.lifecycleToken;
+        const result = await createOrganization(this.settings, name, this);
+        emitDataChanged({ topics: ["organizations"] }, token);
+        return result;
     }
 
     /** B13.3：组织成员列举（join 名册姓名） */
@@ -828,17 +831,23 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     /** B13：归档组织（标记区块值 archived；文档与成员记录保留可恢复） */
     async archiveOrganization(orgDocId: string) {
+        const token = this.lifecycleToken;
         await archiveOrganization(orgDocId);
+        emitDataChanged({ topics: ["organizations", "memberships"], docIds: [orgDocId] }, token);
     }
 
     /** B13：恢复归档组织 */
     async restoreOrganization(orgDocId: string) {
+        const token = this.lifecycleToken;
         await restoreOrganization(orgDocId);
+        emitDataChanged({ topics: ["organizations", "memberships"], docIds: [orgDocId] }, token);
     }
 
     /** B13.4：组织改名（同名检查；标记块文案同步，归档值保持） */
     async renameOrganization(orgDocId: string, name: string) {
+        const token = this.lifecycleToken;
         await renameOrganization(orgDocId, name, this);
+        emitDataChanged({ topics: ["organizations", "memberships"], docIds: [orgDocId] }, token);
     }
 
     async listPendingOrganizationOperations() {

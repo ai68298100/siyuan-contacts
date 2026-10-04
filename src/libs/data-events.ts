@@ -5,8 +5,8 @@ import type { VersionedDataChange } from "../domain/navigation.ts";
 /**
  * FUNC-01.7：数据变化通知的窗口内事件通道。
  *
- * 宿主在数据库/存储变化时对每个窗口的插件实例回调 `onDataChanged`（跨窗口投递由宿主完成，
- * 真实多窗口行为 Host pending）；插件入口把回调防抖后经本通道广播，工作台组件订阅后
+ * 宿主在数据库/存储变化时对每个窗口的插件实例回调 `onDataChanged`；插件入口把回调防抖后经本通道广播，
+ * 同源页面再通过 BroadcastChannel 补齐插件自身发起的块写入，工作台组件订阅后
  * 原地刷新（revision bump），不刷新浏览器全局、不依赖插件重载。
  * 放在 libs 以便 index.ts 与组件共同引用而不产生循环依赖。
  */
@@ -17,11 +17,22 @@ export type DataChangeDetail = VersionedDataChange;
 
 let revision = 0;
 const sourceId = `window-${Math.random().toString(36).slice(2)}`;
+const dataChannel = typeof window !== "undefined" && typeof BroadcastChannel !== "undefined"
+    ? new BroadcastChannel(`${LVCT_DATA_CHANGED}:channel`)
+    : undefined;
+
+dataChannel?.addEventListener("message", (event: MessageEvent<unknown>) => {
+    const normalized = normalizeDataChange(event.data);
+    if (!normalized || normalized.sourceId === sourceId) return;
+    window.dispatchEvent(new CustomEvent(LVCT_DATA_CHANGED, { detail: normalized }));
+});
 
 /** 插件入口调用：广播一次数据变化（调用方负责防抖合并连续事件） */
 export function emitDataChanged(change: Omit<DataChangeDetail, "revision"> = {}, token?: LifecycleToken): void {
     if (token && !token.isAlive()) return;
-    window.dispatchEvent(new CustomEvent(LVCT_DATA_CHANGED, { detail: { ...change, version: 1, sourceId, revision: ++revision } }));
+    const detail = { ...change, version: 1 as const, sourceId, revision: ++revision };
+    window.dispatchEvent(new CustomEvent(LVCT_DATA_CHANGED, { detail }));
+    dataChannel?.postMessage(detail);
 }
 
 /** 组件调用：订阅数据变化，返回取消订阅函数 */
