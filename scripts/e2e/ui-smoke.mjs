@@ -36,7 +36,13 @@ const server = await createServer({
             });
         },
     }],
-    server: { host: "127.0.0.1", port: 0, open: false, hmr: false },
+    server: {
+        host: "127.0.0.1",
+        port: Number(process.env.LVCT_E2E_PORT || 0),
+        strictPort: Number(process.env.LVCT_E2E_PORT) > 0,
+        open: false,
+        hmr: false,
+    },
 });
 let browser;
 let debuggerSocket;

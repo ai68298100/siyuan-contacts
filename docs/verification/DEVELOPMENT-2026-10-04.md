@@ -35,4 +35,4 @@ vCard 响应丢失和未绑定文档重試可能重复建档，P0-014 已重新�
 
 联系人分页服务现在以真实 `rowCount` 判定是否还有后续页，并在分页结果中恢复本人文档标记；新增正好整页的服务回归。组织列表新增 `src/api/organization.ts`：通过真实 v3.8.6 隔离 spike 验证 `root_id` keyset、`COUNT/MIN/MAX` 重复标记阻断、批量文档回读和短页结束语义；组织视图先展示首批，再后台续读，遇到空页、重复文档、缺游标或失败会停止并提供继续读取。新增组织 API 与 UI 回归。
 
-本轮门禁：单测 `504/504`；`pnpm check` 0 errors / 0 warnings；桌面 UI `315/315`；390px UI `316/316`；宿主样式 UI `315/315`。组织分页结果见 `scripts/spike/organization-pagination-results.json`。10k 真实耗时/内存、真实用户大库 SQL 预算、真机和跨窗口仍未由隔离证据替代。
+本轮门禁：单测 `508/508`；`pnpm check` 0 errors / 0 warnings；桌面 UI `315/315`；390px UI `316/316`；宿主样式 UI `315/315`。组织分页结果见 `scripts/spike/organization-pagination-results.json`；并行 E2E 结果见 `docs/verification/E2E-PARALLEL-2026-10-05.md`。10k 真实耗时/内存、真实用户大库 SQL 预算、真机和跨窗口仍未由隔离证据替代。

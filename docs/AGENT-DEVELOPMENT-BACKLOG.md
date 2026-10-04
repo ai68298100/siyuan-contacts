@@ -60,7 +60,7 @@ evidence_paths / owner / last_updated / commit
 
 > 2026-10-03 暂停时的质量快照见 [DEVELOPMENT-AUDIT-2026-10-03](DEVELOPMENT-AUDIT-2026-10-03.md)。用户随后确认三项推荐方案并恢复隔离开发，决定见 [DECISIONS](DECISIONS.md) D-0025。当前验证见 [UI-REGRESSION](UI-REGRESSION.md)：QA-004 已隔离完成，P0-006 已修复并等待真实大库验收；P0-019 已复现并修复锁接管覆盖，等待真实多窗口验收；其他未收口任务保留原退出条件。`done_isolated` 和 `host_pending` 不进入开发认领队列。
 
-> **2026-10-05 隔离增量：** 单测 `504/504`，桌面 UI `315/315`，390px UI `316/316`，宿主样式 UI `315/315`，`pnpm check` 0 errors / 0 warnings。联系人分页改用权威 `rowCount` 收口并恢复本人标记；组织标记新增真实 v3.8.6 `root_id` keyset 分页、重复标记一致性阻断、文档批量回读、首屏后台续读和失败重试。真实组织分页 spike 通过，Host Queue、10k 规模预算、真机和原生图面板仍保留原退出条件；不连接日常思源工作区。
+> **2026-10-05 隔离增量：** 单测 `508/508`，桌面 UI `315/315`，390px UI `316/316`，宿主样式 UI `315/315`，`pnpm check` 0 errors / 0 warnings。联系人分页改用权威 `rowCount` 收口并恢复本人标记；组织标记新增真实 v3.8.6 `root_id` keyset 分页、重复标记一致性阻断、文档批量回读、首屏后台续读和失败重试；多插件并行 E2E `3/3`。真实组织分页 spike 通过，Host Queue、10k 规模预算、真机和原生图面板仍保留原退出条件；不连接日常思源工作区。
 
 依赖开放口径：`done_isolated` / `host_pending` 仅开放不依赖真实宿主结论的隔离开发；真实端点、真机与多窗口结论仍由 Host Queue 守门。`ready` 必须满足所有实现前置；`partial` 表示已有代码，不代表剩余步骤的依赖已满足。
 
@@ -83,6 +83,8 @@ evidence_paths / owner / last_updated / commit
 `AG-HOST-001` 原生图打开与 `siyuan://blocks` 成边、`AG-HOST-002` B13 组织/成员真机与多窗口刷新、`AG-HOST-003` 任务块全量对账、`AG-HOST-004` 移动端 390px/软键盘/系统返回、`AG-HOST-005` 原型关键旅程真宿主复核、`AG-HOST-006` 用户五项反馈的真实读写验收。
 
 2026-10-04 进展：`AG-HOST-003` 的 v3.8.6 隔离内核 spike 通过任务块创建、扫描、勾选/取消、批量标记、自定义关联属性保留、删除反查和 ID 分页；`AG-HOST-001` 的图数据 spike 通过 refs 双向边和 `getGraph/getLocalGraph` 形状核对，并确认普通 Markdown `siyuan://blocks/<docId>` 链接不会形成 refs 边，原生图面板打开仍需真实前端入口与成边方案。`AG-HOST-002` 已在真实 browser-desktop 同源双页面验证稳定 ref 建档和互动 ref 幂等，并在单页面真实 UI 验证组织改名、成员编辑、归档恢复和刷新；组织/成员双窗口刷新仍待补证。`AG-HOST-006` 已通过同一隔离工作区的 9 项实际服务重启回读及 browser-desktop 生日、账本、别名、跟进、组织 UI/重载回读和截图；多人事项的真实 UI 捕获弹窗、真实用户工作区、原生图、真机和系统行为仍不能由隔离证据替代。详见 `docs/verification/REAL-FRONTEND-2026-10-04.md`。
+
+2026-10-05 增量：`AG-E2E-001` 已隔离完成。并行编排器实际同时运行桌面、390px 和实际服务三项作业，结果 `3/3`；端口、临时工作区、浏览器 profile、证据和日志互不复用，失败作业继续执行其他作业，清理只针对本轮持有的进程。真实宿主认证、真机和日常工作区继续由 Host Queue 守门。
 
 ### Deferred / Candidate Queue
 
@@ -734,6 +736,18 @@ evidence_paths / owner / last_updated / commit
 - **验收：** 无横向溢出/遮挡/不可滚动；长内容可读；颜色不是唯一状态信息；截图差异有分类说明。
 
 ### W6：规模、桥能力和质量门禁
+
+#### AG-E2E-001 — 多插件隔离 E2E 并行编排
+
+- **状态 / 类型 / 优先级：** `done_isolated` / `test+e2e+infra` / P1 / M5。
+- **用户结果：** 多个思源插件可以在后台并行验证，不抢占彼此的端口、内核工作区、浏览器 profile、截图和服务证据，也不会清理别的插件或日常思源进程。
+- **用户场景：** 同时运行桌面 UI、390px UI 和真实服务链；任一作业失败、超时或退出时，其余作业仍得到独立结果。
+- **来源与证据：** 用户关于多个插件同时开发及后台 E2E 的要求；`scripts/e2e/parallel-runner.mjs`；`docs/verification/E2E-PARALLEL-2026-10-05.md`。
+- **依赖 / 阻塞 / 并行组 / 前置条件：** 无；不阻塞业务功能；e2e-infra；Node.js、Chromium/Edge 和目标插件脚本可用。
+- **允许触碰 / 禁止触碰 / 契约变化 / 宿主或 spike：** `scripts/e2e/parallel-runner.mjs`、配置示例、E2E 输出适配、`tests/`、回归文档；生产业务、版本、CHANGELOG、README 徽章、`docs/PROGRESS.md`、日常思源工作区；无数据契约变化；真实宿主认证和真机不由本卡替代。
+- **步骤 / 夹具 / 命令 / 验收：** 生成唯一作业 ID；为每项分配独立端口和目录；启动/记录/超时/清理本轮子进程；保存逐作业日志与汇总；`node --test tests/e2e-parallel-runner.test.mjs tests/e2e-safety.test.mjs`、`node scripts/e2e/parallel-runner.mjs --config scripts/e2e/parallel.example.json`；实际 `3/3`，桌面 `315/315`、390px `316/316`、服务 `9/9`。
+- **失败 / 重试 / 回滚 / 隐私 / 性能：** 单作业失败不取消其他作业；超时只终止本轮持有的 PID 树并保留日志；配置失败不启动任何作业；不读取或删除用户目录；并发上限默认为 2，可按配置调节，端口只绑定 `127.0.0.1`。
+- **证据路径 / owner / last_updated / commit：** `scripts/e2e/parallel-runner.mjs`、`scripts/e2e/parallel.example.json`、`tests/e2e-parallel-runner.test.mjs`、`docs/verification/E2E-PARALLEL-2026-10-05.md`；Codex；2026-10-05；本轮阶段快照。
 
 #### AG-SCALE-001 — 1k/10k 联系人和组织的渐进加载
 

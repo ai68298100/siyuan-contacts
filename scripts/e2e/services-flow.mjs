@@ -12,14 +12,17 @@ import { assertIsolatedPath, assertTestPortAvailable, observeTestKernel, prepare
 import { stopIsolatedBrowser } from "./browser-cleanup.mjs";
 import { verifyRealFrontend } from "./frontend-flow.mjs";
 
-const workspace = path.join(os.tmpdir(), `SiYuan-Lvct-Services-${randomUUID()}`);
+const workspace = process.env.LVCT_E2E_WORKSPACE
+    ? path.resolve(process.env.LVCT_E2E_WORKSPACE)
+    : path.join(os.tmpdir(), `SiYuan-Lvct-Services-${randomUUID()}`);
 const kernel = ["D:/biji/SiYuan/resources/kernel/SiYuan-Kernel.exe", "D:/RJ/SiYuan/resources/kernel/SiYuan-Kernel.exe",
     path.join(process.env.ProgramFiles || "C:/Program Files", "SiYuan/resources/kernel/SiYuan-Kernel.exe")].find(fs.existsSync);
 if (!kernel) throw new Error("未找到独立测试内核");
-const port = await new Promise((resolvePort, rejectPort) => {
+const configuredPort = Number(process.env.LVCT_E2E_PORT || 0);
+const port = configuredPort > 0 ? configuredPort : await new Promise((resolvePort, rejectPort) => {
     const server = net.createServer();
     server.once("error", rejectPort);
-    server.listen({ host: "127.0.0.1", port: 0 }, () => {
+    server.listen({ host: "127.0.0.1", port: 0, exclusive: true }, () => {
         const assigned = server.address().port;
         server.close((error) => error ? rejectPort(error) : resolvePort(assigned));
     });
@@ -261,6 +264,10 @@ try {
     detachAliases();
     hooks.deregister();
     delete globalThis.__lvctServiceKernelRequest;
-    fs.writeFileSync(path.resolve(import.meta.dirname, "../../docs/verification/SERVICE-KERNEL-2026-10-04.json"), JSON.stringify(evidence, null, 2) + "\n");
+    const evidenceFile = process.env.LVCT_E2E_EVIDENCE_FILE
+        ? path.resolve(process.env.LVCT_E2E_EVIDENCE_FILE)
+        : path.resolve(import.meta.dirname, "../../docs/verification/SERVICE-KERNEL-2026-10-04.json");
+    fs.mkdirSync(path.dirname(evidenceFile), { recursive: true });
+    fs.writeFileSync(evidenceFile, JSON.stringify(evidence, null, 2) + "\n");
 }
 console.log(`实际服务内核验收：${evidence.results.filter((result) => result.ok).length}/${evidence.results.length}`);

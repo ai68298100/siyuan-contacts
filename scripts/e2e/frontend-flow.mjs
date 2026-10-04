@@ -359,7 +359,10 @@ export async function verifyRealFrontend({
         const captureScreenshot = async (name) => {
             try {
                 const result = await browserSession.call('Page.captureScreenshot', { format: 'png' });
-                const target = path.resolve(process.cwd(), 'output/playwright', `real-frontend-${name}.png`);
+                const artifactDir = process.env.LVCT_E2E_ARTIFACT_DIR
+                    ? path.resolve(process.env.LVCT_E2E_ARTIFACT_DIR)
+                    : path.resolve(process.cwd(), 'output/playwright');
+                const target = path.join(artifactDir, `real-frontend-${name}.png`);
                 fs.mkdirSync(path.dirname(target), { recursive: true });
                 fs.writeFileSync(target, Buffer.from(result.data, 'base64'));
                 evidence.screenshots.push(target);

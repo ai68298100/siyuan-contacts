@@ -1,0 +1,26 @@
+{
+  "maxConcurrency": 2,
+  "jobs": [
+    {
+      "name": "ui-desktop",
+      "command": "node",
+      "args": ["scripts/e2e/ui-smoke.mjs"]
+    },
+    {
+      "name": "ui-mobile",
+      "command": "node",
+      "args": ["scripts/e2e/ui-smoke.mjs"],
+      "env": {
+        "LVCT_UI_MOBILE": "1"
+      }
+    },
+    {
+      "name": "services-real-isolated",
+      "command": "node",
+      "args": ["scripts/e2e/services-flow.mjs"],
+      "env": {
+        "LVCT_REAL_FRONTEND": "1"
+      }
+    }
+  ]
+}
