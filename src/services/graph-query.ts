@@ -29,12 +29,12 @@ export async function loadGraphSources(settings: ContactsSettings, reads: {
 }
 
 export async function loadGraphReferences(sources: GraphSources, query: GraphQuery): Promise<GraphReferenceSource> {
-    const center = resolveGraphCenter(sources, query);
-    if (sources.status.roster !== "verified" || center.status === "unknown" || center.status === "missing") {
-        return { status: "unknown", graph: { nodes: [], edges: [] }, error: "登记集合或指定中心尚未核实，未请求内核图。" };
-    }
-    const registry = graphRegistry(sources);
     try {
+        const center = resolveGraphCenter(sources, query);
+        if (sources.status.roster !== "verified" || center.status === "unknown" || center.status === "missing") {
+            return { status: "unknown", graph: { nodes: [], edges: [] }, error: "登记集合或指定中心尚未核实，未请求内核图。" };
+        }
+        const registry = graphRegistry(sources);
         const native = center.status === "none" ? await fetchGlobalGraph() : await fetchLocalGraph(center.id);
         const nodes = registry.graph.nodes;
         const graph = mapNativeGraph(native, { allowedDocIds: new Set(nodes.map((node) => node.id)),

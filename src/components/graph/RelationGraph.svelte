@@ -323,10 +323,19 @@
         const currentQuery = query;
         nativeLoading = true;
         references = { status: "unknown", graph: { nodes: [], edges: [] } };
-        const next = await loadGraphReferences(currentSources, currentQuery);
-        if (alive && version === nativeVersion && currentSources === sources && graphMode === "native") {
-            references = next;
-            nativeLoading = false;
+        try {
+            const next = await loadGraphReferences(currentSources, currentQuery);
+            if (alive && version === nativeVersion && currentSources === sources && graphMode === "native") {
+                references = next;
+            }
+        } catch (error) {
+            if (alive && version === nativeVersion && currentSources === sources && graphMode === "native") {
+                references = { status: "unknown", graph: { nodes: [], edges: [] }, error: error instanceof Error ? error.message : String(error) };
+            }
+        } finally {
+            if (alive && version === nativeVersion && currentSources === sources && graphMode === "native") {
+                nativeLoading = false;
+            }
         }
     }
 

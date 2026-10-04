@@ -618,6 +618,7 @@ evidence_paths / owner / last_updated / commit
 - **允许触碰：** graph navigation/UI, native service, E2E/host scripts。
 - **步骤：** 明示能力不可用与无数据；保存返回上下文（人物/组织/筛选/滚动）；原生打开失败可重试或切自研图；系统返回不丢上下文。
 - **验收：** 桌面、移动、不同前端证据齐全；原生失败不阻断本地关系图。
+- **2026-10-05 隔离稳定性增量：** `loadGraphReferences` 将中心解析、登记投影、内核请求和形状错误统一收口为 `unknown` 来源；RelationGraph 增加异常 `catch/finally`，原生引用请求失败不会永久停留在 loading，切换关系图和版本号仍会丢弃迟到响应。图查询专项 UI 回归 `3/3`（引用权限失败可见、切换关系图可用、组织中心切换与迟到响应保护通过）；真实原生图面板、返回上下文、真机和不同真实前端仍保持 `host_pending`。
 
 ### W4：捕获、导入和 AI
 
