@@ -231,6 +231,7 @@ export async function verifyRealFrontend({
         organizationCrossWindow: false,
         organizationMemberCrossWindow: false,
         organizationArchiveCrossWindow: false,
+        hostReady: false,
         screenshots: [],
         limitations: [],
         failure: null,
@@ -586,6 +587,8 @@ export async function verifyRealFrontend({
 
         if (captureSourceDocId) {
             try {
+                await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("window.siyuan?.isReady === true")), "真实宿主前端就绪");
+                evidence.hostReady = true;
                 const captureEntry = await browserSession.evaluate(`(async()=>{
                     if (typeof window.openFileByURL !== 'function') return { ok: false, reason: '宿主未暴露 openFileByURL' };
                     const errors = [];
