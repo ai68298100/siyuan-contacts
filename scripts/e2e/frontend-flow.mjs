@@ -588,8 +588,15 @@ export async function verifyRealFrontend({
                 const captureEntry = await browserSession.evaluate(`(async()=>{
                     if (typeof window.openFileByURL !== 'function') return { ok: false, reason: '宿主未暴露 openFileByURL' };
                     const errors = [];
-                    const onError = (event) => errors.push(String(event?.error?.message || event?.message || event));
-                    const onRejection = (event) => errors.push(String(event?.reason?.message || event?.reason || event));
+                    const onError = (event) => errors.push([
+                        event?.error?.message || event?.message || String(event),
+                        event?.filename ? event.filename + ':' + (event.lineno ?? 0) + ':' + (event.colno ?? 0) : '',
+                        event?.error?.stack || '',
+                    ].filter(Boolean).join(' @ '));
+                    const onRejection = (event) => errors.push([
+                        event?.reason?.message || String(event?.reason || event),
+                        event?.reason?.stack || '',
+                    ].filter(Boolean).join(' @ '));
                     window.addEventListener('error', onError);
                     window.addEventListener('unhandledrejection', onRejection);
                     try {
