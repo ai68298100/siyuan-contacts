@@ -3,7 +3,7 @@
  * 业务编排在 services/，内核交互在 api/，自管数据在 data/，纯函数在 domain/，
  * 组件只依赖 types.ts 的 facade 接口，不反向 import 本文件（避免循环）。
  */
-import { Plugin, getFrontend, openTab, showMessage, Dialog, getAllEditor } from "siyuan";
+import { Plugin, getFrontend, openTab, showMessage, Dialog, getActiveEditor } from "siyuan";
 import { mount, unmount } from "svelte";
 import "./index.scss";
 
@@ -384,7 +384,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     /** 打开"从笔记捕获"：需当前有一篇打开的笔记 */
     captureFromCurrentNote(): void {
         if (!this.isLifecycleActive()) return;
-        const editor = getAllEditor().find((item) => item?.protyle?.block?.rootID);
+        const editor = getActiveEditor(true);
         const rootId = editor?.protyle?.block?.rootID;
         if (!rootId) {
             showMessage("请先打开一篇笔记再捕获人员", 3000);

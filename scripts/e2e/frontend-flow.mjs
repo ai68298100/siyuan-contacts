@@ -108,7 +108,15 @@ async function connectCdpTarget(target) {
     await call("Page.enable");
     const evaluate = async (expression) => {
         const result = await call("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
-        if (result.exceptionDetails) throw new Error(result.exceptionDetails.text || "真实前端脚本执行失败");
+        if (result.exceptionDetails) {
+            const details = result.exceptionDetails;
+            const exception = details.exception;
+            const description = exception?.description || exception?.value || details.text || "真实前端脚本执行失败";
+            const location = details.url || details.scriptId
+                ? ` @ ${details.url || `script:${details.scriptId}`}:${details.lineNumber ?? 0}:${details.columnNumber ?? 0}`
+                : "";
+            throw new Error(`${description}${location}`);
+        }
         return result.result?.value;
     };
     return { socket, call, evaluate, consoleTail };
@@ -220,8 +228,10 @@ export async function verifyRealFrontend({
         organizationRestored: false,
         organizationReloaded: false,
         captureSourceDocId: captureSourceDocId ?? null,
+        captureOpenMode: null,
         captureEditorOpen: false,
         captureContextMenu: false,
+        captureCommandPanel: false,
         captureDialog: false,
         captureCompleted: false,
         captureUiLimitations: [],
@@ -589,51 +599,102 @@ export async function verifyRealFrontend({
             try {
                 await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("window.siyuan?.isReady === true")), "真实宿主前端就绪");
                 evidence.hostReady = true;
-                const captureEntry = await browserSession.evaluate(`(async()=>{
-                    if (typeof window.openFileByURL !== 'function') return { ok: false, reason: '宿主未暴露 openFileByURL' };
-                    const errors = [];
-                    const onError = (event) => errors.push([
-                        event?.error?.message || event?.message || String(event),
-                        event?.filename ? event.filename + ':' + (event.lineno ?? 0) + ':' + (event.colno ?? 0) : '',
-                        event?.error?.stack || '',
-                    ].filter(Boolean).join(' @ '));
-                    const onRejection = (event) => errors.push([
-                        event?.reason?.message || String(event?.reason || event),
-                        event?.reason?.stack || '',
-                    ].filter(Boolean).join(' @ '));
-                    window.addEventListener('error', onError);
-                    window.addEventListener('unhandledrejection', onRejection);
-                    try {
-                        const result = window.openFileByURL(${json(`siyuan://blocks/${captureSourceDocId}`)});
-                        await new Promise((resolve) => setTimeout(resolve, 500));
-                        return { ok: result !== false && errors.length === 0, result, reason: errors.join('; ') };
-                    } catch (error) {
-                        return { ok: false, reason: String(error?.message || error) };
-                    } finally {
-                        window.removeEventListener('error', onError);
-                        window.removeEventListener('unhandledrejection', onRejection);
-                    }
-                })()`);
+                let captureEntry;
+                try {
+                    captureEntry = await browserSession.evaluate(`(async()=>{
+                        if (typeof window.openFileByURL !== 'function') return { ok: false, reason: '宿主未暴露 openFileByURL' };
+                        const errors = [];
+                        const onError = (event) => errors.push([
+                            event?.error?.message || event?.message || String(event),
+                            event?.filename ? event.filename + ':' + (event.lineno ?? 0) + ':' + (event.colno ?? 0) : '',
+                            event?.error?.stack || '',
+                        ].filter(Boolean).join(' @ '));
+                        const onRejection = (event) => errors.push([
+                            event?.reason?.message || String(event?.reason || event),
+                            event?.reason?.stack || '',
+                        ].filter(Boolean).join(' @ '));
+                        window.addEventListener('error', onError);
+                        window.addEventListener('unhandledrejection', onRejection);
+                        try {
+                            const result = window.openFileByURL(${json(`siyuan://blocks/${captureSourceDocId}`)});
+                            await new Promise((resolve) => setTimeout(resolve, 500));
+                            return { ok: result !== false && errors.length === 0, result, reason: errors.join('; ') };
+                        } catch (error) {
+                            return { ok: false, reason: String(error?.message || error) };
+                        } finally {
+                            window.removeEventListener('error', onError);
+                            window.removeEventListener('unhandledrejection', onRejection);
+                        }
+                    })()`);
+                } catch (error) {
+                    captureEntry = { ok: false, reason: error instanceof Error ? error.message : String(error) };
+                }
+                if (!captureEntry?.ok) {
+                    const sourceURL = new URL(targetURL);
+                    sourceURL.searchParams.set('id', captureSourceDocId);
+                    await browserSession.call('Page.navigate', { url: sourceURL.href });
+                    await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.readyState === 'complete'")), "捕获来源文档入口");
+                    await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("window.siyuan?.isReady === true")), "捕获来源宿主就绪");
+                    captureEntry = { ok: true, result: 'page-id', reason: captureEntry?.reason || '' };
+                    evidence.captureOpenMode = 'page-id';
+                } else {
+                    evidence.captureOpenMode = 'openFileByURL';
+                }
                 if (captureEntry?.ok) {
-                    await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`Boolean(document.querySelector('.protyle[data-node-id="${captureSourceDocId}"], .protyle [data-node-id="${captureSourceDocId}"], .protyle-wysiwyg)')`)), "捕获来源编辑器");
+                    await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`Boolean(document.querySelector('.protyle[data-node-id="${captureSourceDocId}"], .protyle [data-node-id="${captureSourceDocId}"], .protyle-wysiwyg'))`)), "捕获来源编辑器");
                     evidence.captureEditorOpen = true;
                     const editorPoint = await browserSession.evaluate(`(()=>{
                         const editor = document.querySelector('.protyle[data-node-id="${captureSourceDocId}"] .protyle-wysiwyg, .protyle-wysiwyg');
                         if (!editor) return null;
-                        const rect = editor.getBoundingClientRect();
-                        return { x: Math.max(8, rect.left + Math.min(120, Math.max(20, rect.width / 3))), y: Math.max(8, rect.top + Math.min(80, Math.max(20, rect.height / 3))) };
+                        const target = editor.querySelector('[data-node-id], .p, .b3-typography') || editor;
+                        const rect = target.getBoundingClientRect();
+                        return { x: Math.max(8, rect.left + Math.min(120, Math.max(20, rect.width / 3))), y: Math.max(8, rect.top + Math.min(40, Math.max(20, rect.height / 2))) };
                     })()`);
                     if (editorPoint) {
                         await browserSession.call('Input.dispatchMouseEvent', { type: 'mousePressed', x: editorPoint.x, y: editorPoint.y, button: 'right', clickCount: 1 });
                         await browserSession.call('Input.dispatchMouseEvent', { type: 'mouseReleased', x: editorPoint.x, y: editorPoint.y, button: 'right', clickCount: 1 });
-                        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`([...document.querySelectorAll('.b3-menu__item, [role="menuitem"]')].some((item) => /捕获本文人员|Capture contacts from note/.test(item.textContent || '')))`)), "捕获右键菜单");
-                        evidence.captureContextMenu = true;
-                        const clickedCapture = await browserSession.evaluate(`(()=>{
-                            const item = [...document.querySelectorAll('.b3-menu__item, [role="menuitem"]')].find((node) => /捕获本文人员|Capture contacts from note/.test(node.textContent || ''));
-                            if (!item) return false;
-                            item.click();
+                        await browserSession.evaluate(`(()=>{
+                            const target = document.elementFromPoint(${editorPoint.x}, ${editorPoint.y});
+                            if (!target) return false;
+                            target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, view: window, clientX: ${editorPoint.x}, clientY: ${editorPoint.y}, button: 2, buttons: 2 }));
                             return true;
                         })()`);
+                        let clickedCapture = false;
+                        try {
+                            await waitUntil(Math.min(deadline, Date.now() + 5000), async () => Boolean(await browserSession.evaluate(`([...document.querySelectorAll('.b3-menu__item, [role="menuitem"]')].some((item) => /捕获本文人员|Capture contacts from note/.test(item.textContent || '')))`)), "捕获右键菜单");
+                            evidence.captureContextMenu = true;
+                            clickedCapture = await browserSession.evaluate(`(()=>{
+                                const item = [...document.querySelectorAll('.b3-menu__item, [role="menuitem"]')].find((node) => /捕获本文人员|Capture contacts from note/.test(node.textContent || ''));
+                                if (!item) return false;
+                                item.click();
+                                return true;
+                            })()`);
+                        } catch {
+                            const openedCommandPanel = await browserSession.evaluate(`(()=>{
+                                const button = document.querySelector('[data-topbar-entry="barCommand"]');
+                                if (!button) return false;
+                                button.click();
+                                return true;
+                            })()`);
+                            if (!openedCommandPanel) throw new Error("捕获右键菜单和命令面板均不可用");
+                            await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('#commands') && document.querySelector('#commands').parentElement")), "捕获命令面板");
+                            const commandInput = await browserSession.evaluate(`(()=>{
+                                const input = document.querySelector('[aria-label="命令面板"], [aria-label="Command panel"], #commands')?.closest('.b3-dialog')?.querySelector('input') || document.querySelector('.b3-dialog input.b3-text-field, .b3-dialog input');
+                                if (!input) return false;
+                                input.focus();
+                                return true;
+                            })()`);
+                            if (!commandInput) throw new Error("捕获命令面板输入框不可用");
+                            await browserSession.call('Input.insertText', { text: '捕获本文人员' });
+                            await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`([...document.querySelectorAll('#commands .b3-list-item')].some((item) => /捕获本文人员|Capture contacts from note/.test(item.textContent || '')))`)), "捕获命令项");
+                            clickedCapture = await browserSession.evaluate(`(()=>{
+                                const item = [...document.querySelectorAll('#commands .b3-list-item')].find((node) => /捕获本文人员|Capture contacts from note/.test(node.textContent || ''));
+                                if (!item) return false;
+                                item.click();
+                                return true;
+                            })()`);
+                            evidence.captureCommandPanel = clickedCapture;
+                        }
                         if (clickedCapture) {
                             await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('.lvct-dialog-panel')?.textContent?.includes('联系人候选') || document.querySelector('.lvct-dialog-panel')?.textContent?.includes('Contact candidates')")), "真实捕获弹窗");
                             evidence.captureDialog = true;
