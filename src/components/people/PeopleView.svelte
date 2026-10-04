@@ -1,5 +1,5 @@
 <script lang="ts">
-    /** 联系人视图：名册缓存 + 客户端过滤/分页 + 卡片/表格双形态；详情弹窗由 Workbench 统一承载 */
+    /** 联系人视图：关键词下推后渐进读取，其他条件客户端过滤/分页；详情弹窗由 Workbench 统一承载 */
     import { batchUpdateContacts, filterContacts, listContactPage, PAGE_SIZE, PRESET_GROUPS, removeContacts } from "../../services/contacts";
     import { profileText } from "../../domain/people-profiles";
     import { onDestroy, tick } from "svelte";
@@ -451,7 +451,8 @@
         rosterTotal = 0;
         rosterHasMore = false;
         try {
-            const next = await listContactPage(settings, 1, PAGE_SIZE);
+            const query = searchText.trim();
+            const next = await listContactPage(settings, 1, PAGE_SIZE, query);
             if (request !== refreshGeneration) return; /* 旧响应不得覆盖新数据 */
             people = next.people;
             rosterPage = next.page;
@@ -460,7 +461,7 @@
             const available = new Set(people.map((person) => person.itemId));
             selectedIds = selectedIds.filter((itemId) => available.has(itemId));
             loading = false;
-            void loadRemainingRosterPages(request, pageGeneration);
+            void loadRemainingRosterPages(request, pageGeneration, query);
         } catch (error) {
             if (request !== refreshGeneration) return;
             /* 刷新失败保留旧列表内容，仅以横幅提示（可再次刷新重试） */
@@ -469,13 +470,13 @@
         }
     }
 
-    async function loadRemainingRosterPages(request: number, expectedGeneration = rosterLoadGeneration) {
+    async function loadRemainingRosterPages(request: number, expectedGeneration = rosterLoadGeneration, query = searchText.trim()) {
         if (!rosterHasMore || expectedGeneration !== rosterLoadGeneration) return;
         rosterLoadingMore = true;
         rosterLoadError = "";
         try {
             while (rosterHasMore && request === refreshGeneration && expectedGeneration === rosterLoadGeneration && peopleAlive) {
-                const next = await listContactPage(settings, rosterPage + 1, PAGE_SIZE);
+                const next = await listContactPage(settings, rosterPage + 1, PAGE_SIZE, query);
                 if (request !== refreshGeneration || expectedGeneration !== rosterLoadGeneration || !peopleAlive) return;
                 if (next.people.length === 0 && next.hasMore) throw new Error("联系人分页返回空页但仍有后续数据，已停止继续读取");
                 const known = new Set(people.map((person) => person.itemId));
@@ -504,12 +505,19 @@
 
     function resumeRosterLoading() {
         if (!rosterHasMore || rosterLoadingMore) return;
-        void loadRemainingRosterPages(refreshGeneration, ++rosterLoadGeneration);
+        void loadRemainingRosterPages(refreshGeneration, ++rosterLoadGeneration, searchText.trim());
     }
 
     $effect(() => {
         revision;
-        void refresh();
+        const query = searchText.trim();
+        stopRosterLoading();
+        const timer = window.setTimeout(() => void refresh(), query ? 250 : 0);
+        return () => window.clearTimeout(timer);
+    });
+
+    $effect(() => {
+        revision;
         /* FUNC-01.7-a 请求代际：recent 读取无共享缓存去重，须自行挡乱序响应 */
         const request = ++recentGeneration;
         void loadRecentInteractions().then((value) => {

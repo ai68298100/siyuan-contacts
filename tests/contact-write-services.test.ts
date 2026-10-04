@@ -71,7 +71,7 @@ function fixture(options: { wrappedSetterResponse?: boolean } = {}) {
         docs: new Set([personDocId, selfDocId]), store: new Map<string, unknown>(),
         mappingOverrides: new Map<string, string>(),
         outcomes: new Map<string, "reject" | "permission" | "transport" | "accepted_stale" | "bad_response">(),
-        writes: [] as { itemId: string; field: string; value: unknown }[], jsonWrites: 0, renders: 0,
+        writes: [] as { itemId: string; field: string; value: unknown }[], jsonWrites: 0, renders: 0, queries: [] as string[],
         failRender: false, failDocuments: false, failReadback: false, dropLabels: false,
         lastLabels: undefined as unknown,
         onJsonSave: undefined as (() => void) | undefined,
@@ -100,13 +100,18 @@ function fixture(options: { wrappedSetterResponse?: boolean } = {}) {
             if (state.failRender) throw new Error("渲染断开");
             const page = typeof body.page === "number" ? body.page : undefined;
             const pageSize = typeof body.pageSize === "number" ? body.pageSize : undefined;
-            const rows = page !== undefined && pageSize !== undefined
-                ? state.rows.slice((page - 1) * pageSize, page * pageSize)
+            const query = typeof body.query === "string" ? body.query : "";
+            state.queries.push(query);
+            const sourceRows = query
+                ? state.rows.filter((row) => row.cells.some((cell) => cell.value.block?.content?.includes(query)))
                 : state.rows;
+            const rows = page !== undefined && pageSize !== undefined
+                ? sourceRows.slice((page - 1) * pageSize, page * pageSize)
+                : sourceRows;
             return accepted({ view: {
                 columns: state.columns,
                 rows: structuredClone(rows),
-                ...(page !== undefined ? { rowCount: state.rows.length } : {}),
+                ...(page !== undefined ? { rowCount: sourceRows.length } : {}),
             } });
         }
         if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") {
@@ -727,6 +732,27 @@ test("联系人分页以权威总数停止，正好整页时不会多读或重�
     assert.equal(second.hasMore, false);
     assert.equal(new Set(first.people.map((person) => person.itemId)).size, 200);
     assert.equal(new Set([...first.people, ...second.people].map((person) => person.itemId)).size, 400);
+});
+
+test("联系人关键词下推到 AV 分页并按过滤后总数结束读取", async () => {
+    const { state, settings } = fixture();
+    bindPeopleProfileStorage(undefined);
+    state.rows = Array.from({ length: 400 }, (_, index) => {
+        const row = structuredClone(state.rows[index % 2]) as AvRow;
+        const suffix = index.toString(36).padStart(7, "0");
+        row.id = `20261005000000-${suffix}`;
+        const primary = row.cells.find((cell) => cell.value.keyID === "primary")!;
+        primary.value.block = { id: `20261005000000-${suffix}`, content: `人物 ${index + 1}` };
+        return row;
+    });
+
+    const result = await listContactPage(settings, 1, 200, "人物 4");
+
+    assert.equal(result.people.length, 12);
+    assert.equal(result.total, 12);
+    assert.equal(result.hasMore, false);
+    assert.equal(state.queries.at(-1), "人物 4");
+    assert.ok(result.people.every((person) => person.name.includes("人物 4")));
 });
 
 test("称谓绑定释放阻止排队编辑与恢复，旧释放函数不能清除新生命周期", async () => {

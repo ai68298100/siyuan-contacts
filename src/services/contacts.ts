@@ -76,10 +76,11 @@ export async function listContactPage(
     settings: ContactsSettings,
     page = 1,
     pageSize = PAGE_SIZE,
+    query = "",
 ): Promise<ContactPage> {
     if (!Number.isSafeInteger(page) || page < 1) throw new Error("联系人分页页码必须为正整数");
     if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 500) throw new Error("联系人分页大小必须在 1-500 之间");
-    const rendered = await renderViewPage(settings.avId, settings.dbBlockId, { page, pageSize });
+    const rendered = await renderViewPage(settings.avId, settings.dbBlockId, { page, pageSize, query: query.trim() });
     const returnedRows = rendered.view.rows;
     const rowCount = rendered.view.rowCount;
     const responseLooksUnpaged = returnedRows.length > pageSize;

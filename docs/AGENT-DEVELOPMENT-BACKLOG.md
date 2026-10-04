@@ -764,7 +764,8 @@ evidence_paths / owner / last_updated / commit
 - **允许触碰：** query services/domain/UI/perf fixtures/tests。
 - **步骤：** 定义数据量和等待预算；测量首屏/筛选/切页/图谱；采用已验证分页/分段；显示进度和取消。
 - **已完成子范围（2026-10-04/05）：** v3.8.6 隔离内核实证 `renderAttributeView` 的 `page/pageSize/query` 与 `rowCount`；联系人卡片/表格首屏走 `listContactPage`，后续页逐页追加，行重复/空页矛盾会停止并报错，支持停止、继续和失败重试；组织标记按 `root_id` keyset 分页，`COUNT/MIN/MAX` 聚合阻断重复标记漏过游标，文档 ID 批量回读后再展示，组织卡片也支持后台续读；名册未完整时禁用“选择全部筛选”。新增合成 1k/10k 基线：联系人首屏/全量投影、客户端搜索/分组筛选、组织首屏/全量投影共 `12/12` 达到隔离预算。证据：`scripts/spike/av-pagination-spike.mjs`、`scripts/spike/av-pagination-results.json`、`scripts/spike/organization-pagination-spike.mjs`、`scripts/spike/organization-pagination-results.json`、`scripts/spike/scale-baseline-spike.mjs`、`scripts/spike/scale-baseline-results.json`、`docs/verification/SCALE-BASELINE-2026-10-05.md`、`src/api/organization.ts`、`src/services/contacts.ts`、`src/services/org.ts`、`src/components/people/PeopleView.svelte`、`src/components/org/OrgsView.svelte`。
-- **剩余范围：** 10k 真实数据耗时/内存、分页 SQL 在真实用户大库的预算、服务端搜索、移动端软键盘与长列表锚点预算尚未验证；不得将小型参数 spike 当成规模验收。
+- **已完成子范围（2026-10-05 增补）：** 联系人搜索词经 `listContactPage` 下推到已验证的 AV `query` 参数；PeopleView 对搜索变化做 250ms 防抖，并取消旧分页代际，后续页复用同一搜索快照，避免 10k 名册先全量读完再客户端过滤。服务夹具验证 400 条名册中 `人物 4` 过滤后返回 12 条，权威 `rowCount` 与 `hasMore` 一致。证据：`src/services/contacts.ts`、`src/components/people/PeopleView.svelte`、`tests/contact-write-services.test.ts`。
+- **剩余范围：** 10k 真实数据耗时/内存、AV 搜索在真实用户大库与复杂条件下的预算、分页 SQL 在真实用户大库的预算、移动端软键盘与长列表锚点预算尚未验证；不得将隔离夹具和小型参数 spike 当成规模验收。
 - **验收：** 1k/10k fixture 达到预算；错误、空、取消可区分；不会为性能省略来源或状态。
 
 #### AG-BRIDGE-001 — 外部桥协议版本和能力声明
