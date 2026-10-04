@@ -250,7 +250,7 @@ try {
     });
     if (process.env.LVCT_REAL_FRONTEND === "1") {
         evidence.frontend = await verifyRealFrontend({
-            workspace, storage, baseURL: `http://127.0.0.1:${port}`, request: envelope, first, second, captureSourceDocId: captured.sourceDocId, organization: org, settings,
+            workspace, storage, baseURL: `http://127.0.0.1:${port}`, request: envelope, accessAuthCode: accessToken, first, second, captureSourceDocId: captured.sourceDocId, organization: org, settings,
         });
         evidence.realFrontend = evidence.frontend.ok;
         console.log(`真实 browser-desktop 前端验收：${evidence.frontend.ok ? "PASS" : "LIMITED"}`);

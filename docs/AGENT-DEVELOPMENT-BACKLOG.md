@@ -86,6 +86,8 @@ evidence_paths / owner / last_updated / commit
 
 2026-10-05 增量：`AG-E2E-001` 已隔离完成。并行编排器实际同时运行桌面、390px 和实际服务三项作业，结果 `3/3`；端口、临时工作区、浏览器 profile、证据和日志互不复用，失败作业继续执行其他作业，清理只针对本轮持有的进程。真实宿主认证、真机和日常工作区继续由 Host Queue 守门。
 
+2026-10-05 真实隔离前端复核：`services-flow` 的实际服务链保持 `9/9`，`browser-desktop` 真实前端 `realFrontend=true`；生日、账本新增/结清/重开、别名、跟进任务块、组织改名/成员编辑/归档/恢复、页面重载回读、双页面人物 ref 和互动 ref 幂等均通过。捕获来源文档仍因宿主 `openFileByURL` 返回 `Uncaught` 未打开，捕获 UI 不标完成；组织跨窗口刷新、真实用户库、原生图面板和真机仍由 Host Queue 验收。
+
 ### Deferred / Candidate Queue
 
 类型化关系库、纪念日/礼物/周回顾、地图/日历、OCR/二维码、嵌套组织、Agent 自动行动、复杂推荐和任何尚未完成隐私/契约评估的候选只能进入 `AG-RF-*`，不得从原型按钮直接开发。
@@ -534,6 +536,7 @@ evidence_paths / owner / last_updated / commit
 - **步骤：** 定义事件 payload 和版本；去重订阅；刷新投影而非整页重置；保护用户当前筛选/滚动/焦点。
 - **验收：** 两窗口最终一致；关闭旧实例后无回调；外部文档改名能明确显示“待刷新/已刷新”。
 - **当前证据：** 同源 browser-desktop 双页面已验证稳定人物 ref 与互动 ref 幂等；组织改名、成员编辑、归档、恢复和单页面刷新已通过真实隔离 UI。组织/成员跨窗口刷新仍保留 `host_pending`。
+- **2026-10-05 增量：** 真实隔离 browser-desktop 重跑已通过页面重载后的账本、别名、跟进和组织回读，以及双页面人物/互动幂等；组织/成员跨窗口刷新仍保留 `host_pending`。
 - **证据路径 / 负责人 / 更新时间 / 提交：** `docs/verification/SERVICE-KERNEL-2026-10-04.json`、`docs/verification/REAL-FRONTEND-2026-10-04.md` / Codex / 2026-10-04 / 未提交。
 
 #### AG-B13-005 — 组织迁移、导出和恢复
@@ -878,6 +881,7 @@ evidence_paths / owner / last_updated / commit
 - **test_fixtures / test_commands / acceptance：** 虚构两组织、多位人物、特殊字符、失败注入；相关 spike 与实际操作步骤；每项保存输入/输出/回读/版本/截图，未验项不能用隔离通过替代。
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 局部成功保留事实，只清理本轮受控测试产物；禁外发真实往来与联系人；记录请求数和大库边界，不新增性能承诺。
 - **current_evidence：** 隔离真实产品服务 `9/9` 含重启回读；browser-desktop 已通过生日、账本、别名、跟进、组织 UI/刷新、双页面幂等及截图。已实际尝试打开多人事项来源文档进入捕获弹窗，但宿主返回 `Uncaught`，捕获 UI 保持未验；真实用户工作区、组织双窗口、原生图、真机仍未验。
+- **2026-10-05 复核：** 真实隔离 browser-desktop `realFrontend=true`，核心用户旅程、页面重载回读和双页面稳定幂等均通过；捕获来源文档打开仍返回 `Uncaught`，因此捕获 UI 保持未验。该证据不替代真实用户工作区、组织双窗口、原生图和真机验收。
 - **evidence_paths / owner / last_updated / commit：** `docs/verification/SERVICE-KERNEL-2026-10-04.json`、`docs/verification/REAL-FRONTEND-2026-10-04.md`；Codex；2026-10-04；未提交。
 
 ## 6. 研究候选（只调研，不直接开发）

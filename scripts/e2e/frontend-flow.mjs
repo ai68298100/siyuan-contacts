@@ -177,6 +177,7 @@ export async function verifyRealFrontend({
     storage,
     baseURL,
     request,
+    accessAuthCode,
     first,
     second,
     captureSourceDocId,
@@ -192,6 +193,7 @@ export async function verifyRealFrontend({
         plugin: PLUGIN_NAME,
         pluginInstalled: false,
         pluginLoaded: false,
+        browserAuthentication: false,
         bridgeLoaded: false,
         bridgeProtocol: null,
         bridgeGetPerson: false,
@@ -259,8 +261,28 @@ export async function verifyRealFrontend({
         await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.readyState === 'complete'")), "真实 Web desktop 页面");
         evidence.browserUrl = await browserSession.evaluate("location.href");
         if (String(evidence.browserUrl).includes("/check-auth")) {
-            evidence.limitations.push("隔离 Web desktop 要求认证；request 的内核 Token 不会伪装成浏览器登录");
-            return evidence;
+            if (typeof accessAuthCode !== "string" || accessAuthCode.length === 0) {
+                evidence.limitations.push("隔离 Web desktop 要求认证，但隔离工作区未提供认证码");
+                return evidence;
+            }
+            const submitted = await browserSession.evaluate(`(()=>{
+                const input = document.querySelector('#authCode');
+                const button = [...document.querySelectorAll('button')].find((item) => item.classList.contains('b3-button') && !item.classList.contains('b3-button--white'));
+                if (!(input instanceof HTMLInputElement) || !(button instanceof HTMLButtonElement)) return false;
+                input.value = ${json(accessAuthCode)};
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                const remember = document.querySelector('#rememberMe');
+                if (remember instanceof HTMLInputElement) remember.checked = false;
+                button.click();
+                return true;
+            })()`);
+            if (!submitted) {
+                evidence.limitations.push("隔离 Web desktop 认证页控件不可定位");
+                return evidence;
+            }
+            await waitUntil(deadline, async () => !String(await browserSession.evaluate("location.pathname")).includes("/check-auth"), "隔离 Web desktop 认证");
+            evidence.browserAuthentication = true;
+            evidence.browserUrl = await browserSession.evaluate("location.href");
         }
 
         await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("window.LvContacts && window.LvContacts.protocol === 2")), "window.LvContacts 桥");
@@ -326,13 +348,7 @@ export async function verifyRealFrontend({
             })()`);
             if (!control) return false;
             if (control.type === 'text' || control.type === 'search' || control.type === 'number') {
-                for (const character of String(value)) {
-                    await browserSession.call('Input.dispatchKeyEvent', {
-                        type: 'keyDown', key: character, text: character, unmodifiedText: character,
-                        code: /^[a-z]$/i.test(character) ? `Key${character.toUpperCase()}` : '',
-                    });
-                    await browserSession.call('Input.dispatchKeyEvent', { type: 'keyUp', key: character, code: '' });
-                }
+                await browserSession.call('Input.insertText', { text: String(value) });
                 await browserSession.evaluate(`(()=>{
                     const input = ${target};
                     if (!input) return false;
@@ -340,6 +356,19 @@ export async function verifyRealFrontend({
                     input.dispatchEvent(new Event('change', { bubbles: true }));
                     return true;
                 })()`);
+                const inserted = await browserSession.evaluate(`(()=>{const input=${target};return Boolean(input && input.value===${json(value)})})()`);
+                if (!inserted) {
+                    await browserSession.evaluate(`(()=>{
+                        const input = ${target};
+                        if (!input) return false;
+                        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+                        if (!setter) return false;
+                        setter.call(input, ${json(value)});
+                        input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ${json(value)} }));
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                        return true;
+                    })()`);
+                }
             } else {
                 await browserSession.evaluate(`(()=>{
                     const input = ${target};
@@ -394,7 +423,7 @@ export async function verifyRealFrontend({
         })()`);
         if (!ledgerDescriptionSet || !ledgerAmountSet || !ledgerDateSet) throw new Error('往来账本表单控件不可写');
         if (!await clickButton('.lvct-detail', (text) => text.includes('记一笔往来') || text.includes('Record an exchange'))) throw new Error('往来账本保存按钮不可定位');
-        await browserSession.evaluate("new Promise((resolve) => setTimeout(resolve, 1000))");
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`document.querySelector('.lvct-detail')?.textContent?.includes(${json(ledgerDescription)})`)), "往来账本提交后回读");
         evidence.ledgerSubmitState = await browserSession.evaluate(`(()=>{
             const section = ${ledgerSection};
             return {
@@ -403,7 +432,6 @@ export async function verifyRealFrontend({
                 alerts: [...(section?.querySelectorAll('[role="alert"]') ?? [])].map((node) => node.textContent),
             };
         })()`);
-        if (!evidence.ledgerSubmitState.text.includes(ledgerDescription)) throw new Error(`往来账本提交后未回读：${JSON.stringify(evidence.ledgerSubmitState)}`);
         await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`document.querySelector('.lvct-detail')?.textContent?.includes(${json(ledgerDescription)})`)), "往来账本保存回读");
         evidence.ledgerCreated = true;
         const ledgerSettled = await browserSession.evaluate(`(()=>{
@@ -539,6 +567,7 @@ export async function verifyRealFrontend({
         await browserSession.call('Page.navigate', { url: targetURL });
         await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.readyState === 'complete'")), "真实前端重载页面");
         await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("window.LvContacts && window.LvContacts.protocol === 2")), "重载页面桥");
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`(()=>[...document.querySelectorAll('[title], [aria-label], button, .b3-tooltips')].some((item) => /小驴人脉|Lv Contacts/.test(item.getAttribute('title') || item.getAttribute('aria-label') || item.textContent || '')))()`)), "重载页面插件入口");
         const reloadedTopbar = await browserSession.evaluate(`(()=>{const nodes=[...document.querySelectorAll('[title], [aria-label], button, .b3-tooltips')];const node=nodes.find(item=>/小驴人脉|Lv Contacts/.test(item.getAttribute('title')||item.getAttribute('aria-label')||item.textContent||''));if(!node)return false;node.click();return true})()`);
         if (!reloadedTopbar) throw new Error('重载页面工作台入口不可定位');
         await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('.lvct-workbench')")), "重载工作台");
