@@ -228,6 +228,7 @@ export async function verifyRealFrontend({
         uiReloaded: false,
         multiWindowStable: false,
         multiWindowInteraction: false,
+        organizationCrossWindow: false,
         screenshots: [],
         limitations: [],
         failure: null,
@@ -647,6 +648,47 @@ export async function verifyRealFrontend({
         try {
             secondPage = await openCdpPage(browserSession, evidence.browserUrl, deadline);
             await waitUntil(deadline, async () => Boolean(await secondPage.evaluate("window.LvContacts && window.LvContacts.protocol === 2")), "第二页面桥");
+            await waitUntil(deadline, async () => Boolean(await secondPage.evaluate(`(()=>[...document.querySelectorAll('[title], [aria-label], button, .b3-tooltips')].some((item) => /小驴人脉|Lv Contacts/.test(item.getAttribute('title') || item.getAttribute('aria-label') || item.textContent || '')))()`)), "第二页面插件入口");
+            if (!await secondPage.evaluate(`(()=>{const nodes=[...document.querySelectorAll('[title], [aria-label], button, .b3-tooltips')];const node=nodes.find(item=>/小驴人脉|Lv Contacts/.test(item.getAttribute('title')||item.getAttribute('aria-label')||item.textContent||''));if(!node)return false;node.click();return true})()`)) throw new Error("第二页面工作台入口不可定位");
+            await waitUntil(deadline, async () => Boolean(await secondPage.evaluate("document.querySelector('.lvct-workbench')")), "第二页面工作台");
+            if (!await secondPage.evaluate("(()=>{const node=document.querySelector('[data-navigation-view=orgs]');if(!node)return false;node.click();return true})()")) throw new Error("第二页面组织导航不可定位");
+            await waitUntil(deadline, async () => Boolean(await secondPage.evaluate("document.querySelector('.lvct-orgs-view')")), "第二页面组织工作台");
+            await waitUntil(deadline, async () => Boolean(await secondPage.evaluate(`([...document.querySelectorAll('.lvct-orgs-view__card')].some((card) => card.textContent?.includes(${json(renamedOrg)})))`)), "第二页面组织卡片");
+            const crossWindowOrg = `${renamedOrg} MW${randomUUID().slice(0, 6)}`;
+            try {
+                if (await browserSession.evaluate("Boolean(document.querySelector('.lvct-detail'))")) {
+                    if (!await browserSession.evaluate("(()=>{const button=document.querySelector('.lvct-dialog-panel__close');if(!button)return false;button.click();return true})()")) throw new Error("跨窗口测试关闭人物详情失败");
+                    await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("!document.querySelector('.lvct-detail')")), "跨窗口测试关闭人物详情");
+                }
+                if (!await browserSession.evaluate("(()=>{const node=document.querySelector('[data-navigation-view=orgs]');if(!node)return false;node.click();return true})()")) throw new Error("跨窗口测试第一页面组织导航不可定位");
+                await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('.lvct-orgs-view')")), "跨窗口测试第一页面组织工作台");
+                await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`([...document.querySelectorAll('.lvct-orgs-view__card')].some((card) => card.textContent?.includes(${json(renamedOrg)})))`)), "跨窗口测试第一页面组织卡片");
+                if (!await browserSession.evaluate(`(()=>{const card=[...document.querySelectorAll('.lvct-orgs-view__card')].find((item)=>item.textContent?.includes(${json(renamedOrg)}));const button=[...(card?.querySelectorAll('button') ?? [])].find((item)=>['管理','Manage'].includes(item.textContent?.trim())&&!item.disabled);if(!button)return false;button.click();return true})()`)) throw new Error("跨窗口组织管理入口不可定位");
+                await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('.lvct-org-manager')")), "跨窗口组织管理弹窗");
+                await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("[...document.querySelectorAll('.lvct-org-manager__detail button')].some((button) => ['改名', 'Rename'].includes(button.textContent?.trim()) && !button.disabled)")), "跨窗口组织管理加载完成");
+                if (!await clickButton('.lvct-org-manager__detail', (text) => text.trim() === '改名' || text.trim() === 'Rename')) throw new Error("跨窗口组织改名入口不可定位");
+                if (!await setValue('.lvct-org-manager__detail input[aria-label="新组织名称"], .lvct-org-manager__detail input[aria-label="New org name"]', crossWindowOrg)) throw new Error("跨窗口组织改名输入框不可写");
+                if (!await clickButton('.lvct-org-manager__detail', (text) => text.trim() === '保存名称' || text.trim() === 'Save name')) throw new Error("跨窗口组织改名保存按钮不可定位");
+                await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`document.querySelector('.lvct-org-manager__detail')?.textContent?.includes(${json(crossWindowOrg)})`)), "跨窗口组织改名本页回读");
+                await waitUntil(deadline, async () => Boolean(await secondPage.evaluate(`([...document.querySelectorAll('.lvct-orgs-view__card')].some((card) => card.textContent?.includes(${json(crossWindowOrg)})))`)), "组织跨窗口刷新");
+                evidence.organizationCrossWindow = true;
+            } catch (error) {
+                evidence.captureUiLimitations.push(`组织跨窗口刷新仍未核实：${error instanceof Error ? error.message : String(error)}`);
+            } finally {
+                try {
+                    if (await browserSession.evaluate("Boolean(document.querySelector('.lvct-org-manager'))")) {
+                        if (await browserSession.evaluate(`Boolean(document.querySelector('.lvct-org-manager__detail')?.textContent?.includes(${json(crossWindowOrg)}))`)
+                            && await clickButton('.lvct-org-manager__detail', (text) => text.trim() === '改名' || text.trim() === 'Rename')
+                            && await setValue('.lvct-org-manager__detail input[aria-label="新组织名称"], .lvct-org-manager__detail input[aria-label="New org name"]', renamedOrg)
+                            && await clickButton('.lvct-org-manager__detail', (text) => text.trim() === '保存名称' || text.trim() === 'Save name')) {
+                            await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`document.querySelector('.lvct-org-manager__detail')?.textContent?.includes(${json(renamedOrg)})`)), "跨窗口组织恢复原名");
+                        }
+                        if (await browserSession.evaluate("Boolean(document.querySelector('.lvct-org-manager'))")) await clickButton('.lvct-org-manager', (text) => text.trim() === '关闭' || text.trim() === 'Close');
+                    }
+                } catch (error) {
+                    evidence.captureUiLimitations.push(`跨窗口测试清理未完成：${error instanceof Error ? error.message : String(error)}`);
+                }
+            }
             const replayRef = `multi-window-${randomUUID()}`;
             const replayName = `Multi Window ${randomUUID().slice(0, 8)}`;
             const replayResults = await Promise.all([
