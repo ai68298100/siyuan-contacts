@@ -3,7 +3,10 @@ import test from "node:test";
 import {
     pathSegments,
     renderGraphResultMarkdown,
+    renderGraphSnapshotMarkdown,
 } from "../src/domain/graph-export.ts";
+import { buildGraphQuerySnapshot } from "../src/domain/graph-query.ts";
+import type { GraphQuery, GraphSources } from "../src/domain/graph-query.ts";
 import type { GraphResultExportInput } from "../src/domain/graph-export.ts";
 
 const base: GraphResultExportInput = {
@@ -65,4 +68,29 @@ test("共同联系人/二度/直接：结果人物列出，筛选条件写入", 
     assert(second.includes("二度联系人有 1 人"), "二度总结错误");
     const direct = renderGraphResultMarkdown({ ...base, kind: "direct", pathNames: [], resultNames: ["丙"] });
     assert(direct.includes("直接关系有 1 人"), "直接总结错误");
+});
+
+test("快照导出：与展示节点和边一致，同名按 ID 区分，特殊文本不能插入 Markdown 结构", () => {
+    const person = (docId: string, itemId: string) => ({ docId, itemId, name: "同名[*]\n#伪标题", phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false, group: "", tags: [], relatedItemIds: [] as string[] });
+    const first = person("a", "item-a");
+    first.relatedItemIds.push("item-b");
+    const sources: GraphSources = { people: [first, person("b", "item-b")], organizations: [{ docId: "org", name: "组织|[*]", archived: false,
+        memberships: [{ personDocId: "a", status: "active" }] }], selfDocId: "a", status: { roster: "verified", self: "verified", organizations: "verified" }, errors: {}, revision: 3 };
+    const query: GraphQuery = { mode: "relations", scope: "global", centerDocId: "", orgDocId: "", search: "", group: "", isolatedOnly: false,
+        showOrgs: true, depth: "direct", focusId: "a", compareId: "b", queryMode: "path" };
+    const snapshot = buildGraphQuerySnapshot(sources, query);
+    const before = structuredClone(snapshot);
+    const markdown = renderGraphSnapshotMarkdown(snapshot, "2026-10-04");
+    assert(markdown.includes(`展示节点 ${snapshot.graph.nodes.length} / 边 ${snapshot.graph.edges.length}`));
+    assert(markdown.includes("（a）") && markdown.includes("（b）"));
+    assert(markdown.includes("显式人物关系（related）") && markdown.includes("组织成员（member）"));
+    assert(markdown.includes("同名\\[\\*\\] \\#伪标题"));
+    assert(!markdown.includes("\n#伪标题"));
+    assert.equal(markdown, renderGraphSnapshotMarkdown(snapshot, "2026-10-04"));
+    assert.deepEqual(snapshot, before);
+    const unknown = buildGraphQuerySnapshot({ ...sources, status: { ...sources.status, roster: "unknown" }, errors: { roster: "读失败\n#假成功" } }, query);
+    const failedExport = renderGraphSnapshotMarkdown(unknown, "2026-10-04");
+    assert(failedExport.includes("状态：unknown"));
+    assert(failedExport.includes("来源节点 未知"));
+    assert(failedExport.includes("读失败 \\#假成功"));
 });

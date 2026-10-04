@@ -13,6 +13,7 @@
     import { detectCheckinBridge } from "../../bridge/checkin";
     import ViewState from "../ViewState.svelte";
     import StatusNotice from "../StatusNotice.svelte";
+    import PersonProfileSummary from "../people/PersonProfileSummary.svelte";
     import LvctDialog from "../LvctDialog.svelte";
     import ReviewReportDialog from "./ReviewReportDialog.svelte";
     import { translateText } from "../../domain/translation";
@@ -47,6 +48,7 @@
         cadences: ["storeModuleCadences", "联系节奏"],
         dismissals: ["storeModuleDismissals", "提醒暂缓"],
         registry: ["storeModuleRegistry", "收编时间"],
+        self: ["selfSectionTitle", "本人档案"],
     };
     function moduleLabel(key: string): string {
         const entry = MODULE_LABELS[key];
@@ -454,6 +456,11 @@
             onAction={refresh}
         />
     {/if}
+    {#if data?.ordinaryScopeUnknown}
+        <StatusNotice error message={text("dashSelfUnknown", "本人身份尚未核实，普通联系人统计与提醒暂停。请在设置中核实身份后重新加载。")} />
+    {:else if data?.excludedSelfDocId}
+        <StatusNotice message={text("dashSelfExcluded", "统计、生日和待联系提醒已排除本人；本人档案及跟进记录仍保留在联系人详情。")} />
+    {/if}
     {#if !data && !errorText}
         <div class="lvct-dash__skeleton" aria-busy="true" aria-label={text("dashSkeletonLabel", "仪表盘加载中")}>
             {#each Array(4) as _, index (index)}<span class="lvct-skeleton"></span>{/each}
@@ -493,25 +500,25 @@
         <div class="lvct-dash__stats">
             <button class="lvct-dash__stat" onclick={() => onOpenPeople()}>
                 <span class="lvct-dash__stat-ic" aria-hidden="true"><Users size={14} /></span>
-                <b>{data.people}</b>
+                <b>{data.ordinaryScopeUnknown ? "—" : data.people}</b>
                 <span>{text("dashStatPeople", "联系人")}</span>
                 {#if data.relations > 0}<span class="lvct-dash__stat-ft">{text("dashStatPeopleFt", "其中 {n} 人从未互动", { n: data.neverContacted })}</span>{/if}
             </button>
             <button class="lvct-dash__stat" onclick={onOpenGraph}>
                 <span class="lvct-dash__stat-ic" aria-hidden="true"><Share2 size={14} /></span>
-                <b>{data.relations}</b>
+                <b>{data.ordinaryScopeUnknown ? "—" : data.relations}</b>
                 <span>{text("dashStatRelations", "关系")}</span>
                 {#if data.people > 0}<span class="lvct-dash__stat-ft">{text("dashStatRelationsFt", "人均 {n} 条", { n: (data.relations / data.people).toFixed(1) })}</span>{/if}
             </button>
-            <button class="lvct-dash__stat" onclick={openBirthdayPeople}>
+            <button class="lvct-dash__stat" onclick={openBirthdayPeople} disabled={data.ordinaryScopeUnknown}>
                 <span class="lvct-dash__stat-ic lvct-dash__stat-ic--hl" aria-hidden="true"><Cake size={14} /></span>
-                <b>{data.birthdaysThisWeek}</b>
+                <b>{data.ordinaryScopeUnknown ? "—" : data.birthdaysThisWeek}</b>
                 <span>{text("dashStatBirthdaysWeek", "本周生日")}</span>
                 {#if data.birthdays.length > data.birthdaysThisWeek}<span class="lvct-dash__stat-ft">{text("dashStatBirthdaysFt", "窗口内共 {n} 人", { n: data.birthdays.length })}</span>{/if}
             </button>
-            <button class="lvct-dash__stat" onclick={openNeverContactedPeople}>
+            <button class="lvct-dash__stat" onclick={openNeverContactedPeople} disabled={data.ordinaryScopeUnknown}>
                 <span class="lvct-dash__stat-ic lvct-dash__stat-ic--warn" aria-hidden="true"><UserX size={14} /></span>
-                <b>{data.neverContacted}</b>
+                <b>{data.ordinaryScopeUnknown ? "—" : data.neverContacted}</b>
                 <span>{text("dashStatNever", "从未互动")}</span>
                 {#if data.staleTotal > data.neverContacted}<span class="lvct-dash__stat-ft">{text("dashStatNeverFt", "另有久未联系 {n} 人", { n: data.staleTotal })}</span>{/if}
             </button>
@@ -531,7 +538,9 @@
             </div>
             <StatusNotice message={alError ? text("dashOpFailed", "操作失败：{msg}", { msg: alError }) : ""} error />
             <StatusNotice message={alMessage} actionLabel={undoAction ? "撤销" : undefined} onAction={undoAction ? runUndo : undefined} onDismiss={() => { alMessage = ""; undoAction = null; }} />
-            {#if actions.length === 0}
+            {#if data.ordinaryScopeUnknown}
+                <ViewState compact title={text("dashSelfUnverifiedTitle", "提醒范围尚未核实")} description={text("dashSelfUnverifiedDesc", "核实本人身份后可恢复统计和提醒；原始记录保留。")} />
+            {:else if actions.length === 0}
                 <ViewState compact icon="✅" title={text("dashActionsEmptyTitle", "今天没有需要处理的事")} description={text("dashActionsEmptyDesc", "生日、联系节奏和跟进计划都安顿好了。")}>
                     <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>{text("dashBrowsePeople", "浏览联系人")}</button>
                 </ViewState>
@@ -541,6 +550,7 @@
                         <div class="lvct-dash__row">
                             <button class="lvct-dash__row-main" onclick={() => onOpenDetail(card.person)}>
                                 <b>{card.person.name}</b>
+                                <PersonProfileSummary profile={card.person.profile} compact />
                                 <span class="lvct-dash__reasons">
                                     {#each card.reasons as reason (reason.kind + (reason.followUpId ?? ""))}
                                         <span class="lvct-chip lvct-action-chip lvct-action-chip--{reason.bucket}">{reason.label}</span>
@@ -616,7 +626,9 @@
         <div class="lvct-dash__grid">
             <div class="lvct-home__card">
                 <h3>近期生日</h3>
-                {#if data.birthdays.length === 0}
+                {#if data.ordinaryScopeUnknown}
+                    <ViewState compact title={text("dashSelfUnverifiedTitle", "提醒范围尚未核实")} description={text("dashSelfUnverifiedDesc", "核实本人身份后可恢复统计和提醒；原始记录保留。")} />
+                {:else if data.birthdays.length === 0}
                     <ViewState compact icon="🎂" title="提醒窗口内没有生日" description="可以到联系人档案补充生日，或在设置中调整提醒天数。">
                         <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>查看联系人</button>
                     </ViewState>
@@ -635,6 +647,7 @@
                                 }}
                             >
                                 <b>{item.person.name}</b>
+                                <PersonProfileSummary profile={item.person.profile} compact />
                                 <span class="ft__smaller ft__on-surface">{item.projection.label}{item.person.isLunar ? "（农历）" : ""}</span>
                                 <span class="lvct-bucket {bucketStyles[item.bucket]}">
                                     {item.projection.daysUntil === 0 ? text("dashFuToday", "今天") : text("dashDaysUntilN", "{n}天", { n: item.projection.daysUntil })}
@@ -661,7 +674,9 @@
                 <h3>{text("dashStaleTitle", "久未联系")}</h3>
                 <StatusNotice message={quickError ? text("dashRecordFail", "记录失败：{msg}", { msg: quickError }) : ""} error />
                 <StatusNotice message={quickMessage} onDismiss={() => (quickMessage = "")} />
-                {#if data.stale.length === 0}
+                {#if data.ordinaryScopeUnknown}
+                    <ViewState compact title={text("dashSelfUnverifiedTitle", "提醒范围尚未核实")} description={text("dashSelfUnverifiedDesc", "核实本人身份后可恢复统计和提醒；原始记录保留。")} />
+                {:else if data.stale.length === 0}
                     <ViewState compact icon="✓" title={data.people === 0 ? text("dashStaleEmptyNoPeopleTitle", "先添加一位联系人") : text("dashStaleEmptyTitle", "暂无久未联系的人")}
                         description={data.people === 0 ? text("dashStaleEmptyNoPeopleDesc", "创建或导入联系人后，就能开始记录互动。") : text("dashStaleEmptyDesc", "可以继续在联系人档案中记录新的互动。")}>
                         <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>{text("dashGoContacts", "前往联系人")}</button>
@@ -672,6 +687,7 @@
                             <div class="lvct-dash__row">
                                 <button class="lvct-dash__row-main" onclick={() => onOpenDetail(item.person)}>
                                     <b>{item.person.name}</b>
+                                    <PersonProfileSummary profile={item.person.profile} compact />
                                     <span class="ft__smaller ft__on-surface">
                                         {item.lastDaysAgo === undefined ? text("dashNeverContacted", "从未互动") : text("dashDaysAgo", "{n} 天前", { n: item.lastDaysAgo })}
                                     </span>

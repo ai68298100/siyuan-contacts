@@ -8,6 +8,7 @@ import type { Component } from "svelte";
 export const simpleDialog = (args: {
     title: string, ele: HTMLElement | DocumentFragment,
     width?: string, height?: string,
+    disableClose?: boolean,
     callback?: () => void;
 }) => {
     const dialog = new Dialog({
@@ -15,6 +16,7 @@ export const simpleDialog = (args: {
         content: `<div class="dialog-content" style="display: flex; height: 100%;"/>`,
         width: args.width,
         height: args.height,
+        disableClose: args.disableClose ?? true,
         destroyCallback: args.callback
     });
     dialog.element.querySelector(".dialog-content")?.appendChild(args.ele);
@@ -30,6 +32,7 @@ export const svelteDialog = (args: {
     props?: Record<string, any>,
     width?: string,
     height?: string,
+    disableClose?: boolean,
     callback?: () => void;
 }) => {
     let container = document.createElement("div");

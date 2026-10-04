@@ -5,6 +5,8 @@ import {
     parseTaskMarkdown,
     planTaskSync,
     reconcileDecisions,
+    observeFollowUpTasks,
+    taskMatchesItem,
 } from "../src/domain/followup-doc.ts";
 
 test("buildTaskMarkdown/parseTaskMarkdown：序列化与解析往返，含勾选与空标题兜底", () => {
@@ -140,4 +142,43 @@ test("reconcileDecisions：曾记录块的事项块消失判 missing；从未记
     );
     assert.deepEqual(decisions.missing, ["fu-seen"], "已标缺失的不再重复报，取消的不参与");
     assert.deepEqual(decisions.updates, []);
+});
+
+test("observeFollowUpTasks：历史关闭项全量输出，删除与未知任务分开", () => {
+    const items = Array.from({ length: 7 }, (_, index) => ({
+        id: `fu-${index}`,
+        personDocId: "person-1",
+        title: `历史 ${index}`,
+        dueDate: "2026-10-01",
+        status: "done" as const,
+        createdAt: index,
+        updatedAt: index,
+        ...(index === 0 ? { docBlockId: "block-gone" } : {}),
+    }));
+    const observations = observeFollowUpTasks(items, [
+        { blockId: "block-1", followUpId: "fu-1", markdown: "- [X] 文档改名 📅2026-11-01" },
+        { blockId: "block-dup-a", followUpId: "fu-2", markdown: "- [X] 历史 2 📅2026-10-01" },
+        { blockId: "block-dup-b", followUpId: "fu-2", markdown: "- [X] 历史 2 📅2026-10-01" },
+        { blockId: "block-bad", followUpId: "fu-3", markdown: "- [X] 无效日期 📅2026-02-30" },
+    ]);
+    assert.equal(observations.length, 7);
+    assert.equal(observations[0].document, "missing");
+    assert.equal(observations[1].patch.title, "文档改名");
+    assert.equal(observations[2].document, "unknown");
+    assert.equal(observations[3].document, "unknown");
+    assert.equal(observations[6].document, "not_created");
+});
+
+test("taskMatchesItem：原生任务完整回读才算 verified", () => {
+    const item = {
+        id: "fu-verified",
+        personDocId: "person-1",
+        title: "回电",
+        dueDate: "2026-10-01",
+        status: "open" as const,
+        createdAt: 1,
+        updatedAt: 1,
+    };
+    assert.equal(taskMatchesItem(item, [{ blockId: "block-1", followUpId: item.id, markdown: "- [ ] 回电 📅2026-10-01" }]), true);
+    assert.equal(taskMatchesItem(item, [{ blockId: "block-1", followUpId: item.id, markdown: "- [ ] 回电 📅2026-10-02" }]), false);
 });

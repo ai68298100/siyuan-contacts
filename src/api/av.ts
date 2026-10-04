@@ -6,7 +6,16 @@
  * 2. setAttributeViewBlockAttr 必须传 itemID（rowID 已进弃用通道）。
  * 3. 写渲染一律走 renderAttributeView；数据库没有 SQL 表。
  */
-import { appendBlockDom, kernelPost, newNodeId, querySql } from "./client";
+import {
+    appendBlockDom,
+    assertKernelArray,
+    assertKernelRecord,
+    decodeStringMap,
+    KernelProtocolError,
+    kernelPost,
+    newNodeId,
+    querySql,
+} from "./client";
 import { parseAvIdFromBlockMarkdown } from "../domain/init-plan.ts";
 import type { AvFieldType, FieldSpec } from "../domain/fields";
 
@@ -41,7 +50,7 @@ export interface AvValueBlock {
 
 export type AvValue = {
     keyID: string;
-    blockID: string;
+    blockID?: string;
     type: string;
     block?: AvValueBlock;
     text?: { content: string };
@@ -72,6 +81,51 @@ export interface AvRenderResult {
     };
 }
 
+function decodeAvRenderResult(route: string, data: unknown): AvRenderResult {
+    const result = assertKernelRecord(route, data);
+    const view = assertKernelRecord(route, result.view);
+    const columns = assertKernelArray<unknown>(route, view.columns);
+    const rows = assertKernelArray<unknown>(route, view.rows);
+    if (columns.some((column) => {
+        if (typeof column !== "object" || column === null || Array.isArray(column)) return true;
+        const candidate = column as Record<string, unknown>;
+        return typeof candidate.id !== "string" || typeof candidate.name !== "string" || typeof candidate.type !== "string";
+    })) {
+        throw new KernelProtocolError(route, `${route} 返回异常形状（columns 项缺 id/name/type）`);
+    }
+    if (rows.some((row) => {
+        if (typeof row !== "object" || row === null || Array.isArray(row)) return true;
+        const candidate = row as Record<string, unknown>;
+        if (typeof candidate.id !== "string" || !Array.isArray(candidate.cells)) return true;
+        return (candidate.cells as unknown[]).some((cell) => {
+            if (typeof cell !== "object" || cell === null || Array.isArray(cell)) return true;
+            const cellRecord = cell as Record<string, unknown>;
+            const value = cellRecord.value;
+            if (typeof cellRecord.valueType !== "string"
+                || typeof value !== "object"
+                || value === null
+                || Array.isArray(value)) return true;
+            const valueRecord = value as Record<string, unknown>;
+            return typeof valueRecord.keyID !== "string" || typeof valueRecord.type !== "string"
+                || (valueRecord.blockID !== undefined && typeof valueRecord.blockID !== "string");
+        });
+    })) {
+        throw new KernelProtocolError(route, `${route} 返回异常形状（rows/cells 项字段非法）`);
+    }
+    return { view: { ...view, columns, rows } } as AvRenderResult;
+}
+
+function decodeOptionalAvValue(route: string, data: unknown): AvValue | undefined {
+    if (data === null || data === undefined) return undefined;
+    const record = assertKernelRecord(route, data);
+    const value = assertKernelRecord(route, Object.hasOwn(record, "value") ? record.value : record);
+    if (typeof value.keyID !== "string" || typeof value.type !== "string"
+        || (value.blockID !== undefined && typeof value.blockID !== "string")) {
+        throw new KernelProtocolError(route, `${route} 返回异常形状（单元格缺 keyID/type 或 blockID 非字符串）`);
+    }
+    return value as AvValue;
+}
+
 /* ---------- 建库 / 建字段 ---------- */
 
 /** 在宿主文档里插入数据库块并物化数据库（客户端先定 avID，spike 假设①） */
@@ -91,13 +145,13 @@ export async function renderView(
     query: string = "",
     createIfNotExist: boolean = false,
 ): Promise<AvRenderResult> {
-    return kernelPost<AvRenderResult>("/api/av/renderAttributeView", {
+    return kernelPost("/api/av/renderAttributeView", {
         id: avId,
         blockID: dbBlockId,
         query,
         pageSize: -1,
         createIfNotExist,
-    });
+    }, { decode: (data) => decodeAvRenderResult("/api/av/renderAttributeView", data) });
 }
 
 /** 文档内的数据库块（含从块 markdown 还原的 avID） */
@@ -126,7 +180,7 @@ export async function findAvBlocksInDoc(docId: string): Promise<AvBlockRef[]> {
     return refs;
 }
 
-/** 分页参数（性能预算见 DATA-CONTRACT §4：列表热路径禁止 -1 全量渲染；当前视图均走名册缓存，本接口供大规模演进预案使用） */
+/** 分页参数（性能预算见 DATA-CONTRACT §4：卡片/表格走分页，完整名册仍由专用缓存读取） */
 export interface RenderPageOptions {
     query?: string;
     page?: number;
@@ -134,19 +188,24 @@ export interface RenderPageOptions {
 }
 
 export async function renderViewPage(avId: string, dbBlockId: string, options: RenderPageOptions = {}): Promise<AvRenderResult> {
-    return kernelPost<AvRenderResult>("/api/av/renderAttributeView", {
+    const page = options.page ?? 1;
+    const pageSize = options.pageSize ?? 200;
+    if (!Number.isSafeInteger(page) || page < 1) throw new Error("属性视图页码必须为正整数");
+    if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 500) throw new Error("属性视图分页大小必须在 1-500 之间");
+    return kernelPost("/api/av/renderAttributeView", {
         id: avId,
         blockID: dbBlockId,
         query: options.query ?? "",
-        page: options.page ?? 1,
-        pageSize: options.pageSize ?? 200,
+        page,
+        pageSize,
         createIfNotExist: false,
-    });
+    }, { decode: (data) => decodeAvRenderResult("/api/av/renderAttributeView", data) });
 }
 
 /** v3.8.5 实测 keyIcon 必填（官方文档漏写），永远显式传空串 */
-export async function addField(avId: string, spec: FieldSpec, displayName: string, previousKeyId: string): Promise<string> {
-    const keyId = newNodeId();
+export async function addField(avId: string, spec: FieldSpec, displayName: string, previousKeyId: string, stableKeyId?: string): Promise<string> {
+    const keyId = stableKeyId ?? newNodeId();
+    if (!ID_PATTERN.test(keyId)) throw new Error("keyID 不是合法的思源 ID");
     await kernelPost<unknown>("/api/av/addAttributeViewKey", {
         avID: avId,
         keyID: keyId,
@@ -156,6 +215,21 @@ export async function addField(avId: string, spec: FieldSpec, displayName: strin
         previousKeyID: previousKeyId,
     });
     return keyId;
+}
+
+export async function readAttributeViewKeys(avId: string): Promise<Array<{ id: string; name: string; type: string; relation?: unknown }>> {
+    if (!ID_PATTERN.test(avId)) throw new Error("avID 不是合法的思源 ID");
+    return kernelPost("/api/av/getAttributeView", { id: avId }, { decode: (data) => {
+        const route = "/api/av/getAttributeView";
+        const response = assertKernelRecord(route, data);
+        const av = assertKernelRecord(route, response.av);
+        return assertKernelArray<unknown>(route, av.keyValues).map((entry) => {
+            const value = assertKernelRecord(route, entry);
+            const key = assertKernelRecord(route, value.key);
+            if (typeof key.id !== "string" || typeof key.name !== "string" || typeof key.type !== "string") throw new KernelProtocolError(route, "属性视图字段定义损坏，未核实双向关系");
+            return { id: key.id, name: key.name, type: key.type, ...(key.relation !== undefined ? { relation: key.relation } : {}) };
+        });
+    } });
 }
 
 /**
@@ -207,15 +281,10 @@ export async function bindDocsAsRows(avId: string, dbBlockId: string, srcs: read
 
 /** 绑定文档 ID → 行 itemID 的官方换算端点 */
 export async function mapBoundDocIds(avId: string, docIds: readonly string[]): Promise<Record<string, string>> {
-    const data = await kernelPost<Record<string, string>>("/api/av/getAttributeViewItemIDsByBoundIDs", {
+    return kernelPost("/api/av/getAttributeViewItemIDsByBoundIDs", {
         avID: avId,
         blockIDs: docIds,
-    });
-    /* CODE-02.6：异常形状不得按「无绑定」处理（会把已有行误判为未绑定） */
-    if (data === null || typeof data !== "object" || Array.isArray(data)) {
-        throw new Error("/api/av/getAttributeViewItemIDsByBoundIDs 返回异常形状（非映射对象）");
-    }
-    return data;
+    }, { decode: (data) => decodeStringMap("/api/av/getAttributeViewItemIDsByBoundIDs", data) });
 }
 
 /** 解绑行（绑定行只解绑，不删文档——spike 假设⑥） */
@@ -236,11 +305,11 @@ export type CellValue =
     | { type: "checkbox"; value: { checkbox: { checked: boolean } } }
     | { type: "relation"; value: { relation: { blockIDs: string[] } } };
 
-export async function setCell(avId: string, keyId: string, itemId: string, cell: CellValue): Promise<AvValue> {
-    return kernelPost<AvValue>("/api/av/setAttributeViewBlockAttr", {
+export async function setCell(avId: string, keyId: string, itemId: string, cell: CellValue): Promise<AvValue | undefined> {
+    return kernelPost("/api/av/setAttributeViewBlockAttr", {
         avID: avId,
         keyID: keyId,
         itemID: itemId,
         value: cell.value,
-    });
+    }, { decode: (data) => decodeOptionalAvValue("/api/av/setAttributeViewBlockAttr", data) });
 }

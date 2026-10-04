@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isRosterFresh, rosterFromRender } from "../src/domain/roster.ts";
+import { isRosterFresh, rosterFromRender, rosterPageState } from "../src/domain/roster.ts";
 import type { RosterEntry } from "../src/domain/roster.ts";
 import type { AvRenderResult } from "../src/api/av.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
@@ -47,4 +47,13 @@ test("filterContacts：搜索与分组叠加（借 contacts 的纯函数同逻�
     const keyword = "138";
     const hit = people.filter((p) => p.name.includes(keyword) || p.phone.includes(keyword));
     assert.deepEqual(hit.map((p) => p.name), ["张三"]);
+});
+
+test("rosterPageState：总数决定是否还有后续页", () => {
+    assert.deepEqual(rosterPageState(1, 200, 1001, 200), {
+        page: 1, pageSize: 200, total: 1001, loaded: 200, hasMore: true,
+    });
+    assert.equal(rosterPageState(6, 200, 1001, 1001).hasMore, false);
+    assert.throws(() => rosterPageState(0, 200, 1, 0), /页码/);
+    assert.throws(() => rosterPageState(1, 200, -1, 0), /总数/);
 });

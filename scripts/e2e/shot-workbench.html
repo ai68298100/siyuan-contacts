@@ -51,11 +51,15 @@
 <script type="module">
     window.addEventListener("error", (event) => { document.title = `ERROR ${event.message}`; });
     window.addEventListener("unhandledrejection", (event) => { document.title = `ERROR ${event.reason}`; });
-    import { mount } from "svelte";
+    import { mount, tick } from "svelte";
     import "../../src/index.scss";
     import Workbench from "../../src/components/Workbench.svelte";
     import { kernel } from "./ui/siyuan-mock.js";
     import { FIELD_SPECS } from "../../src/domain/fields.ts";
+    import { DEFAULT_VIEW_PREFERENCES } from "../../src/domain/preferences.ts";
+    import { pageOrgMemberships } from "../../src/domain/org-membership.ts";
+    import { loadGraphSources, loadGraphReferences } from "../../src/services/graph-query.ts";
+    import { buildGraphQuerySnapshot } from "../../src/domain/graph-query.ts";
 
     const params = new URLSearchParams(location.search);
     const view = params.get("view") || "home";
@@ -64,7 +68,7 @@
         { name: "林晓梅", docId: "20260927000000-person1", itemId: "row-1", group: "家人", phone: "13902257716", tags: ["家人"], birthday: "1990-09-27", related: ["row-2", "row-3"] },
         { name: "陈立群", docId: "20260927000000-person2", itemId: "row-2", group: "同事", phone: "13826110427", tags: ["数学组"], birthday: "1988-10-04", related: ["row-3"] },
         { name: "郑好", docId: "20260927000000-person3", itemId: "row-3", group: "朋友", phone: "13688402253", tags: ["球友"], birthday: "", related: [] },
-        { name: "苏婉清", docId: "20260927000000-person4", itemId: "row-4", group: "同学", phone: "13755190086", tags: ["校友"], birthday: "1991-10-12", related: ["row-2"] },
+        { name: "苏婉清 · 跨校联合课程与社区项目协调负责人", docId: "20260927000000-person4", itemId: "row-4", group: "同学", phone: "13755190086", tags: ["校友", "跨校联合课程项目协作", "社区公益活动与长期志愿服务"], birthday: "1991-10-12", related: ["row-2"] },
     ];
     const settings = {
         schemaVersion: 1, notebookName: "小驴人脉", notebookId: "20260927000000-book001",
@@ -72,21 +76,43 @@
         avId: "20260927000000-view001", initializedAt: "2026-09-27T00:00:00Z",
         fieldMap: Object.fromEntries(FIELD_SPECS.map((field) => [field.key, field.key])),
     };
-    const preferences = { schemaVersion: 1, defaultView: "home", peopleSort: "recent", openOnStartup: false, aiEnabled: true, birthdayWindowDays: 30, staleThresholdDays: 30 };
-    const summary = (person) => ({ ...person, email: "", wechat: "", website: "", isLunar: false, relatedItemIds: [] });
-    kernel.handler = async (route) => {
+    const preferences = { ...structuredClone(DEFAULT_VIEW_PREFERENCES), peopleSort: "recent" };
+    const summary = (person) => ({ ...person, email: "", wechat: "", website: "", isLunar: false, relatedItemIds: [...person.related] });
+    const organizations = [
+        { docId: "20261004000000-org0001", name: "曙光教育科技 · 跨校联合课程研究与社区协作中心", hpath: "/组织/曙光教育科技", notebookId: settings.notebookId, archived: false, memberships: [
+            { id: "20261004000000-mem0001", orgDocId: "20261004000000-org0001", personDocId: people[1].docId, status: "active", affiliationKind: "work", department: "课程设计与跨校协作研究部", title: "高级课程研究与项目协调负责人", joinedOn: "2024-09-01", leftOn: "" },
+            { id: "20261004000000-mem0002", orgDocId: "20261004000000-org0001", personDocId: people[3].docId, status: "active", affiliationKind: "work", department: "社区公益与长期志愿服务项目组", title: "联合项目协调负责人", joinedOn: "2025-03-12", leftOn: "" },
+            { id: "20261004000000-mem0003", orgDocId: "20261004000000-org0001", personDocId: people[2].docId, status: "former", affiliationKind: "work", department: "课程推广部", title: "顾问", joinedOn: "2021-06-01", leftOn: "2023-12-31" },
+        ] },
+        { docId: "20261004000000-org0002", name: "南方师范大学 · 教育学院校友联合会", hpath: "/组织/南方师范大学", notebookId: settings.notebookId, archived: false, memberships: [
+            { id: "20261004000000-mem0004", orgDocId: "20261004000000-org0002", personDocId: people[0].docId, status: "active", affiliationKind: "education", department: "教育学院", title: "校友联络人", joinedOn: "2008-09-01", leftOn: "" },
+            { id: "20261004000000-mem0005", orgDocId: "20261004000000-org0002", personDocId: people[3].docId, status: "active", affiliationKind: "education", department: "教师教育专业", title: "校友志愿者", joinedOn: "2009-09-01", leftOn: "" },
+        ] },
+        { docId: "20261004000000-org0003", name: "旧社区读书会（历史组织）", hpath: "/组织/旧社区读书会", notebookId: settings.notebookId, archived: true, memberships: [
+            { id: "20261004000000-mem0006", orgDocId: "20261004000000-org0003", personDocId: people[2].docId, status: "former", affiliationKind: "unspecified", department: "活动组", title: "志愿者", joinedOn: "2020-02-01", leftOn: "2022-11-01" },
+        ] },
+    ];
+    const organizationMembers = (docId) => (organizations.find((org) => org.docId === docId)?.memberships ?? [])
+        .map((member) => ({ ...member, personName: people.find((person) => person.docId === member.personDocId)?.name ?? "（已解绑）" }));
+    kernel.handler = async (route, body) => {
         if (route === "/api/av/renderAttributeView") return { view: {
             columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })),
             rows: people.map((person) => ({ id: person.itemId, cells: [
-                { value: { type: "block", keyID: "name", block: { id: person.docId, content: person.name } } },
-                { value: { type: "phone", keyID: "phone", phone: { content: person.phone } } },
-                { value: { type: "text", keyID: "wechat", text: { content: person.name === "陈立群" ? "chenliqun88" : "" } } },
-                { value: { type: "date", keyID: "birthday", date: { content: person.birthday ? new Date(`${person.birthday}T00:00:00`).getTime() : 0 } } },
-                { value: { type: "mSelect", keyID: "group", mSelect: [{ content: person.group }] } },
-                { value: { type: "mSelect", keyID: "tags", mSelect: person.tags.map((tag) => ({ content: tag })) } },
-                { value: { type: "relation", keyID: "related", relation: { blockIDs: person.related } } },
+                { valueType: "block", value: { type: "block", keyID: "name", block: { id: person.docId, content: person.name } } },
+                { valueType: "phone", value: { type: "phone", keyID: "phone", phone: { content: person.phone } } },
+                { valueType: "text", value: { type: "text", keyID: "wechat", text: { content: person.name === "陈立群" ? "chenliqun88" : "" } } },
+                { valueType: "date", value: { type: "date", keyID: "birthday", date: { content: person.birthday ? new Date(`${person.birthday}T00:00:00`).getTime() : 0, isNotEmpty: Boolean(person.birthday) } } },
+                { valueType: "select", value: { type: "select", keyID: "group", mSelect: [{ content: person.group }] } },
+                { valueType: "mSelect", value: { type: "mSelect", keyID: "tags", mSelect: person.tags.map((tag) => ({ content: tag })) } },
+                { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: person.related } } },
             ] })),
         } };
+        if (route === "/api/graph/getGraph" || route === "/api/graph/getLocalGraph") {
+            const nodes = [...people.map((person) => ({ id: person.docId, label: person.name })), ...organizations.filter((org) => !org.archived).map((org) => ({ id: org.docId, label: org.name }))];
+            const links = [{ from: people[0].docId, to: people[1].docId }, { from: people[1].docId, to: organizations[0].docId }];
+            const ids = route === "/api/graph/getGraph" ? new Set(nodes.map((node) => node.id)) : new Set([body.id, ...links.filter((link) => link.from === body.id || link.to === body.id).flatMap((link) => [link.from, link.to])]);
+            return { nodes: nodes.filter((node) => ids.has(node.id)).map((node) => ({ ...node, type: "NodeDocument", refs: 0, defs: 0 })), links: links.filter((link) => ids.has(link.from) && ids.has(link.to)) };
+        }
         throw new Error(`截图环境不允许请求 ${route}`);
     };
     const localDateKey = (offsetDays) => {
@@ -116,6 +142,28 @@
         previousTotal: 0, delta: 0,
     });
     const facade = {
+        listPersonOrgMemberships: async (docId) => organizations.flatMap((org) => org.memberships.filter((member) => member.personDocId === docId)
+            .map((member) => ({ ...member, orgName: org.name, archived: org.archived, reachable: true }))),
+        listCommonOrgBackground: async () => [],
+        listOrganizations: async () => structuredClone(organizations),
+        listContacts: async () => people.map(summary),
+        loadSelfIdentity: async () => ({ schemaVersion: 1, selfDocId: people[0].docId, selfItemId: people[0].itemId }),
+        loadGraphQuerySnapshot: async (query, revision = 0) => {
+            const sources = await loadGraphSources(settings, facade, revision);
+            const references = query.mode === "native" ? await loadGraphReferences(sources, query) : undefined;
+            return buildGraphQuerySnapshot(sources, query, references);
+        },
+        listOrganizationMembers: async (docId) => organizationMembers(docId),
+        listOrganizationMembersPage: async (docId, options = {}) => {
+            const all = organizationMembers(docId);
+            const query = options.query?.trim().toLocaleLowerCase() ?? "";
+            const filtered = query ? all.filter((member) => [member.personName, member.department, member.title].some((value) => value.toLocaleLowerCase().includes(query))) : all;
+            return { ...pageOrgMemberships(filtered, options), personDocIds: [...new Set(all.map((member) => member.personDocId))],
+                activePersonDocIds: [...new Set(all.filter((member) => member.status === "active").map((member) => member.personDocId))] };
+        },
+        listPendingOrganizationOperations: async () => [],
+        listPersonExchanges: async () => [],
+        listPersonAliases: async () => [],
         settings, viewPreferences: preferences, isMobile: innerWidth <= 640,
         loadDashboard: async () => ({
             people: 4, relations: 3, birthdaysThisWeek: 2, neverContacted: 1, neverContactedItemIds: [people[3].itemId],
@@ -169,7 +217,7 @@
         },
         listTemplates: async () => templates,
         saveTemplates: async (next) => { templates.splice(0, templates.length, ...next); return templates; },
-        saveViewPreferences: async (next) => { Object.assign(preferences, next); return preferences; },
+        saveViewPreferences: async (next) => { Object.assign(preferences, next, { revision: preferences.revision + 1 }); return structuredClone(preferences); },
         buildReviewReport: async (from, to) => emptyReviewReport(from, to),
         openPersonDoc() {}, openHostDoc() {}, openDoc() {}, openSettings() {},
         loadViewPreferences: async () => preferences,
@@ -189,38 +237,75 @@
     };
     mount(Workbench, { target: document.getElementById("shot"), props: {
         facade, settings, preferences,
-        initialView: (view === "home" || view === "quickfill") ? "home" : view === "graph" ? "graph" : "people",
+        initialView: (view === "home" || view === "quickfill") ? "home" : view === "graph" ? "graph" : view === "orgs" || view === "orgdetail" ? "orgs" : "people",
         isMobile: innerWidth <= 640, onPreferencesUpdated() {}, onOpenPersonDoc() {},
     } });
-    setTimeout(() => {
-        /* UX-02.5：视图切换为分段控件，点「表格」段（幂等：已在表格态时点击无副作用） */
+    async function waitFor(predicate, message) {
+        const deadline = Date.now() + 6000;
+        while (!predicate()) {
+            if (document.title.startsWith("ERROR")) throw new Error(document.title);
+            if (Date.now() > deadline) throw new Error(message);
+            await new Promise((resolveWait) => setTimeout(resolveWait, 50));
+        }
+        await tick();
+    }
+    async function prepareShot() {
+        await waitFor(() => document.querySelector(".lvct-workbench"), "工作台未挂载");
         const segToTable = () => [...document.querySelectorAll('.lvct-people__toolbar .lvct-seg__item')].find((b) => b.textContent.includes("表格"));
-        if (view === "table") segToTable()?.click();
-        if (view === "peek") document.querySelector(".lvct-person-card")?.click();
+        if (view === "table" || view === "colmenu") {
+            await waitFor(segToTable, "表格切换入口未出现");
+            segToTable().click();
+        }
+        if (view === "peek") {
+            await waitFor(() => document.querySelector(".lvct-person-card"), "联系人卡片未出现");
+            document.querySelector(".lvct-person-card").click();
+        }
+        if (view === "orgdetail") {
+            const targetCard = () => document.querySelector(`.lvct-orgs-view__card[data-org-doc-id="${organizations[0].docId}"]`);
+            await waitFor(targetCard, "目标组织卡片未出现");
+            targetCard().querySelector("button").click();
+            await waitFor(() => document.querySelector(".lvct-org-manager")?.dataset.orgDocId === organizations[0].docId
+                && document.querySelectorAll(".lvct-org-manager__member").length === organizations[0].memberships.length, "组织详情未读取原组织及完整成员");
+        }
         if (view === "viewsmenu") {
-            /* B09-1：移动端视图菜单收进「筛选与整理」弹层，先开弹层再点视图按钮 */
             if (innerWidth <= 640) {
-                const tools = document.querySelector('.lvct-people__toolbar button[aria-label="筛选与整理"]');
-                if (!tools) { document.title = "ERROR no tools button"; return; }
-                tools.click();
-                setTimeout(() => {
-                    const viewBtn = document.querySelector('.lvct-sheet button[aria-label="视图"]');
-                    if (!viewBtn) { document.title = "ERROR no view button in sheet"; return; }
-                    viewBtn.click();
-                }, 200);
+                const tools = () => document.querySelector('.lvct-people__toolbar button[aria-label="筛选与整理"]');
+                await waitFor(tools, "筛选与整理入口未出现");
+                tools().click();
+                const viewButton = () => document.querySelector('.lvct-sheet button[aria-label="视图"]');
+                await waitFor(viewButton, "底部弹层缺少视图入口");
+                viewButton().click();
             } else {
-                document.querySelector('.lvct-people__toolbar button[aria-label="视图"]')?.click();
+                await waitFor(() => document.querySelector('.lvct-people__toolbar button[aria-label="视图"]'), "视图入口未出现");
+                document.querySelector('.lvct-people__toolbar button[aria-label="视图"]').click();
             }
         }
-        if (view === "morefilter") document.querySelector("#lvct-people-moremenu > button")?.click();
-        if (view === "quickfill") {
-            document.querySelector(".lvct-workbench__header-actions button")?.click();
-            setTimeout(() => document.querySelector(".lvct-form__toolbar button")?.click(), 120);
+        if (view === "morefilter") {
+            await waitFor(() => document.querySelector("#lvct-people-moremenu > button"), "更多筛选入口未出现");
+            document.querySelector("#lvct-people-moremenu > button").click();
         }
-        if (view === "colmenu") { segToTable()?.click(); setTimeout(() => document.querySelector('button[aria-label="表格列设置"]')?.click(), 120); }
-        setTimeout(() => {
-            const expected = view === "home" ? ".lvct-dash__stats"
-                : view === "graph" ? ".lvct-graph-view__canvas"
+        if (view === "quickfill") {
+            await waitFor(() => document.querySelector(".lvct-workbench__header-actions button"), "新建联系人入口未出现");
+            document.querySelector(".lvct-workbench__header-actions button").click();
+            await waitFor(() => document.querySelector(".lvct-form__toolbar button"), "新建表单未出现");
+            document.querySelector(".lvct-form__toolbar button").click();
+        }
+        if (view === "colmenu") {
+            await waitFor(() => document.querySelector('button[aria-label="表格列设置"]'), "表格列设置入口未出现");
+            document.querySelector('button[aria-label="表格列设置"]').click();
+        }
+        let graphSnapshot;
+        if (view === "graph") {
+            graphSnapshot = await facade.loadGraphQuerySnapshot({ mode: preferences.graphMode, scope: "global", centerDocId: "", orgDocId: "",
+                search: "", group: "", isolatedOnly: false, showOrgs: true, depth: "direct", focusId: "", compareId: "", queryMode: "common" });
+            if (graphSnapshot.state !== "ready" || graphSnapshot.graph.nodes.length !== people.length + organizations.filter((org) => !org.archived).length) throw new Error("截图图查询来源未完整核实");
+            const presentation = innerWidth <= 640 ? "文本视图" : "画布视图";
+            [...document.querySelectorAll(".lvct-graph-view button")].find((button) => button.textContent.trim() === presentation).click();
+        }
+        const expected = view === "home" ? ".lvct-dash__stats"
+                : view === "graph" ? innerWidth <= 640 ? ".lvct-graph-text" : ".lvct-graph-view__canvas"
+                : view === "orgs" ? ".lvct-orgs-view__card"
+                : view === "orgdetail" ? ".lvct-org-manager__member"
                 : view === "table" ? ".lvct-people__table-wrap"
                 : view === "peek" ? ".lvct-detail"
                 : view === "viewsmenu" ? ".lvct-people__viewsmenu"
@@ -228,18 +313,26 @@
                 : view === "quickfill" ? ".lvct-qf__input"
                 : view === "colmenu" ? ".lvct-people__colmenu"
                 : ".lvct-person-card";
-            if (!document.querySelector(expected)) document.title = `ERROR missing ${expected}`;
-            if (view === "graph" && (document.querySelector(expected)?._cyreg?.cy?.nodes().length ?? 0) < 4) document.title = "ERROR blank graph";
-            /* UX-01.12：页面内可见的错误横幅（role="alert"）必须判失败，不许带病截图 */
+            await waitFor(() => document.querySelector(expected), `缺少截图目标 ${expected}`);
+            if (view === "graph") {
+                await waitFor(() => {
+                    const summary = document.querySelector(".lvct-graph-summary");
+                    if (summary?.getAttribute("aria-busy") !== "false") return false;
+                    if (innerWidth <= 640) return document.querySelectorAll("[data-graph-id]").length === graphSnapshot.graph.nodes.length;
+                    const graph = document.querySelector(expected)?._cyreg?.cy;
+                    return graph?.nodes().length === graphSnapshot.graph.nodes.length && graph.edges().length === graphSnapshot.graph.edges.length;
+                }, "实际图界面与查询快照不一致");
+            }
+            if (view === "orgs" && document.querySelectorAll(".lvct-orgs-view__card").length !== organizations.length) throw new Error("组织卡片不完整");
             const alerts = [...document.querySelectorAll('[role="alert"]')]
                 .filter((element) => element.offsetParent !== null && element.textContent.trim());
-            if (alerts.length) document.title = `ERROR banner: ${alerts[0].textContent.trim().slice(0, 80)}`;
+            if (alerts.length) throw new Error(`banner: ${alerts[0].textContent.trim().slice(0, 80)}`);
             const clipped = [...document.querySelectorAll(".lvct-people__toolbar, .lvct-detail__header-actions")]
                 .some((element) => element.getBoundingClientRect().right > innerWidth + 2);
-            if (clipped) document.title = `ERROR clipped toolbar ${innerWidth} ${[...document.querySelectorAll(".lvct-people__toolbar, .lvct-detail__header-actions")].map((element) => Math.round(element.getBoundingClientRect().right)).join(",")}`;
+            if (clipped) throw new Error(`clipped toolbar ${innerWidth} ${[...document.querySelectorAll(".lvct-people__toolbar, .lvct-detail__header-actions")].map((element) => Math.round(element.getBoundingClientRect().right)).join(",")}`);
             if (!document.title.startsWith("ERROR")) document.title = "READY";
-        }, 250);
-    }, 600);
+    }
+    void prepareShot().catch((error) => { document.title = `ERROR ${error instanceof Error ? error.message : String(error)}`; });
 </script>
 </body>
 </html>

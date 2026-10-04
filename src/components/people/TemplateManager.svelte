@@ -3,6 +3,7 @@
     import { newTemplateId } from "../../domain/interaction-templates";
     import type { NoteTemplate } from "../../domain/interaction-templates";
     import StatusNotice from "../StatusNotice.svelte";
+    import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
 
     let {
@@ -24,6 +25,19 @@
     let busy = $state(false);
     let errorText = $state("");
     let savedMessage = $state("");
+    // svelte-ignore state_referenced_locally
+    let savedDraft: NoteTemplate[] = $state(templates.map((item) => ({ ...item })));
+
+    function isDirty(): boolean {
+        return JSON.stringify(draft) !== JSON.stringify(savedDraft);
+    }
+
+    const guardedClose = useCloseGuard({
+        busy: () => busy,
+        dirty: isDirty,
+        changes: () => [text("tplManagerUnsaved", "互动备注模板修改尚未保存")],
+        save,
+    });
 
     function addTemplate() {
         draft = [...draft, { id: newTemplateId(), name: "", content: "" }];
@@ -45,6 +59,7 @@
         errorText = "";
         try {
             draft = await onSave(cleaned);
+            savedDraft = draft.map((item) => ({ ...item }));
             savedMessage = text("tplManagerSaved", "模板已保存");
         } catch (error) {
             errorText = error instanceof Error ? error.message : String(error);
@@ -71,7 +86,7 @@
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--outline" onclick={addTemplate} disabled={busy}>{text("tplManagerAdd", "＋ 新增模板")}</button>
         <span style="flex:1"></span>
-        <button class="b3-button b3-button--cancel" onclick={onClose} disabled={busy}>{text("tplManagerClose", "关闭")}</button>
+        <button class="b3-button b3-button--cancel" onclick={() => void guardedClose(onClose)} disabled={busy}>{text("tplManagerClose", "关闭")}</button>
         <button class="b3-button b3-button--text" onclick={save} disabled={busy}>{busy ? text("tplManagerSaving", "保存中…") : text("tplManagerSave", "保存模板")}</button>
     </div>
     <StatusNotice message={savedMessage} onDismiss={() => (savedMessage = "")} />

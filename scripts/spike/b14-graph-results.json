@@ -32,7 +32,12 @@
   {
     "name": "B refs 表作为图数据源（节点=文档，边=refs）",
     "ok": true,
-    "detail": "edges=[\"20260930062338-wc1m4ch\",\"20260930062338-fjx4r9c\"]"
+    "detail": "edges=[\"20261004185059-wkb7ju7\",\"20261004185059-elj7nic\"]"
+  },
+  {
+    "name": "B2 siyuan://blocks 链接是否形成 refs 边",
+    "ok": null,
+    "detail": "formed=false edges=[]"
   },
   {
     "name": "C 打开原生图面板",
@@ -42,12 +47,12 @@
   {
     "name": "D 反向边（回链）自动维护",
     "ok": true,
-    "detail": "docB 回链来源=[\"20260930062338-6ifaopw\"]"
+    "detail": "docB 回链来源=[\"20261004185100-fo0mz17\"]"
   },
   {
     "name": "E getLocalGraph 数据形状",
     "ok": null,
-    "detail": "nodes=4 首节点={\"id\":\"20260930062338-6ifaopw\",\"box\":\"20260930062338-7l39w2k\",\"path\":\"/20260930062338-6ifaopw.sy\",\"size\":30,\"label\":\"文档A\",\"type\":\"NodeDocument\",\"refs\":4,\"defs\":2} 首边={\"from\":\"20260930062338-t2lqmzo\",\"to\":\"20260930062338-6ifaopw\",\"ref\":true,\"arrows\":{\"to\":{\"enabled\":true}}} conf={\"dailyNote\":false,\"type\":{\"tag\":false,\"paragraph\":false,\"heading\":false,\"math\":false,\"code\":false,\"table\":false,\"list\":false,\"listItem\":false,\"blockquote\":false,\"super\":false,\"callout\":false},\"d3\":{\"nodeSize\":15,\"linkWi"
+    "detail": "nodes=4 首节点={\"id\":\"20261004185100-fo0mz17\",\"box\":\"20261004185059-ok66c19\",\"path\":\"/20261004185100-fo0mz17.sy\",\"size\":30,\"label\":\"文档A\",\"type\":\"NodeDocument\",\"refs\":4,\"defs\":2} 首边={\"from\":\"20261004185100-j1eu9ui\",\"to\":\"20261004185100-fo0mz17\",\"ref\":true,\"arrows\":{\"to\":{\"enabled\":true}}} conf={\"dailyNote\":false,\"type\":{\"tag\":false,\"paragraph\":false,\"heading\":false,\"math\":false,\"code\":false,\"table\":false,\"list\":false,\"listItem\":false,\"blockquote\":false,\"super\":false,\"callout\":false},\"d3\":{\"nodeSize\":15,\"linkWi"
   },
   {
     "name": "E 局部图一度范围（入链回链是否纳入）",
@@ -57,6 +62,6 @@
   {
     "name": "E getGraph 数据形状",
     "ok": null,
-    "detail": "nodes=13 首节点={\"id\":\"20260930060738-2err27e\",\"box\":\"20260930060737-vunkltf\",\"path\":\"/20260930060738-2err27e.sy\",\"size\":15,\"label\":\"文档B\",\"type\":\"NodeDocument\",\"refs\":0,\"defs\":0} 首边={\"from\":\"20260930061148-xgebl28\",\"to\":\"20260930061147-jkflzox\",\"ref\":true,\"arrows\":{\"to\":{\"enabled\":true}}}"
+    "detail": "nodes=14 首节点={\"id\":\"20261004183037-6vlrd2b\",\"box\":\"20261004183037-2x57tpr\",\"path\":\"/20261004183037-6vlrd2b.sy\",\"size\":15,\"label\":\"文档B\",\"type\":\"NodeDocument\",\"refs\":0,\"defs\":1} 首边={\"from\":\"20261004183037-bkouo3f\",\"to\":\"20261004183037-6vlrd2b\",\"ref\":true,\"arrows\":{\"to\":{\"enabled\":true}}}"
   }
 ]

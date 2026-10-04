@@ -2,15 +2,18 @@
     /** B03 可搜索选人器：输入即筛 + 键盘上下/回车 + 分组·标签提示 + 空态提示。
      *  浮层复用 popover 定位原语（B02），在 Peek/工作台滚动容器内不被裁剪。
      *  只改选择交互，不改变调用方的写入语义（选中后由调用方走既有服务）。 */
-    import { tick } from "svelte";
+    import { onDestroy, tick } from "svelte";
     import { attachPopover } from "../../libs/popover";
     import { translateText } from "../../domain/translation";
+    import { loadContactAliasIndex } from "../../services/contact-aliases";
 
     export interface PickerItem {
         id: string;
         label: string;
         /** 次要行：分组 · 标签 */
         hint?: string;
+        docId?: string;
+        itemId?: string;
         /** 参与搜索的附加关键词（电话/微信/邮箱），调用方拼好小写 */
         keywords?: string;
     }
@@ -45,13 +48,41 @@
     let wrap: HTMLElement | undefined = $state();
     let panel: HTMLElement | undefined = $state();
     let inputEl: HTMLInputElement | undefined = $state();
+    let aliasKeywords = $state<Record<string, string>>({});
+    let aliasError = $state(false);
+    let aliasRequest = 0;
+    const listboxId = `lvct-picker-${Math.random().toString(36).slice(2)}`;
+    onDestroy(() => { aliasRequest += 1; });
+
+    async function loadAliases(): Promise<void> {
+        const request = ++aliasRequest;
+        try {
+            const index = await loadContactAliasIndex();
+            if (request !== aliasRequest) return;
+            const keywords: Record<string, string> = {};
+            for (const entry of index?.aliases ?? []) keywords[entry.personDocId] = `${keywords[entry.personDocId] ?? ""} ${entry.alias.toLowerCase()}`;
+            aliasKeywords = keywords;
+            aliasError = false;
+        } catch {
+            if (request !== aliasRequest) return;
+            aliasKeywords = {};
+            aliasError = true;
+        }
+    }
 
     const selected = $derived(items.find((item) => item.id === value) ?? null);
+    const ambiguousLabels = $derived.by(() => {
+        const counts = new Map<string, number>();
+        for (const item of items) counts.set(item.label, (counts.get(item.label) ?? 0) + 1);
+        return new Set([...counts].filter(([, count]) => count > 1).map(([label]) => label));
+    });
     const filtered = $derived.by(() => {
         const needle = query.trim().toLowerCase();
         if (!needle) return items;
         return items.filter((item) =>
-            item.label.toLowerCase().includes(needle) || (item.keywords ?? "").includes(needle));
+            item.label.toLowerCase().includes(needle) || (item.keywords ?? "").includes(needle)
+            || (aliasKeywords[item.docId ?? item.id] ?? "").includes(needle)
+            || (item.docId ?? item.id).includes(needle) || (item.itemId ?? "").includes(needle));
     });
 
     $effect(() => {
@@ -67,6 +98,7 @@
         query = "";
         highlight = 0;
         open = true;
+        void loadAliases();
         await tick();
         inputEl?.focus();
     }
@@ -100,12 +132,13 @@
         onclick={() => (open ? (open = false) : void show())}
     >
         <span class="lvct-picker__value" class:lvct-picker__placeholder={!selected}>
-            {selected ? selected.label : placeholder}
+            {selected ? `${selected.label}${ambiguousLabels.has(selected.label) ? ` · ${selected.docId ?? selected.id}` : ""}` : placeholder}
         </span>
         <span class="lvct-picker__caret" aria-hidden="true">▾</span>
     </button>
     {#if open}
         <div class="lvct-picker__panel" bind:this={panel}>
+            {#if aliasError}<p role="status">别名读取失败，可按姓名或文档 ID 查找。</p>{/if}
             <input
                 class="b3-text-field lvct-picker__search"
                 type="text"
@@ -115,14 +148,14 @@
                 aria-label={text("pickerSearch", searchText)}
                 role="combobox"
                 aria-expanded="true"
-                aria-controls="lvct-picker-listbox"
+                aria-controls={listboxId}
                 onkeydown={onSearchKeydown}
                 oninput={() => (highlight = 0)}
             />
             {#if filtered.length === 0}
                 <div class="lvct-picker__empty" role="status">{emptyText}</div>
             {:else}
-                <ul class="lvct-picker__list" id="lvct-picker-listbox" role="listbox">
+                <ul class="lvct-picker__list" id={listboxId} role="listbox">
                     {#each filtered as item, index (item.id)}
                         <li role="none">
                             <button
@@ -136,6 +169,9 @@
                             >
                                 <span class="lvct-picker__label">{item.label}</span>
                                 {#if item.hint}<span class="lvct-picker__hint">{item.hint}</span>{/if}
+                                {#if ambiguousLabels.has(item.label) || query.trim() && filtered.length > 1}
+                                    <span class="lvct-picker__hint">{item.docId ?? item.id}{item.itemId ? ` · ${item.itemId}` : ""}</span>
+                                {/if}
                             </button>
                         </li>
                     {/each}

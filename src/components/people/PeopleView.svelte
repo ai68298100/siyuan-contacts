@@ -1,10 +1,12 @@
 <script lang="ts">
     /** 联系人视图：名册缓存 + 客户端过滤/分页 + 卡片/表格双形态；详情弹窗由 Workbench 统一承载 */
-    import { batchUpdateContacts, listContacts, filterContacts, PAGE_SIZE, PRESET_GROUPS, removeContacts } from "../../services/contacts";
-    import { buildOrgDisplayByPerson } from "../../services/org";
+    import { batchUpdateContacts, filterContacts, listContactPage, PAGE_SIZE, PRESET_GROUPS, removeContacts } from "../../services/contacts";
+    import { profileText } from "../../domain/people-profiles";
+    import { onDestroy, tick } from "svelte";
     import { exportVcfText } from "../../services/vcard";
     import { nextBirthday } from "../../domain/occasions";
     import type { ContactSummary } from "../../domain/person";
+    import type { WritableContactField } from "../../domain/contact-write.ts";
     import type { ContactsSettings } from "../../domain/model";
     import { DEFAULT_VIEW_PREFERENCES, normalizeTableColumns, PEOPLE_TABLE_COLUMNS } from "../../domain/preferences";
     import type { PeopleTableColumn, ViewPreferences } from "../../domain/preferences";
@@ -111,6 +113,8 @@
         recent: { labelKey: "peopleRecent", fallback: "最近互动" },
         tags: { labelKey: "peopleTags", fallback: "标签" },
         org: { labelKey: "peopleColumnOrg", fallback: "单位" },
+        school: { labelKey: "peopleColumnSchool", fallback: "学校" },
+        relationship: { labelKey: "peopleColumnRelationship", fallback: "与我的关系" },
     };
     const columnLabel = (key: PeopleTableColumn) => text(columnLabels[key].labelKey, columnLabels[key].fallback);
 
@@ -177,25 +181,43 @@
     let vcarding: boolean = $state(false);
     // C03 串行补录：对当前筛选列表逐个补缺失字段
     let completing: boolean = $state(false);
+    let completionPeople: ContactSummary[] = $state([]);
     // B09-1：移动端「筛选与整理」底部弹层
     let mobileSheetOpen: boolean = $state(false);
     let batchOpen: boolean = $state(false);
     let batchBusy: boolean = $state(false);
+    let exportingSelected: boolean = $state(false);
     let batchError: string = $state("");
     let batchGroup: string = $state("__keep");
     let batchTagsText: string = $state("");
-    useCloseGuard({
-        busy: () => batchBusy,
+    let batchFailedFieldsByItem: Record<string, readonly WritableContactField[]> = $state({});
+    let batchTargets: ContactSummary[] = $state([]);
+    let batchAnchor = $state("");
+    let batchHiddenCount = $state(0);
+    let includeHidden = $state(false);
+    let batchResult = $state("");
+    let batchResultElement: HTMLElement | undefined = $state();
+    let peopleAlive = true;
+    onDestroy(() => { peopleAlive = false; refreshGeneration += 1; recentGeneration += 1; rosterLoadGeneration += 1; });
+    const guardedClose = useCloseGuard({
+        busy: () => batchBusy || exportingSelected,
         dirty: () => batchOpen && (batchGroup !== "__keep" || !!batchTagsText.trim()),
         changes: () => [text("guardBatchDraft", "批量编辑尚未应用")],
     });
     function closeBatch() {
-        if (batchBusy) return;
-        if ((batchGroup !== "__keep" || batchTagsText.trim()) && !window.confirm("有未保存的修改，确定放弃并离开吗？")) return;
-        batchOpen = false;
+        void guardedClose(() => (batchOpen = false));
     }
     let selectedIds: string[] = $state([]);
+    let selectedScope = $state<"manual" | "page" | "filtered">("manual");
+    let batchScopeLabel = $state("");
+    const selectionScopeLabel = $derived(selectedScope === "page" ? "当前页" : selectedScope === "filtered" ? "全部筛选" : "手动选中");
     let visibleCount: number = $state(PAGE_SIZE);
+    let rosterTotal: number = $state(0);
+    let rosterPage: number = $state(0);
+    let rosterHasMore: boolean = $state(false);
+    let rosterLoadingMore: boolean = $state(false);
+    let rosterLoadError: string = $state("");
+    let rosterLoadGeneration = 0;
 
     const groups = $derived.by(() => {
         const set = new Set<string>();
@@ -235,6 +257,9 @@
         if (extraFilter.recentFrom || extraFilter.recentTo) chips.push({ key: "recentRange", label: `最近互动 ${extraFilter.recentFrom || "早期"} ~ ${extraFilter.recentTo || "至今"}` });
         if (extraFilter.neverContacted) chips.push({ key: "neverContacted", label: "从未联系" });
         if (extraFilter.profileGap) chips.push({ key: "profileGap", label: `资料：${PROFILE_GAPS.find((gap) => gap.key === extraFilter.profileGap)?.label ?? extraFilter.profileGap}` });
+        if (extraFilter.workQuery?.trim()) chips.push({ key: "workQuery", label: `工作单位：${extraFilter.workQuery.trim()}` });
+        if (extraFilter.educationQuery?.trim()) chips.push({ key: "educationQuery", label: `学校：${extraFilter.educationQuery.trim()}` });
+        if (extraFilter.relationshipLabel?.trim()) chips.push({ key: "relationshipLabel", label: `与我的关系：${extraFilter.relationshipLabel.trim()}` });
         return chips;
     });
 
@@ -251,6 +276,7 @@
         else if (key === "recentRange") extraFilter = { ...extraFilter, recentFrom: "", recentTo: "" };
         else if (key === "neverContacted") extraFilter = { ...extraFilter, neverContacted: false };
         else if (key === "profileGap") extraFilter = { ...extraFilter, profileGap: "" };
+        else if (["workQuery", "educationQuery", "relationshipLabel"].includes(key)) extraFilter = { ...extraFilter, [key]: "" };
         visibleCount = PAGE_SIZE;
     }
 
@@ -298,6 +324,9 @@
             recentTo: extraFilter.recentTo,
             neverContacted: extraFilter.neverContacted,
             sort: sortMode,
+            ...(extraFilter.workQuery?.trim() ? { workQuery: extraFilter.workQuery.trim() } : {}),
+            ...(extraFilter.educationQuery?.trim() ? { educationQuery: extraFilter.educationQuery.trim() } : {}),
+            ...(extraFilter.relationshipLabel?.trim() ? { relationshipLabel: extraFilter.relationshipLabel.trim() } : {}),
         };
     }
 
@@ -320,7 +349,8 @@
         searchText = query.search;
         groupFilter = query.group;
         tagFilter = [...query.tags];
-        extraFilter = { ...extraFilter, tagMatch: query.tagMatch, recentFrom: query.recentFrom, recentTo: query.recentTo, neverContacted: query.neverContacted };
+        extraFilter = { ...extraFilter, tagMatch: query.tagMatch, recentFrom: query.recentFrom, recentTo: query.recentTo, neverContacted: query.neverContacted,
+            workQuery: query.workQuery ?? "", educationQuery: query.educationQuery ?? "", relationshipLabel: query.relationshipLabel ?? "" };
         sortMode = query.sort;
         visibleCount = PAGE_SIZE;
     }
@@ -403,29 +433,78 @@
         visibleCount = PAGE_SIZE;
     });
     const selectedPeople = $derived(people.filter((person) => selectedIds.includes(person.itemId)));
+    const hiddenSelectionCount = $derived(selectedPeople.filter((person) => !filtered.some((item) => item.itemId === person.itemId)).length);
     const allVisibleSelected = $derived(visible.length > 0 && visible.every((person) => selectedIds.includes(person.itemId)));
 
     /* FUNC-01.7-a 请求代际：revision 连续变化时只有最新一次刷新落位，乱序响应丢弃 */
     let refreshGeneration = 0;
     /* B12：人物 → 单位显示串（来自 org-membership 成员索引；加载失败降级为空） */
-    let orgLines: Record<string, string> = $state({});
     async function refresh() {
         const request = ++refreshGeneration;
+        rosterLoadGeneration += 1;
+        const pageGeneration = rosterLoadGeneration;
         loading = true;
         errorText = "";
+        rosterLoadError = "";
+        rosterLoadingMore = false;
+        rosterPage = 0;
+        rosterTotal = 0;
+        rosterHasMore = false;
         try {
-            const next = await listContacts(settings);
+            const next = await listContactPage(settings, 1, PAGE_SIZE);
             if (request !== refreshGeneration) return; /* 旧响应不得覆盖新数据 */
-            people = next;
+            people = next.people;
+            rosterPage = next.page;
+            rosterTotal = next.total;
+            rosterHasMore = next.hasMore;
             const available = new Set(people.map((person) => person.itemId));
             selectedIds = selectedIds.filter((itemId) => available.has(itemId));
+            loading = false;
+            void loadRemainingRosterPages(request, pageGeneration);
         } catch (error) {
             if (request !== refreshGeneration) return;
             /* 刷新失败保留旧列表内容，仅以横幅提示（可再次刷新重试） */
             errorText = error instanceof Error ? error.message : String(error);
-        } finally {
-            if (request === refreshGeneration) loading = false;
+            loading = false;
         }
+    }
+
+    async function loadRemainingRosterPages(request: number, expectedGeneration = rosterLoadGeneration) {
+        if (!rosterHasMore || expectedGeneration !== rosterLoadGeneration) return;
+        rosterLoadingMore = true;
+        rosterLoadError = "";
+        try {
+            while (rosterHasMore && request === refreshGeneration && expectedGeneration === rosterLoadGeneration && peopleAlive) {
+                const next = await listContactPage(settings, rosterPage + 1, PAGE_SIZE);
+                if (request !== refreshGeneration || expectedGeneration !== rosterLoadGeneration || !peopleAlive) return;
+                if (next.people.length === 0 && next.hasMore) throw new Error("联系人分页返回空页但仍有后续数据，已停止继续读取");
+                const known = new Set(people.map((person) => person.itemId));
+                const duplicate = next.people.find((person) => known.has(person.itemId));
+                if (duplicate) throw new Error(`联系人分页出现重复行「${duplicate.name}」，已停止继续读取以避免重复展示`);
+                people = [...people, ...next.people];
+                rosterPage = next.page;
+                rosterTotal = Math.max(rosterTotal, next.total);
+                rosterHasMore = next.hasMore;
+                const available = new Set(people.map((person) => person.itemId));
+                selectedIds = selectedIds.filter((itemId) => available.has(itemId));
+            }
+        } catch (error) {
+            if (request === refreshGeneration && expectedGeneration === rosterLoadGeneration) {
+                rosterLoadError = error instanceof Error ? error.message : String(error);
+            }
+        } finally {
+            if (expectedGeneration === rosterLoadGeneration) rosterLoadingMore = false;
+        }
+    }
+
+    function stopRosterLoading() {
+        rosterLoadGeneration += 1;
+        rosterLoadingMore = false;
+    }
+
+    function resumeRosterLoading() {
+        if (!rosterHasMore || rosterLoadingMore) return;
+        void loadRemainingRosterPages(refreshGeneration, ++rosterLoadGeneration);
     }
 
     $effect(() => {
@@ -441,13 +520,6 @@
             if (request !== recentGeneration) return;
             recentError = error instanceof Error ? error.message : String(error);
         });
-        /* B12：单位显示串（失败降级为空——卡片不显示单位行，不阻断名册） */
-        void buildOrgDisplayByPerson().then((display) => {
-            if (request !== recentGeneration) return;
-            const next: Record<string, string> = {};
-            for (const [docId, line] of display) next[docId] = line;
-            orgLines = next;
-        }).catch(() => {});
     });
 
     function toggleTag(tag: string) {
@@ -456,12 +528,14 @@
     }
 
     function toggleSelected(itemId: string, selected: boolean) {
+        selectedScope = "manual";
         selectedIds = selected
             ? [...new Set([...selectedIds, itemId])]
             : selectedIds.filter((id) => id !== itemId);
     }
 
     function toggleAllVisible(selected: boolean) {
+        selectedScope = "manual";
         const visibleIds = new Set(visible.map((person) => person.itemId));
         selectedIds = selected
             ? [...new Set([...selectedIds, ...visibleIds])]
@@ -472,36 +546,97 @@
         return [...new Set(value.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0))];
     }
 
-    async function runBatchUpdate() {
+    function selectAllFiltered(): void {
+        if (batchBusy || exportingSelected) return;
+        selectedIds = filtered.map((person) => person.itemId);
+        selectedScope = "filtered";
+    }
+
+    function selectVisibleScope(): void {
+        if (batchBusy || exportingSelected) return;
+        selectedIds = visible.map((person) => person.itemId);
+        selectedScope = "page";
+    }
+
+    function openBatch(): void {
+        if (batchBusy || exportingSelected) return;
+        batchTargets = selectedPeople.map((person) => ({ ...person, tags: [...person.tags] }));
+        batchScopeLabel = selectionScopeLabel;
+        batchAnchor = JSON.stringify([settings.avId, settings.dbBlockId, settings.fieldMap]);
+        batchHiddenCount = hiddenSelectionCount;
+        includeHidden = false;
+        batchError = "";
+        batchFailedFieldsByItem = {};
+        batchOpen = true;
+    }
+
+    async function runBatchUpdate(onlyFailed = false) {
         if (batchBusy) return;
+        if (batchHiddenCount > 0 && !includeHidden) { batchError = "请确认包含筛选外的已选联系人，或取消后重新选择范围"; return; }
+        if (batchAnchor !== JSON.stringify([settings.avId, settings.dbBlockId, settings.fieldMap])) { batchError = "数据库锚点已变化，请取消后重新核对目标"; return; }
         const tagsToAdd = parseTags(batchTagsText);
         const group = batchGroup === "__keep" ? undefined : batchGroup === "__clear" ? "" : batchGroup;
         if (group === undefined && tagsToAdd.length === 0) {
             batchError = "请选择要修改的分组，或输入至少一个要添加的标签";
             return;
         }
+        const targetPeople = onlyFailed
+            ? batchTargets.filter((person) => (batchFailedFieldsByItem[person.itemId]?.length ?? 0) > 0)
+            : batchTargets;
+        if (targetPeople.length === 0) {
+            batchError = "没有可重试的失败字段";
+            return;
+        }
         batchBusy = true;
         batchError = "";
+        const verifyBeforeWrite = Object.keys(batchFailedFieldsByItem).length > 0;
+        if (!onlyFailed) batchFailedFieldsByItem = {};
         try {
-            await batchUpdateContacts(settings, selectedPeople.map((person) => ({
+            const results = await batchUpdateContacts(settings, targetPeople.map((person) => ({
                 itemId: person.itemId,
+                expected: { itemId: person.itemId, docId: person.docId, group: person.group },
                 ...(group !== undefined ? { group } : {}),
-                ...(tagsToAdd.length > 0 ? { tags: [...new Set([...person.tags, ...tagsToAdd])] } : {}),
-            })));
+                ...(tagsToAdd.length > 0 ? { tagsToAdd } : {}),
+            })), onlyFailed ? { onlyFieldsByItem: batchFailedFieldsByItem } : { verifyBeforeWrite });
+            await refresh();
+            if (!peopleAlive) return;
+            const failedResults = results.filter((result) => result.report.unresolved.length > 0);
+            if (failedResults.length > 0) {
+                batchFailedFieldsByItem = Object.fromEntries(failedResults.map((result) => [
+                    result.itemId,
+                    result.report.unresolved.map((failure) => failure.field),
+                ]));
+                batchError = `部分字段写入失败：${failedResults.map((result) => {
+                    const person = targetPeople.find((item) => item.itemId === result.itemId);
+                    const details = result.report.unresolved.map((failure) => `${failure.label}（${failure.message}）`).join("、");
+                    return `${person?.name ?? result.itemId}：${details}`;
+                }).join("；")}`;
+                await tick();
+                if (peopleAlive) batchResultElement?.focus();
+                return;
+            }
             batchOpen = false;
             batchGroup = "__keep";
             batchTagsText = "";
+            batchFailedFieldsByItem = {};
             selectedIds = [];
-            await refresh();
+            batchResult = `批量修改已核实：${targetPeople.length} 人，字段逐项核实完成`;
+            await tick();
+            if (peopleAlive) batchResultElement?.focus();
         } catch (error) {
+            if (!peopleAlive) return;
             batchError = error instanceof Error ? error.message : String(error);
+            await tick();
+            if (peopleAlive) batchResultElement?.focus();
         } finally {
-            batchBusy = false;
+            if (peopleAlive) batchBusy = false;
         }
     }
 
     async function exportSelected() {
-        if (selectedIds.length === 0) return;
+        if (batchBusy || exportingSelected || selectedIds.length === 0) return;
+        if (hiddenSelectionCount > 0 && !window.confirm(`导出手动选中的 ${selectedPeople.length} 人，包含筛选外 ${hiddenSelectionCount} 人；继续导出吗？`)) return;
+        exportingSelected = true;
         try {
             const text = await exportVcfText(settings, selectedIds);
             if (!text) return;
@@ -515,14 +650,16 @@
             URL.revokeObjectURL(url);
         } catch (error) {
             errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            exportingSelected = false;
         }
     }
 
     async function removeSelected() {
-        if (batchBusy || selectedIds.length === 0) return;
+        if (batchBusy || exportingSelected || selectedIds.length === 0) return;
         const names = selectedPeople.map((person) => person.name).slice(0, 5).join("、");
         const suffix = selectedPeople.length > 5 ? ` 等 ${selectedPeople.length} 人` : "";
-        if (!window.confirm(`将从人脉名册移除「${names}${suffix}」。人物文档和互动记录会保留，确定继续吗？`)) return;
+        if (!window.confirm(`将从人脉名册移除「${names}${suffix}」，共 ${selectedPeople.length} 人（筛选外 ${hiddenSelectionCount} 人）。人物文档和互动记录会保留，确定继续吗？`)) return;
         batchBusy = true;
         batchError = "";
         try {
@@ -607,6 +744,10 @@
                         <input type="checkbox" bind:checked={extraFilter.neverContacted} />
                         <span>只看从未联系的人</span>
                     </label>
+                    <label class="lvct-form__item">工作单位关键词<input class="b3-text-field" type="text" maxlength="200" value={extraFilter.workQuery ?? ""} oninput={(event) => { extraFilter = { ...extraFilter, workQuery: event.currentTarget.value }; visibleCount = PAGE_SIZE; }} /></label>
+                    <label class="lvct-form__item">学校关键词<input class="b3-text-field" type="text" maxlength="200" value={extraFilter.educationQuery ?? ""} oninput={(event) => { extraFilter = { ...extraFilter, educationQuery: event.currentTarget.value }; visibleCount = PAGE_SIZE; }} /></label>
+                    <label class="lvct-form__item">与我的关系称谓<input class="b3-text-field" type="text" maxlength="80" value={extraFilter.relationshipLabel ?? ""} oninput={(event) => { extraFilter = { ...extraFilter, relationshipLabel: event.currentTarget.value }; visibleCount = PAGE_SIZE; }} /></label>
+                    <p class="ft__smaller">仅匹配已核实的当前分类与当前本人称谓，未知资料不当作未填写。</p>
                     <!-- C03 资料完整度：只按现有九字段判定 -->
                     <div class="lvct-form__item">
                         <span>资料完整度</span>
@@ -627,7 +768,7 @@
                                 class="b3-button b3-button--outline"
                                 style="margin-top:6px"
                                 disabled={filtered.length === 0}
-                                onclick={() => (completing = true)}
+                                onclick={() => { completionPeople = filtered.map((person) => ({ ...person, tags: [...person.tags] })); completing = true; }}
                             >逐个补录（{filtered.length}）</button>
                         {/if}
                     </div>
@@ -740,6 +881,14 @@
         </div>
     {/if}
     {#if recentError}<div class="lvct-form__error" role="alert">最近互动读取失败：{recentError}</div>{/if}
+    {#if people.some((person) => person.aliasProfile?.state === "unknown")}
+        <p role="status">别名读取尚未核实，可按姓名查找；未把失败解释为无别名。</p>
+        <button class="b3-button b3-button--text" disabled={loading} onclick={() => void refresh()}>重新读取别名</button>
+    {/if}
+    {#if people.some((person) => person.profile?.affiliations.state === "unknown" || person.profile?.relationship.state === "unknown")}
+        <p role="status">部分组织或称谓资料尚未核实。原有联系人仍可查看；相关筛选仅使用已核实的值。</p>
+        <button class="b3-button b3-button--text" disabled={loading} onclick={() => void refresh()}>重新读取三项资料</button>
+    {/if}
     {#if prefError}<div class="lvct-form__error" role="alert">显示偏好保存失败：{prefError}</div>{/if}
 
     {#if viewHint}<div class="lvct-people__viewhint" role="status">{viewHint}</div>{/if}
@@ -773,13 +922,19 @@
     {#if selectedIds.length > 0}
         <div class="lvct-people__batchbar" role="toolbar" aria-label="批量操作">
             <b>已选 {selectedIds.length} 人</b>
-            <button class="b3-button b3-button--outline" onclick={() => { batchError = ""; batchOpen = true; }}>批量编辑</button>
+            <span>{selectionScopeLabel}；筛选外 {hiddenSelectionCount} 人</span>
+            <button class="b3-button b3-button--outline" onclick={openBatch} disabled={batchBusy || exportingSelected}>批量编辑</button>
             <button class="b3-button b3-button--outline" onclick={exportSelected}>导出 vCard</button>
             <button class="b3-button b3-button--cancel lvct-people__remove" onclick={removeSelected} disabled={batchBusy}>从人脉移除</button>
-            <button class="b3-button b3-button--text" onclick={() => (selectedIds = [])}>取消选择</button>
+            <button class="b3-button b3-button--text" onclick={() => (selectedIds = [])} disabled={batchBusy || exportingSelected}>取消选择</button>
         </div>
     {/if}
 
+    <div class="lvct-people__actions" role="group" aria-label="选择联系人范围">
+        <button class="b3-button b3-button--text" disabled={batchBusy || exportingSelected || visible.length === 0} onclick={selectVisibleScope}>选择当前页（{visible.length} 人）</button>
+        <button class="b3-button b3-button--text" disabled={batchBusy || exportingSelected || rosterHasMore || rosterLoadError !== "" || filtered.length === 0} title={rosterHasMore || rosterLoadError ? "名册尚未完整读取，完成读取后再选择全部筛选" : undefined} onclick={selectAllFiltered}>选择全部筛选（{filtered.length} 人）</button>
+    </div>
+    {#if batchResult}<p role="status" tabindex="-1" bind:this={batchResultElement}>{batchResult}</p>{/if}
     {#if batchError && !batchOpen}
         <div class="lvct-form__error" role="alert">批量操作失败：{batchError}</div>
     {/if}
@@ -806,32 +961,48 @@
     {:else if filtered.length === 0}
         <div class="lvct-empty">
             <div class="lvct-empty__icon" aria-hidden="true">♧</div>
-            <b>{people.length === 0 ? "还没有联系人" : "当前筛选下没有联系人"}</b>
-            <p>{people.length === 0 ? "从新建第一个联系人开始，也可以收编笔记或导入 vCard。" : "换个关键词、分组或标签试试。"}</p>
-            {#if people.length === 0}
+            <b>{people.length === 0 && rosterTotal === 0 ? "还没有联系人" : rosterHasMore ? "正在读取更多联系人" : "当前筛选下没有联系人"}</b>
+            <p>{people.length === 0 && rosterTotal === 0 ? "从新建第一个联系人开始，也可以收编笔记或导入 vCard。" : rosterHasMore ? `已读取 ${people.length} / ${rosterTotal} 人，当前页没有命中，读取完成后再判断。` : "换个关键词、分组或标签试试。"}</p>
+            {#if people.length === 0 && rosterTotal === 0}
                 <div class="lvct-empty__actions">
                     <button class="b3-button b3-button--text" onclick={() => (adding = true)}>＋ 新建联系人</button>
                     <button class="b3-button b3-button--outline" onclick={() => (importing = true)}>收编文档</button>
                     <button class="b3-button b3-button--outline" onclick={() => (vcarding = true)}>导入 vCard</button>
                 </div>
+            {:else if rosterHasMore}
+                <div class="lvct-empty__actions">
+                    {#if rosterLoadingMore}
+                        <button class="b3-button b3-button--outline" onclick={stopRosterLoading}>停止继续读取</button>
+                    {:else}
+                        <button class="b3-button b3-button--outline" onclick={resumeRosterLoading}>继续读取</button>
+                    {/if}
+                </div>
             {:else}
                 <div class="lvct-empty__actions">
-                    <button class="b3-button b3-button--outline" onclick={() => {
-                        searchText = "";
-                        groupFilter = "";
-                        tagFilter = [];
-                        visibleCount = PAGE_SIZE;
-                        onClearFocus?.();
-                    }}>清除所有筛选</button>
+                    <button class="b3-button b3-button--outline" onclick={clearAllConditions}>清除所有筛选</button>
                 </div>
             {/if}
         </div>
     {:else if viewMode === "cards"}
+        <div class="lvct-people__progress" role="status" aria-live="polite">
+            已加载 {people.length} / {rosterTotal} 人
+            {#if rosterLoadingMore}
+                · 正在读取后续联系人
+                <button type="button" class="b3-button b3-button--text" onclick={stopRosterLoading}>停止继续读取</button>
+            {:else if rosterLoadError}
+                · 后续读取失败：{rosterLoadError}
+                <button type="button" class="b3-button b3-button--text" onclick={resumeRosterLoading}>重试后续读取</button>
+            {:else if rosterHasMore}
+                · 尚未读取完
+                <button type="button" class="b3-button b3-button--text" onclick={resumeRosterLoading}>继续读取</button>
+            {:else}
+                · 已读取完整名册
+            {/if}
+        </div>
         <div class="lvct-people__cards">
             {#each visible as person (person.itemId)}
                 <PersonCard
                     {person}
-                    orgLine={orgLines[person.docId]}
                     selected={selectedIds.includes(person.itemId)}
                     active={activePersonId === person.itemId}
                     recent={recent[person.docId]}
@@ -842,6 +1013,21 @@
             {/each}
         </div>
     {:else}
+        <div class="lvct-people__progress" role="status" aria-live="polite">
+            已加载 {people.length} / {rosterTotal} 人
+            {#if rosterLoadingMore}
+                · 正在读取后续联系人
+                <button type="button" class="b3-button b3-button--text" onclick={stopRosterLoading}>停止继续读取</button>
+            {:else if rosterLoadError}
+                · 后续读取失败：{rosterLoadError}
+                <button type="button" class="b3-button b3-button--text" onclick={resumeRosterLoading}>重试后续读取</button>
+            {:else if rosterHasMore}
+                · 尚未读取完
+                <button type="button" class="b3-button b3-button--text" onclick={resumeRosterLoading}>继续读取</button>
+            {:else}
+                · 已读取完整名册
+            {/if}
+        </div>
         <div class="lvct-people__table-wrap">
             <table class="b3-table">
                 <thead>
@@ -879,7 +1065,9 @@
                                     {:else if column === "wechat"}{person.wechat || "—"}
                                     {:else if column === "birthday"}{person.birthday ? `${person.birthday}${person.isLunar ? "（农历）" : ""}` : "—"}
                                     {:else if column === "recent"}{recent[person.docId]?.localDate ?? "—"}
-                                    {:else if column === "org"}{orgLines[person.docId] ?? "—"}
+                                    {:else if column === "org"}{profileText(person.profile, "work")}
+                                    {:else if column === "school"}{profileText(person.profile, "education")}
+                                    {:else if column === "relationship"}{profileText(person.profile, "relationship")}
                                     {:else}{person.tags.join(" · ") || "—"}{/if}
                                 </td>
                             {/each}
@@ -933,15 +1121,15 @@
     {/if}
 
     {#if batchOpen}
-        <LvctDialog title={`批量编辑 · ${selectedIds.length} 人`} beforeClose={() => {
-            if (batchBusy) return false;
-            return (batchGroup === "__keep" && !batchTagsText.trim()) || window.confirm("有未保存的修改，确定放弃并离开吗？");
-        }} onClose={() => (batchOpen = false)}>
+        <LvctDialog title={`批量编辑 · ${batchTargets.length} 人`} onClose={() => (batchOpen = false)}>
             <div class="lvct-form">
+                <p>已固定{batchScopeLabel}的 {batchTargets.length} 人，包含筛选外 {batchHiddenCount} 人。筛选和后台刷新不会增加或替换本次目标。</p>
+                {#if batchHiddenCount > 0}<label><input type="checkbox" bind:checked={includeHidden} disabled={batchBusy} />确认包含筛选外 {batchHiddenCount} 人</label>{/if}
+                <details><summary>核对目标文档</summary>{#each batchTargets as person (person.itemId)}<p>{person.name} · {person.docId} · {person.itemId}</p>{/each}</details>
                 <p class="ft__smaller ft__on-surface">分组会覆盖所选联系人当前值；标签会追加到现有标签并自动去重。</p>
                 <label class="lvct-form__item">
                     <span>统一分组</span>
-                    <select class="b3-select fn__block" bind:value={batchGroup}>
+                    <select class="b3-select fn__block" bind:value={batchGroup} disabled={batchBusy}>
                         <option value="__keep">保持不变</option>
                         <option value="__clear">清空分组</option>
                         {#each PRESET_GROUPS as group (group)}<option value={group}>{group}</option>{/each}
@@ -950,12 +1138,18 @@
                 </label>
                 <label class="lvct-form__item">
                     <span>追加标签（空格/逗号分隔）</span>
-                    <input class="b3-text-field fn__block" type="text" bind:value={batchTagsText} placeholder="重点 客户" />
+                    <input class="b3-text-field fn__block" type="text" bind:value={batchTagsText} placeholder="重点 客户" disabled={batchBusy} />
                 </label>
-                {#if batchError}<div class="lvct-form__error">{batchError}</div>{/if}
+                {#if batchError}<div class="lvct-form__error" role="alert" tabindex="-1" bind:this={batchResultElement}>{batchError}</div>{/if}
+                {#if Object.keys(batchFailedFieldsByItem).length > 0}
+                    <div class="ft__smaller ft__on-surface">已有 {Object.keys(batchFailedFieldsByItem).length} 人存在失败字段，可只重试这些字段。</div>
+                {/if}
                 <div class="lvct-form__actions">
                     <button class="b3-button b3-button--cancel" onclick={closeBatch} disabled={batchBusy}>取消</button>
-                    <button class="b3-button b3-button--text" onclick={runBatchUpdate} disabled={batchBusy}>{batchBusy ? "保存中…" : "应用到所选联系人"}</button>
+                    {#if Object.keys(batchFailedFieldsByItem).length > 0}
+                        <button class="b3-button b3-button--outline" onclick={() => runBatchUpdate(true)} disabled={batchBusy}>{batchBusy ? "重试中…" : text("formRetryFailed", "核实并重试未完成字段")}</button>
+                    {/if}
+                    <button class="b3-button b3-button--text" onclick={() => runBatchUpdate()} disabled={batchBusy || batchHiddenCount > 0 && !includeHidden}>{batchBusy ? "保存中…" : "应用到所选联系人"}</button>
                 </div>
             </div>
         </LvctDialog>
@@ -1000,7 +1194,8 @@
             <ProfileCompletionDialog
                 {i18n}
                 {settings}
-                people={filtered}
+                people={completionPeople}
+                scopeLabel="全部筛选"
                 onSaved={() => refresh()}
                 onClose={() => {
                     completing = false;

@@ -627,6 +627,12 @@
    日期输入保持可收缩（min-content 兜底），不可设 shrink:0——会叠加移动端 width:0 消失。 */
 .lvct-detail__record {
     gap: var(--lvct-sp-2);
+    min-width: 0;
+    flex-wrap: wrap;
+
+    > input[type="text"] {
+        min-width: 0;
+    }
 
     > .b3-button {
         flex-shrink: 0;
@@ -1841,6 +1847,16 @@
     align-self: center;
 }
 
+.lvct-people__progress {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--lvct-sp-1);
+    margin: 0 0 var(--lvct-sp-2);
+    color: var(--lvct-text-2);
+    font-size: var(--lvct-fs-caption);
+}
+
 .lvct-people__filters {
     display: flex;
     align-items: center;
@@ -2450,6 +2466,7 @@
 
 .lvct-detail__meta {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--lvct-sp-2);
     min-width: 0;
@@ -2462,6 +2479,14 @@
     border-radius: var(--lvct-r-pill);
     border: 1px solid var(--lvct-border-subtle);
     color: var(--lvct-text-2);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.lvct-detail__id {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .lvct-detail__header-actions {
@@ -3377,7 +3402,7 @@
     }
     .lvct-detail__header {
         display: grid;
-        grid-template-columns: 38px minmax(0, 1fr);
+        grid-template-columns: var(--lvct-avatar-lg) minmax(0, 1fr);
         align-items: center;
     }
     .lvct-detail__header-actions {
@@ -3606,4 +3631,10 @@
 .lvct-org-manager__footer {
     display: flex;
     justify-content: flex-end;
+}
+.lvct-form__fields {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
 }

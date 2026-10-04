@@ -42,11 +42,12 @@ export async function loadNativePersonGraph(
     identity: SelfIdentity | null,
     options?: NativePersonGraphOptions,
 ): Promise<PersonGraph> {
-    if (!identity || identity.selfDocId === "") throw new NativeGraphCenterMissingError();
-    const centerDocId = options?.centerDocId ?? identity.selfDocId;
+    const centerDocId = options?.centerDocId ?? identity?.selfDocId;
+    if (!centerDocId) throw new NativeGraphCenterMissingError();
     const roster = await listContacts(settings);
+    if (roster.filter((person) => person.docId === centerDocId).length !== 1) throw new NativeGraphCenterMissingError();
     const allowedDocIds = applyRestrict(
-        new Set<string>([identity.selfDocId, ...roster.map((person) => person.docId)]),
+        new Set<string>(roster.map((person) => person.docId)),
         options?.restrictDocIds,
         centerDocId,
     );

@@ -1,3 +1,7 @@
+import { createLifecycleToken, type LifecycleToken } from "../domain/lifecycle.ts";
+import { acceptDataChange, isNavigationDocId, mergeDataChanges, normalizeDataChange } from "../domain/navigation.ts";
+import type { VersionedDataChange } from "../domain/navigation.ts";
+
 /**
  * FUNC-01.7：数据变化通知的窗口内事件通道。
  *
@@ -9,14 +13,99 @@
 
 export const LVCT_DATA_CHANGED = "lvct-data-changed";
 
+export type DataChangeDetail = VersionedDataChange;
+
+let revision = 0;
+const sourceId = `window-${Math.random().toString(36).slice(2)}`;
+
 /** 插件入口调用：广播一次数据变化（调用方负责防抖合并连续事件） */
-export function emitDataChanged(): void {
-    window.dispatchEvent(new CustomEvent(LVCT_DATA_CHANGED));
+export function emitDataChanged(change: Omit<DataChangeDetail, "revision"> = {}, token?: LifecycleToken): void {
+    if (token && !token.isAlive()) return;
+    window.dispatchEvent(new CustomEvent(LVCT_DATA_CHANGED, { detail: { ...change, version: 1, sourceId, revision: ++revision } }));
 }
 
 /** 组件调用：订阅数据变化，返回取消订阅函数 */
-export function subscribeDataChanged(handler: () => void): () => void {
-    const wrapped = () => handler();
-    window.addEventListener(LVCT_DATA_CHANGED, wrapped);
-    return () => window.removeEventListener(LVCT_DATA_CHANGED, wrapped);
+export function subscribeDataChanged(
+    handler: (change: DataChangeDetail) => void,
+    options: { token?: LifecycleToken } = {},
+): () => void {
+    const token = createLifecycleToken(options.token);
+    const seen = new Map<string, number>();
+    const wrapped = (event: Event) => {
+        if (!token.isAlive()) return;
+        const detail = (event as CustomEvent<DataChangeDetail>).detail;
+        const normalized = detail === undefined || detail === null ? { revision: ++revision, sourceId, version: 1 as const } : normalizeDataChange(detail);
+        if (normalized && acceptDataChange(seen, normalized)) handler(normalized);
+    };
+    if (token.isAlive()) window.addEventListener(LVCT_DATA_CHANGED, wrapped);
+    token.onDispose(() => window.removeEventListener(LVCT_DATA_CHANGED, wrapped));
+    return token.invalidate;
+}
+
+export function subscribeDataChangedDebounced(
+    handler: (change: DataChangeDetail) => void,
+    options: { delayMs?: number; invalidate?: () => void; token?: LifecycleToken } = {},
+): () => void {
+    const token = createLifecycleToken(options.token);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let pending: DataChangeDetail | undefined;
+    const unsubscribe = subscribeDataChanged((change) => {
+        if (!change || typeof change.revision !== "number") return;
+        if (!token.isAlive()) return;
+        options.invalidate?.();
+        pending = mergeDataChanges(pending, change);
+        clearTimeout(timer);
+        if (!token.isAlive()) return;
+        timer = setTimeout(() => {
+            timer = undefined;
+            const merged = pending;
+            pending = undefined;
+            if (token.isAlive() && merged) handler(merged);
+        }, options.delayMs ?? 400);
+    }, { token });
+    token.onDispose(() => {
+        clearTimeout(timer);
+        timer = undefined;
+        pending = undefined;
+        unsubscribe();
+    });
+    return token.invalidate;
+}
+
+export const LVCT_PERSON_NAVIGATION = "lvct-person-navigation";
+export interface PersonNavigationRequest {
+    docId: string;
+    source: "document";
+    trigger?: HTMLElement;
+}
+const pendingPersonNavigation = new WeakMap<object, { request: PersonNavigationRequest; token?: LifecycleToken; detach?: () => void }>();
+
+export function requestPersonNavigation(owner: object, request: PersonNavigationRequest, token?: LifecycleToken): void {
+    if (!isNavigationDocId(request.docId) || request.source !== "document" || token && !token.isAlive()) return;
+    pendingPersonNavigation.get(owner)?.detach?.();
+    const entry = { request, token, detach: undefined as (() => void) | undefined };
+    pendingPersonNavigation.set(owner, entry);
+    entry.detach = token?.onDispose(() => {
+        if (pendingPersonNavigation.get(owner) === entry) pendingPersonNavigation.delete(owner);
+    });
+    window.dispatchEvent(new CustomEvent(LVCT_PERSON_NAVIGATION, { detail: { owner } }));
+}
+
+export function subscribePersonNavigation(owner: object, handler: (request: PersonNavigationRequest) => void, parentToken?: LifecycleToken): () => void {
+    const token = createLifecycleToken(parentToken);
+    const deliver = () => {
+        if (!token.isAlive()) return;
+        const entry = pendingPersonNavigation.get(owner);
+        if (!entry || entry.token && !entry.token.isAlive()) return;
+        pendingPersonNavigation.delete(owner);
+        entry.detach?.();
+        handler(entry.request);
+    };
+    const wrapped = (event: Event) => {
+        if ((event as CustomEvent<{ owner?: object }>).detail?.owner === owner) deliver();
+    };
+    if (token.isAlive()) window.addEventListener(LVCT_PERSON_NAVIGATION, wrapped);
+    token.onDispose(() => window.removeEventListener(LVCT_PERSON_NAVIGATION, wrapped));
+    deliver();
+    return token.invalidate;
 }

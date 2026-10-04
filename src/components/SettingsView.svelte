@@ -7,14 +7,22 @@
     import StatusNotice from "./StatusNotice.svelte";
     import { SlidersHorizontal, Database, Bell, Sparkles, Plug, Info } from "@lucide/svelte";
     import { translateText } from "../domain/translation";
-    import { DEFAULT_VIEW_PREFERENCES } from "../domain/preferences";
+    import { DEFAULT_VIEW_PREFERENCES, normalizeViewPreferences } from "../domain/preferences";
+    import { rebasePreferenceDraft } from "../domain/preferences-concurrency";
+    import { savePreferenceChanges } from "../services/preferences";
+    import { onDestroy, untrack, tick } from "svelte";
     import pluginManifest from "../../plugin.json";
-    import type { FieldMapPatch, SettingsAnchorPatch, SettingsHealth } from "../services/settings-health";
-    import type { AnchorCandidate } from "../services/init";
+    import type { FieldMapPatch, FieldRebuildPreview, SettingsRebindPreview, SettingsAnchorPatch, SettingsHealth } from "../services/settings-health";
+    import type { AnchorCandidate, AnchorScanResult } from "../services/init";
     import type { ExportSummary } from "../services/export-center";
     import type { InteractionImportDiff } from "../domain/interaction-backup";
-    import type { AuditIssue, AuditIssueKind } from "../domain/health-audit";
+    import type { HealthAuditReport } from "../domain/health-audit";
+    import ReviewReportDialog from "./dashboard/ReviewReportDialog.svelte";
     import type { ReminderDismissal } from "../domain/reminder-dismissals";
+    import { subscribeDataChanged } from "../libs/data-events";
+    import type { SelfIdentityChangePreview } from "../domain/self-identity";
+    import OrgProjectionRepair from "./org/OrgProjectionRepair.svelte";
+    import type { MigrationImportResult } from "../services/migration-bundle";
 
     let {
         facade,
@@ -60,6 +68,12 @@
     let selfDesignateTarget = $state("");
     let selfBusy = $state(false);
     let selfMessage = $state("");
+    let selfReadError = $state("");
+    let selfPreview: SelfIdentityChangePreview | null = $state(null);
+    let selfAlive = true;
+    let selfReadRequest = 0;
+    let selfPreviewElement: HTMLElement | undefined = $state();
+    onDestroy(() => { selfAlive = false; selfReadRequest += 1; });
     let selfRoster: import("../domain/person").ContactSummary[] = $state([]);
     const selfDisplayName = $derived.by(() => {
         const identity = selfIdentity;
@@ -68,59 +82,100 @@
         return person ? person.name : identity.selfDocId;
     });
     const designationCandidates = $derived(
-        selfRoster.filter((person) => !selfIdentity || person.docId !== selfIdentity.selfDocId),
+        selfRoster.filter((person) => !selfIdentity || person.docId !== selfIdentity.selfDocId || person.itemId !== selfIdentity.selfItemId),
     );
 
     async function refreshSelfSection() {
-        if (typeof facade.loadSelfIdentity !== "function") return;
+        if (typeof facade.loadSelfIdentity !== "function") {
+            identityLoading = false;
+            return;
+        }
+        identityLoading = true;
+        const request = ++selfReadRequest;
         try {
-            selfIdentity = await facade.loadSelfIdentity();
-            if (typeof facade.listContacts === "function") {
-                selfRoster = await facade.listContacts();
-            }
+            const [identity, roster] = await Promise.all([
+                facade.loadSelfIdentity(), typeof facade.listContacts === "function" ? facade.listContacts() : Promise.resolve([]),
+            ]);
+            if (!selfAlive || request !== selfReadRequest) return;
+            selfIdentity = identity;
+            selfRoster = roster;
+            selfReadError = "";
         } catch (error) {
-            selfMessage = error instanceof Error ? error.message : String(error);
+            if (selfAlive && request === selfReadRequest) selfReadError = error instanceof Error ? error.message : String(error);
+        } finally {
+            if (selfAlive && request === selfReadRequest) identityLoading = false;
         }
     }
     $effect(() => { void refreshSelfSection(); });
+    const unsubscribeSelfChanges = subscribeDataChanged(() => {
+        selfReadRequest += 1;
+        if (!selfBusy) void refreshSelfSection();
+    });
+    onDestroy(unsubscribeSelfChanges);
 
     async function createSelf() {
-        if (selfBusy || typeof facade.createSelfProfile !== "function") return;
+        if (selfBusy || identityLoading || selfReadError || typeof facade.createSelfProfile !== "function") return;
         selfBusy = true;
         selfMessage = "";
         try {
-            selfIdentity = await facade.createSelfProfile();
+            const identity = await facade.createSelfProfile();
+            if (!selfAlive) return;
+            selfIdentity = identity;
             selfMessage = selfIdentity
                 ? text("selfCreated", "已创建本人档案「我自己」并标记身份")
                 : text("selfCreateFailed", "本人档案建立失败，请稍后重试");
             await refreshSelfSection();
         } catch (error) {
-            selfMessage = error instanceof Error ? error.message : String(error);
+            if (selfAlive) selfMessage = error instanceof Error ? error.message : String(error);
         } finally {
-            selfBusy = false;
+            if (selfAlive) selfBusy = false;
         }
     }
 
-    async function designateSelf() {
-        if (selfBusy || !selfDesignateTarget || typeof facade.designateSelfIdentity !== "function") return;
+    async function previewSelf(target: string | null) {
+        if (selfBusy || identityLoading || selfReadError || typeof facade.previewSelfIdentityChange !== "function") return;
         selfBusy = true;
         selfMessage = "";
         try {
-            selfIdentity = await facade.designateSelfIdentity(selfDesignateTarget);
+            const preview = await facade.previewSelfIdentityChange(target);
+            if (!selfAlive) return;
+            selfPreview = preview;
+            await tick();
+            selfPreviewElement?.focus();
+        } catch (error) {
+            if (selfAlive) selfMessage = error instanceof Error ? error.message : String(error);
+        } finally {
+            if (selfAlive) selfBusy = false;
+        }
+    }
+
+    async function confirmSelfChange() {
+        if (selfBusy || !selfPreview) return;
+        selfBusy = true;
+        selfMessage = "";
+        try {
+            const identity = await facade.applySelfIdentityChange(selfPreview);
+            if (!selfAlive) return;
+            selfIdentity = identity;
+            selfPreview = null;
             selfDesignateTarget = "";
-            selfMessage = text("selfDesignated", "本人身份已改绑到所选联系人（原资料保留）");
+            selfMessage = identity ? text("selfDesignated", "本人身份已改绑到所选联系人（原资料保留）")
+                : text("selfCleared", "已清除本人身份，人物档案与历史记录保留");
             await refreshSelfSection();
         } catch (error) {
-            selfMessage = error instanceof Error ? error.message : String(error);
+            if (selfAlive) selfMessage = error instanceof Error ? error.message : String(error);
         } finally {
-            selfBusy = false;
+            if (selfAlive) selfBusy = false;
         }
     }
 
     let checking = $state(false);
     // FUNC-01.4 资料体检：只读巡检，结果按类列出（缺字段/悬空关系/孤儿互动等）
-    let auditIssues: AuditIssue[] | null = $state(null);
+    let auditOpen = $state(false);
     let auditBusy = $state(false);
+    let orgProjectionBusy = $state(false);
+    let auditAlive = true;
+    onDestroy(() => { auditAlive = false; });
     // B08：已暂缓提醒（reminder-dismissals）恢复入口
     let dismissedReminders: ReminderDismissal[] | null = $state(null);
     let dismissalsLoading = $state(false);
@@ -150,47 +205,51 @@
             dismissalsBusy = false;
         }
     }
-    /* C03：可跳转联系人页聚焦的体检类（人物 itemIds 语义）；孤儿互动/不可达跟进是 docId 语义，不跳转 */
-    const jumpableAuditKinds: ReadonlySet<AuditIssueKind> = new Set([
-        "missingPhone", "missingBirthday", "missingContact", "noGroupNoTags", "suspiciousBirthday", "danglingRelation", "longInactive",
-    ]);
-    const auditJumpLabels: Partial<Record<AuditIssueKind, string>> = {
-        missingPhone: "缺电话",
-        missingBirthday: "缺生日",
-        missingContact: "缺全部联系方式",
-        noGroupNoTags: "无分组且无标签",
-        suspiciousBirthday: "可疑生日",
-        danglingRelation: "悬空关系",
-    };
     let rebuilding = $state(false);
+    let rebuildPreview = $state.raw<FieldRebuildPreview | null>(null);
+    let rebindPreview = $state.raw<SettingsRebindPreview | null>(null);
+    let rebuildPreviewElement: HTMLElement | undefined = $state();
+    let rebindPreviewElement: HTMLElement | undefined = $state();
     let savingPreferences = $state(false);
     let preferencesMessage = $state("");
     let rebinding = $state(false);
     let rebindOpen = $state(false);
     // FUNC-01.8 锚点找回：全库只读扫描候选，选中后填入手填框，提交仍走既有验证路径
     let anchorCandidates: AnchorCandidate[] | null = $state(null);
+    let anchorScan: AnchorScanResult | null = $state(null);
     let scanningAnchors = $state(false);
     let selectedCandidateKey = $state("");
     function candidateKey(candidate: AnchorCandidate): string {
         return `${candidate.notebookId}/${candidate.hostDocId}/${candidate.dbBlockId}/${candidate.avId}`;
     }
-    async function runAnchorScan() {
+    function mergeAnchorCandidates(previous: readonly AnchorCandidate[], incoming: readonly AnchorCandidate[]): AnchorCandidate[] {
+        const merged = new Map<string, AnchorCandidate>();
+        for (const candidate of [...previous, ...incoming]) merged.set(candidateKey(candidate), candidate);
+        return [...merged.values()].sort((left, right) => right.matchedFields - left.matchedFields);
+    }
+    async function runAnchorScan(resume = false) {
         if (scanningAnchors) return;
+        const cursor = resume ? anchorScan?.cursor : null;
+        if (resume && !cursor) return;
         scanningAnchors = true;
         errorText = "";
         try {
-            anchorCandidates = await facade.scanAnchorCandidates();
-            selectedCandidateKey = "";
+            const result = await facade.scanAnchorCandidates(cursor ? { cursor } : undefined);
+            if (!selfAlive) return;
+            anchorScan = result;
+            anchorCandidates = mergeAnchorCandidates(resume ? (anchorCandidates ?? []) : [], result.candidates);
+            if (!resume) selectedCandidateKey = "";
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            if (selfAlive) errorText = error instanceof Error ? error.message : String(error);
         } finally {
-            scanningAnchors = false;
+            if (selfAlive) scanningAnchors = false;
         }
     }
     function applySelectedCandidate() {
         const picked = (anchorCandidates ?? []).find((candidate) => candidateKey(candidate) === selectedCandidateKey);
         if (!picked) return;
-        anchorDraft = { hostDocId: picked.hostDocId, dbBlockId: picked.dbBlockId, avId: picked.avId };
+        anchorDraft = { notebookId: picked.notebookId, hostDocId: picked.hostDocId, dbBlockId: picked.dbBlockId, avId: picked.avId };
+        rebindPreview = null;
         rebindMessage = `已填入「${picked.notebookName}」的候选锚点，确认后点「验证并重新绑定」。`;
     }
     let rebindMessage = $state("");
@@ -200,7 +259,9 @@
     let rosterExportMessage = $state("");
     let exportSummary: ExportSummary | null = $state(null);
     let loadingSummary = $state(false);
+    let summaryError = $state("");
     let summaryRequest = 0;
+    onDestroy(() => { summaryRequest += 1; });
     // 跟进事项导出与合并恢复（F05）
     let exportingFollowUps = $state(false);
     let followUpsExportMessage = $state("");
@@ -226,8 +287,23 @@
     let draft: ViewPreferences = $state({ ...preferences });
     // svelte-ignore state_referenced_locally
     let savedDraft: ViewPreferences = $state({ ...preferences });
+    let preferencesAlive = true;
+    let preferencesRequest = 0;
+    $effect(() => {
+        const latest = preferences;
+        untrack(() => {
+            if (latest.revision < savedDraft.revision) return;
+            draft = rebasePreferenceDraft(latest, draft, savedDraft);
+            savedDraft = normalizeViewPreferences(latest);
+        });
+    });
+    onDestroy(() => {
+        preferencesAlive = false;
+        preferencesRequest += 1;
+    });
     // svelte-ignore state_referenced_locally
     let anchorDraft: SettingsAnchorPatch = $state({
+        notebookId: settings.notebookId,
         hostDocId: settings.hostDocId,
         dbBlockId: settings.dbBlockId,
         avId: settings.avId,
@@ -235,14 +311,18 @@
     let errorText = $state("");
     const guardedClose = useCloseGuard({
         /* CODE-02.1：全部挂起类操作（偏好/重绑/映射/互动与迁移导入导出/扫描/字段重建/体检/提醒恢复）期间不关 */
-        busy: () => savingPreferences || rebinding || mappingBusy || importingInteractions || previewingImport
-            || scanningAnchors || rebuilding || auditBusy || checking || dismissalsBusy
-            || exportingInteractions || exportingRoster || exportingFollowUps || exportingBundle
+        busy: () => identityLoading || selfBusy || checking || auditBusy || orgProjectionBusy || dismissalsLoading || dismissalsBusy
+            || savingPreferences || rebinding || mappingBusy || importingInteractions || previewingImport
+            || scanningAnchors || rebuilding
+            || loadingSummary || exportingInteractions || exportingRoster || exportingFollowUps || exportingBundle
             || previewingBundle || importingBundle || fuPreviewing || fuImporting,
-        dirty: () => JSON.stringify(draft) !== JSON.stringify(savedDraft) || importText.trim().length > 0,
+        dirty: () => JSON.stringify(draft) !== JSON.stringify(savedDraft) || importText.trim().length > 0 || selfPreview !== null
+            || rebuildPreview !== null || rebindPreview !== null,
         changes: () => [
             ...(JSON.stringify(draft) !== JSON.stringify(savedDraft) ? [text("guardPrefsDraft", "显示偏好尚未保存")] : []),
             ...(importText.trim().length > 0 ? [text("guardImportTextDraft", "互动合并输入尚未处理")] : []),
+            ...(selfPreview ? [text("selfPreviewPending", "本人身份修复预览尚未确认")] : []),
+            ...(rebuildPreview || rebindPreview ? ["设置修复预览尚未确认"] : []),
         ],
     });
 
@@ -260,24 +340,30 @@
         checking = true;
         errorText = "";
         try {
-            setHealth(await facade.checkSettingsHealth());
+            const next = await facade.checkSettingsHealth();
+            if (selfAlive) setHealth(next);
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            if (selfAlive) { health = null; errorText = error instanceof Error ? error.message : String(error); }
         } finally {
-            checking = false;
+            if (selfAlive) checking = false;
         }
     }
 
-    async function runDataAudit() {
-        if (auditBusy) return;
+    async function runDataAudit(previous?: HealthAuditReport): Promise<HealthAuditReport> {
         auditBusy = true;
-        errorText = "";
         try {
-            auditIssues = await facade.runHealthAudit();
-        } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            return await facade.runHealthAuditReport(previous);
         } finally {
-            auditBusy = false;
+            if (auditAlive) auditBusy = false;
+        }
+    }
+
+    async function retryDataAudit(previous: HealthAuditReport): Promise<HealthAuditReport> {
+        auditBusy = true;
+        try {
+            return await facade.retryFailedHealthAuditModules(previous);
+        } finally {
+            if (auditAlive) auditBusy = false;
         }
     }
 
@@ -286,68 +372,114 @@
         rebuilding = true;
         errorText = "";
         try {
-            const updated = await facade.rebuildMissingFields();
-            onSettingsUpdated(updated);
-            setHealth(await facade.checkSettingsHealth());
+            const preview = await facade.previewMissingFields();
+            if (!selfAlive) return;
+            rebuildPreview = preview;
+            await tick();
+            if (selfAlive) rebuildPreviewElement?.focus();
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            if (selfAlive) errorText = error instanceof Error ? error.message : String(error);
         } finally {
-            rebuilding = false;
+            if (selfAlive) rebuilding = false;
+        }
+    }
+
+    async function confirmRebuild() {
+        if (rebuilding || !rebuildPreview) return;
+        rebuilding = true;
+        errorText = "";
+        try {
+            const updated = await facade.rebuildMissingFields(rebuildPreview);
+            if (!selfAlive) return;
+            onSettingsUpdated(updated);
+            rebuildPreview = null;
+            const next = await facade.checkSettingsHealth();
+            if (selfAlive) setHealth(next);
+        } catch (error) {
+            if (selfAlive) errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            if (selfAlive) rebuilding = false;
         }
     }
 
     async function savePreferences() {
         if (savingPreferences) return;
+        const request = ++preferencesRequest;
+        const submitted = normalizeViewPreferences(draft);
+        const baseline = normalizeViewPreferences(savedDraft);
         savingPreferences = true;
         errorText = "";
         preferencesMessage = "";
         try {
-            const updated = await facade.saveViewPreferences(draft);
-            draft = { ...updated };
-            savedDraft = { ...updated };
-            onPreferencesUpdated(updated);
-            preferencesMessage = "偏好已保存";
+            const updated = await savePreferenceChanges(facade, submitted, baseline);
+            if (!preferencesAlive || request !== preferencesRequest) return;
+            const latest = preferences.revision > updated.revision ? preferences : updated;
+            draft = rebasePreferenceDraft(latest, draft, submitted);
+            savedDraft = normalizeViewPreferences(latest);
+            onPreferencesUpdated(latest);
+            preferencesMessage = JSON.stringify(draft) === JSON.stringify(savedDraft) ? "偏好已保存" : "本次偏好已保存，后续修改仍未保存";
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            if (preferencesAlive && request === preferencesRequest) errorText = error instanceof Error ? error.message : String(error);
         } finally {
-            savingPreferences = false;
+            if (preferencesAlive && request === preferencesRequest) savingPreferences = false;
         }
     }
 
     async function runRebind() {
         if (rebinding) return;
-        if (!window.confirm("将切换插件当前使用的数据锚点。请确认这三个 ID 指向已有联系人数据库，继续吗？")) return;
         rebinding = true;
         errorText = "";
         rebindMessage = "";
         try {
-            const updated = await facade.rebindSettings({ ...anchorDraft });
+            const preview = await facade.previewRebindSettings({ ...anchorDraft });
+            if (!selfAlive) return;
+            rebindPreview = preview;
+            await tick();
+            if (selfAlive) rebindPreviewElement?.focus();
+        } catch (error) {
+            if (selfAlive) errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            if (selfAlive) rebinding = false;
+        }
+    }
+
+    async function confirmRebind() {
+        if (rebinding || !rebindPreview) return;
+        rebinding = true;
+        errorText = "";
+        try {
+            const updated = await facade.rebindSettings({ ...anchorDraft }, rebindPreview);
+            if (!selfAlive) return;
             anchorDraft = {
+                notebookId: updated.notebookId,
                 hostDocId: updated.hostDocId,
                 dbBlockId: updated.dbBlockId,
                 avId: updated.avId,
             };
             onSettingsUpdated(updated);
-            setHealth(await facade.checkSettingsHealth());
+            rebindPreview = null;
+            const next = await facade.checkSettingsHealth();
+            if (!selfAlive) return;
+            setHealth(next);
             rebindMessage = "锚点已更新，已重新检查字段健康状态";
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            if (selfAlive) errorText = error instanceof Error ? error.message : String(error);
         } finally {
-            rebinding = false;
+            if (selfAlive) rebinding = false;
         }
     }
 
     async function refreshExportSummary() {
         const request = ++summaryRequest;
         loadingSummary = true;
+        summaryError = "";
         try {
             const summary = await facade.loadExportSummary();
-            if (request === summaryRequest) exportSummary = summary;
+            if (selfAlive && request === summaryRequest) exportSummary = summary;
         } catch {
-            // 数量仅辅助展示；读取失败降级为不显示，不阻塞导出动作
-            if (request === summaryRequest) exportSummary = null;
+            if (selfAlive && request === summaryRequest) { exportSummary = null; summaryError = "导出数量尚未核实，统计读取失败；可重新读取或执行导出核实数据。"; }
         } finally {
-            if (request === summaryRequest) loadingSummary = false;
+            if (selfAlive && request === summaryRequest) loadingSummary = false;
         }
     }
 
@@ -377,13 +509,16 @@
         }
     }
 
-    // C08/FUNC-01.6：完整迁移包（六模块）导出与恢复
     let exportingBundle = $state(false);
-    let bundlePreview: { key: string; label: string; count: number }[] | null = $state(null);
+    let bundlePreview: { key: string; label: string; count: number; tombstones?: number }[] | null = $state(null);
     let bundlePreviewText = "";
     let previewingBundle = $state(false);
     let importingBundle = $state(false);
     let bundleMessage = $state("");
+    let bundleResult: MigrationImportResult | null = $state(null);
+    let bundleRequest = 0;
+    let bundleResultElement: HTMLElement | undefined = $state();
+    onDestroy(() => { bundleRequest += 1; });
 
     async function runExportBundle() {
         if (exportingBundle) return;
@@ -395,10 +530,10 @@
             const url = URL.createObjectURL(blob);
             const anchor = document.createElement("a");
             anchor.href = url;
-            anchor.download = `小驴人脉_完整迁移包_${new Date().toISOString().slice(0, 10)}.json`;
+            anchor.download = `小驴人脉_插件数据迁移包_${new Date().toISOString().slice(0, 10)}.json`;
             anchor.click();
             URL.revokeObjectURL(url);
-            bundleMessage = "完整迁移包已导出（不含思源原生数据与锚点，非字节级备份）";
+            bundleMessage = "插件数据迁移包已导出（含账本、别名、本人身份、组织成员和关系称谓；思源原生文档需另行备份）";
         } catch (error) {
             errorText = error instanceof Error ? error.message : String(error);
         } finally {
@@ -409,42 +544,72 @@
         const input = event.currentTarget as HTMLInputElement;
         const file = input.files?.[0];
         if (!file) return;
+        const request = ++bundleRequest;
+        bundleResult = null;
         bundlePreview = null;
         previewingBundle = true;
         bundleMessage = "";
         const reader = new FileReader();
         reader.onload = async () => {
             try {
-                bundlePreviewText = String(reader.result ?? "");
-                bundlePreview = await facade.previewMigrationImport(bundlePreviewText);
+                const text = String(reader.result ?? "");
+                const preview = await facade.previewMigrationImport(text);
+                if (!selfAlive || request !== bundleRequest) return;
+                bundlePreviewText = text;
+                bundlePreview = preview;
             } catch (error) {
+                if (!selfAlive || request !== bundleRequest) return;
                 bundleMessage = error instanceof Error ? error.message : String(error);
                 bundlePreview = [];
             } finally {
-                previewingBundle = false;
+                if (selfAlive && request === bundleRequest) previewingBundle = false;
             }
+        };
+        reader.onerror = () => {
+            if (!selfAlive || request !== bundleRequest) return;
+            bundleMessage = "迁移包文件读取失败，请重新选择文件";
+            bundlePreviewText = "";
+            bundlePreview = null;
+            previewingBundle = false;
         };
         reader.readAsText(file);
         input.value = "";
     }
     async function runImportBundle(): Promise<void> {
         if (importingBundle || !bundlePreviewText) return;
+        const request = ++bundleRequest;
         importingBundle = true;
         try {
             const result = await facade.importMigrationBundle(bundlePreviewText);
+            if (!selfAlive || request !== bundleRequest) return;
+            bundleResult = result;
             const summary = result.modules.map((module) => `${module.label} +${module.merged}`).join("、") || "没有可合并的模块";
             /* FUNC-01.6-b：失败模块必须可见（指名模块与原因），不把部分失败报成整包成功 */
             const failedNote = result.failed.length > 0
                 ? `；恢复失败模块：${result.failed.map((module) => `${module.label}（${module.message}）`).join("、")}`
                 : "";
-            bundleMessage = `迁移恢复完成：${summary}${result.skipped.interactions + result.skipped.followUps > 0 ? `（现状优先跳过 ${result.skipped.interactions + result.skipped.followUps} 条）` : ""}${failedNote}`;
-            bundlePreview = null;
-            bundlePreviewText = "";
+            const issuesNote = result.issues.length > 0
+                ? `；待处理：${result.issues.map((entry) => `${entry.label} ${entry.id}（人物 ${entry.personDocId}${entry.orgDocId ? `，组织 ${entry.orgDocId}` : ""}${entry.selfDocId ? `，本人 ${entry.selfDocId}` : ""}；${entry.message}）`).join("、")}`
+                : "";
+            const skipped = result.skipped.interactions + result.skipped.followUps
+                + result.modules.reduce((total, module) => total + (module.skipped ?? 0), 0);
+            const removed = result.modules.reduce((total, module) => total + (module.removed ?? 0), 0);
+            const prefix = result.failed.length > 0 || result.issues.length > 0 ? "迁移恢复待核实" : "迁移恢复完成";
+            bundleMessage = `${prefix}：${summary}${skipped > 0 ? `（跳过 ${skipped} 条）` : ""}${removed > 0 ? `；删除标记移除 ${removed} 条` : ""}${failedNote}${issuesNote}`;
+            bundlePreviewText = result.retryBundle ?? "";
+            const next = result.retryBundle ? await facade.previewMigrationImport(result.retryBundle) : null;
+            if (!selfAlive || request !== bundleRequest) return;
+            bundlePreview = next;
             onInteractionsUpdated();
         } catch (error) {
+            if (!selfAlive || request !== bundleRequest) return;
             bundleMessage = error instanceof Error ? error.message : String(error);
         } finally {
-            importingBundle = false;
+            if (selfAlive && request === bundleRequest) {
+                importingBundle = false;
+                await tick();
+                if (selfAlive && request === bundleRequest) bundleResultElement?.focus();
+            }
         }
     }
 
@@ -623,7 +788,8 @@
                     class="lvct-settings__nav-item"
                     class:lvct-settings__nav-item--active={activeSection === section.id}
                     aria-current={activeSection === section.id ? "page" : undefined}
-                    onclick={() => (activeSection = section.id)}
+                    disabled={auditBusy || orgProjectionBusy}
+                    onclick={() => { if (!auditBusy && !orgProjectionBusy) activeSection = section.id; }}
                 >
                     <span aria-hidden="true">
                         {#if section.id === "general"}<SlidersHorizontal size={16}/>
@@ -661,29 +827,49 @@
                         </div>
                         {#if identityLoading}
                             <span class="lvct-settings__status">…</span>
+                        {:else if selfReadError}
+                            <span class="lvct-settings__status">{text("selfUnknown", "本人身份尚未核实")}</span>
                         {:else if selfIdentity}
                             <span class="lvct-settings__status">{selfDisplayName}</span>
                         {:else}
-                            <button class="b3-button b3-button--text" disabled={selfBusy} onclick={createSelf}>
+                            <button class="b3-button b3-button--text" disabled={selfBusy || selfPreview !== null} onclick={createSelf}>
                                 {selfBusy ? "…" : text("selfCreate", "创建本人档案「我自己」")}</button>
                         {/if}
                     </div>
-                    {#if selfIdentity}
+                    {#if !identityLoading && !selfReadError && typeof facade.previewSelfIdentityChange === "function"}
                         <div class="lvct-settings__row">
                             <span>{text("selfDesignateLabel", "把本人身份改绑到其他已有联系人（保留原资料）")}</span>
                             <span>
-                                <select class="b3-select" bind:value={selfDesignateTarget}>
+                                <select class="b3-select" aria-label={text("selfDesignatePick", "选择联系人…")} bind:value={selfDesignateTarget} disabled={selfBusy || selfPreview !== null}>
                                     <option value="">{text("selfDesignatePick", "选择联系人…")}</option>
                                     {#each designationCandidates as person (person.itemId)}
-                                        <option value={person.itemId}>{person.name}</option>
+                                        <option value={person.itemId}>{person.name} · {person.group || person.phone || person.docId} · {person.docId}</option>
                                     {/each}
                                 </select>
-                                <button class="b3-button b3-button--outline" disabled={selfBusy || !selfDesignateTarget}
-                                    onclick={designateSelf}>{text("selfDesignate", "改绑本人身份")}</button>
+                                <button class="b3-button b3-button--outline" disabled={selfBusy || !selfDesignateTarget || selfPreview !== null}
+                                    onclick={() => void previewSelf(selfDesignateTarget)}>{text("selfPreviewChange", "预览指定本人")}</button>
+                                {#if selfIdentity}
+                                    <button class="b3-button b3-button--text" disabled={selfBusy || selfPreview !== null} onclick={() => void previewSelf(null)}>{text("selfPreviewClear", "预览清除本人身份")}</button>
+                                {/if}
                             </span>
                         </div>
-                        {#if selfMessage}<div class="lvct-form__error" role="status">{selfMessage}</div>{/if}
                     {/if}
+                    {#if selfReadError}
+                        <div class="lvct-form__error" role="alert">{selfReadError}</div>
+                        <button class="b3-button b3-button--text" disabled={identityLoading || selfBusy} onclick={() => void refreshSelfSection()}>{text("selfRetryRead", "重新核实本人身份")}</button>
+                    {/if}
+                    {#if selfPreview}
+                        <section class="lvct-settings__rebind" tabindex="-1" bind:this={selfPreviewElement} aria-label={text("selfChangePreview", "本人身份影响预览")}>
+                            <b>{text("selfChangePreview", "本人身份影响预览")}</b>
+                            <p>{selfPreview.previousName} → {selfPreview.target?.name ?? text("selfNone", "未指定本人")}</p>
+                            <p class="ft__smaller">{selfPreview.target?.docId ?? selfPreview.previous?.selfDocId}</p>
+                            <p>{text("selfOrdinaryScope", "普通联系人统计范围")}: {selfPreview.ordinaryBefore} → {selfPreview.ordinaryAfter}</p>
+                            <p>{text("selfChangeImpact", "生日、待联系和普通资料体检将排除新本人；图谱默认中心随本人变化，清除后需手动选择。原人物资料、互动、成员与历史称谓保留，不自动转移到新本人。")}</p>
+                            <button class="b3-button" disabled={selfBusy} onclick={confirmSelfChange}>{selfBusy ? text("selfVerifying", "核实并保存中…") : text("selfConfirmChange", "确认本人身份变更")}</button>
+                            <button class="b3-button b3-button--text" disabled={selfBusy} onclick={() => { selfPreview = null; selfMessage = ""; }}>{text("selfCancelPreview", "取消本人预览")}</button>
+                        </section>
+                    {/if}
+                    {#if selfMessage}<div class="lvct-form__error" role="status">{selfMessage}</div>{/if}
 
                     <div class="lvct-settings__form-grid">
                         <label class="lvct-form__item">
@@ -751,38 +937,87 @@
                         <div class="lvct-settings__rebind">
                             <p>仅在迁移或恢复了已有数据库时使用。提交前会验证属性视图并按原 ID 或标准字段名恢复映射，剩余缺失字段可再通过健康检查补建。</p>
                             <div class="lvct-settings__actions">
-                                <button class="b3-button b3-button--outline" onclick={runAnchorScan} disabled={scanningAnchors}>{scanningAnchors ? "扫描中…" : "扫描全库候选（只读）"}</button>
+                                <button class="b3-button b3-button--outline" onclick={() => void runAnchorScan()} disabled={scanningAnchors}>{scanningAnchors ? "扫描中…" : "扫描全库候选（只读）"}</button>
                                 <span class="ft__smaller ft__on-surface">当前绑定：文档 …{settings.hostDocId.slice(-6)} · 块 …{settings.dbBlockId.slice(-6)} · 视图 …{settings.avId.slice(-6)}（填错可按此改回）</span>
                             </div>
-                            {#if anchorCandidates !== null}
-                                {#if anchorCandidates.length === 0}
-                                    <p class="lvct-settings__inline-hint" role="status">全库未找到「联系人总表」文档及数据库块。确认笔记本未被删除后，可手动粘贴 ID；扫描零写入，不会自动创建第二套数据。</p>
-                                {:else}
+                            {#if anchorScan !== null}
+                                <p class="lvct-settings__inline-hint" role={anchorScan.status === "blocked" ? "alert" : "status"}>
+                                    {#if anchorScan.status === "complete"}
+                                        扫描完成：已检查 {anchorScan.progress.documentsScanned} / {anchorScan.progress.totalDocuments ?? "未知"} 篇文档，找到 {anchorCandidates?.length ?? 0} 个候选。
+                                    {:else if anchorScan.status === "truncated"}
+                                        本轮已检查 {anchorScan.progress.documentsScannedThisCall} 篇，累计 {anchorScan.progress.documentsScanned} / {anchorScan.progress.totalDocuments ?? "未知"} 篇文档，达到单次上限 {anchorScan.progress.maxDocuments}；候选已保留，请点击“继续扫描”查看剩余范围。
+                                    {:else}
+                                        扫描在第 {anchorScan.progress.documentsScanned} 篇文档处暂停，读取结果未知；没有自动绑定或写入，请修复原因后重试当前位置。
+                                    {/if}
+                                </p>
+                                <p class="lvct-settings__inline-hint">扫描期间新增或移动的文档，可能需要重新扫描才能完整核实。</p>
+                                {#if anchorScan.issues.length > 0}
                                     <ul class="lvct-settings__missing">
-                                        {#each anchorCandidates as candidate (candidateKey(candidate))}
-                                            <li>
-                                                <label class="lvct-settings__candidate">
-                                                    <input type="radio" name="lvct-anchor-candidate" value={candidateKey(candidate)} bind:group={selectedCandidateKey} />
-                                                    <span>{candidate.notebookName} / {candidate.hpath || "/"} · 可对回字段 {candidate.matchedFields}/9</span>
-                                                    <small class="ft__smaller ft__on-surface">文档 …{candidate.hostDocId.slice(-6)} · 块 …{candidate.dbBlockId.slice(-6)}</small>
-                                                </label>
-                                            </li>
+                                        {#each anchorScan.issues as issue}
+                                            <li><small class="ft__smaller ft__on-surface">{issue.notebookName}：{issue.message}</small></li>
                                         {/each}
                                     </ul>
+                                {/if}
+                                {#if anchorScan.status !== "complete" && anchorScan.cursor}
                                     <div class="lvct-settings__actions">
-                                        <button class="b3-button b3-button--outline" disabled={!selectedCandidateKey} onclick={applySelectedCandidate}>填入所选候选</button>
+                                        <button class="b3-button b3-button--outline" onclick={() => void runAnchorScan(true)} disabled={scanningAnchors}>
+                                            {scanningAnchors ? "扫描中…" : anchorScan.status === "blocked" ? "重试当前位置" : "继续扫描"}
+                                        </button>
                                     </div>
+                                {/if}
+                                {#if anchorCandidates !== null}
+                                    {#if anchorCandidates.length === 0}
+                                        <p class="lvct-settings__inline-hint" role="status">
+                                            {anchorScan.status === "complete"
+                                                ? "全库未找到「联系人总表」文档及数据库块。确认笔记本未被删除后，可手动粘贴 ID；扫描零写入，不会自动创建第二套数据。"
+                                                : "当前扫描范围暂未找到候选；扫描尚未完成，继续后仍会检查剩余文档。"}
+                                        </p>
+                                    {:else}
+                                        <ul class="lvct-settings__missing">
+                                            {#each anchorCandidates as candidate (candidateKey(candidate))}
+                                                <li>
+                                                    <label class="lvct-settings__candidate">
+                                                        <input type="radio" name="lvct-anchor-candidate" value={candidateKey(candidate)} bind:group={selectedCandidateKey} />
+                                                        <span>{candidate.notebookName} / {candidate.hpath || "/"} · 可对回字段 {candidate.matchedFields}/9</span>
+                                                        <small class="ft__smaller ft__on-surface">文档 …{candidate.hostDocId.slice(-6)} · 块 …{candidate.dbBlockId.slice(-6)}</small>
+                                                    </label>
+                                                </li>
+                                            {/each}
+                                        </ul>
+                                        <div class="lvct-settings__actions">
+                                            <button class="b3-button b3-button--outline" disabled={!selectedCandidateKey} onclick={applySelectedCandidate}>填入所选候选</button>
+                                        </div>
+                                    {/if}
                                 {/if}
                             {/if}
                             <div class="lvct-settings__rebind-grid">
-                                <label class="lvct-form__item"><span>宿主文档 ID</span><input class="b3-text-field fn__block" bind:value={anchorDraft.hostDocId} /></label>
-                                <label class="lvct-form__item"><span>数据库块 ID</span><input class="b3-text-field fn__block" bind:value={anchorDraft.dbBlockId} /></label>
-                                <label class="lvct-form__item"><span>属性视图 ID</span><input class="b3-text-field fn__block" bind:value={anchorDraft.avId} /></label>
+                                <label class="lvct-form__item"><span>笔记本 ID</span><input class="b3-text-field fn__block" bind:value={anchorDraft.notebookId} disabled={rebinding || !!rebindPreview} /></label>
+                                <label class="lvct-form__item"><span>宿主文档 ID</span><input class="b3-text-field fn__block" bind:value={anchorDraft.hostDocId} disabled={rebinding || !!rebindPreview} /></label>
+                                <label class="lvct-form__item"><span>数据库块 ID</span><input class="b3-text-field fn__block" bind:value={anchorDraft.dbBlockId} disabled={rebinding || !!rebindPreview} /></label>
+                                <label class="lvct-form__item"><span>属性视图 ID</span><input class="b3-text-field fn__block" bind:value={anchorDraft.avId} disabled={rebinding || !!rebindPreview} /></label>
                             </div>
                             <div class="lvct-settings__actions">
                                 <button class="b3-button b3-button--outline" onclick={runRebind} disabled={rebinding}>{rebinding ? "验证并保存中…" : "验证并重新绑定"}</button>
                                 <StatusNotice message={rebindMessage} onDismiss={() => (rebindMessage = "")} />
                             </div>
+                            {#if rebindPreview}
+                                <section class="lvct-settings__rebind" tabindex="-1" bind:this={rebindPreviewElement} aria-label="数据库重绑影响预览">
+                                    <b>数据库重绑影响预览（只读）</b>
+                                    <p>目标：{rebindPreview.notebookName} / {rebindPreview.hostDocName} · 已核实 {rebindPreview.matchedFields} 项字段。</p>
+                                    <p>当前笔记本：{rebindPreview.previous.notebookId} · 当前文档：{rebindPreview.previous.hostDocId}</p>
+                                    <p>当前数据库块：{rebindPreview.previous.dbBlockId} · 当前属性视图：{rebindPreview.previous.avId}</p>
+                                    <p>目标笔记本：{rebindPreview.target.notebookId} · 目标文档：{rebindPreview.target.hostDocId}</p>
+                                    <p>目标数据库块：{rebindPreview.target.dbBlockId} · 目标属性视图：{rebindPreview.target.avId}</p>
+                                    <p>确认后联系人列表和字段写入使用目标数据库。人物文档、本人身份、组织成员、互动和往来记录保留原文档 ID；本次不迁移这些资料。</p>
+                                    <details><summary>字段映射影响（{rebindPreview.impacts.filter((impact) => impact.changed).length} 项变化）</summary>
+                                        <ul class="lvct-settings__missing">{#each rebindPreview.impacts as impact (impact.key)}<li>{impact.key}：{impact.previousKeyId || "未映射"} → {impact.targetKeyId}</li>{/each}</ul>
+                                    </details>
+                                    <div class="lvct-settings__actions">
+                                        <button class="b3-button" onclick={confirmRebind} disabled={rebinding}>确认切换数据库</button>
+                                        <button class="b3-button b3-button--cancel" onclick={() => (rebindPreview = null)} disabled={rebinding}>取消重绑预览</button>
+                                    </div>
+                                </section>
+                            {/if}
                         </div>
                     {/if}
 
@@ -791,6 +1026,7 @@
                         {#if loadingSummary}<span class="ft__smaller ft__on-surface">统计中…</span>{/if}
                     </div>
                     <p class="lvct-settings__inline-hint">人物文档与联系人数据库是思源原生数据，随工作区保留；以下两项导出都不是完整备份。</p>
+                    {#if summaryError}<p role="status">{summaryError}</p><button class="b3-button b3-button--text" disabled={loadingSummary} onclick={() => void refreshExportSummary()}>重新读取导出数量</button>{/if}
                     <div class="lvct-settings__row">
                         <div>
                             <b>全量名册 vCard</b>
@@ -825,17 +1061,36 @@
                     </div>
                     <StatusNotice message={followUpsExportMessage} onDismiss={() => (followUpsExportMessage = "")} actionLabel="再次导出" onAction={runExportFollowUps} />
 
-                    <!-- C08/FUNC-01.6：完整迁移包（六模块合一导出与恢复） -->
                     <div class="lvct-settings__row">
                         <div>
-                            <b>完整迁移包</b>
-                            <small>互动 + 跟进 + 节奏 + 提醒暂缓 + 收编索引 + 模板；不含思源原生数据与锚点，非字节级备份</small>
+                            <b>插件数据迁移包</b>
+                            <small>互动、跟进、节奏、提醒暂缓、收编索引、模板、账本、别名和本人身份；包含个人敏感信息，请妥善保管</small>
                         </div>
                         <button class="b3-button b3-button--outline" onclick={runExportBundle} disabled={exportingBundle}>
                             {exportingBundle ? "导出中…" : "导出迁移包"}
                         </button>
                     </div>
-                    <StatusNotice message={bundleMessage} onDismiss={() => (bundleMessage = "")} />
+                    <p class="ft__smaller ft__on-surface">本人身份按原文档 ID 核实当前绑定，不覆盖不同本人；组织成员含任职分类、离职历史及删除标记。关系称谓保留原本人参照和明确空值，不转移给其他本人。人物与组织原文、组织归档状态、数据库及原生任务请另行备份思源工作区；界面偏好与数据库锚点不自动恢复。成员恢复后，可在组织双链核对中预览并逐文档重建关联段落。</p>
+                    <div class="lvct-settings__migration-result" style="overflow-wrap:anywhere" tabindex="-1" bind:this={bundleResultElement} aria-label="迁移模块结果">
+                        <StatusNotice message={bundleMessage} onDismiss={() => (bundleMessage = "")} />
+                        {#if bundleResult}
+                            <ul aria-label="已核实模块">
+                                {#each bundleResult.modules as module (module.key)}
+                                    <li>{module.label}：已核实新增 {module.merged} 条，跳过 {module.skipped ?? 0} 条，删除 {module.removed ?? 0} 条。</li>
+                                {/each}
+                            </ul>
+                            {#if bundleResult.failed.length > 0}<ul aria-label="未完成模块">
+                                {#each bundleResult.failed as module (module.key)}
+                                    <li>{module.label}：{module.status === "unknown" ? "结果未知，先核实" : "失败，可重试"}。{module.message}</li>
+                                {/each}
+                            </ul>{/if}
+                            {#if bundleResult.issues.length > 0}<details><summary>逐项冲突与不可达（{bundleResult.issues.length} 条）</summary>
+                                <ul>{#each bundleResult.issues as issue (issue.key + issue.id)}
+                                    <li>{issue.label} · {issue.id} · 人物 {issue.personDocId}{issue.selfDocId ? ` · 本人 ${issue.selfDocId}` : ""}{issue.orgDocId ? ` · 组织 ${issue.orgDocId}` : ""}：{issue.message}</li>
+                                {/each}</ul>
+                            </details>{/if}
+                        {/if}
+                    </div>
                     <div class="lvct-settings__row">
                         <label for="lvct-migration-bundle"><b>恢复迁移包</b></label>
                         <input id="lvct-migration-bundle" class="b3-text-field lvct-settings__backup-input" type="file" accept=".json,application/json" onchange={selectMigrationBundle} disabled={importingBundle || previewingBundle} />
@@ -844,19 +1099,19 @@
                     {#if bundlePreview && bundlePreview.length > 0}
                         <ul class="lvct-settings__missing">
                             {#each bundlePreview as module (module.key)}
-                                <li>{module.label}：{module.count} 条</li>
+                                <li>{module.label}：{module.count} 条{module.tombstones ? `，删除标记 ${module.tombstones} 条` : ""}</li>
                             {/each}
                         </ul>
                         <div class="lvct-settings__actions">
                             <button class="b3-button b3-button--outline" onclick={runImportBundle} disabled={importingBundle}>
-                                {importingBundle ? "恢复中…" : "确认恢复（现状优先合并）"}
+                                {importingBundle ? "恢复中…" : bundleMessage ? "核实并重试未完成模块" : "确认恢复（现状优先合并）"}
                             </button>
                         </div>
                     {:else if bundlePreview !== null && !previewingBundle && !bundleMessage}
                         <p class="lvct-settings__inline-hint" role="status">迁移包为空或没有可恢复的模块。</p>
                     {/if}
                     {#if bundlePreview && bundlePreview.length > 0}
-                        <p class="ft__smaller ft__on-surface">恢复后跟进会同步收敛人物文档任务块（文档为准的对账在下次详情打开时执行），不产生重复任务。</p>
+                        <p class="ft__smaller ft__on-surface">先恢复人物与组织原文并重绑数据库；按双方文档 ID 核对，不按姓名自动关联。别名与成员删除标记优先，旧包不会复活已删除记录。只恢复成员事实，关联段落需另行预览重建；未核实项会保留供手动重试。</p>
                     {/if}
 
                     <div class="lvct-settings__row">
@@ -975,35 +1230,35 @@
                                 <span class="ft__smaller ft__on-surface">只补建缺失列，不修改已有字段或联系人数据。</span>
                             </div>
                         {/if}
+                        {#if rebuildPreview}
+                            <section class="lvct-settings__rebind" tabindex="-1" bind:this={rebuildPreviewElement} aria-label="补列影响预览">
+                                <b>补列影响预览（只读）</b>
+                                <p>数据库：{rebuildPreview.anchors.avId} · 本次核实 {rebuildPreview.missing.length} 项缺失映射。</p>
+                                <ul class="lvct-settings__missing">{#each rebuildPreview.missing as field (field.key)}<li>{field.expectedName} · {field.type} · 原映射 {field.keyId}</li>{/each}</ul>
+                                {#if rebuildPreview.requestId}<p>原请求：{rebuildPreview.requestId}。先核实原列；结果未知时保留断点，不重复建列。</p>{/if}
+                                <p>确认后逐列补建并回读核实，相关人同时核实双向回链。已完成的列保留，失败后重新核实预览再继续。</p>
+                                <div class="lvct-settings__actions">
+                                    <button class="b3-button" onclick={confirmRebuild} disabled={rebuilding}>确认补建并核实</button>
+                                    <button class="b3-button b3-button--outline" onclick={runRebuild} disabled={rebuilding}>重新核实补列预览</button>
+                                    <button class="b3-button b3-button--cancel" onclick={() => (rebuildPreview = null)} disabled={rebuilding}>取消补列预览</button>
+                                </div>
+                            </section>
+                        {/if}
                     {:else}
                         <p class="lvct-settings__inline-hint">建议运行一次检查，确认数据库列没有被删除。</p>
                     {/if}
 
                     <div class="lvct-settings__sub-heading">
                         <b>资料体检（只读巡检）</b>
-                        <button class="b3-button b3-button--outline" onclick={runDataAudit} disabled={auditBusy}>{auditBusy ? "体检中…" : "运行资料体检"}</button>
+                        {#if !auditOpen}<button class="b3-button b3-button--outline" onclick={() => (auditOpen = true)}>运行资料体检</button>{/if}
                     </div>
-                    {#if auditIssues}
-                        {#if auditIssues.length === 0}
-                            <p class="lvct-settings__inline-hint" role="status">未发现资料质量问题：缺字段、悬空关系、孤儿互动均为 0。</p>
-                        {:else}
-                            <ul class="lvct-settings__missing">
-                                {#each auditIssues as issue (issue.kind)}
-                                    <li>
-                                        <div class="ft__smaller ft__on-surface">共 {issue.itemIds.length} 项{issue.samples.length > 0 ? `：${issue.samples.join("、")}${issue.itemIds.length > issue.samples.length ? " 等" : ""}` : ""}</div>
-                                        <div>{issue.reason}</div>
-                                        {#if onOpenPeople && jumpableAuditKinds.has(issue.kind)}
-                                            <button type="button" class="b3-button b3-button--text" onclick={() => onOpenPeople?.({ itemIds: issue.itemIds, label: auditJumpLabels[issue.kind] ?? "资料体检" })}>
-                                                查看这 {issue.itemIds.length} 人
-                                            </button>
-                                        {/if}
-                                    </li>
-                                {/each}
-                            </ul>
-                        {/if}
-                        <p class="ft__smaller ft__on-surface">体检零写入；缺字段可在联系人页筛选补录，悬空关系可在联系人页安全解绑，人物文档被删后收编可归位互动。</p>
+                    {#if auditOpen}
+                        <ReviewReportDialog {i18n} buildAuditReport={runDataAudit} retryFailedAuditModules={retryDataAudit} {onOpenPeople} />
                     {:else}
                         <p class="lvct-settings__inline-hint">检查数据内容质量：缺关键字段、悬空关系、跟进/互动指向不存在的人物等。</p>
+                    {/if}
+                    {#if facade.previewOrganizationProjections && facade.repairOrganizationProjection}
+                        <OrgProjectionRepair {facade} {i18n} onBusyChange={(busy) => (orgProjectionBusy = busy)} />
                     {/if}
                 </section>
             {:else if activeSection === "reminder"}

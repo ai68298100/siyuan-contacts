@@ -21,6 +21,8 @@ export interface FollowUpItem {
     docBlockId?: string;
     /** B07-a：文档任务块已被删除/移出（显式不可达，写侧不自动重建；插件侧显式改动清除） */
     docMissing?: boolean;
+    docSyncPending?: boolean;
+    docSyncBlockId?: string;
 }
 
 export interface FollowUpStore {
@@ -98,7 +100,9 @@ function isFollowUpItem(raw: unknown): raw is FollowUpItem {
         typeof item.updatedAt === "number" && Number.isFinite(item.updatedAt) &&
         (item.closedAt === undefined || (typeof item.closedAt === "number" && Number.isFinite(item.closedAt))) &&
         (item.docBlockId === undefined || (typeof item.docBlockId === "string" && item.docBlockId.length > 0)) &&
-        (item.docMissing === undefined || typeof item.docMissing === "boolean");
+        (item.docMissing === undefined || typeof item.docMissing === "boolean") &&
+        (item.docSyncPending === undefined || typeof item.docSyncPending === "boolean") &&
+        (item.docSyncBlockId === undefined || (typeof item.docSyncBlockId === "string" && /^\d{14}-[0-9a-z]{7}$/.test(item.docSyncBlockId)));
 }
 
 /** 写前检查：不丢弃损坏数据；版本或结构不兼容抛错（与互动库同纪律） */
@@ -145,7 +149,7 @@ export function appendFollowUp(store: FollowUpStore, item: FollowUpItem): Follow
 export function updateFollowUp(
     store: FollowUpStore,
     id: string,
-    patch: Partial<Pick<FollowUpItem, "dueDate" | "status" | "title" | "updatedAt" | "closedAt" | "docBlockId" | "docMissing">>,
+    patch: Partial<Pick<FollowUpItem, "dueDate" | "status" | "title" | "updatedAt" | "closedAt" | "docBlockId" | "docMissing" | "docSyncPending" | "docSyncBlockId">>,
 ): FollowUpStore {
     const index = store.items.findIndex((item) => item.id === id);
     if (index < 0) return store;

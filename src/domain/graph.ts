@@ -20,7 +20,7 @@ export interface GraphEdge {
     source: string;
     target: string;
     /** B14.6 边来源：related=显式关系（查询唯一依据）；member=组织成员（仅展示，不参与关系查询） */
-    kind?: "related" | "member";
+    kind?: "related" | "member" | "ref";
 }
 
 export interface PersonGraph {
@@ -37,6 +37,7 @@ export function queryGraphRelations(graph: PersonGraph, firstId: string, secondI
     const second = new Set<string>();
     if (!ids.has(firstId)) return { neighborIds: [], commonIds: [] };
     for (const edge of graph.edges) {
+        if (edge.kind && edge.kind !== "related") continue;
         if (edge.source === edge.target || !ids.has(edge.source) || !ids.has(edge.target)) continue;
         if (edge.source === firstId) first.add(edge.target);
         if (edge.target === firstId) first.add(edge.source);
@@ -91,18 +92,46 @@ export const GRAPH_MAX_NODES = 800;
  * 规模上限：按度数降序保留前 maxNodes 个节点，丢弃两端都被裁掉的边。
  * 返回裁剪说明，由 UI 提示"图太大，只展示关系最多的 N 人"。
  */
-export function capGraph(graph: PersonGraph, maxNodes: number = GRAPH_MAX_NODES): { graph: PersonGraph; truncated: boolean } {
-    if (graph.nodes.length <= maxNodes) return { graph, truncated: false };
-    const keep = new Set(
-        [...graph.nodes].sort((a, b) => b.degree - a.degree).slice(0, maxNodes).map((node) => node.id),
-    );
-    return {
-        graph: {
-            nodes: graph.nodes.filter((node) => keep.has(node.id)),
-            edges: graph.edges.filter((edge) => keep.has(edge.source) && keep.has(edge.target)),
-        },
-        truncated: true,
-    };
+export function capGraph(graph: PersonGraph, maxNodes: number = GRAPH_MAX_NODES, retainedIds: readonly string[] = []): { graph: PersonGraph; truncated: boolean } {
+    if (!Number.isSafeInteger(maxNodes) || maxNodes < 1) throw new Error("图节点预算必须为正整数");
+    const ordered = orderGraph(graph);
+    const existing = new Set(ordered.nodes.map((node) => node.id));
+    const retained = new Set(retainedIds.filter((id) => existing.has(id)));
+    if (retained.size > maxNodes) throw new Error("节点预算不足以保留查询中心，请扩大预算或清除对比人物");
+    const keep = new Set(retained);
+    for (const node of ordered.nodes) {
+        if (keep.size >= maxNodes) break;
+        keep.add(node.id);
+    }
+    return { graph: orderGraph({
+        nodes: ordered.nodes.filter((node) => keep.has(node.id)),
+        edges: ordered.edges.filter((edge) => keep.has(edge.source) && keep.has(edge.target)),
+    }), truncated: ordered.nodes.length > keep.size };
+}
+
+export function orderGraph(graph: PersonGraph): PersonGraph {
+    const nodes = graph.nodes.map((node) => ({ ...node, degree: 0 }));
+    const byId = new Map(nodes.map((node) => [node.id, node]));
+    const seen = new Set<string>();
+    const edges: GraphEdge[] = [];
+    for (const edge of graph.edges) {
+        if (edge.source === edge.target || !byId.has(edge.source) || !byId.has(edge.target)) continue;
+        const [source, target] = [edge.source, edge.target].sort();
+        const key = `${edge.kind ?? "related"}:${source}:${target}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        edges.push({ ...edge, source, target });
+        byId.get(source)!.degree += 1;
+        byId.get(target)!.degree += 1;
+    }
+    nodes.sort((left, right) => right.degree - left.degree || compareGraphIds(left.id, right.id));
+    edges.sort((left, right) => compareGraphIds(left.kind ?? "related", right.kind ?? "related")
+        || compareGraphIds(left.source, right.source) || compareGraphIds(left.target, right.target));
+    return { nodes, edges };
+}
+
+export function compareGraphIds(left: string, right: string): number {
+    return left < right ? -1 : left > right ? 1 : 0;
 }
 
 /** 分组→固定色相（数据编码用固定色板；UI 底色仍走 b3 变量，见 D-0002 约定注释） */

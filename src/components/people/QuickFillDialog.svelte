@@ -3,7 +3,9 @@
      *  不直接写库：onApply 只把勾选项交给调用方的草稿，B06 守卫与既有保存路径继续生效。 */
     import { parseContactText, CONTACT_TEMPLATE } from "../../domain/quick-fill";
     import type { QuickFillItem, QuickFillResult } from "../../domain/quick-fill";
+    import { quickFillDefaultIndexes } from "../../domain/import.ts";
     import LvctDialog from "../LvctDialog.svelte";
+    import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
 
     let {
@@ -17,7 +19,7 @@
         /** 当前草稿值（判定 新增/冲突/已一致） */
         existing: {
             name: string; phone: string; email: string; wechat: string;
-            website: string; birthday: string; group: string; tags: readonly string[];
+            website: string; birthday: string; isLunar?: boolean; group: string; tags: readonly string[];
         };
         /** FAST-01.3：外部已解析好的结果（选区/整篇文档识别），直接进预览阶段 */
         initialResult?: QuickFillResult;
@@ -52,6 +54,11 @@
     /* FAST-01.2：可复制空白模板（剪贴板不可用时静默，用户仍可从文档手抄） */
     let templateCopied = $state(false);
     let templateTimer: ReturnType<typeof setTimeout> | undefined;
+    const guardedClose = useCloseGuard({
+        busy: () => false,
+        dirty: () => pasteText.trim().length > 0 || previewed,
+        changes: () => [text("qfUnsaved", "粘贴并识别的结果尚未应用")],
+    });
     async function copyTemplate() {
         try {
             await navigator.clipboard.writeText(CONTACT_TEMPLATE);
@@ -78,6 +85,7 @@
     /** 已一致（同名同值）不展示；其余返回 true */
     function isRedundant(item: QuickFillItem): boolean {
         if (item.field === "tags") return existing.tags.includes(item.value);
+        if (item.field === "birthday" && existing.isLunar !== undefined) return currentValue(item) === item.value && existing.isLunar === Boolean(item.note?.includes("农历"));
         return currentValue(item) === item.value;
     }
     function conflict(item: QuickFillItem): boolean {
@@ -95,10 +103,13 @@
     }
     /** 默认勾选：无冲突且可写的新增值（已有值默认不覆盖，用户明确选择后才写入） */
     function selectDefaults() {
-        checked = new Set();
-        for (const [index, item] of visibleItems().entries()) {
-            if (!conflict(item) && !notWritable(item)) checked.add(itemKey(item, index));
+        const next = new Set<string>();
+        const items = visibleItems();
+        const defaults = quickFillDefaultIndexes({ items, unrecognized: result?.unrecognized ?? [] }, { ...existing, tags: [...existing.tags] });
+        for (const index of defaults) {
+            next.add(itemKey(items[index], index));
         }
+        checked = next;
     }
     /* 外部传入 initialResult（FAST-01.3）时初始化默认勾选 */
     $effect(() => {
@@ -133,13 +144,13 @@
                 (patch as unknown as Record<string, string>)[item.field] = item.value;
             }
         }
-        if (patch.birthday && lunar) patch.isLunar = true;
+        if (patch.birthday) patch.isLunar = lunar;
         onApply(patch);
         onClose();
     }
 </script>
 
-<LvctDialog title={text("qfTitle", "粘贴并识别")} onClose={onClose}>
+<LvctDialog title={text("qfTitle", "粘贴并识别")} onClose={() => void guardedClose(onClose)}>
     <div class="lvct-qf">
         {#if !previewed}
             <p class="ft__smaller ft__on-surface">
@@ -152,10 +163,11 @@
                 placeholder={text("qfPlaceholder", "张三\n手机：13800138000\n微信：zhang_san\n邮箱：a@example.com")}
                 bind:value={pasteText}></textarea>
             <div class="lvct-form__actions">
-                <button class="b3-button b3-button--cancel" onclick={onClose}>{text("formCancel", "取消")}</button>
+                <button class="b3-button b3-button--cancel" onclick={() => void guardedClose(onClose)}>{text("formCancel", "取消")}</button>
                 <button class="b3-button" disabled={pasteText.trim().length === 0} onclick={recognize}>{text("qfRecognize", "识别")}</button>
             </div>
         {:else}
+            <p class="ft__smaller">来源：本地粘贴/单人表格；目标：当前一个草稿。每项显示原文 → 字段；不同候选值须单选，未识别内容保留并忽略，不直接写联系人。</p>
             {#if visibleItems().length === 0 && (result?.unrecognized.length ?? 0) === 0}
                 <p class="ft__on-surface">{text("qfEmpty", "没有识别到可填充的内容。")}</p>
             {/if}
@@ -187,7 +199,7 @@
                 </div>
             {/if}
             <div class="lvct-form__actions">
-                <button class="b3-button b3-button--cancel" onclick={onClose}>{text("formCancel", "取消")}</button>
+                <button class="b3-button b3-button--cancel" onclick={() => void guardedClose(onClose)}>{text("formCancel", "取消")}</button>
                 <button class="b3-button" disabled={checked.size === 0} onclick={apply}>
                     {text("qfApply", "应用到表单（{n}）", { n: checked.size })}
                 </button>

@@ -6,6 +6,7 @@
     import { translateText } from "../../domain/translation";
     import type { ContactsPluginFacade } from "../../types";
     import type { OrganizationWithMembers } from "../../services/org";
+    import { onDestroy } from "svelte";
 
     let {
         facade,
@@ -16,7 +17,7 @@
         facade: ContactsPluginFacade;
         revision?: number;
         i18n?: Readonly<Record<string, string>>;
-        onOpenOrgManager: () => void;
+        onOpenOrgManager: (docId?: string) => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -24,13 +25,36 @@
     let orgs: OrganizationWithMembers[] = $state([]);
     let loading = $state(true);
     let errorText = $state("");
+    let organizationCursor = $state<string | null>(null);
+    let organizationHasMore = $state(false);
+    let organizationLoadingMore = $state(false);
+    let organizationLoadError = $state("");
     let refreshVersion = 0;
+    let organizationLoadGeneration = 0;
+    let alive = true;
+    onDestroy(() => { alive = false; refreshVersion += 1; organizationLoadGeneration += 1; });
 
     async function refresh() {
         const version = ++refreshVersion;
         loading = true;
         errorText = "";
+        organizationLoadError = "";
+        organizationLoadingMore = false;
+        organizationCursor = null;
+        organizationHasMore = false;
+        const generation = ++organizationLoadGeneration;
         try {
+            if (facade.listOrganizationsPage) {
+                const page = await facade.listOrganizationsPage({ limit: 200 });
+                if (!alive || version !== refreshVersion || generation !== organizationLoadGeneration) return;
+                if (page.hasMore && !page.nextRootId) throw new Error("组织首屏分页缺少后续游标，已停止继续读取");
+                orgs = page.organizations;
+                organizationCursor = page.nextRootId;
+                organizationHasMore = page.hasMore;
+                loading = false;
+                void loadRemainingOrganizations(version, generation);
+                return;
+            }
             const result = await facade.listOrganizations();
             if (version === refreshVersion) orgs = result;
         } catch (error) {
@@ -40,6 +64,38 @@
         }
     }
 
+    async function loadRemainingOrganizations(version: number, generation: number) {
+        if (!facade.listOrganizationsPage || !organizationHasMore || !organizationCursor) return;
+        organizationLoadingMore = true;
+        organizationLoadError = "";
+        try {
+            while (organizationHasMore && organizationCursor && alive
+                && version === refreshVersion && generation === organizationLoadGeneration) {
+                const page = await facade.listOrganizationsPage({ afterRootId: organizationCursor, limit: 200 });
+                if (!alive || version !== refreshVersion || generation !== organizationLoadGeneration) return;
+                if (page.organizations.length === 0 && page.hasMore) throw new Error("组织分页返回空页但仍有后续数据，已停止继续读取");
+                const known = new Set(orgs.map((org) => org.docId));
+                const duplicate = page.organizations.find((org) => known.has(org.docId));
+                if (duplicate) throw new Error(`组织分页出现重复文档「${duplicate.name}」，已停止继续读取`);
+                if (page.hasMore && !page.nextRootId) throw new Error("组织分页缺少后续游标，已停止继续读取");
+                orgs = [...orgs, ...page.organizations];
+                organizationCursor = page.nextRootId;
+                organizationHasMore = page.hasMore;
+            }
+        } catch (error) {
+            if (alive && version === refreshVersion && generation === organizationLoadGeneration) {
+                organizationLoadError = error instanceof Error ? error.message : String(error);
+            }
+        } finally {
+            if (generation === organizationLoadGeneration) organizationLoadingMore = false;
+        }
+    }
+
+    function retryRemainingOrganizations() {
+        if (organizationLoadingMore || !organizationHasMore || !organizationCursor) return;
+        void loadRemainingOrganizations(refreshVersion, organizationLoadGeneration);
+    }
+
     $effect(() => {
         revision;
         void refresh();
@@ -47,8 +103,8 @@
 
     /* 卡片排序：活跃在前（名称序），归档垫底 */
     const sortedOrgs = $derived.by(() => {
-        const active = orgs.filter((org) => !org.archived).sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
-        const archived = orgs.filter((org) => org.archived).sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
+        const active = orgs.filter((org) => !org.archived).sort((first, second) => first.name.localeCompare(second.name, "zh-Hans-CN") || first.docId.localeCompare(second.docId));
+        const archived = orgs.filter((org) => org.archived).sort((first, second) => first.name.localeCompare(second.name, "zh-Hans-CN") || first.docId.localeCompare(second.docId));
         return [...active, ...archived];
     });
     const activeCountOf = (org: OrganizationWithMembers) => org.memberships.filter((membership) => membership.status === "active").length;
@@ -57,29 +113,45 @@
 <div class="lvct-orgs-view">
     <div class="lvct-people__toolbar fn__flex">
         <span class="ft__smaller ft__on-surface">
-            {text("orgsViewSummary", "共 {total} 个组织，{archived} 个已归档。成员的加入与离开在组织管理中维护。", { total: orgs.length, archived: orgs.filter((org) => org.archived).length })}
+            {#if loading || errorText}
+                <span role="status">{text("orgsCountUnknown", "组织数量待核实")}</span>
+            {:else if organizationLoadingMore}
+                <span role="status">已读取 {orgs.length} 个组织，正在继续读取…</span>
+            {:else if organizationLoadError}
+                <span role="alert">后续组织读取失败：{organizationLoadError}</span>
+            {:else if organizationHasMore}
+                <span role="status">已读取 {orgs.length} 个组织，仍有后续组织待读取。</span>
+            {:else}
+                {text("orgsViewSummary", "共 {total} 个组织，{archived} 个已归档。成员的加入与离开在组织管理中维护。", { total: orgs.length, archived: orgs.filter((org) => org.archived).length })}
+            {/if}
         </span>
         <span class="fn__flex-1"></span>
-        <button type="button" class="b3-button b3-button--text" onclick={onOpenOrgManager}>
+        <button type="button" class="b3-button b3-button--text" onclick={() => onOpenOrgManager()}>
             <Plus size={15} />{text("orgsManage", "组织管理")}
         </button>
+        {#if organizationLoadError}
+            <button type="button" class="b3-button b3-button--text" onclick={retryRemainingOrganizations} disabled={organizationLoadingMore}>
+                继续读取
+            </button>
+        {/if}
     </div>
 
     {#if errorText}
         <ViewState error title={text("orgsLoadFailTitle", "组织列表加载失败")} description={errorText}>
             <button type="button" class="b3-button b3-button--outline" onclick={() => void refresh()}>{text("graphReload", "重新加载")}</button>
         </ViewState>
-    {:else if loading}
+    {/if}
+    {#if loading && orgs.length === 0 && !errorText}
         <ViewState loading title={text("orgsLoading", "正在加载组织…")} />
-    {:else if sortedOrgs.length === 0}
+    {:else if sortedOrgs.length === 0 && !errorText && !loading}
         <ViewState title={text("orgsEmptyTitle", "还没有组织")}
             description={text("orgsEmptyDesc", "在组织管理中新建组织（公司/学校等），再为联系人登记归属。")}>
-            <button type="button" class="b3-button b3-button--outline" onclick={onOpenOrgManager}>{text("orgsCreateFirst", "新建组织")}</button>
+            <button type="button" class="b3-button b3-button--outline" onclick={() => onOpenOrgManager()}>{text("orgsCreateFirst", "新建组织")}</button>
         </ViewState>
-    {:else}
+    {:else if sortedOrgs.length > 0}
         <div class="lvct-orgs-view__grid">
             {#each sortedOrgs as org (org.docId)}
-                <div class="lvct-orgs-view__card" class:lvct-orgs-view__card--archived={org.archived}>
+                <div class="lvct-orgs-view__card" data-org-doc-id={org.docId} class:lvct-orgs-view__card--archived={org.archived}>
                     <div class="lvct-orgs-view__card-head">
                         <span class="lvct-orgs-view__card-icon" aria-hidden="true"><Building2 size={16} /></span>
                         <b class="lvct-orgs-view__card-name">{org.name}</b>
@@ -89,7 +161,7 @@
                         {text("orgsCardMembers", "{n} 名在职/在读成员", { n: activeCountOf(org) })}
                     </div>
                     <div class="lvct-orgs-view__card-actions">
-                        <button type="button" class="b3-button b3-button--text" onclick={onOpenOrgManager}>
+                        <button type="button" class="b3-button b3-button--text" disabled={loading || !!errorText} onclick={() => onOpenOrgManager(org.docId)}>
                             {text("orgsManageOrg", "管理")}</button>
                     </div>
                 </div>

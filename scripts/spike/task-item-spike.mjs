@@ -10,9 +10,9 @@ import os from "node:os";
 import {spawn} from "node:child_process";
 import { prepareIsolatedWorkspace, assertTestPortAvailable, observeTestKernel } from "../e2e/kernel-safety.mjs";
 
-const WORKSPACE = path.join(os.homedir(), "SiYuan-Renmai-Task-Spike");
+const WORKSPACE = path.join(os.tmpdir(), `lvct-task-spike-${process.pid}-${Date.now()}`);
 const HOST = "127.0.0.1";
-const PORT = 6832;
+const PORT = 16832;
 const BASE = `http://${HOST}:${PORT}`;
 const MARKER = "renmai-task-spike.json";
 
@@ -72,6 +72,7 @@ async function main() {
     prepareIsolatedWorkspace(WORKSPACE, MARKER, "renmai task spike");
     const child = spawn(kernel, ["--workspace", WORKSPACE, "serve", "--wd", appDir, "--port", String(PORT)], {
         stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
         env: {...process.env, SIYUAN_WORKSPACE_PATH: WORKSPACE},
     });
     const lines = [];
@@ -170,8 +171,30 @@ async function main() {
             note("④b 任务块被删后按 ID 反查为空", `rows=${gone.length}`, gone.length === 0);
         }
 
+        const atomicId = "fu-atomic";
+        const atomic = await apiChecked("/api/block/insertBlock", {
+            dataType: "dom", parentID: docId,
+            data: `<div data-node-id="20261004000000-atlist1" data-type="NodeList" data-subtype="t" class="list"><div data-node-id="20261004000000-attask1" data-type="NodeListItem" data-subtype="t" data-marker="*" data-task=" " class="li" custom-lvct-followup="${atomicId}"><div class="protyle-action protyle-action--task"><svg><use xlink:href="#iconUncheck"></use></svg></div><div data-node-id="20261004000000-atpara1" data-type="NodeParagraph" class="p"><div contenteditable="true">原子关联 📅2026-10-08</div></div></div></div>`,
+        });
+        await apiChecked("/api/sqlite/flushTransaction", {});
+        const atomicRows = await rows(`SELECT id, type, subtype, markdown, ial FROM blocks WHERE root_id = '${docId}' AND ial LIKE '%custom-lvct-followup="${atomicId}"%'`);
+        const atomicTask = atomicRows.find((row) => row.type === "i" && row.subtype === "t");
+        note("⑤ 原子插入关联键挂在任务项", JSON.stringify({operations: atomic, rows: atomicRows}), Boolean(atomicTask) && atomicRows.length === 1);
+        if (!atomicTask) throw new Error("原子任务项属性未经实证");
+        await apiChecked("/api/block/updateBlock", {
+            id: atomicTask.id, dataType: "dom",
+            data: `<div data-node-id="${atomicTask.id}" data-type="NodeListItem" data-subtype="t" data-marker="*" data-task="x" class="li" custom-lvct-followup="${atomicId}"><div class="protyle-action protyle-action--task"><svg><use xlink:href="#iconCheck"></use></svg></div><div data-node-id="20261004000000-atpara2" data-type="NodeParagraph" class="p"><div contenteditable="true">改标题 📅2026-11-09</div></div></div>`,
+        });
+        await apiChecked("/api/sqlite/flushTransaction", {});
+        const atomicUpdated = await rows(`SELECT id, type, subtype, markdown, ial FROM blocks WHERE id = '${atomicTask.id}'`);
+        note("⑤b updateBlock 保留任务项关联键", JSON.stringify(atomicUpdated), atomicUpdated.length === 1 && atomicUpdated[0].ial.includes(`custom-lvct-followup="${atomicId}"`));
+        const paged = await rows(`SELECT id, ial, markdown FROM blocks WHERE root_id = '${docId}' AND type = 'i' AND subtype = 't' AND ial LIKE '%custom-lvct-followup="%' ORDER BY id LIMIT 1`);
+        const pagedNext = await rows(`SELECT id, ial, markdown FROM blocks WHERE root_id = '${docId}' AND type = 'i' AND subtype = 't' AND ial LIKE '%custom-lvct-followup="%' AND id > '${paged[0].id}' ORDER BY id LIMIT 1`);
+        note("⑤c 任务扫描按 ID 分页", JSON.stringify({first: paged, next: pagedNext}), paged.length === 1 && pagedNext.length === 1 && paged[0].id < pagedNext[0].id);
+
         fs.writeFileSync(path.join(import.meta.dirname, "task-item-results.json"),
-            JSON.stringify({kernel: version, ranAt: new Date().toISOString(), results}, null, 2) + "\n");
+            JSON.stringify({kernel: version, ranAt: new Date().toISOString(), workspace: WORKSPACE, port: PORT, results}, null, 2) + "\n");
+        if (results.some((result) => !result.ok)) exitCode = 1;
     } catch (error) {
         note("spike 异常", String(error?.message || error), false);
         exitCode = 1;

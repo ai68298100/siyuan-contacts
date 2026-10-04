@@ -1,0 +1,45 @@
+{
+  "workspace": "C:\\Users\\sunku\\AppData\\Local\\Temp\\SiYuan-Contacts-Org-Operations-5fca4d6c-0e82-4f48-a704-6498e2f421b1",
+  "kernel": "D:/biji/SiYuan/resources/kernel/SiYuan-Kernel.exe",
+  "port": 6458,
+  "hostVerified": false,
+  "version": "3.8.6",
+  "atomicCreate": {
+    "notebookId": "20261004075951-5psijzo",
+    "requestId": "20261004000000-orgreq1",
+    "docId": "20261004075952-xjk7hl0",
+    "markers": [
+      {
+        "box": "20261004075951-5psijzo",
+        "ial": "{: custom-lvct-org-draft=\"20261004000000-orgreq1\" id=\"20261004075953-tv2xs97\" updated=\"20261004075953\" custom-lvct-org=\"1\"}",
+        "id": "20261004075953-tv2xs97",
+        "markdown": "**组织**：组织 \\[甲\\]\\#%",
+        "root_id": "20261004075952-xjk7hl0"
+      }
+    ]
+  },
+  "afterRestart": [
+    {
+      "box": "20261004075951-5psijzo",
+      "ial": "{: custom-lvct-org-draft=\"20261004000000-orgreq1\" id=\"20261004075953-tv2xs97\" updated=\"20261004075953\" custom-lvct-org=\"1\"}",
+      "id": "20261004075953-tv2xs97",
+      "markdown": "**组织**：组织 \\[甲\\]\\#%",
+      "root_id": "20261004075952-xjk7hl0"
+    }
+  ],
+  "renamePreservesMarkerAndBody": {
+    "markers": [
+      {
+        "box": "20261004075951-5psijzo",
+        "ial": "{: id=\"20261004075953-tv2xs97\" updated=\"20261004075953\" custom-lvct-org-draft=\"20261004000000-orgreq1\" custom-lvct-org=\"1\"}",
+        "id": "20261004075953-tv2xs97",
+        "markdown": "**组织**：改名组织",
+        "root_id": "20261004075952-xjk7hl0"
+      }
+    ],
+    "exported": {
+      "hPath": "/改名组织",
+      "content": "---\ntitle: 改名组织\ndate: 2026-10-04T07:59:52+08:00\nlastmod: 2026-10-04T07:59:53+08:00\n---\n\n# 改名组织\n\n# 组织 \\[甲\\]\\#%\n\n**组织**：改名组织\n\n用户正文保留\n"
+    }
+  }
+}

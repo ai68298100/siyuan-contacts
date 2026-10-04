@@ -45,6 +45,7 @@ export async function createFollowUpRecord(plugin: Plugin, input: CreateFollowUp
             status: "open",
             createdAt: now,
             updatedAt: now,
+            docSyncPending: true,
         };
         const store = normalizeFollowUpStoreForWrite(await loadJsonStrict(plugin, FOLLOW_UP_STORAGE_KEY));
         await saveJsonVerified(plugin, FOLLOW_UP_STORAGE_KEY, appendFollowUp(store, item));
@@ -91,7 +92,7 @@ export async function updateFollowUpRecord(
                     ...(patch.status === "open" ? { closedAt: undefined } : { closedAt: Date.now() }),
                 }
                 : {}),
-            ...(userEdited ? { docMissing: undefined } : {}),
+            ...(userEdited ? { docMissing: undefined, docSyncPending: true, docSyncBlockId: undefined } : {}),
             updatedAt: Date.now(),
         };
         const updated = updateFollowUp(store, id, {
@@ -99,7 +100,7 @@ export async function updateFollowUpRecord(
             ...(patch.title !== undefined ? { title: next.title } : {}),
             ...(next.status !== existing.status ? { status: next.status, closedAt: next.closedAt } : {}),
             ...(fromReconcile ? { docBlockId: patch.docBlockId, docMissing: patch.docMissing } : {}),
-            ...(userEdited ? { docMissing: undefined } : {}),
+            ...(userEdited ? { docMissing: undefined, docSyncPending: true, docSyncBlockId: undefined } : {}),
             updatedAt: next.updatedAt,
         });
         await saveJsonVerified(plugin, FOLLOW_UP_STORAGE_KEY, updated);

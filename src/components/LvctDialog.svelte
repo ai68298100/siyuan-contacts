@@ -11,7 +11,6 @@
         modal = !peek,
         closeOnBackdrop = true,
         onClose,
-        beforeClose,
         children,
     }: {
         title: string;
@@ -21,7 +20,6 @@
         modal?: boolean;
         closeOnBackdrop?: boolean;
         onClose: () => void;
-        beforeClose?: () => boolean | Promise<boolean>;
         children: Snippet;
     } = $props();
 
@@ -45,7 +43,6 @@
             // B06：聚合作用域内全部脏项，弹一次三选一（保存并离开/放弃/取消）
             const allowed = await canClose.requestClose();
             if (!allowed) return;
-            if (beforeClose && !(await beforeClose())) return;
             onClose();
         } finally {
             closing = false;

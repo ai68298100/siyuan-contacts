@@ -1,17 +1,17 @@
 <script lang="ts">
     /** 关系图谱：cytoscape 力导向布局，节点=联系人，边=related 关系，点击节点开文档 */
     import cytoscape from "cytoscape";
-    import { onMount } from "svelte";
+    import { onDestroy, onMount, tick, untrack } from "svelte";
+    import { getFrontend } from "siyuan";
     import { Scan, ZoomIn, ZoomOut, Network, RefreshCw } from "@lucide/svelte";
     import ViewState from "../ViewState.svelte";
-    import { listContacts } from "../../services/contacts";
-    import { loadNativePersonGraph, loadNativeRegisteredGraph, NativeGraphCenterMissingError } from "../../services/native-graph";
-    import { buildGraph, buildOrgAugmentation, capGraph, GRAPH_MAX_NODES, groupColor, ORG_NODE_COLOR, queryGraphRelations } from "../../domain/graph";
-    import type { GraphOrgAugmentation } from "../../domain/graph";
-    import type { GraphViewMode, NativeGraphScope, ViewPreferences } from "../../domain/preferences";
-    import type { PersonGraph } from "../../domain/graph";
-    import { shortestGraphPath, secondDegreeGraphIds } from "../../domain/graph-path";
-    import { renderGraphResultMarkdown } from "../../domain/graph-export";
+    import { loadGraphSources, loadGraphReferences } from "../../services/graph-query";
+    import { GRAPH_MAX_NODES } from "../../domain/graph";
+    import { buildGraphQuerySnapshot, graphEdgeLabel } from "../../domain/graph-query";
+    import type { GraphSources, GraphQuery, GraphReferenceSource, GraphScope } from "../../domain/graph-query";
+    import type { GraphNode } from "../../domain/graph";
+    import type { GraphViewMode, ViewPreferences } from "../../domain/preferences";
+    import { renderGraphSnapshotMarkdown } from "../../domain/graph-export";
     import { translateText } from "../../domain/translation";
     import type { ContactsSettings } from "../../domain/model";
     import type { ContactSummary } from "../../domain/person";
@@ -47,32 +47,39 @@
         translateText(i18n, key, fallback, values));
 
     let container: HTMLElement | undefined = $state();
-    let people: ContactSummary[] = $state([]);
+    let sources: GraphSources = $state({ people: [], organizations: [], selfDocId: null,
+        status: { roster: "unknown", organizations: "unknown", self: "unknown" }, errors: {}, revision: 0 });
+    const people = $derived(sources.people);
     let loading: boolean = $state(true);
     let errorText: string = $state("");
-    let truncated: boolean = $state(false);
     // svelte-ignore state_referenced_locally
     let graphMode: GraphViewMode = $state(preferences.graphMode);
-    let nativeGraph: PersonGraph | null = $state(null);
+    let references: GraphReferenceSource = $state({ status: "unknown", graph: { nodes: [], edges: [] } });
     let nativeLoading = $state(false);
-    let nativeError = $state("");
-    let nativeMissingCenter = $state(false);
     let nativeVersion = 0;
     /* B14.8 引用图范围（B14.5 重开保留）：self=本人中心一度；person=指定联系人中心；global=全部登记文档 */
     // svelte-ignore state_referenced_locally
-    let nativeScope: NativeGraphScope = $state(preferences.nativeScope);
+    let nativeScope: GraphScope = $state(preferences.nativeScope);
     // svelte-ignore state_referenced_locally
     let nativeCenterDocId = $state(preferences.nativeCenterDocId);
-    let nativeSelfDocId = $state("");
     /* B14.6 组织增强：组织节点+成员边只叠加渲染，关系查询仍只按 related 边 */
-    let orgOverlay: GraphOrgAugmentation | null = $state(null);
     let showOrgs = $state(true);
+    let relationScope: GraphScope = $state("global");
+    let relationCenterDocId = $state("");
+    const frontend = getFrontend();
+    let presentation: "canvas" | "text" = $state(frontend === "mobile" || frontend === "browser-mobile" ? "text" : "canvas");
+    let textLimit = $state(100);
+    let resultHeading: HTMLElement | undefined = $state();
+    let canvasFocusId = $state("");
+    let preferenceError = $state("");
+    let alive = true;
+    let returnObserver: MutationObserver | undefined;
     /* B14.8 按组织收窄（会话态：组织可能被归档/改名，不持久化） */
     let orgNarrowId = $state("");
     let searchText: string = $state("");
     let groupFilter: string = $state("");
     let isolatedOnly = $state(false);
-    let relationDepth = $state("direct");
+    let relationDepth: "direct" | "second" = $state("direct");
     let graphInstance: cytoscape.Core | null = $state.raw(null);
     let focusId = $state("");
     let compareId = $state("");
@@ -97,88 +104,50 @@
         { label: "组织", className: "org" },
     ] as const;
 
-    const groups = $derived.by(() => [...new Set(people.map((person) => person.group).filter(Boolean))].sort());
+    const groups = $derived.by(() => [...new Set(snapshot.people.map((person) => person.group).filter(Boolean))].sort());
     /* B03 可搜索选人器：图内节点 → 候选项（带分组提示与联系方式关键词） */
-    const graphPickerItems = $derived.by((): PickerItem[] => displayed.graph.nodes.map((node) => {
-        const person = people.find((item) => item.docId === node.id);
+    const graphPickerItems = $derived.by((): PickerItem[] => snapshot.people.map((person) => {
         return {
-            id: node.id,
-            label: node.label,
-            hint: person ? [person.group, ...person.tags].filter(Boolean).join(" · ") : undefined,
-            keywords: person ? `${person.phone} ${person.wechat} ${person.email}`.toLowerCase() : undefined,
+            id: person.docId,
+            label: person.name,
+            docId: person.docId,
+            itemId: person.itemId,
+            hint: [person.group, person.phone || person.email, ...person.tags].filter(Boolean).join(" · ") || undefined,
+            keywords: `${person.phone} ${person.wechat} ${person.email}`.toLowerCase(),
         };
     }));
-    const fullGraph = $derived(buildGraph(people));
-    const isolatedIds = $derived(new Set(fullGraph.nodes.filter((node) => node.degree === 0).map((node) => node.id)));
     /* B14.8 按组织收窄：选中组织后画布人物=该组织成员（成员边来自组织覆盖层） */
-    const narrowedDocIds = $derived.by(() => {
-        if (orgNarrowId === "" || !orgOverlay) return null;
-        const ids = new Set<string>();
-        for (const edge of orgOverlay.edges) {
-            if (edge.source === orgNarrowId) ids.add(edge.target);
-        }
-        return ids;
-    });
-    const filteredPeople = $derived.by(() => {
-        const needle = searchText.trim().toLowerCase();
-        const restrict = narrowedDocIds;
-        return people.filter((person) => {
-            const matchesGroup = !groupFilter || person.group === groupFilter;
-            const matchesSearch = !needle || [person.name, person.phone, person.wechat, person.email, ...person.tags]
-                .join(" ")
-                .toLowerCase()
-                .includes(needle);
-            return matchesGroup && matchesSearch && (!isolatedOnly || isolatedIds.has(person.docId))
-                && (!restrict || restrict.has(person.docId));
-        });
-    });
+    const query: GraphQuery = $derived({ mode: graphMode, scope: graphMode === "native" ? nativeScope : relationScope,
+        centerDocId: graphMode === "native" ? nativeCenterDocId : relationCenterDocId, orgDocId: orgNarrowId,
+        search: searchText, group: groupFilter, isolatedOnly, showOrgs, depth: relationDepth, focusId, compareId, queryMode });
+    const snapshot = $derived(buildGraphQuerySnapshot(sources, query, references));
+    const canvasData = $derived(JSON.stringify(snapshot.graph));
+    const canvasCanRender = $derived(snapshot.state !== "unknown" && snapshot.state !== "center_missing");
+    const orgOverlay = $derived({ nodes: snapshot.organizations });
     const searchNeedle = $derived(searchText.trim().toLowerCase());
-    const displayed = $derived(capGraph(buildGraph(filteredPeople)));
     /* B14 原生模式：搜索只按节点 label/ID 过滤，再统一走规模裁剪 */
-    const nativeFiltered = $derived.by((): PersonGraph => {
-        const graph = nativeGraph ?? { nodes: [], edges: [] };
-        if (!searchNeedle) return graph;
-        const kept = graph.nodes.filter((node) => node.label.toLowerCase().includes(searchNeedle) || node.id.toLowerCase().includes(searchNeedle));
-        const keptIds = new Set(kept.map((node) => node.id));
-        return { nodes: kept, edges: graph.edges.filter((edge) => keptIds.has(edge.source) && keptIds.has(edge.target)) };
-    });
-    const nativeDisplayed = $derived(capGraph(nativeFiltered));
-    const nativeHitCount = $derived(nativeFiltered.nodes.length);
+    const truncated = $derived(snapshot.truncated);
     /* native 模式 hover 卡的图内连接数（related 度数在引用图语境不适用，B14.8 边来源标识）；-1=非本模式。
        先取局部快照：svelte-check 对 $state 跨表达式不收窄（既有坑位） */
     const hoveredNativeDegree = $derived.by(() => {
         const person = hoveredPerson;
-        if (graphMode !== "native" || !nativeGraph || !person) return -1;
-        return nativeGraph.nodes.find((node) => node.id === person.docId)?.degree ?? 0;
+        if (graphMode !== "native" || !person) return -1;
+        return snapshot.graph.nodes.find((node) => node.id === person.docId)?.degree ?? 0;
     });
-    const relations = $derived(queryGraphRelations(displayed.graph, focusId, compareId));
+    const relations = $derived({ neighborIds: snapshot.result.neighborIds });
     const secondMode = $derived.by(() => !compareId && relationDepth === "second");
-    const secondIds = $derived(secondMode ? secondDegreeGraphIds(displayed.graph, focusId) : []);
-    const resultIds = $derived(compareId ? relations.commonIds : secondMode ? secondIds : relations.neighborIds);
-    const resultPeople = $derived(people.filter((person) => resultIds.includes(person.docId)));
+    const resultIds = $derived(snapshot.result.ids);
+    const resultPeople = $derived(resultIds.map((id) => snapshot.people.find((person) => person.docId === id)).filter((person) => person !== undefined));
     const pathMode = $derived.by(() => Boolean(compareId) && queryMode === "path");
-    const pathIds = $derived(pathMode ? shortestGraphPath(displayed.graph, focusId, compareId) : []);
-    const pathPeople = $derived(pathIds.map((id) => people.find((person) => person.docId === id)).filter((person) => person !== undefined));
+    const pathIds = $derived(snapshot.result.pathIds);
+    const pathPeople = $derived(pathIds.map((id) => snapshot.people.find((person) => person.docId === id)).filter((person) => person !== undefined));
 
     // ---- 查询结果导出（F16） ----
     let resultExportMessage = $state("");
     function exportResultMarkdown() {
-        const center = people.find((person) => person.docId === focusId);
-        const compare = people.find((person) => person.docId === compareId);
         const pad = (value: number) => String(value).padStart(2, "0");
         const now = new Date();
-        const markdown = renderGraphResultMarkdown({
-            kind: pathMode ? "path" : compareId ? "common" : secondMode ? "second" : "direct",
-            centerName: center?.name ?? "（未知）",
-            ...(compare ? { compareName: compare.name } : {}),
-            pathNames: pathPeople.map((person) => person.name),
-            resultNames: resultPeople.map((person) => person.name),
-            nodeCount: displayed.graph.nodes.length,
-            edgeCount: displayed.graph.edges.length,
-            truncated,
-            filters: { search: searchText.trim(), group: groupFilter, isolatedOnly },
-            generatedAt: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
-        });
+        const markdown = renderGraphSnapshotMarkdown(snapshot, `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`);
         const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
@@ -190,11 +159,39 @@
         resultExportMessage = "结果说明已导出为 Markdown";
     }
 
-    $effect(() => {
-        const ids = new Set(displayed.graph.nodes.map((node) => node.id));
-        if (!ids.has(focusId)) focusId = "";
-        if (!focusId || !ids.has(compareId) || focusId === compareId) compareId = "";
-    });
+    onDestroy(() => { alive = false; refreshVersion += 1; nativeVersion += 1; returnObserver?.disconnect(); clearHover(); });
+
+    function openSnapshotPerson(person: ContactSummary) {
+        const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        returnObserver?.disconnect();
+        onOpenDetail(person);
+        void tick().then(() => {
+            if (!alive) return;
+            const dialog = [...document.querySelectorAll(".lvct-dialog-panel")].at(-1);
+            if (!dialog) return;
+            returnObserver = new MutationObserver(() => {
+                if (dialog.isConnected || document.querySelector(".lvct-dialog-panel")) return;
+                returnObserver?.disconnect();
+                void tick().then(() => {
+                    if (!alive) return;
+                    const active = document.activeElement;
+                    if (active instanceof HTMLElement && active !== document.body && active.isConnected) return;
+                    const target = trigger?.isConnected ? trigger : [...document.querySelectorAll<HTMLElement>("[data-graph-id]")].find((element) => element.dataset.graphId === person.docId);
+                    (target ?? resultHeading)?.focus();
+                });
+            });
+            returnObserver.observe(document.body, { childList: true, subtree: true });
+        });
+    }
+
+    async function locateNode(id: string) {
+        presentation = "canvas";
+        canvasFocusId = id;
+        await tick();
+        const node = graphInstance?.getElementById(id);
+        if (node?.nonempty()) { graphInstance?.fit(node.closedNeighborhood(), 60); node.addClass("lvct-graph-focus"); }
+        container?.focus();
+    }
 
     $effect(() => {
         const instance = graphInstance;
@@ -204,10 +201,11 @@
         const path = pathMode ? pathIds : null;
         const bridges = secondMode ? relations.neighborIds : [];
         const expandSecond = secondMode;
+        const canHighlight = graphMode === "relations" && (snapshot.result.status === "ready" || snapshot.result.status === "no_path");
         if (!instance || instance.destroyed()) return;
         instance.batch(() => {
             instance.elements().removeClass("lvct-graph-muted lvct-graph-focus");
-            if (!selected) return;
+            if (!selected || !canHighlight) return;
             const visible = new Set([selected, other, ...hits, ...bridges]);
             const hitIds = new Set(hits);
             const bridgeIds = new Set(bridges);
@@ -219,13 +217,13 @@
             instance.edges().forEach((edge) => {
                 const source = edge.source().id();
                 const target = edge.target().id();
-                const connectsHit = path !== null
+                const connectsHit = edge.data("kind") === "related" && (path !== null
                     ? nextOnPath.get(source) === target || nextOnPath.get(target) === source
                     : expandSecond
                     ? (source === selected && bridgeIds.has(target)) || (target === selected && bridgeIds.has(source))
                         || (bridgeIds.has(source) && hitIds.has(target)) || (bridgeIds.has(target) && hitIds.has(source))
                     : (hitIds.has(source) && (target === selected || target === other))
-                        || (hitIds.has(target) && (source === selected || source === other));
+                        || (hitIds.has(target) && (source === selected || source === other)));
                 if (!connectsHit) edge.addClass("lvct-graph-muted");
             });
         });
@@ -235,10 +233,20 @@
     function themeColors(): { text: string; edge: string; surface: string } {
         const probe = container ?? document.body;
         const style = getComputedStyle(probe);
+        const resolve = (name: string, fallback: string): string => {
+            const value = style.getPropertyValue(name).trim();
+            if (!value || !value.includes("color-mix")) return value || fallback;
+            const swatch = document.createElement("span");
+            swatch.style.color = `var(${name})`;
+            probe.appendChild(swatch);
+            const resolved = getComputedStyle(swatch).color;
+            swatch.remove();
+            return resolved || fallback;
+        };
         return {
-            text: style.getPropertyValue("--lvct-text-2").trim() || "currentColor",
-            edge: style.getPropertyValue("--lvct-border-subtle").trim() || "currentColor",
-            surface: style.getPropertyValue("--lvct-bg-surface").trim() || "transparent",
+            text: resolve("--lvct-text-2", "currentColor"),
+            edge: resolve("--lvct-border-subtle", "currentColor"),
+            surface: resolve("--lvct-bg-surface", "transparent"),
         };
     }
 
@@ -251,7 +259,7 @@
             "其他": "--lvct-group-other",
         };
         const value = getComputedStyle(container ?? document.body).getPropertyValue(key[group] ?? "--lvct-group-other").trim();
-        return value || groupColor(group);
+        return value || getComputedStyle(container ?? document.body).getPropertyValue("--b3-theme-primary").trim() || "currentColor";
     }
 
     onMount(() => {
@@ -261,7 +269,11 @@
             const palette = themeColors();
             instance.batch(() => {
                 instance.nodes().forEach((node) => { node.data("color", groupColorValue(node.data("group"))); });
-                instance.nodes().style({ color: palette.text, "border-color": palette.surface });
+                instance.nodes().style({
+                    color: palette.text,
+                    "border-color": palette.surface,
+                    "text-outline-color": palette.surface,
+                });
                 instance.edges().style("line-color", palette.edge);
             });
         };
@@ -277,35 +289,17 @@
         loading = true;
         errorText = "";
         try {
-            /* B14.6：人物名册与组织增强并行取；组织读取失败降级为纯人物图（不阻断） */
-            const [roster, orgsResult] = await Promise.all([
-                listContacts(settings),
-                facade?.listOrganizations
-                    ? facade.listOrganizations().catch(() => "error" as const)
-                    : Promise.resolve(undefined),
-            ]);
-            if (version !== refreshVersion) return;
-            people = roster;
-            if (Array.isArray(orgsResult)) {
-                const rosterIds = new Set(roster.map((person) => person.docId));
-                /* 归档组织不进关系图（B13 归档语义：活跃分组才是当前事实） */
-                orgOverlay = buildOrgAugmentation(
-                    orgsResult.filter((org) => !org.archived).map((org) => ({
-                        docId: org.docId,
-                        name: org.name,
-                        memberDocIds: org.memberships
-                            .filter((membership) => membership.status === "active")
-                            .map((membership) => membership.personDocId),
-                    })),
-                    rosterIds,
-                );
-            } else {
-                orgOverlay = null;
-            }
+            const next = await loadGraphSources(settings, {
+                listOrganizations: facade?.listOrganizations ? () => facade.listOrganizations() : undefined,
+                loadSelfIdentity: facade?.loadSelfIdentity ? () => facade.loadSelfIdentity() : undefined,
+            }, version);
+            if (!alive || version !== refreshVersion) return;
+            sources = next;
+            errorText = next.errors.roster ?? "";
         } catch (error) {
-            if (version === refreshVersion) errorText = error instanceof Error ? error.message : String(error);
+            if (alive && version === refreshVersion) errorText = error instanceof Error ? error.message : String(error);
         } finally {
-            if (version === refreshVersion) loading = false;
+            if (alive && version === refreshVersion) loading = false;
         }
     }
 
@@ -313,49 +307,26 @@
     async function switchGraphMode(mode: GraphViewMode) {
         if (graphMode === mode) return;
         graphMode = mode;
+        if (mode === "relations") { nativeVersion += 1; nativeLoading = false; }
+        preferenceError = "";
         try {
             await onPreferencesChange({ ...preferences, graphMode: mode });
         } catch (error) {
-            console.warn("[lvct] 图谱模式偏好保存失败", error);
+            if (alive) preferenceError = `图谱偏好保存失败：${error instanceof Error ? error.message : String(error)}`;
         }
     }
 
     /** B14 原生模式加载：范围由 nativeScope 决定（B14.8），登记集合过滤（B14.3）。失败显式降级 */
     async function loadNativeGraph() {
         const version = ++nativeVersion;
+        const currentSources = sources;
+        const currentQuery = query;
         nativeLoading = true;
-        nativeError = "";
-        nativeMissingCenter = false;
-        try {
-            const identity = facade ? await facade.loadSelfIdentity() : null;
-            nativeSelfDocId = identity?.selfDocId ?? "";
-            /* B14.8 按组织收窄：白名单与该组织成员取交集（中心保留） */
-            const restrict = narrowedDocIds;
-            let graph: PersonGraph;
-            if (nativeScope === "global") {
-                graph = await loadNativeRegisteredGraph(settings, identity, restrict ?? undefined);
-            } else {
-                /* person 模式中心失效（人物已删）回退本人中心 */
-                let centerDocId: string | undefined;
-                if (nativeScope === "person" && nativeCenterDocId !== "" && people.some((person) => person.docId === nativeCenterDocId)) {
-                    centerDocId = nativeCenterDocId;
-                }
-                graph = await loadNativePersonGraph(settings, identity, {
-                    centerDocId,
-                    restrictDocIds: restrict ?? undefined,
-                });
-            }
-            if (version === nativeVersion) nativeGraph = graph;
-        } catch (error) {
-            if (version !== nativeVersion) return;
-            nativeGraph = null;
-            if (error instanceof NativeGraphCenterMissingError) {
-                nativeMissingCenter = true;
-            } else {
-                nativeError = error instanceof Error ? error.message : String(error);
-            }
-        } finally {
-            if (version === nativeVersion) nativeLoading = false;
+        references = { status: "unknown", graph: { nodes: [], edges: [] } };
+        const next = await loadGraphReferences(currentSources, currentQuery);
+        if (alive && version === nativeVersion && currentSources === sources && graphMode === "native") {
+            references = next;
+            nativeLoading = false;
         }
     }
 
@@ -363,54 +334,38 @@
         if (graphMode !== "native") return;
         nativeScope;
         nativeCenterDocId;
-        revision;
-        void loadNativeGraph();
+        sources;
+        if (nativeScope === "org") orgNarrowId;
+        untrack(() => { if (!loading) void loadNativeGraph(); });
     });
 
     /** B14.8：切换引用图范围并持久化（B14.5 重开保留）；保存失败不阻断本次切换 */
     async function switchNativeScope(next: string) {
-        const scope: NativeGraphScope = next === "global" ? "global" : next === "person" ? "person" : "self";
+        const scope: GraphScope = next === "global" ? "global" : next === "person" ? "person" : next === "org" ? "org" : "self";
         if (nativeScope === scope) return;
         nativeScope = scope;
         try {
-            await onPreferencesChange({ ...preferences, nativeScope, nativeCenterDocId });
+            if (scope !== "org") await onPreferencesChange({ ...preferences, nativeScope: scope, nativeCenterDocId });
         } catch (error) {
-            console.warn("[lvct] 引用图范围偏好保存失败", error);
+            if (alive) preferenceError = `引用图范围偏好保存失败：${error instanceof Error ? error.message : String(error)}`;
         }
     }
 
     async function pickNativeCenter(docId: string) {
         nativeCenterDocId = docId;
         try {
-            await onPreferencesChange({ ...preferences, nativeScope, nativeCenterDocId: docId });
+            await onPreferencesChange({ ...preferences, nativeScope: nativeScope === "org" ? "global" : nativeScope, nativeCenterDocId: docId });
         } catch (error) {
-            console.warn("[lvct] 引用图中心偏好保存失败", error);
+            if (alive) preferenceError = `引用图中心偏好保存失败：${error instanceof Error ? error.message : String(error)}`;
         }
     }
 
-    /** 范围说明的实际生效中心（B14.9 状态如实）：person 模式失效时回退「我自己」 */
-    const nativeCenterName = $derived.by(() => {
-        if (nativeScope !== "person") return "";
-        const chosen = nativeCenterDocId;
-        if (chosen !== "") {
-            const person = people.find((item) => item.docId === chosen);
-            if (person) return person.name;
-        }
-        return "";
-    });
-    /* B14.3 纳入/排除数：图内登记文档数与图外联系人（含本人）数 */
-    const nativeRangeStats = $derived.by(() => {
-        if (!nativeGraph) return null;
-        const inside = new Set(nativeGraph.nodes.map((node) => node.id));
-        const selfId = nativeSelfDocId;
-        const outside = people.filter((person) => !inside.has(person.docId)).length
-            + (selfId !== "" && !inside.has(selfId) ? 1 : 0);
-        return { inside: nativeGraph.nodes.length, outside };
-    });
-    const nativeCenterItems = $derived(people.map((person) => ({
+    const nativeCenterItems = $derived(snapshot.people.map((person) => ({
         id: person.docId,
         label: person.name,
-        hint: [person.group, ...person.tags].filter(Boolean).join(" · ") || undefined,
+        docId: person.docId,
+        itemId: person.itemId,
+        hint: [person.group, person.phone || person.email, ...person.tags].filter(Boolean).join(" · ") || undefined,
     })));
 
     function zoomBy(factor: number) {
@@ -420,7 +375,13 @@
     function relayout() {
         const instance = graphInstance;
         if (!instance) return;
-        instance.layout({ name: "cose", animate: true, animationDuration: 300, padding: 30 }).run();
+        instance.layout({
+            name: "cose",
+            animate: true,
+            animationDuration: 300,
+            padding: 30,
+            nodeDimensionsIncludeLabels: true,
+        }).run();
     }
 
     function clearHover() {
@@ -452,7 +413,7 @@
         const person = people.find((item) => item.docId === docId);
         if (!person) {
             /* B14：组织节点 hover 卡（名称+成员连接数+跳转入口） */
-            const orgNode = orgOverlay?.nodes.find((node) => node.id === docId);
+            const orgNode = snapshot.graph.nodes.find((node) => node.id === docId && node.kind === "org");
             if (!orgNode) return;
             if (hoverTimer) clearTimeout(hoverTimer);
             if (clearHoverTimer) clearTimeout(clearHoverTimer);
@@ -503,13 +464,10 @@
     }
 
     $effect(() => {
-        if (!container) return;
+        if (!container || presentation !== "canvas" || loading || nativeLoading || !canvasCanRender) return;
         /* B14：数据源按模式切换——关系图用名册投影，文档引用图用内核局部图（均走规模裁剪） */
-        if (graphMode === "relations" && people.length === 0) return;
-        if (graphMode === "native" && (nativeLoading || nativeMissingCenter || nativeError !== "")) return;
-        const capped = graphMode === "native" ? nativeDisplayed : displayed;
-        truncated = capped.truncated;
-        if (capped.graph.nodes.length === 0) return;
+        const graph: import("../../domain/graph").PersonGraph = JSON.parse(canvasData);
+        if (graph.nodes.length === 0) return;
         const palette = themeColors();
 
         const instance = cytoscape({
@@ -517,47 +475,23 @@
             /* 画布撑满工作台后，小图的 fit 放大不设上限会糊脸（UX-02.13） */
             maxZoom: 2.5,
             elements: [
-                ...capped.graph.nodes.map((node) => ({
+                ...graph.nodes.map((node) => ({
                     data: {
                         id: node.id,
                         label: node.label,
                         degree: node.degree,
                         group: node.group,
                         kind: node.kind ?? "person",
-                        color: node.kind === "org" ? ORG_NODE_COLOR : groupColorValue(node.group),
+                        color: groupColorValue(node.group),
                     },
                     classes: searchNeedle ? "lvct-graph-hit" : "",
                 })),
-                ...capped.graph.edges.map((edge) => ({
+                ...graph.edges.map((edge) => ({
                     data: { source: edge.source, target: edge.target, kind: edge.kind ?? "related" },
                 })),
-                /* B14.6 组织增强层（仅关系图模式）：成员边只连当前画布内人物，裁剪后不造悬空端点；
-                   B14.8 收窄时只画所选组织节点 */
-                ...(graphMode === "relations" && showOrgs && orgOverlay
-                    ? orgOverlay.nodes.filter((node) => orgNarrowId === "" || node.id === orgNarrowId).map((node) => ({
-                        data: {
-                            id: node.id,
-                            label: node.label,
-                            degree: node.degree,
-                            group: node.group,
-                            kind: "org",
-                            color: ORG_NODE_COLOR,
-                        },
-                        classes: searchNeedle && node.label.toLowerCase().includes(searchNeedle) ? "lvct-graph-hit" : "",
-                    }))
-                    : []),
-                ...(graphMode === "relations" && showOrgs && orgOverlay
-                    ? (() => {
-                        const layer = orgOverlay;
-                        return layer.edges
-                            .filter((edge) => layer.nodes.some((node) => node.id === edge.source)
-                                && capped.graph.nodes.some((node) => node.id === edge.target))
-                            .map((edge) => ({ data: { source: edge.source, target: edge.target, kind: "member" } }));
-                    })()
-                    : []),
             ],
             // 同步完成布局，避免筛选/切页销毁画布后动画帧继续访问 renderer。
-            layout: { name: "cose", animate: false, padding: 30 },
+            layout: { name: "cose", animate: false, padding: 30, nodeDimensionsIncludeLabels: true },
             style: [
                 {
                     selector: "node",
@@ -569,6 +503,10 @@
                         "font-size": 11,
                         "font-weight": 500,
                         color: palette.text,
+                        "text-wrap": "ellipsis",
+                        "text-max-width": "88px",
+                        "text-outline-width": 2,
+                        "text-outline-color": palette.surface,
                         "text-valign": "bottom",
                         "text-margin-y": 4,
                         /* UX-02.4 表面色描边环 + 同色 underlay 光晕 */
@@ -614,14 +552,14 @@
             const person = people.find((item) => item.docId === docId);
             if (person) {
                 clearHover();
-                onOpenDetail(person);
+                openSnapshotPerson(person);
                 return;
             }
             /* B14 组织入口：组织节点点击跳组织视图 */
             const orgNode = orgOverlay?.nodes.find((node) => node.id === docId);
-            if (orgNode && onOpenOrgs) {
+            if (orgNode) {
                 clearHover();
-                onOpenOrgs();
+                focusOrganization(docId);
             }
         });
         instance.on("mouseover", "node", scheduleHover);
@@ -642,9 +580,60 @@
     function openHoveredPerson() {
         const person = hoveredPerson;
         clearHover();
-        if (person) onOpenDetail(person);
+        if (person) openSnapshotPerson(person);
+    }
+
+    function focusOrganization(id: string) {
+        orgNarrowId = id;
+        if (graphMode === "relations") relationScope = "org";
+        else nativeScope = "org";
+        textLimit = 100;
+    }
+
+    function clearFilters() {
+        searchText = ""; groupFilter = ""; isolatedOnly = false; orgNarrowId = "";
+        if (relationScope === "org") relationScope = "global";
+        if (nativeScope === "org") nativeScope = "global";
+    }
+
+    const nodeById = $derived(new Map(snapshot.graph.nodes.map((node) => [node.id, node])));
+    function nodeName(id: string): string { return nodeById.get(id)?.label ?? id; }
+
+    function openTextNode(node: GraphNode) {
+        if (node.kind === "org") focusOrganization(node.id);
+        else {
+            const person = snapshot.people.find((entry) => entry.docId === node.id);
+            if (person) openSnapshotPerson(person);
+        }
     }
 </script>
+
+<style>
+    .lvct-graph-view { overflow-y: auto; min-width: 0; }
+    .lvct-graph-summary, .lvct-graph-text {
+        flex-shrink: 0;
+        min-width: 0;
+        padding: 12px;
+        color: var(--b3-theme-on-background);
+        background: var(--b3-theme-background);
+        overflow-wrap: anywhere;
+    }
+    .lvct-graph-summary h2 { margin: 0; font-size: 1rem; }
+    .lvct-graph-summary p { margin: 6px 0; }
+    .lvct-graph-text { overflow-y: auto; }
+    .lvct-graph-text ul, .lvct-graph-text ol { padding-inline-start: 20px; }
+    .lvct-graph-text li { margin-block: 8px; }
+    .lvct-graph-text__nodes li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .lvct-graph-text__nodes span { flex: 1 1 180px; min-width: 0; }
+    .lvct-graph-text button { min-height: 40px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+    .lvct-graph-summary :focus-visible, .lvct-graph-text :focus-visible { outline: 2px solid var(--b3-theme-primary); outline-offset: 2px; }
+    .lvct-graph-diagnostics { max-height: 180px; overflow: auto; }
+    @media (max-width: 640px) {
+        .lvct-graph-summary, .lvct-graph-text { padding: 8px; }
+        .lvct-graph-text__nodes li { align-items: flex-start; }
+        .lvct-graph-text__nodes span { flex-basis: 100%; }
+    }
+</style>
 
 <div class="lvct-graph-view">
     <div class="lvct-people__toolbar fn__flex">
@@ -666,11 +655,17 @@
             >{text("graphModeNative", "文档引用")}</button>
         </div>
         <input class="b3-text-field fn__flex-1" type="search" placeholder={text("graphSearchPlaceholder", "搜索节点…")} aria-label={text("graphSearchNodes", "搜索关系图谱节点")} bind:value={searchText} />
-        {#if searchNeedle}<span class="ft__smaller ft__on-surface">{graphMode === "native" ? text("graphNativeHitCount", "命中 {n} 个节点", { n: nativeHitCount }) : text("graphHitCount", "命中 {n} 人", { n: filteredPeople.length })}</span>{/if}
-        {#if orgOverlay && orgOverlay.nodes.length > 0}
+        {#if searchNeedle}<span class="ft__smaller ft__on-surface">{text("graphSnapshotHits", "筛选后 {n} 个节点（含保留中心）", { n: snapshot.counts.filteredNodes })}</span>{/if}
+        <div role="group" aria-label={text("graphPresentation", "图谱阅读方式")}>
+            <button class="b3-button b3-button--text" aria-pressed={presentation === "text"} onclick={() => (presentation = "text")}>{text("graphTextView", "文本视图")}</button>
+            <button class="b3-button b3-button--text" aria-pressed={presentation === "canvas"} onclick={() => (presentation = "canvas")}>{text("graphCanvasView", "画布视图")}</button>
+        </div>
+        <button class="b3-button b3-button--outline" onclick={exportResultMarkdown} disabled={loading || nativeLoading}>{text("graphSnapshotExport", "导出当前快照")}</button>
+        {#if orgOverlay.nodes.length > 0 || orgNarrowId}
             <!-- B14.8 按组织收窄：两模式共享（画布人物/登记白名单收窄到所选组织成员） -->
             <select class="b3-select" bind:value={orgNarrowId} aria-label={text("graphOrgNarrowLabel", "按组织收窄")}>
                 <option value="">{text("graphOrgNarrowAll", "全部组织")}</option>
+                {#if orgNarrowId && !orgOverlay.nodes.some((org) => org.id === orgNarrowId)}<option value={orgNarrowId}>{text("graphOrgUnverified", "所选组织待核实")} · {orgNarrowId}</option>{/if}
                 {#each orgOverlay.nodes as org (org.id)}
                     <option value={org.id}>{org.label}</option>
                 {/each}
@@ -682,6 +677,7 @@
                 <option value="self">{text("graphNativeScopeSelf", "以本人为中心（一度引用）")}</option>
                 <option value="person">{text("graphNativeScopePerson", "以联系人为中心（一度引用）")}</option>
                 <option value="global">{text("graphNativeScopeGlobal", "全部登记文档")}</option>
+                <option value="org">{text("graphScopeOrg", "以组织为中心（一度引用）")}</option>
             </select>
             {#if nativeScope === "person"}
                 <!-- B03 可搜索选人器：中心人物（B14.8 中心保留） -->
@@ -696,13 +692,20 @@
             {/if}
             <span class="ft__smaller ft__on-surface">{text("graphNativeEdgeNote", "边=文档间块引用（双向一度，含回链），非 related 关系")}</span>
         {:else}
+            <select class="b3-select" bind:value={relationScope} aria-label={text("graphRelationsScope", "关系图范围")}>
+                <option value="global">{text("graphScopeGlobal", "全部登记文档")}</option>
+                <option value="self">{text("graphScopeSelf", "以本人为中心")}</option>
+                <option value="person">{text("graphScopePerson", "以人物为中心")}</option>
+                <option value="org">{text("graphScopeOrganization", "以组织为中心")}</option>
+            </select>
+            {#if relationScope === "person"}<PersonPicker items={graphPickerItems} value={relationCenterDocId} ariaLabel={text("graphScopeCenter", "范围中心人物")} onSelect={(id) => (relationCenterDocId = id)} />{/if}
             <select class="b3-select" bind:value={groupFilter} aria-label={text("graphFilterByGroup", "按分组过滤")}>
                 <option value="">{text("graphAllGroups", "全部分组")}</option>
                 {#each groups as group (group)}
                     <option value={group}>{group}</option>
                 {/each}
             </select>
-            <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={isolatedOnly} />{text("graphIsolatedOnly", "仅无关系人物（{n}）", { n: isolatedIds.size })}</label>
+            <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={isolatedOnly} />{text("graphIsolatedOnly", "仅无关系人物（{n}）", { n: snapshot.counts.isolatedPeople })}</label>
             <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={showOrgs} />{text("graphShowOrgs", "显示组织（{n}）", { n: orgOverlay?.nodes.length ?? 0 })}</label>
         {/if}
         <span class="ft__smaller ft__on-surface lvct-graph-legend">
@@ -713,7 +716,7 @@
         <span class="fn__flex-1"></span>
     </div>
 
-    {#if graphMode === "relations" && !loading && !errorText && displayed.graph.nodes.length > 0}
+    {#if graphMode === "relations" && !loading && !errorText && snapshot.people.length > 0}
         <div class="lvct-graph-query">
             <label>{text("graphCenterLabel", "关系中心")}
                 <!-- B03 可搜索选人器：输入即筛替换全量长列表 -->
@@ -750,7 +753,9 @@
                 </select>
             {/if}
             {#if focusId}
-                {#if pathMode}
+                {#if snapshot.result.status === "unknown" || snapshot.result.status === "center_missing"}
+                    <span class="ft__smaller ft__on-surface">{text("graphQueryUnverified", "关系查询结果待核实")}</span>
+                {:else if pathMode}
                     <span class="ft__smaller ft__on-surface">{pathIds.length > 0 ? text("graphPathCount", "最短路径：{n} 段关系（当前图内）", { n: pathIds.length - 1 }) : text("graphPathNone", "最短路径：无连接（当前图内）")}</span>
                 {:else}
                     <span class="ft__smaller ft__on-surface">{compareId ? text("graphCommonCount", "共同联系人：{n} 人（当前图内）", { n: resultPeople.length }) : secondMode ? text("graphSecondCount", "二度关系：{n} 人（当前图内）", { n: resultPeople.length }) : text("graphDirectCount", "直接关系：{n} 人（当前图内）", { n: resultPeople.length })}</span>
@@ -764,16 +769,18 @@
                 <div class="ft__smaller ft__on-surface" role="status">{resultExportMessage}（{text("graphExportScope", "结果仅限当前图内，不代表现实社交关系或引荐意愿。")}）</div>
             {/if}
             <div class="lvct-graph-query__results">
-                {#if pathMode}
+                {#if snapshot.result.status === "unknown" || snapshot.result.status === "center_missing"}
+                    <span class="ft__smaller ft__on-surface">{snapshot.result.reason}</span>
+                {:else if pathMode}
                     {#each pathPeople as person, index (person.docId)}
                         {#if index > 0}<span class="ft__on-surface" aria-hidden="true">→</span>{/if}
-                        <button class="b3-button b3-button--text" onclick={() => onOpenDetail(person)}>{person.name}</button>
+                        <button class="b3-button b3-button--text" onclick={() => openSnapshotPerson(person)}>{person.name} · {person.docId}</button>
                     {:else}
                         <span class="ft__smaller ft__on-surface">{text("graphNoPath", "当前图内没有连接路径")}</span>
                     {/each}
                 {:else}
                 {#each resultPeople as person (person.docId)}
-                    <button class="b3-button b3-button--text" onclick={() => onOpenDetail(person)}>{person.name}</button>
+                    <button class="b3-button b3-button--text" onclick={() => openSnapshotPerson(person)}>{person.name} · {person.docId}</button>
                 {:else}
                     <span class="ft__smaller ft__on-surface">{compareId ? text("graphNoCommon", "当前图内没有共同联系人") : secondMode ? text("graphNoSecond", "当前图内没有二度关系") : text("graphNoDirect", "当前图内没有直接关系")}</span>
                 {/each}
@@ -782,31 +789,26 @@
         {/if}
     {/if}
 
-    {#if graphMode === "native" && !nativeLoading && !nativeMissingCenter && nativeError === ""}
-        <div class="ft__smaller ft__on-surface lvct-graph-note" role="status">
-            {#if nativeScope === "global"}
-                {text("graphNativeScopeGlobalDesc", "全部登记文档之间的文档引用（不是整库图）")}
-            {:else if nativeCenterName}
-                {text("graphNativeScopePersonDesc", "以 {name} 为中心的一度文档引用（含回链）", { name: nativeCenterName })}
-            {:else}
-                {text("graphNativeScopeSelfDesc", "以「我自己」为中心的一度文档引用（含回链）")}
-            {/if}
-            {#if orgNarrowId !== "" && narrowedDocIds}
-                {text("graphNativeNarrowed", "（仅 {n} 位所选组织成员）", { n: narrowedDocIds.size })}
-            {/if}
-            {#if nativeRangeStats}
-                {" "}{text("graphNativeRangeStats", "纳入 {in} 个登记文档 · 图外 {out} 位联系人暂无引用", { in: nativeRangeStats.inside, out: nativeRangeStats.outside })}
-            {/if}
-        </div>
-    {/if}
+    <section class="lvct-graph-summary" aria-label={text("graphSnapshotSummary", "图查询范围与计数")} aria-busy={loading || nativeLoading}>
+        <h2 tabindex="-1" bind:this={resultHeading}>{text("graphSnapshotTitle", "当前图查询")}</h2>
+        <p role="status" aria-live="polite" aria-atomic="true">{loading || nativeLoading ? text("graphSnapshotLoading", "正在核实图查询…") : `${snapshot.state === "unknown" || snapshot.state === "center_missing" ? "范围尚未核实" : snapshot.state === "partial" ? "已显示核实部分" : "查询完成"} · 展示 ${snapshot.counts.displayedNodes} 节点 / ${snapshot.counts.displayedEdges} 边`}</p>
+        <p>{text("graphScopeLabel", "范围")}：{query.scope === "global" ? "全部登记文档" : query.scope === "self" ? "本人中心" : query.scope === "person" ? "人物中心" : "组织中心"} · {snapshot.center.label} · {snapshot.center.status === "verified" ? snapshot.center.id : snapshot.center.status === "none" ? "无中心" : "中心待核实"}</p>
+        <p>登记 {snapshot.counts.registered ?? "未知"} · 来源节点 {snapshot.counts.sourceNodes ?? "未知"} / 边 {snapshot.counts.sourceEdges ?? "未知"} · 范围内 {snapshot.counts.rangeNodes} · 筛选后 {snapshot.counts.filteredNodes} · 范围排除 {snapshot.counts.rangeExcluded ?? "未知"} · 筛选排除 {snapshot.counts.filterExcluded}</p>
+        <p>{graphMode === "relations" ? `${graphEdgeLabel("related")}；${graphEdgeLabel("member")}。只有 related 参与关系查询。` : `${graphEdgeLabel("ref")}（含回链）；不是整库图，未打开思源原生面板。`}</p>
+        {#if graphMode === "native" && (groupFilter || isolatedOnly)}<p>已保留关系图分组/无关系筛选；这些条件不应用于文档引用图。</p>{/if}
+        {#if snapshot.retainedByRange.length}<p>{text("graphRangeRetained", "范围外中心优先保留：{names}（不属于当前范围或组织成员集合，不新增关系事实）", { names: snapshot.retainedByRange.map(nodeName).join("、") })}</p>{/if}
+        {#if snapshot.retainedByFilter.length}<p>中心优先保留：{snapshot.retainedByFilter.map(nodeName).join("、")}（未满足全部筛选）</p>{/if}
+        {#if snapshot.result.status !== "none"}<p role={snapshot.result.status === "unknown" || snapshot.result.status === "center_missing" ? "alert" : "status"}>{snapshot.result.reason}</p>{/if}
+        {#if snapshot.diagnostics.length}<details class="lvct-graph-diagnostics" open={snapshot.state === "unknown" || snapshot.state === "center_missing"}>
+            <summary>{text("graphDiagnostics", "待核实与诊断")}（{snapshot.diagnostics.length}）</summary>
+            <ul>{#each snapshot.diagnostics as diagnostic}<li>{diagnostic.message}</li>{/each}</ul>
+        </details>{/if}
+        {#if preferenceError}<p role="alert">{preferenceError}</p>{/if}
+    </section>
 
     {#if truncated}
         <div class="ft__smaller ft__on-surface lvct-graph-note">
-            {#if graphMode === "native"}
-                {text("graphNativeTruncated", "引用图超过 {max} 个节点，只展示连接最多的 {max} 个（搜索可缩小范围）。", { max: GRAPH_MAX_NODES })}
-            {:else}
-                {text("graphTruncatedNote", "联系人超过 {max}，当前只展示关系最多的 {max} 人（用分组筛选或搜索缩小范围可看全）。", { max: GRAPH_MAX_NODES })}
-            {/if}
+            {text("graphSnapshotTruncated", "节点预算 {max}（含人物与组织），裁剪 {nodes} 节点 / {edges} 边；中心已保留，请搜索或按组织收窄。", { max: GRAPH_MAX_NODES, nodes: snapshot.counts.clippedNodes, edges: snapshot.counts.clippedEdges })}
         </div>
     {/if}
 
@@ -814,33 +816,43 @@
         <ViewState error title={text("graphLoadFailTitle", "图谱加载失败")} description={errorText}>
             <button class="b3-button b3-button--outline" onclick={refresh}>{text("graphReload", "重新加载")}</button>
         </ViewState>
-    {:else if graphMode === "native" && nativeMissingCenter}
-        <ViewState title={text("graphNativeNoCenterTitle", "还没有本人档案")} description={text("graphNativeNoCenterDesc", "文档引用图以本人档案为中心。请先在设置中建立或指定「我自己」。")}>
-            <button class="b3-button b3-button--outline" onclick={() => void loadNativeGraph()}>{text("graphReload", "重新加载")}</button>
-        </ViewState>
-    {:else if graphMode === "native" && nativeError}
-        <ViewState error title={text("graphNativeLoadFailTitle", "文档引用图加载失败")} description={nativeError}>
-            <button class="b3-button b3-button--outline" onclick={() => void loadNativeGraph()}>{text("graphReload", "重新加载")}</button>
-        </ViewState>
-    {:else if graphMode === "native" && nativeLoading}
-        <ViewState loading title={text("graphNativeLoading", "正在读取文档引用图")} />
-    {:else if graphMode === "native" && nativeDisplayed.graph.nodes.length === 0}
-        <ViewState title={text("graphNativeEmptyTitle", "暂无文档引用")} description={text("graphNativeEmptyDesc", "在笔记中用块引用链接联系人文档后，这里会显示引用网络。")}>
-            <button class="b3-button b3-button--outline" onclick={() => void loadNativeGraph()}>{text("graphReload", "重新加载")}</button>
-        </ViewState>
-    {:else if loading}
+    {:else if loading || nativeLoading}
         <ViewState loading title={text("graphLoadingTitle", "正在加载关系图谱")} />
-    {:else if filteredPeople.length === 0}
+    {:else if snapshot.state === "unknown" || snapshot.state === "center_missing"}
+        <ViewState error title={text("graphSnapshotUnknown", "图查询范围尚未核实")} description={snapshot.diagnostics.map((entry) => entry.message).join("；")}>
+            <button class="b3-button b3-button--outline" onclick={refresh}>{text("graphReverify", "重新核实来源")}</button>
+            <button class="b3-button b3-button--text" onclick={() => { relationScope = "global"; nativeScope = "global"; orgNarrowId = ""; }}>{text("graphUseGlobal", "切换全局范围")}</button>
+            {#if graphMode === "native"}<button class="b3-button b3-button--text" onclick={() => void switchGraphMode("relations")}>{text("graphUseRelations", "切换关系图")}</button>{/if}
+        </ViewState>
+    {:else if snapshot.graph.nodes.length === 0}
         <ViewState title={people.length === 0 ? text("graphEmptyNoPeopleTitle", "还没有联系人") : text("graphEmptyNoMatchTitle", "没有匹配的节点")}
             description={people.length === 0 ? text("graphEmptyNoPeopleDesc", "创建或导入联系人后，在人物详情中建立关系。") : text("graphEmptyNoMatchDesc", "试试清除关键词和分组筛选。")}>
             {#if people.length > 0}
-                <button class="b3-button b3-button--outline" onclick={() => { searchText = ""; groupFilter = ""; isolatedOnly = false; }}>{text("graphClearFilters", "清除筛选")}</button>
+                <button class="b3-button b3-button--outline" onclick={clearFilters}>{text("graphClearFilters", "清除筛选")}</button>
             {/if}
             <button class="b3-button b3-button--text" onclick={onOpenPeople}>{text("graphGoContacts", "前往联系人")}</button>
         </ViewState>
+    {:else if presentation === "text"}
+        <section class="lvct-graph-text" aria-label={text("graphTextResults", "图谱文本结果")}>
+            <h3>{text("graphTextNodes", "节点")}（{snapshot.graph.nodes.length}）</h3>
+            <ul class="lvct-graph-text__nodes">
+                {#each snapshot.graph.nodes.slice(0, textLimit) as node (node.id)}
+                    <li>
+                        <button class="b3-button b3-button--text" data-graph-id={node.id} onclick={() => openTextNode(node)} aria-label={`${node.kind === "org" ? "聚焦组织" : "打开人物"} ${node.label} ${node.id}`}>{node.label}</button>
+                        <span>{node.kind === "org" ? "组织" : "人物"} · 图内连接 {node.degree} · {node.id}</span>
+                        <button class="b3-button b3-button--outline" onclick={() => void locateNode(node.id)}>{text("graphLocateCanvas", "定位画布")}</button>
+                    </li>
+                {/each}
+            </ul>
+            <h3>{text("graphTextEdges", "边及来源")}（{snapshot.graph.edges.length}）</h3>
+            <ul>{#each snapshot.graph.edges.slice(0, textLimit) as edge}<li>{nodeName(edge.source)}（{edge.source}） — {nodeName(edge.target)}（{edge.target}） · {graphEdgeLabel(edge.kind)}</li>{/each}</ul>
+            {#if snapshot.result.pathIds.length}<h3>{text("graphTextPath", "related 路径链")}</h3><ol>{#each snapshot.result.pathIds as id}<li>{nodeName(id)} · {id}</li>{/each}</ol>{/if}
+            <p role="status">文本已列出 {Math.min(textLimit, snapshot.graph.nodes.length)} / {snapshot.graph.nodes.length} 节点，{Math.min(textLimit, snapshot.graph.edges.length)} / {snapshot.graph.edges.length} 边；导出包含完整展示快照。</p>
+            {#if textLimit < Math.max(snapshot.graph.nodes.length, snapshot.graph.edges.length)}<button class="b3-button b3-button--outline" onclick={() => (textLimit += 100)}>{text("graphTextMore", "继续列出节点与边")}</button>{/if}
+        </section>
     {:else}
         <div class="lvct-graph-view__canvas-wrap">
-            <div class="lvct-graph-view__canvas" bind:this={container}></div>
+            <div class="lvct-graph-view__canvas" bind:this={container} tabindex="-1" role="img" aria-label={`图谱画布，${snapshot.graph.nodes.length} 节点、${snapshot.graph.edges.length} 边。请切换文本视图用键盘阅读。${canvasFocusId ? `已定位 ${nodeName(canvasFocusId)}` : ""}`}></div>
             <!-- UX-02.13 视图操作收进画布右下角浮动簇（地图应用范式），工具栏只留筛选 -->
             <div class="lvct-graph__fab" role="toolbar" aria-label={text("graphViewTools", "图谱视图操作")}>
                 <button class="lvct-graph__fab-btn" title={text("graphFit", "适应")} aria-label={text("graphFit", "适应")} onclick={() => graphInstance?.fit()}><Scan size={15} /></button>
@@ -862,11 +874,9 @@
                         <b>{hoveredOrg.label}</b>
                         <span class="lvct-chip lvct-chip--group">{text("graphOrgChip", "组织")}</span>
                     </div>
-                    <div class="ft__smaller ft__on-surface">{text("graphOrgHoverMembers", "图内成员连接：{n}", { n: hoveredOrg.degree })}</div>
-                    {#if onOpenOrgs}
-                        <button class="b3-button b3-button--text" onclick={() => { const open = onOpenOrgs; clearHover(); open(); }}>
-                            {text("graphOrgHoverOpen", "打开组织视图")}</button>
-                    {/if}
+                    <div class="ft__smaller ft__on-surface">{graphMode === "native" ? text("graphOrgHoverConnections", "图内引用连接：{n}", { n: hoveredOrg.degree }) : text("graphOrgHoverMembers", "图内成员连接：{n}", { n: hoveredOrg.degree })}</div>
+                    <button class="b3-button b3-button--text" onclick={() => { const id = hoveredOrg?.id; clearHover(); if (id) focusOrganization(id); }}>{text("graphOrgFocus", "聚焦该组织")}</button>
+                    {#if onOpenOrgs}<button class="b3-button b3-button--text" onclick={onOpenOrgs}>{text("graphOrgHoverOpen", "打开组织视图")}</button>{/if}
                 </div>
             {:else if hoveredPerson}
                 <div
@@ -884,7 +894,7 @@
                     {#if hoveredNativeDegree >= 0}
                         <div class="ft__smaller ft__on-surface">{text("graphNativeDegree", "图内连接：{n}", { n: hoveredNativeDegree })}</div>
                     {:else}
-                        <div class="ft__smaller ft__on-surface">{text("graphDegreeLabel", "关系度数：{n}", { n: hoveredPerson.relatedItemIds.length })}</div>
+                        <div class="ft__smaller ft__on-surface">{text("graphDegreeLabel", "关系度数：{n}", { n: snapshot.relationGraph.nodes.find((node) => node.id === hoveredPerson?.docId)?.degree ?? 0 })}</div>
                     {/if}
                     {#if hoveredPerson.phone}<div class="ft__smaller ft__on-surface">{text("graphPhoneLabel", "电话：{n}", { n: hoveredPerson.phone })}</div>{/if}
                     {#if hoveredPerson.tags.length > 0}<div class="ft__smaller ft__on-surface">{text("graphTagsLabel", "标签：{n}", { n: hoveredPerson.tags.join(" · ") })}</div>{/if}

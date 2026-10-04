@@ -14,23 +14,26 @@ import type { MeetingBriefingItem } from "../domain/briefing";
 import { getOrgDisplayForDoc } from "../services/org";
 import { nextBirthday } from "../domain/occasions";
 import { svelteDialog } from "../libs/dialog";
-import { subscribeDataChanged } from "../libs/data-events";
+import { requestPersonNavigation, subscribeDataChanged } from "../libs/data-events";
 import PersonEditDialog from "../components/people/PersonEditDialog.svelte";
 import { translateText } from "../domain/translation";
 import type { Plugin } from "siyuan";
 import type { ContactsSettings } from "../domain/model";
 import type { ContactSummary } from "../domain/person";
+import type { LifecycleToken } from "../domain/lifecycle";
 
 const STRIP_CLASS = "lvct-doc-strip";
 const stripRequests = new WeakMap<HTMLElement, number>();
 /** FUNC-01.7-a：已注入档案条的活跃文档登记——数据变化时原地重渲染（不整页刷新） */
 const activeStrips = new Map<HTMLElement, { context: PanelContext; protyle: ProtyleLike; rootId: string }>();
 let dataSubscription: (() => void) | null = null;
+const lifecycleCleanups = new Map<Plugin, () => void>();
 
 export interface PanelContext {
     plugin: Plugin;
     settings: ContactsSettings | null;
     i18n?: Record<string, string>;
+    lifecycleToken?: LifecycleToken;
 }
 
 interface ProtyleLike {
@@ -42,11 +45,31 @@ type ProtyleEvent = { detail?: { protyle?: ProtyleLike } };
 
 /** protyle 事件入口（loaded-protyle-static/dynamic、switch-protyle） */
 export function handleProtyleEvent(context: PanelContext, event: ProtyleEvent): void {
+    if (context.lifecycleToken && !context.lifecycleToken.isAlive()) return;
+    if (context.lifecycleToken && !lifecycleCleanups.has(context.plugin)) {
+        lifecycleCleanups.set(context.plugin, context.lifecycleToken.onDispose(() => disposePersonPanels(context.plugin)));
+    }
     ensureDataSubscription();
     const protyle = event.detail?.protyle;
     if (!protyle?.element || !context.settings) return;
     const rootId = protyle.block?.rootID ?? "";
     void updateStrip(context, protyle, rootId);
+}
+
+export function disposePersonPanels(plugin: Plugin): void {
+    const detach = lifecycleCleanups.get(plugin);
+    lifecycleCleanups.delete(plugin);
+    detach?.();
+    for (const [element, entry] of activeStrips) {
+        if (entry.context.plugin !== plugin) continue;
+        stripRequests.set(element, (stripRequests.get(element) ?? 0) + 1);
+        element.querySelector(`.${STRIP_CLASS}`)?.remove();
+        activeStrips.delete(element);
+    }
+    if (activeStrips.size === 0) {
+        dataSubscription?.();
+        dataSubscription = null;
+    }
 }
 
 /** 数据变化（含跨窗口）：名册缓存立即失效，活跃档案条逐个重渲染（乱序由 stripRequests 代际挡） */
@@ -55,7 +78,7 @@ function ensureDataSubscription(): void {
     dataSubscription = subscribeDataChanged(() => {
         invalidateRoster();
         for (const [element, entry] of [...activeStrips]) {
-            if (!element.isConnected) {
+            if (!element.isConnected || entry.context.lifecycleToken && !entry.context.lifecycleToken.isAlive()) {
                 activeStrips.delete(element);
                 continue;
             }
@@ -65,30 +88,36 @@ function ensureDataSubscription(): void {
 }
 
 async function updateStrip(context: PanelContext, protyle: ProtyleLike, rootId: string): Promise<void> {
+    if (context.lifecycleToken && !context.lifecycleToken.isAlive()) return;
     const request = (stripRequests.get(protyle.element) ?? 0) + 1;
     stripRequests.set(protyle.element, request);
+    const isCurrent = () => stripRequests.get(protyle.element) === request
+        && protyle.block?.rootID === rootId && protyle.element.isConnected
+        && (!context.lifecycleToken || context.lifecycleToken.isAlive());
     protyle.element.querySelector(`.${STRIP_CLASS}`)?.remove();
     if (!rootId || !context.settings) {
         activeStrips.delete(protyle.element);
         return;
     }
+    activeStrips.set(protyle.element, { context, protyle, rootId });
     try {
         const roster = await getRoster(context.settings);
+        if (!isCurrent()) return;
         const person = roster.find((item) => item.docId === rootId);
         if (!person) {
             activeStrips.delete(protyle.element);
             return;
         }
-        activeStrips.set(protyle.element, { context, protyle, rootId });
         const [interactionStore, followUpStore] = await Promise.all([
             loadInteractionStore(context.plugin),
             loadFollowUpStore(context.plugin),
         ]);
-        if (stripRequests.get(protyle.element) !== request || protyle.block?.rootID !== rootId || !protyle.element.isConnected) return;
+        if (!isCurrent()) return;
         const lastInteraction = lastInteractionByPerson(interactionStore, [person]).get(person.docId);
         const birthday = person.birthday ? nextBirthday(person.birthday, person.isLunar) : undefined;
         /* B12：简报追加「单位」组织归属行（失败降级为无该行） */
         const orgLine = await getOrgDisplayForDoc(person.docId).catch(() => "");
+        if (!isCurrent()) return;
         const briefing = buildMeetingBriefing(
             person,
             roster,
@@ -135,6 +164,7 @@ function buildStrip(
 ): HTMLElement {
     const strip = document.createElement("div");
     strip.className = `${STRIP_CLASS} lvct-strip`;
+    strip.dataset.personDocId = person.docId;
     strip.dataset.personDocId = person.docId;
 
     const avatar = document.createElement("span");
@@ -241,8 +271,11 @@ function buildStrip(
     const open = document.createElement("button");
     open.className = "b3-button b3-button--small b3-button--outline";
     open.textContent = t(context, "stripOpen", "打开人脉");
+    open.dataset.lvctPersonEntry = "true";
     open.addEventListener("click", () => {
+        if (context.lifecycleToken && !context.lifecycleToken.isAlive()) return;
         const workbench = (context.plugin as Plugin & { openWorkbench?: () => void }).openWorkbench;
+        if (workbench) requestPersonNavigation(context.plugin, { docId: person.docId, source: "document", trigger: open }, context.lifecycleToken);
         workbench?.call(context.plugin);
     });
     actions.appendChild(open);
@@ -261,7 +294,7 @@ function makeBadge(text: string, className: string): HTMLSpanElement {
 }
 
 function openEditDialog(context: PanelContext, protyle: ProtyleLike, person: ContactSummary): void {
-    if (!context.settings) return;
+    if (!context.settings || context.lifecycleToken && !context.lifecycleToken.isAlive()) return;
     svelteDialog({
         title: `编辑资料 · ${person.name}`,
         width: "620px",

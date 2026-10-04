@@ -1,6 +1,8 @@
 <script lang="ts">
     /** 编辑资料：全字段更新（空值清空对应单元格） */
-    import { updateContactFields, PRESET_GROUPS } from "../../services/contacts";
+    import { retryContactFields, updateContactFields, PRESET_GROUPS } from "../../services/contacts";
+    import type { ContactWriteReport, WritableContactField } from "../../domain/contact-write.ts";
+    import { changedContactWriteFields } from "../../domain/contact-write.ts";
     import type { ContactDraft } from "../../domain/person";
     import type { ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
@@ -8,6 +10,7 @@
     import { translateText } from "../../domain/translation";
     import QuickFillDialog from "./QuickFillDialog.svelte";
     import { ClipboardPaste } from "@lucide/svelte";
+    import { onDestroy, untrack } from "svelte";
 
     let {
         settings,
@@ -41,6 +44,12 @@
     let tagsText: string = $state(person.tags.join(" "));
     let running: boolean = $state(false);
     let errorText: string = $state("");
+    let failedFields: WritableContactField[] = $state([]);
+    let pending: { draft: ContactDraft; report: ContactWriteReport } | undefined;
+    const target = untrack(() => ({ docId: person.docId, itemId: person.itemId }));
+    const writeSettings = untrack(() => ({ ...settings, fieldMap: { ...settings.fieldMap } }));
+    let alive = true;
+    onDestroy(() => { alive = false; });
     const original = JSON.stringify(draft);
     // svelte-ignore state_referenced_locally
     const originalTags = tagsText;
@@ -67,11 +76,43 @@
         }
     }
     // B06：字段级改动明细 + 「保存并离开」（persist 抛错则留在原地）
-    async function persist(): Promise<void> {
+    async function persist(retrying = false): Promise<void> {
+        if (!alive) throw new Error("编辑窗口已关闭，未发送新写入");
         const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
-        await updateContactFields(settings, person.itemId, { ...draft, tags });
+        const next = { ...draft, tags };
+        const changed = pending ? changedContactWriteFields(pending.draft, next) : [];
+        if (pending && changed.length > 0 && (retrying || pending.report.unknown.length > 0)) {
+            throw new Error("草稿与原请求不同；未知字段请先恢复原输入并核实，明确失败后修改输入请使用保存");
+        }
+        const fields = pending?.report.unresolved.map((failure) => failure.field);
+        const report = pending && changed.length === 0
+            ? await retryContactFields(writeSettings, target.itemId, pending.draft, fields!, target, () => alive)
+            : await updateContactFields(writeSettings, target.itemId, next, {
+                expected: target, canWrite: () => alive,
+                ...(pending ? { onlyFields: [...new Set([...fields!, ...changed])] } : {}),
+            });
+        if (!alive) return;
+        pending = { draft: { ...next, tags: [...tags] }, report };
+        failedFields = report.unresolved.map((failure) => failure.field);
+        if (!report.complete) {
+            throw new Error(`字段尚未完成：${report.unresolved.map((failure) => `${failure.label}（${failure.message}）`).join("、")}；已核实字段保留，请核实并重试未完成字段`);
+        }
         saved = true;
         onSaved();
+    }
+
+    async function retryFailed(): Promise<void> {
+        if (running || failedFields.length === 0) return;
+        running = true;
+        errorText = "";
+        try {
+            await persist(true);
+            if (alive) onClose();
+        } catch (error) {
+            if (alive) errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            running = false;
+        }
     }
     function draftChanges(): string[] {
         if (saved) return [];
@@ -111,9 +152,9 @@
         errorText = "";
         try {
             await persist();
-            onClose();
+            if (alive) onClose();
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            if (alive) errorText = error instanceof Error ? error.message : String(error);
         } finally {
             running = false;
         }
@@ -122,38 +163,38 @@
 
 <div class="lvct-form">
     <div class="lvct-form__toolbar">
-        <button type="button" class="b3-button b3-button--text lvct-form__toolbar-btn" onclick={() => (quickFillOpen = true)}>
+        <button type="button" class="b3-button b3-button--text lvct-form__toolbar-btn" onclick={() => (quickFillOpen = true)} disabled={running}>
             <ClipboardPaste size={14}/>{text("qfOpen", "粘贴并识别")}
         </button>
     </div>
     <div class="lvct-form__grid">
         <label class="lvct-form__item">
             <span>{text("formPhone", "电话")}</span>
-            <input class="b3-text-field fn__block" type="tel" bind:value={draft.phone} />
+            <input class="b3-text-field fn__block" type="tel" bind:value={draft.phone} disabled={running} />
         </label>
         <label class="lvct-form__item">
             <span>{text("formWechat", "微信")}</span>
-            <input class="b3-text-field fn__block" type="text" bind:value={draft.wechat} />
+            <input class="b3-text-field fn__block" type="text" bind:value={draft.wechat} disabled={running} />
         </label>
         <label class="lvct-form__item">
             <span>{text("formEmail", "邮箱")}</span>
-            <input class="b3-text-field fn__block" type="email" bind:value={draft.email} />
+            <input class="b3-text-field fn__block" type="email" bind:value={draft.email} disabled={running} />
         </label>
         <label class="lvct-form__item">
             <span>{text("formWebsite", "网站")}</span>
-            <input class="b3-text-field fn__block" type="url" bind:value={draft.website} />
+            <input class="b3-text-field fn__block" type="url" bind:value={draft.website} disabled={running} />
         </label>
         <label class="lvct-form__item">
             <span>{text("formBirthday", "生日")}</span>
-            <input class="b3-text-field fn__block" type="date" bind:value={draft.birthday} />
+            <input class="b3-text-field fn__block" type="date" bind:value={draft.birthday} disabled={running} />
         </label>
         <label class="lvct-form__item lvct-form__item--inline">
             <span>{text("formLunar", "农历")}</span>
-            <input class="b3-switch" type="checkbox" bind:checked={draft.isLunar} />
+            <input class="b3-switch" type="checkbox" bind:checked={draft.isLunar} disabled={running} />
         </label>
         <label class="lvct-form__item">
             <span>{text("formGroup", "分组")}</span>
-            <select class="b3-select fn__block" bind:value={draft.group}>
+            <select class="b3-select fn__block" bind:value={draft.group} disabled={running}>
                 <option value="">{text("formUngrouped", "未分组")}</option>
                 {#each PRESET_GROUPS as group (group)}
                     <option value={group}>{group}</option>
@@ -162,7 +203,7 @@
         </label>
         <label class="lvct-form__item">
             <span>{text("formTagsLabel", "标签（空格/逗号分隔）")}</span>
-            <input class="b3-text-field fn__block" type="text" bind:value={tagsText} />
+            <input class="b3-text-field fn__block" type="text" bind:value={tagsText} disabled={running} />
         </label>
     </div>
 
@@ -172,6 +213,9 @@
 
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={running}>{text("formCancel", "取消")}</button>
+        {#if failedFields.length > 0}
+            <button class="b3-button b3-button--outline" onclick={retryFailed} disabled={running}>{text("formRetryFailed", "核实并重试未完成字段")}</button>
+        {/if}
         <button class="b3-button b3-button--text" onclick={submit} disabled={running}>
             {running ? text("formSaving", "保存中…") : text("formSave", "保存")}
         </button>

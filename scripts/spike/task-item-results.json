@@ -1,31 +1,33 @@
 {
-  "kernel": "3.8.5",
-  "ranAt": "2026-09-28T03:05:42.368Z",
+  "kernel": "3.8.6",
+  "ranAt": "2026-10-04T10:30:10.446Z",
+  "workspace": "C:\\Users\\sunku\\AppData\\Local\\Temp\\lvct-task-spike-7580-1791109804906",
+  "port": 16832,
   "results": [
     {
       "name": "内核启动",
       "ok": true,
-      "detail": "v3.8.5"
+      "detail": "v3.8.6"
     },
     {
       "name": "① 原生待办块可建且 SQL 可识别",
       "ok": true,
-      "detail": "type=i subtype=t content=\" 联系是否开中药 📅2026-09-29\" id=20260928110541-8lu2yv5"
+      "detail": "type=i subtype=t content=\" 联系是否开中药 📅2026-09-29\" id=20261004183008-mg0s4yt"
     },
     {
       "name": "② 其他插件可按 type='i' + subtype='t' 扫到该待办",
       "ok": true,
-      "detail": "[{\"content\":\" 联系是否开中药 📅2026-09-29\",\"id\":\"20260928110541-8lu2yv5\",\"markdown\":\"- [ ] 联系是否开中药 📅2026-09-29\",\"subtype\":\"t\",\"type\":\"i\"}]"
+      "detail": "[{\"content\":\" 联系是否开中药 📅2026-09-29\",\"id\":\"20261004183008-mg0s4yt\",\"markdown\":\"- [ ] 联系是否开中药 📅2026-09-29\",\"subtype\":\"t\",\"type\":\"i\"}]"
     },
     {
       "name": "②b updateTaskListItemMarker 勾选",
       "ok": true,
-      "detail": "code=0 msg= → {\"content\":\" 联系是否开中药 📅2026-09-29\",\"ial\":\"{: id=\\\"20260928110541-8lu2yv5\\\" updated=\\\"20260928110541\\\"}\",\"id\":\"20260928110541-8lu2yv5\",\"markdown\":\"- [X] 联系是否开中药 📅2026-09-29\"}"
+      "detail": "code=0 msg= → {\"content\":\" 联系是否开中药 📅2026-09-29\",\"ial\":\"{: id=\\\"20261004183008-mg0s4yt\\\" updated=\\\"20261004183009\\\"}\",\"id\":\"20261004183008-mg0s4yt\",\"markdown\":\"- [X] 联系是否开中药 📅2026-09-29\"}"
     },
     {
       "name": "②c 反向取消勾选",
       "ok": true,
-      "detail": "code=0 → {\"ial\":\"{: id=\\\"20260928110541-8lu2yv5\\\" updated=\\\"20260928110541\\\"}\",\"id\":\"20260928110541-8lu2yv5\",\"markdown\":\"- [ ] 联系是否开中药 📅2026-09-29\"}"
+      "detail": "code=0 → {\"ial\":\"{: id=\\\"20261004183008-mg0s4yt\\\" updated=\\\"20261004183009\\\"}\",\"id\":\"20261004183008-mg0s4yt\",\"markdown\":\"- [ ] 联系是否开中药 📅2026-09-29\"}"
     },
     {
       "name": "②d batchUpdateTaskListItemMarker 生效于每条",
@@ -40,27 +42,42 @@
     {
       "name": "③ setBlockAttrs 挂跟进 ID",
       "ok": true,
-      "detail": "code=0 msg= ial={: updated=\"20260928110541\" custom-lvct-followup=\"fu-123\" custom-lvct-kind=\"followup\" id=\"20260928110541-8lu2yv5\"}"
+      "detail": "code=0 msg= ial={: id=\"20261004183008-mg0s4yt\" updated=\"20261004183009\" custom-lvct-followup=\"fu-123\" custom-lvct-kind=\"followup\"}"
     },
     {
       "name": "③b 勾选后自定义属性是否存活",
       "ok": true,
-      "detail": "ial={: id=\"20260928110541-8lu2yv5\" updated=\"20260928110542\" custom-lvct-followup=\"fu-123\" custom-lvct-kind=\"followup\"}"
+      "detail": "ial={: id=\"20261004183008-mg0s4yt\" updated=\"20261004183009\" custom-lvct-followup=\"fu-123\" custom-lvct-kind=\"followup\"}"
     },
     {
       "name": "③c 按自定义属性反查任务块",
       "ok": true,
-      "detail": "[{\"content\":\" 联系是否开中药 📅2026-09-29\",\"id\":\"20260928110512-847cxgz\"},{\"content\":\" 联系是否开中药 📅2026-09-29\",\"id\":\"20260928110532-57352ee\"},{\"content\":\" 联系是否开中药 📅2026-09-29\",\"id\":\"20260928110541-8lu2yv5\"}]"
+      "detail": "[{\"content\":\" 联系是否开中药 📅2026-09-29\",\"id\":\"20261004183008-mg0s4yt\"}]"
     },
     {
       "name": "④ 日期标记原样保留",
       "ok": true,
-      "detail": "[{\"content\":\" 联系是否开中药 📅2026-09-29\",\"markdown\":\"- [X] 联系是否开中药 📅2026-09-29\"},{\"content\":\" 联系是否开中药 📅2026-09-29\",\"markdown\":\"- [X] 联系是否开中药 📅2026-09-29\"},{\"content\":\" 送资料 @2026-10-01\",\"markdown\":\"- [ ] 送资料 @2026-10-01\"},{\"content\":\" 送资料 @2026-10-01 约饭 📅2026-10-05\",\"markdown\":\"- [ ] 送资料 @2026-10-01\\n- [ ] 约饭 📅2026-10-05\"},{\"content\":\" 约饭 📅2026-10-05\",\"markdown\":\"- [ ] 约饭 📅2026-10-05\"}]"
+      "detail": "[{\"content\":\" 联系是否开中药 📅2026-09-29\",\"markdown\":\"- [X] 联系是否开中药 📅2026-09-29\"},{\"content\":\" 联系是否开中药 📅2026-09-29\",\"markdown\":\"- [X] 联系是否开中药 📅2026-09-29\"},{\"content\":\" 约饭 📅2026-10-05\",\"markdown\":\"- [ ] 约饭 📅2026-10-05\"},{\"content\":\" 送资料 @2026-10-01 约饭 📅2026-10-05\",\"markdown\":\"- [ ] 送资料 @2026-10-01\\n- [ ] 约饭 📅2026-10-05\"},{\"content\":\" 送资料 @2026-10-01\",\"markdown\":\"- [ ] 送资料 @2026-10-01\"}]"
     },
     {
       "name": "④b 任务块被删后按 ID 反查为空",
       "ok": true,
       "detail": "rows=0"
+    },
+    {
+      "name": "⑤ 原子插入关联键挂在任务项",
+      "ok": true,
+      "detail": "{\"operations\":[{\"timestamp\":0,\"doOperations\":[{\"action\":\"insert\",\"data\":\"<div data-node-id=\\\"20261004000000-atlist1\\\" data-type=\\\"NodeList\\\" data-subtype=\\\"t\\\" class=\\\"list\\\"><div data-node-id=\\\"20261004000000-attask1\\\" data-type=\\\"NodeListItem\\\" data-subtype=\\\"t\\\" data-marker=\\\"*\\\" data-task=\\\" \\\" class=\\\"li\\\" custom-lvct-followup=\\\"fu-atomic\\\"><div class=\\\"protyle-action protyle-action--task\\\"><svg><use xlink:href=\\\"#iconUncheck\\\"></use></svg></div><div data-node-id=\\\"20261004000000-atpara1\\\" data-type=\\\"NodeParagraph\\\" class=\\\"p\\\"><div contenteditable=\\\"true\\\">原子关联 📅2026-10-08</div></div></div></div>\",\"id\":\"20261004000000-atlist1\",\"rootID\":\"\",\"parentID\":\"20261004183008-0qn7opi\",\"previousID\":\"\",\"nextID\":\"\",\"retData\":null,\"blockIDs\":null,\"blockID\":\"\",\"deckID\":\"\",\"avID\":\"\",\"srcIDs\":null,\"srcs\":null,\"isDetached\":false,\"name\":\"\",\"type\":\"\",\"format\":\"\",\"keyID\":\"\",\"rowID\":\"\",\"isTwoWay\":false,\"backRelationKeyID\":\"\",\"removeDest\":false,\"layout\":\"\",\"groupID\":\"\",\"targetGroupID\":\"\",\"viewID\":\"\",\"ignoreDefaultFill\":false,\"context\":null}],\"undoOperations\":null}],\"rows\":[{\"ial\":\"{: id=\\\"20261004000000-attask1\\\" custom-lvct-followup=\\\"fu-atomic\\\" updated=\\\"20261004000000\\\"}\",\"id\":\"20261004000000-attask1\",\"markdown\":\"- [ ] 原子关联 📅2026-10-08\",\"subtype\":\"t\",\"type\":\"i\"}]}"
+    },
+    {
+      "name": "⑤b updateBlock 保留任务项关联键",
+      "ok": true,
+      "detail": "[{\"ial\":\"{: id=\\\"20261004000000-attask1\\\" custom-lvct-followup=\\\"fu-atomic\\\" updated=\\\"20261004000000\\\"}\",\"id\":\"20261004000000-attask1\",\"markdown\":\"- [X] 改标题 📅2026-11-09\",\"subtype\":\"t\",\"type\":\"i\"}]"
+    },
+    {
+      "name": "⑤c 任务扫描按 ID 分页",
+      "ok": true,
+      "detail": "{\"first\":[{\"ial\":\"{: id=\\\"20261004000000-attask1\\\" custom-lvct-followup=\\\"fu-atomic\\\" updated=\\\"20261004000000\\\"}\",\"id\":\"20261004000000-attask1\",\"markdown\":\"- [X] 改标题 📅2026-11-09\"}],\"next\":[{\"ial\":\"{: id=\\\"20261004183008-mg0s4yt\\\" updated=\\\"20261004183009\\\" custom-lvct-followup=\\\"fu-123\\\" custom-lvct-kind=\\\"followup\\\"}\",\"id\":\"20261004183008-mg0s4yt\",\"markdown\":\"- [X] 联系是否开中药 📅2026-09-29\"}]}"
     }
   ]
 }

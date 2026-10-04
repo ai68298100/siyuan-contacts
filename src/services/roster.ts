@@ -45,7 +45,7 @@ export async function getRoster(settings: ContactsSettings): Promise<ContactSumm
             const people = rosterFromRender(rendered, fieldMap);
             /* B11.4：名册保留并标识本人——isSelf 供卡片徽标/选人器排除等投影使用；
                身份读取失败或未装配按无标记降级（roster 不因身份层故障而失败） */
-            const identity = await loadSelfIdentityBound().catch(() => null);
+            const identity = await loadSelfIdentityBound();
             if (identity) {
                 for (const person of people) {
                     if (isSelfDoc(identity, person.docId)) person.isSelf = true;

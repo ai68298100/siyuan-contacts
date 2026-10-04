@@ -5,6 +5,7 @@
  * 非法日期串视为该侧不限制。「从未联系」与日期范围同时启用时按 AND 语义为空集（互相矛盾的条件）。
  */
 import type { ContactSummary } from "./person";
+import { matchesProfileFilters } from "./people-profiles.ts";
 
 export type TagMatchMode = "all" | "any";
 
@@ -28,6 +29,9 @@ export interface PeopleFilterState {
     neverContacted: boolean;
     /** 资料完整度（C03）；空串表示不限 */
     profileGap: ProfileGap | "";
+    workQuery?: string;
+    educationQuery?: string;
+    relationshipLabel?: string;
 }
 
 export const EMPTY_PEOPLE_FILTER: PeopleFilterState = {
@@ -70,7 +74,8 @@ export function hasProfileGap(person: ContactSummary, gap: ProfileGap): boolean 
 
 /** 附加筛选（标签模式之外的部分）是否生效 */
 export function isExtraFilterActive(filter: PeopleFilterState): boolean {
-    return filter.tagMatch !== "all" || !!filter.recentFrom || !!filter.recentTo || filter.neverContacted || !!filter.profileGap;
+    return filter.tagMatch !== "all" || !!filter.recentFrom || !!filter.recentTo || filter.neverContacted || !!filter.profileGap
+        || !!filter.workQuery || !!filter.educationQuery || !!filter.relationshipLabel;
 }
 
 /** 当前生效的附加条件（固定顺序），供生效条件行渲染与单项清除 */
@@ -93,6 +98,7 @@ export function applyPeopleFilters(
     const to = isDateKey(filter.recentTo) ? filter.recentTo : "";
     const rangeActive = !!(from || to);
     return people.filter((person) => {
+        if (!matchesProfileFilters(person.profile, filter)) return false;
         if (filter.profileGap && !hasProfileGap(person, filter.profileGap)) return false;
         const last = recent[person.docId];
         if (filter.neverContacted && last) return false;

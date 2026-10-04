@@ -16,6 +16,9 @@ export interface SavedViewQuery {
     recentTo: string;
     neverContacted: boolean;
     sort: PeopleSortMode;
+    workQuery?: string;
+    educationQuery?: string;
+    relationshipLabel?: string;
 }
 
 export interface SavedView {
@@ -54,6 +57,9 @@ function normalizeQuery(raw: unknown): SavedViewQuery | null {
         recentTo: typeof record.recentTo === "string" && DATE_RE.test(record.recentTo) ? record.recentTo : "",
         neverContacted: record.neverContacted,
         sort: record.sort,
+        ...(typeof record.workQuery === "string" && record.workQuery.trim() ? { workQuery: record.workQuery.trim().slice(0, 200) } : {}),
+        ...(typeof record.educationQuery === "string" && record.educationQuery.trim() ? { educationQuery: record.educationQuery.trim().slice(0, 200) } : {}),
+        ...(typeof record.relationshipLabel === "string" && record.relationshipLabel.trim() ? { relationshipLabel: record.relationshipLabel.trim().slice(0, 80) } : {}),
     };
 }
 

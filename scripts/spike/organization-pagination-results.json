@@ -1,0 +1,42 @@
+{
+  "isolated": true,
+  "workspace": "C:\\Users\\sunku\\AppData\\Local\\Temp\\SiYuan-Lvct-OrgPage-8163aecc-9a0e-4262-a0cf-e42ed6c18816",
+  "kernelVersion": "3.8.6",
+  "notebookId": "20261005005129-k2s7uvf",
+  "pages": [
+    {
+      "rows": 2,
+      "cursor": "20261005005129-eksnq1e"
+    },
+    {
+      "rows": 1,
+      "cursor": "20261005005130-3lt4wz4"
+    },
+    {
+      "rows": 0
+    }
+  ],
+  "checks": [
+    {
+      "name": "组织标记首页稳定排序与 LIMIT",
+      "ok": true,
+      "detail": "rows=2"
+    },
+    {
+      "name": "root_id keyset 游标不重叠",
+      "ok": true,
+      "detail": "rows=1"
+    },
+    {
+      "name": "短页确认组织标记读取结束",
+      "ok": true,
+      "detail": "rows=0"
+    },
+    {
+      "name": "分页返回根 ID 可唯一回读文档",
+      "ok": true,
+      "detail": "docs=3"
+    }
+  ],
+  "at": "2026-10-04T16:51:25.547Z"
+}

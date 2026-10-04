@@ -34,60 +34,64 @@ export async function saveJsonVerified(plugin: Plugin, key: string, value: unkno
     const expected = JSON.stringify(value);
     for (let attempt = 0; attempt < 2; attempt += 1) {
         await plugin.saveData(key, value);
-        const reread = await loadJson(plugin, key);
+        const reread = await loadJsonStrict(plugin, key);
         if (JSON.stringify(reread) === expected) return;
     }
     throw new Error(`存储写入未收敛: ${key}`);
 }
 
-/**
- * 读-改-写临界区。无 Web Locks 时按键在本上下文排队，不提供跨窗口排他。
- *
- * 锁守护（回归环境曾现「锁 held 不释放」假死）：navigator.locks.request 无超时，
- * 持有方临界区内任一 await 挂死即整键不可用。因此取锁带中止信号；**连续
- * stealAfterWaits+1 次超时才判定持有方真挂死**，以 steal 模式接管自愈——挂死者
- * 不会再写入，接管不丢其数据；首次超时后先按原样重新排队（宽限），正常慢写
- * （大库慢回读）在宽限内完成即被串行化，不与接管者的读改写重叠（FUNC-01.13）。
- * 非中止类锁错误照常抛出不绕过保护（契约语义不变）。超时与宽限次数可配置
- * （storeLockConfig），测试里缩短以验证接管路径。
- */
-/** 取锁等待上限与接管宽限（可按环境调整；测试里缩短以验证接管路径） */
 export const storeLockConfig = {
     acquireTimeoutMs: 5_000,
-    /** 首次超时后的宽限重试次数：连续 N+1 次超时才 steal（0 = 首次超时立即接管） */
-    stealAfterWaits: 1,
+    acquireRetryCount: 1,
 };
+
+export class StoreLockTimeoutError extends Error {
+    readonly key: string;
+    readonly timeoutMs: number;
+    readonly attempts: number;
+
+    constructor(key: string, timeoutMs: number, attempts: number) {
+        super(`存储仍被其他操作占用，等待超时（每次 ${timeoutMs}ms，共 ${attempts} 次）: ${key}。此次操作尚未执行，请等待原操作结束并核实结果后重试。`);
+        this.name = "StoreLockTimeoutError";
+        this.key = key;
+        this.timeoutMs = timeoutMs;
+        this.attempts = attempts;
+    }
+}
 
 function isAbortError(error: unknown): boolean {
     return typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError";
 }
 
-function requestLockGuarded<T>(name: string, fn: () => Promise<T>): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
+async function requestLockGuarded<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const { acquireTimeoutMs, acquireRetryCount } = storeLockConfig;
+    if (!Number.isSafeInteger(acquireTimeoutMs) || acquireTimeoutMs < 1 || acquireTimeoutMs > 2_147_483_647
+        || !Number.isSafeInteger(acquireRetryCount) || acquireRetryCount < 0) {
+        throw new RangeError("存储锁等待时长必须为正整数，重试次数必须为非负整数");
+    }
+    for (let attempt = 0; attempt <= acquireRetryCount; attempt += 1) {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), storeLockConfig.acquireTimeoutMs);
-        navigator.locks!.request(name, { signal: controller.signal }, fn).then(
-            (value) => { clearTimeout(timer); resolve(value); },
-            (error) => { clearTimeout(timer); reject(error); },
-        );
-    });
+        let acquired = false;
+        const timer = setTimeout(() => controller.abort(), acquireTimeoutMs);
+        try {
+            return await navigator.locks.request(`lvct-${key}`, { signal: controller.signal }, () => {
+                acquired = true;
+                clearTimeout(timer);
+                return fn();
+            });
+        } catch (error) {
+            if (acquired || !controller.signal.aborted || !isAbortError(error)) throw error;
+            if (attempt === acquireRetryCount) throw new StoreLockTimeoutError(key, acquireTimeoutMs, attempt + 1);
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+    throw new StoreLockTimeoutError(key, acquireTimeoutMs, acquireRetryCount + 1);
 }
 
 export async function withStoreLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
-    if (typeof navigator !== "undefined" && navigator.locks?.request) {
-        const name = `lvct-${key}`;
-        let aborts = 0;
-        while (true) {
-            try {
-                return await requestLockGuarded(name, fn);
-            } catch (error) {
-                if (!isAbortError(error)) throw error;
-                aborts += 1;
-                if (aborts <= storeLockConfig.stealAfterWaits) continue; /* 宽限：先按原样重新排队 */
-            }
-            console.warn(`[lvct] 存储锁连续 ${aborts} 次等待超时，判定持有方挂死，接管继续: ${key}`);
-            return navigator.locks.request(name, { steal: true }, fn);
-        }
+    if (typeof navigator !== "undefined" && typeof navigator.locks?.request === "function") {
+        return requestLockGuarded(key, fn);
     }
     const previous = localQueues.get(key) ?? Promise.resolve();
     const task = previous.then(fn);

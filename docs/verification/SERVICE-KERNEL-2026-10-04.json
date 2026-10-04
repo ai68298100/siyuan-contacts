@@ -1,0 +1,268 @@
+{
+  "isolated": true,
+  "randomPort": true,
+  "uuidWorkspace": true,
+  "actualProductServices": true,
+  "realFrontend": true,
+  "storageAdapter": "controlled files in isolated workspace",
+  "results": [
+    {
+      "name": "实际初始化与稳定人物创建",
+      "ok": true
+    },
+    {
+      "name": "设置补列与四层重绑只读预览及确认回读",
+      "ok": true
+    },
+    {
+      "name": "生日早年、公历农历连续保存与清空回读",
+      "ok": true
+    },
+    {
+      "name": "多人事项来源、当日日记、地点和双方人物投影及重复捕获",
+      "ok": true
+    },
+    {
+      "name": "往来账本稳定请求、结清与重新打开",
+      "ok": true
+    },
+    {
+      "name": "别名唯一核实、重复幂等、泛称拒绝与列表搜索",
+      "ok": true
+    },
+    {
+      "name": "组织员工接替保留旧历史与双方文档投影",
+      "ok": true
+    },
+    {
+      "name": "迁移包新模块覆盖、预览与现状优先重复恢复",
+      "ok": true
+    },
+    {
+      "name": "真实内核重启后的原人物、双链、账本、别名和组织历史回读",
+      "ok": true
+    }
+  ],
+  "kernelVersion": "3.8.6",
+  "emptyOptionShape": [
+    {
+      "id": "20261004221005-apudeu1",
+      "value": {
+        "id": "20261004221005-apudeu1",
+        "keyID": "20261004221005-xlz443q",
+        "blockID": "20261004221005-skv46an",
+        "type": "select",
+        "createdAt": 1791123005000,
+        "updatedAt": 1791123005000
+      },
+      "valueType": "select",
+      "color": "",
+      "bgColor": ""
+    },
+    {
+      "id": "20261004221005-dji67a0",
+      "value": {
+        "id": "20261004221005-dji67a0",
+        "keyID": "20261004221005-6vi9hzp",
+        "blockID": "20261004221005-skv46an",
+        "type": "select",
+        "createdAt": 1791123005000,
+        "updatedAt": 1791123005000
+      },
+      "valueType": "select",
+      "color": "",
+      "bgColor": ""
+    },
+    {
+      "id": "20261004221005-axp2847",
+      "value": {
+        "id": "20261004221005-axp2847",
+        "keyID": "20261004221005-4iaexo7",
+        "blockID": "20261004221005-skv46an",
+        "type": "mSelect",
+        "createdAt": 1791123005000,
+        "updatedAt": 1791123005000
+      },
+      "valueType": "mSelect",
+      "color": "",
+      "bgColor": ""
+    }
+  ],
+  "settingsPreviewRoutes": [
+    "/api/notebook/lsNotebooks",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/av/renderAttributeView",
+    "/api/notebook/lsNotebooks",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/av/renderAttributeView",
+    "/api/av/getAttributeView"
+  ],
+  "cellWriteShape": {
+    "code": 0,
+    "msg": "",
+    "data": {
+      "value": {
+        "id": "20261004221007-ambwvti",
+        "keyID": "20261004221005-rtc483o",
+        "blockID": "20261004221005-skv46an",
+        "type": "date",
+        "createdAt": 1791123007001,
+        "updatedAt": 1791123008001,
+        "date": {
+          "content": -631094400000,
+          "isNotEmpty": true,
+          "hasEndDate": false,
+          "isNotTime": true,
+          "content2": 0,
+          "isNotEmpty2": false,
+          "formattedContent": "January 2, 1950"
+        }
+      }
+    }
+  },
+  "organizationProjection": "**组织**：虚构公司\n\n# 虚构公司\n**当前成员**：[虚构服务乙](siyuan://blocks/20261004221005-tkhdvo2) · 工作 · 新对接人 · 2026-10-04 ~ 至今",
+  "frontend": {
+    "ok": true,
+    "isolated": true,
+    "frontend": "browser-desktop",
+    "workspace": "C:\\Users\\sunku\\AppData\\Local\\Temp\\SiYuan-Lvct-Services-d6784085-79a1-4445-b1dd-f4436e93eef0",
+    "plugin": "siyuan-contacts",
+    "pluginInstalled": true,
+    "pluginLoaded": true,
+    "bridgeLoaded": true,
+    "bridgeProtocol": 2,
+    "bridgeGetPerson": true,
+    "replayCreated": true,
+    "replayStable": true,
+    "workbenchTopbar": true,
+    "birthdayEditor": true,
+    "birthdaySaved": true,
+    "ledgerEditor": true,
+    "ledgerCreated": true,
+    "ledgerSettled": true,
+    "ledgerReopened": true,
+    "aliasEditor": true,
+    "aliasSaved": true,
+    "aliasRejected": true,
+    "followUpEditor": true,
+    "followUpCreated": true,
+    "followUpCompleted": true,
+    "followUpKernelVerified": true,
+    "organizationView": true,
+    "organizationRenamed": true,
+    "organizationMemberEdited": true,
+    "organizationArchived": true,
+    "organizationRestored": true,
+    "organizationReloaded": true,
+    "captureEditorOpen": false,
+    "captureContextMenu": false,
+    "captureDialog": false,
+    "captureCompleted": false,
+    "captureUiLimitations": [
+      "真实捕获 UI 未完成：Uncaught"
+    ],
+    "uiReloaded": true,
+    "multiWindowStable": true,
+    "multiWindowInteraction": true,
+    "screenshots": [
+      "D:\\AI\\思源笔记插件开发\\插件探索\\小驴人脉\\output\\playwright\\real-frontend-organization.png",
+      "D:\\AI\\思源笔记插件开发\\插件探索\\小驴人脉\\output\\playwright\\real-frontend-detail.png"
+    ],
+    "limitations": [],
+    "failure": null,
+    "browserUrl": "http://127.0.0.1:5526/stage/build/desktop/",
+    "consoleTail": [
+      "[lvct] storage data changed",
+      "[lvct] storage data changed",
+      "[lvct] storage data changed"
+    ],
+    "ledgerBeforeSubmit": [
+      {
+        "type": "text",
+        "value": "Real UI ledger 35bf2406"
+      },
+      {
+        "type": "number",
+        "value": "35"
+      },
+      {
+        "type": "text",
+        "value": "CNY"
+      },
+      {
+        "type": "date",
+        "value": "2026-12-26"
+      },
+      {
+        "type": "date",
+        "value": ""
+      },
+      {
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "ledgerSubmitState": {
+      "text": "Exchange ledger（2） Record money, items and favors exchanged. Settling an entry preserves its history.  Type MoneyItemFavor Direction Owed to meI owe them Description  Amount  Currency  Date  Due date (optional)  Note (optional)  Record an exchange 2026-12-26 Real UI ledger 35bf2406 · 35 CNY 金钱 · 对方欠我  待处理 结清 取消2026-10-04 虚构借款 · 123 CNY 金钱 · 对方欠我  待处理 结清 取消",
+      "inputs": [
+        {
+          "type": "text",
+          "value": "",
+          "disabled": false
+        },
+        {
+          "type": "number",
+          "value": "",
+          "disabled": false
+        },
+        {
+          "type": "text",
+          "value": "CNY",
+          "disabled": false
+        },
+        {
+          "type": "date",
+          "value": "2026-10-04",
+          "disabled": false
+        },
+        {
+          "type": "date",
+          "value": "",
+          "disabled": false
+        },
+        {
+          "type": "text",
+          "value": "",
+          "disabled": false
+        }
+      ],
+      "alerts": []
+    },
+    "followUpBeforeSubmit": {
+      "inputs": [
+        {
+          "placeholder": "What do you want to ask about? (optional)",
+          "aria": null,
+          "value": "Real UI followup 951d82df",
+          "disabled": false
+        },
+        {
+          "placeholder": "",
+          "aria": "Plan date",
+          "value": "2026-12-27",
+          "disabled": false
+        }
+      ],
+      "buttons": [
+        {
+          "text": "Add plan",
+          "disabled": false
+        }
+      ]
+    }
+  }
+}

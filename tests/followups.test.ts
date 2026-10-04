@@ -126,3 +126,16 @@ test("B07-a 对账字段：updateFollowUp 支持 docBlockId/docMissing；归一�
     assert.deepEqual(filtered.items.map((entry) => entry.id), ["ok"]);
     assert.equal(filtered.items[0].docMissing, true);
 });
+
+test("AG-P0-008 文档同步字段：pending 与预期块 ID 可严格归一化", () => {
+    const store = normalizeFollowUpStore({
+        schemaVersion: 1,
+        items: [{ ...item({ id: "pending" }), docSyncPending: true, docSyncBlockId: "20261004000000-abc1234" }],
+    });
+    assert.equal(store.items[0].docSyncPending, true);
+    assert.equal(store.items[0].docSyncBlockId, "20261004000000-abc1234");
+    assert.throws(() => normalizeFollowUpStoreForWrite({
+        schemaVersion: 1,
+        items: [{ ...item({ id: "bad" }), docSyncBlockId: "bad" }],
+    }), /损坏/);
+});

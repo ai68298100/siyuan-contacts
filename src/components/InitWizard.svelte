@@ -9,6 +9,7 @@
     import { HOST_DOC_TITLE } from "../services/init.ts";
     import type { InitProgressStep, WorkspaceSnapshot } from "../services/init";
     import { translateText } from "../domain/translation";
+    import { useCloseGuard } from "./close-guard";
 
     let {
         facade,
@@ -38,6 +39,9 @@
         wizardStepRelationCreate: "配置「{name}」双向关联…",
         wizardStepRelationKept: "双向关联已存在，跳过配置…",
         wizardStepSettings: "保存工作空间设置…",
+        wizardStepSelfCreate: "建立本人档案「{name}」…",
+        wizardStepSelfPending: "工作空间已就绪，本人档案待续做：{message}。可进入后在设置中继续。",
+        wizardStepSelfSkipped: "已跳过本人建档，可稍后在设置中创建或指定。",
         wizardStepDone: "初始化完成 ✔",
     };
 
@@ -48,6 +52,10 @@
     let logLines: string[] = $state([]);
     let snapshot: WorkspaceSnapshot | null = $state(null);
     let previewToken: number = 0;
+    let createSelf = $state(true);
+    let selfPending = $state(false);
+    let completedSettings: import("../domain/model").ContactsSettings | null = $state(null);
+    useCloseGuard({ busy: () => running, dirty: () => false });
 
     /** 只读预检：预检自身失败不阻断向导（真实错误在运行时呈现） */
     async function refreshPreview() {
@@ -68,6 +76,7 @@
     });
 
     function pushLog(step: InitProgressStep) {
+        if (step.key === "wizardStepSelfPending") selfPending = true;
         logLines = [...logLines, text(step.key, STEP_FALLBACKS[step.key] ?? step.key, step.values)];
     }
 
@@ -76,9 +85,11 @@
         running = true;
         errorText = "";
         logLines = [];
+        selfPending = false;
         try {
-            const settings = await facade.initialize(notebookName, pushLog);
-            onInitialized(settings);
+            const settings = await facade.initialize(notebookName, pushLog, { createSelf });
+            if (selfPending) completedSettings = settings;
+            else onInitialized(settings);
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             errorText = message;
@@ -107,6 +118,10 @@
     <p class="b3-label ft__smaller ft__on-surface">
         {text("wizardNotebookDesc", "将在工作空间新建一个笔记本存放联系人文档；每个联系人是一篇文档，可正常双链、搜索。")}
     </p>
+    <label class="b3-label">
+        <input type="checkbox" bind:checked={createSelf} disabled={running || completedSettings !== null} />
+        {text("wizardCreateSelf", "同时建立本人档案「我自己」（可跳过，稍后在设置中指定）")}
+    </label>
 
     {#if snapshot}
         <div class="lvct-wizard__plan" aria-live="polite">
@@ -155,6 +170,12 @@
         </div>
     {/if}
 
+    {#if completedSettings}
+        <div class="lvct-wizard__error" role="status">{text("wizardSelfPending", "工作空间已经初始化，本人档案尚未确认。进入后可在设置中继续或指定已有联系人。")}</div>
+        <button class="b3-button lvct-wizard__cta" onclick={() => { if (completedSettings) onInitialized(completedSettings); }}>
+            {text("wizardEnterWorkspace", "进入工作空间")}
+        </button>
+    {:else}
     <button class="b3-button lvct-wizard__cta" onclick={run} disabled={running || notebookName.trim().length === 0}>
         {running
             ? text("wizardRunning", "正在初始化…")
@@ -162,6 +183,7 @@
                 ? text("wizardContinue", "继续初始化")
                 : text("wizardStart", "开始初始化")}
     </button>
+    {/if}
 
     {#if running}
         <div class="lvct-wizard__progress" role="progressbar" aria-label={text("wizardProgressLabel", "初始化进行中")}>
@@ -170,7 +192,7 @@
     {/if}
 
     {#if logLines.length > 0}
-        <div class="lvct-wizard__log">
+        <div class="lvct-wizard__log" role="log" aria-live="polite">
             {#each logLines as line, index (index)}
                 <div>{line}</div>
             {/each}

@@ -5,6 +5,9 @@
  * 纯函数：无 DOM、无 IO，node --test 直接可测。
  */
 
+import { isValidDateKey } from "./followups.ts";
+import type { FollowUpItem } from "./followups";
+
 export interface FollowUpTaskPlan {
     /** insert = 新建任务块；update = 更新块 markdown；done = 打勾标记；delete = 移除任务块 */
     action: "insert" | "update" | "done" | "delete";
@@ -22,11 +25,12 @@ export interface DocTaskBlock {
     markdown: string;
 }
 
-const MARKER_RE = /^- \[([ xX-])\] /;
-const DATE_MARK_RE = /📅(\d{4}-\d{2}-\d{2})/;
+const MARKER_RE = /^[-*] \[([ xX-])\] /;
+const DATE_MARK_RE = /(?:^|\s)📅(\d{4}-\d{2}-\d{2})\s*$/;
 
 /** 任务行序列化：取消的计划不产出任务行（由 plan 的 delete 表达） */
 export function buildTaskMarkdown(title: string, dueDate: string, done: boolean): string {
+    if (!isValidDateKey(dueDate)) throw new Error("跟进日期必须是有效的 YYYY-MM-DD 日期");
     const safeTitle = title.trim() || "保持联系";
     const titleText = safeTitle.split(/\r?\n/).join(" ");
     return `- [${done ? "X" : " "}] ${titleText} 📅${dueDate}`;
@@ -36,12 +40,12 @@ export function buildTaskMarkdown(title: string, dueDate: string, done: boolean)
 export function parseTaskMarkdown(markdown: string): { done: boolean; title: string; dueDate: string | null } {
     const marker = markdown.match(MARKER_RE);
     const rest = marker ? markdown.slice(marker[0].length) : markdown;
-    const date = rest.match(DATE_MARK_RE);
+    const date = marker ? rest.match(DATE_MARK_RE) : null;
     const title = (date ? rest.replace(DATE_MARK_RE, "") : rest).trim();
     return {
         done: marker?.[1] === "X" || marker?.[1] === "x",
         title,
-        dueDate: date ? date[1] : null,
+        dueDate: date && isValidDateKey(date[1]) ? date[1] : null,
     };
 }
 
@@ -66,7 +70,10 @@ export function planTaskSync(
             continue;
         }
         if (item.status === "done") {
-            if (block && !parseTaskMarkdown(block.markdown).done) {
+            const parsed = block ? parseTaskMarkdown(block.markdown) : undefined;
+            if (block && (parsed?.title !== (item.title.trim() || "保持联系") || parsed?.dueDate !== item.dueDate)) {
+                plans.push({ action: "update", blockId: block.blockId, markdown: buildTaskMarkdown(item.title, item.dueDate, true), followUpId: item.id });
+            } else if (block && !parsed?.done) {
                 plans.push({ action: "done", blockId: block.blockId, followUpId: item.id });
             }
             continue;
@@ -133,4 +140,67 @@ export function reconcileDecisions(
         if (dirty) updates.push(patch);
     }
     return { toDone, toOpen, updates, missing };
+}
+
+export interface FollowUpTaskObservation {
+    item: FollowUpItem;
+    block?: DocTaskBlock;
+    patch: Partial<FollowUpItem>;
+    changes: string[];
+    document: "verified" | "missing" | "not_created" | "pending" | "unknown";
+    message?: string;
+}
+
+export function observeFollowUpTasks(items: readonly FollowUpItem[], blocks: readonly DocTaskBlock[]): FollowUpTaskObservation[] {
+    const byId = new Map<string, DocTaskBlock[]>();
+    for (const block of blocks) {
+        const matches = byId.get(block.followUpId) ?? [];
+        matches.push(block);
+        byId.set(block.followUpId, matches);
+    }
+    return items.map((item) => {
+        const matches = byId.get(item.id) ?? [];
+        const block = matches[0];
+        const base = { item, block, patch: {}, changes: [] };
+        if (matches.length > 1) return { ...base, document: "unknown", message: "同一事项存在多个任务项，已停止自动写入" };
+        if (item.docSyncPending) return { ...base, document: "pending", message: "索引已保存，文档写入仍待核实或重试" };
+        if (item.status === "cancelled") return {
+            ...base, document: block ? "pending" : "verified",
+            ...(block ? { message: "已取消事项的文档任务仍存在，需重试删除" } : {}),
+        };
+        if (!block) {
+            const newlyMissing = Boolean(item.docBlockId);
+            return {
+                ...base, document: newlyMissing || item.docMissing ? "missing" : "not_created",
+                patch: newlyMissing ? { docMissing: true, docBlockId: undefined } : {},
+                changes: newlyMissing ? ["deleted"] : [],
+            };
+        }
+        const parsed = parseTaskMarkdown(block.markdown);
+        if (!/^[-*] \[[ xX]\] /.test(block.markdown) || !parsed.dueDate || !parsed.title) {
+            return { ...base, document: "unknown", message: "任务标记、标题或日期无法可靠解析，保留原索引" };
+        }
+        const patch: Partial<FollowUpItem> = {};
+        const changes: string[] = [];
+        const status = parsed.done ? "done" : "open";
+        if (status !== item.status) { patch.status = status; changes.push("status"); }
+        if (parsed.title !== (item.title.trim() || "保持联系")) { patch.title = parsed.title; changes.push("title"); }
+        if (parsed.dueDate !== item.dueDate) { patch.dueDate = parsed.dueDate; changes.push("dueDate"); }
+        if (item.docBlockId !== block.blockId || item.docMissing) {
+            patch.docBlockId = block.blockId;
+            patch.docMissing = undefined;
+            changes.push("block");
+        }
+        return { ...base, patch, changes, document: "verified" };
+    });
+}
+
+export function taskMatchesItem(item: FollowUpItem, blocks: readonly DocTaskBlock[]): boolean {
+    const matches = blocks.filter((block) => block.followUpId === item.id);
+    if (item.status === "cancelled") return matches.length === 0;
+    if (matches.length !== 1) return false;
+    const parsed = parseTaskMarkdown(matches[0].markdown);
+    return /^[-*] \[[ xX]\] /.test(matches[0].markdown)
+        && parsed.title === parseTaskMarkdown(buildTaskMarkdown(item.title, item.dueDate, item.status === "done")).title
+        && parsed.dueDate === item.dueDate && parsed.done === (item.status === "done");
 }
