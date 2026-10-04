@@ -32,7 +32,8 @@
     "spike:init": "node scripts/spike/init-resume-spike.mjs",
     "spike:b13": "node scripts/spike/b13-org-spike.mjs",
     "spike:b14": "node scripts/spike/b14-graph-spike.mjs",
-    "spike:task": "node scripts/spike/task-item-spike.mjs"
+    "spike:task": "node scripts/spike/task-item-spike.mjs",
+    "spike:scale": "node --expose-gc scripts/spike/scale-baseline-spike.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
