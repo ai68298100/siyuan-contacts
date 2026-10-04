@@ -425,6 +425,7 @@ export async function verifyRealFrontend({
             return [...(section?.querySelectorAll('input') ?? [])].map((input) => ({ type: input.type, value: input.value }));
         })()`);
         if (!ledgerDescriptionSet || !ledgerAmountSet || !ledgerDateSet) throw new Error('往来账本表单控件不可写');
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`([...document.querySelectorAll('.lvct-detail button')].some((button) => ((button.textContent || '').includes('记一笔往来') || (button.textContent || '').includes('Record an exchange')) && !button.disabled))`)), "往来账本提交控件可用");
         if (!await clickButton('.lvct-detail', (text) => text.includes('记一笔往来') || text.includes('Record an exchange'))) throw new Error('往来账本保存按钮不可定位');
         await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`document.querySelector('.lvct-detail')?.textContent?.includes(${json(ledgerDescription)})`)), "往来账本提交后回读");
         evidence.ledgerSubmitState = await browserSession.evaluate(`(()=>{
@@ -702,6 +703,7 @@ export async function verifyRealFrontend({
             const openOrgManager = async (session, label) => {
                 if (!await session.evaluate("Boolean(document.querySelector('.lvct-org-manager'))")) {
                     await waitUntil(deadline, async () => Boolean(await session.evaluate(`([...document.querySelectorAll('.lvct-orgs-view__card')].some((card) => card.textContent?.includes(${json(renamedOrg)})))`)), `${label}组织卡片`);
+                    await waitUntil(deadline, async () => Boolean(await session.evaluate(`(()=>{const card=[...document.querySelectorAll('.lvct-orgs-view__card')].find((item)=>item.textContent?.includes(${json(renamedOrg)}));return [...(card?.querySelectorAll('button') ?? [])].some((item)=>['管理','Manage'].includes(item.textContent?.trim())&&!item.disabled)})()`)), `${label}组织管理入口`);
                     if (!await session.evaluate(`(()=>{const card=[...document.querySelectorAll('.lvct-orgs-view__card')].find((item)=>item.textContent?.includes(${json(renamedOrg)}));const button=[...(card?.querySelectorAll('button') ?? [])].find((item)=>['管理','Manage'].includes(item.textContent?.trim())&&!item.disabled);if(!button)return false;button.click();return true})()`)) throw new Error(`${label}组织管理入口不可定位`);
                 }
                 await waitUntil(deadline, async () => Boolean(await session.evaluate("document.querySelector('.lvct-org-manager')")), `${label}组织管理弹窗`);
