@@ -384,6 +384,7 @@
         revision;
         preferences.birthdayWindowDays;
         preferences.staleThresholdDays;
+        preferences.reminderGraceDays;
         void refresh();
     });
 

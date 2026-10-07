@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildGraph, buildOrgAugmentation, capGraph, groupColor, queryGraphRelations } from "../src/domain/graph.ts";
+import { buildGraph, buildOrgAugmentation, capGraph, groupColor, orderGraph, queryGraphRelations } from "../src/domain/graph.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
 import { shortestGraphPath, secondDegreeGraphIds } from "../src/domain/graph-path.ts";
 import { buildGraphQuerySnapshot, resolveGraphCenter } from "../src/domain/graph-query.ts";
@@ -29,6 +29,21 @@ test("无关系人物：有效入边也计关系，自环与悬空关系不计",
         person({ itemId: "c", docId: "c", name: "c", relatedItemIds: ["missing", "c"] }),
     ]);
     assert.deepEqual(graph.nodes.filter((node) => node.degree === 0).map((node) => node.id), ["c"]);
+});
+
+test("orderGraph：未声明边类型规范化为 related，输入顺序不影响去重", () => {
+    const nodes = ["a", "b"].map((id) => ({ id, label: id, group: "", degree: 0 }));
+    const first = orderGraph({ nodes, edges: [
+        { source: "a", target: "b" },
+        { source: "b", target: "a", kind: "related" as const },
+    ] });
+    const second = orderGraph({ nodes, edges: [
+        { source: "b", target: "a", kind: "related" as const },
+        { source: "a", target: "b" },
+    ] });
+    assert.deepEqual(first, second);
+    assert.deepEqual(first.edges, [{ source: "a", target: "b", kind: "related" }]);
+    assert.deepEqual(first.nodes.map((node) => node.degree), [1, 1]);
 });
 
 test("最短路径：优先较短链路、支持反向关系且不改变输入", () => {

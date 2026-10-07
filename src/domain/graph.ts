@@ -116,11 +116,12 @@ export function orderGraph(graph: PersonGraph): PersonGraph {
     const edges: GraphEdge[] = [];
     for (const edge of graph.edges) {
         if (edge.source === edge.target || !byId.has(edge.source) || !byId.has(edge.target)) continue;
+        const kind = edge.kind ?? "related";
         const [source, target] = [edge.source, edge.target].sort();
-        const key = `${edge.kind ?? "related"}:${source}:${target}`;
+        const key = `${kind}:${source}:${target}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        edges.push({ ...edge, source, target });
+        edges.push({ ...edge, source, target, kind });
         byId.get(source)!.degree += 1;
         byId.get(target)!.degree += 1;
     }

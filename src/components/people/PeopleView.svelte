@@ -8,7 +8,7 @@
     import type { ContactSummary } from "../../domain/person";
     import type { WritableContactField } from "../../domain/contact-write.ts";
     import type { ContactsSettings } from "../../domain/model";
-    import { DEFAULT_VIEW_PREFERENCES, normalizeTableColumns, PEOPLE_TABLE_COLUMNS } from "../../domain/preferences";
+    import { DEFAULT_VIEW_PREFERENCES, normalizeTableColumns, normalizeViewPreferences, PEOPLE_TABLE_COLUMNS } from "../../domain/preferences";
     import type { PeopleTableColumn, ViewPreferences } from "../../domain/preferences";
     import { applyPeopleFilters, EMPTY_PEOPLE_FILTER, isExtraFilterActive, matchTags } from "../../domain/people-filters";
     import type { PeopleFilterState } from "../../domain/people-filters";
@@ -64,7 +64,7 @@
         activePersonId?: string;
         onOrderChange?: (people: ContactSummary[]) => void;
         onOpenPersonDoc?: (docId: string) => void;
-        onPreferencesChange: (preferences: ViewPreferences) => Promise<ViewPreferences>;
+        onPreferencesChange: (preferences: ViewPreferences, baseline?: ViewPreferences) => Promise<ViewPreferences>;
         /** B09-1：移动端工具栏收纳（常驻搜索/视图切换/新建，其余收进底部弹层） */
         isMobile?: boolean;
     } = $props();
@@ -104,6 +104,10 @@
     let viewMode: "cards" | "table" = $state(preferences.peopleView === "table" ? "table" : "cards");
     // svelte-ignore state_referenced_locally
     let tableColumns: PeopleTableColumn[] = $state(normalizeTableColumns(preferences.tableColumns));
+    // 连续切换期间父层 props 可能仍是旧 revision；本地意图作为下一次操作的基线，
+    // 等持久化响应回来后再由 preferences effect 对齐，避免“切回原值”被旧快照吞掉。
+    // svelte-ignore state_referenced_locally
+    let preferenceIntent: ViewPreferences = $state(preferences);
     let prefError = $state("");
     let colMenuOpen = $state(false);
     const columnLabels: Record<PeopleTableColumn, { labelKey: string; fallback: string }> = {
@@ -121,14 +125,22 @@
 
     // 外部偏好更新（设置页保存/恢复默认）时同步本地显示
     $effect(() => {
+        preferenceIntent = preferences;
         viewMode = preferences.peopleView === "table" ? "table" : "cards";
         tableColumns = normalizeTableColumns(preferences.tableColumns);
     });
 
-    async function persistPreferences(next: ViewPreferences) {
+    function nextPreferenceIntent(patch: Partial<ViewPreferences>): { next: ViewPreferences; baseline: ViewPreferences } {
+        const baseline = normalizeViewPreferences(preferenceIntent);
+        preferenceIntent = { ...preferenceIntent, ...patch };
+        return { next: preferenceIntent, baseline };
+    }
+
+    async function persistPreferences(next: ViewPreferences, baseline: ViewPreferences = preferences) {
         prefError = "";
+        preferenceIntent = next;
         try {
-            await onPreferencesChange(next);
+            await onPreferencesChange(next, baseline);
         } catch (error) {
             prefError = error instanceof Error ? error.message : String(error);
         }
@@ -137,7 +149,8 @@
     function setViewMode(mode: "cards" | "table") {
         if (viewMode === mode) return;
         viewMode = mode;
-        void persistPreferences({ ...preferences, peopleView: mode === "table" ? "table" : "card" });
+        const intent = nextPreferenceIntent({ peopleView: mode === "table" ? "table" : "card" });
+        void persistPreferences(intent.next, intent.baseline);
     }
 
     function toggleColumn(key: PeopleTableColumn, visible: boolean) {
@@ -145,7 +158,8 @@
             ? [...tableColumns, key]
             : tableColumns.filter((column) => column !== key);
         tableColumns = normalizeTableColumns(next);
-        void persistPreferences({ ...preferences, tableColumns });
+        const intent = nextPreferenceIntent({ tableColumns: [...tableColumns] });
+        void persistPreferences(intent.next, intent.baseline);
     }
 
     function moveColumn(key: PeopleTableColumn, offset: -1 | 1) {
@@ -156,18 +170,19 @@
         next.splice(index, 1);
         next.splice(target, 0, key);
         tableColumns = next;
-        void persistPreferences({ ...preferences, tableColumns });
+        const intent = nextPreferenceIntent({ tableColumns: [...tableColumns] });
+        void persistPreferences(intent.next, intent.baseline);
     }
 
     function resetDisplayPreferences() {
         viewMode = "cards";
         tableColumns = [...DEFAULT_VIEW_PREFERENCES.tableColumns];
         colMenuOpen = false;
-        void persistPreferences({
-            ...preferences,
+        const intent = nextPreferenceIntent({
             peopleView: DEFAULT_VIEW_PREFERENCES.peopleView,
             tableColumns: [...DEFAULT_VIEW_PREFERENCES.tableColumns],
         });
+        void persistPreferences(intent.next, intent.baseline);
     }
 
     // 列设置浮层：fixed 定位原语（B02）——absolute 面板会被滚动祖先裁剪，宿主菜单同样用 fixed
@@ -420,8 +435,10 @@
 
     async function persistViews(next: SavedView[]) {
         prefError = "";
+        const baseline = normalizeViewPreferences(preferenceIntent);
+        preferenceIntent = { ...preferenceIntent, savedViews: next };
         try {
-            await onPreferencesChange({ ...preferences, savedViews: next });
+            await onPreferencesChange(preferenceIntent, baseline);
             return true;
         } catch (error) {
             prefError = error instanceof Error ? error.message : String(error);

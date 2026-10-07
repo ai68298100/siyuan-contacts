@@ -67,6 +67,11 @@ export function createPreferenceRequests(operations: {
     let generation = 0;
     let active = true;
     let revision = 0;
+    /**
+     * 请求尚未回填到父层 props 前，保留最后一份本地意图。
+     * 后续调用只提交相对调用方基线的 patch，避免旧 props 把前一项改动抹掉。
+     */
+    let pendingIntent: ViewPreferences | null = null;
 
     async function run(operation: () => Promise<ViewPreferences>, writing: boolean): Promise<ViewPreferences> {
         if (!active) throw new Error("偏好实例已关闭，操作已停止");
@@ -85,16 +90,42 @@ export function createPreferenceRequests(operations: {
         }
     }
 
+    function resetPending(request: number): void {
+        if (active && request === generation) pendingIntent = null;
+    }
+
     return {
-        load: () => run(operations.load, false),
+        load: () => {
+            const request = generation + 1;
+            const promise = run(operations.load, false);
+            return promise.then((value) => {
+                resetPending(request);
+                return value;
+            }, (error) => {
+                resetPending(request);
+                throw error;
+            });
+        },
         save: (preferences: ViewPreferences, baseline: ViewPreferences) => {
             const submitted = normalizeViewPreferences(preferences);
-            const base = normalizeViewPreferences(baseline);
-            return run(() => operations.save(submitted, base), true);
+            const callerBase = normalizeViewPreferences(baseline);
+            const patch = diffViewPreferences(callerBase, submitted);
+            const base = pendingIntent ?? callerBase;
+            const effectiveSubmitted = normalizeViewPreferences({ ...base, ...patch });
+            pendingIntent = effectiveSubmitted;
+            const request = generation + 1;
+            const promise = run(() => operations.save(effectiveSubmitted, base), true);
+            return promise.then((value) => {
+                resetPending(request);
+                return value;
+            }, (error) => {
+                resetPending(request);
+                throw error;
+            });
         },
-        invalidate: () => { generation += 1; },
-        activate: () => { active = true; generation += 1; revision = 0; },
-        dispose: () => { active = false; generation += 1; },
+        invalidate: () => { generation += 1; pendingIntent = null; },
+        activate: () => { active = true; generation += 1; revision = 0; pendingIntent = null; },
+        dispose: () => { active = false; generation += 1; pendingIntent = null; },
     };
 }
 

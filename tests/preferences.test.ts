@@ -296,6 +296,37 @@ test("P0-009：保存先后响应乱序、外部失效及卸载后回调均不�
     await assert.rejects(requests.load(), /已关闭/);
 });
 
+test("P0-009：连续保存合并待提交意图，旧父层快照不会吞掉前一项改动", async () => {
+    const first = deferred<ViewPreferences>();
+    const second = deferred<ViewPreferences>();
+    const submitted: Array<{ value: ViewPreferences; baseline: ViewPreferences }> = [];
+    const pending = [first, second];
+    const applied: ViewPreferences[] = [];
+    const requests = createPreferenceRequests({
+        load: async () => DEFAULT_VIEW_PREFERENCES,
+        save: (value, baseline) => {
+            submitted.push({ value, baseline });
+            return pending.shift()!.promise;
+        },
+        apply: (value) => applied.push(value),
+    });
+    const table = { ...DEFAULT_VIEW_PREFERENCES, peopleView: "table" as const };
+    const card = { ...DEFAULT_VIEW_PREFERENCES, peopleView: "card" as const, graphMode: "native" as const };
+    const firstSave = requests.save(table, DEFAULT_VIEW_PREFERENCES);
+    const secondSave = requests.save(card, table);
+    assert.equal(submitted.length, 2);
+    assert.equal(submitted[0].value.peopleView, "table");
+    assert.equal(submitted[1].value.peopleView, "card");
+    assert.equal(submitted[1].baseline.peopleView, "table");
+    assert.equal(submitted[1].value.graphMode, "native");
+    second.resolve({ ...card, revision: 2 });
+    first.resolve({ ...table, revision: 1 });
+    await Promise.all([firstSave, secondSave]);
+    assert.deepEqual(applied.map((value) => value.revision), [2]);
+    assert.equal(applied[0].peopleView, "card");
+    assert.equal(applied[0].graphMode, "native");
+});
+
 test("P0-009：版本通知防抖、拒绝旧事件，销毁后定时器和订阅零副作用", (context) => {
     context.mock.timers.enable({ apis: ["setTimeout"] });
     const descriptor = Object.getOwnPropertyDescriptor(globalThis, "window");

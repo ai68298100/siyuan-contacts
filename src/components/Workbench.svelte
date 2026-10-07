@@ -111,9 +111,9 @@
         onPreferencesUpdated(updated);
     }
 
-    function savePreferences(next: ViewPreferences): Promise<ViewPreferences> {
-        const baseline = normalizeViewPreferences(currentPreferences);
-        return preferenceRequests.save(next, baseline);
+    function savePreferences(next: ViewPreferences, baseline?: ViewPreferences): Promise<ViewPreferences> {
+        const effectiveBaseline = normalizeViewPreferences(baseline ?? currentPreferences);
+        return preferenceRequests.save(next, effectiveBaseline);
     }
     let detailPerson: ContactSummary | null = $state(null);
     let detailReturn = $state<PersonReturnContext | null>(null);

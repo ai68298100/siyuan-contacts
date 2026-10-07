@@ -3524,12 +3524,13 @@ await test("设置页可按列类型手动恢复字段映射并拒绝空提交",
 await test("表格列显隐与顺序偏好持久化，姓名列固定，恢复默认生效", async () => {
     const headers = () => [...fixture.querySelectorAll("thead th")].map((th) => th.textContent.trim());
     const sameList = (list, expected, message) => assert(JSON.stringify(list) === JSON.stringify(expected), `${message}（实际：${JSON.stringify(list)}）`);
+    const preferenceCalls = [];
     const mountPeople = (prefs) => mount(PeopleView, { target: fixture, props: {
         settings, preferences: prefs,
         loadRecentInteractions: async () => ({}),
         revision: 0, initialSort: "name",
         onOpenDetail() {}, onOpenPersonDoc() {},
-        onPreferencesChange: async (next) => { savedPrefs = next; return next; },
+        onPreferencesChange: async (next, baseline) => { preferenceCalls.push({ next, baseline }); savedPrefs = next; return next; },
     } });
     let savedPrefs = null;
     mounted = mountPeople({ ...DEFAULT_VIEW_PREFERENCES, peopleView: "table", tableColumns: ["phone", "group"] });
@@ -3558,6 +3559,13 @@ await test("表格列显隐与顺序偏好持久化，姓名列固定，恢复�
     [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "恢复默认显示").click();
     await until(() => savedPrefs?.tableColumns.length === 7 && savedPrefs.peopleView === "card", "恢复默认未持久化");
     await until(() => !fixture.querySelector("table") && fixture.querySelector(".lvct-people__cards"), "恢复默认后未回到卡片视图");
+    preferenceCalls.length = 0;
+    /* 连续反向切换时，第二次请求必须携带第一次意图作为基线，不能因父层 props 尚未更新而丢失。 */
+    button("表格").click();
+    button("卡片").click();
+    await until(() => preferenceCalls.length >= 2, "连续切换偏好请求未发出");
+    assert(preferenceCalls[0].next.peopleView === "table", "第一次切换未提交表格意图");
+    assert(preferenceCalls[1].next.peopleView === "card" && preferenceCalls[1].baseline.peopleView === "table", "第二次反向切换未携带最新本地基线");
 });
 
 await test("组合筛选数量与生效条件一致，单项清除与清除全部不遗留", async () => {
