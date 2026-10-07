@@ -195,21 +195,90 @@
         const pad = (value: number) => String(value).padStart(2, "0");
         return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     }
-    // C02 批量安顿：「从未互动」组整体暂缓 30 天（dismissal），保留此前暂缓快照供一次性撤销
-    let settleUndo: ReminderDismissal[] | null = $state(null);
+    // C02 批量安顿：「从未互动」组整体暂缓 30 天；撤销只携带本批前值并做冲突核对。
+    type SettleUndoEntry = { personDocId: string; kind: "stale"; previous?: ReminderDismissal };
+    type SettleUndo = { until: string; entries: SettleUndoEntry[] };
+    type SettleRetry = { until: string; cards: ActionCard[]; entries: SettleUndoEntry[] };
+    let settleUndo: SettleUndo | null = $state(null);
+    let settleRetry: SettleRetry | null = $state(null);
+
+    async function settleCards(
+        cards: readonly ActionCard[],
+        until: string,
+        preserved: readonly SettleUndoEntry[] = [],
+        previousOverrides: readonly SettleUndoEntry[] = [],
+    ): Promise<void> {
+        if (cards.length === 0) return;
+        if (preserved.length === 0) settleUndo = null;
+        settleRetry = null;
+        const snapshot = await facade.loadReminderDismissals();
+        const previousByKey = new Map(
+            snapshot
+                .filter((entry) => entry.kind === "stale")
+                .map((entry) => [`${entry.personDocId}|${entry.kind}`, entry] as const),
+        );
+        const retryConflicts: string[] = [];
+        const blockedRetryKeys = new Set<string>();
+        for (const entry of previousOverrides) {
+            const key = `${entry.personDocId}|${entry.kind}`;
+            const actual = previousByKey.get(key);
+            const expected = entry.previous;
+            const matches = expected
+                ? actual?.until === expected.until
+                : !actual;
+            if (!matches) {
+                blockedRetryKeys.add(key);
+                retryConflicts.push(entry.personDocId);
+                continue;
+            }
+            if (expected) previousByKey.set(key, expected);
+            else previousByKey.delete(key);
+        }
+        const completed: SettleUndoEntry[] = [...preserved];
+        const failed: ActionCard[] = [];
+        const failedEntries: SettleUndoEntry[] = [];
+        const errors: string[] = [];
+        for (const card of cards) {
+            if (blockedRetryKeys.has(`${card.person.docId}|stale`)) continue;
+            try {
+                await facade.dismissReminder(card.person.docId, "stale", until);
+                completed.push({
+                    personDocId: card.person.docId,
+                    kind: "stale",
+                    ...(previousByKey.get(`${card.person.docId}|stale`) ? { previous: previousByKey.get(`${card.person.docId}|stale`) } : {}),
+                });
+            } catch (error) {
+                failed.push(card);
+                const previous = previousByKey.get(`${card.person.docId}|stale`);
+                failedEntries.push({
+                    personDocId: card.person.docId,
+                    kind: "stale",
+                    ...(previous ? { previous } : {}),
+                });
+                errors.push(`${card.person.name}：${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
+        if (completed.length > 0) settleUndo = { until, entries: completed };
+        if (failed.length > 0) settleRetry = { until, cards: failed, entries: failedEntries };
+        if (failed.length === 0 && retryConflicts.length === 0) {
+            alMessage = `已把 ${completed.length} 位从未互动的提醒整体暂缓 30 天`;
+            alError = "";
+        } else {
+            const conflictMessage = retryConflicts.length > 0 ? `另有 ${retryConflicts.length} 位在重试前已被修改，已保留现状` : "";
+            alMessage = failed.length > 0
+                ? `已完成 ${completed.length} 位，${failed.length} 位失败；可重试失败项`
+                : `批量暂缓已完成，${conflictMessage}`;
+            alError = [...errors, ...retryConflicts.map((docId) => `${docId}：重试前已被其他窗口修改`)].join("；");
+        }
+    }
+
     async function settleNeverGroup(): Promise<void> {
         const group = actionGroupsOf(data).find((item) => item.key === "never");
         if (!group || group.cards.length === 0 || alBusy) return;
         alBusy = true;
         alError = "";
         try {
-            const snapshot = await facade.loadReminderDismissals();
-            const until = addDaysToToday(30);
-            for (const card of group.cards) {
-                await facade.dismissReminder(card.person.docId, "stale", until);
-            }
-            settleUndo = snapshot;
-            alMessage = `已把 ${group.cards.length} 位从未互动的提醒整体暂缓 30 天`;
+            await settleCards(group.cards, addDaysToToday(30));
             rowMenuKey = "";
             await refresh();
         } catch (error) {
@@ -218,22 +287,49 @@
             alBusy = false;
         }
     }
+
+    async function retrySettle(): Promise<void> {
+        const retry = settleRetry;
+        if (!retry || alBusy) return;
+        const preserved = settleUndo?.entries ?? [];
+        alBusy = true;
+        alError = "";
+        try {
+            await settleCards(retry.cards, retry.until, preserved, retry.entries);
+            await refresh();
+        } catch (error) {
+            alError = error instanceof Error ? error.message : String(error);
+        } finally {
+            alBusy = false;
+        }
+    }
+
     async function undoSettle(): Promise<void> {
         if (!settleUndo || alBusy) return;
+        const batch = settleUndo;
         alBusy = true;
+        alError = "";
         try {
-            /* 一次性撤销：把批量暂缓前的暂缓快照原样写回（覆盖式恢复） */
             const current = await facade.loadReminderDismissals();
-            for (const entry of current) {
-                if (!settleUndo.some((item) => item.personDocId === entry.personDocId && item.kind === entry.kind)) {
-                    await facade.resumeReminder(entry.personDocId, entry.kind);
+            const currentByKey = new Map<string, ReminderDismissal>(current.map((entry) => [`${entry.personDocId}|${entry.kind}`, entry]));
+            let conflicts = 0;
+            let restored = 0;
+            for (const entry of batch.entries) {
+                const key = `${entry.personDocId}|${entry.kind}`;
+                const currentEntry = currentByKey.get(key);
+                // 只有本批写入仍在当前位置时才恢复，避免覆盖另一窗口的修改或新增。
+                if (!currentEntry || currentEntry.until !== batch.until) {
+                    conflicts += 1;
+                    continue;
                 }
-            }
-            for (const entry of settleUndo) {
-                await facade.dismissReminder(entry.personDocId, entry.kind, entry.until);
+                if (entry.previous) await facade.dismissReminder(entry.personDocId, entry.kind, entry.previous.until);
+                else await facade.resumeReminder(entry.personDocId, entry.kind);
+                restored += 1;
             }
             settleUndo = null;
-            alMessage = "已撤销批量暂缓";
+            alMessage = conflicts > 0
+                ? `已撤销 ${restored} 位；${conflicts} 位已被其他窗口修改，保留现状`
+                : `已撤销批量暂缓（${restored} 位）`;
             await refresh();
         } catch (error) {
             alError = error instanceof Error ? error.message : String(error);
@@ -606,6 +702,9 @@
                                     <button class="b3-button b3-button--outline lvct-dash__quick-button" disabled={alBusy} onclick={settleNeverGroup}>
                                         全部顺延 30 天
                                     </button>
+                                    {#if settleRetry}
+                                        <button class="b3-button b3-button--text lvct-dash__quick-button" disabled={alBusy} onclick={retrySettle}>重试失败项（{settleRetry.cards.length}）</button>
+                                    {/if}
                                     {#if settleUndo}
                                         <button class="b3-button b3-button--text lvct-dash__quick-button" disabled={alBusy} onclick={undoSettle}>撤销</button>
                                     {/if}

@@ -1215,13 +1215,22 @@ await test("近期生日行：主按钮可聚焦打开详情，跳过按钮不�
     assert(opened.length === 1, "跳过本年按钮不应再次打开详情");
 });
 
-await test("收编宽限期与批量安顿：宽限内不出行动卡、批量暂缓可一次性撤销（C02）", async () => {
+await test("收编宽限期与批量安顿：只撤销本批且保留并发修改（C02/C06）", async () => {
     const personOf = (name) => ({
         docId: `20260927000000-${name}0000`, itemId: `row-${name}`, name,
         phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
         group: "", tags: [], relatedItemIds: [],
     });
-    const dismissals = [];
+    const first = personOf("从未甲");
+    const second = personOf("从未乙");
+    const dismissals = [
+        { personDocId: "20260927000000-外部项0000", kind: "stale", until: "2099-01-01" },
+        { personDocId: first.docId, kind: "stale", until: "2098-01-01" },
+    ];
+    const actions = [first, second].map((person) => ({
+        person, bucket: "stale",
+        reasons: [{ kind: "stale", label: "从未互动", bucket: "stale", neverContacted: true }],
+    }));
     mounted = mount(Workbench, { target: fixture, props: {
         settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
         onPreferencesUpdated() {}, onOpenPersonDoc() {},
@@ -1230,14 +1239,19 @@ await test("收编宽限期与批量安顿：宽限内不出行动卡、批量�
                 /* 宽限过滤在服务层；此处用 mock 表达过滤后口径：never 组被宽限隐藏、统计保持真实 */
                 return {
                     people: 3, relations: 0, birthdays: [], birthdaysThisWeek: 0,
-                    stale: [], staleTotal: 3, neverContacted: 3,
-                    neverContactedItemIds: [personOf("宽限一").docId, personOf("宽限二").docId, personOf("宽限三").docId],
-                    followUps: [], actions: [], neverOrder: {},
+                    stale: [], staleTotal: 2, neverContacted: 2,
+                    neverContactedItemIds: [first.docId, second.docId],
+                    followUps: [], actions, neverOrder: {},
                 };
             },
-            dismissReminder: async (docId, kind, until) => dismissals.push({ docId, kind, until }),
+            dismissReminder: async (docId, kind, until) => {
+                const existing = dismissals.findIndex((entry) => entry.personDocId === docId && entry.kind === kind);
+                const next = { personDocId: docId, kind, until };
+                if (existing >= 0) dismissals.splice(existing, 1, next);
+                else dismissals.push(next);
+            },
             resumeReminder: async (docId, kind) => {
-                const index = dismissals.findIndex((entry) => entry.docId === docId && entry.kind === kind);
+                const index = dismissals.findIndex((entry) => entry.personDocId === docId && entry.kind === kind);
                 if (index >= 0) dismissals.splice(index, 1);
             },
             loadReminderDismissals: async () => [...dismissals],
@@ -1245,12 +1259,30 @@ await test("收编宽限期与批量安顿：宽限内不出行动卡、批量�
             savePersonCadence: async () => {},
         },
     } });
-    await until(() => fixture.querySelector(".lvct-dash__stat"), "首页未加载");
-    /* 宽限期口径：统计卡保持真实 3，行动区无 never 卡（空态） */
-    assert(fixture.querySelector(".lvct-dash__stats").textContent.includes("3"), "统计应保持真实");
-    assert(fixture.textContent.includes("今天没有需要处理的事"), "宽限期内行动区应安静");
-    /* 批量安顿依赖真组——此处直接验证该口径由服务级用例与域单测覆盖；UI 侧验证撤销按钮挂载逻辑 */
-    assert(!fixture.querySelector(".lvct-dash__settle"), "无 never 组时不应出现批量安顿");
+    await until(() => fixture.querySelector(".lvct-dash__group-head"), "行动分组未加载");
+    const neverHead = [...fixture.querySelectorAll(".lvct-dash__group-head")]
+        .find((node) => node.textContent.includes("从未互动"));
+    assert(neverHead, "从未互动组未渲染");
+    neverHead.click();
+    await until(() => fixture.querySelector(".lvct-dash__settle"), "批量安顿入口未渲染");
+    const settleButton = [...fixture.querySelectorAll(".lvct-dash__settle button")]
+        .find((node) => node.textContent.includes("全部顺延"));
+    settleButton.click();
+    await until(() => dismissals.filter((entry) => entry.personDocId === first.docId || entry.personDocId === second.docId)
+        .every((entry) => entry.until === (() => { const date = new Date(); date.setDate(date.getDate() + 30); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; })()), "批量暂缓未完成");
+    const batchUntil = dismissals.find((entry) => entry.personDocId === first.docId).until;
+    /* 模拟另一窗口：新增无关提醒，同时修改本批中的一人。撤销不得覆盖两者。 */
+    dismissals.push({ personDocId: "20260927000000-并发项0000", kind: "birthday", until: "2099-12-31" });
+    dismissals.find((entry) => entry.personDocId === first.docId).until = "2099-02-02";
+    const undoButton = [...fixture.querySelectorAll(".lvct-dash__settle button")]
+        .find((node) => node.textContent.trim() === "撤销");
+    assert(undoButton, "批量完成后缺少撤销入口");
+    undoButton.click();
+    await until(() => !fixture.textContent.includes("已撤销批量暂缓（"), "批量撤销未完成");
+    assert(dismissals.some((entry) => entry.personDocId === "20260927000000-外部项0000" && entry.until === "2099-01-01"), "原有无关提醒被撤销覆盖");
+    assert(dismissals.some((entry) => entry.personDocId === "20260927000000-并发项0000"), "并发新增提醒被撤销删除");
+    assert(dismissals.some((entry) => entry.personDocId === first.docId && entry.until === "2099-02-02"), "同人并发修改被撤销覆盖");
+    assert(!dismissals.some((entry) => entry.personDocId === second.docId && entry.until === batchUntil), "未修改的本批项应被撤销");
 });
 
 await test("新建草稿关闭前三选一：取消保留草稿，放弃后关闭且弹窗列明细", async () => {
