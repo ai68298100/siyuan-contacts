@@ -350,6 +350,7 @@
   "fuDateLabel": "Plan date",
   "fuRecentlyClosed": "Recently closed:",
   "cadenceSectionTitle": "Contact cadence",
+  "cadenceLoadFailTitle": "Could not load contact cadence",
   "cadenceLoading": "Loading cadence",
   "cadenceLastLabel": "Last interaction:",
   "cadenceNoInteraction": "No interactions yet",

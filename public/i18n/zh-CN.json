@@ -350,6 +350,7 @@
   "fuDateLabel": "计划日期",
   "fuRecentlyClosed": "最近关闭：",
   "cadenceSectionTitle": "联系节奏",
+  "cadenceLoadFailTitle": "联系节奏读取失败",
   "cadenceLoading": "正在读取联系节奏",
   "cadenceLastLabel": "上次互动：",
   "cadenceNoInteraction": "还没有互动记录",

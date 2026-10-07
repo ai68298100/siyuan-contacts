@@ -823,6 +823,8 @@ import StatusNotice from "../StatusNotice.svelte";
     let cadenceSaving = $state(false);
     let cadenceMessage = $state("");
     let cadenceError = $state("");
+    let cadenceLoadError = $state("");
+    let cadenceRequest = 0;
     const lastContactLabel = $derived.by(() => {
         const first = insights?.timeline?.[0];
         return first?.localDate ?? "";
@@ -830,13 +832,23 @@ import StatusNotice from "../StatusNotice.svelte";
 
     async function loadCadence() {
         if (!onGetCadence) return;
+        const request = ++cadenceRequest;
+        const targetDocId = current.docId;
+        cadenceLoaded = false;
+        cadenceError = "";
+        cadenceLoadError = "";
         try {
-            const cadence = await onGetCadence(current.docId);
+            const cadence = await onGetCadence(targetDocId);
+            if (!detailAlive || request !== cadenceRequest || current.docId !== targetDocId) return;
             cadenceMode = cadence?.paused ? "paused" : cadence ? "custom" : "global";
             if (cadence) cadenceDays = cadence.days;
+            cadenceLoadError = "";
             cadenceLoaded = true;
         } catch (error) {
-            cadenceError = error instanceof Error ? error.message : String(error);
+            if (detailAlive && request === cadenceRequest && current.docId === targetDocId) {
+                cadenceLoadError = error instanceof Error ? error.message : String(error);
+                cadenceLoaded = true;
+            }
         }
     }
     loadCadence();
@@ -1192,10 +1204,14 @@ import StatusNotice from "../StatusNotice.svelte";
     {#if cadenceSupported}
     <section class="lvct-detail__section">
         <h4>{text("cadenceSectionTitle", "联系节奏")}</h4>
-        {#if cadenceError}<div class="lvct-form__error" role="alert">{cadenceError}</div>{/if}
-        {#if !cadenceLoaded}
+        {#if cadenceLoadError}
+            <ViewState compact error title={text("cadenceLoadFailTitle", "联系节奏读取失败")} description={cadenceLoadError}>
+                <button type="button" class="b3-button b3-button--outline" onclick={loadCadence}>{text("commonRetry", "重试")}</button>
+            </ViewState>
+        {:else if !cadenceLoaded}
             <ViewState compact loading title={text("cadenceLoading", "正在读取联系节奏")} />
         {:else}
+            {#if cadenceError}<div class="lvct-form__error" role="alert">{cadenceError}</div>{/if}
             <p class="ft__smaller ft__on-surface">
                 {text("cadenceLastLabel", "上次互动：")}{lastContactLabel || text("cadenceNoInteraction", "还没有互动记录")} · {text("cadenceCurrentLabel", "当前：")}
                 {cadenceMode === "paused" ? text("cadencePausedDesc", "已暂停提醒") : cadenceMode === "custom" ? text("cadenceCustomDesc", "自定义 {n} 天", { n: cadenceDays }) : text("cadenceGlobalDesc", "跟随全局阈值")}

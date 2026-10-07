@@ -4000,6 +4000,27 @@ await test("人物联系节奏设置：显示当前规则，自定义/暂停/清
     await until(() => fixture.textContent.includes("已清除覆盖"), "清除提示未显示");
 });
 
+await test("人物联系节奏读取失败：显示错误态并可重试，不停留在 loading", async () => {
+    let failCadence = true;
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async () => {},
+        onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+        onGetCadence: async () => {
+            if (failCadence) throw new Error("模拟节奏读取失败");
+            return null;
+        },
+        onSaveCadence: async () => {},
+    } });
+    await until(() => fixture.textContent.includes("模拟节奏读取失败"), "联系节奏读取错误未显示");
+    assert(fixture.textContent.includes("联系节奏读取失败"), "联系节奏错误标题未显示");
+    assert(!fixture.textContent.includes("正在读取联系节奏"), "读取失败后不应继续显示 loading");
+    failCadence = false;
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "重试").click();
+    await until(() => fixture.textContent.includes("跟随全局阈值"), "联系节奏重试后未恢复控件");
+});
+
 await test("今日行动清单：多原因单卡徽标，逾期跟进批量顺延到今天，空态", async () => {
     const pad = (value) => String(value).padStart(2, "0");
     const now = new Date();
