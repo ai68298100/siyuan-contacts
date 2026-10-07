@@ -37,14 +37,16 @@ jobs:
       - name: Type check (tsc + svelte-check)
         run: pnpm check
 
-      - name: Unit tests
-        run: pnpm test
-
       - name: Set up Chrome
         uses: browser-actions/setup-chrome@v1
         id: chrome
         with:
           install-dependencies: true
+
+      - name: Unit tests
+        run: pnpm test
+        env:
+          LVCT_TEST_BROWSER: ${{ steps.chrome.outputs.chrome-path }}
 
       - name: Desktop UI regression
         run: pnpm test:ui
