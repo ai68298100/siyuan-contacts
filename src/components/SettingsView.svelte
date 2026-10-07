@@ -841,9 +841,9 @@
                         {/if}
                     </div>
                     {#if !identityLoading && !selfReadError && typeof facade.previewSelfIdentityChange === "function"}
-                        <div class="lvct-settings__row">
+                        <div class="lvct-settings__row lvct-settings__identity-row">
                             <span>{text("selfDesignateLabel", "把本人身份改绑到其他已有联系人（保留原资料）")}</span>
-                            <span>
+                            <span class="lvct-settings__identity-controls">
                                 <select class="b3-select" aria-label={text("selfDesignatePick", "选择联系人…")} bind:value={selfDesignateTarget} disabled={selfBusy || selfPreview !== null}>
                                     <option value="">{text("selfDesignatePick", "选择联系人…")}</option>
                                     {#each designationCandidates as person (person.itemId)}

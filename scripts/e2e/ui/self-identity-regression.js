@@ -236,6 +236,16 @@ export async function runSelfIdentityRegression({ test, assert, kernel, settings
         try {
             await until(() => fixture.querySelector('select[aria-label="选择联系人…"]'), "旧库不能指定已有本人");
             const picker = fixture.querySelector('select[aria-label="选择联系人…"]');
+            if (window.innerWidth <= 640) {
+                const row = picker.closest(".lvct-settings__identity-row");
+                const controls = row?.querySelector(".lvct-settings__identity-controls");
+                assert(row && controls, "移动端本人改绑控件缺少专用布局容器");
+                const controlsRect = controls.getBoundingClientRect();
+                assert(controlsRect.left >= -1 && controlsRect.right <= window.innerWidth + 1,
+                    `移动端本人改绑控件横向溢出：${controlsRect.left}..${controlsRect.right} / ${window.innerWidth}`);
+                assert(picker.getBoundingClientRect().width <= controlsRect.width + 1,
+                    "移动端本人改绑选择器未收缩到容器宽度");
+            }
             picker.value = identity.selfItemId;
             picker.dispatchEvent(new Event("change", { bubbles: true }));
             await tick();

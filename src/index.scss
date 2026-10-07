@@ -1705,6 +1705,21 @@
     small { margin-top: 2px; color: var(--lvct-text-3); font-size: var(--lvct-fs-caption); }
 }
 
+.lvct-settings__identity-controls {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: var(--lvct-sp-2);
+    min-width: 0;
+    max-width: 100%;
+
+    .b3-select {
+        min-width: 0;
+        max-width: 100%;
+    }
+}
+
 .lvct-settings__backup-input {
     min-width: 0;
     max-width: 100%;
@@ -4544,6 +4559,24 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         align-items: flex-start;
         flex-wrap: wrap;
         padding: var(--lvct-sp-2) 0;
+    }
+
+    .lvct-settings__identity-row > .lvct-settings__identity-controls {
+        flex: 1 1 100%;
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .lvct-settings__identity-controls {
+        .b3-select {
+            flex: 1 1 100%;
+            width: 100%;
+        }
+
+        .b3-button {
+            min-width: 0;
+            max-width: 100%;
+        }
     }
 
     .lvct-form__item--inline {
