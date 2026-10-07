@@ -54,7 +54,7 @@ pnpm install          # 国内网络慢可先: pnpm config set registry https://
 
 ## 当前状态速览（详见 docs/PROGRESS.md）
 
-- v0.2.1 已发布（GitHub Release 附 package.zip；集市未上架，由作者择机提交）
+- v0.4.1 已发布（GitHub Release 附 package.zip；集市未上架，由作者择机提交）
 - 已完成：F01–F16 及联系人管理（含存量笔记收编）、vCard (.vcf) 导入导出、关系图谱、相关人物双链区块、
   农历生日提醒、久未联系仪表盘、从笔记捕获（含 AI 抽取）、人物文档档案条、对外人员服务桥、性能预算
 - 待办：真实宿主/真机/多窗口验收；反馈总表中的功能闭环、快速录入、UI 与页面状态收口；集市上架
