@@ -1084,7 +1084,7 @@
     {/if}
 
     {#if errorText}
-        <div class="lvct-form__error">加载失败：{errorText}</div>
+        <div class="lvct-form__error" role="alert">加载失败：{errorText}</div>
     {:else if loading}
         <div class="lvct-people__skeleton" aria-busy="true" aria-label="联系人加载中">
             {#each Array(6) as _, index (index)}

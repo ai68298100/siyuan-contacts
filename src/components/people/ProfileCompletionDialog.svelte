@@ -213,7 +213,7 @@
             <p class="ft__smaller ft__on-surface">{text("qfCompletionComplete", "此人资料已齐全，直接跳过。")}</p>
         {/if}
         {#if errorText}
-            <div class="lvct-form__error">{errorText}</div>
+            <div class="lvct-form__error" role="alert">{errorText}</div>
         {/if}
         <div class="lvct-form__actions">
             <button class="b3-button b3-button--outline" disabled={running && paused} onclick={() => (paused = !paused)}>{paused ? running ? "当前项结束后暂停" : "继续补录" : "暂停"}</button>

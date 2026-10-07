@@ -1375,7 +1375,7 @@ import StatusNotice from "../StatusNotice.svelte";
     {/if}
 
     {#if errorText}
-        <div class="lvct-form__error">{errorText}</div>
+        <div class="lvct-form__error" role="alert">{errorText}</div>
     {/if}
 
     <div class="lvct-form__actions">

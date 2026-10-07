@@ -333,7 +333,6 @@
         try {
             await action();
             fuMessage = message;
-            console.log("[lvct-debug] fuMessage set:", message, "undo:", Boolean(undoAction));
             await refresh();
         } catch (error) {
             fuError = error instanceof Error ? error.message : String(error);
