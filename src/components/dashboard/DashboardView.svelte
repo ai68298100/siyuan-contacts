@@ -636,24 +636,15 @@
                 {:else}
                     <div class="lvct-dash__list">
                         {#each previewList(data?.birthdays ?? [], showAllBirthdays, BIRTHDAY_PREVIEW_LIMIT) as item (item.person.itemId)}
-                            <div
-                                class="lvct-dash__row"
-                                role="button"
-                                tabindex="0"
-                                onclick={() => onOpenDetail(item.person)}
-                                onkeydown={(event) => {
-                                    if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
-                                    event.preventDefault();
-                                    onOpenDetail(item.person);
-                                }}
-                            >
-                                <b>{item.person.name}</b>
-                                <PersonProfileSummary profile={item.person.profile} compact />
-                                <span class="ft__smaller ft__on-surface">{item.projection.label}{item.person.isLunar ? "（农历）" : ""}</span>
-                                <span class="lvct-bucket {bucketStyles[item.bucket]}">
-                                    {item.projection.daysUntil === 0 ? text("dashFuToday", "今天") : text("dashDaysUntilN", "{n}天", { n: item.projection.daysUntil })}
-                                </span>
-                                <span style="flex:1"></span>
+                            <div class="lvct-dash__row">
+                                <button type="button" class="lvct-dash__row-main" onclick={() => onOpenDetail(item.person)}>
+                                    <b>{item.person.name}</b>
+                                    <PersonProfileSummary profile={item.person.profile} compact />
+                                    <span class="ft__smaller ft__on-surface">{item.projection.label}{item.person.isLunar ? "（农历）" : ""}</span>
+                                    <span class="lvct-bucket {bucketStyles[item.bucket]}">
+                                        {item.projection.daysUntil === 0 ? text("dashFuToday", "今天") : text("dashDaysUntilN", "{n}天", { n: item.projection.daysUntil })}
+                                    </span>
+                                </button>
                                 <button
                                     type="button"
                                     class="b3-button b3-button--text lvct-dash__quick-button"

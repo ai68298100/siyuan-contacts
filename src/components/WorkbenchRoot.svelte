@@ -50,7 +50,7 @@
     <WorkspaceRecovery
         {facade}
         workspace={workspaceState}
-        onRetry={() => void facade.reloadWorkspaceState()}
+        onRetry={async () => { await facade.reloadWorkspaceState(); }}
         onStartInit={() => { settings = null; workspaceState = { kind: "uninitialized" }; }}
         onReady={(value) => { settings = value; workspaceState = { kind: "ready" }; }}
     />

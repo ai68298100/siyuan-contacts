@@ -1176,6 +1176,45 @@ await test("行内快捷处置：生日跳过本年、从未互动不再提醒�
     await until(() => dismissals.some((entry) => entry.kind === "stale" && entry.until === ""), "不再提醒未写入长期暂缓");
 });
 
+await test("近期生日行：主按钮可聚焦打开详情，跳过按钮不触发详情（UX-01.14）", async () => {
+    const opened = [];
+    const dismissals = [];
+    const birthdayPerson = {
+        ...person,
+        docId: "20260927000000-birthday0001",
+        itemId: "row-birthday",
+        name: "键盘寿星",
+    };
+    mounted = mount(DashboardView, { target: fixture, props: {
+        preferences: DEFAULT_VIEW_PREFERENCES,
+        onOpenDetail(value) { opened.push(value.docId); },
+        onOpenPeople() {}, onOpenGraph() {},
+        facade: {
+            settings,
+            loadDashboard: async () => ({
+                people: 1, relations: 0,
+                birthdays: [{ person: birthdayPerson, bucket: "today", projection: { daysUntil: 0, label: "今天" } }],
+                birthdaysThisWeek: 1, stale: [], staleTotal: 0, neverContacted: 0,
+                neverContactedItemIds: [], actions: [], followUps: [],
+            }),
+            dismissReminder: async (docId, kind, until) => dismissals.push({ docId, kind, until }),
+            resumeReminder: async () => {},
+            loadReminderDismissals: async () => [],
+        },
+    } });
+    await until(() => fixture.querySelector(".lvct-dash__row-main"), "近期生日主按钮未渲染");
+    const mainButton = fixture.querySelector(".lvct-dash__row-main");
+    const skipButton = [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "跳过本年");
+    assert(mainButton && skipButton, "近期生日行缺少独立主按钮或跳过按钮");
+    mainButton.focus();
+    mainButton.click();
+    assert(opened.length === 1 && opened[0] === birthdayPerson.docId, "键盘可聚焦的生日主按钮未打开详情");
+    skipButton.focus();
+    skipButton.click();
+    await until(() => dismissals.length === 1, "跳过本年未写入");
+    assert(opened.length === 1, "跳过本年按钮不应再次打开详情");
+});
+
 await test("收编宽限期与批量安顿：宽限内不出行动卡、批量暂缓可一次性撤销（C02）", async () => {
     const personOf = (name) => ({
         docId: `20260927000000-${name}0000`, itemId: `row-${name}`, name,

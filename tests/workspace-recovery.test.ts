@@ -82,3 +82,49 @@ test("工作区重读在每个宿主读取后检查生命周期，并延迟到�
     assert.ok(versionGuard >= 0, "工作区重读必须丢弃过期请求");
     assert.ok(versionGuard < settingsCommit && settingsCommit < workspaceCommit, "状态提交必须位于版本门禁之后且顺序稳定");
 });
+
+test("工作区恢复重读：异步核验期间按钮锁定且等待真实 Promise 完成", () => {
+    const recovery = readFileSync(fileURLToPath(new URL("../src/components/WorkspaceRecovery.svelte", import.meta.url)), "utf8").replace(/\r\n/g, "\n");
+    const root = readFileSync(fileURLToPath(new URL("../src/components/WorkbenchRoot.svelte", import.meta.url)), "utf8").replace(/\r\n/g, "\n");
+    assert.ok(recovery.includes("let retrying = $state(false);"), "恢复页必须有独立的重读进行中状态");
+    assert.ok(recovery.includes("await onRetry();"), "恢复页必须等待重读 Promise 完成，避免提前解锁");
+    assert.ok(recovery.includes("onRetry: () => void | Promise<void>;"), "恢复页必须接收可等待的重读 Promise");
+    assert.ok(recovery.includes("if (retrying || busy || scanning) return;"), "重复点击必须在发起前被拦截");
+    assert.ok(recovery.includes("disabled={busy || scanning || retrying}"), "重读期间其他恢复动作也必须锁定");
+    assert.ok(recovery.includes("retrying ? \"核验中…\" : \"重新读取并核验\""), "重读期间必须向用户反馈当前状态");
+    assert.ok(root.includes("onRetry={async () => { await facade.reloadWorkspaceState(); }}"), "根组件必须把真实重读 Promise 交给恢复页等待");
+});
+
+test("工作区恢复重读：并发点击只发起一次请求，完成或失败后均释放忙碌态", async () => {
+    const source = readFileSync(fileURLToPath(new URL("../src/components/WorkspaceRecovery.svelte", import.meta.url)), "utf8")
+        .replace(/\r\n/g, "\n");
+    const functionSource = source.match(/async function retryWorkspace\(\): Promise<void> \{[\s\S]*?\n    \}(?=\n\n    async function scan)/)?.[0];
+    assert.ok(functionSource, "找不到工作区重读控制函数");
+    const runnable = ts.transpileModule(functionSource, { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.None } }).outputText;
+    const makeController = (onRetry: () => Promise<void>) => new Function("onRetry", `
+        let retrying = false;
+        let busy = false;
+        let scanning = false;
+        let message = "旧消息";
+        ${runnable}
+        return { retryWorkspace, state: () => ({ retrying, message }) };
+    `)(onRetry) as { retryWorkspace: () => Promise<void>; state: () => { retrying: boolean; message: string } };
+
+    let resolveRetry!: () => void;
+    let calls = 0;
+    const controller = makeController(() => {
+        calls += 1;
+        return new Promise<void>((resolve) => { resolveRetry = resolve; });
+    });
+    const pending = controller.retryWorkspace();
+    assert.deepEqual(controller.state(), { retrying: true, message: "" });
+    await controller.retryWorkspace();
+    assert.equal(calls, 1, "挂起的核验不能被重复触发");
+    resolveRetry();
+    await pending;
+    assert.deepEqual(controller.state(), { retrying: false, message: "" });
+
+    const failed = makeController(async () => { throw new Error("核验失败"); });
+    await failed.retryWorkspace();
+    assert.deepEqual(failed.state(), { retrying: false, message: "核验失败" });
+});

@@ -10,11 +10,12 @@
         facade: ContactsPluginFacade;
         workspace: WorkspaceState;
         onReady: (settings: ContactsSettings) => void;
-        onRetry: () => void;
+        onRetry: () => void | Promise<void>;
         onStartInit: () => void;
     } = $props();
 
     let scanning = $state(false);
+    let retrying = $state(false);
     let busy = $state(false);
     let message = $state("");
     let candidates = $state<AnchorCandidate[]>([]);
@@ -37,6 +38,19 @@
             merged.set(`${candidate.notebookId}/${candidate.hostDocId}/${candidate.dbBlockId}/${candidate.avId}`, candidate);
         }
         return [...merged.values()].sort((left, right) => right.matchedFields - left.matchedFields);
+    }
+
+    async function retryWorkspace(): Promise<void> {
+        if (retrying || busy || scanning) return;
+        retrying = true;
+        message = "";
+        try {
+            await onRetry();
+        } catch (error) {
+            message = error instanceof Error ? error.message : String(error);
+        } finally {
+            retrying = false;
+        }
     }
 
     async function scan(resume = false) {
@@ -98,10 +112,10 @@
     <p class="lvct-recovery__message">{workspace.message ?? "插件已暂停读取联系人数据库，原有文档和插件数据不会被删除。"}</p>
     <p class="lvct-recovery__rule">请先重新核验或扫描原数据库。插件不会把读取失败当成空库，也不会自动创建第二套联系人数据库。</p>
     <div class="lvct-recovery__actions">
-        <button class="b3-button" disabled={busy || scanning} onclick={onRetry}>重新读取并核验</button>
-        <button class="b3-button" disabled={busy || scanning} onclick={() => void scan(false)}>{scanning ? "扫描中…" : "扫描全库候选"}</button>
-        {#if scanCursor}<button class="b3-button" disabled={busy || scanning} onclick={() => void scan(true)}>{scanning ? "扫描中…" : "继续扫描"}</button>{/if}
-        <button class="b3-button" disabled={busy || scanning} onclick={onStartInit}>进入初始化向导（明确新建或复用）</button>
+        <button class="b3-button" disabled={busy || scanning || retrying} onclick={() => void retryWorkspace()}>{retrying ? "核验中…" : "重新读取并核验"}</button>
+        <button class="b3-button" disabled={busy || scanning || retrying} onclick={() => void scan(false)}>{scanning ? "扫描中…" : "扫描全库候选"}</button>
+        {#if scanCursor}<button class="b3-button" disabled={busy || scanning || retrying} onclick={() => void scan(true)}>{scanning ? "扫描中…" : "继续扫描"}</button>{/if}
+        <button class="b3-button" disabled={busy || scanning || retrying} onclick={onStartInit}>进入初始化向导（明确新建或复用）</button>
     </div>
     {#if message}<p class="lvct-recovery__message">{message}</p>{/if}
     {#if candidates.length}
