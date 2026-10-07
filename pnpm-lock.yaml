@@ -175,7 +175,7 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.3.0
-        version: 7.3.1(svelte@5.57.1)(vite@8.3.1(@types/node@26.6.2)(sass@1.105.0))
+        version: 7.3.1(svelte@5.57.1)(vite@8.3.1(@types/node@26.6.2)(sass@1.105.1))
       '@types/cytoscape':
         specifier: ^3.31.0
         version: 3.31.0
@@ -198,8 +198,8 @@ importers:
         specifier: ^4.1.5
         version: 4.1.5
       sass:
-        specifier: ^1.103.1
-        version: 1.105.0
+        specifier: ^1.105.1
+        version: 1.105.1
       siyuan:
         specifier: 1.2.7
         version: 1.2.7
@@ -214,13 +214,13 @@ importers:
         version: 6.0.3
       vite:
         specifier: ^8.2.2
-        version: 8.3.1(@types/node@26.6.2)(sass@1.105.0)
+        version: 8.3.1(@types/node@26.6.2)(sass@1.105.1)
       vite-plugin-static-copy:
         specifier: ^4.1.1
-        version: 4.1.1(vite@8.3.1(@types/node@26.6.2)(sass@1.105.0))
+        version: 4.1.1(vite@8.3.1(@types/node@26.6.2)(sass@1.105.1))
       vite-plugin-zip-pack:
         specifier: ^1.2.4
-        version: 1.2.4(vite@8.3.1(@types/node@26.6.2)(sass@1.105.0))
+        version: 1.2.4(vite@8.3.1(@types/node@26.6.2)(sass@1.105.1))
 
 packages:
 
@@ -1210,8 +1210,8 @@ packages:
     resolution: {integrity: sha512-x/+Cz4YrimQxQccJf5mKEbIa1NzeCRNI5Ecl/ekmlYaampdNLPalVyIcCZNNH3MvmqBugV5TMYZXv0ljslUlaw==}
     engines: {node: '>= 0.4'}
 
-  sass@1.105.0:
-    resolution: {integrity: sha512-4EjSuRTyG8M4yRXXY1PT9OUV5zz23xBxJkbIAprohKHqf6HOU4MCpE3U3vAC+iO1gxobBjESNbcj8rYAQZWnyA==}
+  sass@1.105.1:
+    resolution: {integrity: sha512-1CnAWPyrrnVQzXGB/DUep1vYCKCm1CIBr+YxjjiW6wk9qtzemnGP4qicH56T2F9S4Hjtv/Ne3jDz8JqfdDU4oA==}
     engines: {node: '>=20.19.0'}
     hasBin: true
 
@@ -1644,14 +1644,14 @@ snapshots:
 
   '@sveltejs/load-config@0.2.3': {}
 
-  '@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.1)(vite@8.3.1(@types/node@26.6.2)(sass@1.105.0))':
+  '@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.1)(vite@8.3.1(@types/node@26.6.2)(sass@1.105.1))':
     dependencies:
       deepmerge: 4.3.1
       magic-string: 1.4.2
       obug: 2.2.1
       svelte: 5.57.1
-      vite: 8.3.1(@types/node@26.6.2)(sass@1.105.0)
-      vitefu: 1.1.3(vite@8.3.1(@types/node@26.6.2)(sass@1.105.0))
+      vite: 8.3.1(@types/node@26.6.2)(sass@1.105.1)
+      vitefu: 1.1.3(vite@8.3.1(@types/node@26.6.2)(sass@1.105.1))
 
   '@types/cytoscape@3.31.0':
     dependencies:
@@ -2488,7 +2488,7 @@ snapshots:
       es-errors: 1.3.0
       is-regex: 1.2.1
 
-  sass@1.105.0:
+  sass@1.105.1:
     dependencies:
       chokidar: 5.0.0
       immutable: 5.1.9
@@ -2727,20 +2727,20 @@ snapshots:
       spdx-correct: 3.2.0
       spdx-expression-parse: 3.0.1
 
-  vite-plugin-static-copy@4.1.1(vite@8.3.1(@types/node@26.6.2)(sass@1.105.0)):
+  vite-plugin-static-copy@4.1.1(vite@8.3.1(@types/node@26.6.2)(sass@1.105.1)):
     dependencies:
       chokidar: 3.6.0
       p-map: 7.0.8
       picocolors: 1.1.1
       tinyglobby: 0.2.17
-      vite: 8.3.1(@types/node@26.6.2)(sass@1.105.0)
+      vite: 8.3.1(@types/node@26.6.2)(sass@1.105.1)
 
-  vite-plugin-zip-pack@1.2.4(vite@8.3.1(@types/node@26.6.2)(sass@1.105.0)):
+  vite-plugin-zip-pack@1.2.4(vite@8.3.1(@types/node@26.6.2)(sass@1.105.1)):
     dependencies:
       jszip: 3.10.2
-      vite: 8.3.1(@types/node@26.6.2)(sass@1.105.0)
+      vite: 8.3.1(@types/node@26.6.2)(sass@1.105.1)
 
-  vite@8.3.1(@types/node@26.6.2)(sass@1.105.0):
+  vite@8.3.1(@types/node@26.6.2)(sass@1.105.1):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
@@ -2750,11 +2750,11 @@ snapshots:
     optionalDependencies:
       '@types/node': 26.6.2
       fsevents: 2.3.3
-      sass: 1.105.0
+      sass: 1.105.1
 
-  vitefu@1.1.3(vite@8.3.1(@types/node@26.6.2)(sass@1.105.0)):
+  vitefu@1.1.3(vite@8.3.1(@types/node@26.6.2)(sass@1.105.1)):
     optionalDependencies:
-      vite: 8.3.1(@types/node@26.6.2)(sass@1.105.0)
+      vite: 8.3.1(@types/node@26.6.2)(sass@1.105.1)
 
   which-boxed-primitive@1.1.1:
     dependencies:
