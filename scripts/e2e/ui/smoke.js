@@ -4005,6 +4005,10 @@ await test("人物联系节奏设置：显示当前规则，自定义/暂停/清
     document.body.querySelector('.lvct-closeguard button[data-choice="cancel"]').click();
     await until(() => !document.body.querySelector(".lvct-closeguard"), "联系节奏守卫取消后未关闭");
     assert(fixture.querySelector('input[aria-label="自定义天数"]')?.value === "21", "取消守卫后联系节奏草稿丢失");
+    button("关闭").click();
+    await until(() => document.body.querySelector(".lvct-closeguard"), "联系节奏守卫第二次关闭未打开");
+    document.body.querySelector('.lvct-closeguard button[data-choice="save"]').click();
+    await until(() => savedCadence?.days === 21 && savedCadence?.paused === false, "关闭守卫的保存并离开未写入联系节奏");
     input(daysInput, "14");
     [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "保存节奏").click();
     await until(() => savedCadence?.days === 14 && savedCadence?.paused === false, "自定义节奏未保存");
