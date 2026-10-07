@@ -64,12 +64,33 @@
     const params = new URLSearchParams(location.search);
     const view = params.get("view") || "home";
     if (params.get("theme") === "dark") document.documentElement.dataset.theme = "dark";
-    const people = [
+    /* PR-UX-10：可选规模夹具。默认不启用，保持普通截图的数据量和耗时不变。 */
+    const fixture = params.get("fixture")?.trim().toLowerCase() ?? "";
+    const scaleSize = fixture === "scale" ? 200 : fixture.startsWith("scale:") ? Number(fixture.slice("scale:".length)) : 0;
+    if (fixture && (!fixture.startsWith("scale") || ![200, 1000].includes(scaleSize))) {
+        throw new Error(`截图规模夹具未知：${fixture}（可用 scale、scale:200、scale:1000）`);
+    }
+    const seedPeople = [
         { name: "林晓梅", docId: "20260927000000-person1", itemId: "row-1", group: "家人", phone: "13902257716", tags: ["家人"], birthday: "1990-09-27", related: ["row-2", "row-3"] },
         { name: "陈立群", docId: "20260927000000-person2", itemId: "row-2", group: "同事", phone: "13826110427", tags: ["数学组"], birthday: "1988-10-04", related: ["row-3"] },
         { name: "郑好", docId: "20260927000000-person3", itemId: "row-3", group: "朋友", phone: "13688402253", tags: ["球友"], birthday: "", related: [] },
         { name: "苏婉清 · 跨校联合课程与社区项目协调负责人", docId: "20260927000000-person4", itemId: "row-4", group: "同学", phone: "13755190086", tags: ["校友", "跨校联合课程项目协作", "社区公益活动与长期志愿服务"], birthday: "1991-10-12", related: ["row-2"] },
     ];
+    const people = scaleSize > 0
+        ? [...seedPeople, ...Array.from({ length: scaleSize - seedPeople.length }, (_, index) => {
+            const ordinal = index + seedPeople.length + 1;
+            return {
+                name: `规模联系人 ${String(ordinal).padStart(5, "0")}`,
+                docId: `20261008000000-scale${String(ordinal).padStart(5, "0")}`,
+                itemId: `row-scale-${ordinal}`,
+                group: ["朋友", "同事", "校友", "客户"][index % 4],
+                phone: `138${String(ordinal).padStart(8, "0")}`,
+                tags: [index % 3 === 0 ? "目标" : "规模", `批次-${index % 10}`],
+                birthday: index % 5 === 0 ? `199${index % 10}-0${(index % 8) + 1}-0${(index % 8) + 1}` : "",
+                related: [],
+            };
+        })]
+        : seedPeople;
     const settings = {
         schemaVersion: 1, notebookName: "小驴人脉", notebookId: "20260927000000-book001",
         hostDocId: "20260927000000-host001", dbBlockId: "20260927000000-block01",
@@ -105,7 +126,7 @@
                 { valueType: "select", value: { type: "select", keyID: "group", mSelect: [{ content: person.group }] } },
                 { valueType: "mSelect", value: { type: "mSelect", keyID: "tags", mSelect: person.tags.map((tag) => ({ content: tag })) } },
                 { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: person.related } } },
-            ] })),
+            ] })), rowCount: people.length,
         } };
         if (route === "/api/graph/getGraph" || route === "/api/graph/getLocalGraph") {
             const nodes = [...people.map((person) => ({ id: person.docId, label: person.name })), ...organizations.filter((org) => !org.archived).map((org) => ({ id: org.docId, label: org.name }))];

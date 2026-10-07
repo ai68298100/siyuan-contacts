@@ -14,6 +14,13 @@ const root = resolve(import.meta.dirname, "../..");
 const workbenchViews = ["home", "people", "table", "peek", "graph", "orgs", "orgdetail", "quickfill", "viewsmenu", "morefilter", "colmenu"];
 const selectedView = process.env.LVCT_SHOT_VIEW?.trim();
 if (selectedView && !workbenchViews.includes(selectedView)) throw new Error(`截图视图未知：${selectedView}；可用 ${workbenchViews.join(", ")}`);
+const scaleValue = process.env.LVCT_SHOT_SCALE?.trim();
+const scaleSize = scaleValue ? Number(scaleValue) : 0;
+if (scaleValue && ![200, 1000].includes(scaleSize)) throw new Error(`LVCT_SHOT_SCALE 只支持 200 或 1000，收到：${scaleValue}`);
+if (scaleSize && selectedView && !["people", "table"].includes(selectedView)) {
+    throw new Error("规模截图只支持联系人 people/table 视图");
+}
+const scaleFixture = scaleSize ? `scale:${scaleSize}` : "";
 const browserPath = [
     process.env.LVCT_TEST_BROWSER,
     "C:/Program Files/Google/Chrome/Application/chrome.exe",
@@ -35,7 +42,7 @@ const port = server.httpServer.address().port;
 
 const pause = (ms) => new Promise((resolvePause) => setTimeout(resolvePause, ms));
 
-async function capture({ url, outFile, size }) {
+async function capture({ url, outFile, size, assertViewportBounds = false }) {
     const [width, height] = size.split(",").map(Number);
     const profile = mkdtempSync(join(tmpdir(), "lvct-shot-"));
     const browser = spawn(browserPath, [
@@ -84,10 +91,23 @@ async function capture({ url, outFile, size }) {
             if (title === "READY" || title.startsWith("ERROR")) break;
         }
         if (title !== "READY") throw new Error(`页面未就绪：${title}`);
-        const metrics = await call("Runtime.evaluate", { expression: "[innerWidth,innerHeight,document.documentElement.scrollWidth]", returnByValue: true });
-        const [actualWidth, actualHeight, scrollWidth] = metrics.result.value ?? [];
+        const metrics = await call("Runtime.evaluate", { expression: `(() => {
+            const selectors = [".lvct-workbench", ".lvct-workbench__main", ".lvct-workbench__body", ".lvct-people", ".lvct-people__toolbar", ".lvct-people__cards", ".lvct-people__table-wrap"];
+            const containers = selectors.flatMap((selector) => [...document.querySelectorAll(selector)].map((element) => {
+                const rect = element.getBoundingClientRect();
+                return { selector, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height };
+            }));
+            return { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, containers };
+        })()`, returnByValue: true });
+        const { width: actualWidth, height: actualHeight, scrollWidth, containers = [] } = metrics.result.value ?? {};
         if (actualWidth !== width || actualHeight !== height || scrollWidth > width + 2) {
             throw new Error(`视口/溢出异常：${actualWidth}x${actualHeight}, scrollWidth=${scrollWidth}`);
+        }
+        if (assertViewportBounds) {
+            const outOfBounds = containers.filter(({ left, right, width: boxWidth }) => boxWidth > 0 && (left < -2 || right > actualWidth + 2));
+            if (outOfBounds.length) {
+                throw new Error(`联系人容器超出视口：${outOfBounds.map(({ selector, left, right }) => `${selector}[${Math.round(left)},${Math.round(right)}]`).join(", ")}`);
+            }
         }
         const shot = await call("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
         writeFileSync(outFile, Buffer.from(shot.data, "base64"));
@@ -108,7 +128,7 @@ async function capture({ url, outFile, size }) {
     }
 }
 
-const sections = selectedView ? [] : ["general", "data"];
+const sections = selectedView || scaleSize ? [] : ["general", "data"];
 try {
     for (const section of sections) {
         for (const theme of ["light", "dark"]) {
@@ -120,7 +140,7 @@ try {
             }
         }
     }
-    for (const state of selectedView ? [] : ["reuse", "failed"]) {
+    for (const state of selectedView || scaleSize ? [] : ["reuse", "failed"]) {
         for (const [viewport, size] of [["desktop", "1280,900"], ["mobile", "390,844"]]) {
             for (const theme of ["light", "dark"]) {
                 const url = `http://127.0.0.1:${port}/scripts/e2e/shot-wizard.html?state=${state}&theme=${theme}`;
@@ -130,12 +150,15 @@ try {
             }
         }
     }
-    for (const view of selectedView ? [selectedView] : ["home", "people", "table", "peek", "graph", "orgs", "orgdetail", "quickfill"]) {
+    const captureViews = selectedView ? [selectedView] : scaleSize ? ["people", "table"] : ["home", "people", "table", "peek", "graph", "orgs", "orgdetail", "quickfill"];
+    for (const view of captureViews) {
         for (const [viewport, size] of [["desktop", "1280,900"], ["mobile", "390,844"]]) {
             for (const theme of ["light", "dark"]) {
                 const host = selectedView && process.env.LVCT_HOST_BASELINE === "1" ? "&host=1" : "";
-                const url = `http://127.0.0.1:${port}/scripts/e2e/shot-workbench.html?view=${view}&theme=${theme}&mobile=${viewport === "mobile" ? "1" : "0"}${host}`;
-                const ok = await capture({ url, size, outFile: join(outDir, `${host ? "host-" : ""}workbench-${view}-${viewport}-${theme}.png`) });
+                const fixtureQuery = scaleFixture ? `&fixture=${encodeURIComponent(scaleFixture)}` : "";
+                const url = `http://127.0.0.1:${port}/scripts/e2e/shot-workbench.html?view=${view}&theme=${theme}&mobile=${viewport === "mobile" ? "1" : "0"}${fixtureQuery}${host}`;
+                const scaleSuffix = scaleSize ? `-scale-${scaleSize}` : "";
+                const ok = await capture({ url, size, assertViewportBounds: Boolean(scaleSize), outFile: join(outDir, `${host ? "host-" : ""}workbench-${view}-${viewport}-${theme}${scaleSuffix}.png`) });
                 console.log(`${view} ${viewport} ${theme}: ${ok ? "OK" : "FAIL"}`);
                 if (!ok) process.exitCode = 1;
             }
