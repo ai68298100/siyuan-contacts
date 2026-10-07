@@ -445,6 +445,18 @@ function detailRefreshController(initial: ContactSummary, listContacts: () => Pr
         + script + "\nreturn {loadOthers,state(){return {current,others,othersError}},select(person){current=person},dispose(){detailAlive=false;othersRequest++}};")(listContacts, initial);
 }
 
+test("详情关闭守卫：跟进与自定义推迟草稿只允许放弃或取消，不隐式写入", () => {
+    const source = readFileSync(new URL("../src/components/people/PersonDetail.svelte", import.meta.url), "utf8")
+        .replace(/\r\n/g, "\n");
+    const guard = source.match(/\/\* 跟进输入没有「保存并离开」[\s\S]*?useCloseGuard\(\{[\s\S]*?\n    \}\);/)?.[0];
+    assert.ok(guard, "跟进草稿应注册独立关闭守卫");
+    assert.match(guard, /dirty:\s*\(\)\s*=>\s*followUpDraftDirty/);
+    assert.match(guard, /guardFollowUpDraft/);
+    assert.match(guard, /guardSnoozeDraft/);
+    assert.doesNotMatch(guard, /\bsave\s*:/);
+    assert.match(source, /followUpSavedDate\s*=\s*followUpDate/);
+});
+
 test("详情实际刷新逻辑：文档与行必须同时唯一匹配，换绑和重复保持原人物", async () => {
     const original: ContactSummary = { ...emptyDraft(), name: "原人物", docId: personDocId, itemId: personItemId, relatedItemIds: [] };
     const other: ContactSummary = { ...original, docId: "20261004000000-other01", name: "换绑人物" };

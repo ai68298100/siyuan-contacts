@@ -16,7 +16,7 @@ import StatusNotice from "../StatusNotice.svelte";
     import { translateText } from "../../domain/translation";
     import PersonPicker from "./PersonPicker.svelte";
     import type { PickerItem } from "./PersonPicker.svelte";
-    import { dueLabel } from "../../domain/followups";
+    import { dueLabel, hasFollowUpDraft } from "../../domain/followups";
     import type { FollowUpItem, SnoozeOption } from "../../domain/followups";
     import type { PersonCadence } from "../../domain/cadence";
     import { renderTemplate } from "../../domain/interaction-templates";
@@ -532,34 +532,74 @@ import StatusNotice from "../StatusNotice.svelte";
     const orgSectionSupported = $derived(Boolean(onLoadOrgMemberships));
     let followUps: FollowUpItem[] = $state([]);
     let followUpsLoading = $state(true);
+    const initialFollowUpDate = toLocalDateKey(new Date());
     let followUpTitle = $state("");
-    let followUpDate = $state(toLocalDateKey(new Date()));
+    let followUpDate = $state(initialFollowUpDate);
+    let followUpSavedTitle = $state("");
+    let followUpSavedDate = $state(initialFollowUpDate);
     let followUpBusy = $state(false);
     let followUpRecorded = $state(false);
     let followUpError = $state("");
+    /* 写入已经成功但随后列表回读失败时，不能把成功误报为写入失败。 */
+    let followUpActionError = $state("");
+    let followUpRefreshWarning = $state("");
     let followUpRequest = 0;
     let snoozeForId = $state("");
     let snoozeCustomDate = $state("");
     const todayKey = $derived(toLocalDateKey(new Date()));
+    const followUpPlanDirty = $derived(hasFollowUpDraft({
+        title: followUpTitle,
+        dueDate: followUpDate,
+        savedTitle: followUpSavedTitle,
+        savedDueDate: followUpSavedDate,
+        snoozeCustomDate: "",
+    }));
+    const followUpSnoozeDirty = $derived(snoozeCustomDate.trim().length > 0);
+    const followUpDraftDirty = $derived(followUpPlanDirty || followUpSnoozeDirty);
     const openFollowUps = $derived(followUps.filter((item) => item.status === "open"));
     const closedFollowUps = $derived(followUps.filter((item) => item.status !== "open"));
 
-    async function loadFollowUps() {
-        if (!onListFollowUps) return;
+    /* 跟进输入没有「保存并离开」：离开确认只能放弃或取消，避免隐式创建/推迟。 */
+    useCloseGuard({
+        busy: () => busy || deleting || personNoteSaving || personNoteLoading || followUpBusy || cadenceSaving,
+        dirty: () => followUpDraftDirty,
+        changes: () => [
+            ...(followUpPlanDirty ? [text("guardFollowUpDraft", "跟进计划草稿尚未添加")] : []),
+            ...(followUpSnoozeDirty ? [text("guardSnoozeDraft", "推迟日期尚未应用")] : []),
+        ],
+    });
+
+    async function loadFollowUps(): Promise<boolean> {
+        if (!onListFollowUps) return false;
         const request = ++followUpRequest;
         const targetDocId = current.docId;
         followUpsLoading = true;
         followUpError = ""; /* FUNC-01.12：重试先清错误态，成功后不得残留旧错误分支 */
         try {
             const next = await onListFollowUps(targetDocId);
-            if (!detailAlive || request !== followUpRequest || current.docId !== targetDocId) return;
+            /* 旧请求被新请求取代时，交给当前请求继续显示结果，不制造假失败。 */
+            if (!detailAlive || request !== followUpRequest || current.docId !== targetDocId) return true;
             followUps = next;
+            followUpRefreshWarning = "";
+            return true;
         } catch (error) {
             if (detailAlive && request === followUpRequest && current.docId === targetDocId) {
                 followUpError = error instanceof Error ? error.message : String(error);
+                return false;
             }
+            return true;
         } finally {
             if (detailAlive && request === followUpRequest) followUpsLoading = false;
+        }
+    }
+
+    async function refreshFollowUpsAfterMutation(): Promise<void> {
+        const refreshed = await loadFollowUps();
+        if (!refreshed && detailAlive) {
+            followUpRefreshWarning = text(
+                "fuSavedRefreshFail",
+                "已保存，但跟进列表刷新失败。请点击“重试”核实最新状态；不要重复提交。",
+            );
         }
     }
 
@@ -776,14 +816,18 @@ import StatusNotice from "../StatusNotice.svelte";
         if (followUpBusy || !onCreateFollowUp) return;
         followUpBusy = true;
         followUpError = "";
+        followUpActionError = "";
+        followUpRefreshWarning = "";
         try {
             await onCreateFollowUp(current.docId, followUpTitle.trim(), followUpDate);
             followUpTitle = "";
+            followUpSavedTitle = "";
+            followUpSavedDate = followUpDate;
             followUpRecorded = true;
             onChanged();
-            await loadFollowUps();
+            await refreshFollowUpsAfterMutation();
         } catch (error) {
-            followUpError = error instanceof Error ? error.message : String(error);
+            followUpActionError = error instanceof Error ? error.message : String(error);
         } finally {
             followUpBusy = false;
         }
@@ -793,12 +837,14 @@ import StatusNotice from "../StatusNotice.svelte";
         if (followUpBusy || !onSetFollowUpStatus) return;
         followUpBusy = true;
         followUpError = "";
+        followUpActionError = "";
+        followUpRefreshWarning = "";
         try {
             await onSetFollowUpStatus(item.id, "done");
-            await loadFollowUps();
+            await refreshFollowUpsAfterMutation();
             onChanged();
         } catch (error) {
-            followUpError = error instanceof Error ? error.message : String(error);
+            followUpActionError = error instanceof Error ? error.message : String(error);
         } finally {
             followUpBusy = false;
         }
@@ -809,12 +855,14 @@ import StatusNotice from "../StatusNotice.svelte";
         if (!window.confirm(`取消跟进「${item.title || text("fuKeepInTouch", "保持联系")}」？取消后不再出现在待办中。`)) return;
         followUpBusy = true;
         followUpError = "";
+        followUpActionError = "";
+        followUpRefreshWarning = "";
         try {
             await onSetFollowUpStatus(item.id, "cancelled");
-            await loadFollowUps();
+            await refreshFollowUpsAfterMutation();
             onChanged();
         } catch (error) {
-            followUpError = error instanceof Error ? error.message : String(error);
+            followUpActionError = error instanceof Error ? error.message : String(error);
         } finally {
             followUpBusy = false;
         }
@@ -825,14 +873,16 @@ import StatusNotice from "../StatusNotice.svelte";
         if (option === "custom" && !snoozeCustomDate) return;
         followUpBusy = true;
         followUpError = "";
+        followUpActionError = "";
+        followUpRefreshWarning = "";
         try {
             await onSnoozeFollowUp(item.id, option, option === "custom" ? snoozeCustomDate : undefined);
             snoozeForId = "";
             snoozeCustomDate = "";
-            await loadFollowUps();
+            await refreshFollowUpsAfterMutation();
             onChanged();
         } catch (error) {
-            followUpError = error instanceof Error ? error.message : String(error);
+            followUpActionError = error instanceof Error ? error.message : String(error);
         } finally {
             followUpBusy = false;
         }
@@ -1163,6 +1213,12 @@ import StatusNotice from "../StatusNotice.svelte";
     {#if followUpSupported}
     <section class="lvct-detail__section">
         <h4>{text("fuSectionTitle", "跟进计划")}</h4>
+        {#if followUpActionError}
+            <div class="lvct-form__error" role="alert">{text("fuActionFail", "跟进操作失败：{msg}", { msg: followUpActionError })}</div>
+        {/if}
+        {#if followUpRefreshWarning}
+            <StatusNotice error message={followUpRefreshWarning} actionLabel={text("commonRetry", "重试")} onAction={() => void loadFollowUps()} />
+        {/if}
         {#if followUpError}
             <!-- FUNC-01.12：读取失败显式报错并可重试，不与「没有跟进计划」空态同时呈现 -->
             <ViewState compact error title={text("fuLoadFailTitle", "跟进计划加载失败")} description={followUpError}>

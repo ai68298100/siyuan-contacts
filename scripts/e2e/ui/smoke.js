@@ -3026,6 +3026,12 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
     select("关系查询模式", "common");
     await pick("对比人物", "e");
     await until(() => fixture.textContent.includes("当前图内没有共同联系人"), "无共同联系人空态错误");
+    /* 更换关系中心必须清掉旧对比人物，否则选择器显示未选择但查询仍沿用旧结果。 */
+    await pick("关系中心", "b");
+    await until(() => fixture.textContent.includes("直接关系：1 人"), "更换关系中心未清除旧对比结果");
+    const staleCompare = [...fixture.querySelectorAll(".lvct-picker__trigger")]
+        .find((node) => node.getAttribute("aria-label") === "对比人物");
+    assert(staleCompare && staleCompare.textContent.includes("未选择"), "更换关系中心后对比人物仍残留");
     button("清除选择").click();
     await until(() => cy.elements(".lvct-graph-muted").length === 0, "清除未恢复图谱");
     await pick("关系中心", "e");
@@ -3886,6 +3892,50 @@ await test("人物跟进计划：创建防重复提交，推迟菜单语义选�
     } finally {
         window.confirm = originalConfirm;
     }
+});
+
+await test("人物跟进计划：写入成功但回读失败时提示核实，避免重复提交", async () => {
+    let items = [];
+    let failReads = false;
+    let createCalls = 0;
+    const statusCalls = [];
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async () => {},
+        onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onDeleted() {}, onClose() {}, onChanged() {},
+        onListFollowUps: async () => {
+            if (failReads) throw new Error("列表暂时无法读取");
+            return items;
+        },
+        onCreateFollowUp: async (_docId, title, dueDate) => {
+            createCalls += 1;
+            const created = { id: "fu-refresh-1", personDocId: person.docId, title, dueDate, status: "open", createdAt: 1, updatedAt: 1 };
+            items = [...items, created];
+            return created;
+        },
+        onSetFollowUpStatus: async (id, status) => {
+            statusCalls.push([id, status]);
+            items = items.map((entry) => entry.id === id ? { ...entry, status } : entry);
+        },
+        onSnoozeFollowUp: async () => {},
+    } });
+    await until(() => fixture.textContent.includes("跟进计划"), "跟进区未显示");
+    const titleInput = fixture.querySelector('input[placeholder*="这次想联系什么"]');
+    input(titleInput, "回读失败测试");
+    failReads = true;
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "添加计划").click();
+    await until(() => createCalls === 1 && fixture.textContent.includes("已保存，但跟进列表刷新失败"), "写入成功后的回读失败提示未显示");
+    assert(fixture.textContent.includes("不要重复提交") && !fixture.textContent.includes("跟进操作失败"), "回读失败被误报成写入失败或缺少防重复提示");
+
+    failReads = false;
+    fixture.querySelector(".lvct-notice__action").click();
+    await until(() => fixture.textContent.includes("回读失败测试"), "重试后未核实已写入跟进");
+
+    failReads = true;
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "完成").click();
+    await until(() => statusCalls.length === 1 && fixture.textContent.includes("已保存，但跟进列表刷新失败"), "状态写入成功后的回读失败提示未显示");
+    assert(statusCalls.length === 1, "回读失败后不应重复提交状态写入");
 });
 
 await test("跟进备份：预览零写入，合并现状优先幂等，损坏数据与非法日期拒绝", async () => {

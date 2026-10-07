@@ -7,6 +7,7 @@ import {
     dueLabel,
     emptyFollowUpStore,
     followUpsForPerson,
+    hasFollowUpDraft,
     isValidDateKey,
     nextMondayFrom,
     normalizeFollowUpStore,
@@ -49,6 +50,17 @@ test("推迟语义：明天/三天/下周一/次月/指定日期；非法指定�
     assert.equal(snoozedDueDate("custom", today, "2026-10-15"), "2026-10-15");
     assert.equal(snoozedDueDate("custom", today, "2026-10-32"), "");
     assert.equal(snoozedDueDate("custom", today), "");
+});
+
+test("详情草稿判断：仅比较未提交字段，不把成功创建后的保留日期误报为草稿", () => {
+    const baseline = { title: "", dueDate: "2026-09-28", savedTitle: "", savedDueDate: "2026-09-28", snoozeCustomDate: "" };
+    assert.equal(hasFollowUpDraft(baseline), false);
+    assert.equal(hasFollowUpDraft({ ...baseline, title: "   " }), false);
+    assert.equal(hasFollowUpDraft({ ...baseline, title: "下周联系" }), true);
+    assert.equal(hasFollowUpDraft({ ...baseline, dueDate: "2026-10-01" }), true);
+    // 创建成功后标题会清空，但表单保留日期供连续添加；更新基线后不应再次拦截。
+    assert.equal(hasFollowUpDraft({ ...baseline, dueDate: "2026-10-01", savedDueDate: "2026-10-01" }), false);
+    assert.equal(hasFollowUpDraft({ ...baseline, snoozeCustomDate: "2026-10-15" }), true);
 });
 
 test("归一化：坏条目容错过滤、按 id 去重；写前严格模式抛错；空串可首次保存", () => {

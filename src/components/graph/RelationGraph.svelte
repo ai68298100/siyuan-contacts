@@ -1008,7 +1008,12 @@
                     placeholder={text("graphPickNone", "未选择")}
                     emptyText={text("graphPickerEmpty", "当前图内没有匹配的人物")}
                     ariaLabel={text("graphCenterLabel", "关系中心")}
-                    onSelect={(id) => (focusId = id)}
+                    onSelect={(id) => {
+                        /* 更换关系中心会使旧对比人物失去语义；清空它，避免
+                         * 选人器显示“未选择”却仍用旧 compareId 计算结果。 */
+                        focusId = id;
+                        compareId = "";
+                    }}
                 />
             </label>
             <label>{text("graphCompareLabel", "对比人物")}

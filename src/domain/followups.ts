@@ -35,6 +35,28 @@ export const FOLLOW_UP_STORE_VERSION = 1;
 /** 推迟语义选项（Google Inbox snooze 语义）：不做裸日期选择器，「指定日期」为唯一显式入口 */
 export type SnoozeOption = "tomorrow" | "threeDays" | "nextMonday" | "nextMonth" | "custom";
 
+/**
+ * 人物详情中的跟进输入草稿。
+ *
+ * 标题/日期的基线来自最近一次成功创建后的表单状态；自定义推迟日期
+ * 没有保存基线，因为它只在点击「按指定日期推迟」时写入。该判断让
+ * 关闭守卫能拦截会被丢弃的输入，同时不会把「保存并离开」扩展成隐式
+ * 创建跟进或执行推迟。
+ */
+export interface FollowUpDraftState {
+    title: string;
+    dueDate: string;
+    savedTitle: string;
+    savedDueDate: string;
+    snoozeCustomDate: string;
+}
+
+export function hasFollowUpDraft(state: FollowUpDraftState): boolean {
+    return state.title.trim() !== state.savedTitle.trim()
+        || state.dueDate !== state.savedDueDate
+        || state.snoozeCustomDate.trim().length > 0;
+}
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function isValidDateKey(value: string): boolean {
