@@ -167,8 +167,8 @@ importers:
   .:
     dependencies:
       '@lucide/svelte':
-        specifier: ^1.48.0
-        version: 1.48.0(svelte@5.57.1)
+        specifier: ^1.51.0
+        version: 1.51.0(svelte@5.57.1)
       cytoscape:
         specifier: ^3.34.3
         version: 3.34.3
@@ -252,8 +252,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@lucide/svelte@1.48.0':
-    resolution: {integrity: sha512-bLimVDjehxu3fpu9XEUpqEkBk2sJAHAT2sVcLHhlM70EdNsXuj9ZnYENWv5xgw3+05h4i5TirAxTiTgnZZf8gw==}
+  '@lucide/svelte@1.51.0':
+    resolution: {integrity: sha512-FNoBtfrnQS1LV7yRm8T8pF6OH72BzCyPOWrOmVcpqGGLFmQZndRB4h0qhzUKqPq2JNkSfF7f4tUaiCwdY4WFfg==}
     peerDependencies:
       svelte: ^5
 
@@ -1516,7 +1516,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@lucide/svelte@1.48.0(svelte@5.57.1)':
+  '@lucide/svelte@1.51.0(svelte@5.57.1)':
     dependencies:
       svelte: 5.57.1
 

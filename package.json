@@ -54,7 +54,7 @@
     "vite-plugin-zip-pack": "^1.2.4"
   },
   "dependencies": {
-    "@lucide/svelte": "^1.48.0",
+    "@lucide/svelte": "^1.51.0",
     "cytoscape": "^3.34.3"
   }
 }
