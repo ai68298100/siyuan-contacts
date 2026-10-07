@@ -168,6 +168,18 @@ import StatusNotice from "../StatusNotice.svelte";
     let personNoteError = $state("");
     let personNoteErrorKind: "load" | "save" | "" = $state("");
     let personNoteSaved = $state(false);
+    // 联系节奏草稿与已保存基线必须在关闭守卫注册前建立，避免守卫首次读取时引用未初始化状态。
+    let cadenceMode: "global" | "custom" | "paused" = $state("global");
+    let cadenceDays = $state(14);
+    let cadenceSavedMode: "global" | "custom" | "paused" = $state("global");
+    let cadenceSavedDays = $state(14);
+    let cadenceSaving = $state(false);
+    let cadenceMessage = $state("");
+    let cadenceError = $state("");
+    let cadenceLoadError = $state("");
+    let cadenceRequest = 0;
+    const cadenceDirty = $derived(cadenceMode !== cadenceSavedMode
+        || (String(cadenceMode) === "custom" && cadenceDays !== cadenceSavedDays));
     // 备注读取可能跨越 revision 刷新、人物切换或用户开始编辑；只允许
     // 仍属于当前人物且没有被新草稿淘汰的请求提交结果。
     let personNoteRequest = 0;
@@ -229,14 +241,16 @@ import StatusNotice from "../StatusNotice.svelte";
     }
     useCloseGuard({
         busy: () => busy || deleting || personNoteSaving || personNoteLoading || followUpBusy || cadenceSaving,
-        dirty: () => noteText.trim().length > 0 || personNoteDraft !== personNote,
+        dirty: () => noteText.trim().length > 0 || personNoteDraft !== personNote || cadenceDirty,
         changes: () => [
             ...(noteText.trim() ? [text("guardNoteDraft", "互动备注尚未记录：{text}", { text: noteText.trim() })] : []),
             ...(personNoteDraft !== personNote ? ["人物独立备注尚未保存"] : []),
+            ...(cadenceDirty ? [text("guardCadenceDraft", "联系节奏尚未保存")] : []),
         ],
         save: async () => {
             if (noteText.trim()) await persistNote();
             if (personNoteDraft !== personNote) await savePersonNoteState(true);
+            if (cadenceDirty) await saveCadence(true);
         },
     });
     async function navigate(person: ContactSummary | null) {
@@ -741,13 +755,14 @@ import StatusNotice from "../StatusNotice.svelte";
             refreshPending = true;
             orgRefreshPending = true;
         }
-        if (busy || followUpBusy || personNoteSaving || personNoteDraft !== personNote) return;
+        if (busy || followUpBusy || personNoteSaving || cadenceSaving || personNoteDraft !== personNote) return;
         if (refreshPending) {
             refreshPending = false;
             void loadOthers();
             void loadInsights();
             void loadFollowUps();
             void loadPersonNoteState(true);
+            if (!cadenceDirty) void loadCadence();
         }
         if (orgRefreshPending && !addOrgBusy && !editingOrgMembershipId && !removingOrgMembershipId && !addOrgDocId) {
             orgRefreshPending = false;
@@ -826,13 +841,6 @@ import StatusNotice from "../StatusNotice.svelte";
     // ---- 联系节奏（F06） ----
     const cadenceSupported = $derived(Boolean(onGetCadence && onSaveCadence));
     let cadenceLoaded = $state(false);
-    let cadenceMode: "global" | "custom" | "paused" = $state("global");
-    let cadenceDays = $state(14);
-    let cadenceSaving = $state(false);
-    let cadenceMessage = $state("");
-    let cadenceError = $state("");
-    let cadenceLoadError = $state("");
-    let cadenceRequest = 0;
     const lastContactLabel = $derived.by(() => {
         const first = insights?.timeline?.[0];
         return first?.localDate ?? "";
@@ -849,7 +857,9 @@ import StatusNotice from "../StatusNotice.svelte";
             const cadence = await onGetCadence(targetDocId);
             if (!detailAlive || request !== cadenceRequest || current.docId !== targetDocId) return;
             cadenceMode = cadence?.paused ? "paused" : cadence ? "custom" : "global";
-            if (cadence) cadenceDays = cadence.days;
+            cadenceDays = cadence?.days ?? 14;
+            cadenceSavedMode = cadenceMode;
+            cadenceSavedDays = cadenceDays;
             cadenceLoadError = "";
             cadenceLoaded = true;
         } catch (error) {
@@ -861,7 +871,7 @@ import StatusNotice from "../StatusNotice.svelte";
     }
     loadCadence();
 
-    async function saveCadence() {
+    async function saveCadence(rethrowOnFailure = false) {
         if (cadenceSaving || !onSaveCadence) return;
         cadenceSaving = true;
         cadenceError = "";
@@ -870,6 +880,9 @@ import StatusNotice from "../StatusNotice.svelte";
             const days = Math.max(1, Math.min(365, Math.round(cadenceDays || 14)));
             const next: PersonCadence | null = cadenceMode === "global" ? null : { days, paused: cadenceMode === "paused" };
             await onSaveCadence(current.docId, next);
+            cadenceDays = days;
+            cadenceSavedMode = cadenceMode;
+            cadenceSavedDays = days;
             cadenceMessage = cadenceMode === "global"
                 ? "已清除覆盖，跟随全局阈值"
                 : cadenceMode === "paused"
@@ -878,6 +891,7 @@ import StatusNotice from "../StatusNotice.svelte";
             onChanged();
         } catch (error) {
             cadenceError = error instanceof Error ? error.message : String(error);
+            if (rethrowOnFailure) throw error;
         } finally {
             cadenceSaving = false;
         }
@@ -1233,7 +1247,7 @@ import StatusNotice from "../StatusNotice.svelte";
                 {#if cadenceMode === "custom"}
                     <input type="number" class="b3-text-field" min="1" max="365" aria-label="自定义天数" bind:value={cadenceDays} disabled={cadenceSaving} />
                 {/if}
-                <button class="b3-button b3-button--text" onclick={saveCadence} disabled={cadenceSaving}>
+                <button class="b3-button b3-button--text" onclick={() => void saveCadence()} disabled={cadenceSaving}>
                     {cadenceSaving ? text("cadenceSaving", "保存中…") : text("cadenceSave", "保存节奏")}
                 </button>
             </div>

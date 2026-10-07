@@ -620,6 +620,7 @@
   "guardTagsChange": "标签：{from} → {to}",
   "guardEmpty": "（空）",
   "guardNoteDraft": "互动备注尚未记录：{text}",
+  "guardCadenceDraft": "联系节奏尚未保存",
   "guardPrefsDraft": "显示偏好尚未保存",
   "guardImportTextDraft": "互动合并输入尚未处理",
   "guardVcardSelection": "已选择 {n} 位联系人待导入",

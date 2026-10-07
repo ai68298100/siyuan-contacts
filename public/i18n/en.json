@@ -620,6 +620,7 @@
   "guardTagsChange": "Tags: {from} → {to}",
   "guardEmpty": "(empty)",
   "guardNoteDraft": "Interaction note not recorded: {text}",
+  "guardCadenceDraft": "Contact cadence not saved",
   "guardPrefsDraft": "Display preferences not saved",
   "guardImportTextDraft": "Interaction merge input not processed",
   "guardVcardSelection": "{n} contacts selected for import",

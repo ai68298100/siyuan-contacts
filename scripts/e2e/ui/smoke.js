@@ -605,6 +605,8 @@ await test("数据刷新乱序防护：慢的旧互动响应不得覆盖新数�
 await test("数据刷新：已打开的 Peek 随数据变化原地重载洞察与跟进（FUNC-01.7-a）", async () => {
     let insightsCalls = 0;
     let followUpCalls = 0;
+    let cadenceCalls = 0;
+    let cadence = { days: 7, paused: false };
     kernel.handler = async (route) => {
         if (route === "/api/av/renderAttributeView") return renderResult();
         return null;
@@ -623,6 +625,8 @@ await test("数据刷新：已打开的 Peek 随数据变化原地重载洞察�
                 followUpCalls += 1;
                 return [{ id: "fu-peek-1", personDocId: person.docId, title: "跨窗口跟进", dueDate: "2026-10-30", status: "open", createdAt: 1, updatedAt: 1 }];
             },
+            getPersonCadence: async () => { cadenceCalls += 1; return cadence; },
+            savePersonCadence: async (_docId, value) => { cadence = value; },
             createFollowUp: async () => { throw new Error("用例不涉及"); },
             setFollowUpStatus: async () => {},
             snoozeFollowUp: async () => {},
@@ -635,10 +639,22 @@ await test("数据刷新：已打开的 Peek 随数据变化原地重载洞察�
     detailNav.closest("button").click();
     await until(() => fixture.querySelector(".lvct-person-card"), "名册未渲染");
     fixture.querySelector(".lvct-person-card").dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await until(() => insightsCalls >= 1 && followUpCalls >= 1, "Peek 未加载洞察与跟进");
+    await until(() => insightsCalls >= 1 && followUpCalls >= 1 && cadenceCalls >= 1, "Peek 未加载洞察、跟进与联系节奏");
+    const cadenceMode = fixture.querySelector('select[aria-label="联系节奏模式"]');
+    assert(cadenceMode, "Peek 未渲染联系节奏控件");
+    cadenceMode.value = "custom";
+    cadenceMode.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    const cadenceDays = fixture.querySelector('input[aria-label="自定义天数"]');
+    assert(cadenceDays, "自定义节奏未出现天数输入");
+    input(cadenceDays, "23");
+    await tick();
+    const cadenceCallsBeforeRefresh = cadenceCalls;
+    cadence = { days: 3, paused: false };
     emitDataChanged();
     await until(() => insightsCalls >= 2 && followUpCalls >= 2, "Peek 未随数据变化原地重载");
     assert(fixture.textContent.includes("跨窗口跟进"), "重载后跟进列表未渲染");
+    assert(cadenceCalls === cadenceCallsBeforeRefresh && cadenceDays.value === "23", "跨窗口刷新覆盖了未保存的联系节奏草稿");
 });
 
 await test("粘贴并识别：分组预览、勾选回填草稿、冲突默认不覆盖（FAST-01.1）", async () => {
@@ -3981,6 +3997,14 @@ await test("人物联系节奏设置：显示当前规则，自定义/暂停/清
     await tick();
     const daysInput = fixture.querySelector('input[aria-label="自定义天数"]');
     assert(daysInput, "自定义模式下未出现天数输入");
+    input(daysInput, "21");
+    await tick();
+    button("关闭").click();
+    await until(() => document.body.querySelector(".lvct-closeguard"), "未保存的联系节奏关闭时未触发守卫");
+    assert(document.body.querySelector(".lvct-closeguard__list")?.textContent?.includes("联系节奏尚未保存"), "联系节奏守卫未列出草稿明细");
+    document.body.querySelector('.lvct-closeguard button[data-choice="cancel"]').click();
+    await until(() => !document.body.querySelector(".lvct-closeguard"), "联系节奏守卫取消后未关闭");
+    assert(fixture.querySelector('input[aria-label="自定义天数"]')?.value === "21", "取消守卫后联系节奏草稿丢失");
     input(daysInput, "14");
     [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "保存节奏").click();
     await until(() => savedCadence?.days === 14 && savedCadence?.paused === false, "自定义节奏未保存");
