@@ -4614,11 +4614,18 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 
     .lvct-dash__quick-form {
         width: 100%;
+        flex-wrap: wrap;
+        row-gap: var(--lvct-sp-1);
 
         input {
             flex: 1;
             width: auto;
             min-height: var(--lvct-touch-min-mobile);
+        }
+
+        > button {
+            flex: 1 1 auto;
+            min-width: 0;
         }
     }
 

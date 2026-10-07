@@ -3777,6 +3777,10 @@ await test("首页待办跟进：分桶展示，处理仅限可达人物，推�
     // 推迟 → 语义选项传递
     [...fixture.querySelectorAll(".lvct-dash__fu-actions button")].find((node) => node.textContent.trim() === "推迟").click();
     await tick();
+    if (window.innerWidth <= 640) {
+        const quickForm = fixture.querySelector(".lvct-dash__quick-form");
+        assert(quickForm && quickForm.scrollWidth <= quickForm.clientWidth + 1, "移动端推迟菜单不应横向溢出");
+    }
     [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "明天").click();
     await until(() => snoozeCalls.length === 1 && snoozeCalls[0][0] === "fu-overdue" && snoozeCalls[0][1] === "tomorrow", "推迟未传递语义选项");
     await until(() => fixture.textContent.includes("已将「问问面试结果」推迟到明天"), `推迟成功提示未显示（通知区：${[...fixture.querySelectorAll(".lvct-notice")].map((node) => node.textContent).join(" | ") || "无"}）`);

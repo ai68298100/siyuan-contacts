@@ -496,7 +496,7 @@
         }
         if (failed.length > 0) {
             overdueRetry = { ids: failed.map((item) => item.id), today, titles: failed.map((item) => item.title) };
-            alMessage = `已顺延 ${done} 条，${failed.length} 条失败；可重试失败项`;
+            alMessage = text("dashPostponePartial", "已顺延 {done} 条，{failed} 条失败；可重试失败项", { done, failed: failed.length });
             alError = failed.map((item) => `${item.title}：${item.error}`).join("；");
         } else {
             overdueRetry = null;
@@ -607,7 +607,7 @@
         </div>
     {:else if data}
         {#if summaryVisible}
-            <div class="lvct-dash__summary" role="region" aria-label={text("dashSummaryLabel", "今日关注摘要")}>
+            <div class="lvct-dash__summary" role="region" aria-label={text("dashSummaryLabel", "今日关注摘要")} aria-busy={summaryBusy}>
                 <div class="lvct-dash__summary-main">
                     <b>{text("dashSummaryTitle", "今天有 {n} 件值得处理的事", { n: summary.total })}</b>
                     <span class="lvct-dash__summary-chips">
@@ -618,9 +618,9 @@
                 </div>
                 <div class="lvct-dash__summary-actions">
                     <button class="b3-button b3-button--text" onclick={() => (summaryHiddenThisSession = true)}>{text("dashCollapse", "收起")}</button>
-                    <button class="b3-button b3-button--outline" disabled={summaryBusy} onclick={dismissSummaryToday}>{text("dashDismissToday", "今日不再展示")}</button>
+                    <button class="b3-button b3-button--outline" disabled={summaryBusy} onclick={dismissSummaryToday}>{summaryBusy ? text("dashSavingDismiss", "保存中…") : text("dashDismissToday", "今日不再展示")}</button>
                 </div>
-                <StatusNotice error message={summaryError ? `今日隐藏保存失败：${summaryError}，请重试。` : ""} />
+                <StatusNotice error message={summaryError ? text("dashSummaryDismissFailed", "今日隐藏保存失败：{msg}，请重试。", { msg: summaryError }) : ""} />
             </div>
         {/if}
         <div class="lvct-dash__welcome">
@@ -676,7 +676,7 @@
                 {/if}
                 {#if overdueRetry}
                     <button class="b3-button b3-button--text lvct-dash__head-action" onclick={retryOverdue} disabled={alBusy} title={overdueRetry.titles.join("、")}>
-                        重试失败项（{overdueRetry.ids.length}）
+                        {text("dashRetryFailed", "重试失败项（{n}）", { n: overdueRetry.ids.length })}
                     </button>
                 {/if}
             </div>
