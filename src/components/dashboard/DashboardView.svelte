@@ -212,7 +212,7 @@
         if (preserved.length === 0) settleUndo = null;
         settleRetry = null;
         const snapshot = await facade.loadReminderDismissals();
-        const previousByKey = new Map(
+        const previousByKey = new Map<string, ReminderDismissal>(
             snapshot
                 .filter((entry) => entry.kind === "stale")
                 .map((entry) => [`${entry.personDocId}|${entry.kind}`, entry] as const),
