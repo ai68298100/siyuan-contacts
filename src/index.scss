@@ -4378,6 +4378,14 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 
     .lvct-workbench__nav-item { width: auto; min-height: var(--lvct-touch-min-mobile); white-space: nowrap; }
 
+    /* Bottom navigation uses a column flex layout. Keep the label's intrinsic
+       width so the grid item's text cannot collapse into the 18px icon box. */
+    .lvct-workbench__nav-item .lvct-workbench__nav-text {
+        flex: 0 0 auto;
+        min-width: max-content;
+        width: max-content;
+    }
+
     /* Match the prototype's restrained bottom nav: active state is carried by the label/icon. */
     .lvct-workbench__nav-item--active {
         background: transparent;
