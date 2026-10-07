@@ -4382,8 +4382,13 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
        width so the grid item's text cannot collapse into the 18px icon box. */
     .lvct-workbench__nav-item .lvct-workbench__nav-text {
         flex: 0 0 auto;
-        min-width: max-content;
-        width: max-content;
+        /* Keep a measurable label box even when the host WebView resolves
+           max-content against the grid's zero-width track. */
+        min-width: 24px;
+        width: auto;
+        display: inline-block;
+        writing-mode: horizontal-tb;
+        overflow: visible;
     }
 
     /* Match the prototype's restrained bottom nav: active state is carried by the label/icon. */
