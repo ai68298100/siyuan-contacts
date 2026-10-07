@@ -488,6 +488,74 @@ test("详情实际刷新逻辑：迟到响应不能覆盖已切换人物或已�
     assert.equal(failed.state().othersError, "");
 });
 
+function detailPersonNoteController(initial: ContactSummary, loadPersonNote: (docId: string) => Promise<string>) {
+    const source = readFileSync(new URL("../src/components/people/PersonDetail.svelte", import.meta.url), "utf8")
+        .replace(/\r\n/g, "\n")
+        .match(/async function loadPersonNoteState\(preserveSaved = false\): Promise<void> \{[\s\S]*?\n    \}(?=\n\n    async function savePersonNoteState)/)![0];
+    const script = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.None } }).outputText;
+    return new Function("loadPersonNote", "initial", `
+        let current = initial;
+        let detailAlive = true;
+        let personNoteRequest = 0;
+        let personNoteDraftRevision = 0;
+        let personNote = "";
+        let personNoteDraft = "";
+        let personNoteLoading = false;
+        let personNoteError = "";
+        let personNoteErrorKind = "";
+        let personNoteSaved = false;
+        const onLoadPersonNote = loadPersonNote;
+        ${script}
+        return {
+            loadPersonNoteState,
+            state() { return { current, personNote, personNoteDraft, personNoteLoading, personNoteError, personNoteSaved }; },
+            editDraft(value) { personNoteDraftRevision += 1; personNoteDraft = value; personNoteSaved = false; },
+            select(person) { current = person; },
+            dispose() { detailAlive = false; personNoteRequest += 1; },
+        };
+    `)(loadPersonNote, initial);
+}
+
+test("详情个人备注：迟到读取不能覆盖连续刷新后的最新结果", async () => {
+    const original: ContactSummary = { ...emptyDraft(), name: "原人物", docId: personDocId, itemId: personItemId, relatedItemIds: [] };
+    const releases: Array<(note: string) => void> = [];
+    const controller = detailPersonNoteController(original, () => new Promise((resolve) => releases.push(resolve)));
+    const first = controller.loadPersonNoteState();
+    const second = controller.loadPersonNoteState(true);
+    releases[0]("旧备注");
+    await first;
+    assert.equal(controller.state().personNoteDraft, "");
+    releases[1]("最新备注");
+    await second;
+    assert.equal(controller.state().personNote, "最新备注");
+    assert.equal(controller.state().personNoteDraft, "最新备注");
+    assert.equal(controller.state().personNoteLoading, false);
+});
+
+test("详情个人备注：人物切换或详情销毁后，迟到读取不回写旧状态", async () => {
+    const original: ContactSummary = { ...emptyDraft(), name: "原人物", docId: personDocId, itemId: personItemId, relatedItemIds: [] };
+    const next: ContactSummary = { ...original, name: "新人物", docId: selfDocId, itemId: selfItemId };
+    let release!: (note: string) => void;
+    const controller = detailPersonNoteController(original, () => new Promise((resolve) => { release = resolve; }));
+    const pending = controller.loadPersonNoteState();
+    controller.select(next);
+    controller.editDraft("新人物草稿");
+    release("旧人物备注");
+    await pending;
+    assert.equal(controller.state().current, next);
+    assert.equal(controller.state().personNote, "");
+    assert.equal(controller.state().personNoteDraft, "新人物草稿");
+
+    let releaseDisposed!: (note: string) => void;
+    const disposed = detailPersonNoteController(original, () => new Promise((resolve) => { releaseDisposed = resolve; }));
+    const abandoned = disposed.loadPersonNoteState();
+    disposed.dispose();
+    releaseDisposed("已销毁详情的旧备注");
+    await abandoned;
+    assert.equal(disposed.state().personNote, "");
+    assert.equal(disposed.state().personNoteDraft, "");
+});
+
 function labelRecord(labels = ["同学"]): PersonRelationshipLabels {
     return { id: "20261004000000-label01", selfDocId, personDocId, labels, createdAt: 1, updatedAt: 1 };
 }

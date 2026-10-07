@@ -145,6 +145,7 @@ import StatusNotice from "../StatusNotice.svelte";
         detailAlive = false;
         othersRequest += 1;
         insightsRequest += 1;
+        personNoteRequest += 1;
     });
     /* B03 可搜索选人器：候选（排除本人与已关联）→ 选中即建关系，写入语义不变 */
     const relationCandidates = $derived.by((): PickerItem[] => candidates.map((person) => ({
@@ -166,6 +167,10 @@ import StatusNotice from "../StatusNotice.svelte";
     let personNoteError = $state("");
     let personNoteErrorKind: "load" | "save" | "" = $state("");
     let personNoteSaved = $state(false);
+    // 备注读取可能跨越 revision 刷新、人物切换或用户开始编辑；只允许
+    // 仍属于当前人物且没有被新草稿淘汰的请求提交结果。
+    let personNoteRequest = 0;
+    let personNoteDraftRevision = 0;
     const canLeave = createCloseScope();
     // B06：互动备注草稿给出明细与「保存并离开」（保存=记录这条互动）
     async function persistNote(): Promise<void> {
@@ -178,19 +183,26 @@ import StatusNotice from "../StatusNotice.svelte";
 
     async function loadPersonNoteState(preserveSaved = false): Promise<void> {
         if (!onLoadPersonNote) return;
+        const request = ++personNoteRequest;
+        const targetDocId = current.docId;
+        const targetItemId = current.itemId;
+        const draftRevision = personNoteDraftRevision;
         personNoteLoading = true;
         personNoteError = "";
         personNoteErrorKind = "";
         try {
-            const loaded = await onLoadPersonNote(current.docId);
+            const loaded = await onLoadPersonNote(targetDocId);
+            if (!detailAlive || request !== personNoteRequest || current.docId !== targetDocId || current.itemId !== targetItemId || personNoteDraftRevision !== draftRevision) return;
             personNote = loaded;
             personNoteDraft = loaded;
             if (!preserveSaved) personNoteSaved = false;
         } catch (error) {
-            personNoteError = error instanceof Error ? error.message : String(error);
-            personNoteErrorKind = "load";
+            if (detailAlive && request === personNoteRequest && current.docId === targetDocId && current.itemId === targetItemId && personNoteDraftRevision === draftRevision) {
+                personNoteError = error instanceof Error ? error.message : String(error);
+                personNoteErrorKind = "load";
+            }
         } finally {
-            personNoteLoading = false;
+            if (detailAlive && request === personNoteRequest) personNoteLoading = false;
         }
     }
 
@@ -913,7 +925,7 @@ import StatusNotice from "../StatusNotice.svelte";
                     aria-label="个人备注"
                     placeholder="例如：偏好安静的环境，下次见面前提醒准备资料"
                     bind:value={personNoteDraft}
-                    oninput={() => { personNoteSaved = false; personNoteError = ""; personNoteErrorKind = ""; }}
+                    oninput={() => { personNoteDraftRevision += 1; personNoteSaved = false; personNoteError = ""; personNoteErrorKind = ""; }}
                     disabled={personNoteSaving}
                 ></textarea>
                 <div class="lvct-detail__person-note-actions">
