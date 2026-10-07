@@ -22,6 +22,7 @@
     import { subscribeDataChanged } from "../libs/data-events";
     import type { SelfIdentityChangePreview } from "../domain/self-identity";
     import OrgProjectionRepair from "./org/OrgProjectionRepair.svelte";
+    import PersonPicker from "./people/PersonPicker.svelte";
     import type { MigrationImportResult } from "../services/migration-bundle";
 
     let {
@@ -84,6 +85,18 @@
     const designationCandidates = $derived(
         selfRoster.filter((person) => !selfIdentity || person.docId !== selfIdentity.selfDocId || person.itemId !== selfIdentity.selfItemId),
     );
+    const designationPickerItems = $derived(designationCandidates.map((person) => ({
+        id: person.itemId,
+        label: person.name,
+        hint: [person.group, person.phone || person.email, ...person.tags].filter(Boolean).join(" · ") || undefined,
+        docId: person.docId,
+        itemId: person.itemId,
+        keywords: [person.group, person.phone, person.email, person.wechat, person.website, ...person.tags]
+            .filter(Boolean).join(" ").toLowerCase(),
+    })));
+    const selfDesignateTargetAvailable = $derived(
+        designationPickerItems.some((item) => item.id === selfDesignateTarget),
+    );
 
     async function refreshSelfSection() {
         if (typeof facade.loadSelfIdentity !== "function") {
@@ -99,6 +112,11 @@
             if (!selfAlive || request !== selfReadRequest) return;
             selfIdentity = identity;
             selfRoster = roster;
+            if (selfDesignateTarget && !roster.some((person) =>
+                person.itemId === selfDesignateTarget
+                && (!identity || person.docId !== identity.selfDocId || person.itemId !== identity.selfItemId))) {
+                selfDesignateTarget = "";
+            }
             selfReadError = "";
         } catch (error) {
             if (selfAlive && request === selfReadRequest) selfReadError = error instanceof Error ? error.message : String(error);
@@ -134,6 +152,10 @@
 
     async function previewSelf(target: string | null) {
         if (selfBusy || identityLoading || selfReadError || typeof facade.previewSelfIdentityChange !== "function") return;
+        if (target !== null && !selfDesignateTargetAvailable) {
+            selfDesignateTarget = "";
+            return;
+        }
         selfBusy = true;
         selfMessage = "";
         try {
@@ -844,13 +866,18 @@
                         <div class="lvct-settings__row lvct-settings__identity-row">
                             <span>{text("selfDesignateLabel", "把本人身份改绑到其他已有联系人（保留原资料）")}</span>
                             <span class="lvct-settings__identity-controls">
-                                <select class="b3-select" aria-label={text("selfDesignatePick", "选择联系人…")} bind:value={selfDesignateTarget} disabled={selfBusy || selfPreview !== null}>
-                                    <option value="">{text("selfDesignatePick", "选择联系人…")}</option>
-                                    {#each designationCandidates as person (person.itemId)}
-                                        <option value={person.itemId}>{person.name} · {person.group || person.phone || person.docId} · {person.docId}</option>
-                                    {/each}
-                                </select>
-                                <button class="b3-button b3-button--outline" disabled={selfBusy || !selfDesignateTarget || selfPreview !== null}
+                                <PersonPicker
+                                    items={designationPickerItems}
+                                    value={selfDesignateTarget}
+                                    placeholder={text("selfDesignatePick", "选择联系人…")}
+                                    emptyText={text("selfDesignateEmpty", "没有可改绑的联系人")}
+                                    searchText={text("selfDesignateSearch", "输入姓名、电话、微信或文档 ID 筛选")}
+                                    ariaLabel={text("selfDesignatePick", "选择联系人…")}
+                                    i18n={i18n}
+                                    disabled={selfBusy || selfPreview !== null}
+                                    onSelect={(itemId) => (selfDesignateTarget = itemId)}
+                                />
+                                <button class="b3-button b3-button--outline" disabled={selfBusy || !selfDesignateTargetAvailable || selfPreview !== null}
                                     onclick={() => void previewSelf(selfDesignateTarget)}>{text("selfPreviewChange", "预览指定本人")}</button>
                                 {#if selfIdentity}
                                     <button class="b3-button b3-button--text" disabled={selfBusy || selfPreview !== null} onclick={() => void previewSelf(null)}>{text("selfPreviewClear", "预览清除本人身份")}</button>

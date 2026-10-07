@@ -224,6 +224,9 @@ export async function runSelfIdentityRegression({ test, assert, kernel, settings
     });
     await test("AG-B11-003 设置先预览再确认，取消零写入且键盘可定位影响", async () => {
         const state = configureSelfKernel(kernel, settings);
+        const target = { selfDocId: "20261004000000-other01", selfItemId: "20261004000000-row0002" };
+        state.rows.push(state.row(target.selfDocId, target.selfItemId, "同名本人"));
+        state.map[target.selfDocId] = target.selfItemId;
         const facade = {
             loadSelfIdentity: () => loadSelfIdentity(state.plugin),
             listContacts: async () => { invalidateRoster(); return getRoster(settings); },
@@ -234,8 +237,8 @@ export async function runSelfIdentityRegression({ test, assert, kernel, settings
             facade, settings, preferences: DEFAULT_VIEW_PREFERENCES, onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {},
         } });
         try {
-            await until(() => fixture.querySelector('select[aria-label="选择联系人…"]'), "旧库不能指定已有本人");
-            const picker = fixture.querySelector('select[aria-label="选择联系人…"]');
+            await until(() => fixture.querySelector('.lvct-picker__trigger[aria-label="选择联系人…"]'), "旧库不能指定已有本人");
+            const picker = fixture.querySelector('.lvct-picker__trigger[aria-label="选择联系人…"]');
             if (window.innerWidth <= 640) {
                 const row = picker.closest(".lvct-settings__identity-row");
                 const controls = row?.querySelector(".lvct-settings__identity-controls");
@@ -246,8 +249,15 @@ export async function runSelfIdentityRegression({ test, assert, kernel, settings
                 assert(picker.getBoundingClientRect().width <= controlsRect.width + 1,
                     "移动端本人改绑选择器未收缩到容器宽度");
             }
-            picker.value = identity.selfItemId;
-            picker.dispatchEvent(new Event("change", { bubbles: true }));
+            picker.click();
+            await until(() => fixture.querySelector(".lvct-picker__panel"), "本人改绑选人器浮层未打开");
+            const targetOption = [...fixture.querySelectorAll(".lvct-picker__option")]
+                .find((node) => node.textContent.includes("同名本人"));
+            assert(targetOption, "本人改绑候选未显示");
+            const pickerSearch = fixture.querySelector(".lvct-picker__search");
+            assert(pickerSearch, "本人改绑选人器缺少搜索框");
+            pickerSearch.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+            pickerSearch.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
             await tick();
             button("预览指定本人").click();
             await until(() => fixture.textContent.includes("本人身份影响预览"), "未显示影响预览");

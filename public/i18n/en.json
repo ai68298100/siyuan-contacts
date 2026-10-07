@@ -601,6 +601,8 @@
   "selfCreateFailed": "Failed to create my profile, please retry later",
   "selfDesignateLabel": "Rebind my identity to another existing contact (data preserved)",
   "selfDesignatePick": "Choose a contact…",
+  "selfDesignateEmpty": "No contacts available for rebinding",
+  "selfDesignateSearch": "Search by name, phone, WeChat, or document ID",
   "selfDesignate": "Rebind my identity",
   "selfDesignated": "My identity rebound to the selected contact (data preserved)",
   "orgSectionTitle": "Organizations",

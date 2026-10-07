@@ -601,6 +601,8 @@
   "selfCreateFailed": "本人档案建立失败，请稍后重试",
   "selfDesignateLabel": "把本人身份改绑到其他已有联系人（保留原资料）",
   "selfDesignatePick": "选择联系人…",
+  "selfDesignateEmpty": "没有可改绑的联系人",
+  "selfDesignateSearch": "输入姓名、电话、微信或文档 ID 筛选",
   "selfDesignate": "改绑本人身份",
   "selfDesignated": "本人身份已改绑到所选联系人（原资料保留）",
   "orgSectionTitle": "组织归属",
