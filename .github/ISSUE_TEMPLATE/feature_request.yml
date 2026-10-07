@@ -8,6 +8,33 @@ body:
     attributes:
       value: |
         请先说明真实使用场景。涉及新字段、内核端点、在线同步或跨插件协议的建议，需要先经过契约和隐私评估。
+        请脱敏，不要粘贴完整笔记正文、姓名、联系方式、工作区路径或 token。
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version or commit
+      placeholder: v0.4.1 or 4cd367b
+    validations:
+      required: true
+  - type: input
+    id: siyuan-version
+    attributes:
+      label: SiYuan version
+      placeholder: 3.8.5
+    validations:
+      required: true
+  - type: dropdown
+    id: frontend
+    attributes:
+      label: Frontend or test surface
+      options:
+        - desktop
+        - mobile (real Android)
+        - browser-desktop
+        - browser-mobile / 390px viewport
+        - desktop-window
+    validations:
+      required: true
   - type: textarea
     id: problem
     attributes:
@@ -33,3 +60,10 @@ body:
       options:
         - label: This request does not require sending workspace content to a new external service.
         - label: This request does not assume an unverified SiYuan API endpoint.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized screenshot or evidence
+      description: 可选；请注明屏幕尺寸、主题、是否真实 Android，并移除所有个人数据。
