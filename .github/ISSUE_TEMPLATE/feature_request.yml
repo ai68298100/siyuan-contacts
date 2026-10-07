@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest a focused improvement for Lv Contacts.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先说明真实使用场景。涉及新字段、内核端点、在线同步或跨插件协议的建议，需要先经过契约和隐私评估。
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or scenario
+      description: 现在遇到什么问题？谁会受到影响？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: 期望如何工作？请给出一个具体流程或例子。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope checks
+      options:
+        - label: This request does not require sending workspace content to a new external service.
+        - label: This request does not assume an unverified SiYuan API endpoint.

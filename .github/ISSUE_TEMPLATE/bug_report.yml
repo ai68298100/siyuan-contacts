@@ -1,0 +1,64 @@
+name: Bug report
+description: Report a reproducible problem in Lv Contacts.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先确认问题仍存在于最新 Release，并移除笔记内容、姓名、联系方式和工作区路径等敏感信息。
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: 例如 v0.4.1，或说明是开发分支构建。
+      placeholder: v0.4.1
+    validations:
+      required: true
+  - type: input
+    id: siyuan-version
+    attributes:
+      label: SiYuan version
+      placeholder: 3.8.5
+    validations:
+      required: true
+  - type: dropdown
+    id: frontend
+    attributes:
+      label: Frontend
+      options:
+        - desktop
+        - mobile
+        - browser-desktop
+        - browser-mobile
+        - desktop-window
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or screenshots
+      description: 请脱敏后粘贴；不要上传完整笔记正文、数据库快照、token 或个人联系方式。

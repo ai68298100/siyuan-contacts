@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation and release notes
+    url: https://github.com/ai68298100/siyuan-contacts#readme
+    about: Check installation, backup, compatibility and current limitations first.
