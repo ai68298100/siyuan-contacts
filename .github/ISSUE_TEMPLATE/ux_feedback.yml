@@ -1,0 +1,65 @@
+name: UX feedback
+description: Report a confusing flow, accessibility issue, or mobile interaction problem.
+title: "[UX]: "
+labels:
+  - enhancement
+  - ux-feedback
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请描述真实使用场景和完成目标。涉及移动端时请注明是真实 Android 思源，还是 Chromium 390px 视口；两者不能混写。
+        截图和日志请脱敏，不要上传完整笔记正文、姓名、联系方式或工作区路径。
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version or commit
+      placeholder: v0.4.1 or c3f2b9a
+    validations:
+      required: true
+  - type: input
+    id: siyuan-version
+    attributes:
+      label: SiYuan version
+      placeholder: 3.8.5
+    validations:
+      required: true
+  - type: dropdown
+    id: frontend
+    attributes:
+      label: Frontend or test surface
+      options:
+        - desktop
+        - mobile (real Android)
+        - browser-desktop
+        - browser-mobile / 390px viewport
+        - desktop-window
+    validations:
+      required: true
+  - type: textarea
+    id: scenario
+    attributes:
+      label: User scenario
+      description: What were you trying to finish, and what context matters?
+      placeholder: I was trying to ...
+    validations:
+      required: true
+  - type: textarea
+    id: friction
+    attributes:
+      label: Current friction
+      description: What did you see or hear, and where did the flow become unclear or inaccessible?
+    validations:
+      required: true
+  - type: textarea
+    id: desired
+    attributes:
+      label: Desired outcome
+      description: Describe the smallest behavior or presentation change that would resolve the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized screenshot or evidence
+      description: Include only redacted screenshots, screen size, theme, and reproducible details.

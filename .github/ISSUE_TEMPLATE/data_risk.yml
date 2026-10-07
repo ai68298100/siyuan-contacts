@@ -1,0 +1,73 @@
+name: Data risk report
+description: Report possible data loss, duplication, overwrite, or incorrect recovery.
+title: "[Data risk]: "
+labels:
+  - bug
+  - data-risk
+body:
+  - type: markdown
+    attributes:
+      value: |
+        数据风险请优先说明事实是否已经写入、是否只是显示错误、是否可以通过重试或核实恢复。
+        请删除姓名、联系方式、笔记正文、工作区路径、token 和完整数据库快照；不要在公开 Issue 中报告安全漏洞。
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version or commit
+      placeholder: v0.4.1 or c3f2b9a
+    validations:
+      required: true
+  - type: input
+    id: siyuan-version
+    attributes:
+      label: SiYuan version
+      placeholder: 3.8.5
+    validations:
+      required: true
+  - type: dropdown
+    id: frontend
+    attributes:
+      label: Frontend
+      options:
+        - desktop
+        - mobile
+        - browser-desktop
+        - browser-mobile
+        - desktop-window
+    validations:
+      required: true
+  - type: checkboxes
+    id: risk-type
+    attributes:
+      label: Risk type
+      options:
+        - label: Possible data loss or deletion
+        - label: Duplicate document, relation, interaction, or follow-up
+        - label: Incorrect overwrite or merge
+        - label: Backup, restore, or migration mismatch
+        - label: Saved state is unknown and needs verification
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Minimal reproduction
+      description: Include the smallest safe sequence and whether the issue reproduces after a fresh retry.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: observed-state
+    attributes:
+      label: Observed fact
+      description: State what was verified in the UI or document, and what remains unknown.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Paste redacted error text, stable test IDs, or screenshots. Never include note content or credentials.
