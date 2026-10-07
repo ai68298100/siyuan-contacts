@@ -134,7 +134,7 @@
 | PR-BRAND-02 | ready | 预览图终稿：制作桌面主视图、移动端视图和关系图/行动卡组合截图；去除测试数据和个人信息；对比 1 秒内能否看懂“管理人脉、记录交集、查看关系”。 |
 | PR-DOC-01 | partial | README 中英文按同一版本事实重写：首屏一句话价值、三张关键截图、5 分钟上手、数据保存/备份/AI 隐私、当前限制、真实宿主/真机状态、安装和卸载说明；删除过期版本和未验证措辞。 |
 | PR-DOC-02 | ready | 建立文档导航：README → CHANGELOG → RELEASE → DATA-CONTRACT → BRIDGE → FAQ；增加“不是完整工作空间备份”“AI 仅主动调用”“同名不自动合并”等高风险说明。 |
-| PR-GH-01 | ready | GitHub 仓库介绍：更新 About 一句话、topics（SiYuan、contacts、CRM、knowledge-base、relationship-management 等）、首页截图、Release 资产和中文/英文入口。 |
+| PR-GH-01 | partial | GitHub About 描述已改为中英并列，topics 已补齐 `knowledge-base`、`relationship-management`、`follow-ups`，homepage 保持 Release 入口；README 双语截图、首页展示和下一版 Release 资产仍需单独完成。 |
 | PR-GH-02 | done_isolated | GitHub 协作设施已补齐 Bug/数据风险/体验反馈模板、安全问题入口和空白 Issue 禁止；模板要求插件/思源版本、前端类型、复现步骤和脱敏证据。真实反馈流程仍需实际 Issue 演练。 |
 | PR-GH-03 | partial | 已新增发布说明模板，并让 CI 生成并上传 `package.zip.sha256`；下一次 Release 仍需人工复制模板、核对真实宿主/真机/集市状态并附完整校验和，历史 v0.4.1 Release 正文不重写。 |
 | PR-GH-04 | ready | Bazaar 上架准备：核对 plugin.json、readme 文件名、图标/预览尺寸、最低思源版本、关键词、安装路径和手动安装说明；提交前保留用户授权与最终验收记录。 |
