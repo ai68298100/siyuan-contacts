@@ -38,7 +38,7 @@ jobs:
         run: pnpm check
 
       - name: Set up Chrome
-        uses: browser-actions/setup-chrome@v1
+        uses: browser-actions/setup-chrome@v2
         id: chrome
         with:
           install-dependencies: true
