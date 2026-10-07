@@ -146,6 +146,7 @@ import StatusNotice from "../StatusNotice.svelte";
         othersRequest += 1;
         insightsRequest += 1;
         personNoteRequest += 1;
+        followUpRequest += 1;
     });
     /* B03 可搜索选人器：候选（排除本人与已关联）→ 选中即建关系，写入语义不变 */
     const relationCandidates = $derived.by((): PickerItem[] => candidates.map((person) => ({
@@ -227,7 +228,7 @@ import StatusNotice from "../StatusNotice.svelte";
         }
     }
     useCloseGuard({
-        busy: () => busy || deleting || personNoteSaving || personNoteLoading,
+        busy: () => busy || deleting || personNoteSaving || personNoteLoading || followUpBusy || cadenceSaving,
         dirty: () => noteText.trim().length > 0 || personNoteDraft !== personNote,
         changes: () => [
             ...(noteText.trim() ? [text("guardNoteDraft", "互动备注尚未记录：{text}", { text: noteText.trim() })] : []),
@@ -522,6 +523,7 @@ import StatusNotice from "../StatusNotice.svelte";
     let followUpBusy = $state(false);
     let followUpRecorded = $state(false);
     let followUpError = $state("");
+    let followUpRequest = 0;
     let snoozeForId = $state("");
     let snoozeCustomDate = $state("");
     const todayKey = $derived(toLocalDateKey(new Date()));
@@ -530,14 +532,20 @@ import StatusNotice from "../StatusNotice.svelte";
 
     async function loadFollowUps() {
         if (!onListFollowUps) return;
+        const request = ++followUpRequest;
+        const targetDocId = current.docId;
         followUpsLoading = true;
         followUpError = ""; /* FUNC-01.12：重试先清错误态，成功后不得残留旧错误分支 */
         try {
-            followUps = await onListFollowUps(current.docId);
+            const next = await onListFollowUps(targetDocId);
+            if (!detailAlive || request !== followUpRequest || current.docId !== targetDocId) return;
+            followUps = next;
         } catch (error) {
-            followUpError = error instanceof Error ? error.message : String(error);
+            if (detailAlive && request === followUpRequest && current.docId === targetDocId) {
+                followUpError = error instanceof Error ? error.message : String(error);
+            }
         } finally {
-            followUpsLoading = false;
+            if (detailAlive && request === followUpRequest) followUpsLoading = false;
         }
     }
 
@@ -758,7 +766,7 @@ import StatusNotice from "../StatusNotice.svelte";
             followUpTitle = "";
             followUpRecorded = true;
             onChanged();
-            followUps = await onListFollowUps?.(current.docId) ?? followUps;
+            await loadFollowUps();
         } catch (error) {
             followUpError = error instanceof Error ? error.message : String(error);
         } finally {
@@ -772,7 +780,7 @@ import StatusNotice from "../StatusNotice.svelte";
         followUpError = "";
         try {
             await onSetFollowUpStatus(item.id, "done");
-            followUps = await onListFollowUps?.(current.docId) ?? followUps;
+            await loadFollowUps();
             onChanged();
         } catch (error) {
             followUpError = error instanceof Error ? error.message : String(error);
@@ -788,7 +796,7 @@ import StatusNotice from "../StatusNotice.svelte";
         followUpError = "";
         try {
             await onSetFollowUpStatus(item.id, "cancelled");
-            followUps = await onListFollowUps?.(current.docId) ?? followUps;
+            await loadFollowUps();
             onChanged();
         } catch (error) {
             followUpError = error instanceof Error ? error.message : String(error);
@@ -806,7 +814,7 @@ import StatusNotice from "../StatusNotice.svelte";
             await onSnoozeFollowUp(item.id, option, option === "custom" ? snoozeCustomDate : undefined);
             snoozeForId = "";
             snoozeCustomDate = "";
-            followUps = await onListFollowUps?.(current.docId) ?? followUps;
+            await loadFollowUps();
             onChanged();
         } catch (error) {
             followUpError = error instanceof Error ? error.message : String(error);
