@@ -532,6 +532,19 @@ test("详情个人备注：迟到读取不能覆盖连续刷新后的最新结�
     assert.equal(controller.state().personNoteLoading, false);
 });
 
+test("详情个人备注：读取期间出现的新草稿优先于回读结果", async () => {
+    const original: ContactSummary = { ...emptyDraft(), name: "原人物", docId: personDocId, itemId: personItemId, relatedItemIds: [] };
+    let release!: (note: string) => void;
+    const controller = detailPersonNoteController(original, () => new Promise((resolve) => { release = resolve; }));
+    const pending = controller.loadPersonNoteState(true);
+    controller.editDraft("用户正在填写的新备注");
+    release("读取开始时的旧备注");
+    await pending;
+    assert.equal(controller.state().personNote, "");
+    assert.equal(controller.state().personNoteDraft, "用户正在填写的新备注");
+    assert.equal(controller.state().personNoteLoading, false);
+});
+
 test("详情个人备注：人物切换或详情销毁后，迟到读取不回写旧状态", async () => {
     const original: ContactSummary = { ...emptyDraft(), name: "原人物", docId: personDocId, itemId: personItemId, relatedItemIds: [] };
     const next: ContactSummary = { ...original, name: "新人物", docId: selfDocId, itemId: selfItemId };
@@ -545,6 +558,7 @@ test("详情个人备注：人物切换或详情销毁后，迟到读取不回�
     assert.equal(controller.state().current, next);
     assert.equal(controller.state().personNote, "");
     assert.equal(controller.state().personNoteDraft, "新人物草稿");
+    assert.equal(controller.state().personNoteLoading, false);
 
     let releaseDisposed!: (note: string) => void;
     const disposed = detailPersonNoteController(original, () => new Promise((resolve) => { releaseDisposed = resolve; }));
