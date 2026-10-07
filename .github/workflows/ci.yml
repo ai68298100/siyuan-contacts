@@ -61,6 +61,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Generate package checksum
+        run: sha256sum package.zip > package.zip.sha256
+
       - name: Release gate
         run: node scripts/check-release.mjs
 
@@ -72,3 +75,4 @@ jobs:
           path: |
             dist/
             package.zip
+            package.zip.sha256
