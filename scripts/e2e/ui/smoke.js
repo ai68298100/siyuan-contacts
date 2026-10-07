@@ -4012,21 +4012,26 @@ await test("今日行动清单：多原因单卡徽标，逾期跟进批量顺�
             { kind: "followup", bucket: "overdue", label: "跟进「问问面试」已逾期", dueDate: offsetDate(-3), followUpId: "fu-1" },
             { kind: "stale", bucket: "stale", label: "60 天未联系（阈值 30 天）" },
         ] },
-        { person: personB, bucket: "today", earliestDate: todayKey, reasons: [
-            { kind: "birthday", bucket: "today", label: "今天生日", dueDate: todayKey },
+        { person: personB, bucket: "overdue", earliestDate: offsetDate(-1), reasons: [
+            { kind: "followup", bucket: "overdue", label: "跟进「补联系」已逾期", dueDate: offsetDate(-1), followUpId: "fu-2" },
         ] },
     ];
     const snoozeCalls = [];
     const opened = [];
-    let shifted = false;
+    const shifted = new Set();
+    let failFu2 = true;
     mounted = mount(DashboardView, { target: fixture, props: {
         preferences: DEFAULT_VIEW_PREFERENCES,
         onOpenDetail(p) { opened.push(p.docId); }, onOpenPeople() {}, onOpenGraph() {},
         facade: { settings, loadDashboard: async () => ({
             people: 2, relations: 0, birthdays: [], birthdaysThisWeek: 0,
             stale: [], neverContacted: 0, neverContactedItemIds: [],
-            followUps: [], actions: shifted ? [] : actions,
-        }), snoozeFollowUp: async (id, option, date) => { snoozeCalls.push([id, option, date]); shifted = true; } },
+            followUps: [], actions: shifted.size === 2 ? [] : actions,
+        }), snoozeFollowUp: async (id, option, date) => {
+            snoozeCalls.push([id, option, date]);
+            if (id === "fu-2" && failFu2) throw new Error("模拟顺延失败");
+            shifted.add(id);
+        } },
     } });
     await until(() => fixture.textContent.includes("今日行动"), "行动清单未渲染");
     await until(() => fixture.querySelectorAll(".lvct-dash__actions .lvct-dash__row").length === 2, "行动卡数量错误");
@@ -4035,10 +4040,16 @@ await test("今日行动清单：多原因单卡徽标，逾期跟进批量顺�
     assert(cardA.textContent.includes("行动乙") === false, "不同人物不应合并卡片");
 
     // 批量顺延：把逾期跟进顺延到今天
-    [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("1 条逾期跟进顺延到今天")).click();
-    await until(() => snoozeCalls.length === 1, "批量顺延未触发");
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("2 条逾期跟进顺延到今天")).click();
+    await until(() => snoozeCalls.length === 2, "批量顺延未触发");
     assert(snoozeCalls[0][0] === "fu-1" && snoozeCalls[0][1] === "custom" && snoozeCalls[0][2] === todayKey, "顺延参数错误");
-    await until(() => fixture.textContent.includes("今天没有需要处理的事"), "顺延后清单未清空");
+    assert(snoozeCalls[1][0] === "fu-2", "失败项未继续执行");
+    await until(() => fixture.textContent.includes("1 条失败"), "部分失败提示未显示");
+    assert(fixture.textContent.includes("跟进「补联系」已逾期") && fixture.textContent.includes("模拟顺延失败"), "失败项标题或原因未显示");
+    failFu2 = false;
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("重试失败项（1）")).click();
+    await until(() => snoozeCalls.length === 3, "失败项重试未触发");
+    await until(() => fixture.textContent.includes("今天没有需要处理的事"), "重试成功后清单未清空");
     assert(fixture.textContent.includes("已把 1 条逾期跟进顺延到今天"), "顺延成功提示未显示");
 
     // 打开详情
@@ -4060,11 +4071,18 @@ await test("打开摘要：开关与当日忽略抑制、次日恢复、空清�
         { person: { ...person, docId: "doc-b", name: "摘要乙" }, bucket: "today", earliestDate: dateKey(0), reasons: [{ kind: "stale", bucket: "stale", label: "从未互动" }] },
     ];
     const mountedViews = [];
+    let savedPrefs = null;
+    let failSummarySave = false;
+    const saveSummaryPreferences = async (next) => {
+        if (failSummarySave) throw new Error("模拟偏好保存失败");
+        savedPrefs = next;
+        return next;
+    };
     const mountDash = (prefs, withActions = true) => {
         const view = mount(DashboardView, { target: fixture, props: {
             preferences: prefs,
             onOpenDetail() {}, onOpenPeople() {}, onOpenGraph() {},
-            onPreferencesChange: async (next) => { savedPrefs = next; return next; },
+            onPreferencesChange: saveSummaryPreferences,
             facade: { settings, loadDashboard: async () => ({
                 people: 2, relations: 0, birthdays: [], birthdaysThisWeek: 0,
                 stale: [], neverContacted: 0, neverContactedItemIds: [],
@@ -4074,7 +4092,6 @@ await test("打开摘要：开关与当日忽略抑制、次日恢复、空清�
         mountedViews.push(view);
         return view;
     };
-    let savedPrefs = null;
     // 数据就绪的标志：问候语渲染（data 已非空）
     const dataReady = () => fixture.textContent.includes("今天先联系谁");
 
@@ -4082,7 +4099,7 @@ await test("打开摘要：开关与当日忽略抑制、次日恢复、空清�
     mountedViews.push(mount(DashboardView, { target: fixture, props: {
         preferences: DEFAULT_VIEW_PREFERENCES,
         onOpenDetail() {}, onOpenPeople() {}, onOpenGraph() {},
-        onPreferencesChange: async (next) => { savedPrefs = next; return next; },
+        onPreferencesChange: saveSummaryPreferences,
         facade: { settings, loadDashboard: async () => ({
             people: 2, relations: 0, birthdays: [], birthdaysThisWeek: 0,
             stale: [], neverContacted: 0, neverContactedItemIds: [], followUps: [], actions: actionsData,
@@ -4105,7 +4122,13 @@ await test("打开摘要：开关与当日忽略抑制、次日恢复、空清�
     await until(dataReady, "仪表盘未加载");
     await until(() => fixture.textContent.includes("今天有 2 件值得处理的事"), "次日未恢复显示");
 
-    // ④ 点击「今日不再展示」→ 写入当天日期
+    // ④ 保存失败时摘要保留且错误可见，恢复后再次点击才隐藏
+    savedPrefs = null;
+    failSummarySave = true;
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "今日不再展示").click();
+    await until(() => fixture.textContent.includes("今日隐藏保存失败") && fixture.textContent.includes("模拟偏好保存失败"), "摘要保存失败未显式提示");
+    assert(fixture.textContent.includes("今天有 2 件值得处理的事"), "摘要保存失败后不应提前隐藏横幅");
+    failSummarySave = false;
     [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "今日不再展示").click();
     await until(() => savedPrefs?.summaryDismissedOn === dateKey(0), "当日忽略未持久化");
     await until(() => !fixture.textContent.includes("值得处理的事"), "忽略后横幅未消失");

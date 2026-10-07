@@ -466,12 +466,44 @@
     let alBusy = $state(false);
     let alError = $state("");
     let alMessage = $state("");
+    type OverdueRetry = { ids: string[]; today: string; titles: string[] };
+    let overdueRetry = $state<OverdueRetry | null>(null);
     const actions: ActionCard[] = $derived(pickActions(data));
     const overdueFollowUpIds: string[] = $derived(actions.flatMap((card: ActionCard) =>
         card.reasons
             .filter((reason) => reason.kind === "followup" && reason.bucket === "overdue" && reason.followUpId)
             .map((reason) => reason.followUpId as string)));
     const overdueCount: number = $derived(overdueFollowUpIds.length);
+
+    function overdueTitle(id: string): string {
+        return actions
+            .flatMap((card) => card.reasons)
+            .find((reason) => reason.kind === "followup" && reason.followUpId === id)
+            ?.label ?? id;
+    }
+
+    async function postponeOverdue(ids: readonly string[], today: string): Promise<void> {
+        let done = 0;
+        const failed: Array<{ id: string; title: string; error: string }> = [];
+        for (const id of ids) {
+            try {
+                await facade.snoozeFollowUp(id, "custom", today);
+                done += 1;
+            } catch (error) {
+                const title = overdueTitle(id);
+                failed.push({ id, title, error: error instanceof Error ? error.message : String(error) });
+            }
+        }
+        if (failed.length > 0) {
+            overdueRetry = { ids: failed.map((item) => item.id), today, titles: failed.map((item) => item.title) };
+            alMessage = `已顺延 ${done} 条，${failed.length} 条失败；可重试失败项`;
+            alError = failed.map((item) => `${item.title}：${item.error}`).join("；");
+        } else {
+            overdueRetry = null;
+            alMessage = `已把 ${done} 条逾期跟进顺延到今天`;
+            alError = "";
+        }
+    }
 
     async function postponeOverdueToToday() {
         if (alBusy || overdueCount === 0) return;
@@ -482,16 +514,22 @@
         const now = new Date();
         const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
         try {
-            let done = 0;
-            for (const id of overdueFollowUpIds) {
-                try {
-                    await facade.snoozeFollowUp(id, "custom", today);
-                    done += 1;
-                } catch (error) {
-                    console.warn("顺延单条逾期跟进失败", error);
-                }
-            }
-            alMessage = `已把 ${done} 条逾期跟进顺延到今天`;
+            await postponeOverdue(overdueFollowUpIds, today);
+            await refresh();
+        } catch (error) {
+            alError = error instanceof Error ? error.message : String(error);
+        } finally {
+            alBusy = false;
+        }
+    }
+
+    async function retryOverdue() {
+        const retry = overdueRetry;
+        if (!retry || alBusy) return;
+        alBusy = true;
+        alError = "";
+        try {
+            await postponeOverdue(retry.ids, retry.today);
             await refresh();
         } catch (error) {
             alError = error instanceof Error ? error.message : String(error);
@@ -504,6 +542,7 @@
     let reviewOpen = $state(false);
     let summaryHiddenThisSession = $state(false);
     let summaryBusy = $state(false);
+    let summaryError = $state("");
     const localTodayKey = $derived.by(() => {
         const now = new Date();
         const pad = (value: number) => String(value).padStart(2, "0");
@@ -522,9 +561,12 @@
     async function dismissSummaryToday() {
         if (summaryBusy) return;
         summaryBusy = true;
+        summaryError = "";
         try {
             await onPreferencesChange?.({ ...preferences, summaryDismissedOn: localTodayKey });
             summaryHiddenThisSession = true;
+        } catch (error) {
+            summaryError = error instanceof Error ? error.message : String(error);
         } finally {
             summaryBusy = false;
         }
@@ -578,6 +620,7 @@
                     <button class="b3-button b3-button--text" onclick={() => (summaryHiddenThisSession = true)}>{text("dashCollapse", "收起")}</button>
                     <button class="b3-button b3-button--outline" disabled={summaryBusy} onclick={dismissSummaryToday}>{text("dashDismissToday", "今日不再展示")}</button>
                 </div>
+                <StatusNotice error message={summaryError ? `今日隐藏保存失败：${summaryError}，请重试。` : ""} />
             </div>
         {/if}
         <div class="lvct-dash__welcome">
@@ -626,9 +669,14 @@
                 <span class="ft__smaller ft__on-surface">{text("dashActionsSub", "生日 · 联系节奏 · 跟进事项")}</span>
                 <span style="flex:1"></span>
                 <button class="b3-button b3-button--outline lvct-dash__head-action" onclick={() => (reviewOpen = true)}>{text("dashReview", "交往回顾")}</button>
-                {#if overdueCount > 0}
+                {#if overdueCount > 0 && !overdueRetry}
                     <button class="b3-button b3-button--outline lvct-dash__head-action" onclick={postponeOverdueToToday} disabled={alBusy}>
                         {alBusy ? text("dashPostponing", "顺延中…") : text("dashPostponeOverdue", "把 {n} 条逾期跟进顺延到今天", { n: overdueCount })}
+                    </button>
+                {/if}
+                {#if overdueRetry}
+                    <button class="b3-button b3-button--text lvct-dash__head-action" onclick={retryOverdue} disabled={alBusy} title={overdueRetry.titles.join("、")}>
+                        重试失败项（{overdueRetry.ids.length}）
                     </button>
                 {/if}
             </div>
