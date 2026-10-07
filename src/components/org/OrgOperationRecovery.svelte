@@ -88,6 +88,6 @@
 {/if}
 
 <style>
-    .lvct-org-recovery { padding: 12px; border: 1px solid var(--b3-border-color); border-radius: 6px; }
-    .lvct-org-recovery__entry { padding: 10px 0; border-top: 1px solid var(--b3-border-color); overflow-wrap: anywhere; }
+    .lvct-org-recovery { padding: var(--lvct-sp-3); border: 1px solid var(--lvct-border-subtle); border-radius: var(--lvct-r-sm); }
+    .lvct-org-recovery__entry { padding: 10px 0; border-top: 1px solid var(--lvct-border-subtle); overflow-wrap: anywhere; }
 </style>

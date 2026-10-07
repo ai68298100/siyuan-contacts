@@ -179,6 +179,7 @@ vCard 同名项默认跳过，但允许逐项人工确认“作为独立人物�
 | `reminder-dismissals.json` | 1 | 提醒暂缓（B08）：`{schemaVersion, dismissals: [{personDocId, kind, until}]}`。`kind ∈ birthday\|stale`；`until` 为 `YYYY-MM-DD` 或空串（空串=长期，直到手动恢复）。**只屏蔽提醒呈现，不改变统计与名单口径**——生日 `until` ≥ 当天（含空串）时该人生日不出现在近期生日/行动清单（「跳过本年」写入当年 `12-31`，跨年自动恢复）；stale 命中时该人的久未联系/从未互动**提醒行**隐藏，首页久未联系统计卡与名单计数保持真实。键必须通过人物文档 ID 校验，非法条目归一化丢弃；同一 `personDocId+kind` 仅一条（重复写入覆盖）。写入在存储锁内严格读取，损坏或未知版本拒绝写入不覆盖；恢复即删除对应条目；设置页「提醒」分区提供已暂缓列表与一键恢复 |
 | `person-registry.json` | 1 | 收编时间索引（C02）：`{schemaVersion, registeredAt: {"<personDocId>": "YYYY-MM-DD"}}`。人物首次进入插件视野（新建/收编/首次发现）写入当天本地日期；**首次发现补记**发生在 `loadDashboard` 读路径（幂等 upsert，只补缺失键，不改已有值）。用途：收编宽限期起点（`view-preferences.json` 的 `reminderGraceDays`，默认 14 天，0=关闭）内该人不计入「从未互动」提醒，仅在联系人列表可见；「从未互动」行动组按 `registeredAt` 倒序（最近收编优先，D-0020）。键必须通过人物文档 ID 校验，非法条目归一化丢弃；删除键即遗忘（下次发现重新起算）。写入在存储锁内严格读取，损坏或未知版本拒绝写入不覆盖；读路径补记失败不阻断首页加载（按缺失处理降级） |
 | `self-identity.json` | 1 | 本人身份标记（B11）：`{schemaVersion, selfDocId, selfItemId, createdAt}`——**本人身份的唯一事实源**（按稳定文档 ID 识别，不经设置锚点，重绑设置不改身份）。初始化向导在数据库确认后默认建立「我自己」人物文档并写入标记（幂等续建：标记已存在即跳过并核验名册仍含；残留未绑定同名文档按 FUNC-01.15 断点语义复用；同名已绑定联系人复用该行不改资料）。读取为严格展示读（FUNC-01.12：失败显式降级不按无本人处理）。**使用规则（B11.4）**：本人在名册保留并标识；首页统计（联系人数量/生日/久未联系/从未互动）与行动清单、普通联系人资料体检默认**排除本人**（本人不是"待联系对象"）。改动本人身份（换绑/清除）属 B11.5 修复流程，需显式操作并预览影响，不静默改绑——`saveSelfIdentity` 对已有**不同** selfDocId 的覆写直接拒绝 |
+| 人物文档独立备注（临时功能） | 原生人物文档标记块 `custom-lvct-person-note="1"` | 每个人物文档最多一个备注标记块；备注为独立自由文本，不属于 AV 字段、互动事件或 `follow-ups.json`，不计入首页统计。读取要求标记块唯一，重复/格式未知/文档不可达均报告未知，不按空备注处理。保存先核实当前备注（可带 expected），写后回读精确核对；空备注只删除该标记块，保留人物正文和原生跟进任务。备注随人物文档保留，当前迁移 JSON 不单独导出。 |
 | （导出包）`lvct-migration-bundle` | 1 | 完整迁移包（C08/FUNC-01.6，**文件而非存储键**）：`{schemaVersion: 1, exportedAt, storageKey: "lvct-migration-bundle", modules: {interactions?, followUps?, cadences?, reminderDismissals?, registry?, templates?}}`。`interactions`/`followUps` 内嵌各自导出包同款对象（含 rawStore/rawValue，坏数据原样随包）；`cadences`/`reminderDismissals`/`registry`/`templates` 为各自 store 同款对象。**不含** settings 锚点与 view-preferences（锚点请用设置页重绑；偏好属个人 UI 配置），明示"这不是思源原生数据的字节级备份"。恢复：模块预览（各条目计数，零写入）→ 确认后逐模块合并——互动/跟进复用既有合并（id 去重、现状优先、墓碑优先）；cadences/reminderDismissals 按 personDocId+kind 覆盖合并；registry 按 docId 覆盖合并；templates 按 id 去重合并（**读取、合并、保存同一存储锁临界区**，并发恢复不丢模板）。**逐模块结果与失败可见（FUNC-01.6-b）**：恢复结果含 `failed: {key, label, message}[]`——任一模块读/写失败指名模块与原因，不阻断其他模块，也不得报整包成功；registry 等合并不吞异常（失败上抛交由服务层报告，不冒充「合并 0 条」）；坏库（版本不兼容）拒绝合并且不被覆盖污染。**跟进恢复触发安全任务同步**：对新增条目的人物逐个调用 B07 写侧同步（settings 未初始化或文档不可达在 sync 内部降级）。**与文档任务块的冲突策略**：跟进合并后由 B07 写侧同步自然收敛人物文档任务块（文档为准的对账在下次详情打开时执行），不产生重复任务 |
 
 **reminder-dismissals 与 person-cadences 的分工**：`person-cadences.json` 的 `days` 表达"按更长节奏
@@ -693,3 +694,13 @@ lvct-data-changed 增加兼容版本 `version:1`、窗口来源 `sourceId`；rev
 recordInteraction 返回 recorded/applied/skipped/failed/unknown/complete 与按输入序号排列的 results。非法 ID、未登记 ID、重复输入均有独立结果；重复输入 skipped，未知身份或读取失败 unknown。recorded 只计本次新增且回读核实的事件，已有事件与只读核实不计新增。默认 ref 沿用 bridge:<本地日期>:<排序去重的合法人员>；默认日期冻结到请求首次接收当天。显式 ref 建议使用调用方命名空间和稳定事件 ID；同键不同内容冲突，不覆盖旧事件。不能把 changed/partial/unknown 报成全部完成。
 
 公开错误固定 code/message/writeState/retry，diagnostic 仅 operation/code/writeState；不透传原始 Error、cause、路径、姓名、联系方式、备注或 ref。正常候选/人物结果中的姓名与稳定 ID 是明确调用的数据，不写日志。未初始化、卸载、锚点变化及桥不可达保持独立失败，不影响手动联系人流程。外部桥只是本地公开协作接口，不是沙箱、权限或身份认证边界，不接收凭证、不发网络消息。
+
+## 14. 工作区设置与原生属性视图恢复（AG-P0-020）
+
+`contacts-settings.json` 是插件自管的关键锚点文件。读取结果必须区分：文件不存在或返回空串为 `missing`；通过 schema、ID 和字段映射校验为 `valid`；JSON/版本/字段形状不符为 `invalid`；宿主读取抛错为 `read_failed`。`missing` 才能进入初始化向导；`invalid` 与 `read_failed` 保留原文件、停止普通业务读写并显示恢复入口，不能把读取失败当成空库覆盖或新建。
+
+`valid` 设置在挂载工作台前先只读核验笔记本、宿主文档、数据库块和 AV 定义。先按宿主文档查询 `type='av'` 的块及其 markdown 中的 `data-av-id`，再调用 `renderAttributeView`；若块不存在，不再把旧 `dbBlockId` 发送给内核。内核精确返回 `resolve attribute view carrier: block [...] not found` 时归类为 `anchor-missing`；权限、传输、协议、加密笔记本未加载等无法判断现场的错误归类为 `anchor-unknown`。`createIfNotExist` 只用于全新已存在载体的物化，不能修复缺失载体。
+
+锚点恢复只读扫描全库候选，展示笔记本、宿主文档、数据库块尾 ID 和字段匹配数。用户选择候选后先预览字段与双向关系，再显式确认重绑；没有候选时才允许明确进入初始化向导。恢复期间工作台及其设置页快照均卸载，旧设置只存在于恢复服务的短暂上下文，禁止联系人列表、健康检查、捕获和外部桥继续请求旧 AV。恢复不会删除人物文档、互动/跟进等插件 JSON，不自动合并、不静默创建第二套数据库。
+
+用户删掉 `contacts-settings.json` 与删掉“联系人总表”中的数据库块是两类现场：前者通常可由初始化向导扫描并复用原生数据库，后者必须走锚点扫描/重绑或显式新建。截图中的 block ID 只能作为诊断证据，不能当作字段 ID 或让用户手填恢复。

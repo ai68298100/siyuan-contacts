@@ -47,8 +47,11 @@
     let highlight = $state(0);
     let wrap: HTMLElement | undefined = $state();
     let panel: HTMLElement | undefined = $state();
+    let triggerEl: HTMLButtonElement | undefined = $state();
     let inputEl: HTMLInputElement | undefined = $state();
+    let listEl: HTMLUListElement | undefined = $state();
     let aliasKeywords = $state<Record<string, string>>({});
+    let aliasLoading = $state(false);
     let aliasError = $state(false);
     let aliasRequest = 0;
     const listboxId = `lvct-picker-${Math.random().toString(36).slice(2)}`;
@@ -56,6 +59,7 @@
 
     async function loadAliases(): Promise<void> {
         const request = ++aliasRequest;
+        aliasLoading = true;
         try {
             const index = await loadContactAliasIndex();
             if (request !== aliasRequest) return;
@@ -67,6 +71,8 @@
             if (request !== aliasRequest) return;
             aliasKeywords = {};
             aliasError = true;
+        } finally {
+            if (request === aliasRequest) aliasLoading = false;
         }
     }
 
@@ -105,18 +111,27 @@
     function choose(item: PickerItem): void {
         open = false;
         onSelect(item.id);
+        void tick().then(() => triggerEl?.focus());
     }
     function onSearchKeydown(event: KeyboardEvent): void {
         if (event.key === "ArrowDown") {
+            if (filtered.length === 0) return;
             event.preventDefault();
             highlight = Math.min(highlight + 1, filtered.length - 1);
+            void tick().then(() => document.getElementById(`${listboxId}-option-${highlight}`)?.scrollIntoView({ block: "nearest" }));
         } else if (event.key === "ArrowUp") {
+            if (filtered.length === 0) return;
             event.preventDefault();
             highlight = Math.max(highlight - 1, 0);
+            void tick().then(() => document.getElementById(`${listboxId}-option-${highlight}`)?.scrollIntoView({ block: "nearest" }));
         } else if (event.key === "Enter") {
             event.preventDefault();
             const item = filtered[highlight];
             if (item) choose(item);
+        } else if (event.key === "Escape") {
+            event.preventDefault();
+            open = false;
+            void tick().then(() => triggerEl?.focus());
         }
     }
 </script>
@@ -125,7 +140,9 @@
     <button
         type="button"
         class="b3-select lvct-picker__trigger"
+        bind:this={triggerEl}
         aria-haspopup="listbox"
+        aria-controls={open ? listboxId : undefined}
         aria-expanded={open}
         aria-label={ariaLabel}
         disabled={disabled}
@@ -146,37 +163,43 @@
                 bind:value={query}
                 placeholder={text("pickerSearch", searchText)}
                 aria-label={text("pickerSearch", searchText)}
+                aria-busy={aliasLoading}
                 role="combobox"
+                aria-autocomplete="list"
                 aria-expanded="true"
                 aria-controls={listboxId}
+                aria-activedescendant={filtered.length > 0 ? `${listboxId}-option-${highlight}` : undefined}
                 onkeydown={onSearchKeydown}
-                oninput={() => (highlight = 0)}
+                oninput={() => { highlight = 0; if (listEl) listEl.scrollTop = 0; }}
             />
+            {#if aliasLoading}
+                <p class="lvct-picker__status" role="status">{text("pickerAliasLoading", "正在读取别名…")}</p>
+            {/if}
             {#if filtered.length === 0}
                 <div class="lvct-picker__empty" role="status">{emptyText}</div>
-            {:else}
-                <ul class="lvct-picker__list" id={listboxId} role="listbox">
-                    {#each filtered as item, index (item.id)}
-                        <li role="none">
-                            <button
-                                type="button"
-                                role="option"
-                                aria-selected={item.id === value}
-                                class="lvct-picker__option"
-                                class:lvct-picker__option--active={index === highlight}
-                                onmouseenter={() => (highlight = index)}
-                                onclick={() => choose(item)}
-                            >
-                                <span class="lvct-picker__label">{item.label}</span>
-                                {#if item.hint}<span class="lvct-picker__hint">{item.hint}</span>{/if}
-                                {#if ambiguousLabels.has(item.label) || query.trim() && filtered.length > 1}
-                                    <span class="lvct-picker__hint">{item.docId ?? item.id}{item.itemId ? ` · ${item.itemId}` : ""}</span>
-                                {/if}
-                            </button>
-                        </li>
-                    {/each}
-                </ul>
             {/if}
+            <ul class="lvct-picker__list" id={listboxId} role="listbox" bind:this={listEl}>
+                {#each filtered as item, index (item.id)}
+                    <li role="none">
+                        <button
+                            type="button"
+                            id={`${listboxId}-option-${index}`}
+                            role="option"
+                            aria-selected={item.id === value}
+                            class="lvct-picker__option"
+                            class:lvct-picker__option--active={index === highlight}
+                            onmouseenter={() => (highlight = index)}
+                            onclick={() => choose(item)}
+                        >
+                            <span class="lvct-picker__label">{item.label}</span>
+                            {#if item.hint}<span class="lvct-picker__hint">{item.hint}</span>{/if}
+                            {#if ambiguousLabels.has(item.label) || query.trim() && filtered.length > 1}
+                                <span class="lvct-picker__hint">{item.docId ?? item.id}{item.itemId ? ` · ${item.itemId}` : ""}</span>
+                            {/if}
+                        </button>
+                    </li>
+                {/each}
+            </ul>
         </div>
     {/if}
 </div>

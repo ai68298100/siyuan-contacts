@@ -26,6 +26,20 @@ export async function runOrganizationPageRegression({ test, assert, kernel, sett
             await until(() => fixture.querySelectorAll(".lvct-orgs-view__card").length === 2, "组织卡片后台续读未完成");
             assert(calls.length === 2 && calls[1].afterRootId === org(1).docId, "组织分页没有沿用稳定游标");
             assert(fixture.textContent.includes("组织1") && fixture.textContent.includes("组织2"), "组织卡片分页丢失或重复");
+            const search = fixture.querySelector('input[type="search"]');
+            search.value = "组织2";
+            search.dispatchEvent(new Event("input", { bubbles: true }));
+            await until(() => fixture.querySelectorAll(".lvct-orgs-view__card").length === 1, "组织搜索未收窄卡片");
+            assert(fixture.querySelector('[data-org-doc-id$="org0002"]'), "组织搜索结果缺少目标组织");
+            const status = fixture.querySelector('select[aria-label="组织状态"]');
+            search.value = "";
+            search.dispatchEvent(new Event("input", { bubbles: true }));
+            status.value = "active";
+            status.dispatchEvent(new Event("change", { bubbles: true }));
+            await until(() => fixture.querySelectorAll(".lvct-orgs-view__card").length === 1, "组织状态筛选未收窄卡片");
+            assert(fixture.querySelector('[data-org-doc-id$="org0001"]'), "活跃组织筛选错误");
+            button("清除筛选").click();
+            await until(() => fixture.querySelectorAll(".lvct-orgs-view__card").length === 2, "组织清除筛选未恢复卡片");
         } finally { await unmount(instance); }
     });
 

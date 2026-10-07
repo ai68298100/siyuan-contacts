@@ -19,7 +19,7 @@ import { bindSelfIdentityStorage } from "./data/self-identity";
 import { bindOrgMembershipStorage } from "./data/org-membership";
 import { bindPeopleProfileStorage, loadPersonRelationshipLabels, savePersonRelationshipLabels } from "./services/people-profiles";
 import { bindContactAliasStorage } from "./services/contact-aliases";
-import { initializeWorkspace, inspectWorkspace, loadSettings, scanAnchorCandidates } from "./services/init";
+import { initializeWorkspace, inspectWorkspace, readSettingsState, scanAnchorCandidates } from "./services/init";
 import { configureCloseGuardI18n } from "./components/close-guard";
 import type { InitProgressStep, WorkspaceSnapshot } from "./services/init";
 import { loadDashboard, DEFAULT_DASHBOARD_OPTIONS } from "./services/dashboard";
@@ -30,7 +30,8 @@ import type { AiExtractionConfirmation } from "./services/ai-extract";
 import { AiExtractionError } from "./domain/ai-preflight";
 import type { AiPreflightOptions } from "./domain/ai-preflight";
 import { loadPersonInsights } from "./services/insights";
-import { checkSettingsHealth, previewMissingFields, previewRebindSettings, rebuildMissingFields, rebindSettings, repairFieldMap } from "./services/settings-health";
+import { loadPersonNote, savePersonNote } from "./services/person-note";
+import { checkSettingsHealth, previewMissingFields, previewRebindSettings, probeSettingsAnchor, rebuildMissingFields, rebindSettings, repairFieldMap } from "./services/settings-health";
 import type { FieldRebuildPreview, SettingsRebindPreview } from "./services/settings-health";
 import { auditWorkspaceData, auditWorkspaceDataReport, retryFailedHealthAuditModules } from "./services/health-audit";
 import { reconcileFollowUpTasksFromDoc } from "./services/followup-sync";
@@ -81,13 +82,14 @@ import { previewInteractionImportDiff } from "./services/interaction-import";
 import { initExternalBridge, disposeExternalBridge } from "./bridge/external-bridge";
 import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
 import { svelteDialog } from "./libs/dialog";
-import { emitDataChanged } from "./libs/data-events";
+import { emitDataChanged, emitWorkspaceState } from "./libs/data-events";
 import type { ContactsSettings } from "./domain/model";
 import type { ContactSummary } from "./domain/person";
 import { emptyDraft } from "./domain/person";
 import { DEFAULT_VIEW_PREFERENCES, type ViewPreferences } from "./domain/preferences";
 import { createLifecycleToken, LIFECYCLE_CONTEXT, type LifecycleToken } from "./domain/lifecycle";
 import type { ContactsPluginFacade, WorkbenchView } from "./types";
+import type { WorkspaceState } from "./domain/workspace-state";
 
 const TAB_TYPE = "workbench";
 
@@ -118,9 +120,25 @@ function readSelectionWithin(scope: HTMLElement): string {
     return selection.toString();
 }
 
+function visibleEditorRootId(): string | undefined {
+    const activeEditor = document.activeElement?.closest<HTMLElement>(".protyle[data-node-id]");
+    if (activeEditor && activeEditor.getBoundingClientRect().width > 0 && activeEditor.getBoundingClientRect().height > 0) {
+        return activeEditor.dataset.nodeId || undefined;
+    }
+    const editors = [...document.querySelectorAll<HTMLElement>(".protyle[data-node-id]")]
+        .filter((editor) => {
+            const rect = editor.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0 && editor.dataset.nodeId;
+        });
+    return editors.length === 1 ? editors[0].dataset.nodeId : undefined;
+}
+
 export default class LvContactsPlugin extends Plugin implements ContactsPluginFacade {
     isMobile = false;
     settings: ContactsSettings | null = null;
+    workspaceState: WorkspaceState = { kind: "uninitialized" };
+    /** 锚点失效时仅供显式扫描/重绑使用；普通业务门禁通过 settings=null。 */
+    private recoverySettings: ContactsSettings | null = null;
     viewPreferences: ViewPreferences = DEFAULT_VIEW_PREFERENCES;
 
     private workbenchDialog: Dialog | null = null;
@@ -139,6 +157,9 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     private preferencesActive = true;
     private preferencesEpoch = 0;
     private dataChangeRequest = 0;
+    /** 合并同时触发的工作区核验，避免批量 dataChange 造成并行宿主读取。 */
+    private workspaceStateReloadPromise: Promise<WorkspaceState> | null = null;
+    private workspaceStateReloadVersion = 0;
     private preferencesVerified = false;
     private preferenceRequests = this.createPreferenceRequests(this.lifecycleToken);
 
@@ -184,10 +205,31 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
         configureCloseGuardI18n(this.i18n);
 
-        // 自管设置只在此处加载一次；tab / dialog 都读这个缓存
-        const settings = await loadSettings(this);
+        // 关键设置严格读取并先核验原生锚点；失效时挂载恢复界面，禁止旧工作台继续访问 AV。
+        const settingsRead = await readSettingsState(this);
+        let settings: ContactsSettings | null = settingsRead.settings;
+        if (settingsRead.status === "valid" && settings) {
+            const anchor = await probeSettingsAnchor(settings);
+            if (anchor.status === "verified") {
+                this.workspaceState = { kind: "ready" };
+            } else {
+                this.recoverySettings = settings;
+                this.workspaceState = { kind: anchor.status === "missing" ? "anchor-missing" : "anchor-unknown", message: anchor.message };
+                settings = null;
+            }
+        } else if (settingsRead.status === "missing") {
+            this.workspaceState = { kind: "uninitialized" };
+            settings = null;
+        } else if (settingsRead.status === "invalid") {
+            this.workspaceState = { kind: "settings-invalid", message: "联系人设置文件格式无效，原文件已保留" };
+            settings = null;
+        } else {
+            this.workspaceState = { kind: "settings-read-failed", message: settingsRead.error?.message ?? "联系人设置文件读取失败" };
+            settings = null;
+        }
         if (!this.isLifecycleActive(lifecycleToken) || !this.preferencesActive || preferencesEpoch !== this.preferencesEpoch) return;
         this.settings = settings;
+        emitWorkspaceState(this.workspaceState);
         try {
             await this.loadViewPreferences();
         } catch (error) {
@@ -314,6 +356,8 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         this.preferencesActive = false;
         this.preferencesEpoch += 1;
         this.dataChangeRequest += 1;
+        this.workspaceStateReloadVersion += 1;
+        this.workspaceStateReloadPromise = null;
         this.requestedWorkbenchView = undefined;
         this.preferenceRequests.dispose();
         this.layoutReady = false;
@@ -385,7 +429,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     captureFromCurrentNote(): void {
         if (!this.isLifecycleActive()) return;
         const editor = getActiveEditor(true);
-        const rootId = editor?.protyle?.block?.rootID;
+        const rootId = editor?.protyle?.block?.rootID || visibleEditorRootId();
         if (!rootId) {
             showMessage("请先打开一篇笔记再捕获人员", 3000);
             return;
@@ -581,6 +625,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
             if (!this.isLifecycleActive(lifecycleToken) || !this.preferencesActive || epoch !== this.preferencesEpoch || request !== this.dataChangeRequest) return;
             this.dataChangeTimer = 0;
             try {
+                await this.reloadWorkspaceState();
                 await this.loadViewPreferences();
                 if (this.isLifecycleActive(lifecycleToken) && this.preferencesActive && epoch === this.preferencesEpoch && request === this.dataChangeRequest) {
                     emitDataChanged({ preferencesRevision: this.viewPreferences.revision }, lifecycleToken);
@@ -591,6 +636,60 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
                 }
             }
         }, 600);
+    }
+
+    async reloadWorkspaceState(): Promise<WorkspaceState> {
+        this.workspaceStateReloadVersion += 1;
+        if (this.workspaceStateReloadPromise) return this.workspaceStateReloadPromise;
+        const lifecycleToken = this.lifecycleToken;
+        const reloadPromise = (async (): Promise<WorkspaceState> => {
+            while (this.isLifecycleActive(lifecycleToken)) {
+                const observedVersion = this.workspaceStateReloadVersion;
+                const read = await readSettingsState(this);
+                if (!this.isLifecycleActive(lifecycleToken)) return this.workspaceState;
+                let next: WorkspaceState;
+                let nextSettings: ContactsSettings | null;
+                let nextRecoverySettings: ContactsSettings | null;
+                if (read.status === "valid" && read.settings) {
+                    const anchor = await probeSettingsAnchor(read.settings);
+                    if (!this.isLifecycleActive(lifecycleToken)) return this.workspaceState;
+                    if (anchor.status === "verified") {
+                        nextRecoverySettings = null;
+                        nextSettings = read.settings;
+                        next = { kind: "ready" };
+                    } else {
+                        nextRecoverySettings = read.settings;
+                        nextSettings = null;
+                        next = { kind: anchor.status === "missing" ? "anchor-missing" : "anchor-unknown", message: anchor.message };
+                    }
+                } else if (read.status === "missing") {
+                    nextRecoverySettings = null;
+                    nextSettings = null;
+                    next = { kind: "uninitialized" };
+                } else if (read.status === "invalid") {
+                    nextRecoverySettings = null;
+                    nextSettings = null;
+                    next = { kind: "settings-invalid", message: "联系人设置文件格式无效，原文件已保留" };
+                } else {
+                    nextRecoverySettings = null;
+                    nextSettings = null;
+                    next = { kind: "settings-read-failed", message: read.error?.message ?? "联系人设置文件读取失败" };
+                }
+                if (observedVersion !== this.workspaceStateReloadVersion) continue;
+                this.recoverySettings = nextRecoverySettings;
+                this.settings = nextSettings;
+                this.workspaceState = next;
+                emitWorkspaceState(next);
+                return next;
+            }
+            return this.workspaceState;
+        })();
+        this.workspaceStateReloadPromise = reloadPromise;
+        try {
+            return await reloadPromise;
+        } finally {
+            if (this.workspaceStateReloadPromise === reloadPromise) this.workspaceStateReloadPromise = null;
+        }
     }
 
     openWorkbench(view?: WorkbenchView) {
@@ -633,7 +732,14 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const settings = await initializeWorkspace(this, { notebookName, createSelf: options?.createSelf }, (step) => {
             if (this.isLifecycleActive(lifecycleToken)) onProgress(step);
         });
-        if (this.isLifecycleActive(lifecycleToken)) this.settings = settings;
+        if (this.isLifecycleActive(lifecycleToken)) {
+            this.recoverySettings = null;
+            this.settings = settings;
+        }
+        if (this.isLifecycleActive(lifecycleToken)) {
+            this.workspaceState = { kind: "ready" };
+            emitWorkspaceState(this.workspaceState);
+        }
         return settings;
     }
 
@@ -977,15 +1083,22 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     async previewRebindSettings(patch: Parameters<typeof rebindSettings>[2]) {
-        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
-        return previewRebindSettings(this, this.settings, patch);
+        const settings = this.recoverySettings ?? this.settings;
+        if (!settings) throw new Error("人脉工作空间尚未初始化");
+        return previewRebindSettings(this, settings, patch);
     }
 
     async rebindSettings(patch: Parameters<typeof rebindSettings>[2], preview: SettingsRebindPreview) {
-        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        const source = this.recoverySettings ?? this.settings;
+        if (!source) throw new Error("人脉工作空间尚未初始化");
         const token = this.lifecycleToken;
-        const settings = await rebindSettings(this, this.settings, patch, preview, () => this.isLifecycleActive(token));
-        if (this.isLifecycleActive(token)) this.settings = settings;
+        const settings = await rebindSettings(this, source, patch, preview, () => this.isLifecycleActive(token));
+        if (this.isLifecycleActive(token)) {
+            this.recoverySettings = null;
+            this.settings = settings;
+            this.workspaceState = { kind: "ready" };
+            emitWorkspaceState(this.workspaceState);
+        }
         return settings;
     }
 
@@ -1013,6 +1126,16 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
             console.warn("[lvct] 跟进任务块对账失败（按未对账返回）:", error);
         }
         return listPersonFollowUps(this, personDocId);
+    }
+
+    async loadPersonNote(personDocId: string) {
+        return loadPersonNote(personDocId);
+    }
+
+    async savePersonNote(personDocId: string, note: string, expected?: string) {
+        const saved = await savePersonNote(personDocId, note, expected);
+        emitDataChanged({ topics: ["people"], docIds: [personDocId] });
+        return saved;
     }
 
     async createFollowUp(personDocId: string, title: string, dueDate: string) {

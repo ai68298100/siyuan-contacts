@@ -47,8 +47,14 @@
     } = $props();
 
     type ViewId = WorkbenchView;
-    const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
-        translateText(facade.i18n, key, fallback, values));
+    // Keep the message object as an explicit reactive dependency.  Returning a
+    // function from `$derived` hid the actual `facade.i18n` read from derived
+    // values such as `viewMeta`, so their first render could retain Chinese
+    // fallback titles while the navigation (which calls `text` directly) had
+    // already switched to English.
+    const messages = $derived(facade.i18n);
+    const text = (key: string, fallback: string, values?: Record<string, string | number>) =>
+        translateText(messages, key, fallback, values);
     const canLeave = createCloseScope();
     const mountToken = getContext<LifecycleToken | undefined>(LIFECYCLE_CONTEXT);
     const lifecycleToken = createLifecycleToken(mountToken);
@@ -61,12 +67,20 @@
         { id: "orgs", label: text("navOrganizations", "组织"), shortLabel: text("navOrganizations", "组织"), enabled: true },
     ]);
 
-    const viewMeta: Record<ViewId, { title: string; subtitle: string }> = $derived({
-        home: { title: text("navHome", "首页"), subtitle: text("homeSubtitle", "今天该关注谁") },
-        people: { title: text("navPeople", "联系人"), subtitle: text("peopleSubtitle", "管理你的联系人与资料") },
-        graph: { title: text("navGraph", "关系图谱"), subtitle: text("graphSubtitle", "查看人际关系网络") },
-        orgs: { title: text("navOrganizations", "组织"), subtitle: text("orgsSubtitle", "公司与学校等归属维度") },
-        settings: { title: text("navSettings", "设置"), subtitle: text("settingsSubtitle", "检查数据锚点与插件行为") },
+    const viewMeta: Record<ViewId, { title: string; subtitle: string }> = $derived.by(() => {
+        // Read `messages` in this derived computation so a supplied locale is
+        // reflected in the page heading as well as in the sidebar labels.
+        const localized = messages;
+        const t = (key: string, fallback: string) => translateText(localized, key, fallback);
+        return {
+            // The page heading names the workspace section; the dashboard keeps
+            // its more conversational greeting inside the content area.
+            home: { title: t("navHome", "首页"), subtitle: t("dashHomeSubtitle", "把记忆变成下一步；每条提醒都说明出现原因") },
+            people: { title: t("navPeople", "联系人"), subtitle: t("peopleSubtitle", "管理你的联系人与资料") },
+            graph: { title: t("navGraph", "关系图谱"), subtitle: t("graphPageSubtitle", "只呈现当前范围内有来源的连接；没有连线不能证明两人没有关系") },
+            orgs: { title: t("navOrganizations", "组织"), subtitle: t("orgsSubtitle", "公司与学校等归属维度") },
+            settings: { title: t("navSettings", "设置"), subtitle: t("settingsSubtitle", "检查数据锚点与插件行为") },
+        };
     });
 
     // svelte-ignore state_referenced_locally
@@ -319,9 +333,18 @@
             {/each}
             <span class="lvct-workbench__nav-label lvct-workbench__nav-label--secondary">{text("navUpcoming", "即将推出")}</span>
             <button class="lvct-workbench__nav-item" disabled><span class="lvct-workbench__nav-icon" aria-hidden="true"><Sparkles size={16}/></span><span class="lvct-workbench__nav-text">{text("navSuggestions", "建议")}</span></button>
+            <button
+                class="lvct-workbench__nav-item lvct-workbench__nav-item--mobile-settings"
+                class:lvct-workbench__nav-item--active={current === "settings"}
+                aria-current={current === "settings" ? "page" : undefined}
+                onclick={() => selectView("settings")}
+            >
+                <span class="lvct-workbench__nav-icon" aria-hidden="true"><Settings size={16}/></span>
+                <span class="lvct-workbench__nav-text">{text("navSettings", "设置")}</span>
+            </button>
         </nav>
         <div class="lvct-workbench__sidebar-footer">
-            <button class="lvct-workbench__nav-item" title={text("openSettings", "打开插件设置")} onclick={() => selectView("settings")}>
+            <button class="lvct-workbench__nav-item" class:lvct-workbench__nav-item--active={current === "settings"} aria-current={current === "settings" ? "page" : undefined} title={text("openSettings", "打开插件设置")} onclick={() => selectView("settings")}>
                 <span class="lvct-workbench__nav-icon" aria-hidden="true"><Settings size={16}/></span><span class="lvct-workbench__nav-text">{text("navSettings", "设置")}</span>
             </button>
         </div>
@@ -336,7 +359,7 @@
             {#if current === "home"}<div class="lvct-workbench__header-actions">
                 <input class="b3-text-field" type="search" aria-label="搜索联系人" placeholder="搜索联系人" bind:value={globalSearch}
                     oninput={() => { if (globalSearch.trim() && current !== "people") selectView("people"); }} />
-                <button type="button" class="b3-button b3-button--text" onclick={() => { selectView("people"); createRequested += 1; }}><UserPlus size={16}/>新建联系人</button>
+                <button type="button" class="b3-button" onclick={() => { selectView("people"); createRequested += 1; }}><UserPlus size={16}/>新建联系人</button>
             </div>{/if}
         </header>
         <StatusNotice message={dataChangeNotice} onDismiss={() => (dataChangeNotice = "")} />
@@ -437,6 +460,8 @@
             onRecord={(personDocId, note) => facade.recordInteraction(personDocId, note)}
             onDeleteInteraction={(personDocId, eventId) => facade.deleteInteraction(personDocId, eventId)}
             onLoadInsights={(docId) => facade.loadPersonInsights(docId)}
+            onLoadPersonNote={(docId) => facade.loadPersonNote(docId)}
+            onSavePersonNote={(docId, note, expected) => facade.savePersonNote(docId, note, expected)}
             onLoadExchanges={(docId) => facade.listPersonExchanges(docId)}
             onCreateExchange={(input) => facade.createPersonExchange(input)}
             onChangeExchangeStatus={(id, status, settledOn) => facade.changePersonExchangeStatus(id, status, settledOn)}

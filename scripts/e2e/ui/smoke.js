@@ -107,11 +107,34 @@ function input(node, value) {
 }
 /** B03 可搜索选人器驱动：按 aria-label 打开浮层，按候选名筛选后点选第一项 */
 async function pickOption(label, name) {
-    const trigger = [...fixture.querySelectorAll(".lvct-picker__trigger")]
+    const findTrigger = () => [...fixture.querySelectorAll(".lvct-picker__trigger")]
         .find((node) => node.getAttribute("aria-label") === label);
+    const trigger = findTrigger();
     assert(trigger, `未找到选人器：${label}`);
-    trigger.click();
-    await until(() => fixture.querySelector(".lvct-picker__panel"), `${label}浮层未打开`);
+    // 关系中心选择后，比较人物的 disabled 属性由父组件响应式更新；在高负载浏览器回归中
+    // 可能比触发器 DOM 早一个 tick，先等待可交互再合成 click，避免把时序竞态误报成浮层故障。
+    await until(() => {
+        const current = findTrigger();
+        return Boolean(current && !current.disabled);
+    }, `${label}选人器尚未启用`);
+    const readyTrigger = findTrigger();
+    assert(readyTrigger && !readyTrigger.disabled, `${label}选人器尚未启用`);
+    // 父组件在上一次选择后可能仍处于同一帧的响应式提交中；让当前
+    // 触发器完成一次 DOM 提交，再点击并以 aria-expanded 作为打开确认。
+    await tick();
+    readyTrigger.click();
+    try {
+        await until(() => {
+            const current = findTrigger();
+            return Boolean(current?.getAttribute("aria-expanded") === "true" && fixture.querySelector(".lvct-picker__panel"));
+        }, `${label}浮层未打开`);
+    } catch (error) {
+        // 仅重试一次合成点击，避免把高负载下的 click/响应式交接竞态报成产品浮层故障。
+        const retryTrigger = findTrigger();
+        if (!retryTrigger || retryTrigger.disabled) throw error;
+        retryTrigger.click();
+        await until(() => fixture.querySelector(".lvct-picker__panel"), `${label}浮层未打开`);
+    }
     const search = fixture.querySelector(".lvct-picker__search");
     if (name) {
         input(search, name);
@@ -745,6 +768,15 @@ await test("资料完整度筛选与串行补录：缺电话列表、逐个保�
         onPreferencesChange: async (next) => next,
     } });
     await until(() => fixture.querySelector(".lvct-person-card"), "列表未渲染");
+    const peopleSearch = fixture.querySelector('.lvct-people__toolbar input[placeholder*="搜索姓名"]');
+    assert(peopleSearch?.getAttribute("aria-label") === "搜索联系人", "桌面联系人搜索缺少可访问名称");
+    const peopleGroupFilter = fixture.querySelector('.lvct-people__toolbar select');
+    assert(peopleGroupFilter?.getAttribute("aria-label") === "分组筛选", "分组筛选缺少可访问名称");
+    button("视图").click();
+    await until(() => fixture.querySelector("#lvct-people-viewsmenu-panel"), "视图面板未打开");
+    const viewsPanel = fixture.querySelector("#lvct-people-viewsmenu-panel");
+    assert(viewsPanel?.getAttribute("role") === "group" && !viewsPanel.querySelector('[role="menuitem"]'), "保存视图面板不应伪装为嵌套 ARIA 菜单项");
+    button("视图").click();
     button("更多筛选").click();
     await until(() => fixture.querySelector('input[name="lvct-profile-gap"]'), "资料完整度筛选组未显示");
     [...fixture.querySelectorAll('input[name="lvct-profile-gap"]')][0].click();
@@ -813,6 +845,29 @@ await test("移动端工具栏收纳：常驻搜索/视图切换/新建，其余
     groupSelect.dispatchEvent(new Event("change", { bubbles: true }));
     await tick();
     await until(() => fixture.textContent.includes("共 1 人"), "弹层内分组筛选未生效");
+
+    const sheet = fixture.querySelector(".lvct-sheet");
+    assert(sheet.getAttribute("aria-modal") === "true", "移动工具抽屉未声明模态语义");
+    const titleId = sheet.getAttribute("aria-labelledby");
+    assert(titleId && fixture.querySelector(`#${titleId}`)?.textContent.includes("筛选与整理"), "移动工具抽屉标题关联缺失");
+    const close = sheet.querySelector(".lvct-sheet__bar button");
+    await until(() => document.activeElement === close, "打开抽屉后未聚焦收起按钮");
+
+    const focusables = [...sheet.querySelectorAll("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])")];
+    assert(focusables.length > 1, "移动工具抽屉没有足够的键盘焦点项");
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    last.focus();
+    last.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    assert(document.activeElement === first, "Tab 未从末项循环到首项");
+    first.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
+    assert(document.activeElement === last, "Shift+Tab 未从首项循环到末项");
+
+    close.focus();
+    close.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await until(() => !fixture.querySelector(".lvct-sheet"), "Escape 未关闭移动工具抽屉");
+    await until(() => document.activeElement === tools, "抽屉关闭后焦点未返回触发器");
+    assert(tools.getAttribute("aria-expanded") === "false", "抽屉关闭后触发器展开状态未更新");
 });
 
 await test("行动区一键建跟进与处置撤销（C07/C06）", async () => {
@@ -1917,6 +1972,43 @@ await test("详情子面板：草稿取消保留原标签和人物，保存挂�
     }
 });
 
+await test("人物独立备注：详情加载、保存失败重试与清空写回均保留输入", async () => {
+    let storedNote = "已有特殊情况";
+    let saveAttempts = 0;
+    const saves = [];
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person, onRecord: async () => {}, onLoadInsights: async () => emptyInsights(),
+        onLoadPersonNote: async (docId) => {
+            assert(docId === person.docId, "独立备注读取使用了错误人物文档");
+            return storedNote;
+        },
+        onSavePersonNote: async (docId, note, expected) => {
+            assert(docId === person.docId && expected === storedNote, "独立备注保存未携带当前版本");
+            saveAttempts += 1;
+            if (saveAttempts === 1) throw new Error("临时保存失败");
+            storedNote = note;
+            saves.push({ docId, note, expected });
+            return storedNote;
+        },
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+    } });
+    await until(() => fixture.querySelector('textarea[aria-label="个人备注"]')?.value === "已有特殊情况", "个人备注初始内容未加载");
+    const noteInput = fixture.querySelector('textarea[aria-label="个人备注"]');
+    input(noteInput, "下次见面前提醒准备资料");
+    await tick();
+    button("保存备注").click();
+    await until(() => fixture.querySelector('[role="alert"]')?.textContent.includes("临时保存失败"), "个人备注失败态未显示");
+    assert(noteInput.value === "下次见面前提醒准备资料" && saveAttempts === 1, "个人备注保存失败后丢失草稿或重复提交");
+    button("重试保存").click();
+    await until(() => fixture.querySelector(".lvct-detail__person-note .lvct-chip")?.textContent.includes("已保存"), "个人备注重试未成功");
+    assert(storedNote === "下次见面前提醒准备资料" && saves.length === 1 && noteInput.value === storedNote, "个人备注重试未写回并显示已保存状态");
+    input(noteInput, "");
+    await tick();
+    button("保存备注").click();
+    await until(() => saves.length === 2 && storedNote === "", "清空个人备注未写回");
+    assert(noteInput.value === "" && saves[1].note === "" && saves[1].expected === "下次见面前提醒准备资料", "清空个人备注保存参数错误");
+});
+
 await test("详情子面板：甲乙加载乱序与卸载后的保存回调均不能回填或通知旧实例", async () => {
     const firstDocId = person.docId;
     const secondDocId = "20260927000000-person2";
@@ -2896,6 +2988,9 @@ await test("图谱稳定挂载，悬停卡保留人物，筛选清空后可恢�
     assert(!cy.destroyed(), "图谱被响应式 effect 重复销毁");
     cy.nodes()[0].emit("mouseover");
     await until(() => fixture.querySelector(".lvct-graph-view__hover-card"), "悬停卡未出现");
+    const hoverCard = fixture.querySelector(".lvct-graph-view__hover-card");
+    assert(hoverCard.getAttribute("role") === "dialog" && hoverCard.getAttribute("aria-modal") === "false"
+        && hoverCard.getAttribute("aria-label")?.includes(person.name), "人物悬停卡缺少非模态可访问名称");
     button("查看人物详情").click();
     assert(opened?.docId === person.docId, "悬停卡传给详情的人物为空");
     input(fixture.querySelector('input[type="search"]'), "没有此人");

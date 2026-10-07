@@ -596,8 +596,9 @@ export async function verifyRealFrontend({
         await captureScreenshot('detail');
 
         if (captureSourceDocId) {
+            const captureDeadline = Math.min(deadline, Date.now() + 30_000);
             try {
-                await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("window.siyuan?.isReady === true")), "真实宿主前端就绪");
+                await waitUntil(captureDeadline, async () => Boolean(await browserSession.evaluate("window.siyuan?.isReady === true")), "真实宿主前端就绪");
                 evidence.hostReady = true;
                 let captureEntry;
                 try {
@@ -633,15 +634,15 @@ export async function verifyRealFrontend({
                     const sourceURL = new URL(targetURL);
                     sourceURL.searchParams.set('id', captureSourceDocId);
                     await browserSession.call('Page.navigate', { url: sourceURL.href });
-                    await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.readyState === 'complete'")), "捕获来源文档入口");
-                    await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("window.siyuan?.isReady === true")), "捕获来源宿主就绪");
+                    await waitUntil(captureDeadline, async () => Boolean(await browserSession.evaluate("document.readyState === 'complete'")), "捕获来源文档入口");
+                    await waitUntil(captureDeadline, async () => Boolean(await browserSession.evaluate("window.siyuan?.isReady === true")), "捕获来源宿主就绪");
                     captureEntry = { ok: true, result: 'page-id', reason: captureEntry?.reason || '' };
                     evidence.captureOpenMode = 'page-id';
                 } else {
                     evidence.captureOpenMode = 'openFileByURL';
                 }
                 if (captureEntry?.ok) {
-                    await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`Boolean(document.querySelector('.protyle[data-node-id="${captureSourceDocId}"], .protyle [data-node-id="${captureSourceDocId}"], .protyle-wysiwyg'))`)), "捕获来源编辑器");
+                    await waitUntil(captureDeadline, async () => Boolean(await browserSession.evaluate(`Boolean(document.querySelector('.protyle[data-node-id="${captureSourceDocId}"], .protyle [data-node-id="${captureSourceDocId}"], .protyle-wysiwyg'))`)), "捕获来源编辑器");
                     evidence.captureEditorOpen = true;
                     const editorPoint = await browserSession.evaluate(`(()=>{
                         const editor = document.querySelector('.protyle[data-node-id="${captureSourceDocId}"] .protyle-wysiwyg, .protyle-wysiwyg');
@@ -660,11 +661,12 @@ export async function verifyRealFrontend({
                             return true;
                         })()`);
                         let clickedCapture = false;
+                        const captureLabelPattern = '/捕获本文人员|capture (?:contacts|people) from (?:this )?note/i';
                         try {
-                            await waitUntil(Math.min(deadline, Date.now() + 5000), async () => Boolean(await browserSession.evaluate(`([...document.querySelectorAll('.b3-menu__item, [role="menuitem"]')].some((item) => /捕获本文人员|Capture contacts from note/.test(item.textContent || '')))`)), "捕获右键菜单");
+                            await waitUntil(Math.min(captureDeadline, Date.now() + 5000), async () => Boolean(await browserSession.evaluate(`([...document.querySelectorAll('.b3-menu__item, [role="menuitem"]')].some((item) => ${captureLabelPattern}.test(item.textContent || '')))`)), "捕获右键菜单");
                             evidence.captureContextMenu = true;
                             clickedCapture = await browserSession.evaluate(`(()=>{
-                                const item = [...document.querySelectorAll('.b3-menu__item, [role="menuitem"]')].find((node) => /捕获本文人员|Capture contacts from note/.test(node.textContent || ''));
+                                const item = [...document.querySelectorAll('.b3-menu__item, [role="menuitem"]')].find((node) => ${captureLabelPattern}.test(node.textContent || ''));
                                 if (!item) return false;
                                 item.click();
                                 return true;
@@ -677,7 +679,7 @@ export async function verifyRealFrontend({
                                 return true;
                             })()`);
                             if (!openedCommandPanel) throw new Error("捕获右键菜单和命令面板均不可用");
-                            await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('#commands') && document.querySelector('#commands').parentElement")), "捕获命令面板");
+                            await waitUntil(captureDeadline, async () => Boolean(await browserSession.evaluate("document.querySelector('#commands') && document.querySelector('#commands').parentElement")), "捕获命令面板");
                             const commandInput = await browserSession.evaluate(`(()=>{
                                 const input = document.querySelector('[aria-label="命令面板"], [aria-label="Command panel"], #commands')?.closest('.b3-dialog')?.querySelector('input') || document.querySelector('.b3-dialog input.b3-text-field, .b3-dialog input');
                                 if (!input) return false;
@@ -685,10 +687,44 @@ export async function verifyRealFrontend({
                                 return true;
                             })()`);
                             if (!commandInput) throw new Error("捕获命令面板输入框不可用");
-                            await browserSession.call('Input.insertText', { text: '捕获本文人员' });
-                            await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`([...document.querySelectorAll('#commands .b3-list-item')].some((item) => /捕获本文人员|Capture contacts from note/.test(item.textContent || '')))`)), "捕获命令项");
+                            const commandItemSelector = '.b3-list-item, [role="option"], [role="menuitem"]';
+                            const commandItemMatches = `(node) => ${captureLabelPattern}.test(node.textContent || '') && (() => { const rect = node.getBoundingClientRect(); return rect.width > 0 && rect.height > 0; })()`;
+                            const commandItemVisible = () => browserSession.evaluate(`([...document.querySelectorAll(${json(commandItemSelector)})].some(${commandItemMatches}))`);
+                            const searchCommands = async (query) => {
+                                const cleared = await browserSession.evaluate(`(()=>{
+                                    const marker = document.querySelector('[aria-label="命令面板"], [aria-label="Command panel"], #commands');
+                                    const input = marker instanceof HTMLInputElement || marker instanceof HTMLTextAreaElement
+                                        ? marker
+                                        : marker?.closest('.b3-dialog')?.querySelector('input, textarea') || document.querySelector('.b3-dialog input.b3-text-field, .b3-dialog input, .b3-dialog textarea');
+                                    if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) return false;
+                                    input.focus();
+                                    const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+                                    const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+                                    if (!setter) return false;
+                                    setter.call(input, '');
+                                    input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
+                                    return input.value === '';
+                                })()`);
+                                if (!cleared) return false;
+                                await browserSession.call('Input.insertText', { text: query });
+                                return true;
+                            };
+                            let commandFound = false;
+                            if (await searchCommands('capture')) {
+                                try {
+                                    await waitUntil(Math.min(captureDeadline, Date.now() + 2000), commandItemVisible, "捕获英文命令项");
+                                    commandFound = true;
+                                } catch {
+                                    commandFound = false;
+                                }
+                            }
+                            if (!commandFound && await searchCommands('捕获本文人员')) {
+                                await waitUntil(captureDeadline, commandItemVisible, "捕获命令项");
+                                commandFound = true;
+                            }
+                            if (!commandFound) throw new Error("捕获命令项不可见");
                             clickedCapture = await browserSession.evaluate(`(()=>{
-                                const item = [...document.querySelectorAll('#commands .b3-list-item')].find((node) => /捕获本文人员|Capture contacts from note/.test(node.textContent || ''));
+                                const item = [...document.querySelectorAll(${json(commandItemSelector)})].find((node) => ${captureLabelPattern}.test(node.textContent || '') && (() => { const rect = node.getBoundingClientRect(); return rect.width > 0 && rect.height > 0; })());
                                 if (!item) return false;
                                 item.click();
                                 return true;
@@ -696,14 +732,14 @@ export async function verifyRealFrontend({
                             evidence.captureCommandPanel = clickedCapture;
                         }
                         if (clickedCapture) {
-                            await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('.lvct-dialog-panel')?.textContent?.includes('联系人候选') || document.querySelector('.lvct-dialog-panel')?.textContent?.includes('Contact candidates')")), "真实捕获弹窗");
+                            await waitUntil(captureDeadline, async () => Boolean(await browserSession.evaluate("document.querySelector('.lvct-dialog-panel')?.textContent?.includes('联系人候选') || document.querySelector('.lvct-dialog-panel')?.textContent?.includes('Contact candidates')")), "真实捕获弹窗");
                             evidence.captureDialog = true;
                             const nextButton = await browserSession.evaluate(`(()=>[...document.querySelectorAll('.lvct-dialog-panel button')].find((button) => /下一步：确认记录|Next: confirm/.test(button.textContent || '') && !button.disabled))?.click() !== undefined`);
                             if (nextButton) {
-                                await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('.lvct-dialog-panel')?.textContent?.includes('记录互动并建立事项双链') || document.querySelector('.lvct-dialog-panel')?.textContent?.includes('Record interaction')")), "真实捕获确认页");
+                                await waitUntil(captureDeadline, async () => Boolean(await browserSession.evaluate("document.querySelector('.lvct-dialog-panel')?.textContent?.includes('记录互动并建立事项双链') || document.querySelector('.lvct-dialog-panel')?.textContent?.includes('Record interaction')")), "真实捕获确认页");
                                 const submitCapture = await browserSession.evaluate(`(()=>[...document.querySelectorAll('.lvct-dialog-panel button')].find((button) => /记录互动并建立事项双链|Record interaction/.test(button.textContent || '') && !button.disabled))?.click() !== undefined`);
                                 if (submitCapture) {
-                                    await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('.lvct-dialog-panel')?.textContent?.includes('已记录') || document.querySelector('.lvct-dialog-panel')?.textContent?.includes('Recorded')")), "真实捕获完成页");
+                                    await waitUntil(captureDeadline, async () => Boolean(await browserSession.evaluate("document.querySelector('.lvct-dialog-panel')?.textContent?.includes('已记录') || document.querySelector('.lvct-dialog-panel')?.textContent?.includes('Recorded')")), "真实捕获完成页");
                                     evidence.captureCompleted = true;
                                 }
                             }

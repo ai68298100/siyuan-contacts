@@ -779,6 +779,10 @@
 <div class="lvct-settings">
     <div class="lvct-settings__topbar">
         <button class="b3-button b3-button--outline" onclick={() => guardedClose(onBack)}>← {text("settingsBack", "返回工作台")}</button>
+        <div class="lvct-settings__heading">
+            <h1>{text("settingsPageTitle", "设置与数据")}</h1>
+            <p>{text("settingsPageSubtitle", "配置默认行为、数据锚点和提醒，让联系人工作台保持可控。")}</p>
+        </div>
     </div>
 
     <div class="lvct-settings__layout">
@@ -935,7 +939,7 @@
                     </div>
                     {#if rebindOpen}
                         <div class="lvct-settings__rebind">
-                            <p>仅在迁移或恢复了已有数据库时使用。提交前会验证属性视图并按原 ID 或标准字段名恢复映射，剩余缺失字段可再通过健康检查补建。</p>
+                            <p class="lvct-settings__fine-print">仅在迁移或恢复了已有数据库时使用。提交前会验证属性视图并按原 ID 或标准字段名恢复映射，剩余缺失字段可再通过健康检查补建。</p>
                             <div class="lvct-settings__actions">
                                 <button class="b3-button b3-button--outline" onclick={() => void runAnchorScan()} disabled={scanningAnchors}>{scanningAnchors ? "扫描中…" : "扫描全库候选（只读）"}</button>
                                 <span class="ft__smaller ft__on-surface">当前绑定：文档 …{settings.hostDocId.slice(-6)} · 块 …{settings.dbBlockId.slice(-6)} · 视图 …{settings.avId.slice(-6)}（填错可按此改回）</span>
@@ -1025,8 +1029,15 @@
                         <b>导出中心</b>
                         {#if loadingSummary}<span class="ft__smaller ft__on-surface">统计中…</span>{/if}
                     </div>
-                    <p class="lvct-settings__inline-hint">人物文档与联系人数据库是思源原生数据，随工作区保留；以下两项导出都不是完整备份。</p>
-                    {#if summaryError}<p role="status">{summaryError}</p><button class="b3-button b3-button--text" disabled={loadingSummary} onclick={() => void refreshExportSummary()}>重新读取导出数量</button>{/if}
+                    <p class="lvct-settings__fine-print">人物文档与联系人数据库是思源原生数据，随工作区保留；以下两项导出都不是完整备份。</p>
+                    {#if summaryError}
+                        <div class="lvct-settings__notice lvct-settings__notice--error" role="alert">
+                            <p>{summaryError}</p>
+                            <button class="b3-button b3-button--outline" disabled={loadingSummary} onclick={() => void refreshExportSummary()}>
+                                {loadingSummary ? "正在重新读取…" : "重新读取导出数量"}
+                            </button>
+                        </div>
+                    {/if}
                     <div class="lvct-settings__row">
                         <div>
                             <b>全量名册 vCard</b>
@@ -1070,7 +1081,7 @@
                             {exportingBundle ? "导出中…" : "导出迁移包"}
                         </button>
                     </div>
-                    <p class="ft__smaller ft__on-surface">本人身份按原文档 ID 核实当前绑定，不覆盖不同本人；组织成员含任职分类、离职历史及删除标记。关系称谓保留原本人参照和明确空值，不转移给其他本人。人物与组织原文、组织归档状态、数据库及原生任务请另行备份思源工作区；界面偏好与数据库锚点不自动恢复。成员恢复后，可在组织双链核对中预览并逐文档重建关联段落。</p>
+                    <p class="lvct-settings__fine-print">本人身份按原文档 ID 核实当前绑定，不覆盖不同本人；组织成员含任职分类、离职历史及删除标记。关系称谓保留原本人参照和明确空值，不转移给其他本人。人物与组织原文、组织归档状态、数据库及原生任务请另行备份思源工作区；界面偏好与数据库锚点不自动恢复。成员恢复后，可在组织双链核对中预览并逐文档重建关联段落。</p>
                     <div class="lvct-settings__migration-result" style="overflow-wrap:anywhere" tabindex="-1" bind:this={bundleResultElement} aria-label="迁移模块结果">
                         <StatusNotice message={bundleMessage} onDismiss={() => (bundleMessage = "")} />
                         {#if bundleResult}
@@ -1273,7 +1284,7 @@
                             {dismissalsLoading ? "读取中…" : "刷新列表"}
                         </button>
                     </div>
-                    {#if dismissalsError}<div class="lvct-form__error">{dismissalsError}</div>{/if}
+                    {#if dismissalsError}<div class="lvct-form__error" role="alert">{dismissalsError}</div>{/if}
                     {#if dismissedReminders !== null}
                         {#if dismissedReminders.length === 0}
                             <p class="lvct-settings__inline-hint" role="status">当前没有暂缓中的提醒。生日「跳过本年」与「不再提醒」会出现在这里。</p>

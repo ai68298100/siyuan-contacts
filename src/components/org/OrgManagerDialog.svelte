@@ -546,7 +546,7 @@
 </script>
 
 <div class="lvct-dialog-root lvct-org-manager" data-org-doc-id={currentOrgDocId} bind:this={managerElement}>
-    {#if refreshNeeded}<p role="status">{text("orgMembershipRefreshNeeded", "成员或组织有新变化，重新读取后核对。未保存的表单保留。")}</p>{/if}
+    {#if refreshNeeded}<p class="lvct-org-manager__refresh" role="status">{text("orgMembershipRefreshNeeded", "成员或组织有新变化，重新读取后核对。未保存的表单保留。")}</p>{/if}
     <div class="lvct-org-manager__layout">
         <div class="lvct-org-manager__list">
             <b>{text("orgListTitle", "组织")}</b>
@@ -731,7 +731,10 @@
                                             </div>
                                         </div>
                                     {:else}
-                                        <span>{member.personName} · {affiliationLabel(member.affiliationKind)}{member.title ? ` · ${member.title}` : ""}{member.department ? `（${member.department}）` : ""}{member.status === "former" ? text("orgFormer", "（已离开）") : ""}</span>
+                                        <span class="lvct-org-manager__member-name">
+                                            {member.personName} · {affiliationLabel(member.affiliationKind)}{member.title ? ` · ${member.title}` : ""}{member.department ? `（${member.department}）` : ""}
+                                            {#if member.status === "former"}<span class="lvct-org-manager__member-status">{text("orgFormer", "已离开")}</span>{/if}
+                                        </span>
                                         <span class="fn__flex" style="gap: 4px;">
                                             {#if onOpenPerson}
                                                 <button type="button" class="b3-button b3-button--text" disabled={busy || memberLoading || organizationsRefreshing || hasDraft || selectionGuardBusy}
@@ -751,7 +754,7 @@
                                             >{text("orgMemberRemove", "移除")}</button>
                                         </span>
                                         {#if removingMemberId === member.id}
-                                            <div role="group" aria-label={text("orgMembershipRemoveConfirm", "确认移除这段成员历史")}>
+                                            <div class="lvct-org-manager__member-confirm" role="group" aria-label={text("orgMembershipRemoveConfirm", "确认移除这段成员历史")}>
                                                 <p>{text("orgMembershipRemoveImpact", "将删除这段成员历史并重建双方当前双链。普通离职请编辑为已离开；人物和组织文档保留。")}</p>
                                                 <button class="b3-button b3-button--cancel" disabled={busy} onclick={() => removeMember(member.id)}>{text("orgMembershipRemoveConfirm", "确认移除这段成员历史")}</button>
                                                 <button class="b3-button b3-button--outline" disabled={busy} onclick={() => (removingMemberId = "")}>{text("orgMemberCancel", "取消")}</button>

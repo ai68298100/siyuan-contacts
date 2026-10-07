@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { organizationMarkerStates, organizationsFromDocs } from "../src/domain/organization-scan.ts";
+import { filterOrganizations, organizationMarkerStates, organizationsFromDocs } from "../src/domain/organization-scan.ts";
 
 const orgDocId = "20261004000000-org0001";
 const notebookId = "20261004000000-book001";
@@ -28,4 +28,16 @@ test("组织扫描：不可达、不完整、额外与重复文档拒绝完整�
     for (const rows of [[], [doc, doc], [{ ...doc, box: undefined }], [{ ...doc, id: "20261004000000-other01" }]]) {
         assert.throws(() => organizationsFromDocs(states, rows), /组织状态未核实/);
     }
+});
+
+test("组织筛选：名称查询忽略首尾空白与大小写，状态筛选不改变输入顺序", () => {
+    const organizations = [
+        { name: "Alpha School", archived: false },
+        { name: "Beta Studio", archived: true },
+        { name: "alpha labs", archived: false },
+    ];
+    assert.deepEqual(filterOrganizations(organizations, { query: "  ALPHA  " }).map((item) => item.name), ["Alpha School", "alpha labs"]);
+    assert.deepEqual(filterOrganizations(organizations, { status: "active" }).map((item) => item.name), ["Alpha School", "alpha labs"]);
+    assert.deepEqual(filterOrganizations(organizations, { status: "archived" }).map((item) => item.name), ["Beta Studio"]);
+    assert.deepEqual(organizations.map((item) => item.name), ["Alpha School", "Beta Studio", "alpha labs"]);
 });

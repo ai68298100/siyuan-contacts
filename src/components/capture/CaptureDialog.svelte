@@ -390,7 +390,7 @@
             {#if aiExtrasComplete() && (aiProfileCandidates.some((c) => c.checked) || aiFollowUpCandidates.some((c) => c.checked))}
                 <p class="lvct-capture__done-line"><Sparkles size={14}/> {text("captureAiExtrasDone", "AI 候选的资料补充与建跟进已完成")}</p>
             {/if}
-            {#if extrasError}<p class="ft__smaller lvct-text-danger">{extrasError}</p>{/if}
+            {#if extrasError}<p class="ft__smaller lvct-text-danger" role="alert">{extrasError}</p>{/if}
             {#each [...aiProfileCandidates, ...aiFollowUpCandidates] as candidate}
                 {#if candidate.checked}
                     <div class="lvct-capture__candidate">
@@ -408,7 +408,7 @@
                             </label>
                             <button class="b3-button b3-button--cancel" onclick={() => decideCandidate(candidate, "rejected")} disabled={running}>拒绝本项</button>
                         {/if}
-                        {#if candidate.error}<p class="ft__smaller lvct-text-danger">{candidate.error}</p>{/if}
+                        {#if candidate.error}<p class="ft__smaller lvct-text-danger" role="alert">{candidate.error}</p>{/if}
                     </div>
                 {/if}
             {/each}
@@ -487,7 +487,7 @@
                     <button class="b3-button b3-button--cancel" onclick={cancelAi}>取消 AI，忽略结果</button>
                 {/if}
                 {#if aiError}
-                    <p class="ft__smaller lvct-text-danger">{aiError}</p>
+                    <p class="ft__smaller lvct-text-danger" role="alert">{aiError}</p>
                 {/if}
             {/if}
         </div>
@@ -592,7 +592,7 @@
         </label>
 
         {#if errorText}
-            <div class="lvct-form__error">{errorText}</div>
+            <div class="lvct-form__error" role="alert">{errorText}</div>
         {/if}
 
         {#if running}
@@ -627,20 +627,28 @@
     .lvct-capture__preflight, .lvct-capture__candidate {
         padding: 12px;
         margin: 8px 0;
-        border: 1px solid var(--b3-border-color);
-        border-radius: var(--b3-border-radius);
+        border: 1px solid var(--lvct-border-subtle);
+        border-radius: var(--lvct-r-sm);
         overflow-wrap: anywhere;
+    }
+    .lvct-capture__preflight {
+        border-color: color-mix(in srgb, var(--lvct-highlight) 42%, var(--lvct-border-subtle));
+        border-radius: var(--lvct-r-md);
+        background: var(--lvct-highlight-soft);
+    }
+    .lvct-capture__candidate {
+        background: var(--lvct-bg-elevated);
     }
     .lvct-capture__fields {
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
-        border: 1px solid var(--b3-border-color);
+        border: 1px solid var(--lvct-border-subtle);
     }
     .lvct-capture__candidate blockquote {
         margin: 8px 0;
         padding-left: 8px;
-        border-left: 2px solid var(--b3-theme-primary);
-        color: var(--b3-theme-on-surface);
+        border-left: 2px solid var(--lvct-accent);
+        color: var(--lvct-text-2);
     }
 </style>

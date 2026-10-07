@@ -6,6 +6,7 @@
  */
 import type { ContactSummary } from "./person";
 import { matchesProfileFilters } from "./people-profiles.ts";
+import { isValidDateKey } from "./followups.ts";
 
 export type TagMatchMode = "all" | "any";
 
@@ -50,8 +51,10 @@ export interface ExtraFilterChip {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function isDateKey(value: string): boolean {
-    return DATE_RE.test(value);
+function isDateKey(value: unknown): value is string {
+    // 筛选值可能来自持久化视图或旧版本配置，不能只看字符串形状：
+    // 2026-02-31 会通过正则，却会让闭区间比较产生一个不存在的日期。
+    return typeof value === "string" && DATE_RE.test(value) && isValidDateKey(value);
 }
 
 /** 标签交并匹配：未选标签时恒为命中 */

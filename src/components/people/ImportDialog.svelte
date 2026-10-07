@@ -66,7 +66,8 @@
     });
 
     const selectedIds = $derived(Object.entries(selected).filter(([, on]) => on).map(([id]) => id));
-    const hiddenSelectedCount = $derived(selectedIds.filter((id) => !candidates.some((candidate) => candidate.docId === id)).length);
+    const candidateIdSet = $derived(new Set(candidates.map((candidate) => candidate.docId)));
+    const hiddenSelectedCount = $derived(selectedIds.filter((id) => !candidateIdSet.has(id)).length);
 
     async function loadNotebooks() {
         loading = true;
@@ -185,7 +186,9 @@
         {#if errorText}<p class="lvct-form__error" role="alert">{errorText}</p>{/if}
         <ul>
             {#each queue.items as item (item.docId)}
-                <li>{item.name} · {item.docId} · {item.status === "applied" ? "已核实成功" : item.status === "skipped" ? "已绑定，跳过" : item.status === "pending" ? "未执行" : item.status === "unknown" ? "未知，需核实" : item.status === "conflict" ? "目标或字段冲突" : "失败"}
+                <li class={`lvct-import__queue-item lvct-import__queue-item--${item.status}`}>
+                    <span class="lvct-import__queue-title">{item.name} · {item.docId}</span>
+                    <span class="lvct-import__queue-status">{item.status === "applied" ? "已核实成功" : item.status === "skipped" ? "已绑定，跳过" : item.status === "pending" ? "未执行" : item.status === "unknown" ? "未知，需核实" : item.status === "conflict" ? "目标或字段冲突" : "失败"}</span>
                     <p class="ft__smaller">来源笔记本 {item.notebookId}{item.itemId ? ` · 行 ${item.itemId}` : ""}</p>
                     {#if item.message}<p class="ft__smaller">{item.message}</p>{/if}
                 </li>
@@ -204,7 +207,7 @@
         </div>
     {:else}
     {#if importedCount === null}
-    <div class="lvct-people__toolbar fn__flex">
+    <div class="lvct-people__toolbar lvct-people__control-surface fn__flex">
         <select class="b3-select" aria-label={text("importPickNotebook", "选择待收编文档的笔记本")} bind:value={notebookId} onchange={() => search()} disabled={importing || !loaded}>
             {#each notebooks as notebook (notebook.id)}
                 <option value={notebook.id}>{notebook.name}</option>
@@ -232,7 +235,7 @@
     {/if}
 
     {#if scan && !loading}
-        <p role="status" aria-live="polite">已扫描 {scan.scanned} 篇 · 可收编 {scan.candidates.length} 篇 · {scan.state === "complete" ? "已核实完整范围" : scan.state === "failed" ? "读取失败，保留前页游标与候选" : "尚有未扫描范围"}</p>
+        <p class="lvct-import__scan-status" role="status" aria-live="polite">已扫描 {scan.scanned} 篇 · 可收编 {scan.candidates.length} 篇 · {scan.state === "complete" ? "已核实完整范围" : scan.state === "failed" ? "读取失败，保留前页游标与候选" : "尚有未扫描范围"}</p>
         {#if scan.state !== "complete"}<button class="b3-button b3-button--outline" onclick={() => search(true)} disabled={importing || loading}>{scan.state === "failed" ? "从失败页重试扫描" : "继续扫描"}</button>{/if}
         <p class="ft__smaller">全选仅包含已扫描候选；继续不会自动勾选新增项。姓名 → 文档标题；分组/标签 → 已确认字段，原正文保持原位。</p>
     {/if}

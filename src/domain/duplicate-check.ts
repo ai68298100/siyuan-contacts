@@ -47,17 +47,22 @@ export function findDuplicatePairs(people: readonly ContactSummary[]): Duplicate
     const phones = new Map<string, ContactSummary[]>();
     const emails = new Map<string, ContactSummary[]>();
     const names = new Map<string, ContactSummary[]>();
+    const index = (bucket: Map<string, ContactSummary[]>, key: string, person: ContactSummary) => {
+        const members = bucket.get(key);
+        if (members) members.push(person);
+        else bucket.set(key, [person]);
+    };
     for (const person of people) {
         if (person.phone) {
             const key = normalizePhoneKey(person.phone);
-            if (key) phones.set(key, [...(phones.get(key) ?? []), person]);
+            if (key) index(phones, key, person);
         }
         if (person.email) {
             const key = normalizeEmailKey(person.email);
-            if (key) emails.set(key, [...(emails.get(key) ?? []), person]);
+            if (key) index(emails, key, person);
         }
         const nameKey = normalizeNameKey(person.name);
-        if (nameKey) names.set(nameKey, [...(names.get(nameKey) ?? []), person]);
+        if (nameKey) index(names, nameKey, person);
     }
 
     const pairs = new Map<string, { a: ContactSummary; b: ContactSummary; reasons: DuplicateReason[] }>();

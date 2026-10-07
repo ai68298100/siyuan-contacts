@@ -46,6 +46,9 @@ test("日期范围：闭区间端点命中，缺侧不限制，无互动者不�
     assert.deepEqual(ids(base({ recentFrom: "2026-08-01", recentTo: "2026-08-31" })), ["b"], "区间过滤错误");
     assert.deepEqual(ids(base({ recentFrom: "2026-09-02" })), [], "下界之外应排除");
     assert.deepEqual(ids(base({ recentFrom: "bogus", recentTo: "" })), ["a", "b", "c"], "非法日期应视为不限制");
+    assert.deepEqual(ids(base({ recentFrom: "2026-02-31", recentTo: "" })), ["a", "b", "c"], "不存在的公历日期应视为不限制");
+    assert.deepEqual(ids(base({ recentFrom: "2026-02-28", recentTo: "2026-02-30" })), ["a", "b"], "不存在的结束日期应视为不限制");
+    assert.deepEqual(ids(base({ recentFrom: null as unknown as string })), ["a", "b", "c"], "非字符串日期应视为不限制");
 });
 
 test("从未联系：只保留无互动者；与日期范围同设时按 AND 为空集", () => {

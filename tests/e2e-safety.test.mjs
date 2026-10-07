@@ -163,3 +163,29 @@ test("UI 清理：进程树终止超时后，直接终止必须重新等待实�
     assert.equal(browser.signalCode, "SIGTERM");
     assert.equal(helper.signalCode, "SIGTERM");
 });
+
+test("UI 清理：退出监听注册前已结束的 helper 不会误判超时", async () => {
+    const browser = Object.assign(new EventEmitter(), {
+        pid: 12345,
+        exitCode: null,
+        signalCode: null,
+        kill() {
+            this.signalCode = "SIGTERM";
+            this.emit("exit", null, "SIGTERM");
+        },
+    });
+    const helper = Object.assign(new EventEmitter(), { signalCode: null });
+    let helperReads = 0;
+    Object.defineProperty(helper, "exitCode", {
+        configurable: true,
+        get() { return ++helperReads >= 2 ? 0 : null; },
+    });
+    await stopIsolatedBrowser(browser, {
+        platform: "win32",
+        timeoutMs: 20,
+        // The helper has already exited by the time waitForExit observes it.
+        spawnProcess: () => helper,
+    });
+    assert.equal(browser.signalCode, "SIGTERM");
+    assert.ok(helperReads >= 2);
+});

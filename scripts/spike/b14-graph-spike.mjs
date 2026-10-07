@@ -9,10 +9,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { randomUUID } from "node:crypto";
 import {spawn} from "node:child_process";
 import { prepareIsolatedWorkspace, assertTestPortAvailable, observeTestKernel } from "../e2e/kernel-safety.mjs";
 
-const WORKSPACE = path.join(os.homedir(), "SiYuan-Renmai-B14-Spike");
+const WORKSPACE = path.join(os.tmpdir(), `SiYuan-Lvct-B14-${randomUUID()}`);
 const HOST = "127.0.0.1";
 const PORT = 6834;
 const BASE = `http://${HOST}:${PORT}`;

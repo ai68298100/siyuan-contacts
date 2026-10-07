@@ -1,4 +1,4 @@
-import { addField, configureSelfRelationTwoWay, findAvBlocksInDoc, readAttributeViewKeys, renderView } from "../api/av";
+import { addField, AttributeViewCarrierMissingError, configureSelfRelationTwoWay, findAvBlocksInDoc, isAttributeViewCarrierMissingError, readAttributeViewKeys, renderView } from "../api/av";
 import { KernelPermissionError, KernelResponseError, listNotebooks, newNodeId } from "../api/client";
 import { readNotebookDocument } from "../api/blocks";
 import { FIELD_SPECS, fieldSpec, validateFieldMap } from "../domain/fields.ts";
@@ -26,6 +26,40 @@ export type SettingsAnchors = Pick<ContactsSettings, "notebookId" | "hostDocId" 
 export type SettingsAnchorPatch = Pick<ContactsSettings, "hostDocId" | "dbBlockId" | "avId"> & Partial<Pick<ContactsSettings, "notebookId">>;
 export type FieldMapPatch = Partial<ContactsSettings["fieldMap"]>;
 export type SettingsRepairAlive = () => boolean;
+
+export type SettingsAnchorProbeStatus = "verified" | "missing" | "unknown";
+export interface SettingsAnchorProbe {
+    readonly status: SettingsAnchorProbeStatus;
+    readonly message?: string;
+}
+
+function isCarrierMissing(error: unknown): boolean {
+    return error instanceof AttributeViewCarrierMissingError || isAttributeViewCarrierMissingError(error)
+        || (error instanceof KernelResponseError
+            && /resolve attribute view carrier:\s*block\s*\[[^\]]+\]\s*not found/i.test(error.responseMessage ?? ""));
+}
+
+/**
+ * 只读核验设置中的四段原生锚点。先查宿主文档中的 AV 块，再调用 render，
+ * 这样块已被删除时不会再次把失效 blockID 送进内核而触发 toast。
+ */
+export async function probeSettingsAnchor(settings: ContactsSettings): Promise<SettingsAnchorProbe> {
+    try {
+        parseRepairSettings(settings);
+        const notebooks = (await listNotebooks()).filter((notebook) => notebook.id === settings.notebookId);
+        if (notebooks.length !== 1) return { status: "missing", message: "人脉笔记本不存在或不唯一" };
+        const doc = await readNotebookDocument(settings.notebookId, settings.hostDocId);
+        if (!doc) return { status: "missing", message: "联系人总表文档已删除或不属于原笔记本" };
+        const blocks = await findAvBlocksInDoc(settings.hostDocId);
+        const matches = blocks.filter((block) => block.dbBlockId === settings.dbBlockId && block.avId === settings.avId);
+        if (matches.length !== 1) return { status: "missing", message: "属性视图载体块已删除、移动或 AV 标识不一致" };
+        await renderView(settings.avId, settings.dbBlockId);
+        return { status: "verified" };
+    } catch (error) {
+        if (isCarrierMissing(error)) return { status: "missing", message: "属性视图载体块已被删除或当前不可达" };
+        return { status: "unknown", message: error instanceof Error ? error.message : String(error) };
+    }
+}
 
 function anchorsOf(settings: ContactsSettings): SettingsAnchors {
     return Object.freeze({ notebookId: settings.notebookId, hostDocId: settings.hostDocId, dbBlockId: settings.dbBlockId, avId: settings.avId });
@@ -110,6 +144,9 @@ async function readVerifiedAnchor(settings: ContactsSettings): Promise<{ columns
 }
 
 export async function checkSettingsHealth(settings: ContactsSettings): Promise<SettingsHealth> {
+    const anchor = await probeSettingsAnchor(settings);
+    if (anchor.status === "missing") throw new Error(`联系人数据锚点已失效：${anchor.message ?? "数据库载体不存在"}`);
+    if (anchor.status === "unknown") throw new Error(`联系人数据锚点暂时无法核实：${anchor.message ?? "请稍后重试"}`);
     const rendered = await renderView(settings.avId, settings.dbBlockId);
     assertRepairColumns(rendered.view.columns);
     const columnIds = new Set(rendered.view.columns.map((column) => column.id));

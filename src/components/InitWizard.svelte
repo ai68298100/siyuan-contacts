@@ -104,7 +104,12 @@
 
 <div class="lvct-wizard">
     <header class="lvct-wizard__header">
-        <svg class="lvct-wizard__logo"><use xlink:href="#iconLvContacts"></use></svg>
+        <svg class="lvct-wizard__logo" viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M12 4c3.314 0 6 2.686 6 6s-2.686 6-6 6-6-2.686-6-6 2.686-6 6-6zM12 6.4A3.6 3.6 0 1 0 12 13.6 3.6 3.6 0 0 0 12 6.4z" />
+            <path d="M22.4 8.8c2.651 0 4.8 2.149 4.8 4.8s-2.149 4.8-4.8 4.8-4.8-2.149-4.8-4.8 2.149-4.8 4.8-4.8zM22.4 11.2a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8z" />
+            <path d="M12 18c4.26 0 8.4 1.772 8.4 4.8V26H3.6v-3.2C3.6 19.772 7.74 18 12 18zm0 2.4c-3.42 0-6 1.276-6 2.4V23.6h12v-0.8c0-1.124-2.58-2.4-6-2.4z" />
+            <path d="M23.2 20.4c2.94 0 6 1.176 6 3.2V26h-6.133v-2.4h3.733v-0.16c-.46-.44-1.76-.8-3.4-.86a9.79 9.79 0 0 0-1.6-2.18h1.4z" />
+        </svg>
         <div>
             <h2>{text("wizardWelcome", "欢迎使用小驴人脉")}</h2>
             <p>{text("wizardIntro", "三步建好你的人脉工作空间：笔记本、数据库、关系字段一次配齐。")}</p>
@@ -162,7 +167,7 @@
     {/if}
 
     {#if errorText}
-        <div class="lvct-wizard__error">
+        <div class="lvct-wizard__error" role="alert">
             <div>{text("wizardFailed", "初始化失败：")}{errorText}</div>
             <p class="ft__smaller lvct-wizard__error-hint">
                 {text("wizardResumeHint", "已建成的部分已保留：排除原因后再次点击「继续初始化」，将从断点续建，不会重复创建或删除已有内容。")}

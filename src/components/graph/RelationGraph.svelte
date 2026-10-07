@@ -68,6 +68,7 @@
     let relationCenterDocId = $state("");
     const frontend = getFrontend();
     let presentation: "canvas" | "text" = $state(frontend === "mobile" || frontend === "browser-mobile" ? "text" : "canvas");
+    let graphFiltersOpen = $state(frontend !== "mobile" && frontend !== "browser-mobile");
     let textLimit = $state(100);
     let resultHeading: HTMLElement | undefined = $state();
     let canvasFocusId = $state("");
@@ -122,6 +123,10 @@
         search: searchText, group: groupFilter, isolatedOnly, showOrgs, depth: relationDepth, focusId, compareId, queryMode });
     const snapshot = $derived(buildGraphQuerySnapshot(sources, query, references));
     const canvasData = $derived(JSON.stringify(snapshot.graph));
+    const snapshotStatusText = $derived.by(() => loading || nativeLoading
+        ? text("graphSnapshotLoading", "正在核实图查询…")
+        : snapshot.state === "unknown" || snapshot.state === "center_missing" ? "范围尚未核实"
+            : snapshot.state === "partial" ? "已显示核实部分" : "查询完成");
     const canvasCanRender = $derived(snapshot.state !== "unknown" && snapshot.state !== "center_missing");
     const orgOverlay = $derived({ nodes: snapshot.organizations });
     const searchNeedle = $derived(searchText.trim().toLowerCase());
@@ -230,18 +235,27 @@
     });
 
     /** cytoscape 无法用 CSS 变量，挂载时从主题运行时取值 */
+    function normalizeGraphColor(value: string, fallback: string): string {
+        const normalized = value.trim();
+        const match = normalized.match(/^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\)$/i);
+        if (!match) return normalized || fallback;
+        const channels = match.slice(1, 4).map((channel) => Math.round(Math.max(0, Math.min(1, Number(channel))) * 255));
+        const alpha = match[4] === undefined ? 1 : Math.max(0, Math.min(1, Number(match[4])));
+        return `rgba(${channels.join(", ")}, ${alpha})`;
+    }
+
     function themeColors(): { text: string; edge: string; surface: string } {
         const probe = container ?? document.body;
         const style = getComputedStyle(probe);
         const resolve = (name: string, fallback: string): string => {
             const value = style.getPropertyValue(name).trim();
-            if (!value || !value.includes("color-mix")) return value || fallback;
+            if (!value || !value.includes("color-mix")) return normalizeGraphColor(value, fallback);
             const swatch = document.createElement("span");
             swatch.style.color = `var(${name})`;
             probe.appendChild(swatch);
             const resolved = getComputedStyle(swatch).color;
             swatch.remove();
-            return resolved || fallback;
+            return normalizeGraphColor(resolved, fallback);
         };
         return {
             text: resolve("--lvct-text-2", "currentColor"),
@@ -259,7 +273,7 @@
             "其他": "--lvct-group-other",
         };
         const value = getComputedStyle(container ?? document.body).getPropertyValue(key[group] ?? "--lvct-group-other").trim();
-        return value || getComputedStyle(container ?? document.body).getPropertyValue("--b3-theme-primary").trim() || "currentColor";
+        return normalizeGraphColor(value || getComputedStyle(container ?? document.body).getPropertyValue("--lvct-accent"), "currentColor");
     }
 
     onMount(() => {
@@ -619,114 +633,373 @@
 
 <style>
     .lvct-graph-view { overflow-y: auto; min-width: 0; }
+    .lvct-graph-toolbar { padding: var(--lvct-sp-2); }
+    .lvct-graph-toolbar__primary,
+    .lvct-graph-toolbar__actions,
+    .lvct-graph-toolbar__filters {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        min-width: 0;
+        gap: 6px;
+    }
+    .lvct-graph-toolbar__primary > input { flex: 1 1 220px; min-width: 160px; }
+    .lvct-graph-toolbar__primary > .ft__smaller { flex: 0 1 auto; }
+    .lvct-graph-toolbar__actions { justify-content: flex-end; }
+    .lvct-graph-toolbar__actions > [role="group"] {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding: 2px;
+        border: 1px solid var(--lvct-border-subtle);
+        border-radius: var(--lvct-r-sm);
+        background: var(--lvct-bg-app);
+    }
+    .lvct-graph-toolbar__actions > [role="group"] > .b3-button {
+        min-height: 28px;
+        border-radius: calc(var(--lvct-r-sm) - 2px);
+        transition:
+            background var(--lvct-dur-fast) var(--lvct-ease),
+            border-color var(--lvct-dur-fast) var(--lvct-ease),
+            color var(--lvct-dur-fast) var(--lvct-ease),
+            transform var(--lvct-dur-fast) var(--lvct-ease);
+    }
+    .lvct-graph-toolbar__actions > [role="group"] > .b3-button[aria-pressed="true"] {
+        border-color: var(--lvct-border-strong);
+        background: var(--lvct-bg-active);
+        color: var(--lvct-text-1);
+        font-weight: var(--lvct-fw-medium);
+    }
+    .lvct-graph-toolbar__actions > [role="group"] > .b3-button:focus-visible {
+        outline: 2px solid var(--lvct-accent);
+        outline-offset: 1px;
+    }
+    .lvct-graph-toolbar__filters {
+        padding-top: 4px;
+        border-top: 1px solid var(--lvct-border-subtle);
+    }
+    .lvct-graph-advanced { min-width: 0; }
+    .lvct-graph-advanced > summary { display: none; }
+    .lvct-graph-toolbar__filter-group {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        min-width: 0;
+        padding: 4px 6px;
+        border: 1px solid var(--lvct-border-subtle);
+        border-radius: var(--lvct-r-md);
+        background: var(--lvct-bg-elevated);
+    }
+    .lvct-graph-toolbar__filter-group--scope { flex: 1 1 520px; }
+    .lvct-graph-toolbar__filter-group--refine { flex: 1 1 280px; }
+    .lvct-graph-toolbar__filter-group--legend {
+        flex: 1 1 100%;
+        padding-block: 3px;
+        background: transparent;
+        border-color: transparent;
+    }
+    .lvct-graph-toolbar__filter-group .ft__smaller { min-width: 0; overflow-wrap: anywhere; }
     .lvct-graph-summary, .lvct-graph-text {
         flex-shrink: 0;
         min-width: 0;
         padding: 12px;
-        color: var(--b3-theme-on-background);
-        background: var(--b3-theme-background);
+        color: var(--lvct-text-1);
+        background: var(--lvct-bg-surface);
+        border: 1px solid var(--lvct-border-subtle);
+        border-radius: var(--lvct-r-md);
+        box-shadow: var(--lvct-shadow-1);
         overflow-wrap: anywhere;
     }
-    .lvct-graph-summary h2 { margin: 0; font-size: 1rem; }
-    .lvct-graph-summary p { margin: 6px 0; }
+    .lvct-graph-summary h2,
+    .lvct-graph-text h3 { margin: 0 0 8px; font-size: var(--lvct-fs-heading); }
+    .lvct-graph-summary p { margin: 6px 0; line-height: var(--lvct-lh-body); }
+    .lvct-graph-summary__head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .lvct-graph-summary__head h2 { margin-bottom: 0; }
+    .lvct-graph-summary__status {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 2px 8px;
+        border-radius: var(--lvct-r-pill);
+        background: var(--lvct-accent-soft);
+        margin: 0;
+        margin-left: auto;
+        color: var(--lvct-accent);
+        font-size: var(--lvct-fs-caption);
+        font-weight: 600;
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        text-align: right;
+    }
+    .lvct-graph-summary__status-counts {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
+    }
+    .lvct-graph-summary__status--complete {
+        background: var(--lvct-success-soft);
+        color: var(--lvct-success);
+    }
+    .lvct-graph-summary__status--partial,
+    .lvct-graph-summary__status--loading {
+        background: var(--lvct-accent-soft);
+        color: var(--lvct-accent);
+    }
+    .lvct-graph-summary__status--unknown,
+    .lvct-graph-summary__status--center_missing {
+        background: var(--lvct-highlight-soft);
+        color: var(--lvct-highlight);
+    }
+    .lvct-graph-summary__stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin: 8px 0;
+    }
+    .lvct-graph-summary__stats > div {
+        min-width: 0;
+        padding: 6px 8px;
+        border: 1px solid var(--lvct-border-subtle);
+        border-radius: var(--lvct-r-sm);
+        background: var(--lvct-bg-elevated);
+    }
+    .lvct-graph-summary__stats dt {
+        color: var(--lvct-text-3);
+        font-size: var(--lvct-fs-caption);
+    }
+    .lvct-graph-summary__stats dd {
+        margin: 3px 0 0;
+        color: var(--lvct-text-1);
+        font-size: var(--lvct-fs-title);
+        font-variant-numeric: tabular-nums;
+        font-weight: 650;
+    }
+    .lvct-graph-summary__details {
+        margin-top: 6px;
+        border-top: 1px solid var(--lvct-border-subtle);
+    }
+    .lvct-graph-summary__details > summary {
+        display: flex;
+        align-items: center;
+        min-height: 32px;
+        color: var(--lvct-text-2);
+        font-size: var(--lvct-fs-caption);
+        cursor: pointer;
+        list-style: none;
+    }
+    .lvct-graph-summary__details > summary::-webkit-details-marker { display: none; }
+    .lvct-graph-summary__details > summary::after {
+        width: 7px;
+        height: 7px;
+        margin-left: auto;
+        border-right: 1px solid currentColor;
+        border-bottom: 1px solid currentColor;
+        transform: rotate(45deg) translateY(-2px);
+        content: "";
+    }
+    .lvct-graph-summary__details[open] > summary::after { transform: rotate(225deg) translate(-1px, -1px); }
+    .lvct-graph-summary__details > summary:focus-visible { outline: 2px solid var(--lvct-accent); outline-offset: 2px; }
+    .lvct-graph-summary__details > p:first-of-type { margin-top: 0; }
     .lvct-graph-text { overflow-y: auto; }
     .lvct-graph-text ul, .lvct-graph-text ol { padding-inline-start: 20px; }
-    .lvct-graph-text li { margin-block: 8px; }
+    .lvct-graph-text li { margin-block: 10px; }
     .lvct-graph-text__nodes li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .lvct-graph-text__nodes span { flex: 1 1 180px; min-width: 0; }
     .lvct-graph-text button { min-height: 40px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
-    .lvct-graph-summary :focus-visible, .lvct-graph-text :focus-visible { outline: 2px solid var(--b3-theme-primary); outline-offset: 2px; }
+    /* 文本结果按“节点/边”分出轻量行面，避免长列表退化成一串难扫读的正文。 */
+    .lvct-graph-text__nodes,
+    .lvct-graph-text > ul:not(.lvct-graph-text__nodes) {
+        margin: 0;
+        padding-inline-start: 0;
+        list-style: none;
+    }
+    .lvct-graph-text__nodes li,
+    .lvct-graph-text > ul:not(.lvct-graph-text__nodes) li {
+        margin-block: 0;
+        padding-block: 8px;
+        border-top: 1px solid var(--lvct-border-subtle);
+    }
+    .lvct-graph-text__nodes li:first-child,
+    .lvct-graph-text > ul:not(.lvct-graph-text__nodes) li:first-child {
+        padding-top: 2px;
+        border-top: 0;
+    }
+    .lvct-graph-text__nodes span {
+        color: var(--lvct-text-2);
+        font-size: var(--lvct-fs-caption);
+    }
+    .lvct-graph-text__nodes li > .b3-button--outline {
+        min-height: 32px;
+        padding-inline: 10px;
+        border-color: var(--lvct-border-subtle);
+        color: var(--lvct-text-2);
+    }
+    .lvct-graph-summary :focus-visible, .lvct-graph-text :focus-visible { outline: 2px solid var(--lvct-accent); outline-offset: 2px; }
     .lvct-graph-diagnostics { max-height: 180px; overflow: auto; }
     @media (max-width: 640px) {
-        .lvct-graph-summary, .lvct-graph-text { padding: 8px; }
+        .lvct-graph-toolbar { padding: var(--lvct-sp-2); }
+        .lvct-graph-toolbar__primary,
+        .lvct-graph-toolbar__actions,
+        .lvct-graph-toolbar__filters { width: 100%; }
+        .lvct-graph-advanced { width: 100%; }
+        .lvct-graph-advanced > summary {
+            display: flex;
+            align-items: center;
+            min-height: 36px;
+            padding: 0 12px;
+            border: 1px solid var(--lvct-border-subtle);
+            border-radius: var(--lvct-r-md);
+            background: var(--lvct-bg-elevated);
+            color: var(--lvct-text-2);
+            font-size: var(--lvct-fs-caption);
+            cursor: pointer;
+            list-style: none;
+        }
+        .lvct-graph-advanced > summary::-webkit-details-marker { display: none; }
+        .lvct-graph-advanced > summary::after {
+            content: "";
+            width: 7px;
+            height: 7px;
+            margin-left: auto;
+            border-right: 1.5px solid var(--lvct-text-3);
+            border-bottom: 1.5px solid var(--lvct-text-3);
+            transform: rotate(45deg) translateY(-2px);
+            transition: transform var(--lvct-dur-fast) var(--lvct-ease);
+        }
+        .lvct-graph-advanced[open] > summary::after { transform: rotate(225deg) translateY(-2px); }
+        .lvct-graph-advanced > summary:focus-visible { outline: 2px solid var(--lvct-accent); outline-offset: 2px; }
+        .lvct-graph-advanced .lvct-graph-toolbar__filters { padding-top: 8px; border-top: 0; }
+        .lvct-graph-toolbar__primary > input { flex-basis: 100%; min-width: 0; }
+        .lvct-graph-toolbar__actions { justify-content: flex-start; }
+        .lvct-graph-toolbar__filters { padding-top: 8px; }
+        .lvct-graph-toolbar__filter-group { width: 100%; box-sizing: border-box; }
+        .lvct-graph-toolbar__filter-group--legend { padding-inline: 2px; }
+        /* 移动端把摘要卡收紧到一个信息分组，保留触控高度。 */
+        .lvct-graph-summary, .lvct-graph-text { padding: var(--lvct-sp-2) var(--lvct-sp-3); }
+        .lvct-graph-summary__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .lvct-graph-summary__stats { gap: var(--lvct-sp-1); margin-block: var(--lvct-sp-2); }
+        .lvct-graph-summary__stats > div { padding: var(--lvct-sp-1) var(--lvct-sp-2); }
+        .lvct-graph-summary__stats dd { margin-top: 2px; }
+        .lvct-graph-summary__details { margin-top: var(--lvct-sp-1); }
+        .lvct-graph-summary__details > summary { min-height: 28px; }
         .lvct-graph-text__nodes li { align-items: flex-start; }
         .lvct-graph-text__nodes span { flex-basis: 100%; }
     }
 </style>
 
 <div class="lvct-graph-view">
-    <div class="lvct-people__toolbar fn__flex">
+    <div class="lvct-people__toolbar lvct-people__control-surface lvct-graph-toolbar">
         <!-- B14.5 数据源模式：关系图（related 边）/ 文档引用图（内核原生图数据） -->
-        <div class="lvct-graph-mode" role="group" aria-label={text("graphModeLabel", "图谱数据源")}>
-            <button
-                class="b3-button b3-button--small"
-                class:b3-button--outline={graphMode === "relations"}
-                class:b3-button--text={graphMode !== "relations"}
-                aria-pressed={graphMode === "relations"}
-                onclick={() => void switchGraphMode("relations")}
-            >{text("graphModeRelations", "关系图")}</button>
-            <button
-                class="b3-button b3-button--small"
-                class:b3-button--outline={graphMode === "native"}
-                class:b3-button--text={graphMode !== "native"}
-                aria-pressed={graphMode === "native"}
-                onclick={() => void switchGraphMode("native")}
-            >{text("graphModeNative", "文档引用")}</button>
+        <div class="lvct-graph-toolbar__primary">
+            <div class="lvct-graph-mode" role="group" aria-label={text("graphModeLabel", "图谱数据源")}>
+                <button
+                    class="b3-button b3-button--small"
+                    class:b3-button--outline={graphMode === "relations"}
+                    class:b3-button--text={graphMode !== "relations"}
+                    aria-pressed={graphMode === "relations"}
+                    onclick={() => void switchGraphMode("relations")}
+                >{text("graphModeRelations", "关系图")}</button>
+                <button
+                    class="b3-button b3-button--small"
+                    class:b3-button--outline={graphMode === "native"}
+                    class:b3-button--text={graphMode !== "native"}
+                    aria-pressed={graphMode === "native"}
+                    onclick={() => void switchGraphMode("native")}
+                >{text("graphModeNative", "文档引用")}</button>
+            </div>
+            <input class="b3-text-field" type="search" placeholder={text("graphSearchPlaceholder", "搜索节点…")} aria-label={text("graphSearchNodes", "搜索关系图谱节点")} bind:value={searchText} />
+            {#if searchNeedle}<span class="ft__smaller ft__on-surface">{text("graphSnapshotHits", "筛选后 {n} 个节点（含保留中心）", { n: snapshot.counts.filteredNodes })}</span>{/if}
         </div>
-        <input class="b3-text-field fn__flex-1" type="search" placeholder={text("graphSearchPlaceholder", "搜索节点…")} aria-label={text("graphSearchNodes", "搜索关系图谱节点")} bind:value={searchText} />
-        {#if searchNeedle}<span class="ft__smaller ft__on-surface">{text("graphSnapshotHits", "筛选后 {n} 个节点（含保留中心）", { n: snapshot.counts.filteredNodes })}</span>{/if}
-        <div role="group" aria-label={text("graphPresentation", "图谱阅读方式")}>
-            <button class="b3-button b3-button--text" aria-pressed={presentation === "text"} onclick={() => (presentation = "text")}>{text("graphTextView", "文本视图")}</button>
-            <button class="b3-button b3-button--text" aria-pressed={presentation === "canvas"} onclick={() => (presentation = "canvas")}>{text("graphCanvasView", "画布视图")}</button>
+        <div class="lvct-graph-toolbar__actions">
+            <div role="group" aria-label={text("graphPresentation", "图谱阅读方式")}>
+                <button class="b3-button b3-button--text" aria-pressed={presentation === "text"} onclick={() => (presentation = "text")}>{text("graphTextView", "文本视图")}</button>
+                <button class="b3-button b3-button--text" aria-pressed={presentation === "canvas"} onclick={() => (presentation = "canvas")}>{text("graphCanvasView", "画布视图")}</button>
+            </div>
+            <button class="b3-button b3-button--outline" onclick={exportResultMarkdown} disabled={loading || nativeLoading}>{text("graphSnapshotExport", "导出当前快照")}</button>
         </div>
-        <button class="b3-button b3-button--outline" onclick={exportResultMarkdown} disabled={loading || nativeLoading}>{text("graphSnapshotExport", "导出当前快照")}</button>
-        {#if orgOverlay.nodes.length > 0 || orgNarrowId}
-            <!-- B14.8 按组织收窄：两模式共享（画布人物/登记白名单收窄到所选组织成员） -->
-            <select class="b3-select" bind:value={orgNarrowId} aria-label={text("graphOrgNarrowLabel", "按组织收窄")}>
-                <option value="">{text("graphOrgNarrowAll", "全部组织")}</option>
-                {#if orgNarrowId && !orgOverlay.nodes.some((org) => org.id === orgNarrowId)}<option value={orgNarrowId}>{text("graphOrgUnverified", "所选组织待核实")} · {orgNarrowId}</option>{/if}
-                {#each orgOverlay.nodes as org (org.id)}
-                    <option value={org.id}>{org.label}</option>
-                {/each}
-            </select>
-        {/if}
-        {#if graphMode === "native"}
-            <select class="b3-select" value={nativeScope} aria-label={text("graphNativeScopeLabel", "引用图范围")}
-                onchange={(event) => void switchNativeScope(event.currentTarget.value)}>
-                <option value="self">{text("graphNativeScopeSelf", "以本人为中心（一度引用）")}</option>
-                <option value="person">{text("graphNativeScopePerson", "以联系人为中心（一度引用）")}</option>
-                <option value="global">{text("graphNativeScopeGlobal", "全部登记文档")}</option>
-                <option value="org">{text("graphScopeOrg", "以组织为中心（一度引用）")}</option>
-            </select>
-            {#if nativeScope === "person"}
-                <!-- B03 可搜索选人器：中心人物（B14.8 中心保留） -->
-                <PersonPicker
-                    items={nativeCenterItems}
-                    value={nativeCenterDocId}
-                    placeholder={text("graphPickNone", "未选择")}
-                    emptyText={text("graphPickerEmpty", "当前图内没有匹配的人物")}
-                    ariaLabel={text("graphNativePickCenter", "中心人物")}
-                    onSelect={(id) => void pickNativeCenter(id)}
-                />
+        <details class="lvct-graph-advanced" bind:open={graphFiltersOpen}>
+            <summary>{text("graphFiltersSummary", "范围、分组与图例")}</summary>
+            <div class="lvct-graph-toolbar__filters">
+            <div class="lvct-graph-toolbar__filter-group lvct-graph-toolbar__filter-group--scope">
+                {#if orgOverlay.nodes.length > 0 || orgNarrowId}
+                <!-- B14.8 按组织收窄：两模式共享（画布人物/登记白名单收窄到所选组织成员） -->
+                <select class="b3-select" bind:value={orgNarrowId} aria-label={text("graphOrgNarrowLabel", "按组织收窄")}>
+                    <option value="">{text("graphOrgNarrowAll", "全部组织")}</option>
+                    {#if orgNarrowId && !orgOverlay.nodes.some((org) => org.id === orgNarrowId)}<option value={orgNarrowId}>{text("graphOrgUnverified", "所选组织待核实")} · {orgNarrowId}</option>{/if}
+                    {#each orgOverlay.nodes as org (org.id)}
+                        <option value={org.id}>{org.label}</option>
+                    {/each}
+                </select>
+                {/if}
+                {#if graphMode === "native"}
+                    <select class="b3-select" value={nativeScope} aria-label={text("graphNativeScopeLabel", "引用图范围")} onchange={(event) => void switchNativeScope(event.currentTarget.value)}>
+                        <option value="self">{text("graphNativeScopeSelf", "以本人为中心（一度引用）")}</option>
+                        <option value="person">{text("graphNativeScopePerson", "以联系人为中心（一度引用）")}</option>
+                        <option value="global">{text("graphNativeScopeGlobal", "全部登记文档")}</option>
+                        <option value="org">{text("graphScopeOrg", "以组织为中心（一度引用）")}</option>
+                    </select>
+                    {#if nativeScope === "person"}
+                        <!-- B03 可搜索选人器：中心人物（B14.8 中心保留） -->
+                        <PersonPicker
+                            items={nativeCenterItems}
+                            value={nativeCenterDocId}
+                            placeholder={text("graphPickNone", "未选择")}
+                            emptyText={text("graphPickerEmpty", "当前图内没有匹配的人物")}
+                            ariaLabel={text("graphNativePickCenter", "中心人物")}
+                            onSelect={(id) => void pickNativeCenter(id)}
+                        />
+                    {/if}
+                    <span class="ft__smaller ft__on-surface">{text("graphNativeEdgeNote", "边=文档间块引用（双向一度，含回链），非 related 关系")}</span>
+                {:else}
+                    <select class="b3-select" bind:value={relationScope} aria-label={text("graphRelationsScope", "关系图范围")}>
+                        <option value="global">{text("graphScopeGlobal", "全部登记文档")}</option>
+                        <option value="self">{text("graphScopeSelf", "以本人为中心")}</option>
+                        <option value="person">{text("graphScopePerson", "以人物为中心")}</option>
+                        <option value="org">{text("graphScopeOrganization", "以组织为中心")}</option>
+                    </select>
+                    {#if relationScope === "person"}<PersonPicker items={graphPickerItems} value={relationCenterDocId} ariaLabel={text("graphScopeCenter", "范围中心人物")} onSelect={(id) => (relationCenterDocId = id)} />{/if}
+                {/if}
+            </div>
+            {#if graphMode === "relations"}
+                <div class="lvct-graph-toolbar__filter-group lvct-graph-toolbar__filter-group--refine">
+                    <select class="b3-select" bind:value={groupFilter} aria-label={text("graphFilterByGroup", "按分组过滤")}>
+                        <option value="">{text("graphAllGroups", "全部分组")}</option>
+                        {#each groups as group (group)}
+                            <option value={group}>{group}</option>
+                        {/each}
+                    </select>
+                    <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={isolatedOnly} />{text("graphIsolatedOnly", "仅无关系人物（{n}）", { n: snapshot.counts.isolatedPeople })}</label>
+                    <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={showOrgs} />{text("graphShowOrgs", "显示组织（{n}）", { n: orgOverlay?.nodes.length ?? 0 })}</label>
+                </div>
             {/if}
-            <span class="ft__smaller ft__on-surface">{text("graphNativeEdgeNote", "边=文档间块引用（双向一度，含回链），非 related 关系")}</span>
-        {:else}
-            <select class="b3-select" bind:value={relationScope} aria-label={text("graphRelationsScope", "关系图范围")}>
-                <option value="global">{text("graphScopeGlobal", "全部登记文档")}</option>
-                <option value="self">{text("graphScopeSelf", "以本人为中心")}</option>
-                <option value="person">{text("graphScopePerson", "以人物为中心")}</option>
-                <option value="org">{text("graphScopeOrganization", "以组织为中心")}</option>
-            </select>
-            {#if relationScope === "person"}<PersonPicker items={graphPickerItems} value={relationCenterDocId} ariaLabel={text("graphScopeCenter", "范围中心人物")} onSelect={(id) => (relationCenterDocId = id)} />{/if}
-            <select class="b3-select" bind:value={groupFilter} aria-label={text("graphFilterByGroup", "按分组过滤")}>
-                <option value="">{text("graphAllGroups", "全部分组")}</option>
-                {#each groups as group (group)}
-                    <option value={group}>{group}</option>
-                {/each}
-            </select>
-            <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={isolatedOnly} />{text("graphIsolatedOnly", "仅无关系人物（{n}）", { n: snapshot.counts.isolatedPeople })}</label>
-            <label class="lvct-graph-isolated"><input type="checkbox" bind:checked={showOrgs} />{text("graphShowOrgs", "显示组织（{n}）", { n: orgOverlay?.nodes.length ?? 0 })}</label>
-        {/if}
-        <span class="ft__smaller ft__on-surface lvct-graph-legend">
-            {#each groupLegend as group (group.label)}
-                <span class={`lvct-graph-legend__item lvct-graph-legend__item--${group.className}`}><i></i>{group.label}</span>
-            {/each}
-        </span>
-        <span class="fn__flex-1"></span>
+            <div class="lvct-graph-toolbar__filter-group lvct-graph-toolbar__filter-group--legend">
+                <span class="ft__smaller ft__on-surface lvct-graph-legend">
+                    {#each groupLegend as group (group.label)}
+                        <span class={`lvct-graph-legend__item lvct-graph-legend__item--${group.className}`}><i></i>{group.label}</span>
+                    {/each}
+                </span>
+            </div>
+            </div>
+        </details>
     </div>
 
     {#if graphMode === "relations" && !loading && !errorText && snapshot.people.length > 0}
         <div class="lvct-graph-query">
+            <div class="lvct-graph-query__fields">
             <label>{text("graphCenterLabel", "关系中心")}
                 <!-- B03 可搜索选人器：输入即筛替换全量长列表 -->
                 <PersonPicker
@@ -761,7 +1034,9 @@
                     <option value="path">{text("graphModePath", "最短路径")}</option>
                 </select>
             {/if}
+            </div>
             {#if focusId}
+                <div class="lvct-graph-query__result">
                 {#if snapshot.result.status === "unknown" || snapshot.result.status === "center_missing"}
                     <span class="ft__smaller ft__on-surface">{text("graphQueryUnverified", "关系查询结果待核实")}</span>
                 {:else if pathMode}
@@ -771,6 +1046,7 @@
                 {/if}
                 <button class="b3-button b3-button--text" onclick={() => { focusId = ""; compareId = ""; }}>{text("graphClearSelection", "清除选择")}</button>
                 <button class="b3-button b3-button--outline" title={text("graphExportTitle", "导出查询结果说明（Markdown）")} onclick={exportResultMarkdown}>{text("graphExportButton", "导出结果说明")}</button>
+                </div>
             {/if}
         </div>
         {#if focusId}
@@ -799,14 +1075,30 @@
     {/if}
 
     <section class="lvct-graph-summary" aria-label={text("graphSnapshotSummary", "图查询范围与计数")} aria-busy={loading || nativeLoading}>
-        <h2 tabindex="-1" bind:this={resultHeading}>{text("graphSnapshotTitle", "当前图查询")}</h2>
-        <p role="status" aria-live="polite" aria-atomic="true">{loading || nativeLoading ? text("graphSnapshotLoading", "正在核实图查询…") : `${snapshot.state === "unknown" || snapshot.state === "center_missing" ? "范围尚未核实" : snapshot.state === "partial" ? "已显示核实部分" : "查询完成"} · 展示 ${snapshot.counts.displayedNodes} 节点 / ${snapshot.counts.displayedEdges} 边`}</p>
-        <p>{text("graphScopeLabel", "范围")}：{query.scope === "global" ? "全部登记文档" : query.scope === "self" ? "本人中心" : query.scope === "person" ? "人物中心" : "组织中心"} · {snapshot.center.label} · {snapshot.center.status === "verified" ? snapshot.center.id : snapshot.center.status === "none" ? "无中心" : "中心待核实"}</p>
-        <p>登记 {snapshot.counts.registered ?? "未知"} · 来源节点 {snapshot.counts.sourceNodes ?? "未知"} / 边 {snapshot.counts.sourceEdges ?? "未知"} · 范围内 {snapshot.counts.rangeNodes} · 筛选后 {snapshot.counts.filteredNodes} · 范围排除 {snapshot.counts.rangeExcluded ?? "未知"} · 筛选排除 {snapshot.counts.filterExcluded}</p>
-        <p>{graphMode === "relations" ? `${graphEdgeLabel("related")}；${graphEdgeLabel("member")}。只有 related 参与关系查询。` : `${graphEdgeLabel("ref")}（含回链）；不是整库图，未打开思源原生面板。`}</p>
-        {#if graphMode === "native" && (groupFilter || isolatedOnly)}<p>已保留关系图分组/无关系筛选；这些条件不应用于文档引用图。</p>{/if}
-        {#if snapshot.retainedByRange.length}<p>{text("graphRangeRetained", "范围外中心优先保留：{names}（不属于当前范围或组织成员集合，不新增关系事实）", { names: snapshot.retainedByRange.map(nodeName).join("、") })}</p>{/if}
-        {#if snapshot.retainedByFilter.length}<p>中心优先保留：{snapshot.retainedByFilter.map(nodeName).join("、")}（未满足全部筛选）</p>{/if}
+        <div class="lvct-graph-summary__head">
+            <h2 tabindex="-1" bind:this={resultHeading}>{text("graphSnapshotTitle", "当前图查询")}</h2>
+            <p
+                class="lvct-graph-summary__status lvct-graph-summary__status--{loading || nativeLoading ? "loading" : snapshot.state === "ready" || snapshot.state === "empty" ? "complete" : snapshot.state}"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+            >{snapshotStatusText}<span class="lvct-graph-summary__status-counts"> · 展示 {snapshot.counts.displayedNodes} 节点 / {snapshot.counts.displayedEdges} 边</span></p>
+        </div>
+        <dl class="lvct-graph-summary__stats" aria-label={text("graphSnapshotStats", "图谱统计")}>
+            <div><dt>{text("graphDisplayedNodes", "展示节点")}</dt><dd>{snapshot.counts.displayedNodes}</dd></div>
+            <div><dt>{text("graphDisplayedEdges", "展示边")}</dt><dd>{snapshot.counts.displayedEdges}</dd></div>
+            <div><dt>{text("graphRangeNodes", "范围内")}</dt><dd>{snapshot.counts.rangeNodes}</dd></div>
+            <div><dt>{text("graphFilteredNodes", "筛选后")}</dt><dd>{snapshot.counts.filteredNodes}</dd></div>
+        </dl>
+        <p>{text("graphScopeLabel", "范围")}：{query.scope === "global" ? "全部登记文档" : query.scope === "self" ? "本人中心" : query.scope === "person" ? "人物中心" : "组织中心"} · {snapshot.center.status === "none" ? "中心：无中心" : `${snapshot.center.label} · ${snapshot.center.status === "verified" ? snapshot.center.id : "中心待核实"}`}</p>
+        <details class="lvct-graph-summary__details" open={snapshot.state === "unknown" || snapshot.state === "center_missing"}>
+            <summary>{text("graphSummaryDetails", "来源与排除详情")}</summary>
+            <p>登记 {snapshot.counts.registered ?? "未知"} · 来源节点 {snapshot.counts.sourceNodes ?? "未知"} / 边 {snapshot.counts.sourceEdges ?? "未知"} · 范围内 {snapshot.counts.rangeNodes} · 筛选后 {snapshot.counts.filteredNodes} · 范围排除 {snapshot.counts.rangeExcluded ?? "未知"} · 筛选排除 {snapshot.counts.filterExcluded}</p>
+            <p>{graphMode === "relations" ? `${graphEdgeLabel("related")}；${graphEdgeLabel("member")}。只有 related 参与关系查询。` : `${graphEdgeLabel("ref")}（含回链）；不是整库图，未打开思源原生面板。`}</p>
+            {#if graphMode === "native" && (groupFilter || isolatedOnly)}<p>已保留关系图分组/无关系筛选；这些条件不应用于文档引用图。</p>{/if}
+            {#if snapshot.retainedByRange.length}<p>{text("graphRangeRetained", "范围外中心优先保留：{names}（不属于当前范围或组织成员集合，不新增关系事实）", { names: snapshot.retainedByRange.map(nodeName).join("、") })}</p>{/if}
+            {#if snapshot.retainedByFilter.length}<p>中心优先保留：{snapshot.retainedByFilter.map(nodeName).join("、")}（未满足全部筛选）</p>{/if}
+        </details>
         {#if snapshot.result.status !== "none"}<p role={snapshot.result.status === "unknown" || snapshot.result.status === "center_missing" ? "alert" : "status"}>{snapshot.result.reason}</p>{/if}
         {#if snapshot.diagnostics.length}<details class="lvct-graph-diagnostics" open={snapshot.state === "unknown" || snapshot.state === "center_missing"}>
             <summary>{text("graphDiagnostics", "待核实与诊断")}（{snapshot.diagnostics.length}）</summary>
@@ -847,15 +1139,15 @@
             <ul class="lvct-graph-text__nodes">
                 {#each snapshot.graph.nodes.slice(0, textLimit) as node (node.id)}
                     <li>
-                        <button class="b3-button b3-button--text" data-graph-id={node.id} onclick={() => openTextNode(node)} aria-label={`${node.kind === "org" ? "聚焦组织" : "打开人物"} ${node.label} ${node.id}`}>{node.label}</button>
-                        <span>{node.kind === "org" ? "组织" : "人物"} · 图内连接 {node.degree} · {node.id}</span>
+                        <button class="b3-button b3-button--text" data-graph-id={node.id} title={node.id} onclick={() => openTextNode(node)} aria-label={`${node.kind === "org" ? "聚焦组织" : "打开人物"} ${node.label} ${node.id}`}>{node.label}</button>
+                        <span>{node.kind === "org" ? "组织" : "人物"} · 图内连接 {node.degree}</span>
                         <button class="b3-button b3-button--outline" onclick={() => void locateNode(node.id)}>{text("graphLocateCanvas", "定位画布")}</button>
                     </li>
                 {/each}
             </ul>
             <h3>{text("graphTextEdges", "边及来源")}（{snapshot.graph.edges.length}）</h3>
-            <ul>{#each snapshot.graph.edges.slice(0, textLimit) as edge}<li>{nodeName(edge.source)}（{edge.source}） — {nodeName(edge.target)}（{edge.target}） · {graphEdgeLabel(edge.kind)}</li>{/each}</ul>
-            {#if snapshot.result.pathIds.length}<h3>{text("graphTextPath", "related 路径链")}</h3><ol>{#each snapshot.result.pathIds as id}<li>{nodeName(id)} · {id}</li>{/each}</ol>{/if}
+            <ul>{#each snapshot.graph.edges.slice(0, textLimit) as edge}<li title={`${edge.source} → ${edge.target}`}>{nodeName(edge.source)} — {nodeName(edge.target)} · {graphEdgeLabel(edge.kind)}</li>{/each}</ul>
+            {#if snapshot.result.pathIds.length}<h3>{text("graphTextPath", "related 路径链")}</h3><ol>{#each snapshot.result.pathIds as id}<li title={id}>{nodeName(id)}</li>{/each}</ol>{/if}
             <p role="status">文本已列出 {Math.min(textLimit, snapshot.graph.nodes.length)} / {snapshot.graph.nodes.length} 节点，{Math.min(textLimit, snapshot.graph.edges.length)} / {snapshot.graph.edges.length} 边；导出包含完整展示快照。</p>
             {#if textLimit < Math.max(snapshot.graph.nodes.length, snapshot.graph.edges.length)}<button class="b3-button b3-button--outline" onclick={() => (textLimit += 100)}>{text("graphTextMore", "继续列出节点与边")}</button>{/if}
         </section>
@@ -874,6 +1166,8 @@
                 <div
                     class="lvct-graph-view__hover-card"
                     role="dialog"
+                    aria-modal="false"
+                    aria-label={`组织 ${hoveredOrg.label} 的图谱信息`}
                     tabindex="-1"
                     style={`left:${hoverPosition.x}px;top:${hoverPosition.y}px`}
                     onmouseenter={() => clearHoverTimer && clearTimeout(clearHoverTimer)}
@@ -891,6 +1185,8 @@
                 <div
                     class="lvct-graph-view__hover-card"
                     role="dialog"
+                    aria-modal="false"
+                    aria-label={`人物 ${hoveredPerson.name} 的图谱信息`}
                     tabindex="-1"
                     style={`left:${hoverPosition.x}px;top:${hoverPosition.y}px`}
                     onmouseenter={() => clearHoverTimer && clearTimeout(clearHoverTimer)}

@@ -28,7 +28,8 @@ import {
 import type { AnchorScanCursor } from "../domain/init-plan";
 import { normalizeSettings, SETTINGS_STORAGE_KEY, SETTINGS_STORE_VERSION } from "../domain/model";
 import type { ContactsSettings } from "../domain/model";
-import { loadJson, saveJsonVerified } from "../data/storage";
+import { parseRepairSettings } from "../domain/settings-repair";
+import { loadJson, loadJsonStrict, saveJsonVerified } from "../data/storage";
 import { ensureSelfIdentity, SELF_PERSON_NAME } from "./self-identity";
 import type { Plugin } from "siyuan";
 
@@ -323,11 +324,6 @@ export async function scanAnchorCandidates(options: AnchorScanOptions = {}): Pro
         }
 
         for (const doc of docs) {
-            const previousAfterDocId = afterDocId;
-            const previousScannedDocuments = scannedDocuments;
-            const previousScannedInNotebook = scannedInNotebook;
-            scannedDocuments += 1;
-            scannedInNotebook += 1;
             const isHostDoc = doc.content === HOST_DOC_TITLE || doc.hpath === `/${HOST_DOC_TITLE}`;
             if (isHostDoc) {
                 let avBlocks;
@@ -340,7 +336,7 @@ export async function scanAnchorCandidates(options: AnchorScanOptions = {}): Pro
                         notebookName: notebook.name,
                         hostDocId: doc.id,
                         message: `无法读取宿主文档中的数据库块，扫描已停在此处：${errorMessage(error)}`,
-                    }, previousAfterDocId, previousScannedDocuments, previousScannedInNotebook);
+                    }, afterDocId, scannedDocuments, scannedInNotebook);
                 }
                 for (const block of avBlocks) {
                     let columns: AvColumn[];
@@ -354,7 +350,7 @@ export async function scanAnchorCandidates(options: AnchorScanOptions = {}): Pro
                             hostDocId: doc.id,
                             avId: block.avId,
                             message: `无法读取数据库字段，扫描已停在此处：${errorMessage(error)}`,
-                        }, previousAfterDocId, previousScannedDocuments, previousScannedInNotebook);
+                        }, afterDocId, scannedDocuments, scannedInNotebook);
                     }
                     candidates.push({
                         notebookId: notebook.id,
@@ -367,6 +363,11 @@ export async function scanAnchorCandidates(options: AnchorScanOptions = {}): Pro
                     });
                 }
             }
+            // 只有宿主文档及其字段全部核实后，才能推进游标和计数。
+            // 读取失败时由上面的 blocked() 保留当前文档，重试会从它重新核实，
+            // 避免把未知状态伪装成已扫描并漏掉候选。
+            scannedDocuments += 1;
+            scannedInNotebook += 1;
             afterDocId = doc.id;
             if (scannedDocuments - startingScannedDocuments >= maxDocuments) {
                 if (!isAnchorScanNotebookExhausted(docs.length, requestedPageSize)) {
@@ -410,6 +411,46 @@ export async function scanAnchorCandidates(options: AnchorScanOptions = {}): Pro
 
 export async function loadSettings(plugin: Plugin): Promise<ContactsSettings | null> {
     return normalizeSettings(await loadJson(plugin, SETTINGS_STORAGE_KEY));
+}
+
+/**
+ * 严格读取当前工作空间设置，并保留“缺失”和“读取失败”的区别。
+ *
+ * `loadSettings` 仍用于启动时的兼容降级；数据变化事件、恢复入口和任何
+ * 可能继续使用数据库锚点的路径应使用此状态读取，避免把 I/O 故障或坏
+ * 设置误当成首次初始化。思源在未创建文件时可能返回空字符串，因此空串
+ * 与 null/undefined 一样属于明确的 missing 状态。
+ */
+export type SettingsReadStatus = "missing" | "valid" | "invalid" | "read_failed";
+
+export interface SettingsReadState {
+    readonly status: SettingsReadStatus;
+    readonly settings: ContactsSettings | null;
+    /** 仅 invalid/read_failed 提供；调用方应显示固定类别并按需重试。 */
+    readonly error?: Error;
+}
+
+export async function readSettingsState(plugin: Plugin): Promise<SettingsReadState> {
+    let raw: unknown;
+    try {
+        raw = await loadJsonStrict(plugin, SETTINGS_STORAGE_KEY);
+    } catch (cause) {
+        const error = cause instanceof Error ? cause : new Error(String(cause));
+        return { status: "read_failed", settings: null, error };
+    }
+    if (raw === null || raw === undefined || raw === "") {
+        return { status: "missing", settings: null };
+    }
+    const settings = normalizeSettings(raw);
+    if (!settings) {
+        return { status: "invalid", settings: null };
+    }
+    try {
+        parseRepairSettings(settings);
+    } catch {
+        return { status: "invalid", settings: null };
+    }
+    return { status: "valid", settings };
 }
 
 export async function persistSettings(plugin: Plugin, settings: ContactsSettings): Promise<void> {

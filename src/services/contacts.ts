@@ -68,6 +68,10 @@ export interface ContactPage {
     hasMore: boolean;
 }
 
+export interface ContactPageOptions {
+    signal?: AbortSignal;
+}
+
 /**
  * 联系人列表的渐进读取入口：首屏和后续页都走已实证的 AV 分页参数。
  * 这里不复用全量名册缓存，避免首屏为了等待全部行而再次触发 pageSize=-1。
@@ -77,10 +81,16 @@ export async function listContactPage(
     page = 1,
     pageSize = PAGE_SIZE,
     query = "",
+    options: ContactPageOptions = {},
 ): Promise<ContactPage> {
     if (!Number.isSafeInteger(page) || page < 1) throw new Error("联系人分页页码必须为正整数");
     if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 500) throw new Error("联系人分页大小必须在 1-500 之间");
-    const rendered = await renderViewPage(settings.avId, settings.dbBlockId, { page, pageSize, query: query.trim() });
+    const rendered = await renderViewPage(settings.avId, settings.dbBlockId, {
+        page,
+        pageSize,
+        query: query.trim(),
+        signal: options.signal,
+    });
     const returnedRows = rendered.view.rows;
     const rowCount = rendered.view.rowCount;
     const responseLooksUnpaged = returnedRows.length > pageSize;

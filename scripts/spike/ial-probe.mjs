@@ -2,11 +2,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { randomUUID } from "node:crypto";
 import {spawn} from "node:child_process";
 
 const PORT = 6831;
 const BASE = `http://127.0.0.1:${PORT}`;
-const workspace = path.join(os.homedir(), "SiYuan-Renmai-E2E");
+const workspace = path.join(os.tmpdir(), `SiYuan-Lvct-IAL-${randomUUID()}`);
 let token = "";
 async function api(route, body = {}) {
     const headers = {"Content-Type": "application/json"};

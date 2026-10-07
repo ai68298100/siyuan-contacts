@@ -366,8 +366,10 @@
 
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={importing || parsing || exporting}>关闭</button>
-        <button class="b3-button b3-button--text" onclick={runImport} disabled={importing || parsing || exporting || !!errorText || !plans || selectedCount === 0 || report !== null}>
-            {importing ? "导入中…" : report ? "导入完成" : `导入为联系人（${selectedCount}）`}
-        </button>
+        {#if !report}
+            <button class="b3-button b3-button--text" onclick={runImport} disabled={importing || parsing || exporting || !!errorText || !plans || selectedCount === 0}>
+                {importing ? "导入中…" : `导入为联系人（${selectedCount}）`}
+            </button>
+        {/if}
     </div>
 </div>

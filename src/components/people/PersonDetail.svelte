@@ -50,6 +50,8 @@ import StatusNotice from "../StatusNotice.svelte";
         onRecord,
         onDeleteInteraction,
         onLoadInsights,
+        onLoadPersonNote,
+        onSavePersonNote,
         onOpenPersonDoc,
         onNavigate,
         onNavigateDocId,
@@ -84,6 +86,8 @@ import StatusNotice from "../StatusNotice.svelte";
         onDeleteInteraction?: (personDocId: string, eventId: string) => Promise<void>;
         /** 人物洞察（时间线+共同出席） */
         onLoadInsights: (docId: string) => Promise<import("../../services/insights").PersonInsights>;
+        onLoadPersonNote?: (docId: string) => Promise<string>;
+        onSavePersonNote?: (docId: string, note: string, expected?: string) => Promise<string>;
         /** B12：组织归属投影（可选：未接线时隐藏该区） */
         onLoadOrgMemberships?: (docId: string) => Promise<import("../../services/org").PersonOrgMembershipView[]>;
         /** B13.5 双向编辑（可选）：打开组织管理弹窗维护归属；未接线时隐藏按钮 */
@@ -155,6 +159,13 @@ import StatusNotice from "../StatusNotice.svelte";
     let busy: boolean = $state(false);
     let errorText: string = $state("");
     let noteText: string = $state("");
+    let personNote: string = $state("");
+    let personNoteDraft: string = $state("");
+    let personNoteLoading = $state(false);
+    let personNoteSaving = $state(false);
+    let personNoteError = $state("");
+    let personNoteErrorKind: "load" | "save" | "" = $state("");
+    let personNoteSaved = $state(false);
     const canLeave = createCloseScope();
     // B06：互动备注草稿给出明细与「保存并离开」（保存=记录这条互动）
     async function persistNote(): Promise<void> {
@@ -164,11 +175,56 @@ import StatusNotice from "../StatusNotice.svelte";
         noteText = "";
         await loadInsights();
     }
+
+    async function loadPersonNoteState(preserveSaved = false): Promise<void> {
+        if (!onLoadPersonNote) return;
+        personNoteLoading = true;
+        personNoteError = "";
+        personNoteErrorKind = "";
+        try {
+            const loaded = await onLoadPersonNote(current.docId);
+            personNote = loaded;
+            personNoteDraft = loaded;
+            if (!preserveSaved) personNoteSaved = false;
+        } catch (error) {
+            personNoteError = error instanceof Error ? error.message : String(error);
+            personNoteErrorKind = "load";
+        } finally {
+            personNoteLoading = false;
+        }
+    }
+
+    async function savePersonNoteState(rethrowOnFailure = false): Promise<void> {
+        if (!onSavePersonNote || personNoteSaving) return;
+        personNoteSaving = true;
+        personNoteError = "";
+        personNoteErrorKind = "";
+        personNoteSaved = false;
+        try {
+            const saved = await onSavePersonNote(current.docId, personNoteDraft, personNote);
+            personNote = saved;
+            personNoteDraft = saved;
+            personNoteSaved = true;
+            onChanged();
+        } catch (error) {
+            personNoteError = error instanceof Error ? error.message : String(error);
+            personNoteErrorKind = "save";
+            if (rethrowOnFailure) throw error;
+        } finally {
+            personNoteSaving = false;
+        }
+    }
     useCloseGuard({
-        busy: () => busy || deleting,
-        dirty: () => noteText.trim().length > 0,
-        changes: () => [text("guardNoteDraft", "互动备注尚未记录：{text}", { text: noteText.trim() })],
-        save: persistNote,
+        busy: () => busy || deleting || personNoteSaving || personNoteLoading,
+        dirty: () => noteText.trim().length > 0 || personNoteDraft !== personNote,
+        changes: () => [
+            ...(noteText.trim() ? [text("guardNoteDraft", "互动备注尚未记录：{text}", { text: noteText.trim() })] : []),
+            ...(personNoteDraft !== personNote ? ["人物独立备注尚未保存"] : []),
+        ],
+        save: async () => {
+            if (noteText.trim()) await persistNote();
+            if (personNoteDraft !== personNote) await savePersonNoteState(true);
+        },
     });
     async function navigate(person: ContactSummary | null) {
         if (person && await canLeave.requestClose()) onNavigate(person);
@@ -262,6 +318,7 @@ import StatusNotice from "../StatusNotice.svelte";
     }
 
     loadInsights();
+    loadPersonNoteState();
 
     // ---- 互动备注模板（F09） ----
     const templatesSupported = $derived(Boolean(onListTemplates && onSaveTemplates));
@@ -664,12 +721,13 @@ import StatusNotice from "../StatusNotice.svelte";
             refreshPending = true;
             orgRefreshPending = true;
         }
-        if (busy || followUpBusy) return;
+        if (busy || followUpBusy || personNoteSaving || personNoteDraft !== personNote) return;
         if (refreshPending) {
             refreshPending = false;
             void loadOthers();
             void loadInsights();
             void loadFollowUps();
+            void loadPersonNoteState(true);
         }
         if (orgRefreshPending && !addOrgBusy && !editingOrgMembershipId && !removingOrgMembershipId && !addOrgDocId) {
             orgRefreshPending = false;
@@ -836,6 +894,46 @@ import StatusNotice from "../StatusNotice.svelte";
         {#if birthday}<div><dt>下次生日</dt><dd>{birthday.date.toLocaleDateString("zh-CN")} · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}</dd></div>{/if}
     </dl>
 
+    {#if onLoadPersonNote && onSavePersonNote}
+        <section class="lvct-detail__section lvct-detail__person-note">
+            <div class="lvct-detail__section-head">
+                <div>
+                    <h4>个人备注</h4>
+                    <p class="ft__smaller ft__on-surface">记录特殊情况、偏好或下次见面要注意的事。写入该人物文档，不计入互动次数。</p>
+                </div>
+                {#if personNoteSaved}<span class="lvct-chip lvct-bucket--today">已保存</span>{/if}
+            </div>
+            {#if personNoteLoading}
+                <p class="ft__smaller ft__on-surface" role="status">正在读取个人备注…</p>
+            {:else}
+                <textarea
+                    class="b3-text-field lvct-detail__person-note-input"
+                    rows="4"
+                    maxlength="5000"
+                    aria-label="个人备注"
+                    placeholder="例如：偏好安静的环境，下次见面前提醒准备资料"
+                    bind:value={personNoteDraft}
+                    oninput={() => { personNoteSaved = false; personNoteError = ""; personNoteErrorKind = ""; }}
+                    disabled={personNoteSaving}
+                ></textarea>
+                <div class="lvct-detail__person-note-actions">
+                    <span class="ft__smaller ft__on-surface">{personNoteDraft.length} / 5000</span>
+                    <button type="button" class="b3-button b3-button--text" disabled={personNoteSaving || personNoteDraft === personNote} onclick={() => void savePersonNoteState()}>
+                        {personNoteSaving ? "保存中…" : "保存备注"}
+                    </button>
+                </div>
+            {/if}
+            {#if personNoteError}
+                <div class="lvct-form__error" role="alert">个人备注保存失败：{personNoteError}</div>
+                {#if personNoteErrorKind === "save"}
+                    <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving} onclick={() => void savePersonNoteState()}>重试保存</button>
+                {:else}
+                    <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving} onclick={() => void loadPersonNoteState()}>重新读取</button>
+                {/if}
+            {/if}
+        </section>
+    {/if}
+
     <div class="lvct-detail__briefing-row">
         <button class="b3-button b3-button--outline" onclick={openBriefingExport}>导出会面简报</button>
         <span class="ft__smaller ft__on-surface">Markdown：资料 · 最近互动 · 未完成跟进 · 重要日期 · 相关人物 · 共同出席</span>
@@ -891,7 +989,7 @@ import StatusNotice from "../StatusNotice.svelte";
         {:else}
             <ul class="lvct-detail__timeline">
                 {#each orgMemberships as membership (membership.id)}
-                    <li class="lvct-detail__timeline-row">
+                    <li class="lvct-detail__timeline-row lvct-detail__org-timeline-row">
                         <span class="lvct-detail__timeline-note">
                             {membership.orgName}
                             <span class="ft__smaller"> · {affiliationLabel(membership.affiliationKind)}</span>
@@ -904,13 +1002,17 @@ import StatusNotice from "../StatusNotice.svelte";
                         {#if membership.joinedOn || membership.leftOn}
                             <span class="ft__on-surface">{membership.joinedOn || "?"}{membership.leftOn ? ` – ${membership.leftOn}` : " –"}</span>
                         {/if}
-                        {#if orgRemoveSupported}
-                            <button type="button" class="b3-button b3-button--cancel" disabled={addOrgBusy}
-                                aria-label={text("orgMembershipRemoveLabel", "移除归属 {name}", { name: membership.orgName })}
-                                onclick={() => { removingOrgMembershipId = membership.id; removingOrgSnapshot = orgMembershipSnapshot(membership); }}>{text("orgMembershipRemove", "移除")}</button>
-                        {/if}
-                        {#if onUpdateOrgMembership}
-                            <button class="b3-button b3-button--text" disabled={addOrgBusy} onclick={() => startEditOrgMembership(membership)}>{text("orgMemberEdit", "编辑")}</button>
+                        {#if orgRemoveSupported || onUpdateOrgMembership}
+                            <span class="lvct-detail__org-actions">
+                                {#if orgRemoveSupported}
+                                    <button type="button" class="b3-button b3-button--cancel" disabled={addOrgBusy}
+                                        aria-label={text("orgMembershipRemoveLabel", "移除归属 {name}", { name: membership.orgName })}
+                                        onclick={() => { removingOrgMembershipId = membership.id; removingOrgSnapshot = orgMembershipSnapshot(membership); }}>{text("orgMembershipRemove", "移除")}</button>
+                                {/if}
+                                {#if onUpdateOrgMembership}
+                                    <button class="b3-button b3-button--text" disabled={addOrgBusy} onclick={() => startEditOrgMembership(membership)}>{text("orgMemberEdit", "编辑")}</button>
+                                {/if}
+                            </span>
                         {/if}
                         {#if editingOrgMembershipId === membership.id}
                             <div class="lvct-org-add">
@@ -1104,25 +1206,33 @@ import StatusNotice from "../StatusNotice.svelte";
         {/if}
     </section>
     {/if}
-    {#if onLoadExchanges && onCreateExchange && onChangeExchangeStatus}
-        <ExchangeLedger
-            personDocId={current.docId}
-            {i18n}
-            onLoad={onLoadExchanges}
-            onCreate={onCreateExchange}
-            onChangeStatus={onChangeExchangeStatus}
-            onChanged={onChanged}
-        />
-    {/if}
-    {#if onLoadAliases && onAddAlias && onRemoveAlias}
-        <PersonAliases
-            personDocId={current.docId}
-            {i18n}
-            onLoad={onLoadAliases}
-            onAdd={onAddAlias}
-            onRemove={onRemoveAlias}
-            {onChanged}
-        />
+    {#if (onLoadExchanges && onCreateExchange && onChangeExchangeStatus) || (onLoadAliases && onAddAlias && onRemoveAlias)}
+        <details class="lvct-detail__advanced">
+            <summary>
+                <span>更多资料与辅助记录</span>
+                <span class="ft__smaller ft__on-surface">往来账本 · 别名</span>
+            </summary>
+            {#if onLoadExchanges && onCreateExchange && onChangeExchangeStatus}
+                <ExchangeLedger
+                    personDocId={current.docId}
+                    {i18n}
+                    onLoad={onLoadExchanges}
+                    onCreate={onCreateExchange}
+                    onChangeStatus={onChangeExchangeStatus}
+                    onChanged={onChanged}
+                />
+            {/if}
+            {#if onLoadAliases && onAddAlias && onRemoveAlias}
+                <PersonAliases
+                    personDocId={current.docId}
+                    {i18n}
+                    onLoad={onLoadAliases}
+                    onAdd={onAddAlias}
+                    onRemove={onRemoveAlias}
+                    {onChanged}
+                />
+            {/if}
+        </details>
     {/if}
     {:else if activeTab === "activity"}
 

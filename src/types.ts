@@ -18,6 +18,7 @@ import type { ExportSummary } from "./services/export-center";
 import type { AnchorScanOptions, AnchorScanResult, InitProgressStep, WorkspaceSnapshot } from "./services/init";
 import type { CreatePersonExchangeInput, ExchangePatch, ExchangeRecord, ExchangeStatus } from "./services/exchanges";
 import type { PersonIdentityResolution as AliasResolution, PersonAlias } from "./services/person-aliases";
+import type { WorkspaceState } from "./domain/workspace-state";
 
 export type WorkbenchView = "home" | "people" | "graph" | "orgs" | "settings";
 
@@ -27,8 +28,10 @@ export type WorkbenchView = "home" | "people" | "graph" | "orgs" | "settings";
 export interface ContactsPluginFacade {
     readonly i18n?: Readonly<Record<string, string>>;
     readonly settings: ContactsSettings | null;
+    readonly workspaceState: WorkspaceState;
     readonly viewPreferences: ViewPreferences;
     readonly isMobile: boolean;
+    reloadWorkspaceState(): Promise<WorkspaceState>;
     loadPersonRelationshipLabels(personDocId: string): Promise<import("./services/people-profiles").RelationshipLabelEditorState>;
     savePersonRelationshipLabels(personDocId: string, selfDocId: string, labels: string[], expected: import("./domain/person-relationship-labels").PersonRelationshipLabels | null): Promise<import("./domain/person-relationship-labels").PersonRelationshipLabels>;
     /** 执行工作空间初始化并向导日志回调进度；幂等可续建，失败抛错 */
@@ -44,6 +47,9 @@ export interface ContactsPluginFacade {
     deleteInteraction(personDocId: string, eventId: string): Promise<void>;
     /** 人物洞察：互动时间线 + 共同出席统计 */
     loadPersonInsights(docId: string): Promise<PersonInsights>;
+    /** 人物独立备注：写入对应人物文档的 custom-lvct-person-note 标记块，不计入互动统计 */
+    loadPersonNote(personDocId: string): Promise<string>;
+    savePersonNote(personDocId: string, note: string, expected?: string): Promise<string>;
     loadRecentInteractions(): Promise<Record<string, { occurredAt: number; localDate: string }>>;
     /** 个人往来账本：金钱、物品、人情均按人物独立记录 */
     listPersonExchanges(personDocId: string): Promise<ExchangeRecord[]>;

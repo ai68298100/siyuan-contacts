@@ -130,6 +130,9 @@
         { id: "fu-shot-2", personDocId: people[1].docId, title: "同步课程评审结论", dueDate: localDateKey(4), status: "open", createdAt: Date.now() - 86400000, updatedAt: Date.now() - 86400000 },
     ];
     const cadenceOverrides = new Map();
+    const personNotes = new Map([
+        [people[0].docId, "下次见面前提醒带上课程资料。"],
+    ]);
     const templates = [
         { id: "tpl-meet", name: "见面", content: "和{{姓名}}见面，聊了……" },
         { id: "tpl-call", name: "电话", content: "和{{姓名}}通电话，主要聊了……" },
@@ -192,6 +195,12 @@
         }),
         loadRecentInteractions: async () => Object.fromEntries(people.map((person, index) => [person.docId, { occurredAt: Date.now() - index * 86400000, localDate: `2026-09-${String(27 - index).padStart(2, "0")}` }])),
         loadPersonInsights: async () => ({ timeline: [], coAttendance: [], totalEvents: 0 }),
+        loadPersonNote: async (docId) => personNotes.get(docId) ?? "",
+        savePersonNote: async (docId, note) => {
+            const value = String(note ?? "").replace(/\r\n?/g, "\n").trim();
+            if (value) personNotes.set(docId, value); else personNotes.delete(docId);
+            return value;
+        },
         recordInteraction: async () => {}, deleteInteraction: async () => {},
         listPersonFollowUps: async (docId) => followUps.filter((item) => item.personDocId === docId),
         createFollowUp: async (docId, title, dueDate) => {

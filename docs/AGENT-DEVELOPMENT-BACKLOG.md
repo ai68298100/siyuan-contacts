@@ -4,6 +4,8 @@
 >
 > **更新规则：** 一个任务只允许一个 Agent 认领；先更新本卡状态，再开始编码。完成代码不等于真实宿主完成，`host_pending` 必须保留到真内核、真机或多窗口证据齐全。版本号、`CHANGELOG`、README 徽章、`docs/PROGRESS.md` 是本轮保护文件，任何任务都不得修改。
 
+> **2026-10-06 产品评审入口：** 当前工作区功能已接近完整工作台，但本次复核发现桌面 UI `314/315`、390px UI `315/316`，评审开始时已有 22 个未提交代码/测试/文档文件。跨模块的产品判断、用户体验、品牌头像、README、GitHub 介绍和发布收口见 [PRODUCT-REVIEW-2026-10-06](PRODUCT-REVIEW-2026-10-06.md)。先处理 `PR-P0-01`（关系结果导出回归）和 `PR-P0-02`（统一验证快照），再推进真实宿主、Android 真机和多窗口；不得沿用旧文档中的 315/315 数字。
+
 ## 1. 给 Agent 的最短规则
 
 开始任务前按顺序读取：
@@ -765,6 +767,8 @@ evidence_paths / owner / last_updated / commit
 - **步骤：** 定义数据量和等待预算；测量首屏/筛选/切页/图谱；采用已验证分页/分段；显示进度和取消。
 - **已完成子范围（2026-10-04/05）：** v3.8.6 隔离内核实证 `renderAttributeView` 的 `page/pageSize/query` 与 `rowCount`；联系人卡片/表格首屏走 `listContactPage`，后续页逐页追加，行重复/空页矛盾会停止并报错，支持停止、继续和失败重试；组织标记按 `root_id` keyset 分页，`COUNT/MIN/MAX` 聚合阻断重复标记漏过游标，文档 ID 批量回读后再展示，组织卡片也支持后台续读；名册未完整时禁用“选择全部筛选”。新增合成 1k/10k 基线：联系人首屏/全量投影、客户端搜索/分组筛选、组织首屏/全量投影共 `12/12` 达到隔离预算。证据：`scripts/spike/av-pagination-spike.mjs`、`scripts/spike/av-pagination-results.json`、`scripts/spike/organization-pagination-spike.mjs`、`scripts/spike/organization-pagination-results.json`、`scripts/spike/scale-baseline-spike.mjs`、`scripts/spike/scale-baseline-results.json`、`docs/verification/SCALE-BASELINE-2026-10-05.md`、`src/api/organization.ts`、`src/services/contacts.ts`、`src/services/org.ts`、`src/components/people/PeopleView.svelte`、`src/components/org/OrgsView.svelte`。
 - **已完成子范围（2026-10-05 增补）：** 联系人搜索词经 `listContactPage` 下推到已验证的 AV `query` 参数；PeopleView 对搜索变化做 250ms 防抖，并取消旧分页代际，后续页复用同一搜索快照，避免 10k 名册先全量读完再客户端过滤。服务夹具验证 400 条名册中 `人物 4` 过滤后返回 12 条，权威 `rowCount` 与 `hasMore` 一致。证据：`src/services/contacts.ts`、`src/components/people/PeopleView.svelte`、`tests/contact-write-services.test.ts`。
+- **已完成子范围（2026-10-05 组织卡片筛选）：** 组织卡片在后台分页续读的同时支持按名称搜索和活跃/归档状态筛选；无匹配结果显示独立空态并可清除筛选，组织总量与当前显示数分开表达，筛选不会改变稳定 `docId` 或分页游标。纯函数规则与 UI 回归覆盖大小写/空白查询、状态筛选、清除恢复和分页首屏续读。证据：`src/domain/organization-scan.ts`、`src/components/org/OrgsView.svelte`、`tests/organization-scan.test.ts`、`scripts/e2e/ui/organization-page-regression.js`。
+- **已完成子范围（2026-10-05 取消闭环）：** 分页读取的 `AbortSignal` 从 `PeopleView` 贯穿 `listContactPage`、`renderViewPage` 与内核超时包装；搜索切换、停止续读、组件销毁会中止当前待读请求，取消不显示为失败，明确失败仍保留继续读取入口。已取消请求在发出内核调用前即拒绝，迟到响应不会落位。`tests/contact-write-services.test.ts` 新增取消零读取回归；定向 48/48、全量 512/512、`pnpm check` 0 errors / 0 warnings。
 - **剩余范围：** 10k 真实数据耗时/内存、AV 搜索在真实用户大库与复杂条件下的预算、分页 SQL 在真实用户大库的预算、移动端软键盘与长列表锚点预算尚未验证；不得将隔离夹具和小型参数 spike 当成规模验收。
 - **验收：** 1k/10k fixture 达到预算；错误、空、取消可区分；不会为性能省略来源或状态。
 
@@ -932,3 +936,29 @@ Agent 完成后在任务卡追加：
 ```
 
 根 Agent 在合并前再检查 `git diff --name-only`、架构测试、全量测试和保护文件，确认后按用户授权执行 `git push`。
+
+### AG-SYNC-001 — CardDAV / CalDAV 同步方向调研与契约拆解（candidate）
+
+- **状态 / 类型 / 优先级：** `candidate` / `research+contract+spike` / P2。
+- **用户结果：** 明确能否让手机通讯录显示人脉联系人、能否把跟进事项送到手机日历提醒，以及哪些资料永不自动同步。
+- **来源：** 2026-10-06 用户反馈：希望 CardDAV 同步手机通讯录，并进一步用 CalDAV 同步待办/日历提醒。
+- **依赖 / 阻塞：** 依赖当前数据恢复策略和真实宿主网络边界；未完成 RFC/服务器矩阵前禁止写在线同步主流程。
+- **步骤：** ①验证 RFC 6352/RFC 4791 发现、REPORT、ETag、sync-token、UID、VTODO/VEVENT/VALARM；②用隔离账号测试 Nextcloud/Radicale/iCloud 或记录排除项；③补 CardDAV/CalDAV 数据契约、凭据策略、字段白名单、删除/冲突语义；④产出可审阅 UI 流程与错误矩阵。
+- **CardDAV 字段边界：** MVP 仅姓名、电话、邮箱、网站、公历生日、公开备注、可选 CATEGORIES；不自动同步 docId/itemId、关系、组织历史、互动、跟进、本人标记、AI 内容、私密字段。头像/农历/自定义字段必须逐项提示。
+- **CalDAV 字段边界：** MVP 只评估 follow-up → VTODO；生日/纪念日 → VEVENT 另列候选。状态、到期日、UID、更新时间和提醒提前量可配置；不外发互动和人物全文。VALARM 不受所有服务器保证，UI 必须显示能力差异。
+- **安全与体验：** 凭据不得进普通 JSON、日志或迁移包；首版只手动/工作台打开触发，先预览再写，按条显示成功/冲突/失败/未知；远端删除进入确认回收，不删除思源人物文档；支持暂停、断开、清除凭据和脱敏诊断。
+- **测试/验收：** 新建、更新、删除、同名不同人、ETag 冲突、sync-token 断点、离线/401/403/TLS、重复点击、时区/DST、VTODO 不支持、手机锁屏通知；必须在真实服务器和设备验证，mock 只能证明域函数。
+- **禁止：** 不把 vCard 文件导入导出宣传成 CardDAV；不假设所有服务 URL/鉴权兼容；不做后台常驻和系统通知承诺；不因同步失败覆盖本地事实。
+- **负责人 / 更新时间：** Agent / 2026-10-06。
+
+#### AG-SYNC-002 — CardDAV 手动预览与单向同步（blocked）
+
+依赖 AG-SYNC-001 的服务器矩阵和契约；先做地址簿选择、字段开关、预览、逐条报告与回滚，再决定导出到服务器或从服务器导入。未实现前继续使用现有 vCard 文件导入导出。
+
+#### AG-SYNC-003 — CardDAV 双向冲突同步（blocked）
+
+依赖 AG-SYNC-002；增加远端 UID/ETag/sync-token、字段级冲突队列、远端删除确认、断点和手动重试。默认不按姓名合并、不自动删除人物文档。
+
+#### AG-SYNC-004 — CalDAV 跟进事项 → VTODO（blocked）
+
+依赖 AG-SYNC-001 和现有 follow-up 契约；先验证服务/手机对 VTODO、STATUS、DUE、VALARM 的支持，设置目标日历和提醒提前量，支持手动同步、冲突队列与脱敏诊断。生日 VEVENT、后台定时同步和系统通知保证另行评估。

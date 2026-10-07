@@ -119,6 +119,6 @@
 </section>
 
 <style>
-    .lvct-org-projection__target { border-top: 1px solid var(--b3-border-color); padding: 8px 0; overflow-wrap: anywhere; }
+    .lvct-org-projection__target { border-top: 1px solid var(--lvct-border-subtle); padding: var(--lvct-sp-2) 0; overflow-wrap: anywhere; }
     .lvct-org-projection__text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: inherit; margin: 4px 0; }
 </style>

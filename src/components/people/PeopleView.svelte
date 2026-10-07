@@ -28,6 +28,7 @@
     import { useCloseGuard } from "../close-guard";
     import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal, Bookmark, Pencil, Trash2 } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
+    import { isAbortError } from "../../shared/async";
 
     let {
         settings,
@@ -184,6 +185,51 @@
     let completionPeople: ContactSummary[] = $state([]);
     // B09-1：移动端「筛选与整理」底部弹层
     let mobileSheetOpen: boolean = $state(false);
+    let mobileSheetTrigger: HTMLButtonElement | null = $state(null);
+    let mobileSheetCloseButton: HTMLButtonElement | null = $state(null);
+    let mobileSheetPanel: HTMLDivElement | null = $state(null);
+    const mobileSheetTitleId = "lvct-people-mobile-tools-title";
+
+    function focusableMobileSheetElements(): HTMLElement[] {
+        if (!mobileSheetPanel) return [];
+        return [...mobileSheetPanel.querySelectorAll<HTMLElement>(
+            "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])",
+        )];
+    }
+
+    function openMobileSheet() {
+        mobileSheetOpen = true;
+        void tick().then(() => mobileSheetCloseButton?.focus());
+    }
+
+    function closeMobileSheet(restoreFocus = true) {
+        mobileSheetOpen = false;
+        if (restoreFocus) void tick().then(() => mobileSheetTrigger?.focus());
+    }
+
+    function handleMobileSheetKeydown(event: KeyboardEvent) {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeMobileSheet();
+            return;
+        }
+        if (event.key !== "Tab") return;
+        const items = focusableMobileSheetElements();
+        if (items.length === 0) {
+            event.preventDefault();
+            mobileSheetPanel?.focus();
+            return;
+        }
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    }
     let batchOpen: boolean = $state(false);
     let batchBusy: boolean = $state(false);
     let exportingSelected: boolean = $state(false);
@@ -198,7 +244,15 @@
     let batchResult = $state("");
     let batchResultElement: HTMLElement | undefined = $state();
     let peopleAlive = true;
-    onDestroy(() => { peopleAlive = false; refreshGeneration += 1; recentGeneration += 1; rosterLoadGeneration += 1; });
+    let rosterAbortController: AbortController | undefined;
+    onDestroy(() => {
+        peopleAlive = false;
+        refreshGeneration += 1;
+        recentGeneration += 1;
+        rosterLoadGeneration += 1;
+        rosterAbortController?.abort();
+        rosterAbortController = undefined;
+    });
     const guardedClose = useCloseGuard({
         busy: () => batchBusy || exportingSelected,
         dirty: () => batchOpen && (batchGroup !== "__keep" || !!batchTagsText.trim()),
@@ -432,15 +486,32 @@
         void extraFilter.neverContacted;
         visibleCount = PAGE_SIZE;
     });
-    const selectedPeople = $derived(people.filter((person) => selectedIds.includes(person.itemId)));
-    const hiddenSelectionCount = $derived(selectedPeople.filter((person) => !filtered.some((item) => item.itemId === person.itemId)).length);
-    const allVisibleSelected = $derived(visible.length > 0 && visible.every((person) => selectedIds.includes(person.itemId)));
+    /*
+     * 选择状态会同时驱动卡片、表格和批量工具栏。此前这些位置都用
+     * Array.includes/Array.some 做线性查找，联系人较多时一次筛选会产生
+     * O(n²) 的重复扫描。派生 Set 后每个查找均为 O(1)，且只在对应数组
+     * 变化时重建，保持 Svelte 的响应式更新语义。
+     */
+    const selectedIdSet = $derived(new Set(selectedIds));
+    const filteredIdSet = $derived(new Set(filtered.map((person) => person.itemId)));
+    const selectedPeople = $derived(people.filter((person) => selectedIdSet.has(person.itemId)));
+    const hiddenSelectionCount = $derived(selectedPeople.filter((person) => !filteredIdSet.has(person.itemId)).length);
+    const allVisibleSelected = $derived(visible.length > 0 && visible.every((person) => selectedIdSet.has(person.itemId)));
+    const someVisibleSelected = $derived(visible.some((person) => selectedIdSet.has(person.itemId)) && !allVisibleSelected);
+    let visibleSelectionToggle: HTMLInputElement | undefined = $state();
+    $effect(() => {
+        /* Native checkboxes expose partial selection through the DOM property only. */
+        if (visibleSelectionToggle) visibleSelectionToggle.indeterminate = someVisibleSelected;
+    });
 
     /* FUNC-01.7-a 请求代际：revision 连续变化时只有最新一次刷新落位，乱序响应丢弃 */
     let refreshGeneration = 0;
     /* B12：人物 → 单位显示串（来自 org-membership 成员索引；加载失败降级为空） */
     async function refresh() {
         const request = ++refreshGeneration;
+        rosterAbortController?.abort();
+        const abortController = new AbortController();
+        rosterAbortController = abortController;
         rosterLoadGeneration += 1;
         const pageGeneration = rosterLoadGeneration;
         loading = true;
@@ -452,7 +523,7 @@
         rosterHasMore = false;
         try {
             const query = searchText.trim();
-            const next = await listContactPage(settings, 1, PAGE_SIZE, query);
+            const next = await listContactPage(settings, 1, PAGE_SIZE, query, { signal: abortController.signal });
             if (request !== refreshGeneration) return; /* 旧响应不得覆盖新数据 */
             people = next.people;
             rosterPage = next.page;
@@ -461,22 +532,29 @@
             const available = new Set(people.map((person) => person.itemId));
             selectedIds = selectedIds.filter((itemId) => available.has(itemId));
             loading = false;
-            void loadRemainingRosterPages(request, pageGeneration, query);
+            void loadRemainingRosterPages(request, pageGeneration, query, abortController);
         } catch (error) {
             if (request !== refreshGeneration) return;
             /* 刷新失败保留旧列表内容，仅以横幅提示（可再次刷新重试） */
-            errorText = error instanceof Error ? error.message : String(error);
+            if (!isAbortError(error)) errorText = error instanceof Error ? error.message : String(error);
             loading = false;
+        } finally {
+            if (rosterAbortController === abortController && !rosterLoadingMore) rosterAbortController = undefined;
         }
     }
 
-    async function loadRemainingRosterPages(request: number, expectedGeneration = rosterLoadGeneration, query = searchText.trim()) {
+    async function loadRemainingRosterPages(
+        request: number,
+        expectedGeneration = rosterLoadGeneration,
+        query = searchText.trim(),
+        abortController = rosterAbortController ?? new AbortController(),
+    ) {
         if (!rosterHasMore || expectedGeneration !== rosterLoadGeneration) return;
         rosterLoadingMore = true;
         rosterLoadError = "";
         try {
             while (rosterHasMore && request === refreshGeneration && expectedGeneration === rosterLoadGeneration && peopleAlive) {
-                const next = await listContactPage(settings, rosterPage + 1, PAGE_SIZE, query);
+                const next = await listContactPage(settings, rosterPage + 1, PAGE_SIZE, query, { signal: abortController.signal });
                 if (request !== refreshGeneration || expectedGeneration !== rosterLoadGeneration || !peopleAlive) return;
                 if (next.people.length === 0 && next.hasMore) throw new Error("联系人分页返回空页但仍有后续数据，已停止继续读取");
                 const known = new Set(people.map((person) => person.itemId));
@@ -490,7 +568,7 @@
                 selectedIds = selectedIds.filter((itemId) => available.has(itemId));
             }
         } catch (error) {
-            if (request === refreshGeneration && expectedGeneration === rosterLoadGeneration) {
+            if (request === refreshGeneration && expectedGeneration === rosterLoadGeneration && !isAbortError(error)) {
                 rosterLoadError = error instanceof Error ? error.message : String(error);
             }
         } finally {
@@ -500,12 +578,16 @@
 
     function stopRosterLoading() {
         rosterLoadGeneration += 1;
+        rosterAbortController?.abort();
+        rosterAbortController = undefined;
         rosterLoadingMore = false;
     }
 
     function resumeRosterLoading() {
         if (!rosterHasMore || rosterLoadingMore) return;
-        void loadRemainingRosterPages(refreshGeneration, ++rosterLoadGeneration, searchText.trim());
+        const abortController = new AbortController();
+        rosterAbortController = abortController;
+        void loadRemainingRosterPages(refreshGeneration, ++rosterLoadGeneration, searchText.trim(), abortController);
     }
 
     $effect(() => {
@@ -686,16 +768,18 @@
     <!-- B09-1：工具栏控件 snippet 化——桌面原位渲染；移动端收进「筛选与整理」底部弹层（互斥渲染，popover 单挂载） -->
     {#snippet viewMenuControl()}
         <span id="lvct-people-viewsmenu" bind:this={viewsMenuWrap} style="position:relative; display:inline-flex">
-            <button class="b3-button b3-button--outline" aria-label={text("peopleViews", "视图")} aria-expanded={viewsOpen} onclick={() => (viewsOpen = !viewsOpen)}>
+            <button class="b3-button b3-button--outline" aria-label={text("peopleViews", "视图")} aria-expanded={viewsOpen} aria-controls="lvct-people-viewsmenu-panel" onclick={() => (viewsOpen = !viewsOpen)}>
                 <Bookmark size={16}/>{activeViewName ? `${text("peopleViews", "视图")}：${activeViewName}` : text("peopleViews", "视图")}
             </button>
             {#if viewsOpen}
-                <div class="lvct-people__moremenu lvct-people__viewsmenu" bind:this={viewsMenuPanel} role="menu" aria-label="保存的视图">
+                <!-- Saved views expose independent apply, rename and delete actions;
+                     keep native button semantics inside a labelled group. -->
+                <div id="lvct-people-viewsmenu-panel" class="lvct-people__moremenu lvct-people__viewsmenu" bind:this={viewsMenuPanel} role="group" aria-label="保存的视图">
                     {#if localViews.length === 0}
                         <p class="lvct-people__viewsmenu-empty">还没有保存的视图。设置筛选条件后，点下方「保存当前筛选为视图」。</p>
                     {/if}
                     {#each localViews as view (view.id)}
-                        <div class="lvct-people__viewsmenu-item" role="menuitem">
+                        <div class="lvct-people__viewsmenu-item">
                             <button type="button" class="lvct-people__viewsmenu-apply" title={`应用视图 ${view.name}`} onclick={() => applySavedView(view)}>{view.name}</button>
                             <span class="lvct-people__colmenu-actions">
                                 <button type="button" aria-label={`重命名视图 ${view.name}`} onclick={() => renameSavedView(view)}><Pencil size={14}/></button>
@@ -711,7 +795,7 @@
         </span>
     {/snippet}
     {#snippet filterControls()}
-        <select class="b3-select" bind:value={groupFilter} onchange={() => (visibleCount = PAGE_SIZE)}>
+        <select class="b3-select" bind:value={groupFilter} aria-label={text("peopleGroupLabel", "分组筛选")} onchange={() => (visibleCount = PAGE_SIZE)}>
             <option value="">{text("peopleAllGroups", "全部分组")}</option>
             {#each groups as group (group)}
                 <option value={group}>{group}</option>
@@ -727,12 +811,15 @@
             <button
                 class="b3-button b3-button--outline"
                 aria-expanded={moreOpen}
+                aria-controls="lvct-people-moremenu-panel"
                 onclick={() => (moreOpen = !moreOpen)}
             >
                 <SlidersHorizontal size={16}/>{text("peopleMoreFilters", "更多筛选")}{isExtraFilterActive(extraFilter) ? " ·" : ""}
             </button>
             {#if moreOpen}
-                <div class="lvct-people__moremenu" bind:this={moreMenuPanel} role="group" aria-label="组合筛选">
+                <div id="lvct-people-moremenu-panel" class="lvct-people__moremenu" bind:this={moreMenuPanel} role="group" aria-label="组合筛选">
+                    <p class="lvct-people__menu-title">高级筛选</p>
+                    <p class="lvct-people__menu-hint">只显示已核实资料；条件会保留在当前视图中。</p>
                     <label class="lvct-form__item">
                         <span>标签匹配（选中多个标签时）</span>
                         <select class="b3-select fn__block" bind:value={extraFilter.tagMatch}>
@@ -791,12 +878,22 @@
         <button class="b3-button b3-button--outline" onclick={() => (importing = true)}><FolderInput size={16}/>{text("peopleImportDocs", "导入已有文档")}</button>
         <button class="b3-button b3-button--outline" onclick={() => (vcarding = true)}><ContactRound size={16}/>{text("peopleVcard", "vCard 导入/导出")}</button>
     {/snippet}
-    <div class="lvct-people__toolbar fn__flex">
+    <div class="lvct-people__toolbar lvct-people__control-surface fn__flex">
+        {#if isMobile}
+            <input
+                class="b3-text-field lvct-people__mobile-search"
+                type="text"
+                aria-label={text("peopleSearchPlaceholder", "搜索联系人")}
+                placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
+                bind:value={searchText}
+            />
+        {/if}
         {#if !isMobile}
             {@render viewMenuControl()}
             <input
                 class="b3-text-field fn__flex-1"
                 type="text"
+                aria-label={text("peopleSearchPlaceholder", "搜索联系人")}
                 placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
                 bind:value={searchText}
             />
@@ -824,12 +921,15 @@
                     <button
                         class="b3-button b3-button--outline"
                         aria-expanded={colMenuOpen}
+                        aria-controls="lvct-people-colmenu-panel"
                         aria-label="表格列设置"
                         title="表格列设置"
                         onclick={() => (colMenuOpen = !colMenuOpen)}
                     ><Columns3 size={16}/>{text("peopleColumnSettings", "列设置")}</button>
                     {#if colMenuOpen}
-                        <div class="lvct-people__colmenu" bind:this={colMenuPanel} role="group" aria-label="表格列显隐与顺序">
+                        <div id="lvct-people-colmenu-panel" class="lvct-people__colmenu" bind:this={colMenuPanel} role="group" aria-label="表格列显隐与顺序">
+                            <p class="lvct-people__menu-title">显示字段</p>
+                            <p class="lvct-people__menu-hint">拖动顺序只影响当前表格。</p>
                             <label class="lvct-people__colmenu-row" title="姓名列固定显示">
                                 <input type="checkbox" checked disabled />
                                 <span>{text("peopleName", "姓名")}</span>
@@ -859,32 +959,61 @@
             {/if}
         </span>
         {#if !isMobile}
-            {@render actionControls()}
-        {/if}
-        {#if !isMobile}
-            <button class="b3-button b3-button--text" onclick={() => (adding = true)}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
+            <button class="b3-button lvct-people__create" onclick={() => (adding = true)}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
+            <span class="lvct-people__toolbar-actions">
+                {@render actionControls()}
+            </span>
         {:else}
-            <button class="b3-button b3-button--text" onclick={() => (adding = true)} aria-label={text("peopleCreate", "新建联系人")}><UserPlus size={16}/>{text("peopleCreate", "新建")}</button>
+            <button class="b3-button" onclick={() => (adding = true)} aria-label={text("peopleCreate", "新建联系人")}><UserPlus size={16}/>{text("peopleCreate", "新建")}</button>
             <button
                 class="b3-button b3-button--outline"
                 aria-label={text("peopleMobileTools", "筛选与整理")}
                 aria-expanded={mobileSheetOpen}
-                onclick={() => (mobileSheetOpen = true)}
+                aria-controls="lvct-people-mobile-tools-sheet"
+                bind:this={mobileSheetTrigger}
+                onclick={openMobileSheet}
             ><SlidersHorizontal size={16}/>{text("peopleMobileTools", "筛选与整理")}{isExtraFilterActive(extraFilter) || duplicatePairs.length > 0 ? " ·" : ""}</button>
         {/if}
     </div>
+    {#if !isMobile && localViews.length > 0}
+        <div class="lvct-people__savedviews" aria-label="已保存视图">
+            <span class="lvct-people__savedviews-label">已保存视图</span>
+            {#each localViews.slice(0, 3) as view (view.id)}
+                <button
+                    type="button"
+                    class="lvct-people__savedview"
+                    class:lvct-people__savedview--active={currentViewId === view.id}
+                    aria-pressed={currentViewId === view.id}
+                    title={`应用视图 ${view.name}`}
+                    onclick={() => applySavedView(view)}
+                >{view.name}</button>
+            {/each}
+            <button type="button" class="b3-button b3-button--text lvct-people__savedviews-manage" onclick={() => (viewsOpen = true)}>
+                管理视图
+            </button>
+        </div>
+    {/if}
     {#if isMobile && mobileSheetOpen}
-        <div class="lvct-dialog-mask" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) mobileSheetOpen = false; }}></div>
-        <div class="lvct-sheet" role="dialog" aria-label="筛选与整理">
+        <div class="lvct-dialog-mask" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) closeMobileSheet(); }}></div>
+        <div
+            id="lvct-people-mobile-tools-sheet"
+            class="lvct-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={mobileSheetTitleId}
+            tabindex="-1"
+            bind:this={mobileSheetPanel}
+            onkeydown={handleMobileSheetKeydown}
+        >
             <div class="lvct-sheet__bar">
-                <b>{text("peopleMobileTools", "筛选与整理")}</b>
-                <button type="button" class="b3-button b3-button--text" onclick={() => (mobileSheetOpen = false)}>{text("dashCollapse", "收起")}</button>
+                <b id={mobileSheetTitleId}>{text("peopleMobileTools", "筛选与整理")}</b>
+                <button type="button" class="b3-button b3-button--text" bind:this={mobileSheetCloseButton} onclick={() => closeMobileSheet()}>{text("dashCollapse", "收起")}</button>
             </div>
             <div class="lvct-sheet__body">
                 {@render viewMenuControl()}
                 {@render filterControls()}
                 {@render actionControls()}
-                <button class="b3-button b3-button--outline" onclick={() => { mobileSheetOpen = false; adding = true; }}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
+                <button class="b3-button b3-button--outline" onclick={() => { closeMobileSheet(false); adding = true; }}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
             </div>
         </div>
     {/if}
@@ -968,7 +1097,7 @@
         </div>
     {:else if filtered.length === 0}
         <div class="lvct-empty">
-            <div class="lvct-empty__icon" aria-hidden="true">♧</div>
+            <div class="lvct-empty__icon" aria-hidden="true"><ContactRound size={24} strokeWidth={1.8}/></div>
             <b>{people.length === 0 && rosterTotal === 0 ? "还没有联系人" : rosterHasMore ? "正在读取更多联系人" : "当前筛选下没有联系人"}</b>
             <p>{people.length === 0 && rosterTotal === 0 ? "从新建第一个联系人开始，也可以收编笔记或导入 vCard。" : rosterHasMore ? `已读取 ${people.length} / ${rosterTotal} 人，当前页没有命中，读取完成后再判断。` : "换个关键词、分组或标签试试。"}</p>
             {#if people.length === 0 && rosterTotal === 0}
@@ -1011,7 +1140,7 @@
             {#each visible as person (person.itemId)}
                 <PersonCard
                     {person}
-                    selected={selectedIds.includes(person.itemId)}
+                    selected={selectedIdSet.has(person.itemId)}
                     active={activePersonId === person.itemId}
                     recent={recent[person.docId]}
                     {onOpenPersonDoc}
@@ -1036,12 +1165,21 @@
                 · 已读取完整名册
             {/if}
         </div>
-        <div class="lvct-people__table-wrap">
+        {#if isMobile}<p class="lvct-people__scroll-hint">左右滑动查看更多字段</p>{/if}
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -- keyboard users need to focus the horizontal scroll region -->
+        <div class="lvct-people__table-wrap" role="region" tabindex="0" aria-label="联系人表格，可左右滚动查看更多字段">
             <table class="b3-table">
                 <thead>
                     <tr>
                         <th class="lvct-people__select-cell">
-                            <input type="checkbox" aria-label="选择当前列表联系人" checked={allVisibleSelected} onchange={(event) => toggleAllVisible((event.currentTarget as HTMLInputElement).checked)} />
+                            <input
+                                type="checkbox"
+                                bind:this={visibleSelectionToggle}
+                                aria-label={allVisibleSelected ? "取消选择当前列表联系人" : "选择当前列表联系人"}
+                                aria-checked={someVisibleSelected ? "mixed" : allVisibleSelected ? "true" : "false"}
+                                checked={allVisibleSelected}
+                                onchange={(event) => toggleAllVisible((event.currentTarget as HTMLInputElement).checked)}
+                            />
                         </th>
                         <th>{text("peopleName", "姓名")}</th>
                         {#each tableColumns as column (column)}<th>{columnLabel(column)}</th>{/each}
@@ -1060,7 +1198,7 @@
                                 <input
                                     type="checkbox"
                                     aria-label={`选择 ${person.name}`}
-                                    checked={selectedIds.includes(person.itemId)}
+                                    checked={selectedIdSet.has(person.itemId)}
                                     onclick={(event) => event.stopPropagation()}
                                     onchange={(event) => toggleSelected(person.itemId, (event.currentTarget as HTMLInputElement).checked)}
                                 />

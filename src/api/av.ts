@@ -12,6 +12,7 @@ import {
     assertKernelRecord,
     decodeStringMap,
     KernelProtocolError,
+    KernelResponseError,
     kernelPost,
     newNodeId,
     querySql,
@@ -21,6 +22,40 @@ import type { AvFieldType, FieldSpec } from "../domain/fields";
 
 /** 思源节点 ID 形状（DATA-CONTRACT §4：进 SQL 的值仅限严格校验过的 ID） */
 const ID_PATTERN = /^\d{14}-[0-9a-z]{7}$/;
+
+const ATTRIBUTE_VIEW_CARRIER_MISSING_PATTERN = /^resolve attribute view carrier:\s*block\s+\[(\d{14}-[0-9a-z]{7})\]\s+not found$/i;
+
+/**
+ * 属性视图的数据库块（carrier）已经不在内核块树中。
+ *
+ * 该错误与“属性视图定义不存在”不同：调用方必须保留原设置和原始
+ * 内核错误，交给上层进入锚点恢复流程，不能把它当成空库或静默重建。
+ */
+export class AttributeViewCarrierMissingError extends Error {
+    readonly avId: string;
+    readonly dbBlockId: string;
+    readonly originalError: unknown;
+
+    constructor(avId: string, dbBlockId: string, originalError: unknown) {
+        const detail = originalError instanceof Error ? originalError.message : String(originalError);
+        super(`属性视图载体数据库块不存在（avId=${avId}，dbBlockId=${dbBlockId}）：${detail}`, { cause: originalError });
+        this.name = "AttributeViewCarrierMissingError";
+        this.avId = avId;
+        this.dbBlockId = dbBlockId;
+        this.originalError = originalError;
+    }
+}
+
+/** 仅识别思源内核的精确 carrier 缺块错误，避免吞掉其它 not-found。 */
+export function isAttributeViewCarrierMissingError(error: unknown): error is KernelResponseError {
+    if (!(error instanceof KernelResponseError) || typeof error.responseMessage !== "string") return false;
+    return ATTRIBUTE_VIEW_CARRIER_MISSING_PATTERN.test(error.responseMessage.trim());
+}
+
+function rethrowAttributeViewCarrierMissing(error: unknown, avId: string, dbBlockId: string): never {
+    if (isAttributeViewCarrierMissingError(error)) throw new AttributeViewCarrierMissingError(avId, dbBlockId, error);
+    throw error;
+}
 
 /* ---------- 类型（渲染响应的最小切片） ---------- */
 
@@ -145,13 +180,17 @@ export async function renderView(
     query: string = "",
     createIfNotExist: boolean = false,
 ): Promise<AvRenderResult> {
-    return kernelPost("/api/av/renderAttributeView", {
-        id: avId,
-        blockID: dbBlockId,
-        query,
-        pageSize: -1,
-        createIfNotExist,
-    }, { decode: (data) => decodeAvRenderResult("/api/av/renderAttributeView", data) });
+    try {
+        return await kernelPost("/api/av/renderAttributeView", {
+            id: avId,
+            blockID: dbBlockId,
+            query,
+            pageSize: -1,
+            createIfNotExist,
+        }, { decode: (data) => decodeAvRenderResult("/api/av/renderAttributeView", data) });
+    } catch (error) {
+        rethrowAttributeViewCarrierMissing(error, avId, dbBlockId);
+    }
 }
 
 /** 文档内的数据库块（含从块 markdown 还原的 avID） */
@@ -185,6 +224,8 @@ export interface RenderPageOptions {
     query?: string;
     page?: number;
     pageSize?: number;
+    /** 读取分页可由视图切换/用户停止操作取消；取消只终止本次等待，不重试请求。 */
+    signal?: AbortSignal;
 }
 
 export async function renderViewPage(avId: string, dbBlockId: string, options: RenderPageOptions = {}): Promise<AvRenderResult> {
@@ -192,14 +233,21 @@ export async function renderViewPage(avId: string, dbBlockId: string, options: R
     const pageSize = options.pageSize ?? 200;
     if (!Number.isSafeInteger(page) || page < 1) throw new Error("属性视图页码必须为正整数");
     if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 500) throw new Error("属性视图分页大小必须在 1-500 之间");
-    return kernelPost("/api/av/renderAttributeView", {
-        id: avId,
-        blockID: dbBlockId,
-        query: options.query ?? "",
-        page,
-        pageSize,
-        createIfNotExist: false,
-    }, { decode: (data) => decodeAvRenderResult("/api/av/renderAttributeView", data) });
+    try {
+        return await kernelPost("/api/av/renderAttributeView", {
+            id: avId,
+            blockID: dbBlockId,
+            query: options.query ?? "",
+            page,
+            pageSize,
+            createIfNotExist: false,
+        }, {
+            signal: options.signal,
+            decode: (data) => decodeAvRenderResult("/api/av/renderAttributeView", data),
+        });
+    } catch (error) {
+        rethrowAttributeViewCarrierMissing(error, avId, dbBlockId);
+    }
 }
 
 /** v3.8.5 实测 keyIcon 必填（官方文档漏写），永远显式传空串 */

@@ -710,6 +710,18 @@ test("编辑器销毁后排队保存零写入，已发出电话不继续发送�
     assert.equal(current.saved(), 0);
 });
 
+test("联系人分页已取消时立即停止且不触发内核读取", async () => {
+    const { state, settings } = fixture();
+    const controller = new AbortController();
+    controller.abort();
+
+    await assert.rejects(
+        listContactPage(settings, 1, 200, "", { signal: controller.signal }),
+        (error: unknown) => error instanceof Error && error.name === "AsyncAbortError",
+    );
+    assert.equal(state.renders, 0);
+});
+
 test("联系人分页以权威总数停止，正好整页时不会多读或重复读取", async () => {
     const { state, settings } = fixture();
     bindPeopleProfileStorage(undefined);

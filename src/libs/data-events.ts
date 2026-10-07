@@ -1,6 +1,7 @@
 import { createLifecycleToken, type LifecycleToken } from "../domain/lifecycle.ts";
 import { acceptDataChange, isNavigationDocId, mergeDataChanges, normalizeDataChange } from "../domain/navigation.ts";
 import type { VersionedDataChange } from "../domain/navigation.ts";
+import type { WorkspaceState } from "../domain/workspace-state.ts";
 
 /**
  * FUNC-01.7：数据变化通知的窗口内事件通道。
@@ -12,8 +13,14 @@ import type { VersionedDataChange } from "../domain/navigation.ts";
  */
 
 export const LVCT_DATA_CHANGED = "lvct-data-changed";
+export const LVCT_WORKSPACE_STATE = "lvct-workspace-state";
 
 export type DataChangeDetail = VersionedDataChange;
+
+export function emitWorkspaceState(state: WorkspaceState): void {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent<WorkspaceState>(LVCT_WORKSPACE_STATE, { detail: state }));
+}
 
 let revision = 0;
 const sourceId = `window-${Math.random().toString(36).slice(2)}`;

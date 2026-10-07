@@ -6,6 +6,7 @@
     import { translateText } from "../../domain/translation";
     import type { ContactsPluginFacade } from "../../types";
     import type { OrganizationWithMembers } from "../../services/org";
+    import { filterOrganizations, type OrganizationStatusFilter } from "../../domain/organization-scan";
     import { onDestroy } from "svelte";
 
     let {
@@ -29,6 +30,8 @@
     let organizationHasMore = $state(false);
     let organizationLoadingMore = $state(false);
     let organizationLoadError = $state("");
+    let organizationQuery = $state("");
+    let organizationStatus = $state<OrganizationStatusFilter>("all");
     let refreshVersion = 0;
     let organizationLoadGeneration = 0;
     let alive = true;
@@ -107,11 +110,16 @@
         const archived = orgs.filter((org) => org.archived).sort((first, second) => first.name.localeCompare(second.name, "zh-Hans-CN") || first.docId.localeCompare(second.docId));
         return [...active, ...archived];
     });
+    const filteredOrgs = $derived.by(() => {
+        return filterOrganizations(sortedOrgs, { query: organizationQuery, status: organizationStatus });
+    });
+    const organizationFilterActive = $derived(organizationQuery.trim().length > 0 || organizationStatus !== "all");
     const activeCountOf = (org: OrganizationWithMembers) => org.memberships.filter((membership) => membership.status === "active").length;
+    const formerCountOf = (org: OrganizationWithMembers) => org.memberships.filter((membership) => membership.status === "former").length;
 </script>
 
 <div class="lvct-orgs-view">
-    <div class="lvct-people__toolbar fn__flex">
+    <div class="lvct-people__toolbar lvct-people__control-surface fn__flex">
         <span class="ft__smaller ft__on-surface">
             {#if loading || errorText}
                 <span role="status">{text("orgsCountUnknown", "组织数量待核实")}</span>
@@ -123,9 +131,28 @@
                 <span role="status">已读取 {orgs.length} 个组织，仍有后续组织待读取。</span>
             {:else}
                 {text("orgsViewSummary", "共 {total} 个组织，{archived} 个已归档。成员的加入与离开在组织管理中维护。", { total: orgs.length, archived: orgs.filter((org) => org.archived).length })}
+                {#if organizationFilterActive} · {text("orgsFilteredSummary", "当前显示 {shown} 个", { shown: filteredOrgs.length })}{/if}
             {/if}
         </span>
         <span class="fn__flex-1"></span>
+        <input
+            class="b3-text-field lvct-orgs-view__filter"
+            type="search"
+            aria-label={text("orgsSearchLabel", "搜索组织")}
+            placeholder={text("orgsSearchPlaceholder", "按组织名称搜索")}
+            bind:value={organizationQuery}
+            disabled={loading || !!errorText}
+        />
+        <select class="b3-select lvct-orgs-view__filter" aria-label={text("orgsStatusLabel", "组织状态")} bind:value={organizationStatus} disabled={loading || !!errorText}>
+            <option value="all">{text("orgsStatusAll", "全部状态")}</option>
+            <option value="active">{text("orgsStatusActive", "仅活跃")}</option>
+            <option value="archived">{text("orgsStatusArchived", "仅已归档")}</option>
+        </select>
+        {#if organizationFilterActive}
+            <button type="button" class="b3-button b3-button--text" onclick={() => { organizationQuery = ""; organizationStatus = "all"; }}>
+                {text("orgsClearFilters", "清除筛选")}
+            </button>
+        {/if}
         <button type="button" class="b3-button b3-button--text" onclick={() => onOpenOrgManager()}>
             <Plus size={15} />{text("orgsManage", "组织管理")}
         </button>
@@ -143,14 +170,19 @@
     {/if}
     {#if loading && orgs.length === 0 && !errorText}
         <ViewState loading title={text("orgsLoading", "正在加载组织…")} />
-    {:else if sortedOrgs.length === 0 && !errorText && !loading}
+    {:else if filteredOrgs.length === 0 && !errorText && !loading && organizationFilterActive}
+        <ViewState title={text("orgsNoMatchTitle", "没有匹配的组织")}
+            description={text("orgsNoMatchDesc", "试试其他名称或清除筛选条件。")}>
+            <button type="button" class="b3-button b3-button--outline" onclick={() => { organizationQuery = ""; organizationStatus = "all"; }}>{text("orgsClearFilters", "清除筛选")}</button>
+        </ViewState>
+    {:else if filteredOrgs.length === 0 && !errorText && !loading}
         <ViewState title={text("orgsEmptyTitle", "还没有组织")}
             description={text("orgsEmptyDesc", "在组织管理中新建组织（公司/学校等），再为联系人登记归属。")}>
             <button type="button" class="b3-button b3-button--outline" onclick={() => onOpenOrgManager()}>{text("orgsCreateFirst", "新建组织")}</button>
         </ViewState>
-    {:else if sortedOrgs.length > 0}
+    {:else if filteredOrgs.length > 0}
         <div class="lvct-orgs-view__grid">
-            {#each sortedOrgs as org (org.docId)}
+            {#each filteredOrgs as org (org.docId)}
                 <div class="lvct-orgs-view__card" data-org-doc-id={org.docId} class:lvct-orgs-view__card--archived={org.archived}>
                     <div class="lvct-orgs-view__card-head">
                         <span class="lvct-orgs-view__card-icon" aria-hidden="true"><Building2 size={16} /></span>
@@ -159,6 +191,7 @@
                     </div>
                     <div class="ft__smaller ft__on-surface">
                         {text("orgsCardMembers", "{n} 名在职/在读成员", { n: activeCountOf(org) })}
+                        {#if formerCountOf(org) > 0}<span class="lvct-orgs-view__card-history"> · {formerCountOf(org)} 条历史</span>{/if}
                     </div>
                     <div class="lvct-orgs-view__card-actions">
                         <button type="button" class="b3-button b3-button--text" disabled={loading || !!errorText} onclick={() => onOpenOrgManager(org.docId)}>

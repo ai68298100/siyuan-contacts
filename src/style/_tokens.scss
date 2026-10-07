@@ -75,6 +75,7 @@
     --lvct-group-work: #2b87db;
     --lvct-group-school: #d9822b;
     --lvct-group-other: #7a8194;
+    --lvct-group-org: #8e5ad8;
     --lvct-group-family-soft: color-mix(in srgb, var(--lvct-group-family) 14%, transparent);
     --lvct-group-friend-soft: color-mix(in srgb, var(--lvct-group-friend) 14%, transparent);
     --lvct-group-work-soft: color-mix(in srgb, var(--lvct-group-work) 14%, transparent);
@@ -85,7 +86,9 @@
     --lvct-font-family: var(--b3-font-family, inherit);
     --lvct-font-code: var(--b3-font-family-code, monospace);
     --lvct-fs-display: 20px;   /* 向导标题、页头问候 */
-    --lvct-fs-title: 16px;     /* 视图页头 */
+    --lvct-fs-title: 20px;     /* 视图页头；与原型 page title 层级对齐 */
+    --lvct-fs-page-title: clamp(21px, 2vw, 27px); /* 工作台/设置页标题，对齐原型 page title */
+    --lvct-fs-subtitle: 14px;  /* 页头副标题，对齐原型正文层级 */
     --lvct-fs-heading: 13.5px; /* 面板/弹窗标题 */
     --lvct-fs-body: 13px;      /* 正文、列表主行 */
     --lvct-fs-caption: 12px;   /* 次级信息、元数据 */
@@ -94,6 +97,7 @@
     --lvct-fw-medium: 600;
     --lvct-fw-regular: 400;
     --lvct-lh-body: 1.6;
+    --lvct-lh-tight: 1.35;
     --lvct-ls-micro: 0.04em;
 
     /* ---------- 8. 间距（4pt 网格） ---------- */
@@ -106,6 +110,7 @@
 
     /* ---------- 9. 圆角 ---------- */
     --lvct-r-sm: 7px;    /* 按钮、chip、小头像 */
+    --lvct-r-control: 4px; /* 原生语义控件的轻圆角 */
     --lvct-r-md: 10px;   /* 输入框、下拉、步骤条 */
     --lvct-r-lg: 13px;   /* 卡片、面板 */
     --lvct-r-xl: 15px;   /* 弹窗 */
@@ -130,9 +135,10 @@
     --lvct-z-dialog: 100;   /* 与既有 .lvct-dialog-mask 一致 */
     --lvct-z-popover: 200;  /* 下拉、悬停卡 */
     --lvct-z-toast: 300;
+    --lvct-overlay: color-mix(in srgb, var(--lvct-text-1) 35%, transparent);
 
     /* ---------- 13. 布局尺寸 ---------- */
-    --lvct-sidebar-w: 196px;         /* 桌面端左侧栏导航 */
+    --lvct-sidebar-w: 216px;         /* 桌面端左侧栏导航；与原型侧栏宽度对齐 */
     --lvct-peek-w: 400px;            /* 人物详情 Peek 侧栏 */
     --lvct-dialog-w: 560px;          /* 标准模态（与 libs/dialog.ts 一致） */
     --lvct-dialog-w-wide: 720px;     /* 宽版模态（导入/vCard） */
@@ -143,6 +149,14 @@
     --lvct-avatar-sm: 30px;
     --lvct-avatar-md: 40px;
     --lvct-avatar-lg: 56px;
+}
+
+@media (max-width: 640px) {
+    .lvct-tab-root,
+    .lvct-dialog-root,
+    .lvct-doc-strip {
+        --lvct-fs-page-title: clamp(21px, 5.6vw, 24px);
+    }
 }
 
 /* ============================================================================

@@ -6,6 +6,22 @@ export interface OrganizationSummary {
     archived: boolean;
 }
 
+export type OrganizationStatusFilter = "all" | "active" | "archived";
+
+/** 组织视图的纯筛选规则；不改变输入顺序或对象，便于分页结果增量展示。 */
+export function filterOrganizations<T extends Pick<OrganizationSummary, "name" | "archived">>(
+    organizations: readonly T[],
+    options: { query?: string; status?: OrganizationStatusFilter } = {},
+): T[] {
+    const query = options.query?.trim().toLocaleLowerCase() ?? "";
+    const status = options.status ?? "all";
+    return organizations.filter((organization) => {
+        if (status === "active" && organization.archived) return false;
+        if (status === "archived" && !organization.archived) return false;
+        return !query || organization.name.toLocaleLowerCase().includes(query);
+    });
+}
+
 export class OrganizationScanIncompleteError extends Error {
     readonly targetIds: readonly string[];
 

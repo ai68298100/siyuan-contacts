@@ -23,6 +23,10 @@ function waitForExit(child, timeoutMs) {
         const timer = setTimeout(() => finish(new Error("隔离浏览器进程未在清理时限内退出")), timeoutMs);
         child.once("exit", onExit);
         child.once("error", onError);
+        // A short-lived helper (notably Windows taskkill) may exit between the
+        // initial check above and listener registration. Re-check after the
+        // listeners are attached so that this race cannot turn into a timeout.
+        if (hasExited(child)) finish();
     });
 }
 

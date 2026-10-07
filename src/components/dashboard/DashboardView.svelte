@@ -529,9 +529,9 @@
                 <h3>{text("dashActionsTitle", "今日行动")}</h3>
                 <span class="ft__smaller ft__on-surface">{text("dashActionsSub", "生日 · 联系节奏 · 跟进事项")}</span>
                 <span style="flex:1"></span>
-                <button class="b3-button b3-button--outline" onclick={() => (reviewOpen = true)}>{text("dashReview", "交往回顾")}</button>
+                <button class="b3-button b3-button--outline lvct-dash__head-action" onclick={() => (reviewOpen = true)}>{text("dashReview", "交往回顾")}</button>
                 {#if overdueCount > 0}
-                    <button class="b3-button b3-button--outline" onclick={postponeOverdueToToday} disabled={alBusy}>
+                    <button class="b3-button b3-button--outline lvct-dash__head-action" onclick={postponeOverdueToToday} disabled={alBusy}>
                         {alBusy ? text("dashPostponing", "顺延中…") : text("dashPostponeOverdue", "把 {n} 条逾期跟进顺延到今天", { n: overdueCount })}
                     </button>
                 {/if}
@@ -549,8 +549,10 @@
                     <div class="lvct-dash__rowwrap">
                         <div class="lvct-dash__row">
                             <button class="lvct-dash__row-main" onclick={() => onOpenDetail(card.person)}>
-                                <b>{card.person.name}</b>
-                                <PersonProfileSummary profile={card.person.profile} compact />
+                                <span class="lvct-dash__row-primary">
+                                    <b>{card.person.name}</b>
+                                    <PersonProfileSummary profile={card.person.profile} compact />
+                                </span>
                                 <span class="lvct-dash__reasons">
                                     {#each card.reasons as reason (reason.kind + (reason.followUpId ?? ""))}
                                         <span class="lvct-chip lvct-action-chip lvct-action-chip--{reason.bucket}">{reason.label}</span>
@@ -670,7 +672,7 @@
                 {/if}
             </div>
 
-            <div class="lvct-home__card">
+            <div class="lvct-home__card lvct-dash__secondary-card lvct-dash__stale-card">
                 <h3>{text("dashStaleTitle", "久未联系")}</h3>
                 <StatusNotice message={quickError ? text("dashRecordFail", "记录失败：{msg}", { msg: quickError }) : ""} error />
                 <StatusNotice message={quickMessage} onDismiss={() => (quickMessage = "")} />
@@ -729,7 +731,7 @@
                 {/if}
             </div>
 
-            <div class="lvct-home__card">
+            <div class="lvct-home__card lvct-dash__secondary-card lvct-dash__followup-card">
                 <h3>{text("dashFollowupsTitle", "待办跟进")}</h3>
                 <StatusNotice message={fuError ? text("dashOpFailed", "操作失败：{msg}", { msg: fuError }) : ""} error />
                 <StatusNotice message={fuMessage} onDismiss={() => (fuMessage = "")} />

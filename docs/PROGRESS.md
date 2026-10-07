@@ -1,5 +1,12 @@
 # 进度（PROGRESS）
 
+## 2026-10-06 后续收口
+
+- 设置/原生 AV 载体恢复态已接入入口、工作台切换和运行中 `onDataChanged` 重读；失效锚点不会再继续发起旧渲染请求。
+- 恢复页支持全库候选扫描、字段证据展示、游标续扫、预览重绑；坏候选被记录并跳过，未知读取不会伪装成空库。
+- 写型冒烟共享隔离防线已覆盖联系人流程、服务回归和加载验证；默认临时 workspace、前缀清扫、非隔离拒绝、token 显式传入和 AI 默认关闭均已纳入测试。
+- 验证：`pnpm check`、`pnpm test`（526 项）、`pnpm build`、`pnpm check:release` 通过；CardDAV/CalDAV 仍处于协议与安全 spike 候选阶段。
+
 ## M0 — API 验证 spike ✅（2026-09-27）
 
 - 隔离内核（v3.8.5）上 9/9 验证通过：建库、建字段、relation 双向、文档绑行、itemID 映射、
@@ -2118,3 +2125,10 @@
   取代）。
 - **待作者真机确认**：禁用→重新启用插件（或重启思源）后顶栏按钮恢复；随后集市 PR
   （以 v0.4.1 提交）与 RELEASE.md 八条 + B14 两项核对。
+
+## P0 恢复策略：设置丢失与 AV 载体失效（2026-10-06）
+
+- [x] `readSettingsState` 区分 missing / valid / invalid / read_failed；关键读取失败不再按空库初始化。
+- [x] 启动前探测笔记本、宿主文档、AV carrier；精确 carrier 缺失错误分类，禁止静默 `createIfNotExist` 修复。
+- [x] 失效状态卸载工作台，提供重新核验、全库候选扫描、字段证据预览和显式重绑；恢复期间旧设置不进入普通业务入口。
+- [x] 补充回归测试与 DATA-CONTRACT / DECISIONS；真实 v3.8.7-alpha.4 删除载体、删除设置、移动文档、多候选演练列为 Host pending。

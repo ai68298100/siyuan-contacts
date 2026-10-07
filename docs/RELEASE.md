@@ -14,6 +14,9 @@ pnpm check:release # 发布包检查
 node scripts/spike/av-spike.mjs          # 9/9（可选回归）
 node scripts/e2e/load-check.mjs          # 隔离内核加载
 node scripts/e2e/contacts-flow.mjs       # 联系人流程 10/10
+
+写型内核脚本的隔离靶场、token、残留清扫和共享工作区拒跑规则见
+[E2E-SMOKE-RUNBOOK](E2E-SMOKE-RUNBOOK.md)。不要把写型脚本直接指向日常工作区。
 ```
 
 - [x] 版本号：plugin.json 与 package.json 一致为 0.3.0，已发布（2026-09-29；v0.2.1 此前已发布）

@@ -25,7 +25,7 @@
 {/if}
 
 <style>
-    .lvct-profile-summary { margin: 8px 0; color: var(--b3-theme-on-surface); font-size: 12px; }
+    .lvct-profile-summary { margin: var(--lvct-sp-2) 0; color: var(--lvct-text-2); font-size: var(--lvct-fs-caption); }
     .lvct-profile-summary div { display: flex; gap: 8px; margin: 4px 0; }
     .lvct-profile-summary dt { flex: 0 0 72px; }
     .lvct-profile-summary dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
