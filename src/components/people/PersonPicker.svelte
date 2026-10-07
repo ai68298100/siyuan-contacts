@@ -155,7 +155,11 @@
     </button>
     {#if open}
         <div class="lvct-picker__panel" bind:this={panel}>
-            {#if aliasError}<p role="status">别名读取失败，可按姓名或文档 ID 查找。</p>{/if}
+            {#if aliasError}
+                <p class="lvct-picker__status" role="status">
+                    {text("pickerAliasError", "别名读取失败，可按姓名或文档 ID 查找。")}
+                </p>
+            {/if}
             <input
                 class="b3-text-field lvct-picker__search"
                 type="text"

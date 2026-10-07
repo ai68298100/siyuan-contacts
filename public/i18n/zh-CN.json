@@ -833,6 +833,7 @@
   "routeReturnView": "返回{view}",
   "pickerSearch": "输入姓名、电话、微信筛选",
   "pickerAliasLoading": "正在读取别名…",
+  "pickerAliasError": "别名读取失败，可按姓名或文档 ID 查找。",
   "orgsCountUnknown": "组织数量待核实",
   "orgContextMissing": "原组织 {id} 不可达或未登记，未切换到其他组织。请重新读取核对。",
   "orgsSearchLabel": "搜索组织",

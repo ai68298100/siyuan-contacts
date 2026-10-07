@@ -833,6 +833,7 @@
   "routeReturnView": "Return to {view}",
   "pickerSearch": "Search by name, phone, or WeChat",
   "pickerAliasLoading": "Loading aliases…",
+  "pickerAliasError": "Could not read aliases. Search by name or document ID instead.",
   "orgsCountUnknown": "Organization count not yet verified",
   "orgContextMissing": "The original organization {id} is unreachable or not registered; no switch was made. Reload and verify.",
   "orgsSearchLabel": "Search organizations",
