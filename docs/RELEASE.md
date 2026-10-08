@@ -1,6 +1,6 @@
 # 发布清单（RELEASE）
 
-> v0.5.0 已于 2026-10-08 发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0)，annotated tag 指向 PR #13 merge commit `bd66a2ed0ef371fdbdddea9bf745182f247eaa67`。两机开发线先经 PR #12 合并；本轮未修改 bazaar，bazaar#2289 维持待审。真实思源宿主、Android 真机和真实多窗口尚未验证，隔离测试不能代替。
+> v0.5.0 已于 2026-10-08 发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0)，annotated tag 指向 PR #13 merge commit `bd66a2ed0ef371fdbdddea9bf745182f247eaa67`。两机开发线先经 PR #12 合并。集市 PR #2289 已于 2026-09-30 合并，且目录索引已包含本插件；v0.5.0 发布时未修改 bazaar，客户端可见性仍未实机验收。真实思源宿主、Android 真机和真实多窗口尚未验证，隔离测试不能代替。
 
 ## 1. 质量门禁（全部绿才发）
 
@@ -88,6 +88,6 @@ CI 在构建和上传产物前执行两套浏览器回归。内核脚本只在�
 
 ## 4. 发布后
 
-- [ ] GitHub Issues 打开；README 放反馈渠道
+- [x] GitHub Issues 已打开；README 已提供反馈渠道
 - [ ] 崩溃/丢数据类问题优先：存储纪律层已带写后回读，事件问题查 `data/storage/petal/siyuan-contacts/`
 - [ ] 后续候选（见 ROADMAP）：图谱深化、完整英文 UI、关系库、组织维度与官方 Agent；vCard、AI 抽取及人员桥已交付
