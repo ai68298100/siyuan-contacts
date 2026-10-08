@@ -1,8 +1,21 @@
 # 发布清单（RELEASE）
 
-> v0.4.1 已发布（2026-09-30：main 推送至 `bfe46f2`（CI run 36663898002 绿）、tag v0.4.1、Release https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.4.1 附 package.zip 380856B，sha256 `de3b9fc1781114ac431a5e1b4ec718d6d7a88038eb0315ae973eba3ad17ff0a2`）；v0.4.0 因动态 import 拆 chunk 在真实宿主加载失败，已被本版取代。当前开发分支仍未授权发布新版本或提交集市；Release 正文中的历史安装措辞不能替代当前宿主、真机和集市验收。本文后续发布步骤只适用于下一版本或集市上架，改版本、推送、标签、Release 与集市提交均需用户明确授权。
+> v0.5.1 已于 2026-10-08 发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.1)，annotated tag 指向 PR #18 merge commit `3a3de430f6b08f3cbfb20df55a113dc8beb1125c`。本版本包含自定义联系人分组、README 系列介绍恢复和已验证的常规依赖更新；未修改 bazaar。
 
-## 1. 质量门禁（全部绿才发）
+## v0.5.1 本轮状态
+
+- [x] `package.json` 与 `plugin.json` 版本均为 0.5.1
+- [x] `pnpm check`、`pnpm test`、桌面/移动 UI 回归、`pnpm build`、`pnpm check:release` 全部通过
+- [x] 通过开发分支 PR #18 普通合并进 `main`
+- [x] annotated tag `v0.5.1` 与 GitHub Release 已创建，`package.zip` 为 506502 bytes，SHA-256 为 `31792cc96764c4a10f92678cb06d5b579cdaa3e50da7fb96bc2148dafd6a5d6f`
+- [x] GitHub Actions build run `37761460576` 成功（含类型、538 项单测、桌面/移动 UI、构建和发布门禁）
+- [ ] 真实思源宿主、Android 真机、真实多窗口、原生图入口、任务管理器互读和集市可见性仍按下方手工清单单独验收
+
+## v0.5.0 历史发布记录
+
+v0.5.0 已于 2026-10-08 发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0)，annotated tag 指向 PR #13 merge commit `bd66a2ed0ef371fdbdddea9bf745182f247eaa67`。两机开发线先经 PR #12 合并。集市 PR #2289 已于 2026-09-30 合并，且目录索引已包含本插件；v0.5.0 发布时未修改 bazaar，客户端可见性仍未实机验收。真实思源宿主、Android 真机和真实多窗口尚未验证，隔离测试不能代替。
+
+## 1. 质量门禁（历史模板；v0.5.1 仍沿用）
 
 ```bash
 pnpm check    # tsc + svelte-check 0 错误
@@ -19,31 +32,34 @@ node scripts/e2e/contacts-flow.mjs       # 联系人流程 10/10
 [E2E-SMOKE-RUNBOOK](E2E-SMOKE-RUNBOOK.md)。不要把写型脚本直接指向日常工作区。
 ```
 
-- [x] 版本号：plugin.json 与 package.json 一致为 0.4.1，已发布（2026-09-30；v0.4.0 加载事故由本版取代）
-- [x] README.md / README.en-US.md 功能表与 v0.4.1 已交付功能一致；下一版发布前仍需按模板补充新增能力和限制
-- [x] `package.zip` SHA-256：`de3b9fc1781114ac431a5e1b4ec718d6d7a88038eb0315ae973eba3ad17ff0a2`
+- [x] 版本字段：`package.json` 与 `plugin.json` 均为 0.5.0；PR #13 普通合并、annotated tag 与 GitHub Release 已完成
+- [x] README.md / README.en-US.md 已更新 v0.5.0 范围；人物备注的数据边界与未验证环境已写入 Release 正文
+- [x] main CI run `37742167395` 成功；`package.zip` 509797 bytes，SHA-256 `0a5e6b04684021e8d369dac098db93df67710de331d7d5fd49999decd2beb089`；已与 Release 下载附件核对一致
+- [x] Annotated tag `v0.5.0` 指向 `bd66a2ed0ef371fdbdddea9bf745182f247eaa67`；[GitHub Release 已发布](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0)
 - [ ] icon.png/preview.png 终稿（当前为脚本生成的家庭视觉版，可请人重绘后替换，重跑 gen-icon 逻辑不变）
 
-下一版 Release 正文请复制 [RELEASE-NOTES-TEMPLATE](RELEASE-NOTES-TEMPLATE.md)，并同时附 `package.zip` 与 CI 生成的 `package.zip.sha256`。发布前需明确列出真实宿主、Android、多窗口和集市状态，不能用隔离浏览器结果代替。
+v0.5.0 已按 [RELEASE-NOTES-v0.5.0](RELEASE-NOTES-v0.5.0.md) 发布，附件来自 CI 且校验和匹配。后续版本 Release 继续按模板填写真实宿主、Android、多窗口和集市状态，不能用隔离浏览器结果代替。
 
 CI 在构建和上传产物前执行两套浏览器回归。内核脚本只在隔离工作区执行，先核实目标；故障模拟先保存原文件，不对用户笔记做破坏性测试。隔离 UI 使用内存替身，不证明真实 AV 写入或宿主行为。
 
 内核测试执行前验证回环端口空闲、工作区标记 JSON 与创建者匹配，拒绝未标记/损坏标记、项目或宽泛目录；数据与插件安装目标不得通过链接越出工作区。每次请求前后检查本次内核进程仍存活，请求超时为 5 秒。启动未确认或进程已退出时不向端口发送退出请求，仅处理本次子进程。端口预检不是持续保留端口，仍应避免同时启动其他服务抢占测试端口。
 
-### 最近自动验收记录（2026-09-27）
+### 自动验收记录（v0.5.0，2026-10-08；后续记录按日期追加）
 
 | 检查 | 环境与范围 | 结果 | 限制 |
 |---|---|---|---|
+| v0.5.0 自动门禁 | Node 24.15.0 / pnpm 12.5.1；本地及 GitHub main CI run 37742167395，含 check、537 单测、桌面/移动 UI、build、check:release | 全部通过；537/537、319/319、320/320 | 隔离移动视口不等于 Android 真机 |
+| v0.5.0 隔离内核 | 本机思源内核 3.8.6；API spike、插件 load、contacts-flow | 9/9、通过（加载 v0.5.0）、13/13 | 独立临时工作区，不证明真实用户库、多窗口或 Android 行为 |
 | 联系人内核流程 | 标记隔离工作区、本机安装内核；建库/建人/字段/关系/双链/笔记捕获 API 序列 | 10/10 通过 | 不执行完整前端，也不验证真实插件互动持久化 |
 | 插件加载 | 同一隔离工作区，安装当前 dist，信任/启用/下发 JS 与 CSS | 通过 | 不证明前端生命周期、视觉与触控正确 |
 | 脚本安全单测 | 临时目录与回环端口；标记、越界链接、占用端口、进程错误 | 4/4 通过 | 不替代真实多窗口互斥与用户设备验收 |
 | 浏览器跨上下文存储 | 两个独立同源 iframe、真实服务模块、Web Locks、共享隔离 localStorage | 通过 | 不证明思源窗口的 origin/存储分区相同或宿主文件读写一致 |
 
-以上不勾选下方手工验收；数据库 spike 本轮未重跑，历史结果不当作本轮结果。
+以上自动验收不代替下方手工验收；v0.5.0 已重跑 API spike，历史结果不会覆盖本轮记录。
 
 ## 2. 手工验收（真机）
 
-按用户 2026-09-27 最新要求，实际宿主、真机与实际多窗口验证全部跳过，不作为后续开发阻塞。下列项目保留为未验证风险，不勾选为通过；这不自动授权发布或取消对外说明验证范围的责任。
+本次 v0.5.0 未执行以下真实宿主、真机和多窗口验收，项目保持未勾选，并已在 Release 正文披露；不能将隔离测试表述为真实环境通过。
 
 - [ ] 桌面：向导初始化 → 新建/导入 → 卡片/表格/搜索 → 图谱 → 编辑资料 → 详情记互动 → 首页生日/久未联系
 - [ ] 人物文档：档案条出现、编辑后刷新；建立关系后"相关人物"双链区块出现在文档里
@@ -85,6 +101,6 @@ CI 在构建和上传产物前执行两套浏览器回归。内核脚本只在�
 
 ## 4. 发布后
 
-- [ ] GitHub Issues 打开；README 放反馈渠道
+- [x] GitHub Issues 已打开；README 已提供反馈渠道
 - [ ] 崩溃/丢数据类问题优先：存储纪律层已带写后回读，事件问题查 `data/storage/petal/siyuan-contacts/`
 - [ ] 后续候选（见 ROADMAP）：图谱深化、完整英文 UI、关系库、组织维度与官方 Agent；vCard、AI 抽取及人员桥已交付

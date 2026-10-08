@@ -1,6 +1,6 @@
 <script lang="ts">
     /** 存量文档收编：选笔记本 → 勾选"人名"文档 → 批量绑定为联系人 */
-    import { listImportNotebooks, PRESET_GROUPS } from "../../services/contacts";
+    import { listImportNotebooks } from "../../services/contacts";
     import { scanImportCandidates } from "../../services/import-scan";
     import type { ImportScanSnapshot } from "../../services/import-scan";
     import { runDocumentImportQueue } from "../../services/import";
@@ -8,6 +8,7 @@
     import type { ContactsSettings } from "../../domain/model";
     import { onDestroy } from "svelte";
     import ViewState from "../ViewState.svelte";
+    import GroupField from "./GroupField.svelte";
     import { importAnchor, normalizeImportTags, snapshotImportQueue } from "../../domain/import";
     import type { DocumentImportQueue } from "../../domain/import";
     import { useCloseGuard } from "../close-guard";
@@ -34,6 +35,7 @@
     let keyword: string = $state("");
     let folderPrefix: string = $state("");
     let importGroup: string = $state("");
+    let groupValid = $state(true);
     let importTagsText: string = $state("");
     let candidates: ImportCandidate[] = $state([]);
     let selectionPool = $state<Record<string, ImportCandidate & { notebookId: string }>>({});
@@ -138,6 +140,7 @@
 
     async function runImport() {
         if (importing || loading || errorText || importedCount !== null || selectedIds.length === 0) return;
+        if (!groupValid) return;
         try {
             queue = snapshotImportQueue(importAnchor(settings), notebookId,
                 selectedIds.map((docId) => selectionPool[docId]),
@@ -284,13 +287,7 @@
             {/each}
         </div>
         <div class="lvct-form__grid lvct-import__options">
-            <label class="lvct-form__item">
-                <span>{text("importGroupLabel", "收编后分组（可选）")}</span>
-                <select class="b3-select fn__block" bind:value={importGroup} disabled={importing}>
-                    <option value="">{text("importNoGroup", "不设置分组")}</option>
-                    {#each PRESET_GROUPS as group (group)}<option value={group}>{group}</option>{/each}
-                </select>
-            </label>
+            <GroupField {i18n} value={importGroup} onValueChange={(value) => (importGroup = value)} onValidityChange={(valid) => (groupValid = valid)} label={text("importGroupLabel", "收编后分组（可选）")} ungroupedLabel={text("importNoGroup", "不设置分组")} disabled={importing} />
             <label class="lvct-form__item">
                 <span>{text("importTagsLabel", "收编后标签（可选）")}</span>
                 <input class="b3-text-field fn__block" type="text" bind:value={importTagsText} placeholder={text("importTagsPlaceholder", "客户 重点")} disabled={importing} />
@@ -303,7 +300,7 @@
             <button class="b3-button b3-button--text" onclick={onClose}>{text("importDone", "完成")}</button>
         {:else}
             <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={importing}>{text("importCancel", "取消")}</button>
-            <button class="b3-button b3-button--text" onclick={runImport} disabled={importing || loading || !!errorText || selectedIds.length === 0}>
+            <button class="b3-button b3-button--text" onclick={runImport} disabled={importing || loading || !!errorText || !groupValid || selectedIds.length === 0}>
                 {importing ? text("importAdopting", "收编中…") : text("importAdoptAs", "收编为联系人（{n}）", { n: selectedIds.length })}
             </button>
         {/if}

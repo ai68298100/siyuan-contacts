@@ -1,6 +1,6 @@
 <script lang="ts">
     /** 新建联系人弹窗 */
-    import { ContactCreationError, ContactNameAmbiguityError, createContact, PRESET_GROUPS } from "../../services/contacts";
+    import { ContactCreationError, ContactNameAmbiguityError, createContact } from "../../services/contacts";
     import type { ContactCreationPreview, ContactCreationRequest } from "../../services/contacts";
     import { emptyDraft } from "../../domain/person";
     import type { ContactDraft, ContactSummary } from "../../domain/person";
@@ -8,6 +8,7 @@
     import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
     import QuickFillDialog from "./QuickFillDialog.svelte";
+    import GroupField from "./GroupField.svelte";
     import { ClipboardPaste } from "@lucide/svelte";
 
     let {
@@ -35,6 +36,7 @@
     // svelte-ignore state_referenced_locally
     let tagsText: string = $state(initial ? initial.tags.join(" ") : "");
     let running: boolean = $state(false);
+    let groupValid = $state(true);
     let errorText: string = $state("");
     let saved = $state(false);
     let creationPreview = $state<ContactCreationPreview | null>(null);
@@ -64,6 +66,7 @@
     }
     // B06：新建草稿给出明细 + 「保存并离开」（persist 抛错则留在原地）
     async function persist(): Promise<void> {
+        if (!groupValid) throw new Error(text("groupCustomEmpty", "请输入分组名称。"));
         const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
         running = true;
         try {
@@ -170,15 +173,7 @@
             <span>{text("formLunar", "农历")}</span>
             <input class="b3-switch" type="checkbox" bind:checked={draft.isLunar} />
         </label>
-        <label class="lvct-form__item">
-            <span>{text("formGroup", "分组")}</span>
-            <select class="b3-select fn__block" bind:value={draft.group}>
-                <option value="">{text("formUngrouped", "未分组")}</option>
-                {#each PRESET_GROUPS as group (group)}
-                    <option value={group}>{group}</option>
-                {/each}
-            </select>
-        </label>
+        <GroupField {i18n} value={draft.group} onValueChange={(value) => (draft.group = value)} onValidityChange={(valid) => (groupValid = valid)} label={text("formGroup", "分组")} ungroupedLabel={text("formUngrouped", "未分组")} disabled={running || !!creationRequest} />
         <label class="lvct-form__item">
             <span>{text("formTagsLabel", "标签（空格/逗号分隔）")}</span>
             <input class="b3-text-field fn__block" type="text" bind:value={tagsText} placeholder={text("formTagsPlaceholder", "球友 重点")} />
@@ -217,7 +212,7 @@
 
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={running}>{text("formCancel", "取消")}</button>
-        <button class="b3-button b3-button--text" onclick={submit} disabled={running || draft.name.trim().length === 0 || !!currentPreview && !creationRequest && !creationChoice}>
+        <button class="b3-button b3-button--text" onclick={submit} disabled={running || !groupValid || draft.name.trim().length === 0 || !!currentPreview && !creationRequest && !creationChoice}>
             {running ? text("formCreating", "创建中…") : creationRequest ? text("contactContinueCreation", "核实并继续原请求") : text("formCreate", "创建联系人")}
         </button>
     </div>
