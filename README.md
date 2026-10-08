@@ -1,19 +1,17 @@
 <div align="center">
 
-# 小驴人脉
+# 小驴人脉 (Lv Contacts)
 
 [![CI](https://github.com/ai68298100/siyuan-contacts/actions/workflows/ci.yml/badge.svg)](https://github.com/ai68298100/siyuan-contacts/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-contacts)](https://github.com/ai68298100/siyuan-contacts/releases/latest)
+[![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-contacts)](https://github.com/ai68298100/siyuan-contacts/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![SiYuan](https://img.shields.io/badge/思源笔记-%3E%3D%203.8.5-blue)
+![思源笔记](https://img.shields.io/badge/思源笔记-%3E%3D%203.8.5-blue)
 
-**把联系人、关系、组织和互动放进思源知识库。** 每个人是一篇普通思源文档，结构化资料由与文档关联的原生数据库管理。
+**在思源笔记里管理人脉与人际关系：人物是文档，资料由思源原生数据库承载。**
 
-**当前稳定版 v0.5.0** · [下载与更新](https://github.com/ai68298100/siyuan-contacts/releases/latest) · [更新日志](docs/CHANGELOG.md) · [反馈问题](https://github.com/ai68298100/siyuan-contacts/issues)
+**最新稳定版：v0.5.0** · [下载与安装](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0) · [提交 Issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 [English](README.en-US.md) | 简体中文
-
-思源集市目录已收录本插件；集市客户端内的可见性尚未验收。若暂时搜不到，可按下方说明手动安装。
 
 <img src="preview.png" alt="小驴人脉预览" width="640" />
 
@@ -21,63 +19,68 @@
 
 ---
 
+小驴人脉把联系人、关系和共同经历放进思源工作空间。每个人对应一篇普通思源文档，结构化资料保存在与文档关联的思源数据库中，可继续使用思源的搜索、双链和同步。
+
 ## 功能
 
-- **联系人档案**：卡片与表格名册、搜索筛选与保存视图、从已有笔记批量收编、粘贴识别、vCard 导入导出；支持别名、关系称谓、独立备注、资料档案条和会面简报。
-- **关系与组织**：联系人双向关联、关系图与文档引用图；组织支持多段任职历史、成员管理与共同背景查看。
-- **互动记录**：从会议或聚会笔记捕获参与者和共同交集；按人物查看互动时间线，并用往来账本记录金钱、物品或人情的应收应付事项。
-- **提醒与跟进**：公历和农历生日、联系节奏、跟进计划与今日行动清单；跟进事项可同步为人物文档中的思源原生任务块。
-- **回顾与检查**：互动回顾报表、资料体检、待处理事项和可跳转的修复入口。
-- **备份与扩展**：导出互动备份或插件数据迁移包；其他插件可通过 `window.LvContacts` 搜索、创建联系人和记录交集，详见[人员服务桥](docs/BRIDGE.md)。
-- **可选 AI 辅助**：仅在你主动触发分析时，才把相关笔记内容发送到你配置的思源 AI 端点；插件不含遥测。
+| 能力 | 说明 |
+|---|---|
+| 联系人名册 | 卡片与表格视图、搜索、分组与组合筛选、保存视图、资料补录、批量收编已有笔记、疑似重复提示 |
+| 通讯录与快速录入 | 导入 vCard 2.1/3.0/4.0 文件，导出 vCard 3.0；粘贴名片或聊天文字识别资料，也可从编辑器选区或整篇笔记识别 |
+| 人物资料 | 本人档案、人物别名、「与我的关系」称谓、人物文档档案条、可写回人物文档的独立备注 |
+| 关系与组织 | 双向人物关系、关系图与文档引用图；组织及多段成员历史、共同背景和关系查询 |
+| 互动与捕获 | 从会议笔记捕获参与者和共同经历；互动时间线、备注模板、往来账本、交往回顾报表和会面简报 |
+| 提醒与跟进 | 公历/农历生日、联系节奏、久未联系提醒；跟进事项可同步为人物文档中的思源原生任务块 |
+| 资料检查与插件桥接 | 只读资料体检并跳转处理；通过 window.LvContacts 为其他插件提供选人、建人和记录共同经历的能力 |
+| 移动布局 | 响应式工作台与全屏弹窗，移动视口有隔离回归覆盖 |
 
 ## 安装
 
-需要思源笔记 **3.8.5 或更新版本**。可在思源集市中搜索「小驴人脉」；若客户端尚未显示，使用 GitHub Release 手动安装：
+当前通过 GitHub Release 手动安装，尚未上架思源集市。
 
-1. 下载最新 [Release 中的 `package.zip`](https://github.com/ai68298100/siyuan-contacts/releases/latest)。
-2. 将压缩包内容解压到思源工作空间的 `data/plugins/siyuan-contacts/`，确认 `plugin.json` 直接位于该目录根部。
-3. 重启思源，在「设置 → 集市 → 已安装」中启用「小驴人脉」。手动安装的插件不会出现在集市下载列表中。
+1. 从 [v0.5.0 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0) 下载 package.zip。
+2. 将压缩包内容解压到思源工作空间的 data/plugins/siyuan-contacts/，确认 plugin.json 位于该目录根部。
+3. 重启思源，在「设置 → 集市 → 已安装」中启用「小驴人脉」。
+
+要求：思源笔记 **3.8.5 或更高版本**。
+
+## 数据与隐私
+
+联系人文档、人物独立备注和数据库属于思源工作区内容。插件不发送遥测；AI 识别只在用户主动操作时调用思源配置的 AI 服务，相关笔记内容会发送给该服务。
+
+互动、跟进、节奏、提醒暂缓、收编索引、模板、往来账本、别名、本人身份、组织成员和关系称谓等插件自管数据保存在思源的插件数据目录。卸载或删除插件数据前，请先在「设置 → 导出中心」导出插件数据迁移包；插件数据目录被删除时，这些数据可能丢失。
+
+迁移包是带差异预览的 JSON 值快照，不是工作区备份或字节级备份。它包含上述 11 类插件数据，但不包含人物/组织文档、联系人数据库、数据库锚点、界面偏好和未完成操作断点；人物独立备注保存在人物文档中，不会作为迁移包的单独条目导出。跨工作区迁移时，先通过思源迁移人物和组织文档及数据库，再在插件中重绑数据库，最后导入迁移包；插件不会按姓名猜测文档对应关系。
+
+## 已知限制
+
+- 移动视口回归和隔离内核测试不等于真实宿主验收；真实用户工作区、Android 真机、软键盘/安全区和真实多窗口尚未验收。
+- 思源原生图入口、任务管理器互读及集市可见性尚未验收；当前请按上方步骤手动安装。
+- 插件界面英文翻译尚未完整，部分内容可能显示为中文。
+- 当前不支持 CardDAV 通讯录或 CalDAV 日历在线同步；通讯录交换通过 vCard 文件完成。
+
+各项验证范围见 [v0.5.0 发布说明](docs/RELEASE-NOTES-v0.5.0.md)。
 
 ## 快速开始
 
-1. 点击思源顶栏的人脉图标，按向导初始化联系人笔记本和数据库。
-2. 在联系人页新建人物，或批量收编已有文档、导入 `.vcf`、粘贴名片文字识别。
-3. 在人物详情中添加关系、组织归属、互动记录和个人备注；备注会写入该人物文档。
-4. 在会议笔记中链接联系人，再通过右键菜单捕获参与者和共同交集。
-5. 到首页查看生日、久未联系和跟进事项；需要迁移插件数据时，从设置页导出迁移包。
-
-## 数据与迁移
-
-联系人文档和结构化资料保存在思源工作空间；卸载插件不会删除这些人物文档。每个人的独立备注也保存在对应人物文档中。
-
-互动、跟进、提醒状态、模板等插件自管数据保存在插件数据目录中，卸载或删除该目录时可能一并丢失。卸载前请先从设置页导出插件数据迁移包。迁移包提供数据值级导出与恢复预览，**不是整个思源工作区备份或文件字节副本**；它不包含联系人文档、原生数据库及其绑定锚点、界面偏好，也不单独导出人物备注。跨工作区迁移时，还需通过思源自己的迁移流程带走联系人文档与数据库。
-
-## 当前边界
-
-- 真实用户工作区、Android 真机、真实多窗口并发、思源原生图入口和任务管理器互读仍待单独验收；隔离浏览器与移动视口测试不能替代这些验收。
-- 英文界面尚未完整本地化。
-- 当前支持 vCard 文件导入导出，不支持 CardDAV 通讯录或 CalDAV 日历在线同步。
-- 集市 PR 已合并且目录索引包含本插件；客户端是否已展示仍待实际核对。
+1. 点击思源顶栏的人脉图标，按向导建立联系人笔记本和数据库。
+2. 在联系人页新建人物、收编已有笔记、导入 .vcf，或粘贴文字识别资料。
+3. 在人物详情中维护关系、组织归属、独立备注和往来记录。
+4. 在会议笔记中右键选择「人脉：捕获本文人员」，记录参与者与共同经历。
+5. 在首页查看生日、联系提醒和待跟进事项；卸载前先导出插件数据迁移包。
 
 ## 开发
 
-需要 Node.js 24+、pnpm 12.x 和思源 3.8.5+。安装依赖后，先启动思源并运行 `pnpm make-link` 配置开发热重载，再运行 `pnpm dev`。
+需要 Node.js 24 或更高版本、pnpm 12.x。安装依赖后启动思源，首次调试先运行 pnpm make-link 配置热重载链接，再运行 pnpm dev。
 
-```bash
-pnpm install
-pnpm check          # TypeScript 与 Svelte 检查
-pnpm test           # 单元测试与架构守门
-pnpm test:ui        # 桌面隔离 UI 回归
-pnpm test:ui:mobile # 移动视口隔离 UI 回归，不是真机验收
-pnpm build          # 构建 dist/ 与 package.zip
-pnpm check:release  # 发布包门禁
-```
+常用检查：pnpm check、pnpm test、pnpm test:ui、pnpm test:ui:mobile、pnpm build、pnpm check:release。移动视口测试不代表真机验收。
 
-开始改动前请阅读[开发协议](AGENTS.md)、[交接指南](docs/HANDOFF.md)和[数据契约](docs/DATA-CONTRACT.md)。更多文档见[路线图](docs/ROADMAP.md)、[设计决策](docs/DECISIONS.md)与[更新日志](docs/CHANGELOG.md)。
+开发约定见 [AGENTS.md](AGENTS.md) 和 [开发交接](docs/HANDOFF.md)，存储边界见 [数据契约](docs/DATA-CONTRACT.md)，变更记录见 [CHANGELOG](docs/CHANGELOG.md)。
 
 ## 反馈与许可
 
-请通过 [GitHub Issues](https://github.com/ai68298100/siyuan-contacts/issues) 提交问题或建议，并附思源版本、插件版本、复现步骤和脱敏日志。
+问题与建议请提交 [GitHub Issues](https://github.com/ai68298100/siyuan-contacts/issues)，附思源和插件版本、复现步骤及脱敏日志。
 
-本项目使用 [MIT License](LICENSE)。
+交流 QQ 群：**871707735**
+
+[MIT License](LICENSE)

@@ -3,13 +3,13 @@
 # Lv Contacts (小驴人脉)
 
 [![CI](https://github.com/ai68298100/siyuan-contacts/actions/workflows/ci.yml/badge.svg)](https://github.com/ai68298100/siyuan-contacts/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-contacts)](https://github.com/ai68298100/siyuan-contacts/releases/latest)
+[![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-contacts)](https://github.com/ai68298100/siyuan-contacts/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![SiYuan](https://img.shields.io/badge/SiYuan-%3E%3D%203.8.5-blue)
 
-**Keep your contacts, relationships, organizations, and interactions in your SiYuan knowledge base.** Each person is a regular SiYuan document; the contact roster and structured profile fields are managed through SiYuan's native database.
+**Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.0** · [Download](https://github.com/ai68298100/siyuan-contacts/releases/latest) · [Changelog](docs/CHANGELOG.md) · [Report an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.0** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -19,63 +19,68 @@ English | [简体中文](README.md)
 
 ---
 
+Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
+
 ## Features
 
-- **Contact profiles** — card and table rosters, search and filters with saved views, batch adoption of existing notes, paste recognition, vCard import/export, aliases, relationship labels, per-person notes, profile strips, and meeting briefings.
-- **Relationships and organizations** — two-way contact links, relationship and document-reference graphs, organization membership with multiple tenures, member management, and shared-background views.
-- **Interaction records** — capture attendees and shared occasions from meeting or party notes; browse a per-person timeline; track money, items, or favors as receivables and payables in the exchange ledger.
-- **Reminders and follow-ups** — solar and lunar birthdays, contact cadence, follow-up plans, and a daily action list. Follow-ups can sync with native SiYuan task blocks in person documents.
-- **Review and data health** — interaction reports, read-only profile checks, actionable findings, and links to the relevant records.
-- **Backup and integration** — export interaction backups or a plugin-data migration bundle. Other plugins can search/create contacts and record shared occasions through `window.LvContacts`; see the [People Service Bridge](docs/BRIDGE.md).
-- **Optional AI assistance** — note content is sent to your configured SiYuan AI endpoint only when you explicitly start an analysis. The plugin has no telemetry.
+| Area | What it does |
+|---|---|
+| Contact roster | Card and table views, search, groups, combined filters, saved views, profile completion, batch adoption of existing notes and suspected-duplicate hints |
+| Contact import and entry | Import vCard 2.1/3.0/4.0 files and export vCard 3.0; recognize pasted business-card or chat text, selected editor text or a whole note |
+| Person profiles | Self profile, aliases, relationship labels relative to you, a profile strip in person documents and a free-form note written back to each person document |
+| Relationships and organizations | Two-way person relations, relationship and document-reference graphs, organizations, membership history, common background and graph queries |
+| Interactions | Capture attendees from meeting notes; interaction timeline, reusable note templates, exchange ledger, review reports and meeting briefings |
+| Reminders and follow-ups | Solar and lunar birthdays, contact cadence and inactivity reminders; follow-ups can sync with native SiYuan task blocks in person documents |
+| Health and integrations | Read-only data health checks with jump-to actions; window.LvContacts lets other plugins search/create people and record shared experiences |
+| Mobile layouts | Responsive workspace and fullscreen dialogs, covered by isolated mobile-viewport regression tests |
 
 ## Install
 
-Requires **SiYuan 3.8.5 or later**. Search for “小驴人脉” in the SiYuan Bazaar. If it is not yet visible in your client, install the latest GitHub Release manually:
+Manual installation from GitHub Releases is currently supported; the plugin is not listed in the SiYuan Marketplace.
 
-1. Download [`package.zip` from the latest Release](https://github.com/ai68298100/siyuan-contacts/releases/latest).
-2. Extract its contents into `data/plugins/siyuan-contacts/` in your SiYuan workspace. `plugin.json` must be directly inside that directory.
-3. Restart SiYuan and enable **Lv Contacts** under **Settings → Bazaar → Installed**. A manual install will not appear in the Bazaar download list.
+1. Download package.zip from the [v0.5.0 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0).
+2. Extract its contents into data/plugins/siyuan-contacts/ in your SiYuan workspace. plugin.json must be at that directory root.
+3. Restart SiYuan and enable **Lv Contacts** under **Settings → Marketplace → Installed**.
+
+Requires **SiYuan 3.8.5 or later**.
+
+## Data and privacy
+
+Person documents, per-person notes and the contact database are SiYuan workspace content. The plugin sends no telemetry. AI recognition runs only after an explicit user action and sends the relevant note content to the AI service configured in SiYuan.
+
+Plugin-managed data includes interactions, follow-ups, cadence and reminder state, adoption dates, templates, exchanges, aliases, self identity, organization memberships and relationship labels. It is stored in SiYuan's plugin data directory and may be lost when that data is deleted. Export the plugin data migration bundle from **Settings → Export Center** before uninstalling or deleting plugin data.
+
+The migration bundle is a JSON value snapshot with a preview and merge flow, not a workspace or byte-for-byte backup. It covers those 11 plugin-data modules, but excludes person and organization documents, the contact database, database anchors, UI preferences and unfinished operation checkpoints. A per-person note lives in its person document and is not exported as a separate bundle entry. To move to another workspace, migrate the SiYuan documents and database first, rebind the database in the plugin, then import the bundle. The plugin does not guess document identity by matching names.
+
+## Known limitations
+
+- Isolated viewport and kernel tests do not establish acceptance in a real host. A real user workspace, Android device, keyboard/safe-area behavior and actual multi-window use have not been verified.
+- Opening SiYuan's native graph, task-manager interoperability and Marketplace availability have not been verified; use the manual installation steps above.
+- The in-app English translation is incomplete, so some interface text may appear in Chinese.
+- CardDAV address-book sync and CalDAV calendar sync are not supported. Contacts can be exchanged using vCard files.
+
+See the [v0.5.0 release notes](docs/RELEASE-NOTES-v0.5.0.md) for validation scope.
 
 ## Quick start
 
-1. Click the people icon in the SiYuan toolbar and follow the setup wizard to create the contacts notebook and database.
-2. Create a person, batch-adopt existing documents, import a `.vcf`, or paste business-card text for recognition.
-3. Add relationships, organization memberships, interactions, and a personal note in the person details. The note is written to that person's document.
-4. Link people in a meeting note, then use the context menu to capture attendees and the shared occasion.
-5. Review birthdays, inactive contacts, and follow-ups on the home page. Export the migration bundle from Settings before moving plugin data.
-
-## Data and migration
-
-Person documents and structured profiles live in your SiYuan workspace. Uninstalling the plugin does not delete those documents. Each person's free-form note is stored in that person's document as well.
-
-Interactions, follow-ups, reminder state, templates, and other plugin-owned data live in the plugin data directory and may be removed when the plugin or that directory is deleted. Export the plugin-data migration bundle from Settings before uninstalling. The bundle exports values and previews restore changes; **it is not a full SiYuan workspace backup or a byte-for-byte copy**. It does not include person documents, the native database or its binding anchors, interface preferences, or a separate copy of person notes. To move to another workspace, also migrate the documents and database through SiYuan's own workspace migration process.
-
-## Current limitations
-
-- Acceptance in real user workspaces, on Android devices, across real multiple windows, through the native graph entry point, and with external task managers is still pending. Isolated browser and mobile-viewport tests do not replace those checks.
-- The English UI is not fully localized.
-- vCard file import/export is supported; online CardDAV address-book and CalDAV calendar sync are not.
-- The Bazaar PR is merged and the plugin is present in the catalog index; visibility in the client still needs an on-device check.
+1. Click the Lv Contacts toolbar icon and follow the wizard to create the contacts notebook and database.
+2. Create a person, adopt existing notes, import a .vcf, or paste text to recognize profile details.
+3. Add relationships, organization memberships, a per-person note or exchange records in the person detail.
+4. In a meeting note, right-click and choose **Lv Contacts: capture people from this note** to record attendees and a shared occasion.
+5. Review birthdays, contact reminders and follow-ups from the home view. Export the plugin data migration bundle before uninstalling.
 
 ## Development
 
-Requires Node.js 24+, pnpm 12.x, and SiYuan 3.8.5+. After installing dependencies, start SiYuan and run `pnpm make-link` to configure the development reload target, then run `pnpm dev`.
+Requires Node.js 24 or later and pnpm 12.x. Install dependencies and start SiYuan. Before the first hot-reload session, run pnpm make-link, then run pnpm dev.
 
-```bash
-pnpm install
-pnpm check          # TypeScript and Svelte checks
-pnpm test           # Unit tests and architecture guards
-pnpm test:ui        # Isolated desktop UI regression
-pnpm test:ui:mobile # Isolated mobile viewport regression, not device acceptance
-pnpm build          # Build dist/ and package.zip
-pnpm check:release  # Release package gate
-```
+Common checks: pnpm check, pnpm test, pnpm test:ui, pnpm test:ui:mobile, pnpm build and pnpm check:release. Mobile viewport tests do not replace real-device acceptance.
 
-Before contributing, read the [development protocol](AGENTS.md), [handoff guide](docs/HANDOFF.md), and [data contract](docs/DATA-CONTRACT.md). See the [roadmap](docs/ROADMAP.md), [decisions](docs/DECISIONS.md), and [changelog](docs/CHANGELOG.md) for more context.
+See [AGENTS.md](AGENTS.md) and the [handoff guide](docs/HANDOFF.md) for development conventions, the [data contract](docs/DATA-CONTRACT.md) for storage boundaries, and the [changelog](docs/CHANGELOG.md) for changes.
 
 ## Feedback and license
 
-Report bugs or request features in [GitHub Issues](https://github.com/ai68298100/siyuan-contacts/issues). Include your SiYuan and plugin versions, reproduction steps, and redacted logs.
+Report issues and request features in [GitHub Issues](https://github.com/ai68298100/siyuan-contacts/issues), including SiYuan/plugin versions, reproduction steps and redacted logs.
 
-Licensed under the [MIT License](LICENSE).
+QQ group: **871707735**
+
+[MIT License](LICENSE)

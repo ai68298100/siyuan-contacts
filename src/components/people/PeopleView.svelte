@@ -1,10 +1,12 @@
 <script lang="ts">
     /** 联系人视图：关键词下推后渐进读取，其他条件客户端过滤/分页；详情弹窗由 Workbench 统一承载 */
-    import { batchUpdateContacts, filterContacts, listContactPage, PAGE_SIZE, PRESET_GROUPS, removeContacts } from "../../services/contacts";
+    import { batchUpdateContacts, filterContacts, listContactPage, PAGE_SIZE, removeContacts } from "../../services/contacts";
+    import { GROUP_CLEAR_OPTION, GROUP_KEEP_OPTION } from "../../domain/contact-group";
     import { profileText } from "../../domain/people-profiles";
     import { onDestroy, tick } from "svelte";
     import { exportVcfText } from "../../services/vcard";
     import { nextBirthday } from "../../domain/occasions";
+    import GroupField from "./GroupField.svelte";
     import type { ContactSummary } from "../../domain/person";
     import type { WritableContactField } from "../../domain/contact-write.ts";
     import type { ContactsSettings } from "../../domain/model";
@@ -249,7 +251,8 @@
     let batchBusy: boolean = $state(false);
     let exportingSelected: boolean = $state(false);
     let batchError: string = $state("");
-    let batchGroup: string = $state("__keep");
+    let batchGroup: string = $state(GROUP_KEEP_OPTION);
+    let batchGroupValid = $state(true);
     let batchTagsText: string = $state("");
     let batchFailedFieldsByItem: Record<string, readonly WritableContactField[]> = $state({});
     let batchTargets: ContactSummary[] = $state([]);
@@ -270,7 +273,7 @@
     });
     const guardedClose = useCloseGuard({
         busy: () => batchBusy || exportingSelected,
-        dirty: () => batchOpen && (batchGroup !== "__keep" || !!batchTagsText.trim()),
+        dirty: () => batchOpen && (batchGroup !== GROUP_KEEP_OPTION || !!batchTagsText.trim()),
         changes: () => [text("guardBatchDraft", "批量编辑尚未应用")],
     });
     function closeBatch() {
@@ -679,10 +682,11 @@
 
     async function runBatchUpdate(onlyFailed = false) {
         if (batchBusy) return;
+        if (!batchGroupValid) { batchError = text("groupCustomEmpty", "请输入分组名称。"); return; }
         if (batchHiddenCount > 0 && !includeHidden) { batchError = "请确认包含筛选外的已选联系人，或取消后重新选择范围"; return; }
         if (batchAnchor !== JSON.stringify([settings.avId, settings.dbBlockId, settings.fieldMap])) { batchError = "数据库锚点已变化，请取消后重新核对目标"; return; }
         const tagsToAdd = parseTags(batchTagsText);
-        const group = batchGroup === "__keep" ? undefined : batchGroup === "__clear" ? "" : batchGroup;
+        const group = batchGroup === GROUP_KEEP_OPTION ? undefined : batchGroup === GROUP_CLEAR_OPTION ? "" : batchGroup;
         if (group === undefined && tagsToAdd.length === 0) {
             batchError = "请选择要修改的分组，或输入至少一个要添加的标签";
             return;
@@ -723,7 +727,8 @@
                 return;
             }
             batchOpen = false;
-            batchGroup = "__keep";
+            batchGroup = GROUP_KEEP_OPTION;
+            batchGroupValid = true;
             batchTagsText = "";
             batchFailedFieldsByItem = {};
             selectedIds = [];
@@ -1290,15 +1295,7 @@
                 {#if batchHiddenCount > 0}<label><input type="checkbox" bind:checked={includeHidden} disabled={batchBusy} />确认包含筛选外 {batchHiddenCount} 人</label>{/if}
                 <details><summary>核对目标文档</summary>{#each batchTargets as person (person.itemId)}<p>{person.name} · {person.docId} · {person.itemId}</p>{/each}</details>
                 <p class="ft__smaller ft__on-surface">分组会覆盖所选联系人当前值；标签会追加到现有标签并自动去重。</p>
-                <label class="lvct-form__item">
-                    <span>统一分组</span>
-                    <select class="b3-select fn__block" bind:value={batchGroup} disabled={batchBusy}>
-                        <option value="__keep">保持不变</option>
-                        <option value="__clear">清空分组</option>
-                        {#each PRESET_GROUPS as group (group)}<option value={group}>{group}</option>{/each}
-                        {#each groups.filter((group) => !PRESET_GROUPS.includes(group as typeof PRESET_GROUPS[number])) as group (group)}<option value={group}>{group}</option>{/each}
-                    </select>
-                </label>
+                <GroupField {i18n} value={batchGroup} onValueChange={(value) => (batchGroup = value)} onValidityChange={(valid) => (batchGroupValid = valid)} label={text("batchGroupLabel", "统一分组")} ungroupedLabel={text("formUngrouped", "未分组")} availableGroups={groups} allowKeep allowClear allowUngrouped={false} disabled={batchBusy} />
                 <label class="lvct-form__item">
                     <span>追加标签（空格/逗号分隔）</span>
                     <input class="b3-text-field fn__block" type="text" bind:value={batchTagsText} placeholder="重点 客户" disabled={batchBusy} />
@@ -1310,9 +1307,9 @@
                 <div class="lvct-form__actions">
                     <button class="b3-button b3-button--cancel" onclick={closeBatch} disabled={batchBusy}>取消</button>
                     {#if Object.keys(batchFailedFieldsByItem).length > 0}
-                        <button class="b3-button b3-button--outline" onclick={() => runBatchUpdate(true)} disabled={batchBusy}>{batchBusy ? "重试中…" : text("formRetryFailed", "核实并重试未完成字段")}</button>
+                        <button class="b3-button b3-button--outline" onclick={() => runBatchUpdate(true)} disabled={batchBusy || !batchGroupValid}>{batchBusy ? "重试中…" : text("formRetryFailed", "核实并重试未完成字段")}</button>
                     {/if}
-                    <button class="b3-button b3-button--text" onclick={() => runBatchUpdate()} disabled={batchBusy || batchHiddenCount > 0 && !includeHidden}>{batchBusy ? "保存中…" : "应用到所选联系人"}</button>
+                    <button class="b3-button b3-button--text" onclick={() => runBatchUpdate()} disabled={batchBusy || !batchGroupValid || batchHiddenCount > 0 && !includeHidden}>{batchBusy ? "保存中…" : "应用到所选联系人"}</button>
                 </div>
             </div>
         </LvctDialog>
