@@ -449,7 +449,12 @@ export async function runOrganizationProjectionRegression({ test, assert, kernel
             await until(() => !fixture.querySelector(".lvct-org-manager__member-edit"), "保存后表单未结束");
             assert(state.membership().id === id && state.membership().affiliationKind === "education", "结束成员更换身份或丢失分类");
             assert(document.activeElement?.classList.contains("lvct-org-membership-result"), "结果焦点未落到事实与投影报告");
-            assert(fixture.querySelector('[aria-label="选择要添加的联系人"]').options.length === 2, "历史成员不能再次加入");
+            const addPicker = fixture.querySelector('[aria-label="选择要添加的联系人"]');
+            addPicker.click();
+            await until(() => fixture.querySelector(".lvct-picker__panel"), "历史成员候选器未打开");
+            assert(fixture.querySelectorAll(".lvct-picker__option").length === 1, "历史成员不能再次加入");
+            fixture.querySelector(".lvct-picker__search")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+            await tick();
             button("编辑").click();
             await tick();
             const restore = fixture.querySelector(".lvct-org-manager__member-edit");
