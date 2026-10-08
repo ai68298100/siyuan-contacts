@@ -6,7 +6,7 @@
 
 后续变更记录放在这里，已发布内容见下方版本条目。
 
-## [0.5.1] — 2026-10-08（准备发布）
+## [0.5.1] — 2026-10-08（已发布：https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.1）
 
 这是 v0.5.0 之后的补丁版本，包含自定义联系人分组和已验证的开发依赖更新。
 
@@ -22,7 +22,7 @@
 
 ### 验证边界
 
-- 发布前必须通过 `pnpm check`、`pnpm test`、桌面/移动 UI 回归、`pnpm build` 和 `pnpm check:release`。
+- 已通过 `pnpm check`、`pnpm test`、桌面/移动 UI 回归、`pnpm build` 和 `pnpm check:release`；GitHub Actions build run `37761460576` 全部通过。
 - 真实思源宿主、Android 真机、真实多窗口、原生图入口、任务管理器互读和集市可见性仍沿用 v0.5.0 的未验收边界。
 
 ## [0.5.0] — 2026-10-08（已发布：https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0）
