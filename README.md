@@ -9,7 +9,7 @@
 
 **在思源笔记里管理人脉与人际关系：人物是文档，资料由思源原生数据库承载。**
 
-**最新稳定版：v0.5.0** · [下载与安装](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0) · [提交 Issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**最新稳定版：v0.5.1** · [下载与安装](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.1) · [提交 Issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 [English](README.en-US.md) | 简体中文
 
@@ -20,6 +20,17 @@
 ---
 
 小驴人脉把联系人、关系和共同经历放进思源工作空间。每个人对应一篇普通思源文档，结构化资料保存在与文档关联的思源数据库中，可继续使用思源的搜索、双链和同步。
+
+## 🐴 小驴插件系列
+
+目前已开发的插件：
+
+- [**小驴雷切**](https://github.com/ai68298100/siyuan-speed-switch)
+- [**小驴打卡**](https://github.com/ai68298100/siyuan-checkin)
+- **小驴人脉**（本项目）
+- [**小驴拾遗**](https://github.com/ai68298100/siyuan-glean)
+
+各插件独立维护，围绕思源笔记的导航、记录、资料整理和人脉管理协同使用。
 
 ## 功能
 
@@ -38,7 +49,7 @@
 
 当前通过 GitHub Release 手动安装，尚未上架思源集市。
 
-1. 从 [v0.5.0 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0) 下载 package.zip。
+1. 从 [v0.5.1 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.1) 下载 package.zip。
 2. 将压缩包内容解压到思源工作空间的 data/plugins/siyuan-contacts/，确认 plugin.json 位于该目录根部。
 3. 重启思源，在「设置 → 集市 → 已安装」中启用「小驴人脉」。
 
@@ -59,7 +70,7 @@
 - 插件界面英文翻译尚未完整，部分内容可能显示为中文。
 - 当前不支持 CardDAV 通讯录或 CalDAV 日历在线同步；通讯录交换通过 vCard 文件完成。
 
-各项验证范围见 [v0.5.0 发布说明](docs/RELEASE-NOTES-v0.5.0.md)。
+各项验证范围见 [v0.5.1 发布说明](docs/RELEASE-NOTES-v0.5.1.md)。
 
 ## 快速开始
 

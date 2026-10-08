@@ -1,8 +1,20 @@
 # 发布清单（RELEASE）
 
-> v0.5.0 已于 2026-10-08 发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0)，annotated tag 指向 PR #13 merge commit `bd66a2ed0ef371fdbdddea9bf745182f247eaa67`。两机开发线先经 PR #12 合并。集市 PR #2289 已于 2026-09-30 合并，且目录索引已包含本插件；v0.5.0 发布时未修改 bazaar，客户端可见性仍未实机验收。真实思源宿主、Android 真机和真实多窗口尚未验证，隔离测试不能代替。
+> 当前准备发布 v0.5.1：包含自定义联系人分组、README 系列介绍恢复和已验证的常规依赖更新。完成全部门禁、普通合并、tag 与 GitHub Release 后，再把本段补为已发布记录。
 
-## 1. 质量门禁（全部绿才发）
+## v0.5.1 本轮状态
+
+- [ ] `package.json` 与 `plugin.json` 版本均为 0.5.1
+- [ ] `pnpm check`、`pnpm test`、桌面/移动 UI 回归、`pnpm build`、`pnpm check:release` 全部通过
+- [ ] 通过开发分支 PR 普通合并进 `main`
+- [ ] annotated tag `v0.5.1` 与 GitHub Release 已创建，附件校验和已核对
+- [ ] 真实思源宿主、Android 真机、真实多窗口、原生图入口、任务管理器互读和集市可见性仍按下方手工清单单独验收
+
+## v0.5.0 历史发布记录
+
+v0.5.0 已于 2026-10-08 发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0)，annotated tag 指向 PR #13 merge commit `bd66a2ed0ef371fdbdddea9bf745182f247eaa67`。两机开发线先经 PR #12 合并。集市 PR #2289 已于 2026-09-30 合并，且目录索引已包含本插件；v0.5.0 发布时未修改 bazaar，客户端可见性仍未实机验收。真实思源宿主、Android 真机和真实多窗口尚未验证，隔离测试不能代替。
+
+## 1. 质量门禁（历史模板；v0.5.1 仍沿用）
 
 ```bash
 pnpm check    # tsc + svelte-check 0 错误
