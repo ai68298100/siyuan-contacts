@@ -6,17 +6,24 @@
     import type { ContactDraft } from "../../domain/person";
     import type { ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
+    import type { OrgAffiliationKind } from "../../domain/org-membership";
+    import type { RelationshipLabelEditorState } from "../../services/people-profiles";
     import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
     import QuickFillDialog from "./QuickFillDialog.svelte";
     import GroupField from "./GroupField.svelte";
     import { ClipboardPaste } from "@lucide/svelte";
-    import { onDestroy, untrack } from "svelte";
+    import { onDestroy, onMount, untrack } from "svelte";
 
     let {
         settings,
         i18n,
         person,
+        onLoadRelationshipLabels,
+        onSaveRelationshipLabels,
+        onLoadOrgMemberships,
+        onLoadOrgCandidates,
+        onAddOrgMembership,
         hostCloseChannel,
         onSaved,
         onClose,
@@ -24,6 +31,12 @@
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
         person: ContactSummary;
+        /** B12：编辑弹窗内可直接补充关系称谓及工作/学校归属。 */
+        onLoadRelationshipLabels?: (personDocId: string) => Promise<RelationshipLabelEditorState>;
+        onSaveRelationshipLabels?: (personDocId: string, selfDocId: string, labels: string[], expected: import("../../domain/person-relationship-labels").PersonRelationshipLabels | null) => Promise<import("../../domain/person-relationship-labels").PersonRelationshipLabels>;
+        onLoadOrgMemberships?: (personDocId: string) => Promise<import("../../services/org").PersonOrgMembershipView[]>;
+        onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string }>>;
+        onAddOrgMembership?: (personDocId: string, orgDocId: string, extra?: { department?: string; title?: string; joinedOn?: string; affiliationKind?: OrgAffiliationKind }) => Promise<unknown>;
         /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
         hostCloseChannel?: { request?: (close: () => void) => void };
         onSaved: () => void;
@@ -59,6 +72,75 @@
     // svelte-ignore state_referenced_locally
     const originalTags = tagsText;
     let saved = $state(false);
+    // B12：编辑页面直接填写/选择组织归属与本人称谓。组织归属仍以 membership 为唯一事实源。
+    let profileLoading = $state(false);
+    let profileBusy = $state(false);
+    let profileError = $state("");
+    let profileMessage = $state("");
+    let relationshipSnapshot = $state<RelationshipLabelEditorState | null>(null);
+    let relationshipDraft = $state("");
+    let orgCandidates = $state<ReadonlyArray<{ docId: string; name: string }>>([]);
+    let orgMemberships = $state<import("../../services/org").PersonOrgMembershipView[]>([]);
+    let workOrgDocId = $state("");
+    let educationOrgDocId = $state("");
+    // 使用 .by 形式与编辑器逻辑的无 Svelte 运行时测试夹具保持兼容；
+    // 这里的派生值仍会由 Svelte 编译器按依赖追踪更新。
+    const profileSupported = $derived.by(() => Boolean(onLoadRelationshipLabels || (onLoadOrgCandidates && onAddOrgMembership)));
+    const activeOrgIds = $derived.by(() => new Set(orgMemberships.filter((membership) => membership.status === "active").map((membership) => membership.orgDocId)));
+    const availableOrgCandidates = $derived.by(() => orgCandidates.filter((org) => !activeOrgIds.has(org.docId)));
+    const profileDirty = $derived.by(() =>
+        Boolean(relationshipSnapshot && onSaveRelationshipLabels && relationshipDraft !== (relationshipSnapshot.record?.labels ?? []).join("、"))
+            || Boolean(workOrgDocId || educationOrgDocId),
+    );
+    async function loadProfileEditor(): Promise<void> {
+        if (!profileSupported) return;
+        profileLoading = true;
+        profileError = "";
+        try {
+            const [relationship, memberships, candidates] = await Promise.all([
+                onLoadRelationshipLabels ? onLoadRelationshipLabels(person.docId) : Promise.resolve(null),
+                onLoadOrgMemberships ? onLoadOrgMemberships(person.docId) : Promise.resolve([]),
+                onLoadOrgCandidates ? onLoadOrgCandidates() : Promise.resolve([]),
+            ]);
+            relationshipSnapshot = relationship;
+            relationshipDraft = relationship?.record?.labels.join("、") ?? "";
+            orgMemberships = memberships;
+            orgCandidates = candidates;
+        } catch (error) {
+            profileError = error instanceof Error ? error.message : String(error);
+        } finally { profileLoading = false; }
+    }
+    // 运行时由 Svelte 注入 onMount；控制逻辑单测以无生命周期夹具执行，需安全跳过。
+    if (typeof onMount === "function") onMount(() => { if (profileSupported) void loadProfileEditor(); });
+    async function saveProfileEditor(): Promise<void> {
+        if (profileBusy || profileLoading || !profileDirty) return;
+        profileBusy = true;
+        profileError = "";
+        profileMessage = "";
+        try {
+            if (relationshipSnapshot && onSaveRelationshipLabels && onLoadRelationshipLabels && relationshipSnapshot.selfDocId
+                && relationshipDraft !== (relationshipSnapshot.record?.labels ?? []).join("、")) {
+                const record = await onSaveRelationshipLabels(person.docId, relationshipSnapshot.selfDocId,
+                    relationshipDraft.split(/[、,，\n]/).map((label) => label.trim()).filter(Boolean),
+                    relationshipSnapshot.record ? { ...relationshipSnapshot.record, labels: [...relationshipSnapshot.record.labels] } : null);
+                relationshipSnapshot = { selfDocId: record.selfDocId, record };
+                relationshipDraft = record.labels.join("、");
+            }
+            for (const [kind, orgDocId] of [["work", workOrgDocId], ["education", educationOrgDocId]] as const) {
+                if (!orgDocId || !onAddOrgMembership) continue;
+                await onAddOrgMembership(person.docId, orgDocId, { affiliationKind: kind });
+                if (kind === "work") workOrgDocId = "";
+                else educationOrgDocId = "";
+            }
+            profileMessage = "工作单位、学校或关系称谓已保存";
+            onSaved();
+        } catch (error) {
+            profileError = error instanceof Error ? error.message : String(error);
+        } finally {
+            profileBusy = false;
+            if (!profileError) await loadProfileEditor();
+        }
+    }
     // FAST-01.1：粘贴并识别（识别结果经勾选后回填草稿，不直接写库）
     let quickFillOpen = $state(false);
     function applyQuickFill(patch: {
@@ -145,11 +227,20 @@
         }
         return changes;
     }
+    const profileChanges = (): string[] => profileDirty ? ["工作单位、学校或与我的关系有未保存修改"] : [];
+    const baseDraftDirty = (): boolean => !saved && (JSON.stringify(draft) !== original || tagsText !== originalTags);
+    async function persistAll(): Promise<void> {
+        if (baseDraftDirty()) await persist();
+        if (profileDirty) {
+            await saveProfileEditor();
+            if (profileError) throw new Error(profileError);
+        }
+    }
     const guardedClose = useCloseGuard({
-        busy: () => running,
-        dirty: () => !saved && (JSON.stringify(draft) !== original || tagsText !== originalTags),
-        changes: draftChanges,
-        save: persist,
+        busy: () => running || profileBusy || profileLoading,
+        dirty: () => baseDraftDirty() || profileDirty,
+        changes: () => [...draftChanges(), ...profileChanges()],
+        save: persistAll,
     });
     /* D-40：宿主 X/Esc/遮罩经同一守卫路由（返回 Promise 供拦截层重入门） */
     // svelte-ignore state_referenced_locally
@@ -166,7 +257,7 @@
         running = true;
         errorText = "";
         try {
-            await persist();
+            await persistAll();
             if (alive) onClose();
         } catch (error) {
             if (alive) errorText = error instanceof Error ? error.message : String(error);
@@ -183,6 +274,52 @@
             <ClipboardPaste size={14}/>{text("qfOpen", "粘贴并识别")}
         </button>
     </div>
+    {#if profileSupported && !person.isSelf}
+        <section class="lvct-detail__section lvct-person-edit__profile" aria-labelledby="lvct-person-edit-profile-title">
+            <div class="lvct-detail__section-head">
+                <div>
+                    <h4 id="lvct-person-edit-profile-title">工作单位、学校与我的关系</h4>
+                    <p class="ft__smaller ft__on-surface">可直接填写关系称谓，或选择组织补充当前工作单位/学校。组织归属会保留历史，重复选择当前组织不会新增记录。</p>
+                </div>
+            </div>
+            {#if profileLoading}
+                <p role="status">正在读取可编辑资料…</p>
+            {:else}
+                {#if onLoadRelationshipLabels && onSaveRelationshipLabels}
+                    <label class="lvct-form__item">
+                        <span>与我的关系（多个称谓用顿号分隔）</span>
+                        <input class="b3-text-field fn__block" type="text" maxlength="1600" bind:value={relationshipDraft} disabled={profileBusy} placeholder="例如：同事、朋友" />
+                    </label>
+                {/if}
+                {#if onLoadOrgCandidates && onAddOrgMembership}
+                    <div class="lvct-form__grid">
+                        <label class="lvct-form__item">
+                            <span>工作单位</span>
+                            <select class="b3-select fn__block" bind:value={workOrgDocId} disabled={profileBusy || availableOrgCandidates.length === 0}>
+                                <option value="">选择组织…</option>
+                                {#each availableOrgCandidates as org (org.docId)}<option value={org.docId}>{org.name}</option>{/each}
+                            </select>
+                        </label>
+                        <label class="lvct-form__item">
+                            <span>学校</span>
+                            <select class="b3-select fn__block" bind:value={educationOrgDocId} disabled={profileBusy || availableOrgCandidates.length === 0}>
+                                <option value="">选择组织…</option>
+                                {#each availableOrgCandidates as org (org.docId)}<option value={org.docId}>{org.name}</option>{/each}
+                            </select>
+                        </label>
+                    </div>
+                    {#if availableOrgCandidates.length === 0}
+                        <p class="ft__smaller ft__on-surface">暂无可选择的活跃组织；可先在“组织管理”中新建组织，或编辑已有归属的分类。</p>
+                    {/if}
+                {/if}
+                {#if profileError}<p class="lvct-form__error" role="alert">{profileError}</p>{/if}
+                {#if profileMessage}<p role="status">{profileMessage}</p>{/if}
+                <button type="button" class="b3-button b3-button--outline" onclick={() => void saveProfileEditor()} disabled={profileBusy || !profileDirty}>
+                    {profileBusy ? "保存资料中…" : "保存这些资料"}
+                </button>
+            {/if}
+        </section>
+    {/if}
     <div class="lvct-form__grid">
         <label class="lvct-form__item">
             <span>{text("formPhone", "电话")}</span>

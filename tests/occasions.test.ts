@@ -47,20 +47,30 @@ test("公历 2月29日：平年顺延 3月1日，闰年当年仍是 2月29", () 
     assert.equal(leap.date.getDate(), 29);
 });
 
-test("农历生日：按农历月日换算，今年已过顺延明年", () => {
-    const now = new Date(2026, 8, 27);
-    // 1990-01-01 按农历解读：1990 年正月初一
-    const birthLunar = solarToLunar(new Date(1990, 0, 1));
-    assert.ok(birthLunar, "出生日应在换算表范围内");
+test("农历生日：输入月日直接按农历解读，不再先按公历换算", () => {
+    const now = new Date(2026, 1, 1);
+    // 1990-01-01 按农历解读就是正月初一；不能被解释成公历对应的腊月初五。
     const projection = nextBirthday("1990-01-01", true, now);
     assert.ok(projection);
-    // 与换算原语自洽：目标日 = 农历(某年, 出生月日) 的公历
+    assert.equal(projection.label, "正月初一");
+    // 目标日 = 农历(今年, 输入月日) 的公历
     const targetLunarYear = solarToLunar(projection.date)?.year;
     assert.ok(targetLunarYear);
-    const expected = lunarToSolar(targetLunarYear, birthLunar.month, birthLunar.day);
+    const expected = lunarToSolar(targetLunarYear, 1, 1);
     assert.ok(expected);
     assert.equal(projection.date.getTime(), expected.getTime());
     assert.ok(projection.daysUntil >= 0);
+});
+
+test("upcomingBirthdays：混合公历与农历按各自下一次公历发生日排序", () => {
+    const now = new Date(2026, 1, 1);
+    const list = upcomingBirthdays([
+        person({ name: "公历二月二十", birthday: "1990-02-20", itemId: "solar", docId: "solar", isLunar: false }),
+        person({ name: "农历正月初一", birthday: "1990-01-01", itemId: "lunar", docId: "lunar", isLunar: true }),
+    ], now);
+    assert.deepEqual(list.map((item) => item.person.itemId), ["lunar", "solar"]);
+    assert.equal(list[0].projection.label, "正月初一");
+    assert.equal(list[1].projection.label, "2月20日");
 });
 
 test("bucketOf 分桶", () => {

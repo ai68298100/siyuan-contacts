@@ -1231,7 +1231,7 @@
                                     {#if column === "group"}{person.group || "—"}
                                     {:else if column === "phone"}{person.phone || "—"}
                                     {:else if column === "wechat"}{person.wechat || "—"}
-                                    {:else if column === "birthday"}{person.birthday ? `${person.birthday}${person.isLunar ? "（农历）" : ""}` : "—"}
+                                    {:else if column === "birthday"}{person.birthday ? `${person.birthday}（${person.isLunar ? "农历" : "公历"}）` : "—"}
                                     {:else if column === "recent"}{recent[person.docId]?.localDate ?? "—"}
                                     {:else if column === "org"}{profileText(person.profile, "work")}
                                     {:else if column === "school"}{profileText(person.profile, "education")}

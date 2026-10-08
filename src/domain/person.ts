@@ -14,7 +14,10 @@ export interface ContactDraft {
     email: string;
     wechat: string;
     website: string;
-    /** YYYY-MM-DD（公历语义；isLunar 时表示农历日期） */
+    /**
+     * YYYY-MM-DD；公历时为完整公历日期，isLunar=true 时年份作为出生年份、月日作为农历月日。
+     * 这样同一日期输入不会在换算前被再次当作公历解释。
+     */
     birthday: string;
     isLunar: boolean;
     group: string;
@@ -75,7 +78,7 @@ export interface ContactSummary {
     email: string;
     wechat: string;
     website: string;
-    /** YYYY-MM-DD；空串表示未填 */
+    /** YYYY-MM-DD；公历为完整日期，农历时月日按农历解释；空串表示未填 */
     birthday: string;
     isLunar: boolean;
     group: string;

@@ -1,7 +1,7 @@
 /**
  * 生日/纪念日投影：从联系人的生日字段算"下一次 occurrence"。
- * 纯函数，本地时区日期；农历生日按"存储日期的月日为农历月日"换算
- * （WOLB/时光序同语义），年龄按公历粗算。
+ * 纯函数，本地时区日期；农历生日按"存储日期的月日为农历月日"计算
+ * （WOLB/时光序同语义），年龄按农历年份粗算。
  */
 import { lunarToSolar, solarToLunar, formatLunar } from "./lunar.ts";
 import type { ContactSummary } from "./person";
@@ -63,9 +63,17 @@ export function nextBirthday(birthday: string, isLunar: boolean, now: Date = new
         };
     }
 
-    // 农历：取存储日期的农历月日（以出生那年为准），在"今年农历年"与"明年农历年"里找下一次
-    const birthLunar = solarToLunar(parsed);
-    if (!birthLunar) return undefined;
+    // 农历：存储值的年份只作为出生年份，月日直接是农历月日。
+    // 不能先把整个值当公历再调用 solarToLunar：例如输入 1990-01-01
+    // 表示农历正月初一，而不是公历 1990-01-01 对应的腊月初五。
+    const birthLunar = {
+        year: parsed.getFullYear(),
+        month: parsed.getMonth() + 1,
+        day: parsed.getDate(),
+        leap: false,
+    } as const;
+    // 出生年份用于校验月日组合；无效的农历日期不进入提醒或排序。
+    if (!lunarToSolar(birthLunar.year, birthLunar.month, birthLunar.day)) return undefined;
     const todayLunar = solarToLunar(today);
     if (!todayLunar) return undefined;
 

@@ -33,7 +33,7 @@
         preferences: ViewPreferences;
         revision?: number;
         onOpenDetail: (person: ContactSummary) => void;
-        onOpenPeople: (focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" }) => void;
+        onOpenPeople: (focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" | "recent" }) => void;
         onOpenGraph: () => void;
         /** 摘要忽略等偏好写入（F08）；未接线时「当日不再展示」退化为本次隐藏 */
         onPreferencesChange?: (preferences: ViewPreferences) => Promise<ViewPreferences>;
@@ -400,6 +400,55 @@
     function openNeverContactedPeople() {
         if (!data) return;
         onOpenPeople({ itemIds: data.neverContactedItemIds, label: "从未互动" });
+    }
+
+    /**
+     * FUNC-01.1：列表超过首屏时，「查看全部」要能把当前集合带到联系人页。
+     * 保留本地展开状态作为无导航宿主（例如独立预览/隔离回归）的降级行为；
+     * Workbench 接到 onOpenPeople 后会切换到联系人页并用 itemIds 聚焦集合。
+     */
+    function openAllBirthdays(): void {
+        if (!data) return;
+        if (showAllBirthdays) {
+            showAllBirthdays = false;
+            return;
+        }
+        showAllBirthdays = true;
+        onOpenPeople({
+            itemIds: data.birthdays.map((item) => item.person.itemId),
+            label: "近期生日",
+            sort: "birthday",
+        });
+    }
+
+    function openAllStale(): void {
+        if (!data) return;
+        if (showAllStale) {
+            showAllStale = false;
+            return;
+        }
+        showAllStale = true;
+        onOpenPeople({
+            itemIds: data.stale.map((item) => item.person.itemId),
+            label: "久未联系",
+            // 联系人页的最近互动排序可稳定展示该集合，并兼容从未互动的人。
+            sort: "recent",
+        });
+    }
+
+    function openAllFollowUps(): void {
+        if (!data) return;
+        if (showAllFollowUps) {
+            showAllFollowUps = false;
+            return;
+        }
+        showAllFollowUps = true;
+        const itemIds = [...new Set(
+            data.followUps
+                .filter((card) => card.reachable && card.person)
+                .map((card) => card.person!.itemId),
+        )];
+        onOpenPeople({ itemIds, label: "待办跟进", sort: "name" });
     }
 
     async function recordQuick(person: ContactSummary) {
@@ -788,7 +837,7 @@
                                 <button type="button" class="lvct-dash__row-main" onclick={() => onOpenDetail(item.person)}>
                                     <b>{item.person.name}</b>
                                     <PersonProfileSummary profile={item.person.profile} compact />
-                                    <span class="ft__smaller ft__on-surface">{item.projection.label}{item.person.isLunar ? "（农历）" : ""}</span>
+                                    <span class="ft__smaller ft__on-surface">{item.projection.label}（{item.person.isLunar ? "农历" : "公历"}）</span>
                                     <span class="lvct-bucket {bucketStyles[item.bucket]}">
                                         {item.projection.daysUntil === 0 ? text("dashFuToday", "今天") : text("dashDaysUntilN", "{n}天", { n: item.projection.daysUntil })}
                                     </span>
@@ -803,7 +852,7 @@
                         {/each}
                     </div>
                     {#if data.birthdays.length > BIRTHDAY_PREVIEW_LIMIT}
-                        <button class="lvct-dash__show-all" onclick={() => (showAllBirthdays = !showAllBirthdays)}>
+                        <button class="lvct-dash__show-all" onclick={openAllBirthdays}>
                             {showAllBirthdays ? text("dashShowLess", "收起") : text("dashShowAllN", "查看全部（共 {n} 条）", { n: data.birthdays.length })}
                         </button>
                     {/if}
@@ -862,7 +911,7 @@
                         {/each}
                     </div>
                     {#if data.stale.length > STALE_PREVIEW_LIMIT}
-                        <button class="lvct-dash__show-all" onclick={() => (showAllStale = !showAllStale)}>
+                        <button class="lvct-dash__show-all" onclick={openAllStale}>
                             {showAllStale ? text("dashShowLess", "收起") : text("dashShowAllN", "查看全部（共 {n} 条）", { n: data.stale.length })}
                         </button>
                     {/if}
@@ -915,7 +964,7 @@
                         {/each}
                     </div>
                     {#if (data.followUps ?? []).length > FOLLOW_UP_PREVIEW_LIMIT}
-                        <button class="lvct-dash__show-all" onclick={() => (showAllFollowUps = !showAllFollowUps)}>
+                        <button class="lvct-dash__show-all" onclick={openAllFollowUps}>
                             {showAllFollowUps ? text("dashShowLess", "收起") : text("dashShowAllN", "查看全部（共 {n} 条）", { n: (data.followUps ?? []).length })}
                         </button>
                     {/if}
