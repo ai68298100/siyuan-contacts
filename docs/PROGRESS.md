@@ -2141,3 +2141,534 @@
 - [x] 启动前探测笔记本、宿主文档、AV carrier；精确 carrier 缺失错误分类，禁止静默 `createIfNotExist` 修复。
 - [x] 失效状态卸载工作台，提供重新核验、全库候选扫描、字段证据预览和显式重绑；恢复期间旧设置不进入普通业务入口。
 - [x] 补充回归测试与 DATA-CONTRACT / DECISIONS；真实 v3.8.7-alpha.4 删除载体、删除设置、移动文档、多候选演练列为 Host pending。
+## P1 业务主线 第 82 轮：B13.6a 组织视图侧共同背景入口 + B13.5b 共同背景查询规模（2026-10-01，续跑口令第 83 版驱动）
+
+- **B13.6a 组织视图侧共同背景入口**（H-15 同源修复）：
+  - `openOrgManagerDialog(initialOrgDocId?)`：组织卡片「管理」必携目标 orgDocId 打开弹窗并定位到该组织
+    （活跃/归档均可定位；目标不存在回退首个组织），不再每次落到默认首个；工具栏/空态入口不携参。
+  - 组织管理弹窗成员行新增「查看详情」（复用 orgCommonOpen 键）：仅 `onOpenPerson` 已接线且成员在
+    名册时显示（已解绑成员无入口，与人物详情共同背景同语义）；点击=先经 `lvct-workbench-person`
+    窗口事件让工作台打开人物详情 Peek（复用 openDetail 守卫通道），再关闭组织弹窗——宿主级弹窗
+    压在 Peek 之上，必须先关才能看到详情；跨弹窗导航闭环「组织→同组织成员→人物详情」。
+- **B13.5b 第一批：共同背景查询规模**（G-09 收口）：
+  - `buildCommonOrgBackground` 重写为「一次遍历建 组织→成员 索引 + 同伴 Set 去重」——不再对每段
+    归属全索引扫描、不再 peers.some 线性查重；输出语义与全量扫描严格一致（同伴首现序、收录一次
+    取最早交集、无名同伴不进背景、组织顺序随本人归属记录）。
+  - 新增单测 2 例：同人多段/同人多记录的交集与顺序等价、3000 名同组织同伴零重复零丢失。
+  - 余项：组织成员长表分页/虚拟化与选人器分页归 H-04/H-06/G-08 通道（查询层已单遍索引化）。
+- **S11 窗口内通道**：组织管理弹窗订阅数据变化原地刷新组织与成员（busy/成员编辑/改名中跳过——
+  草稿与写入保护；刷新失败保留当前快照不伪装空库）；真实跨窗口投递仍 Host pending。
+- **存量失败修复（日期炸弹，2026-10-01 翻日暴露）**：两用例在基线（c6e7a05）即失败、与本轮无关——
+  ① 乱序防护夹具写死 `2026-09-29`=「昨天」，翻月后变「2 天前」；改 `pastDate(n)` 相对今天构造。
+  ② 改绑用例夹具 `selfItemId:"row-1"` 不满足 ID 模式→归一丢弃→createdAt 回落「今天」，此前恰与
+  夹具日期同天而假通过；夹具改为合法 ID（`20260927000000-row00xx`），createdAt 保留成为确定性断言。
+  新增顶层 `pastDate` 助手；其余写死日期经排查均不参与「相对今天」断言（筛选计数/回顾文本/已有相对助手）。
+- **验证**：单测 218/218（+2）；三套 UI 桌面 104 / 移动 105 / 宿主 104 全绿（新增 B13.6a 弹窗定位
+  +导航用例、卡片携 orgDocId 断言）；collect-i18n 缺失 0（复用 orgCommonOpen，零新键）；`pnpm run
+  build` + `check:release` PASS（含产物形态双门禁）；真内核 contacts-flow 10/10、spike:init 21/21；
+  52 景基线重拍 + 断点扫描有效（组织/弹窗无专属截图景，V-16 缺口维持登记；Peek 景目检正常）。
+- **留后续**：B13.5b 分页/虚拟化（H-04/H-06/G-08）、B13.7 双链对账、B13.8/B13.9、S12/S13 真机核验、
+  B14 真机核对项（原生图面板/siyuan:// 成边/B14.10）、B11 余项（表格标识/捕获参与人/未绑定文档指定/B11.5）。
+
+## 缺陷修复批 第 83 轮：确定缺陷六项（D-15/V-19/H-29/C-32/B14.11/B14.14，2026-10-01，续跑口令第 84 版驱动）
+
+- **D-15（P0）设置页本人档案加载状态机**：`identityLoading` 曾初始 true 后永不置 false，状态/创建
+  入口被「…」永久遮住。补 loading→ready/failed 终态：失败显式呈现「本人档案读取失败」+ 重试按钮
+  （`role=alert`），不得伪装成未绑定；facade 缺方法时直接落终态（fixture 安全）。i18n +2 键
+  （selfLoadFailed/selfRetry，中英）。
+- **V-19（P0）捕获向导关闭守卫真实脏态**：`dirty: () => false` 写死——识别勾选/新人名单/日期/地点/
+  备注与 AI 回填的草稿被「取消」静默丢弃。改为载入完成后落基线（初始勾选不算草稿、重试重载复基线），
+  当前值偏离基线即脏；主捕获成功（result 就绪）后草稿已消费不再拦。守卫取消=草稿保留，放弃并离开=
+  关闭。**宿主 svelteDialog X/Esc/遮罩直销毁为结构性缺口（所有直挂弹窗共有），登记独立项跟进**。
+- **H-29（P0）组织管理弹窗切换目标隔离草稿**：切组织曾不清理 `renaming/renameValue/addPersonId/
+  editingMemberId`——A 的改名草稿按 B 的 orgDocId 落笔=跨组织误写。切组安全清空四项草稿态；
+  页脚「关闭」接 useCloseGuard（busy 阻断；改名/成员编辑草稿经守卫放弃）；`loadMembers` 加请求
+  代际守卫（快速切组时迟到旧响应不覆盖当前组织，H-14 同源）。
+- **C-32（P1）本周生日统计口径**：`birthdaysThisWeek` 曾先按用户可设提醒窗口截断、再经暂缓过滤后
+  计数——窗口 <7 天漏报本周生日、暂缓使统计下降。改为按 `upcomingBirthdays` 原始事实计算（FUNC-01.2a
+  口径：暂缓只屏蔽呈现）；呈现列表的窗口截断与暂缓过滤保持不变。
+- **B14.11（P1）原生图组织收窄即时重载**：收窄 effect 曾不追踪 `narrowedDocIds`（且在首个 await 后
+  读取）——原生模式下切换组织只更新范围文案不重载图。收窄集合改为 await 前快照 + effect 显式追踪
+  （旧响应经既有版本守卫丢弃）；顺带补 person 中心对名册的晚到重触发（名册未就绪时人物中心首载曾
+  误判缺失后不自愈，仅 person 范围追踪 people.length，self/global 不多加载）。
+- **B14.14（P1）指定人物中心独立于本人档案**：`loadNativePersonGraph` 曾一律先要求本人档案——
+  旧工作空间未建档/本人读取失败时，指定有效人物中心的人物图被错误阻断。改为仅「回落本人中心且本人
+  缺失」才抛 NativeGraphCenterMissingError；显式 centerDocId 独立生效（白名单=名册∪本人（如有），
+  中心始终保留）。
+- **验证**：单测 218/218；三套 UI 桌面 **109** / 移动 **110** / 宿主 **109** 全绿（新增 5 用例：
+  D-15 状态机、V-19 草稿守卫、H-29 切组隔离+关闭守卫、C-32 口径三态、B14.11/14.14 收窄重载+人物
+  中心）；collect-i18n 缺失 0；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 10/10、
+  spike:init 21/21；52 景基线重拍 + 断点扫描有效（settings-general 景目检：本人档案行已显创建入口）。
+- **留后续**：svelteDialog 宿主关闭通道守卫（结构性，独立轮）；V-01~V-04 移动布局缺陷批；K-01/K-02
+  smoke fixture 契约门禁；B13.7/B13.8/B13.9、B13.5b 分页（H-04/H-06/G-08）；B14 真机核对项；B11 余项。
+
+## 缺陷修复批 第 84 轮：D-40 宿主关闭通道守卫 + V-01/V-04 移动布局（2026-10-01，续跑口令第 85 版驱动）
+
+- **D-40（P1 结构）svelteDialog 宿主关闭通道守卫**：宿主 Dialog 的 X/Esc/遮罩曾直接 destroy 组件、
+  绕过 close-guard（V-19/H-29 修复了组件内按钮路径，宿主路径仍漏）。
+  - `libs/dialog.ts`：svelteDialog 向组件注入 `hostCloseChannel`；组件把自身守卫挂到
+    `channel.request` 后，本层 capture 拦截宿主关闭动作（遮罩/关闭钮=元素级 capture 先于目标冒泡；
+    Esc=window capture 先于宿主处理器）并路由到同一守卫——干净态直接关、脏草稿走三选一、busy 静默阻断。
+    重入门按「守卫浮层在场」判定（无时序敏感 pending 标志——曾用 Promise finally 复位，
+    微任务时序导致二次 Esc 穿透，已废弃）；守卫浮层打开期间由其自身 Esc 逻辑接管。
+    组件未挂接 request 时拦截器空转（其余直挂弹窗保持宿主原行为，可逐个接入）。
+    卸载时移除监听（destroyCallback 链）。
+  - `CaptureDialog`/`OrgManagerDialog` 挂接通道（本轮两处；其余直挂弹窗随各自轮次接入）。
+  - `siyuan-mock.js` Dialog 对齐真实宿主 DOM（`.b3-dialog__scrim`/`.b3-dialog__close`）并模拟宿主
+    「遮罩/关闭钮/Esc 直接 destroy」原行为，使拦截可端到端断言；**真实宿主三路径核对 Host pending**。
+- **V-01（P0）移动端联系人页常驻搜索**：搜索输入移出 `!isMobile` 分支全断点渲染（B09-1 的 CSS
+  早已预留整行 flex-basis，模板却从未在移动渲染）；补 aria-label；390px 下搜索占满整行、工具栏
+  换行不溢出。
+- **V-04（P0）移动端 Peek 头像压名**：`.lvct-detail__header` 移动网格首列由固定 `38px` 改 `auto`
+  （适配 `--lvct-avatar-lg`=56px 令牌）——任何头像尺寸/字体缩放下头像不再遮挡姓名与生日行。
+- **验证**：单测 218/218；三套 UI 桌面 **110** / 移动 **113** / 宿主 **110** 全绿（新增 3 用例：
+  D-40 遮罩/关闭钮/Esc 三路径+无草稿直关、V-01 移动搜索可见/整行/可过滤、V-04 头像 56px 与姓名
+  几何不重叠）；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 10/10、spike:init
+  21/21；52 景基线重拍（people-mobile/peek-mobile 景目检：搜索框整行、头像与姓名并排）+ 断点扫描
+  有效（偶发失败重跑即过）。
+- **留后续**：D-40 真实宿主三路径核对（Host pending）+ 其余直挂弹窗（AddPerson/PersonEdit/VCard/
+  QuickFill）逐个接入；V-02/V-03（组织弹窗挤压、底部导航五入口溢出）与 V-05+ 布局矩阵；
+  K-01/K-02 smoke fixture 契约门禁；B13 余项；B14 真机核对项；B11 余项。
+
+## 缺陷修复批 第 85 轮：V-03 移动底部导航 + K-01/K-02 smoke 契约门禁（2026-10-01，续跑口令第 86 版驱动）
+
+- **V-03（P0）移动底部导航五入口可达**：曾 `.lvct-workbench__nav` 横向 `overflow:auto`——390px 下
+  组织项被溢出隐藏、设置在独立 footer 且无当前态。重排为五入口一屏均布：导航项改竖排
+  （图标上/短标签下，`--lvct-fs-micro`），`space-around` 等分且 footer 同宽（flex 1 1 0），
+  溢出滚动移除；设置按钮补 `--active` 类与 `aria-current="page"`（视图项同款，非当前页不标）。
+- **K-01/K-02 smoke 契约门禁**：原「无未处理异常」全局汇总（套件级一次性判定）升级为**逐用例
+  console 门禁**——
+  - 逐用例收集 `console.warn`/`error`（经包装器，原样透传）与 `window.error`/`unhandledrejection`；
+  - 裁决规则：首参命中前缀 allowlist（=src/ 全部 17 处失败路径警告，含共同背景/归属候选/组织投影
+    读取失败、偏好保存失败、跟进对账/同步分项失败、存储锁接管等）放行；**allowlist 行内混入
+    "is not a function" TypeError 仍判违规**（fixture 缺 facade 方法即使被组件 catch 后以预期警告
+    形态出现也必须失败——K-01 核心）；非预期警告/未捕获异常指名用例失败。
+  - 门禁首跑即暴露 5 个用例的 fixture 缺口（桌面 3 + 移动 2：开 Peek 的 Workbench 夹具缺
+    `listPersonOrgMemberships/listCommonOrgBackground/listOrganizations`，此前被预期警告掩护、
+    组织区块静默降级为空仍报 PASS）——已全部补齐契约 stub；旧全局汇总用例删除（职责并入门禁）。
+- **验证**：单测 218/218；三套 UI 桌面 **109** / 移动 **112** / 宿主 **109** 全绿（各 -1=旧全局
+  汇总用例并入门禁；移动含新 V-03 断言：5 入口均布/不溢出/组织在列/设置 aria-current 与 active
+  切换）；`pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 10/10、
+  spike:init 21/21；52 景基线重拍目检（people-mobile 景：五入口全可见、联系人项高亮当前态）+
+  断点扫描有效。
+- **留后续**：V-02（组织弹窗/详情字段挤压，关联 H-01/H-02）与 V-05（宿主×容器宽度布局矩阵）；
+  K-02 完整形态（每个故障注入场景声明预期错误对象与恢复动作——当前门禁已覆盖非预期错误部分）；
+  D-40 余项（其余弹窗接入+真机三路径）；B13 余项；B14 真机核对项；B11 余项。
+
+## 布局与守卫批 第 86 轮：V-02 组织弹窗宽屏/Peek 裁切修复 + D-40 三弹窗接入（2026-10-01，续跑口令第 87 版驱动）
+
+- **V-02（P0）/H-01 组织管理弹窗宽屏响应式**：
+  - 弹窗宽度 `620px` → `min(920px, 92vw)`（桌面大窗利用空间；窄视口不溢出——原 620px 在移动
+    本身超宽）；左栏 `200px` 固定 → `clamp(200px, 28%, 300px)` 自适应。
+  - 长组织名：列表项省略号截断（overflow/ellipsis/nowrap）+ `title` 完整名提示（活跃/归档两处）。
+  - 成员行防挤压：姓名/部门 span 可收缩换行（min-width:0 + overflow-wrap），动作按钮组
+    （查看详情/编辑/移除）禁压缩——操作区不再过窄。
+- **V-02（P0）Peek 400px 录入行裁切**：`.lvct-detail__record` 主输入（fn__flex-1）补
+  `min-width: 0`——flex 项默认 min-width:auto 曾把 shrink-0 的「添加计划」按钮顶出 Peek 右缘
+  （截图实证按钮文字被裁）；`.lvct-org-add` 补 row-gap 与按钮禁压缩，「添加归属」不再贴边。
+- **D-40 余项（部分）**：AddPerson/PersonEdit/VCard 三弹窗接入宿主关闭通道（props 增
+  `hostCloseChannel` + $effect 挂接 guardedClose，与 Capture/OrgManager 同构）；新增 AddPerson
+  代表性端到端用例（草稿中点遮罩→守卫→放弃关闭）。**余项：QuickFillDialog（无守卫，需先建
+  草稿脏态追踪再接入）；真机三路径核对 Host pending。**
+- **验证**：单测 218/218；三套 UI 桌面 **112** / 移动 **115** / 宿主 **112** 全绿（新增 3 用例：
+  D-40 AddPerson 遮罩路由、V-02 Peek 400px「添加计划/添加归属」右缘内、组织弹窗 920px 内容区
+  长名省略+title+成员动作不挤压；头两轮曾因缺组件导入/未切联系人视图/scrollWidth 误判中断，
+  已修正断言方式——overflow:hidden 下用计算样式与几何边界）；`pnpm check` 0 错误；
+  `pnpm run build` + `check:release` PASS；真内核 contacts-flow 10/10、spike:init 21/21；
+  52 景基线重拍目检（peek 景：「添加计划/添加归属」完整可见，底部说明文字不再截断）+ 断点扫描有效。
+- **留后续**：V-05 布局矩阵（宿主×容器宽度×视口，200% 缩放/旋转/长文字复核）；QuickFill 守卫
+  与 D-40 接入；K-02 余项；B13 余项（B13.7/B13.8/B13.9、B13.5b 分页）；B14 真机核对；B11 余项。
+
+## 布局与守卫批 第 87 轮：QuickFill 草稿守卫 + V-05 第一批/宿主基线根修（2026-10-01，续跑口令第 88 版驱动）
+
+- **QuickFillDialog 草稿守卫（D-40 语义补齐）**：粘贴未识别、或识别结果未应用即关闭=丢草稿——
+  补 useCloseGuard（dirty=有待应用识别结果/非空粘贴；apply 是完成动作不拦），LvctDialog onClose
+  与两处「取消」按钮统一走 guardedClose；**index.ts 裸挂载 close 幂等化**（onApply/onClose 先后
+  到达防双重 unmount，N-08 同源竞态）。新增 smoke 用例：空粘贴直关/粘贴未识别守卫/预览未应用守卫
+  /父表单不受浮层关闭影响。
+- **V-05 第一批：断点矩阵扩展 + 宿主基线根修**：
+  - `breakpoint-sweep` 加 575px 档与 peek 场景（5 页 × 4 宽度 = 20 景）；shot 夹具补组织区样例
+    （长组织名/期间文本/同伴行），Peek 组织归属/共同背景首次进入布局基线。
+  - **根修（V-15 类）**：sweep 页面带 host=1 但其 vite **未挂 hostBaselinePlugin**——/__host/*.css
+    404、近似宿主样式又被夹具移除 → **b3 桥接令牌全部解析为空**（面板透明、页面内容透出交叠）。
+    补挂后 sweep 首次以真实思源 base.css + daylight 主题变量出图；诊断经临时 CDP 探针实证
+    （--b3-theme-background 根域为空 → --lvct-bg-elevated guaranteed-invalid → 透明）。
+    本机真实安装布局为 `<root>/resources/appearance|stage`，既有资源解析两布局兼容已覆盖。
+  - **实证结果**：peek@390/575/1280 真宿主 CSS 下组织归属长行换行整齐、共同背景/添加表单无裁切
+    不重叠——V-02 余项「575px Peek 复核」就此收口；home/people@575 与五入口底栏均正常。
+- **验证**：单测 218/218；三套 UI 桌面 **113** / 移动 **116** / 宿主 **113** 全绿（+1 QuickFill
+  守卫用例）；`pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow
+  10/10、spike:init 21/21；52 景基线重拍目检（peek 景带组织样例，400px 下长名换行整齐）+
+  20 景断点矩阵重拍目检（真宿主 CSS 下 peek@390/575/1280、home@390、people@575 抽查正常）。
+- **留后续**：V-05 余项（200% 文本缩放、旋转、暗色宿主主题矩阵——真机向）；「组织归属/跟进计划
+  边界重叠」用户实图复核（真机）；QuickFill 真机三路径并入 D-40 核对清单；K-02 余项；B13 余项；
+  B14 真机核对项；B11 余项。
+
+## P1 业务主线 第 88 轮：B13.7 人物—组织双链区块（第一批，2026-10-01，续跑口令第 89 版驱动）
+
+- **契约（DATA-CONTRACT §8 增补）**：人物文档内**单个**带 `custom-lvct-org-links` 属性的段落块
+  （与 related 区块同构、幂等更新）＝`**所属组织**：[组织名](siyuan://blocks/<orgDocId>)（部门 · 职位）、…`。
+  口径＝**active 成员 × 活跃组织**（与单位行投影一致；former/归档组织不上文档——历史事实在成员索引
+  与共同背景，文档区块只做「当前档案导航」）；siyuan://blocks 链接使组织文档获得原生反链（成员名单
+  由反链面板/原生图自然承载），组织侧不写区块；仅操作插件标记区块，不触碰用户正文。
+- **域层**：`buildOrgLinksSection(entries)` 纯函数——链接/括注（部门 · 职位按存在性拼接）/空条目返回
+  空串（调用方移除区块）；组织名 Markdown 语法字符与人物姓名同水位（C-14 通道）。
+- **服务层**：`syncPersonOrgLinksSection`（单人对账：active×活跃组织投影→findBlockByAttr→upsert）
+  ＋ `refreshPersonOrgLinkSections`（逐文档隔离，失败仅告警不回退成员事实，可由对该人物的下一 次
+  组织操作补同步）。**六个挂接点**：成员添加/移除/字段更新（先读记录定位 personDocId）与组织
+  归档/恢复/改名（plugin0 → 全员对账；改名同步链接文本、链接目标 orgDocId 不变）。
+- **验证**：
+  - 单测 219/219（+1：区块文本拼接与空条目移除语义）；
+  - smoke 服务级新用例（kernel mock：添加→区块写入含括注；归档→区块移除；恢复→区块回归；单文档
+    失败→成员事实不回退、无关区块不受波及、告警入 allowlist；status→former→区块移除）；三套 UI
+    桌面 **114** / 移动 **117** / 宿主 **114** 全绿；
+  - **真内核 contacts-flow 扩至 13/13**：组织归属链接区块写入（siyuan://blocks 链接可检索）、
+    **原地更新保 IAL**（rename 同步序列——块 ID 不变、IAL 关联键保留，真实内核实证）、移除干净；
+  - `pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；spike:init 21/21；52 景基线 +
+    20 景断点矩阵重拍有效（无 UI 渲染变更）。
+- **留后续（B13.7 第二批候选）**：组织文档侧成员索引区块（org→person，当前靠原生反链承载）；
+  外部删除人物文档后的区块悬空体检（B13.9 通道）；B13.5b 分页（H-04/H-06/G-08）；B13.8 外部编辑
+  对账实证；B14 真机核对项；B11 余项。
+
+## P1 业务主线 第 89 轮：B13.9 组织体检（第一批只读，2026-10-01，续跑口令第 90 版驱动）
+
+- **域层**：`runOrgHealthAudit` 纯函数（domain/health-audit.ts）——五类检测：
+  孤儿成员（人物文档不在名册）、组织文档不可达（标记区块扫描缺失）、期间倒挂
+  （加入晚于离开）、同人同组织重复在职、冲突标记块（H-22：>1 个 custom-lvct-org 标记，
+  归档状态投影不可靠）。零写入；每项给既有修复入口指引（组织管理编辑/移除），
+  与人物体检同纪律（不自动改写、不自动合并）。不可达/孤儿降级展示 docId 片段。
+- **服务层**：`countOrgMarkers`（GROUP BY 标记块统计，SQL 收敛 services/org）；
+  `auditWorkspaceData` 六模块 allSettled（名册/互动/跟进/**组织成员/组织扫描/组织标记统计**），
+  失败指名中止（FUNC-01.12 纪律）；组织体检并入体检报告（孤儿判定用全名册——本人可加入组织）。
+- **设置页**：零问题提示与底注文案补组织口径（组织成员与期间可在组织管理中修正）。
+- **契约校准（D-12）**：DATA-CONTRACT §4 SQL 组装口径由「contacts 一处」校准为
+  「contacts 收编候选 + services/org 组织扫描/标记统计」两处（与组织扫描落地现状同步）。
+- **验证**：单测 220/220（+1：五类检测+清洁样本，含降级展示与首条定位）；三套 UI 桌面 **114** /
+  移动 **117** / 宿主 **114** 全绿；`pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；
+  真内核 contacts-flow 13/13、spike:init 21/21；52 景基线重拍目检（settings-data 景体检文案正常）
+  + 20 景断点矩阵有效。
+- **留后续（B13.9 第二批候选）**：体检项逐条修复按钮（现由组织管理入口承担）；人物文档
+  org-links 区块悬空检测（需逐文档查询，规模策略随 B13.5b）；B13.8 外部编辑对账实证（真机向）；
+  B13.5b 分页；B14 真机核对项；B11 余项。
+
+## P1 业务主线 第 90 轮：B13.9 第二批体检逐条修复 + B13.8 收口（2026-10-01，续跑口令第 91 版驱动）
+
+- **B13.9 第二批：体检逐条修复（设置页资料体检报告行内动作）**：
+  - 孤儿成员 → 「移除这 N 条成员记录」：确认后逐条 `removeOrganizationMember`（单条隔离、
+    失败计数可重试），修复后自动重跑体检刷新报告；
+  - 重复在职 → 「保留最早一条，其余转为已离开」：从组织列举重导出重复组（报告只带每组
+    首条 id），加入日升序保留最早、其余逐条 `updateOrganizationMember(status=former)`；
+  - 期间倒挂 → 「打开组织管理修正」（人工判断正确期间，不机械改写）；
+  - 不可达组织/冲突标记 → 无自动修复，报告理由已给指引（重建文档/手工删多余标记块）。
+  - 修复消息 `role=status` 展示（已移除 N 条/已转换 N 条/未发现重复可能已被修正）。
+- **B13.8 收口（窗口内通道闭环）**：组织视图工具栏补「重新加载」手动对账入口——打开时对账
+  （挂载即刷新）+ 手动刷新 + 弹窗订阅数据变化（第 82 轮）三层齐备；**真机外部编辑投递
+  （onDataChanged 是否覆盖原生 AV/文档外部修改）Host pending**。
+- **验证**：单测 220/220；三套 UI 桌面 **115** / 移动 **118** / 宿主 **115** 全绿（+2 用例：
+  组织体检修复全链路——确认放行后孤儿两条移除、重复组保留最早转 former、体检自动重跑至清洁；
+  组织视图手动刷新计数）；`pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；真内核
+  contacts-flow 13/13、spike:init 21/21；52 景基线 + 20 景断点矩阵重拍有效（体检报告为交互态
+  截图无静态变化）。
+- **留后续**：B13.8 真机投递实证；B13.5b 分页（H-04/H-06/G-08）；K-02 余项；V-05 真机向余项
+  （200%/旋转/暗色宿主矩阵、用户实图「边界重叠」复核）；B14 真机核对项；B11 余项。
+
+## P1 业务主线 第 91 轮：B13.5b 成员列表分页 + 悬空 org-links 区块检测与清理（2026-10-01，续跑口令第 92 版驱动）
+
+- **B13.5b 组织管理成员列表分页**（增量渲染，虚拟化留后续）：首屏 50 名 + 「加载更多（还有 N 名）」
+  + 「已显示 X / 共 Y 名成员」计数行；切换组织重置游标；新增成员后展开使其可见、移除后游标收敛。
+  共同背景已索引（第 82 轮）、组织列表单 SQL（既有）——B13.5b 的查询/渲染两侧口径就此收口；
+  成员数据仍整读（单组织 JSON 内存分页），服务端分页随 G-14/G-15 大规模演进。
+- **B13.9 悬空 org-links 区块检测与清理**（第二批收口项）：
+  - `findOrgLinkBlocks`（单 SQL 反查 root_id → 块 id）+ 域层 `findDanglingOrgLinks`（文档有
+    org-links 区块但无任何 active 成员记录＝悬空，历史对账失败残留）；
+  - 并入资料体检（第七读模块「组织链接区块」失败指名中止）：`danglingOrgLinks` 报告项
+    指名块 ID、降级展示 docId 片段；
+  - SettingsView「清理这 N 个悬空区块」：确认后 `facade.removeOrgLinkBlocks`（逐块隔离），
+    部分失败消息可重试（剩余清单随重跑体检动态指名），清理后自动重跑至清洁。
+- **验证**：单测 221/221（+1 悬空判定：former-only 也算悬空）；三套 UI 桌面 **117** / 移动 **120** /
+  宿主 **117** 全绿（+2 用例：分页首屏 50/加载更多/切组织重置；悬空报告+清理含部分失败重试链）；
+  `pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 13/13、
+  spike:init 21/21；i18n +2 键双语 parity；52 景基线 + 20 景断点矩阵重拍有效。
+- **坑位新增**：域层运行时相对导入**值导入**也必须带 .ts（architecture 门禁，type-only 豁免——
+  `import { x } from "./y"` 缺 .ts 会被架构测试拒绝）。
+- **留后续**：选人器搜索化（H-05，添加成员下拉仍为原生 select）；服务端分页（G-14/G-15 大规模
+  演进）；K-02 余项；B13.8 真机投递实证；V-05 真机向余项；B14 真机核对项；B11 余项。
+
+## P1 业务主线 第 92 轮：H-05 组织管理添加成员选人器搜索化（2026-10-01，续跑口令第 93 版驱动）
+
+- **H-05**：组织管理弹窗「添加成员」由原生 `<select>` 换为可搜索选人器（PersonPicker 复用，
+  B03 同款交互）——姓名/电话/微信/邮箱即时筛选、键盘上下/回车、分组提示、空态提示；
+  候选=名册减当前成员（既有 addCandidates 口径），提示行带分组；长名册不再靠滚动找人是本项验收核心。
+  选中语义不变：仍写 `addPersonId`、经既有 `addOrganizationMember`（active 记录）落盘；
+  添加成功/切组/外部刷新后选人器回落占位（与既有清空语义一致）。
+- **smoke 适配**：B13.3 添加成员与 H-29 跨组隔离两用例由 select.value 驱动改 `pickOption` 驱动
+  （搜索"张三"点选）；H-29 断言改选人器触发器回落占位文案；新增搜索筛选路径即覆盖。
+- **验证**：单测 221/221；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；`pnpm check`
+  0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 13/13、spike:init 21/21；
+  52 景基线 + 20 景断点矩阵重拍有效（组织弹窗无专属景，交互经 smoke 断言覆盖）。
+- **留后续**：其余原生选人 select 盘点（如有）；K-02 余项；B13.8 真机投递实证；V-05 真机向余项；
+  B14 真机核对项；B11 余项。
+
+## 测试基建 第 93 轮：K-02 内核故障显式声明与命中校验（2026-10-01，续跑口令第 94 版驱动）
+
+- **机制**：siyuan-mock 的 `kernel` 对象新增 `faultLog`（route + 失败消息；fetchPost 失败分支记录，
+  **挂在 kernel 对象上**——vite 对 alias 与相对路径可能产生两个模块实例，`kernel` 引用是 smoke 与
+  client.ts 之间的共享锚点，独立导出的日志数组会因实例分裂而永远为空，CDP 式逐层诊断实证）。
+  smoke 新增 `expectKernelFault(routePart, msgPart)` 声明 API：故障注入用例显式声明预期内核错误；
+  用例结束校验**全部命中**——声明未命中说明注入没生效（flag 写错/故障路径未走），测试不能在
+  "故障从未发生"的状态下静默通过。与第 91 轮 console 门禁互补：该门禁拦"非预期错误"，
+  本机制拦"预期错误缺席"。
+- **覆盖**：六处内核级故障注入用例补声明——B07-b（updateBlock/打勾两次）、FUNC-01.15（phone）、
+  B13.7（区块检索）、FAST-01.3a（名册渲染）、CODE-02.5（区块插入）、CODE-02.4（微信）、
+  vCard 诊断（createDocWithMd）。
+- **机制首战即中**：启用后立即抓到 B13.7 用例夹具缺陷——`failingDoc` 后缀 8 位不合法，
+  sync 入口 ID 校验本地抛错、内核注入从未发生，测试此前在"故障从未发生"状态下静默通过。
+  夹具改为合法 7 位后缀（`perfa01`）后注入真实发生、命中校验通过。该缺陷若不修，失败隔离
+  断言验证的是"ID 校验错误"而非目标内核故障路径。
+- **验证**：单测 221/221；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；`pnpm check`
+  0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 13/13、spike:init 21/21；
+  52 景基线 + 20 景断点矩阵重拍有效（纯测试基建，无产物变更）。
+- **留后续**：facade 层失败注入（不走内核的 mock 失败）可按同思路加声明；其余用例随回归逐步补；
+  K-02 场景清单随新故障用例增长。
+
+## 测试基建 第 94 轮：K-02 余项——facade 层失败注入声明（2026-10-01，续跑口令第 95 版驱动）
+
+- **机制**：smoke 新增 `expectFacadeFailure(methodPart, msgPart)` 声明 API + `recordFacadeFault(method,
+  message)` 登记 API + `facadeFaultLog` 用例级日志——与内核机制（第 93 轮）同思路，但登记由
+  **用例 mock 注入处主动调用**（facade mock 是用例自有对象，无统一拦截点）；用例结束校验声明
+  的 facade 失败全部登记过，未命中即失败。
+- **覆盖**：B13.9 悬空用例的 `removeOrgLinkBlocks` 部分失败注入补声明 + mock 注入处登记。
+  全量排查确认其余 facade throw 均为"用例不涉及"负向守卫（非故障注入），无需声明。
+- **K-02 状态**：内核级（第 93 轮）+ facade 级（本轮）两层声明机制齐备；新故障用例随回归逐步补。
+- **验证**：单测 221/221；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；`pnpm check`
+  0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 13/13、spike:init 21/21；
+  52 景基线 + 20 景断点矩阵重拍有效（纯测试基建，无产物变更）。
+- **留后续**：新故障用例随回归补声明（内核级 expectKernelFault / facade 级 expectFacadeFailure）；
+  B13.8 真机投递实证；V-05 真机向余项；H-05 余项（多选批量归 H-07 通道）；B14 真机核对项；B11 余项。
+
+## 可访问性 第 95 轮：D-35/D-32 错误块 role=alert + 焦点迁移（2026-10-01，续跑口令第 96 版驱动）
+
+- **D-35（P1）捕获/联系人新增/人物编辑错误块**：四处 `lvct-form__error`（AddPersonDialog、
+  PersonEditDialog、CaptureDialog）与 InitWizard `lvct-wizard__error` 补 `role="alert"` +
+  `tabindex="-1"` + `bind:this` + `$effect` 焦点迁移——错误出现时读屏即时播报、键盘焦点
+  迁入错误块（Tab 可继续操作）。CSS 补 `.lvct-form__error:focus` 焦点环。
+- **V-04 偶发修复**：移动 smoke 头像尺寸断言 `a.width === 56` 改容差比较
+  （`>=55 && <=57`）——getBoundingClientRect 浮点精度导致间歇 56.000003px 不过。
+- **验证**：单测 221/221；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；
+  `pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 13/13、
+  spike:init 21/21；52 景基线 + 20 景断点矩阵重拍有效（错误块为条件渲染，静态景无变化）。
+- **留后续**：D-35 余项（aria-describedby/aria-invalid 逐字段绑定、首个失败控件焦点——
+  需逐表单梳理，随表单统一 U-14 通道）；D-32 余项（InitWizard label-ID 关联）；
+  D-31 焦点环令牌化（CSS 设计系统）；B13.8 真机投递；V-05 真机向余项；B12 主线（作者定优先级）。
+
+## 可访问性 第 96 轮：D-31 焦点环令牌化（2026-10-01，续跑口令第 97 版驱动）
+
+- **令牌**：_tokens.scss 新增 `--lvct-focus-ring-color`（→accent）、`--lvct-focus-ring-width`（2px）、
+  `--lvct-focus-ring-offset`（2px）——焦点环颜色/宽度/偏移令牌化，明暗主题自动跟随 accent 变量。
+- **全局兜底**：`.lvct-tab-root :focus-visible, .lvct-dialog-root :focus-visible` 补默认焦点环——
+  Tab 到无自有 focus-visible 样式的插件交互元素时仍可见（b3 原生 focus 样式在插件自绘背景上
+  可能不可辨）；有自有规则的元素由更高优先级覆盖；不影响鼠标点击（focus-visible 仅键盘触发）。
+- **D-31 证据元素补齐**：`.lvct-person-card__open-doc` / `.lvct-people__open-doc`（人物卡打开文档
+  按钮）与 `.lvct-detail__relation-name` / `.lvct-detail__relation-remove`（关系名称/移除按钮）
+  补 `:focus-visible`（自绘按钮此前完全无焦点指示，键盘用户不可见）。
+- **硬编码收敛**：6 处 `outline: 2px solid var(--lvct-accent)` 换令牌引用
+  （`var(--lvct-focus-ring-width) solid var(--lvct-focus-ring-color)`）。
+- **修复**：relation-remove 编辑时截断了原 `&:hover` 块与 `font-size: 13px` 导致 SCSS 编译
+  失败（三套 UI 全超时），已补回并确认编译通过。
+- **验证**：单测 221/221；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；`pnpm check`
+  0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 13/13、spike:init 21/21；
+  52 景基线 + 20 景断点矩阵重拍有效（focus-visible 仅键盘触发，静态景无变化）。
+- **留后续**：D-31 余项（对比度实测、最小触控尺寸令牌化——随 D-26 全量验收）；D-35 余项
+  （aria-describedby 逐字段绑定）；B13.8 真机投递；V-05 真机向余项；B12 主线（作者定优先级）。
+
+## 测试基建 第 97 轮：V-16 组织视图截图景（2026-10-01，续跑口令第 98 版驱动）
+
+- **V-16 部分**：截图夹具补组织页/组织管理景——
+  - shot-workbench.html：`initialView` 映射加 `"orgs"`；READY 判定选择器 `.lvct-orgs-view__card`；
+    夹具 `listOrganizations` 充实为三组织（活跃 2 + 归档 1）含成员计数，组织卡片网格非空白。
+  - screenshot-settings.mjs views 加 `"orgs"`（桌面/移动 × 明/暗 = 4 景新增）。
+  - breakpoint-sweep.mjs pages 加 `"orgs"`（390/575/640/1280 = 4 景新增）。
+- **效果**：组织视图首次入截图基线（V-16 缺口收口）；组织卡片、概要统计、归档徽标、
+  重新加载/组织管理按钮均入视觉回归覆盖。
+- **验证**：单测 221/221；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；`pnpm check`
+  0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow 13/13、spike:init 21/21；
+  52 景基线重拍目检（workbench-orgs-desktop-light.png：3 组织卡片正常、归档徽标与统计正确）+
+  24 景断点矩阵（+4 orgs 景全 OK）。
+- **留后续**：组织管理弹窗截图景（需 svelteDialog 交互触发，较复杂可后续独立做）；
+  B13.8 真机投递实证；V-05 真机向余项；B12 主线（作者定优先级）；B11 余项。
+
+## 性能优化 第 98 轮：D-38 联系人页重复检查延迟计算（2026-10-01，续跑口令第 99 版驱动）
+
+- **D-38（P1，关联 G-07）**：联系人页 `duplicatePairs` 从 `$derived(findDuplicatePairs(people))`
+  立即计算改为**用户触发按需计算**——原实现每次名册更新都做 O(k²) 扫描阻塞交互；
+  改为打开「整理」弹窗时按需计算（名册签名变更才重算，否则复用上次结果）、
+  刷新名册后自动失效。工具栏「整理」按钮移除 `·N` 候选角标（候选数在弹窗内展示）；
+  移动端「筛选与整理」按钮的重复指示 `·` 同步移除（`isExtraFilterActive` 判定保留）。
+- **验证**：单测 221/221；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿（D-38 用例适配：
+  整理按钮不再有 `·N` 角标，点击直接按需计算并打开弹窗）；`pnpm check` 0 错误；
+  `pnpm run build` + `check:release` PASS；真内核 contacts-flow 13/13、spike:init 21/21；
+  52 景基线 + 24 景断点矩阵重拍有效。
+- **留后续**：G-07 大桶分页/上限提示（1000 同名级别防护）；B13.8 真机投递实证；
+  V-05 真机向余项；V-16 余项（组织管理弹窗景）；B12 主线（作者定优先级）；B11 余项。
+
+## 性能防护 第 99 轮：G-07 重复候选上限截断（2026-10-01，续跑口令第 100 版驱动）
+
+- **G-07（P1，关联 C-20/D-38）**：`findDuplicatePairs` 加 `maxPairs` 参数（默认 500）——
+  同名/同号大桶两两配对达上限后停止生成（`addReason` 入口检查 `pairs.size >= maxPairs`），
+  防大桶 O(k²) 爆内存（500 同名 ≈ 124,750 对 ≈ 60 MiB）；调用方以
+  `pairs.length >= maxPairs` 判断截断。导出 `DUPLICATE_PAIRS_LIMIT = 500` 供 UI 引用。
+- **UI**：整理弹窗候选数达上限时展示截断提示「候选较多，仅展示前 500 对；建议先修正已列出的
+  重复后再重新检查」（`role="status"`）；未达上限不显示。PeopleView `openDupDialog` 传入
+  `DUPLICATE_PAIRS_LIMIT`。
+- **验证**：单测 222/222（+1：30 同名截断至 50 对/默认 500 不截断 C(30,2)=435）；三套 UI 桌面
+  **117** / 移动 **120** / 宿主 **117** 全绿；`pnpm check` 0 错误；`pnpm run build` +
+  `check:release` PASS；真内核 contacts-flow 13/13、spike:init 21/21；52 景基线 +
+  24 景断点矩阵重拍有效。
+- **留后续**：G-07 余项（按需展开证据、分桶导航——当前一屏平铺已够用，大桶分页留大规模演进）；
+  B13.8 真机投递实证；V-05 真机向余项；V-16 余项（组织管理弹窗景）；B12 主线（作者定优先级）。
+
+## 可访问性 第 100 轮：D-37 移动筛选 sheet 焦点管理（2026-10-01，续跑口令第 101 版驱动）
+
+- **D-37（P1，关联 D-19）**：移动筛选 sheet（`PeopleView.svelte` `lvct-sheet`）补无障碍——
+  sheet 加 `aria-modal="true"` + `tabindex="-1"` + `bind:this={mobileSheetEl}`；
+  打开走 `openMobileSheet`（`tick` 后 `focus()` 迁入 sheet 本体），关闭走 `closeMobileSheet`
+  （`tick` 后焦点恢复到触发按钮）——三条关闭路径统一收口：收起按钮、遮罩点击、
+  sheet 本体 `keydown` Escape（`stopPropagation` 防穿透）。触发按钮补 `type="button"` +
+  `bind:this={mobileSheetReturnFocus}`；sheet 内「新建联系人」也改走 `closeMobileSheet`
+  保持关闭路径单一。`tick` 从 svelte 导入（原文件无 svelte 运行时导入）。
+- **测试锚定**：smoke 移动套件既有 sheet 用例扩展——断言 `aria-modal`、打开后
+  `document.activeElement` 迁入 sheet、Esc 关闭弹层、焦点恢复到触发按钮（4 项）。
+- **验证**：单测 222/222；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；
+  `pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow
+  13/13、spike:init 21/21；56 景基线重拍有效。
+- **留后续**：D-37 余项（焦点循环 Tab 圈定——控件全为原生可聚焦元素且遮罩拦点击，
+  键盘穿出风险低，留真机读屏验证后再定）；D-31 余项（对比度实测）；V-16 余项
+  （组织管理弹窗景）；H-05 余项（多选→H-07）；G-07 余项（证据展开）；B13.8 真机
+  投递实证（作者）；B12 主线（作者定优先级）。
+
+## 测试基建 第 101 轮：V-26 第一批——settings 假截图修复 + 向导图标注入 + 去重门禁（2026-10-01，续跑口令第 102 版驱动）
+
+- **V-26（P1，关联 V-16/D-13/G-02）第一批**：
+  - **settings 假截图根修**：`shot-workbench.html` 的 `initialView` 三元链没有 settings
+    分支，`?view=settings` 落入 `people` 兜底——断点矩阵的 `settings-*` 与 `people-*`
+    字节相同（SHA256 逐宽核对属实），所谓设置断点图实际不是设置页。映射补
+    `view === "settings" ? "settings"`（Workbench 原生支持该视图），READY 判定补
+    `.lvct-settings` 选择器。重拍后 390/640/1280 三档 settings 哈希与 people 分离，
+    people-* 哈希不变（未扰动既有景），目检 settings-1280 为真实设置页。
+  - **向导图标注入**：InitWizard 的 logo `<use xlink:href="#iconLvContacts">` 依赖宿主
+    `addIcons` 注入，`shot-wizard.html` 未注入时渲染紫色空方块。夹具 body 补与
+    `src/index.ts` 一致的隐藏 `<symbol>`；重拍后 `wizard-reuse-desktop-light` 目检
+    logo 为双人形图标。
+  - **去重门禁**：`breakpoint-sweep.mjs` 拍摄完成后按宽分组做 SHA256 去重——同宽不同页
+    字节相同即判失败（正是本缺陷形态），当前 24 景全异。此门禁把「假截图」从评审依赖
+    人眼变成脚本失败。
+- **V-26 其余子项核对**：Peek fixture 缺共同背景 facade 一项已在前序轮补齐
+  （`listCommonOrgBackground` 在场）；逐景页面标识断言由「expected 选择器缺失→ERROR
+  title + role=alert 可见即失败 + V-26 字节去重」三层覆盖。
+- **验证**：单测 222/222；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；
+  `pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow
+  13/13、spike:init 21/21；断点矩阵 24 景重拍 + 去重门禁通过；56 景基线重拍全 OK。
+- **留后续**：V-26 余项（700/768/900 中间宽档未纳入矩阵——V-05 已选 390/575/640/1280
+  四档，是否加档留评审）；V-16 余项（组织管理弹窗景需 svelteDialog 交互触发）；B12
+  主线（B12.2/B12.3/B12.6 作者定优先级）；B13.8 真机投递实证（作者）。
+
+## 基准治理 第 102 轮：V-16 余项——组织管理弹窗截图景 + mock Dialog 宿主 DOM 升级（2026-10-01，续跑口令第 103 版驱动）
+
+- **V-16 余项（P2）截图夹具部分收口**：
+  - `shot-workbench.html` 夹具补 `openOrgManagerDialog`——与 `index.ts` 同构
+    （svelteDialog + mock Dialog，宽 `min(920px, 92vw)`，initialOrgDocId 直传，
+    onOpenPerson 同走 `lvct-workbench-person` 窗口事件）；组织数据抽 `orgShotList`
+    供组织视图与弹窗景共用，成员 join 名册带 `personName`。
+  - 夹具组织 facade 补齐弹窗所需读写方法（listOrganizationMembers/listContacts/
+    create/add/remove/update/archive/restore/rename，写操作直接变更高夹具数组）。
+  - `orgmgr` 景：initialView 落组织视图 → 点首个组织卡「管理」→ 弹窗携参定位打开
+    （顺带可视验证 B13.6a 携参入口）；READY 断言 `.b3-dialog .lvct-org-manager`。
+    入断点矩阵 4 档（24→28 景）+ 基线套件 4 景（56→60）+ 宿主基线 1 景。
+- **mock Dialog 宿主 DOM 升级**（V-16 前置）：原 mock 只有 scrim+close+content 平铺，
+  无 `.b3-dialog__container` 包裹、无 `b3-dialog--open`——真实 base.css 的弹窗外观
+  （容器表面/居中/遮罩不透明度）全不生效，首拍弹窗内容散页。升级为宿主完整层级
+  （scrim + container[宽度/标题头/X 关闭 svg] + body + `--open` 常驻态）；
+  三套 UI 117/120/117 全绿（querySelector 兼容：`.b3-dialog__scrim/__close` 仍在）。
+  approx 样式块补 b3-dialog 外观近似（host=1 时撤下由真实 base.css 接管）。
+- **顺带发现（已登记不在本轮扩scope）**：orgmgr@390 弹窗成员行挤压——姓名逐字竖排
+  折行、查看详情/编辑与姓名重叠、改名/归档按钮溢出右缘；已记入 V-02 余项
+  （疑 flex min-width 类根因，同 Peek 400px），复现基线 breakpoints orgmgr-390.png。
+- **验证**：单测 222/222；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；
+  `pnpm check` 0 错误；`pnpm run build` + `check:release` PASS；真内核 contacts-flow
+  13/13、spike:init 21/21；断点矩阵 28 景（含 V-26 去重门禁）+ 基线 60 景 + 宿主
+  12 景重拍；orgmgr 桌面/暗色/host 目检为真实弹窗（容器/标题头/X/遮罩齐备）。
+- **留后续**：V-02 余项（含 390px 弹窗挤压）；V-16 余项（原型页治理：正式原型帧 +
+  有意差异/版本/Host pending 标注）；B12 主线（作者定优先级）；B13.8 真机投递
+  实证（作者）。
+
+## 布局修复 第 103 轮：V-02 余项——组织管理弹窗窄视口堆叠（2026-10-01，续跑口令第 104 版驱动）
+
+- **V-02 余项（P0 缺陷条目的窄屏余项）**：第 102 轮 orgmgr 景实证的 390px 弹窗成员行
+  挤压（姓名逐字竖排折行、查看详情/编辑与姓名重叠、改名/归档按钮溢出右缘）根修——
+  根因不是成员行规则（H-01/V-02 的 `min-width:0`/`flex-shrink:0` 已在），而是
+  `__layout` 双栏里 200px 固定左列（`clamp(200px, 28%, 300px)` 在窄窗取下限）把
+  成员区压到 ~130px，任何行内规则都救不了。
+- **修复**：`@media (max-width: 640px)`（与全局移动断点/夹具 isMobile 一致）下
+  `__layout` 改 `flex-direction: column` 纵向堆叠，左列转全宽（右边线→底边线）、
+  组织列表 `max-height: 180px`；成员区获得整行宽度。弹窗宽 `min(920px, 92vw)`
+  保证「弹窗窄 ⇔ 视口窄」，媒体查询即完备。规则置后于原块（同特异性覆盖惯例）。
+- **测试锚定**：smoke B13.3 用例在成员在场时补窄视口断言（`innerWidth <= 640` 才
+  生效，桌面宽视口跳过）：`__layout` computedStyle 为 column + 成员行
+  `scrollWidth <= clientWidth + 2` 不横向溢出（浮点容差惯例）。
+- **验证**：单测 222/222；三套 UI 桌面 **117** / 移动 **120** / 宿主 **117** 全绿；
+  `pnpm check` 0 错误；`pnpm run build` + `check:release` PASS（src 变更）；真内核
+  contacts-flow 13/13、spike:init 21/21；断点矩阵 28 景（去重门禁过）+ 基线 48 景 +
+  宿主 12 景重拍 0 FAIL；orgmgr-390 重拍目检：堆叠后组织列表/改名归档/成员行/
+  添加成员/关闭全部整行排布，无折行无溢出。
+- **留后续**：V-02 余项（575px Peek 复核、200% 文本缩放、用户实图「边界重叠」复核
+  ——真机向）；V-16 余项（原型页治理）；B12 主线（作者定优先级）；B13.8 真机
+  投递实证（作者）。
+
+## 基准治理 第 104 轮：V-16 余项第一批——原型页版本对照治理（2026-10-01，续跑口令第 105 版驱动）
+
+- **V-16 余项（P2）原型页治理第一批**：`docs/ui-prototype.html` 升 **v1.1**——
+  - 顶部新增「🏛 版本对照（V-16 治理）」横幅：①已交付清单（组织维度/双图模式/
+    本人档案「我自己」标已上线 v0.4）；②仍为规划（关系库二期、智能建议远期；
+    组织上线后单位/学校事实源=组织成员索引，不另建人物重复字段）；③有意差异
+    （原型帧=设计意图，实屏基准=版本库内 shots 基线 60 景+断点矩阵 28 景，视觉
+    门禁只引用版本库内基准）；④Host pending 边界（D-40 三路径/B13.8 投递/
+    B14 原生图在 PAGE-STATUS 与 BACKLOG 登记，原型帧不代验收）。
+  - 四处旧「二期」标记校准：核心功能地图「组织维度·关系库 二期规划」拆分为
+    「组织维度 已上线 v0.4」+「关系库 二期规划」；信息架构组织节点、侧栏 mock
+    组织入口（去半透明+去「二期」）、设计原则⑤与导航模型说明同步。
+  - 首页帧设计要点补「今日行动」已交付差异注记（分组/处置/暂缓恢复，以
+    workbench-home 实屏基线为准）；联系人页 F02/F03/F04 从「计划项」校准为
+    「已上线」（三能力均在 PeopleView 落地：people-filters/saved-views/列偏好）。
+  - `PAGE-STATUS.md` 原型状态标识节同步登记本次校准。
+- **选定说明**：口令内 B12 主线（B12.2 三项资料 UI）「作者定优先级」且 B12.2 的
+  单位/学校字段与 B13 组织成员索引存在事实源重叠（DATA-CONTRACT §8 明确组织
+  维度不重复建人物字段），需要作者定「字段 vs 组织投影」口径——本轮不代决，
+  登记 V-16 第一批推进。
+- **验证**：文档轮门禁——`git diff --check` 干净；headless 渲染 ui-prototype.html
+  目检：v1.1 侧栏标识、版本对照横幅四条、组织「已上线 v0.4」chip、IA/侧栏/首页
+  注记均正确呈现；无 src 变更（不触发 build/内核门禁）。
+- **留后续**：V-16 余项（组织管理/批量成员/移动空失败态正式原型帧补齐）；
+  B12 主线（等作者定口径与优先级）；V-05/V-02 真机向余项；B13.8 真机投递
+  实证（作者）。
+
+## 基准治理 第 105 轮：V-16 余项收口——组织管理弹窗正式原型帧（2026-10-01，续跑口令第 106 版驱动）
+
+- **V-16 余项（P2）正式原型帧补齐**：`docs/ui-prototype.html`（v1.1）新增
+  **「组织管理弹窗」原型屏**（导航「核心界面」组新增入口，含页题映射）——
+  - 设计要点：B13.3 成员维护中枢语义（左清单/右详情、新建底部固定）、B13.6a
+    卡片「管理」携组织 ID 定位打开、成员「查看详情」跨弹窗导航、事实源=组织
+    成员索引与单位行/共同背景同口径（DATA-CONTRACT §8 投影关系）。
+  - 桌面帧：min(920px, 92vw) 双栏 mock——组织清单（活跃项高亮/长名省略/已归档
+    分组）、详情（改名/归档组织、成员行「姓名 · 职位（部门）」+查看详情/编辑/
+    移除、former 成员降透明、可搜索选人添加、关闭）。
+  - 三状态卡：移动端 ≤640 双栏纵向堆叠（V-02 第 103 轮修复语义）、空组织态、
+    加载失败态（FUNC-01.12 不以空态冒充失败）。
+  - proto-status 标「✅ 已实现（v0.4.x）」并列实屏基准（workbench-orgmgr-*、
+    breakpoints/orgmgr-*、host-pop-orgmgr）。
+- **V-16 全项收口**（截图夹具第 97/102 轮 + 原型治理第 104/105 轮）。
+- **验证**：文档轮门禁——`git diff --check` 干净；临时渲染脚本（已删）把原型屏
+  置为默认可见后 headless 截图目检：导航入口/设计要点/帧内双栏布局与成员行/
+  三状态卡均正确呈现，无样式破格；无 src 变更。
+- **留后续**：B12 主线（等作者定 B12.2 口径：单位/学校字段 vs B13 组织投影，
+  「与我的关系」为真正缺字段）；V-05/V-02 真机向余项；B13.8 真机投递实证
+  （作者）；H-05 余项（多选批量归 H-07）。

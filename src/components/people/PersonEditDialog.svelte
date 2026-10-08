@@ -16,12 +16,15 @@
         settings,
         i18n,
         person,
+        hostCloseChannel,
         onSaved,
         onClose,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
         person: ContactSummary;
+        /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
+        hostCloseChannel?: { request?: (close: () => void) => void };
         onSaved: () => void;
         onClose: () => void;
     } = $props();
@@ -145,6 +148,15 @@
         changes: draftChanges,
         save: persist,
     });
+    /* D-40：宿主 X/Esc/遮罩经同一守卫路由（返回 Promise 供拦截层重入门） */
+    // svelte-ignore state_referenced_locally
+    if (hostCloseChannel) hostCloseChannel.request = (close) => guardedClose(close);
+
+    /* D-35：错误出现时焦点迁入错误块 */
+    let errorEl: HTMLElement | undefined = $state();
+    function focusError(): void {
+        queueMicrotask(() => errorEl?.focus());
+    }
 
     async function submit() {
         if (running) return;
@@ -155,6 +167,7 @@
             if (alive) onClose();
         } catch (error) {
             if (alive) errorText = error instanceof Error ? error.message : String(error);
+            if (alive) focusError();
         } finally {
             running = false;
         }
@@ -208,7 +221,8 @@
     </div>
 
     {#if errorText}
-        <div class="lvct-form__error" role="alert">{errorText}</div>
+        <!-- D-35：读屏即时播报 + 焦点迁移 -->
+        <div class="lvct-form__error" role="alert" tabindex="-1" bind:this={errorEl}>{errorText}</div>
     {/if}
 
     <div class="lvct-form__actions">

@@ -153,6 +153,9 @@
                 {text("orgsClearFilters", "清除筛选")}
             </button>
         {/if}
+        <!-- B13.8：手动对账入口（外部编辑无通知时，打开时对账 + 手动刷新兜底） -->
+        <button type="button" class="b3-button b3-button--text" onclick={() => void refresh()} disabled={loading}>
+            {text("graphReload", "重新加载")}</button>
         <button type="button" class="b3-button b3-button--text" onclick={() => onOpenOrgManager()}>
             <Plus size={15} />{text("orgsManage", "组织管理")}
         </button>

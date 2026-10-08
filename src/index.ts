@@ -47,6 +47,7 @@ import {
     archiveOrganization,
     restoreOrganization,
     renameOrganization,
+    removeOrgLinkBlocks,
     listPersonOrgMemberships,
     listCommonOrgBackground,
 } from "./services/org";
@@ -969,6 +970,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         return resumeOrganizationOperation(this, this.settings, requestId);
     }
 
+    /** B13.9：移除悬空的 org-links 区块（体检修复入口；逐块隔离返回失败清单） */
+    async removeOrgLinkBlocks(blockIds: readonly string[]) {
+        return removeOrgLinkBlocks(blockIds);
+    }
+
     /** B12：某人的组织归属投影（成员记录 join 组织名） */
     async listPersonOrgMemberships(personDocId: string) {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
@@ -994,8 +1000,8 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         return listCommonOrgBackground(this, this.settings, personDocId);
     }
 
-    /** B13.3：打开组织管理弹窗 */
-    openOrgManagerDialog(): void {
+    /** B13.3：打开组织管理弹窗（B13.6a：携目标组织定位；成员行可跨弹窗导航到工作台人物详情） */
+    openOrgManagerDialog(initialOrgDocId?: string): void {
         if (!this.isLifecycleActive()) return;
         if (!this.settings) {
             showMessage("请先完成人脉工作空间初始化", 3000);
@@ -1003,9 +1009,19 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         }
         this.openOwnedDialog({
             title: this.i18n.orgManagerTitle ?? "组织管理",
-            width: "620px",
+            /* H-01/V-02：宽屏响应式（原固定 620px 左栏挤迫）；min() 兼顾窄视口不溢出 */
+            width: "min(920px, 92vw)",
             component: OrgManagerDialog,
-            props: { facade: this, i18n: this.i18n },
+            props: {
+                facade: this,
+                i18n: this.i18n,
+                initialOrgDocId,
+                onOpenPerson: (person: unknown) => {
+                    /* 组织弹窗为宿主级弹窗，人物详情 Peek 由工作台承载：
+                       经窗口事件交给已挂载的工作台打开（组织弹窗先于 Peek 关闭，避免遮挡） */
+                    window.dispatchEvent(new CustomEvent("lvct-workbench-person", { detail: { person } }));
+                },
+            },
         });
     }
 

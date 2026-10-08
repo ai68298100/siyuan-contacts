@@ -21,11 +21,14 @@
         facade,
         i18n,
         docId,
+        hostCloseChannel,
         onClose,
     }: {
         facade: ContactsPluginFacade;
         i18n?: Readonly<Record<string, string>>;
         docId: string;
+        /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
+        hostCloseChannel?: { request?: (close: () => void) => void };
         onClose: () => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
@@ -79,13 +82,42 @@
         }
     });
     /* CODE-02.1：捕获挂起（主流程/AI 分析）期间关闭按钮静默阻断——失败草稿与步骤保持可见 */
+    /* V-19：关闭守卫的真实脏态——与载入完成时的基线比对（识别勾选/新人名单/日期/地点/备注）。
+       AI 回填与手工修改都使当前值偏离基线（关闭需经守卫确认放弃）；主捕获成功后草稿已被
+       消费（result 就绪），关闭不再拦截。 */
+    let dirtyBaseline = { checkedIds: [] as string[], newNames: "", date: toLocalDateKey(), place: "", note: "" };
+    function markClean(): void {
+        dirtyBaseline = {
+            checkedIds: Object.entries(checked).filter(([, on]) => on).map(([id]) => id),
+            newNames: newNamesText,
+            date,
+            place,
+            note,
+        };
+    }
+    function hasUnsavedDraft(): boolean {
+        if (result) return false;
+        const baseIds = new Set(dirtyBaseline.checkedIds);
+        if (checkedIds.length !== dirtyBaseline.checkedIds.length) return true;
+        if (checkedIds.some((id) => !baseIds.has(id))) return true;
+        return newNamesText.trim() !== dirtyBaseline.newNames.trim()
+            || date !== dirtyBaseline.date
+            || place.trim() !== dirtyBaseline.place.trim()
+            || note.trim() !== dirtyBaseline.note.trim();
+    }
+    /* CODE-02.1：捕获挂起（主流程/AI 分析）期间关闭按钮静默阻断——失败草稿与步骤保持可见 */
     const guardedClose = useCloseGuard({
         busy: () => loading || running || aiRunning,
-        dirty: () => false,
+        dirty: () => hasUnsavedDraft(),
     });
     function closeIfIdle(): void {
         void guardedClose(onClose);
     }
+    /* D-40：宿主 X/Esc/遮罩经同一守卫路由（通道由 libs/dialog 注入）；
+       返回 Promise 供拦截层做重入门（三选一期间不再重复拦截） */
+    $effect(() => {
+        if (hostCloseChannel) hostCloseChannel.request = (close) => guardedClose(close);
+    });
 
     function openOptionalDoc(docId: string | undefined): void {
         if (docId) void facade.openDoc(docId);
@@ -112,6 +144,8 @@
             linkedDocIds = preview.linked.map((person) => person.docId);
             aiMatchedIds = [];
             aiCandidates = [];
+            /* V-19：初始勾选不算草稿——基线在此刻落定（重试重载同样复基线） */
+            markClean();
         } catch (error) {
             loadError = error instanceof Error ? error.message : String(error);
         } finally {
@@ -258,6 +292,12 @@
             .map((candidate) => `${candidate.personName}：${candidate.error ?? "尚未核实"}`);
         extrasError = failures.join("；");
     }
+
+    /* D-35：错误出现时焦点迁入错误块 */
+    let errorEl: HTMLElement | undefined = $state();
+    $effect(() => {
+        if (errorText && errorEl) errorEl.focus();
+    });
 
     async function submit() {
         if (running || !hasTarget) return;
@@ -592,7 +632,8 @@
         </label>
 
         {#if errorText}
-            <div class="lvct-form__error" role="alert">{errorText}</div>
+            <!-- D-35：读屏即时播报 + 焦点迁移 -->
+            <div class="lvct-form__error" role="alert" tabindex="-1" bind:this={errorEl}>{errorText}</div>
         {/if}
 
         {#if running}

@@ -4,7 +4,7 @@
  * 组织维度不写 related；扫描读取失败保持未知（不静默按无组织处理）。
  */
 import type { Plugin } from "siyuan";
-import { flushBlockIndex, readOrganizationFact, updateBlockMd } from "../api/blocks";
+import { flushBlockIndex, readOrganizationFact, updateBlockMd, upsertMarkedBlock, findBlockIdByCustomAttr, deleteBlock } from "../api/blocks";
 import { querySql } from "../api/client";
 import { withStoreLock } from "../data/storage";
 import { loadOrganizationOperations } from "../data/organization-operations";
@@ -23,7 +23,7 @@ import {
     replaceOrgMembership,
 } from "../data/org-membership";
 import type { OrgMembership, OrgMembershipPatch, OrgMembershipStatusFilter } from "../domain/org-membership";
-import { buildCommonOrgBackground, pageOrgMemberships, sortOrgMemberships } from "../domain/org-membership";
+import { buildCommonOrgBackground, pageOrgMemberships, sortOrgMemberships, buildOrgLinksSection } from "../domain/org-membership";
 import type { CommonOrgBackground } from "../domain/org-membership";
 import type { ContactsSettings } from "../domain/model";
 import { getRoster } from "./roster";
@@ -32,6 +32,7 @@ import { listOrganizationMarkerPage, readOrganizationDocuments } from "../api/or
 export const ORG_SECTION_ATTR = "custom-lvct-org";
 /** B13 归档语义：标记区块值 custom-lvct-org="archived" 表示组织已归档（文档与成员记录保留） */
 export const ORG_ARCHIVED_VALUE = "archived";
+export const ORG_LINKS_SECTION_ATTR = "custom-lvct-org-links";
 
 /** 全库组织文档列举（单 SQL 找标记含归档值 + 单 SQL 取文档名，性能预算见 §4；零写入） */
 export async function scanOrganizations(): Promise<OrganizationSummary[]> {
@@ -46,6 +47,52 @@ export async function scanOrganizations(): Promise<OrganizationSummary[]> {
         `SELECT id, content, hpath, box FROM blocks WHERE type='d' AND id IN (${idList})`,
     );
     return organizationsFromDocs(states, docs);
+}
+
+/** B13.9：组织标记冲突体检数据源。 */
+export async function countOrgMarkers(): Promise<Map<string, number>> {
+    const rows = await querySql<{ root_id: string; markers: number }>(
+        `SELECT root_id, COUNT(id) AS markers FROM blocks WHERE ial LIKE '%${ORG_SECTION_ATTR}="%' GROUP BY root_id`,
+    );
+    return new Map(rows.map((row) => [row.root_id, Number(row.markers)]));
+}
+
+/** B13.9：人物文档组织链接区块反查与逐块清理。 */
+export async function findOrgLinkBlocks(): Promise<Map<string, string>> {
+    const rows = await querySql<{ root_id: string; id: string }>(
+        `SELECT root_id, id FROM blocks WHERE ial LIKE '%${ORG_LINKS_SECTION_ATTR}="%'`,
+    );
+    return new Map(rows
+        .filter((row) => typeof row.root_id === "string" && typeof row.id === "string")
+        .map((row) => [row.root_id, row.id] as const));
+}
+
+export async function removeOrgLinkBlocks(blockIds: readonly string[]): Promise<Array<{ id: string; message: string }>> {
+    const failures: Array<{ id: string; message: string }> = [];
+    for (const id of blockIds) {
+        try { await deleteBlock(id); } catch (error) { failures.push({ id, message: error instanceof Error ? error.message : String(error) }); }
+    }
+    return failures;
+}
+
+export async function syncPersonOrgLinksSection(plugin: Plugin, personDocId: string): Promise<void> {
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(personDocId)) throw new Error("personDocId 不是合法的思源 ID");
+    const memberships = (await membershipsByPerson(plugin)).get(personDocId) ?? [];
+    const names = new Map((await scanOrganizations()).filter((org) => !org.archived).map((org) => [org.docId, org.name] as const));
+    const entries = memberships.filter((m) => m.status === "active" && names.has(m.orgDocId)).map((m) => ({
+        orgDocId: m.orgDocId, orgName: names.get(m.orgDocId) ?? "", department: m.department, title: m.title,
+    }));
+    const existingId = await findBlockIdByCustomAttr(personDocId, ORG_LINKS_SECTION_ATTR);
+    await upsertMarkedBlock(personDocId, ORG_LINKS_SECTION_ATTR, buildOrgLinksSection(entries), existingId);
+}
+
+export async function refreshPersonOrgLinkSections(plugin: Plugin, docIds: readonly string[]): Promise<Array<{ docId: string; message: string }>> {
+    const failures: Array<{ docId: string; message: string }> = [];
+    for (const docId of [...new Set(docIds)]) {
+        try { await syncPersonOrgLinksSection(plugin, docId); }
+        catch (error) { failures.push({ docId, message: error instanceof Error ? error.message : String(error) }); }
+    }
+    return failures;
 }
 
 /**

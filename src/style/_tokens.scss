@@ -145,6 +145,11 @@
     --lvct-touch-min: 32px;          /* 桌面触控目标下限 */
     --lvct-touch-min-mobile: 40px;   /* 移动端触控目标下限 */
 
+    /* ---------- 13b. D-31 键盘焦点环令牌 ---------- */
+    --lvct-focus-ring-color: var(--lvct-accent);
+    --lvct-focus-ring-width: 2px;
+    --lvct-focus-ring-offset: 2px;
+
     /* ---------- 14. 组件尺寸 ---------- */
     --lvct-avatar-sm: 30px;
     --lvct-avatar-md: 40px;

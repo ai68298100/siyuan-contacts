@@ -277,9 +277,16 @@
         };
         window.addEventListener("lvct-workbench-view", handleRequestedView);
         lifecycleToken.onDispose(() => window.removeEventListener("lvct-workbench-view", handleRequestedView));
+        // B13.6a：组织管理弹窗成员「查看详情」跨弹窗导航（弹窗先关，Peek 由本层打开）
+        const handleRequestedPerson = (event: Event) => {
+            const person = (event as CustomEvent<{ person?: ContactSummary }>).detail?.person;
+            if (person?.docId) void openDetail(person);
+        };
+        window.addEventListener("lvct-workbench-person", handleRequestedPerson);
         return () => {
             lifecycleToken.invalidate();
             window.removeEventListener("lvct-workbench-view", handleRequestedView);
+            window.removeEventListener("lvct-workbench-person", handleRequestedPerson);
         };
     });
 

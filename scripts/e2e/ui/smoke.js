@@ -1628,6 +1628,13 @@ await test("B13.3 组织管理弹窗：新建组织、添加/移除成员经 fac
         "添加成员未生效",
     );
     assert(memberOps.length === 1 && memberOps[0].personDocId === "20260930000000-per0001", "成员未写入");
+    /* V-02：窄视口下组织弹窗双栏纵向堆叠，成员行不横向溢出。 */
+    if (window.innerWidth <= 640) {
+        const layout = fixture.querySelector(".lvct-org-manager__layout");
+        assert(layout && getComputedStyle(layout).flexDirection === "column", "窄视口组织弹窗未堆叠（仍双栏）");
+        const memberRow = fixture.querySelector(".lvct-org-manager__member");
+        assert(memberRow && memberRow.scrollWidth <= memberRow.clientWidth + 2, "窄视口成员行仍横向溢出");
+    }
     /* 移除成员（B13.4 起行内含编辑与移除两个按钮，按文案定位） */
     const removeRow = [...fixture.querySelectorAll(".lvct-org-manager__member")].find((node) => node.textContent.includes("张三"));
     button("移除", removeRow).click();

@@ -25,6 +25,14 @@
     .b3-button { border: 0; padding: 7px 12px; background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); cursor: pointer; }
     .b3-button--outline, .b3-button--cancel { background: var(--b3-theme-surface); color: var(--b3-theme-on-background); }
     .b3-text-field, .b3-select { background: var(--b3-theme-background); color: var(--b3-theme-on-background); border: 1px solid var(--b3-border-color); padding: 6px; box-sizing: border-box; }
+    /* V-16 余项：b3-dialog 外观近似（host=1 时本块整体撤下、由真实 base.css 接管）。
+       与宿主规则的差异仅省略过渡动画——截图取入场后的常驻态。 */
+    .b3-dialog { position: fixed; top: 0; left: 0; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; height: 100%; display: flex; font-size: var(--b3-font-size); }
+    .b3-dialog__scrim { background-color: rgba(0,0,0,.35); position: fixed; inset: 0; }
+    .b3-dialog__container { outline: none; border-radius: 4px; background-color: var(--b3-theme-surface); position: relative; box-shadow: 0 4px 16px rgba(0,0,0,.2); display: flex; flex-direction: column; box-sizing: border-box; max-width: 88vw; border: 1px solid var(--b3-theme-surface-lighter); }
+    .b3-dialog__header { cursor: default; padding: 9px 24px; line-height: 24px; font-size: 16px; font-weight: 500; border-bottom: 1px solid var(--b3-theme-surface-lighter); }
+    .b3-dialog__body { min-height: 0; overflow: auto; flex: 1; display: flex; flex-direction: column; }
+    .b3-dialog__close { position: absolute; cursor: pointer; top: 4px; right: 4px; height: 18px; width: 18px; opacity: .68; color: var(--b3-theme-on-surface); padding: 8px; z-index: 1; }
 </style>
 <script id="host-baseline-boot">
     /* 宿主样式基线（C01）：?host=1 时注入真实思源 base.css + 官方主题变量，
@@ -54,6 +62,8 @@
     import { mount, tick } from "svelte";
     import "../../src/index.scss";
     import Workbench from "../../src/components/Workbench.svelte";
+    import OrgManagerDialog from "../../src/components/org/OrgManagerDialog.svelte";
+    import { svelteDialog } from "../../src/libs/dialog.ts";
     import { kernel } from "./ui/siyuan-mock.js";
     import { FIELD_SPECS } from "../../src/domain/fields.ts";
     import { DEFAULT_VIEW_PREFERENCES } from "../../src/domain/preferences.ts";
@@ -165,6 +175,18 @@
         bySource: { manual: 0, diary: 0, api: 0 }, topPeople: [], entries: [],
         previousTotal: 0, delta: 0,
     });
+    /* V-16：组织样例（活跃×2 + 归档×1）——组织视图卡片与组织管理弹窗景共用 */
+    const orgShotList = [
+        { docId: "20260101000000-orgshot1", name: "曙光科技（原晨曦信息技术有限公司）", hpath: "/曙光科技", notebookId: settings.notebookId, archived: false, memberships: [
+            { id: "mem-1", orgDocId: "20260101000000-orgshot1", personDocId: people[0].docId, status: "active", joinedOn: "2021-03-01", department: "研发中心平台架构部", title: "高级工程师" },
+            { id: "mem-2", orgDocId: "20260101000000-orgshot1", personDocId: people[1].docId, status: "active", joinedOn: "2022-06-01", department: "数学组", title: "教师" },
+            { id: "mem-3", orgDocId: "20260101000000-orgshot1", personDocId: people[2].docId, status: "former", joinedOn: "2020-01-01", leftOn: "2023-06-30", department: "", title: "摄影指导" },
+        ] },
+        { docId: "20260101000000-orgshot2", name: "母校学院", hpath: "/母校学院", notebookId: settings.notebookId, archived: false, memberships: [
+            { id: "mem-4", orgDocId: "20260101000000-orgshot2", personDocId: people[0].docId, status: "active", joinedOn: "2015-09-01", department: "计算机系", title: "" },
+        ] },
+        { docId: "20260101000000-orgshot3", name: "已注销工作室", hpath: "/已注销工作室", notebookId: settings.notebookId, archived: true, memberships: [] },
+    ];
     const facade = {
         listPersonOrgMemberships: async (docId) => organizations.flatMap((org) => org.memberships.filter((member) => member.personDocId === docId)
             .map((member) => ({ ...member, orgName: org.name, archived: org.archived, reachable: true }))),
@@ -245,6 +267,65 @@
         savePersonCadence: async (docId, cadence) => {
             if (cadence === null) cadenceOverrides.delete(docId); else cadenceOverrides.set(docId, cadence);
         },
+        /* B13/V-05：Peek 组织区样例（长组织名/期间文本/同伴行，供布局矩阵核对） */
+        listPersonOrgMemberships: async (docId) => docId === people[0].docId ? [{
+            id: "mem-shot-1", orgDocId: "20260101000000-orgshot1", orgName: "曙光科技（原晨曦信息技术有限公司）",
+            department: "研发中心平台架构部", title: "高级工程师", joinedOn: "2021-03-01", leftOn: "", status: "active",
+        }] : [],
+        /* V-16：组织视图样例——多组织（活跃+归档）+ 成员计数供组织卡片网格核对；
+           V-16 余项：同一份组织数据供组织管理弹窗景复用（listOrganizationMembers join 名册取姓名） */
+        listOrganizations: async () => orgShotList,
+        listOrganizationMembers: async (orgDocId) => {
+            const byDoc = new Map(people.map((person) => [person.docId, person.name]));
+            return (orgShotList.find((org) => org.docId === orgDocId)?.memberships ?? []).map((membership) => ({
+                ...membership,
+                personName: byDoc.get(membership.personDocId) ?? "（已解绑）",
+            }));
+        },
+        listContacts: async () => people.map(summary),
+        createOrganization: async (name) => {
+            orgShotList.push({ docId: `20260927000000-orgshot${orgShotList.length + 1}`, name, hpath: `/${name}`, notebookId: settings.notebookId, archived: false, memberships: [] });
+        },
+        addOrganizationMember: async (orgDocId, personDocId, extra) => {
+            const org = orgShotList.find((entry) => entry.docId === orgDocId);
+            if (!org) return;
+            org.memberships.push({ id: `mem-mgr-${org.memberships.length + 1}`, orgDocId, personDocId, status: "active", joinedOn: "2026-01-01", department: "", title: "", ...(extra ?? {}) });
+        },
+        removeOrganizationMember: async (id) => {
+            for (const org of orgShotList) {
+                const index = org.memberships.findIndex((membership) => membership.id === id);
+                if (index >= 0) org.memberships.splice(index, 1);
+            }
+        },
+        updateOrganizationMember: async (id, patch) => {
+            for (const org of orgShotList) {
+                const membership = org.memberships.find((entry) => entry.id === id);
+                if (membership) Object.assign(membership, patch);
+            }
+        },
+        archiveOrganization: async (docId) => { const org = orgShotList.find((entry) => entry.docId === docId); if (org) org.archived = true; },
+        restoreOrganization: async (docId) => { const org = orgShotList.find((entry) => entry.docId === docId); if (org) org.archived = false; },
+        renameOrganization: async (docId, name) => { const org = orgShotList.find((entry) => entry.docId === docId); if (org) { org.name = name; org.hpath = `/${name}`; } },
+        /* V-16 余项：与 index.ts 同构的弹窗打开（svelteDialog + mock Dialog 提供真实 b3-dialog DOM） */
+        openOrgManagerDialog: (initialOrgDocId = "") => {
+            svelteDialog({
+                title: "组织管理",
+                width: "min(920px, 92vw)",
+                component: OrgManagerDialog,
+                props: {
+                    facade,
+                    initialOrgDocId,
+                    onOpenPerson: (person) => window.dispatchEvent(new CustomEvent("lvct-workbench-person", { detail: { person } })),
+                },
+            });
+        },
+        listCommonOrgBackground: async (docId) => docId === people[0].docId ? [{
+            orgDocId: "20260101000000-orgshot1", orgName: "曙光科技（原晨曦信息技术有限公司）",
+            peers: [
+                { docId: people[1].docId, name: people[1].name, overlapText: "2021-03-01 ~ 至今", samePeriod: true, contact: summary(people[1]) },
+                { docId: people[2].docId, name: people[2].name, overlapText: "? ~ 2022-06-30", samePeriod: false, contact: summary(people[2]) },
+            ],
+        }] : [],
         listTemplates: async () => templates,
         saveTemplates: async (next) => { templates.splice(0, templates.length, ...next); return templates; },
         saveViewPreferences: async (next) => { Object.assign(preferences, next, { revision: preferences.revision + 1 }); return structuredClone(preferences); },
@@ -267,7 +348,9 @@
     };
     mount(Workbench, { target: document.getElementById("shot"), props: {
         facade, settings, preferences,
-        initialView: (view === "home" || view === "quickfill") ? "home" : view === "graph" ? "graph" : view === "orgs" || view === "orgdetail" ? "orgs" : "people",
+        /* V-26：settings 曾落入 people 兜底——断点矩阵 settings-* 与 people-* 字节相同；
+           V-16 余项：orgmgr 先落组织视图再由触发器开组织管理弹窗 */
+        initialView: (view === "home" || view === "quickfill") ? "home" : view === "graph" ? "graph" : view === "orgs" || view === "orgmgr" ? "orgs" : view === "settings" ? "settings" : "people",
         isMobile: innerWidth <= 640, onPreferencesUpdated() {}, onOpenPersonDoc() {},
     } });
     async function waitFor(predicate, message) {
@@ -336,6 +419,8 @@
                 : view === "graph" ? innerWidth <= 640 ? ".lvct-graph-text" : ".lvct-graph-view__canvas"
                 : view === "orgs" ? ".lvct-orgs-view__card"
                 : view === "orgdetail" ? ".lvct-org-manager__member"
+                : view === "orgmgr" ? ".b3-dialog .lvct-org-manager"
+                : view === "settings" ? ".lvct-settings"
                 : view === "table" ? ".lvct-people__table-wrap"
                 : view === "peek" ? ".lvct-detail"
                 : view === "viewsmenu" ? ".lvct-people__viewsmenu"
@@ -343,7 +428,14 @@
                 : view === "quickfill" ? ".lvct-qf__input"
                 : view === "colmenu" ? ".lvct-people__colmenu"
                 : ".lvct-person-card";
-            await waitFor(() => document.querySelector(expected), `缺少截图目标 ${expected}`);
+        if (view === "orgmgr") {
+            /* V-16 余项：点首个活跃组织卡片的「管理」→ facade.openOrgManagerDialog(orgDocId) */
+            const manage = [...document.querySelectorAll(".lvct-orgs-view__card button")]
+                .find((node) => node.textContent.includes("管理"));
+            if (!manage) { document.title = "ERROR no org manage button"; return; }
+            manage.click();
+        }
+        await waitFor(() => document.querySelector(expected), `缺少截图目标 ${expected}`);
             if (view === "graph") {
                 await waitFor(() => {
                     const summary = document.querySelector(".lvct-graph-summary");

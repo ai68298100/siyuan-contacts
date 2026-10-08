@@ -14,6 +14,7 @@
         settings,
         i18n,
         initial,
+        hostCloseChannel,
         onCreated,
         onClose,
     }: {
@@ -21,6 +22,8 @@
         i18n?: Readonly<Record<string, string>>;
         /** FAST-01.3：识别资料后预填的初始草稿（打开快照，不随外部变化） */
         initial?: ContactDraft;
+        /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
+        hostCloseChannel?: { request?: (close: () => void) => void };
         onCreated: (person: ContactSummary) => void;
         onClose: () => void;
     } = $props();
@@ -104,6 +107,16 @@
         dirty: () => !saved && (JSON.stringify(draft) !== JSON.stringify(emptyDraft()) || tagsText.trim().length > 0),
         changes: () => [...draftChanges(), ...(creationRequest ? [text("contactCheckpointWarning", "原请求断点仅保留在当前窗口。关闭不会删除已保存文档；请核实后继续，不能凭同名重新建档。")] : [])],
         save: persist,
+    });
+    /* D-40：宿主 X/Esc/遮罩经同一守卫路由（返回 Promise 供拦截层重入门） */
+    $effect(() => {
+        if (hostCloseChannel) hostCloseChannel.request = (close) => guardedClose(close);
+    });
+
+    /* D-35：错误出现时焦点迁入错误块（键盘/读屏用户可 Tab 继续操作） */
+    let errorEl: HTMLElement | undefined = $state();
+    $effect(() => {
+        if (errorText && errorEl) errorEl.focus();
     });
 
     async function submit() {
@@ -197,9 +210,10 @@
             <br />{creationRequest.checkpoint.requestId}{creationRequest.checkpoint.docId ? ` · ${creationRequest.checkpoint.docId}` : ""}</p>
     {/if}
 
-    {#if errorText}
-        <div class="lvct-form__error" role="alert">{errorText}</div>
-    {/if}
+        {#if errorText}
+            <!-- D-35：读屏即时播报（role=alert），focus 落到错误块便于键盘继续操作 -->
+            <div class="lvct-form__error" role="alert" tabindex="-1" bind:this={errorEl}>{errorText}</div>
+        {/if}
 
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={running}>{text("formCancel", "取消")}</button>

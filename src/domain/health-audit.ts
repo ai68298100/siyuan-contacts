@@ -10,6 +10,7 @@
 import type { ContactSummary } from "./person";
 import type { FollowUpItem } from "./followups";
 import type { OrgMembership } from "./org-membership";
+import { findDanglingOrgLinks } from "./org-membership.ts";
 import type { SelfIdentity } from "./self-identity";
 import { normalizeInteractionStoreForWrite } from "./interactions.ts";
 import type { InteractionStore } from "./interactions";
@@ -31,7 +32,13 @@ export type AuditIssueKind =
     | "orphanOrganizationMember"
     | "duplicateOrganizationHistory"
     | "abnormalOrganizationPeriod"
-    | "unreachableSelfIdentity";
+    | "unreachableSelfIdentity"
+    | "orphanOrgMember"
+    | "unreachableOrg"
+    | "invertedMembershipPeriod"
+    | "duplicateActiveMembership"
+    | "conflictingOrgMarkers"
+    | "danglingOrgLinks";
 
 export type AuditModuleKey = "roster" | "interactions" | "followUps" | "organizationMembers" | "selfIdentity";
 export type AuditModuleState = "success" | "failed" | "unknown";
@@ -74,10 +81,13 @@ export interface AuditModuleResult {
 export interface HealthAuditReferences {
     people: ContactSummary[];
     organizationDocIds: string[];
+    organizationNames?: ReadonlyMap<string, string>;
     interactions?: InteractionStore;
     followUps?: FollowUpStore;
     organizationMembers?: OrgMembership[];
     selfIdentity?: SelfIdentity | null;
+    organizationMarkerCounts?: ReadonlyMap<string, number>;
+    organizationLinkBlocks?: ReadonlyMap<string, string>;
 }
 
 export interface HealthAuditReport {
@@ -123,6 +133,12 @@ const REPAIR_COPY: Record<AuditIssueKind, { action: string; impact: string }> = 
     duplicateOrganizationHistory: { action: "核对重复组织历史", impact: "只展示重复历史，不自动删除或合并成员记录。" },
     abnormalOrganizationPeriod: { action: "核对组织任职期间", impact: "只展示异常期间，不自动填补或更改任职日期。" },
     unreachableSelfIdentity: { action: "核对本人身份绑定", impact: "只展示身份与名册差异，不自动改绑。" },
+    orphanOrgMember: { action: "核对组织成员归属", impact: "只定位成员记录，不猜测组织或人物文档。" },
+    unreachableOrg: { action: "核对组织文档", impact: "只展示不可达组织，不自动重建或删除成员事实。" },
+    invertedMembershipPeriod: { action: "核对组织任职期间", impact: "只展示期间倒挂，不自动修改日期。" },
+    duplicateActiveMembership: { action: "核对重复在职记录", impact: "只展示重复记录，不自动删除成员事实。" },
+    conflictingOrgMarkers: { action: "核对组织标记块", impact: "只展示冲突标记，不自动删除正文。" },
+    danglingOrgLinks: { action: "清理悬空组织链接", impact: "仅在确认后清理插件组织链接区块。" },
 };
 
 export function previewAuditRepair(issue: Pick<AuditIssue, "module" | "kind" | "itemIds">): AuditRepairPreview {
@@ -424,4 +440,46 @@ export function decodeAuditOrganizationMembers(raw: unknown): OrgMembership[] {
             || !validDate(member.joinedOn) || !validDate(member.leftOn)) throw new HealthAuditJsonError("organizationMembers");
         return { ...member, department: member.department ?? "", title: member.title ?? "", joinedOn: member.joinedOn ?? "", leftOn: member.leftOn ?? "" } as OrgMembership;
     });
+}
+
+/** B13.9 组织体检：只读检查成员、组织标记和人物组织链接，不执行写入。 */
+export interface OrgAuditInput {
+    memberships: readonly OrgMembership[];
+    rosterDocIds: ReadonlySet<string>;
+    reachableOrgDocIds: ReadonlySet<string>;
+    orgNames: ReadonlyMap<string, string>;
+    personNames: ReadonlyMap<string, string>;
+    markerCounts?: ReadonlyMap<string, number>;
+    orgLinkBlockRoots?: ReadonlyMap<string, string>;
+    activePersonDocIds?: ReadonlySet<string>;
+}
+
+export function runOrgHealthAudit(input: OrgAuditInput): AuditIssue[] {
+    const { memberships, rosterDocIds, reachableOrgDocIds, orgNames, personNames } = input;
+    const orgLabel = (id: string) => orgNames.get(id) ?? `组织文档 ${id.slice(-6)}`;
+    const personLabel = (id: string) => personNames.get(id) ?? `人物 ${id.slice(-6)}`;
+    const label = (m: OrgMembership) => `${personLabel(m.personDocId)} @ ${orgLabel(m.orgDocId)}`;
+    const issues: AuditIssue[] = [];
+    const orphan = memberships.filter((m) => !rosterDocIds.has(m.personDocId)).map((m) => ({ id: m.id, label: label(m) }));
+    if (orphan.length) issues.push(toIssue("organizationMembers", "orphanOrgMember", "以下成员记录的人物文档已不在名册", orphan));
+    const unreachable = [...new Set(memberships.filter((m) => !reachableOrgDocIds.has(m.orgDocId)).map((m) => m.orgDocId))]
+        .map((id) => ({ id, label: `${orgLabel(id)}（组织文档不可达）` }));
+    if (unreachable.length) issues.push(toIssue("organizationMembers", "unreachableOrg", "以下组织文档不可达，成员事实保留待核对", unreachable));
+    const inverted = memberships.filter((m) => m.joinedOn && m.leftOn && m.joinedOn > m.leftOn)
+        .map((m) => ({ id: m.id, label: `${label(m)}（${m.joinedOn} ~ ${m.leftOn}）` }));
+    if (inverted.length) issues.push(toIssue("organizationMembers", "invertedMembershipPeriod", "以下成员任职期间倒挂", inverted));
+    const active = new Map<string, OrgMembership[]>();
+    for (const m of memberships) if (m.status === "active") {
+        const key = `${m.personDocId}|${m.orgDocId}`;
+        active.set(key, [...(active.get(key) ?? []), m]);
+    }
+    const duplicates = [...active.values()].filter((list) => list.length > 1).map((list) => ({ id: list[0].id, label: `${label(list[0])}（${list.length} 条在职记录）` }));
+    if (duplicates.length) issues.push(toIssue("organizationMembers", "duplicateActiveMembership", "以下同人同组织存在多条在职记录", duplicates));
+    const markers = [...(input.markerCounts ?? [])].filter(([, count]) => count > 1)
+        .map(([id, count]) => ({ id, label: `${orgLabel(id)}（${count} 个标记块）` }));
+    if (markers.length) issues.push(toIssue("organizationMembers", "conflictingOrgMarkers", "以下组织文档存在多个组织标记块", markers));
+    const dangling = findDanglingOrgLinks(input.orgLinkBlockRoots ?? new Map(), input.activePersonDocIds ?? new Set())
+        .map((item) => ({ id: item.blockId, label: `人物 ${item.rootId.slice(-6)}` }));
+    if (dangling.length) issues.push(toIssue("organizationMembers", "danglingOrgLinks", "以下人物文档残留悬空组织链接区块", dangling));
+    return issues;
 }

@@ -60,3 +60,19 @@ test("排序：理由多者优先；空名册返回空数组", () => {
     assert.equal(pairs[0].reasons.length, 3);
     assert.equal(findDuplicatePairs([]).length, 0);
 });
+
+test("G-07 重复候选上限：达 maxPairs 停止生成防大桶爆内存", () => {
+    /* 构造 30 个同名联系人 → 两两配对理论 435 对，限制 50 对验证截断 */
+    const crowd = Array.from({ length: 30 }, (_, i) => ({
+        docId: `20260930000000-dup${String(i + 1).padStart(4, "0")}`,
+        itemId: `row-dup-${String(i + 1).padStart(4, "0")}`,
+        name: "同名",
+        phone: "", email: "", wechat: "", website: "",
+        birthday: "", isLunar: false, group: "", tags: [], relatedItemIds: [],
+    }));
+    const result = findDuplicatePairs(crowd, 50);
+    assert.equal(result.length, 50, "候选数应被上限截断为 50");
+    /* 不传 maxPairs 时默认 500——30 人同名不会触发 */
+    const unbounded = findDuplicatePairs(crowd);
+    assert.equal(unbounded.length, 435, "默认上限内不应截断（C(30,2)=435）");
+});

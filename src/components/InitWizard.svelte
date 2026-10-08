@@ -48,6 +48,11 @@
     let notebookName: string = $state("人脉");
     let running: boolean = $state(false);
     let errorText: string = $state("");
+    /* D-32：错误出现时焦点迁入错误块 */
+    let errorEl: HTMLElement | undefined = $state();
+    $effect(() => {
+        if (errorText && errorEl) errorEl.focus();
+    });
     let failed: boolean = $state(false);
     let logLines: string[] = $state([]);
     let snapshot: WorkspaceSnapshot | null = $state(null);
@@ -167,7 +172,8 @@
     {/if}
 
     {#if errorText}
-        <div class="lvct-wizard__error" role="alert">
+        <!-- D-32：读屏即时播报 + 焦点迁移 -->
+        <div class="lvct-wizard__error" role="alert" tabindex="-1" bind:this={errorEl}>
             <div>{text("wizardFailed", "初始化失败：")}{errorText}</div>
             <p class="ft__smaller lvct-wizard__error-hint">
                 {text("wizardResumeHint", "已建成的部分已保留：排除原因后再次点击「继续初始化」，将从断点续建，不会重复创建或删除已有内容。")}

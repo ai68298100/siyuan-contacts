@@ -439,6 +439,7 @@
       <div class="lvct-sidebar-caption">其他流程与页面预览</div>
       <div class="lvct-nav-list">
         <button class="lvct-nav-item" data-screen-target="person"><svg class="lvct-icon"><use href="#lvct-i-people"></use></svg>人物详情</button>
+        <button class="lvct-nav-item" data-screen-target="orgmgr"><svg class="lvct-icon"><use href="#lvct-i-org"></use></svg>组织管理弹窗</button>
         <button class="lvct-nav-item" data-screen-target="capture"><svg class="lvct-icon"><use href="#lvct-i-plus"></use></svg>笔记捕获</button>
         <button class="lvct-nav-item" data-screen-target="import"><svg class="lvct-icon"><use href="#lvct-i-arrow"></use></svg>收编与导入</button>
         <button class="lvct-nav-item" data-screen-target="onboarding"><svg class="lvct-icon"><use href="#lvct-i-check"></use></svg>初始化向导</button>
@@ -449,6 +450,7 @@
     </aside>
     <main class="lvct-main">
       <div class="lvct-content">
+        <div class="lvct-callout lvct-small" role="note"><strong>版本对照 · V-16：</strong>当前原型 v1.1 对应插件 v0.4.x。组织视图、组织管理弹窗、成员字段编辑、归档恢复、共同背景、组织体检与人物—组织双链区块已交付；关系库类型化/非对称关系和智能建议仍属规划。实屏验收以 <code>scripts/e2e/shots/</code> 与当前源码为准。</div>
         <section class="lvct-status-frame" aria-live="polite" aria-atomic="true">
           <div class="lvct-state-preview" data-state-preview="ready"><span class="lvct-status-dot"></span><p><strong>演示内容：</strong>以下姓名、日期和数据均为虚构样例。实际功能状态、宿主能力与验收以源码和 PROGRESS 为准。</p></div>
           <div class="lvct-state-preview" data-state-preview="loading"><span class="lvct-status-dot"></span><p><strong>正在读取：</strong>保留页面结构并显示骨架；未拿到数据前不把失败伪装成“暂无联系人”。</p></div>
@@ -603,6 +605,23 @@
               <button class="lvct-button lvct-button--quiet lvct-button--small" data-open-modal="org-impact">管理成员或归档时查看影响</button>
             </div></section>
           </div>
+        </section>
+
+        <section class="lvct-page" data-screen="orgmgr" aria-labelledby="lvct-orgmgr-title">
+          <header class="lvct-page-head">
+            <div><div class="lvct-eyebrow">V-16 · 组织维度已上线 <span class="lvct-chip lvct-chip--success">v0.4.x</span></div><h1 class="lvct-page-title" id="lvct-orgmgr-title">组织管理弹窗</h1><p class="lvct-page-subtitle">组织成员维护中枢；由组织卡片携带组织 ID 定位打开，移动端窄视口自动堆叠。</p></div>
+          </header>
+          <div class="lvct-callout lvct-small" style="margin-bottom:14px"><strong>事实边界：</strong>成员归属、职位、部门和历史状态来自组织成员索引；人物文档仅维护 <code>custom-lvct-org-links</code> 导航投影。查看详情会回到人物 Peek，关闭弹窗保留未保存守卫。</div>
+          <section class="lvct-panel">
+            <div class="lvct-panel-head"><div><h2>组织管理 · 曙光科技</h2><p>桌面双栏；≤640px 时组织列表与详情纵向堆叠，成员动作保持整行可见。</p></div><span class="lvct-chip lvct-chip--accent">当前组织</span></div>
+            <div class="lvct-panel-body">
+              <div class="lvct-grid lvct-grid--two">
+                <section class="lvct-panel"><div class="lvct-panel-head"><div><h3>组织</h3><p>活跃与已归档分组</p></div></div><div class="lvct-panel-body"><button class="lvct-nav-item" style="width:100%; text-align:left; background:var(--lvct-accent-soft)">曙光科技（3 位成员）</button><button class="lvct-nav-item" style="width:100%; text-align:left">母校学院（1 位成员）</button><button class="lvct-nav-item" style="width:100%; text-align:left; opacity:.65">已归档（1）</button><div class="lvct-divider"></div><label class="lvct-search"><span class="lvct-visually-hidden">组织名称</span><input placeholder="组织名称…"></label><button class="lvct-button lvct-button--primary" style="margin-top:8px">新建组织</button></div></section>
+                <section class="lvct-panel"><div class="lvct-panel-head"><div><h3>曙光科技</h3><p>成员归属与字段维护</p></div><div class="lvct-inline"><button class="lvct-button lvct-button--small">改名</button><button class="lvct-button lvct-button--quiet lvct-button--small">归档组织</button></div></div><div class="lvct-panel-body"><div class="lvct-row"><div class="lvct-row-main"><span class="lvct-row-title">林晓梅 · 高级工程师</span><span class="lvct-row-meta">研发中心 · 当前成员</span></div><div class="lvct-inline"><button class="lvct-button lvct-button--quiet lvct-button--small">查看详情</button><button class="lvct-button lvct-button--quiet lvct-button--small">编辑</button><button class="lvct-button lvct-button--quiet lvct-button--small">移除</button></div></div><div class="lvct-row"><div class="lvct-row-main"><span class="lvct-row-title">陈立群 · 教师</span><span class="lvct-row-meta">数学组 · 当前成员</span></div><div class="lvct-inline"><button class="lvct-button lvct-button--quiet lvct-button--small">查看详情</button><button class="lvct-button lvct-button--quiet lvct-button--small">编辑</button><button class="lvct-button lvct-button--quiet lvct-button--small">移除</button></div></div><div class="lvct-row"><div class="lvct-row-main"><span class="lvct-row-title">郑好 · 摄影指导</span><span class="lvct-row-meta">已离开 · 历史成员</span></div><button class="lvct-button lvct-button--quiet lvct-button--small">移除</button></div><div class="lvct-divider"></div><div class="lvct-inline"><label class="lvct-search" style="flex:1"><span class="lvct-visually-hidden">选择联系人</span><input placeholder="选择要添加的联系人…"></label><button class="lvct-button lvct-button--primary">添加成员</button></div></div></section>
+              </div>
+            </div>
+          </section>
+          <div class="lvct-grid lvct-grid--three" style="margin-top:14px"><div class="lvct-callout lvct-small"><strong>移动端</strong><br>列表限高滚动，详情获得整行宽度，成员姓名与动作不横向溢出。</div><div class="lvct-callout lvct-small"><strong>空组织</strong><br>提示暂无组织，保留固定的新建入口。</div><div class="lvct-callout lvct-small"><strong>读取失败</strong><br>行内显示错误与重试，不用空态掩盖未知状态。</div></div>
         </section>
 
         <section class="lvct-page" data-screen="graph" aria-labelledby="lvct-graph-title">

@@ -1,7 +1,7 @@
 import type { Plugin } from "siyuan";
 import { renderView } from "../api/av";
 import { rosterFromRender } from "../domain/roster";
-import { scanOrganizations } from "./org";
+import { countOrgMarkers, findOrgLinkBlocks, scanOrganizations } from "./org";
 import { loadJsonStrict } from "../data/storage";
 import { INTERACTION_STORAGE_KEY } from "../data/interactions";
 import { FOLLOW_UP_STORAGE_KEY } from "../data/followups";
@@ -19,6 +19,7 @@ import {
     runOrganizationMemberAudit,
     runRosterAudit,
     runSelfIdentityAudit,
+    runOrgHealthAudit,
 } from "../domain/health-audit";
 import type { AuditIssue, AuditModuleKey, AuditModuleResult, HealthAuditReport } from "../domain/health-audit";
 import type { ContactsSettings } from "../domain/model";
@@ -103,8 +104,17 @@ export async function auditWorkspaceDataReport(plugin: Plugin, settings: Contact
                 }
                 if (module === "organizationMembers") {
                     const organizationMembers = decodeAuditOrganizationMembers(await loadJsonStrict(plugin, ORG_MEMBERSHIP_STORAGE_KEY));
-                    const organizations = await scanOrganizations();
-                    return { count: organizationMembers.length, references: { organizationMembers, organizationDocIds: organizations.map((organization) => organization.docId) } };
+                    const [organizations, markerCounts, organizationLinkBlocks] = await Promise.all([scanOrganizations(), countOrgMarkers(), findOrgLinkBlocks()]);
+                    return {
+                        count: organizationMembers.length,
+                        references: {
+                            organizationMembers,
+                            organizationDocIds: organizations.map((organization) => organization.docId),
+                            organizationNames: new Map(organizations.map((organization) => [organization.docId, organization.name] as const)),
+                            organizationMarkerCounts: markerCounts,
+                            organizationLinkBlocks,
+                        },
+                    };
                 }
                 const selfIdentity = decodeAuditSelfIdentity(await loadJsonStrict(plugin, SELF_IDENTITY_STORAGE_KEY));
                 return { count: selfIdentity ? 1 : 0, references: { selfIdentity } };
@@ -152,7 +162,20 @@ export async function auditWorkspaceDataReport(plugin: Plugin, settings: Contact
         } else {
             if (!references.organizationMembers?.length) continue;
             if (!rosterReady) { unknown("组织成员已读取，但名册未核实，人物归属未知"); continue; }
-            modules[module].issues = runOrganizationMemberAudit({ people: references.people, memberships: references.organizationMembers, organizationDocIds: references.organizationDocIds });
+            const baseIssues = runOrganizationMemberAudit({ people: references.people, memberships: references.organizationMembers, organizationDocIds: references.organizationDocIds });
+            const orgPeople = new Map(references.people.map((person) => [person.docId, person.name] as const));
+            const orgIds = new Set(references.organizationDocIds);
+            const supplementalOrgIssues = runOrgHealthAudit({
+                    memberships: references.organizationMembers,
+                    rosterDocIds: new Set(references.people.map((person) => person.docId)),
+                    reachableOrgDocIds: orgIds,
+                    orgNames: references.organizationNames ?? new Map(references.organizationDocIds.map((id) => [id, id] as const)),
+                    personNames: orgPeople,
+                    markerCounts: references.organizationMarkerCounts,
+                    orgLinkBlockRoots: references.organizationLinkBlocks,
+                    activePersonDocIds: new Set(references.organizationMembers.filter((membership) => membership.status === "active").map((membership) => membership.personDocId)),
+                }).filter((issue) => issue.kind !== "orphanOrgMember" && issue.kind !== "invertedMembershipPeriod");
+            modules[module].issues = [...baseIssues, ...supplementalOrgIssues];
         }
     }
     return buildHealthAuditReport(modules, references);

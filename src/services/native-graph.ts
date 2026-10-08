@@ -42,15 +42,18 @@ export async function loadNativePersonGraph(
     identity: SelfIdentity | null,
     options?: NativePersonGraphOptions,
 ): Promise<PersonGraph> {
-    const centerDocId = options?.centerDocId ?? identity?.selfDocId;
-    if (!centerDocId) throw new NativeGraphCenterMissingError();
+    /* B14.14：「指定人物中心」与「本人中心」是独立前置——显式传入有效 centerDocId 时
+       不要求本人档案已建立（旧工作空间未建档/本人读取失败仍可看人物图）；
+       仅当回落本人中心（未传 centerDocId）且本人缺失时才阻断。 */
+    const explicitCenter = options?.centerDocId ?? "";
+    const selfDocId = identity && identity.selfDocId !== "" ? identity.selfDocId : "";
+    if (explicitCenter === "" && selfDocId === "") throw new NativeGraphCenterMissingError();
+    const centerDocId = explicitCenter !== "" ? explicitCenter : selfDocId;
     const roster = await listContacts(settings);
-    if (roster.filter((person) => person.docId === centerDocId).length !== 1) throw new NativeGraphCenterMissingError();
-    const allowedDocIds = applyRestrict(
-        new Set<string>(roster.map((person) => person.docId)),
-        options?.restrictDocIds,
-        centerDocId,
-    );
+    const baseDocIds = new Set<string>(roster.map((person) => person.docId));
+    if (selfDocId !== "") baseDocIds.add(selfDocId);
+    if (!baseDocIds.has(centerDocId)) throw new NativeGraphCenterMissingError();
+    const allowedDocIds = applyRestrict(baseDocIds, options?.restrictDocIds, centerDocId);
     const docGroups = new Map(roster.map((person) => [person.docId, person.group] as const));
     const native = await fetchLocalGraph(centerDocId);
     return mapNativeGraph(native, { allowedDocIds, docGroups });

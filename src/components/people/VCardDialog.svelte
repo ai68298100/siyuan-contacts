@@ -11,11 +11,14 @@
     let {
         settings,
         i18n,
+        hostCloseChannel,
         onImported,
         onClose,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
+        /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
+        hostCloseChannel?: { request?: (close: () => void) => void };
         onImported: (count: number) => void;
         onClose: () => void;
     } = $props();
@@ -40,6 +43,10 @@
         changes: () => [report
             ? text("vcardCheckpointWarning", "未完成项的重试断点只保留在本窗口。关闭或更换文件前请保存诊断信息；重新导入不会恢复这些断点。")
             : text("guardVcardSelection", "已选择 {n} 位联系人待导入", { n: selectedCount })],
+    });
+    /* D-40：宿主 X/Esc/遮罩经同一守卫路由（返回 Promise 供拦截层重入门） */
+    $effect(() => {
+        if (hostCloseChannel) hostCloseChannel.request = (close) => guardedClose(close);
     });
 
     const selectedCount = $derived.by(() => {

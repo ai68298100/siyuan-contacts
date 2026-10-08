@@ -25,12 +25,15 @@
         onClose,
         initialOrgDocId = "",
         onOpenPerson,
+        hostCloseChannel,
     }: {
         facade: ContactsPluginFacade;
         i18n?: Readonly<Record<string, string>>;
         onClose: () => void;
         initialOrgDocId?: string;
         onOpenPerson?: (docId: string, orgDocId: string) => void;
+        /** D-40：宿主 X/Esc/遮罩关闭经同一守卫路由，避免绕过未保存提示。 */
+        hostCloseChannel?: { request?: (close: () => void) => void };
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -102,6 +105,10 @@
         busy: () => loading || busy,
         dirty: () => hasDraft,
         changes: () => [text("orgUnsaved", "组织管理中的修改尚未完成")],
+    });
+
+    $effect(() => {
+        if (hostCloseChannel) hostCloseChannel.request = (close) => guardedClose(close);
     });
 
     const currentOrg = $derived(orgs.find((org) => org.docId === currentOrgDocId) ?? null);

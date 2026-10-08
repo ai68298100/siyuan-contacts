@@ -37,13 +37,18 @@ export function normalizeNameKey(name: string): string {
     return name.trim();
 }
 
+/** G-07：重复候选展示上限——防同名大桶 O(k²) 爆内存 */
+export const DUPLICATE_PAIRS_LIMIT = 500;
+
 function pairKey(a: ContactSummary, b: ContactSummary): string {
     const [first, second] = a.itemId < b.itemId ? [a, b] : [b, a];
     return `${first.itemId}::${second.itemId}`;
 }
 
-/** 发现疑似重复候选：多理由优先，同理由数按姓名排序；空名册返回空数组 */
-export function findDuplicatePairs(people: readonly ContactSummary[]): DuplicatePair[] {
+/** 发现疑似重复候选：多理由优先，同理由数按姓名排序；空名册返回空数组。
+ *  G-07：maxPairs 上限防大桶 O(k²) 爆内存（500 同名 ≈ 124,750 对 ≈ 60 MiB）；
+ *  达到上限后停止生成，调用方以 `pairs.length >= maxPairs` 判断截断并提示。 */
+export function findDuplicatePairs(people: readonly ContactSummary[], maxPairs: number = 500): DuplicatePair[] {
     const phones = new Map<string, ContactSummary[]>();
     const emails = new Map<string, ContactSummary[]>();
     const names = new Map<string, ContactSummary[]>();
@@ -67,6 +72,7 @@ export function findDuplicatePairs(people: readonly ContactSummary[]): Duplicate
 
     const pairs = new Map<string, { a: ContactSummary; b: ContactSummary; reasons: DuplicateReason[] }>();
     const addReason = (a: ContactSummary, b: ContactSummary, reason: DuplicateReason) => {
+        if (pairs.size >= maxPairs) return; /* G-07：大桶防护——达上限停止生成 */
         const key = pairKey(a, b);
         const existing = pairs.get(key);
         if (existing) {
