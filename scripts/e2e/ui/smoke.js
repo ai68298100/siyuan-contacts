@@ -2365,6 +2365,40 @@ await test("字段编辑界面：未知结果保留生日草稿，核实已保�
     assert(saved === 1 && state.writes.length === before, "核实重试重复写入或重复回调");
 });
 
+await test("B12 编辑界面：关系称谓可填写，工作单位与学校可选择并保存", async () => {
+    let relationship = null;
+    const added = [];
+    let saved = 0;
+    mounted = mount(PersonEditDialog, { target: fixture, props: {
+        settings, person,
+        onLoadRelationshipLabels: async () => ({ selfDocId: "20260927000000-self001", record: relationship }),
+        onSaveRelationshipLabels: async (docId, selfDocId, labels) => {
+            relationship = { id: "label-1", selfDocId, personDocId: docId, labels, createdAt: "2026-10-08T00:00:00Z", updatedAt: "2026-10-08T00:00:00Z" };
+            return relationship;
+        },
+        onLoadOrgMemberships: async () => [],
+        onLoadOrgCandidates: async () => [{ docId: "org-work", name: "测试公司" }, { docId: "org-school", name: "测试学校" }],
+        onAddOrgMembership: async (docId, orgDocId, extra) => { added.push({ docId, orgDocId, extra }); },
+        onSaved: () => { saved += 1; }, onClose: () => {},
+    } });
+    await until(() => fixture.querySelector(".lvct-person-edit__profile input[maxlength=\"1600\"]"), `编辑页未显示资料补充区：${fixture.textContent}`);
+    await tick();
+    const relationshipInput = fixture.querySelector(".lvct-person-edit__profile input[maxlength=\"1600\"]");
+    assert(relationshipInput, `关系称谓输入框在渲染后消失：${fixture.textContent}`);
+    input(relationshipInput, "同事、朋友");
+    const selects = [...fixture.querySelectorAll(".lvct-person-edit__profile select")];
+    assert(selects.length === 2, "工作单位/学校选择器缺失");
+    selects[0].value = "org-work";
+    selects[0].dispatchEvent(new Event("change", { bubbles: true }));
+    selects[1].value = "org-school";
+    selects[1].dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    button("保存这些资料").click();
+    await until(() => saved === 1, "资料补充保存未完成");
+    assert(relationship?.labels.join("、") === "同事、朋友", "关系称谓未保存");
+    assert(added.length === 2 && added.some((item) => item.extra.affiliationKind === "work") && added.some((item) => item.extra.affiliationKind === "education"), "工作单位/学校归属未写入");
+});
+
 await test("CODE-02.4 编辑写前预校验：非法生日/邮箱零写入，逐字段失败报告可重试", async () => {
     let setCellCount = 0;
     let failWechat = true;
@@ -3485,8 +3519,9 @@ await test("首页超过首屏上限时提供「查看全部」，服务层不�
     const stalePeople = Array.from({ length: 10 }, (_, index) => ({
         ...person, name: `久联人${index + 1}`, itemId: `row-stale-${index + 1}`,
     }));
+    let openedFocus;
     mounted = mount(DashboardView, { target: fixture, props: {
-        preferences: DEFAULT_VIEW_PREFERENCES, onOpenDetail() {}, onOpenPeople() {}, onOpenGraph() {},
+        preferences: DEFAULT_VIEW_PREFERENCES, onOpenDetail() {}, onOpenPeople(focus) { openedFocus = focus; }, onOpenGraph() {},
         facade: { settings, loadDashboard: async () => ({
             people: 10, relations: 0, birthdays: [], birthdaysThisWeek: 0,
             stale: stalePeople.map((entry) => ({ person: entry, lastDaysAgo: 40 })),
@@ -3500,9 +3535,45 @@ await test("首页超过首屏上限时提供「查看全部」，服务层不�
     button("查看全部（共 10 条）").click();
     await tick();
     assert(rows() === 10, "展开后未显示全部条目");
+    assert(openedFocus?.label === "久未联系" && openedFocus?.sort === "recent", "久未联系查看全部未深链到联系人筛选");
+    assert(JSON.stringify(openedFocus?.itemIds) === JSON.stringify(stalePeople.map((entry) => entry.itemId)), "久未联系深链未携带完整人物集合");
     button("收起").click();
     await tick();
     assert(rows() === 8, "收起后未恢复首屏数量");
+});
+
+await test("首页生日/跟进「查看全部」携带联系人深链集合与排序", async () => {
+    const people = Array.from({ length: 13 }, (_, index) => ({
+        ...person, name: `首页集合人${index + 1}`, itemId: `row-home-${index + 1}`,
+        docId: `20260927000000-home${index + 1}`,
+    }));
+    const birthdays = people.slice(0, 9).map((entry, index) => ({
+        person: entry, bucket: index === 0 ? "today" : "week",
+        projection: { daysUntil: index, label: `10月${index + 1}日` },
+    }));
+    const followUps = people.slice(0, 13).map((entry, index) => ({
+        person: entry, reachable: true, documentSync: "verified", bucket: "upcoming",
+        item: { id: `fu-home-${index + 1}`, personDocId: entry.docId, title: `跟进${index + 1}`, dueDate: "2026-10-15", status: "open" },
+    }));
+    const opened = [];
+    mounted = mount(DashboardView, { target: fixture, props: {
+        preferences: DEFAULT_VIEW_PREFERENCES, onOpenDetail() {}, onOpenPeople(focus) { opened.push(focus); }, onOpenGraph() {},
+        facade: { settings, loadDashboard: async () => ({
+            people: people.length, relations: 0, birthdays, birthdaysThisWeek: 9,
+            stale: [], staleTotal: 0, neverContacted: 0, neverContactedItemIds: [], followUps,
+        }) },
+    } });
+    await until(() => fixture.querySelectorAll(".lvct-dash__show-all").length === 2, "生日/跟进查看全部入口未渲染");
+    button("查看全部（共 9 条）").click();
+    await tick();
+    const birthdayFocus = opened.at(-1);
+    assert(birthdayFocus?.label === "近期生日" && birthdayFocus?.sort === "birthday", "生日查看全部未携带生日排序");
+    assert(JSON.stringify(birthdayFocus?.itemIds) === JSON.stringify(birthdays.map((entry) => entry.person.itemId)), "生日查看全部未携带完整人物集合");
+    button("查看全部（共 13 条）").click();
+    await tick();
+    const followUpFocus = opened.at(-1);
+    assert(followUpFocus?.label === "待办跟进" && followUpFocus?.sort === "name", "跟进查看全部未携带姓名排序");
+    assert(JSON.stringify(followUpFocus?.itemIds) === JSON.stringify(people.map((entry) => entry.itemId)), "跟进查看全部未携带去重后人物集合");
 });
 
 await test("设置页可按列类型手动恢复字段映射并拒绝空提交", async () => {

@@ -31,8 +31,8 @@
 
 | 稳定键 | 默认列名 | 类型 | 说明 |
 |---|---|---|---|
-| `birthday` | 生日 | date | 公历；`isNotTime: true` |
-| `lunarBirthday` | 农历生日 | checkbox | true = 生日字段按农历换算 |
+| `birthday` | 生日 | date | 公历时为完整公历日期；`lunarBirthday=true` 时年份作为出生年份、月日作为农历月日；`isNotTime: true` |
+| `lunarBirthday` | 农历生日 | checkbox | true = `birthday` 的月日按农历月日解释并换算为本年度公历发生日 |
 | `phone` | 电话 | phone | |
 | `email` | 邮箱 | email | |
 | `wechat` | 微信 | text | |

@@ -71,7 +71,7 @@
             {#if person.isSelf}<span class="lvct-chip lvct-bucket--today">本人</span>{/if}
         </div>
         <div class="lvct-person-card__sub">
-            {#if birthday}{birthday.label}生日 · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}{person.isLunar ? " · 农历" : ""}{:else}生日未填写{/if}
+            {#if birthday}{birthday.label}生日 · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`} · {person.isLunar ? "农历" : "公历"}{:else}生日未填写{/if}
         </div>
         {#if person.profile}<PersonProfileSummary profile={person.profile} compact />
         {:else if orgLine}

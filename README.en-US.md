@@ -11,6 +11,8 @@
 
 **Latest stable release: v0.4.1** · [Install from GitHub Releases](https://github.com/ai68298100/siyuan-contacts/releases) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
+> **Current development branch (2026-10-08):** The source HEAD is `7ac1e0e`, a development baseline after v0.4.1 and not a published Release. `pnpm test` currently passes **538/538** on this branch; real SiYuan host, Android device, multi-window and marketplace acceptance remain separate gates. Use the `package.zip` attached to GitHub Releases for installation; later HEAD changes must not be described as part of the published v0.4.1 package.
+
 English | [简体中文](README.md)
 
 </div>
@@ -51,9 +53,9 @@ Lv Contacts makes **every contact a regular SiYuan document** (bidirectional lin
 - 🗒 **Per-person notes** — keep a free-form note for each person; it is written back to that person's document and excluded from interaction metrics. Edit, clear and retry after a conflict or failed read-back.
 - 📊 **Interaction review report** — interaction counts, shared-occasion counts, contacted people and source distribution per month or custom range; Top rankings and previous-period comparison with explainable metrics
 - 📝 **Interaction history & templates** — 20 per page, search, source filters, date ranges, month grouping and "on this day"; confirmed per-person deletion that preserves other participants; reusable note templates with local variables
-- 🩺 **Data health audit** — ten-point read-only inspection in Settings (missing fields, suspicious birthdays, dangling relations, unreachable follow-ups, orphan interactions, suspected duplicates, long-inactive…), each explained with a jump-to action
+- 🩺 **Data health audit** — five read modules covering 20 read-only issue kinds in Settings (missing fields, suspicious birthdays, dangling relations, unreachable follow-ups, orphan interactions, suspected duplicates, long-inactive contacts, organization-membership and self-identity anomalies…), each explained with a jump-to action
 - 🔌 **People service bridge** — other plugins get `window.LvContacts` to search/create people and record shared interactions (protocol v2; see the [protocol docs](docs/BRIDGE.md))
-- 🛟 **Backup & restore** — JSON snapshots for interactions and follow-ups plus a **full migration bundle** (interactions + follow-ups + cadences + dismissals + registry + templates) with previewed merge; export center in Settings; these are not byte-for-byte file backups
+- 🛟 **Backup & restore** — JSON snapshots for interactions and follow-ups plus a **full migration bundle** covering 11 plugin-owned modules (interactions, follow-ups, cadences, dismissals, registry, templates, exchanges, aliases, self identity, organization memberships and relationship labels) with previewed merge; export center in Settings; these are not byte-for-byte file backups
 - 📱 Responsive layouts and fullscreen dialogs have mobile viewport regression coverage; real-device touch and keyboard acceptance is still pending.
 
 ## 📦 Install
@@ -65,7 +67,7 @@ Lv Contacts makes **every contact a regular SiYuan document** (bidirectional lin
 
 Before uninstalling, export the interaction backup or full migration bundle from Settings. Person documents remain in the SiYuan workspace; interactions, follow-ups, reminders and templates are plugin-managed data and should not be treated as native SiYuan backups.
 
-The current release baseline is **v0.4.1** (a load-fix on top of v0.4.0 plus data-trust hardening and three major capabilities over v0.3.0 — self profile, organizations and the dual graph, see [CHANGELOG](docs/CHANGELOG.md)). Treat the `package.zip` attached to GitHub Releases as the installable build; later development changes wait for the next Release.
+The current release baseline is **v0.4.1** (a load-fix on top of v0.4.0 plus data-trust hardening and three major capabilities over v0.3.0 — self profile, organizations and the dual graph, see [CHANGELOG](docs/CHANGELOG.md)). Treat the `package.zip` attached to GitHub Releases as the installable build; source HEAD `7ac1e0e` contains post-release development changes that belong to a future Release.
 
 - **Self profile (B11)** — auto-created "Myself" document + identity mark + roster exclusion + rebinding from Settings
 - **Organizations (B13)** — org documents with a membership index (multiple orgs / tenures / active-former), workspace orgs view, org manager dialog (rename / archive-restore / member editing), direct membership editing in person detail, common-background projection

@@ -955,7 +955,7 @@ import StatusNotice from "../StatusNotice.svelte";
             <h3>{current.name}</h3>
             <div class="lvct-detail__meta">
                 {#if current.group}<span class="lvct-detail__group-chip">{current.group}</span>{/if}
-                {#if current.birthday}<span class="ft__smaller ft__on-surface">生日 {current.birthday}{current.isLunar ? "（农历）" : ""}</span>{/if}
+                {#if current.birthday}<span class="ft__smaller ft__on-surface">生日 {current.birthday}（{current.isLunar ? "农历" : "公历"}）</span>{/if}
             </div>
         </div>
         <div class="lvct-detail__header-actions">
@@ -987,7 +987,7 @@ import StatusNotice from "../StatusNotice.svelte";
         {#if current.wechat}<div><dt>微信</dt><dd>{current.wechat}</dd></div>{/if}
         {#if current.website}<div><dt>网站</dt><dd>{current.website}</dd></div>{/if}
         {#if current.tags.length > 0}<div><dt>标签</dt><dd>{current.tags.join(" · ")}</dd></div>{/if}
-        {#if birthday}<div><dt>下次生日</dt><dd>{birthday.date.toLocaleDateString("zh-CN")} · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}</dd></div>{/if}
+        {#if birthday}<div><dt>下次生日</dt><dd>{birthday.date.toLocaleDateString("zh-CN")}（{current.isLunar ? "农历" : "公历"}） · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}</dd></div>{/if}
     </dl>
 
     {#if onLoadPersonNote && onSavePersonNote}
@@ -1497,6 +1497,11 @@ import StatusNotice from "../StatusNotice.svelte";
             {settings}
             {i18n}
             person={current}
+            onLoadRelationshipLabels={onLoadRelationshipLabels}
+            onSaveRelationshipLabels={onSaveRelationshipLabels}
+            onLoadOrgMemberships={onLoadOrgMemberships}
+            onLoadOrgCandidates={onLoadOrgCandidates}
+            onAddOrgMembership={onAddOrgMembership}
             onSaved={refreshAfterEdit}
             onClose={() => (editing = false)}
         />
