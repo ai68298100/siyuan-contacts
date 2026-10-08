@@ -1,12 +1,12 @@
 # 进度（PROGRESS）
 
-## 2026-10-08 两机统一发布候选 v0.5.0
+## 2026-10-08 两机统一发布 v0.5.0
 
-- PR #12 已把主力机与本机开发线普通合并至 `main`；本机原 `dev/thispc-1002` 已普通推送并与合并后的主线一致。本次从统一主线建立 `codex/release-0.5.0`，将 `package.json` 与 `plugin.json` 同步升级到 0.5.0。
+- PR #12 已把两台机器的开发线普通合并至 `main`；随后 PR #13 将统一版本普通合并至 main（无 squash/rebase/force）。合并提交 `bd66a2ed0ef371fdbdddea9bf745182f247eaa67`，`package.json` 与 `plugin.json` 一致为 0.5.0。
 - 更新中英文 README、CHANGELOG、RELEASE、BRANCH-PROTOCOL、ROADMAP、PRODUCT-PLAN、FEEDBACK-BACKLOG、ACTIVE-BACKLOG 与 HANDOFF，区分当前候选和历史快照；增加 GitHub Release 正文草稿 `docs/RELEASE-NOTES-v0.5.0.md`。未修改功能逻辑、未提交集市 PR。
-- 验证：`pnpm check` 0 错误 / 0 警告；`pnpm test` 537/537；桌面 UI 319/319；移动视口 UI 320/320；`pnpm build` 与 `pnpm check:release` 通过。本地 `package.zip` 509825 bytes，SHA-256 `69af65b61f37231770765565d8715852a7fda9277ebfbe166686deede95ca140`。
+- 验证：本地及 PR/main CI 的 `pnpm check` 0 错误 / 0 警告、`pnpm test` 537/537、桌面 UI 319/319、移动视口 UI 320/320、build 与 `check:release` 全通过。main CI run `37742167395` 的 `package.zip` 为 509797 bytes，SHA-256 `0a5e6b04684021e8d369dac098db93df67710de331d7d5fd49999decd2beb089`；Release 下载后再次核对 SHA 匹配，本机忽略产物 `package.zip` 已替换为同一 CI artifact。
 - 隔离内核 3.8.6：API spike 9/9、插件加载显示 v0.5.0、联系人流程 13/13。该证据不代替实际用户工作区、Android 真机、真实多窗口或集市验收。
-- 当前仍为发布候选：PR/main CI、annotated tag、GitHub Release 与 Release 附件需待后续流程完成；bazaar#2289 维持独立待审状态。
+- annotated tag `v0.5.0` 已指向上述版本合并提交，GitHub Release 已发布并附 CI 包及校验文件；bazaar#2289 仍独立待审，本轮未提交集市更改。真实思源用户工作区、Android 真机与真实多窗口仍未验证。
 
 ## 2026-10-08 当前开发分支收口
 

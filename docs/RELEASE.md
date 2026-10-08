@@ -1,6 +1,6 @@
 # 发布清单（RELEASE）
 
-> 最近完成的发布为 v0.4.1（2026-09-30，tag 与 GitHub Release 含 `package.zip`；SHA-256 `de3b9fc1781114ac431a5e1b4ec718d6d7a88038eb0315ae973eba3ad17ff0a2`）。2026-10-08 两机开发线经 PR #12 普通合并进 main。作者已授权统一发布 v0.5.0；本轮覆盖仓库版本、PR、tag 与 GitHub Release，不包含集市提交。真实思源宿主、Android 真机、真实多窗口和集市状态必须按实际证据填写，隔离测试不能代替。
+> v0.5.0 已于 2026-10-08 发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0)，annotated tag 指向 PR #13 merge commit `bd66a2ed0ef371fdbdddea9bf745182f247eaa67`。两机开发线先经 PR #12 合并；本轮未修改 bazaar，bazaar#2289 维持待审。真实思源宿主、Android 真机和真实多窗口尚未验证，隔离测试不能代替。
 
 ## 1. 质量门禁（全部绿才发）
 
@@ -19,35 +19,34 @@ node scripts/e2e/contacts-flow.mjs       # 联系人流程 10/10
 [E2E-SMOKE-RUNBOOK](E2E-SMOKE-RUNBOOK.md)。不要把写型脚本直接指向日常工作区。
 ```
 
-- [x] 版本字段：`package.json` 与 `plugin.json` 均为 0.5.0；待 PR 合入 main 后创建对应 tag 与 GitHub Release
-- [x] README.md / README.en-US.md 已更新 v0.5.0 范围；人物备注的数据边界与未验证环境已写入 Release 正文草稿
-- [x] 本机构建 `package.zip`：509825 bytes，SHA-256 `69af65b61f37231770765565d8715852a7fda9277ebfbe166686deede95ca140`（GitHub Release 最终附件仍须与 main CI 产物核对）
-- [ ] main CI 成功；从对应 CI artifact 取出 `package.zip` 与 `package.zip.sha256` 并与本机包核对
-- [ ] Annotated tag `v0.5.0` 与 GitHub Release 已创建
+- [x] 版本字段：`package.json` 与 `plugin.json` 均为 0.5.0；PR #13 普通合并、annotated tag 与 GitHub Release 已完成
+- [x] README.md / README.en-US.md 已更新 v0.5.0 范围；人物备注的数据边界与未验证环境已写入 Release 正文
+- [x] main CI run `37742167395` 成功；`package.zip` 509797 bytes，SHA-256 `0a5e6b04684021e8d369dac098db93df67710de331d7d5fd49999decd2beb089`；已与 Release 下载附件核对一致
+- [x] Annotated tag `v0.5.0` 指向 `bd66a2ed0ef371fdbdddea9bf745182f247eaa67`；[GitHub Release 已发布](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.0)
 - [ ] icon.png/preview.png 终稿（当前为脚本生成的家庭视觉版，可请人重绘后替换，重跑 gen-icon 逻辑不变）
 
-v0.5.0 Release 正文按 [RELEASE-NOTES-TEMPLATE](RELEASE-NOTES-TEMPLATE.md) 填写，并附 CI 生成且校验过的 `package.zip` 与 `package.zip.sha256`。发布前需明确列出真实宿主、Android、多窗口和集市状态，不能用隔离浏览器结果代替。
+v0.5.0 已按 [RELEASE-NOTES-v0.5.0](RELEASE-NOTES-v0.5.0.md) 发布，附件来自 CI 且校验和匹配。后续版本 Release 继续按模板填写真实宿主、Android、多窗口和集市状态，不能用隔离浏览器结果代替。
 
 CI 在构建和上传产物前执行两套浏览器回归。内核脚本只在隔离工作区执行，先核实目标；故障模拟先保存原文件，不对用户笔记做破坏性测试。隔离 UI 使用内存替身，不证明真实 AV 写入或宿主行为。
 
 内核测试执行前验证回环端口空闲、工作区标记 JSON 与创建者匹配，拒绝未标记/损坏标记、项目或宽泛目录；数据与插件安装目标不得通过链接越出工作区。每次请求前后检查本次内核进程仍存活，请求超时为 5 秒。启动未确认或进程已退出时不向端口发送退出请求，仅处理本次子进程。端口预检不是持续保留端口，仍应避免同时启动其他服务抢占测试端口。
 
-### 自动验收记录（v0.5.0 候选，2026-10-08；后续记录按日期追加）
+### 自动验收记录（v0.5.0，2026-10-08；后续记录按日期追加）
 
 | 检查 | 环境与范围 | 结果 | 限制 |
 |---|---|---|---|
-| v0.5.0 本地自动门禁 | Node 24.15.0 / pnpm 12.5.1；check、537 单测、桌面 UI、移动视口 UI、build、check:release | 全部通过；单测 537/537，桌面 319/319，移动 320/320 | GitHub main CI 待 PR 合入后运行；隔离移动视口不等于 Android 真机 |
+| v0.5.0 自动门禁 | Node 24.15.0 / pnpm 12.5.1；本地及 GitHub main CI run 37742167395，含 check、537 单测、桌面/移动 UI、build、check:release | 全部通过；537/537、319/319、320/320 | 隔离移动视口不等于 Android 真机 |
 | v0.5.0 隔离内核 | 本机思源内核 3.8.6；API spike、插件 load、contacts-flow | 9/9、通过（加载 v0.5.0）、13/13 | 独立临时工作区，不证明真实用户库、多窗口或 Android 行为 |
 | 联系人内核流程 | 标记隔离工作区、本机安装内核；建库/建人/字段/关系/双链/笔记捕获 API 序列 | 10/10 通过 | 不执行完整前端，也不验证真实插件互动持久化 |
 | 插件加载 | 同一隔离工作区，安装当前 dist，信任/启用/下发 JS 与 CSS | 通过 | 不证明前端生命周期、视觉与触控正确 |
 | 脚本安全单测 | 临时目录与回环端口；标记、越界链接、占用端口、进程错误 | 4/4 通过 | 不替代真实多窗口互斥与用户设备验收 |
 | 浏览器跨上下文存储 | 两个独立同源 iframe、真实服务模块、Web Locks、共享隔离 localStorage | 通过 | 不证明思源窗口的 origin/存储分区相同或宿主文件读写一致 |
 
-以上不勾选下方手工验收；数据库 spike 本轮未重跑，历史结果不当作本轮结果。
+以上自动验收不代替下方手工验收；v0.5.0 已重跑 API spike，历史结果不会覆盖本轮记录。
 
 ## 2. 手工验收（真机）
 
-本次 v0.5.0 候选未执行以下真实宿主、真机和多窗口验收，项目保持未勾选。作者已授权按当前证据与已知限制继续发布；Release 正文必须明确披露这些未验证范围，不能将隔离测试表述为真实环境通过。
+本次 v0.5.0 未执行以下真实宿主、真机和多窗口验收，项目保持未勾选，并已在 Release 正文披露；不能将隔离测试表述为真实环境通过。
 
 - [ ] 桌面：向导初始化 → 新建/导入 → 卡片/表格/搜索 → 图谱 → 编辑资料 → 详情记互动 → 首页生日/久未联系
 - [ ] 人物文档：档案条出现、编辑后刷新；建立关系后"相关人物"双链区块出现在文档里

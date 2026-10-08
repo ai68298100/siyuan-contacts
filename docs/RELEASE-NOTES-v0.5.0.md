@@ -26,7 +26,7 @@
 - `pnpm check`：0 错误、0 警告；`pnpm test`：537/537。
 - 桌面隔离 UI 回归：319/319；390px 移动视口隔离 UI 回归：320/320。
 - 思源内核 3.8.6 独立临时工作区：API spike 9/9、插件加载 v0.5.0 成功、联系人流程 13/13。
-- 本地构建与发布包检查通过，包大小 509825 bytes。
+- main CI run 37742167395 构建与发布包检查通过；`package.zip` 为 509797 bytes，SHA-256 `0a5e6b04684021e8d369dac098db93df67710de331d7d5fd49999decd2beb089`，Release 下载附件核对一致。
 
 ## 未验证与已知限制
 
@@ -42,6 +42,6 @@
 
 ## 产物校验
 
-- 本地 `package.zip` SHA-256：`69af65b61f37231770765565d8715852a7fda9277ebfbe166686deede95ca140`
-- GitHub CI run 与最终 Release 附件：PR 合并后补录，并以该 CI artifact 的 `package.zip.sha256` 为准。
-- 产物来源：v0.5.0 发布提交（待 PR 合入 main）。
+- `package.zip` SHA-256：`0a5e6b04684021e8d369dac098db93df67710de331d7d5fd49999decd2beb089`
+- GitHub CI run：37742167395；Release 附件与 CI artifact 校验和匹配。
+- 产物来源：`bd66a2ed0ef371fdbdddea9bf745182f247eaa67`。
