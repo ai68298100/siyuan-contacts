@@ -2,7 +2,17 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildContactWritePlan, changedContactWriteFields, settleContactFieldResult, summarizeContactWriteResults, verifyContactField } from "../src/domain/contact-write.ts";
 import { birthdayToMs, emptyDraft } from "../src/domain/person.ts";
+import { GROUP_OPTION_PREFIX, normalizeCustomGroupName } from "../src/domain/contact-group.ts";
 import type { AvCell } from "../src/api/av.ts";
+
+test("自定义分组会去除首尾空格，拒绝空值和 UI 内部选项，并按普通分组写入", () => {
+    assert.deepEqual(normalizeCustomGroupName("  跑团伙伴  "), { ok: true, value: "跑团伙伴" });
+    assert.deepEqual(normalizeCustomGroupName("  \t "), { ok: false, reason: "empty" });
+    assert.deepEqual(normalizeCustomGroupName(`${GROUP_OPTION_PREFIX}custom`), { ok: false, reason: "reserved" });
+
+    const plan = buildContactWritePlan({ ...emptyDraft(), name: "测试", group: "跑团伙伴" }, "create");
+    assert.equal(plan.writes.find((write) => write.field === "group")?.value, "跑团伙伴");
+});
 
 test("真实内核空选项省略属性可核实空值，显式坏形状仍保持未知", () => {
     const plan = buildContactWritePlan({ ...emptyDraft(), name: "虚构人物" }, "edit", ["group", "tags"]);

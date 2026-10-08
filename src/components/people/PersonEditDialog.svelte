@@ -1,6 +1,6 @@
 <script lang="ts">
     /** 编辑资料：全字段更新（空值清空对应单元格） */
-    import { retryContactFields, updateContactFields, PRESET_GROUPS } from "../../services/contacts";
+    import { retryContactFields, updateContactFields } from "../../services/contacts";
     import type { ContactWriteReport, WritableContactField } from "../../domain/contact-write.ts";
     import { changedContactWriteFields } from "../../domain/contact-write.ts";
     import type { ContactDraft } from "../../domain/person";
@@ -9,6 +9,7 @@
     import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
     import QuickFillDialog from "./QuickFillDialog.svelte";
+    import GroupField from "./GroupField.svelte";
     import { ClipboardPaste } from "@lucide/svelte";
     import { onDestroy, untrack } from "svelte";
 
@@ -46,6 +47,7 @@
     // svelte-ignore state_referenced_locally
     let tagsText: string = $state(person.tags.join(" "));
     let running: boolean = $state(false);
+    let groupValid = $state(true);
     let errorText: string = $state("");
     let failedFields: WritableContactField[] = $state([]);
     let pending: { draft: ContactDraft; report: ContactWriteReport } | undefined;
@@ -81,6 +83,7 @@
     // B06：字段级改动明细 + 「保存并离开」（persist 抛错则留在原地）
     async function persist(retrying = false): Promise<void> {
         if (!alive) throw new Error("编辑窗口已关闭，未发送新写入");
+        if (!groupValid) throw new Error(text("groupCustomEmpty", "请输入分组名称。"));
         const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
         const next = { ...draft, tags };
         const changed = pending ? changedContactWriteFields(pending.draft, next) : [];
@@ -205,15 +208,7 @@
             <span>{text("formLunar", "农历")}</span>
             <input class="b3-switch" type="checkbox" bind:checked={draft.isLunar} disabled={running} />
         </label>
-        <label class="lvct-form__item">
-            <span>{text("formGroup", "分组")}</span>
-            <select class="b3-select fn__block" bind:value={draft.group} disabled={running}>
-                <option value="">{text("formUngrouped", "未分组")}</option>
-                {#each PRESET_GROUPS as group (group)}
-                    <option value={group}>{group}</option>
-                {/each}
-            </select>
-        </label>
+        <GroupField {i18n} value={draft.group} onValueChange={(value) => (draft.group = value)} onValidityChange={(valid) => (groupValid = valid)} label={text("formGroup", "分组")} ungroupedLabel={text("formUngrouped", "未分组")} disabled={running} />
         <label class="lvct-form__item">
             <span>{text("formTagsLabel", "标签（空格/逗号分隔）")}</span>
             <input class="b3-text-field fn__block" type="text" bind:value={tagsText} disabled={running} />
@@ -228,9 +223,9 @@
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={running}>{text("formCancel", "取消")}</button>
         {#if failedFields.length > 0}
-            <button class="b3-button b3-button--outline" onclick={retryFailed} disabled={running}>{text("formRetryFailed", "核实并重试未完成字段")}</button>
+            <button class="b3-button b3-button--outline" onclick={retryFailed} disabled={running || !groupValid}>{text("formRetryFailed", "核实并重试未完成字段")}</button>
         {/if}
-        <button class="b3-button b3-button--text" onclick={submit} disabled={running}>
+        <button class="b3-button b3-button--text" onclick={submit} disabled={running || !groupValid}>
             {running ? text("formSaving", "保存中…") : text("formSave", "保存")}
         </button>
     </div>

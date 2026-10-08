@@ -2,12 +2,12 @@
     /** C03 串行补录：一人一屏，只显示该人缺失的字段（按现有九字段契约）；
      *  保存先核实原人物与最新字段，再逐字段 setCell + 写后回读，保存即进下一位。
      *  跳过不写入；中途关闭经 B06 守卫确认。 */
-    import { PRESET_GROUPS } from "../../services/contacts";
     import { writeImportFields } from "../../services/import";
     import type { WritableContactField } from "../../domain/contact-write.ts";
     import { emptyDraft } from "../../domain/person";
     import { importAnchor, snapshotCompletionPeople } from "../../domain/import.ts";
     import { untrack } from "svelte";
+    import GroupField from "./GroupField.svelte";
     import type { ContactDraft, ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
     import { useCloseGuard } from "../close-guard";
@@ -41,6 +41,7 @@
     let draft: ContactDraft = $state(emptyDraft());
     let tagsText = $state("");
     let running = $state(false);
+    let groupValid = $state(true);
     let errorText = $state("");
     let failedFields: WritableContactField[] = $state([]);
     let submittedRequest = $state.raw<{ draft: ContactDraft; fields: WritableContactField[] } | null>(null);
@@ -71,6 +72,7 @@
         errorText = "";
         failedFields = [];
         submittedRequest = null;
+        groupValid = true;
     }
     $effect(() => {
         index;
@@ -84,6 +86,7 @@
     }
     async function persistCurrent(): Promise<void> {
         if (!currentPerson) return;
+        if (!groupValid) throw new Error(text("groupCustomEmpty", "请输入分组名称。"));
         if (queueAnchor !== importAnchor(settings)) throw new Error("补录锚点已变化，原人物队列未执行，请关闭后重新核对");
         if (!submittedRequest) {
             const fields: WritableContactField[] = [];
@@ -192,15 +195,7 @@
                 </label>
             {/if}
             {#if missingGroup}
-                <label class="lvct-form__item">
-                    <span>{text("formGroup", "分组")}</span>
-                    <select class="b3-select fn__block" bind:value={draft.group} disabled={running || paused || submittedRequest !== null}>
-                        <option value="">{text("formUngrouped", "未分组")}</option>
-                        {#each PRESET_GROUPS as group (group)}
-                            <option value={group}>{group}</option>
-                        {/each}
-                    </select>
-                </label>
+                <GroupField {i18n} value={draft.group} onValueChange={(value) => (draft.group = value)} onValidityChange={(valid) => (groupValid = valid)} label={text("formGroup", "分组")} ungroupedLabel={text("formUngrouped", "未分组")} disabled={running || paused || submittedRequest !== null} />
             {/if}
             {#if missingTags}
                 <label class="lvct-form__item">
@@ -223,7 +218,7 @@
             {#if failedFields.length > 0}
                 <button class="b3-button b3-button--outline" onclick={retryCurrent} disabled={running || paused}>{text("formRetryFailed", "核实并重试未完成字段")}</button>
             {/if}
-            <button class="b3-button b3-button--text" onclick={saveAndNext} disabled={running || paused || !draftIsDirty()}>
+            <button class="b3-button b3-button--text" onclick={saveAndNext} disabled={running || paused || !groupValid || !draftIsDirty()}>
                 {running ? text("formSaving", "保存中…") : text("qfCompletionSaveNext", "保存并下一位")}
             </button>
         </div>
