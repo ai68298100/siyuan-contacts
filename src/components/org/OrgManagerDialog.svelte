@@ -15,6 +15,8 @@
     import type { OrgMembershipWriteReport } from "../../services/org-member-writes";
     import OrgMembershipResult from "./OrgMembershipResult.svelte";
     import OrgOperationRecovery from "./OrgOperationRecovery.svelte";
+    import PersonPicker from "../people/PersonPicker.svelte";
+    import type { PickerItem } from "../people/PersonPicker.svelte";
     import { subscribeDataChanged } from "../../libs/data-events";
 
     let {
@@ -115,6 +117,17 @@
             person.docId !== replacingMember?.personDocId
             && !activeMemberPersonDocIds.includes(person.docId)),
     );
+    const pickerItems = (people: readonly ContactSummary[]): PickerItem[] => people.map((person) => ({
+        id: person.docId,
+        label: person.name,
+        hint: [person.group, person.phone || person.email, person.docId].filter(Boolean).join(" · ") || undefined,
+        docId: person.docId,
+        itemId: person.itemId,
+        keywords: [person.group, person.phone, person.email, person.wechat, person.website, ...(person.tags ?? [])]
+            .filter(Boolean).join(" ").toLowerCase(),
+    }));
+    const addPickerItems = $derived(pickerItems(addCandidates));
+    const replacementPickerItems = $derived(pickerItems(replacementCandidates));
 
     function captureViewport() {
         const positions: Array<{ element: HTMLElement; top: number; left: number }> = [];
@@ -662,13 +675,17 @@
                                         <div class="lvct-org-manager__member-edit">
                                             <p class="ft__smaller ft__on-surface">{text("orgMemberReplaceHint", "关闭原成员的在职记录，并以一次原子操作登记接替成员。")}</p>
                                             <label>{text("orgMemberReplacementPick", "接替联系人")}
-                                                <select class="b3-select fn__block" bind:value={replacementPersonId} disabled={busy}
-                                                    aria-label={text("orgMemberReplacementPick", "接替联系人")}>
-                                                    <option value="">{text("orgAddMemberPick", "选择联系人…")}</option>
-                                                    {#each replacementCandidates as person (person.itemId)}
-                                                        <option value={person.docId}>{person.name} · {person.phone || person.email || "—"} · {person.docId}</option>
-                                                    {/each}
-                                                </select>
+                                                <PersonPicker
+                                                    items={replacementPickerItems}
+                                                    value={replacementPersonId}
+                                                    placeholder={text("orgAddMemberPick", "选择联系人…")}
+                                                    emptyText={text("orgPickerEmpty", "没有可选联系人")}
+                                                    searchText={text("orgPickerSearch", "输入姓名、电话、微信或文档 ID 筛选")}
+                                                    ariaLabel={text("orgMemberReplacementPick", "接替联系人")}
+                                                    i18n={i18n}
+                                                    disabled={busy}
+                                                    onSelect={(personDocId) => (replacementPersonId = personDocId)}
+                                                />
                                             </label>
                                             <label>{text("orgMemberDeptLabel", "部门")}
                                                 <input class="b3-text-field fn__block" bind:value={replacementDepartment} disabled={busy}
@@ -772,13 +789,17 @@
                     {/if}
                     <div class="lvct-org-manager__add">
                         <p class="ft__smaller ft__on-surface">{text("orgMembershipAddImpact", "添加会登记新期间并更新双方当前双链；已离开的期间保留，重复添加当前成员不新增记录。")}</p>
-                        <select class="b3-select fn__block" bind:value={addPersonId} disabled={busy || memberLoading || organizationsRefreshing || !!memberError || selectionGuardBusy || !!editingMemberId || !!replacingMemberId || !!removingMemberId || renaming}
-                            aria-label={text("orgAddMemberLabel", "选择要添加的联系人")}>
-                            <option value="">{text("orgAddMemberPick", "选择联系人…")}</option>
-                            {#each addCandidates as person (person.itemId)}
-                                <option value={person.docId}>{person.name} · {person.phone || person.email || "—"} · {person.docId}</option>
-                            {/each}
-                        </select>
+                        <PersonPicker
+                            items={addPickerItems}
+                            value={addPersonId}
+                            placeholder={text("orgAddMemberPick", "选择联系人…")}
+                            emptyText={text("orgPickerEmpty", "没有可选联系人")}
+                            searchText={text("orgPickerSearch", "输入姓名、电话、微信或文档 ID 筛选")}
+                            ariaLabel={text("orgAddMemberLabel", "选择要添加的联系人")}
+                            i18n={i18n}
+                            disabled={busy || memberLoading || organizationsRefreshing || !!memberError || selectionGuardBusy || !!editingMemberId || !!replacingMemberId || !!removingMemberId || renaming}
+                            onSelect={(personDocId) => (addPersonId = personDocId)}
+                        />
                         <select class="b3-select fn__block" bind:value={addAffiliationKind} disabled={busy || memberLoading || organizationsRefreshing || !!memberError || selectionGuardBusy || !!editingMemberId || !!replacingMemberId || !!removingMemberId || renaming} aria-label={text("orgAffiliationKind", "归属分类")}>
                             <option value="unspecified">{affiliationLabel("unspecified")}</option>
                             <option value="work">{affiliationLabel("work")}</option>

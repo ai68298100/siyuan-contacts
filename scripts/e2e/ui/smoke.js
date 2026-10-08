@@ -1612,10 +1612,13 @@ await test("B13.3 组织管理弹窗：新建组织、添加/移除成员经 fac
     await until(() => fixture.textContent.includes("测试公司"), `新建组织未出现在列表：${fixture.querySelector(".lvct-org-manager")?.textContent?.slice(0, 200)}`);
     assert(createdOrgs.length === 1, "新建未走 facade.createOrganization");
     /* 添加成员 */
-    await until(() => fixture.querySelector(".lvct-org-manager__add select"), "添加成员选择器未出现");
-    const select = fixture.querySelector(".lvct-org-manager__add select");
-    select.value = "20260930000000-per0001";
-    select.dispatchEvent(new Event("change", { bubbles: true }));
+    await until(() => fixture.querySelector('.lvct-org-manager__add .lvct-picker__trigger[aria-label="选择要添加的联系人"]'), "添加成员选择器未出现");
+    const picker = fixture.querySelector('.lvct-org-manager__add .lvct-picker__trigger[aria-label="选择要添加的联系人"]');
+    picker.click();
+    await until(() => fixture.querySelector(".lvct-picker__panel"), "添加成员选人器浮层未打开");
+    const option = [...fixture.querySelectorAll(".lvct-picker__option")].find((node) => node.textContent.includes("张三"));
+    assert(option, "添加成员候选未显示");
+    option.click();
     await tick();
     await tick();
     button("添加成员").click();

@@ -695,6 +695,8 @@
   "orgMemberRemove": "移除",
   "orgAddMemberLabel": "选择要添加的联系人",
   "orgAddMemberPick": "选择联系人…",
+  "orgPickerEmpty": "没有可选联系人",
+  "orgPickerSearch": "输入姓名、电话、微信或文档 ID 筛选",
   "orgMemberAdd": "添加成员",
   "orgPickHint": "从左侧选择一个组织查看成员。",
   "orgClose": "关闭",

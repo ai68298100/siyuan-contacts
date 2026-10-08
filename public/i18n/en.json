@@ -695,6 +695,8 @@
   "orgMemberRemove": "Remove",
   "orgAddMemberLabel": "Choose a contact to add",
   "orgAddMemberPick": "Choose a contact…",
+  "orgPickerEmpty": "No contacts available",
+  "orgPickerSearch": "Search by name, phone, WeChat, or document ID",
   "orgMemberAdd": "Add member",
   "orgPickHint": "Select an organization on the left to view members.",
   "orgClose": "Close",
