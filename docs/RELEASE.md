@@ -1,5 +1,7 @@
 # 发布清单（RELEASE）
 
+> v0.5.2 发布准备：本版本包含农历生日排序修复、生日历法标注和联系人资料编辑入口；发布资产与校验和将在本次构建后写入 GitHub Release。
+
 > v0.5.1 已于 2026-10-08 发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.1)，annotated tag 指向 PR #18 merge commit `3a3de430f6b08f3cbfb20df55a113dc8beb1125c`。本版本包含自定义联系人分组、README 系列介绍恢复和已验证的常规依赖更新；未修改 bazaar。
 
 ## v0.5.1 本轮状态
