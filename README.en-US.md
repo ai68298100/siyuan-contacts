@@ -7,13 +7,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![SiYuan](https://img.shields.io/badge/SiYuan-%3E%3D%203.8.5-blue)
 
-**Keep your contacts, relationships, organizations, and interactions in your SiYuan knowledge base.** Each person is a regular SiYuan document, with structured profile data managed by a native database bound to that document.
+**Keep your contacts, relationships, organizations, and interactions in your SiYuan knowledge base.** Each person is a regular SiYuan document; the contact roster and structured profile fields are managed through SiYuan's native database.
 
 **Latest stable release: v0.5.0** · [Download](https://github.com/ai68298100/siyuan-contacts/releases/latest) · [Changelog](docs/CHANGELOG.md) · [Report an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
-
-The plugin is listed in the SiYuan Bazaar index. Its visibility in the Bazaar client has not yet been verified; use the manual installation steps below if it is not available there.
 
 <img src="preview.png" alt="Lv Contacts preview" width="640" />
 
