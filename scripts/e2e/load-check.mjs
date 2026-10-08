@@ -4,8 +4,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { randomUUID } from "node:crypto";
 import {spawn} from "node:child_process";
 import { prepareIsolatedWorkspace, assertIsolatedPath, assertTestPortAvailable, observeTestKernel } from "./kernel-safety.mjs";
+import { guardScratch, kernelTokenFromConfig, makeApi, sweepOrphans } from "../lib/smoke-kernel.mjs";
 
 const PLUGIN_NAME = "siyuan-contacts";
 const MARKER = "renmai-e2e.json";
@@ -13,7 +15,15 @@ const HOST = "127.0.0.1";
 const PORT = 6829;
 const BASE = `http://${HOST}:${PORT}`;
 
-const workspace = process.env.LVCT_E2E_WORKSPACE || path.join(os.homedir(), "SiYuan-Renmai-E2E");
+function readArg(name) {
+    const index = process.argv.indexOf(name);
+    return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+const cliBase = readArg("--base-url");
+const cliToken = readArg("--token");
+const cliWorkspace = readArg("--workspace");
+const workspace = cliWorkspace || process.env.LVCT_E2E_WORKSPACE || path.join(os.tmpdir(), `SiYuan-Lvct-Load-${randomUUID()}`);
 
 function assertLoopback() {
     const host = new URL(BASE).hostname;
@@ -101,6 +111,12 @@ async function waitForBoot(lines, assertRunning) {
 }
 
 async function main() {
+    // Loading a local dist package changes petal state, so this script always
+    // owns the kernel it starts. Reject external target variables instead of
+    // silently writing to a user's running workspace.
+    if (cliBase || cliToken || process.env.SIYUAN_BASE_URL || process.env.SIYUAN_TOKEN) {
+        throw new Error("load-check 是写型本地加载验证，不能连接外部思源；请去掉 --base-url/--token 与 SIYUAN_BASE_URL/SIYUAN_TOKEN，并让脚本创建隔离靶场。需检查已有内核时使用只读走查脚本。");
+    }
     assertLoopback();
     await assertTestPortAvailable(HOST, PORT);
     prepareWorkspace();
@@ -115,7 +131,11 @@ async function main() {
         await waitForBoot(lines, assertRunning);
         assertRunning();
         booted = true;
-        token = JSON.parse(fs.readFileSync(path.join(workspace, "conf", "conf.json"), "utf8")).accessAuthCode || "";
+        token = kernelTokenFromConfig(JSON.parse(fs.readFileSync(path.join(workspace, "conf", "conf.json"), "utf8")));
+        if (!token) throw new Error("隔离内核没有生成 accessAuthCode，拒绝无 token 写入检查");
+        const guardedApi = makeApi(BASE, token);
+        await sweepOrphans(guardedApi);
+        await guardScratch(guardedApi, { base: BASE });
         console.log(`PASS 内核启动（工作区 ${workspace}）`);
 
         const trust = await api("/api/setting/setBazaar", {trust: true});

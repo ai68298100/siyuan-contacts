@@ -21,6 +21,8 @@ export interface FollowUpItem {
     docBlockId?: string;
     /** B07-a：文档任务块已被删除/移出（显式不可达，写侧不自动重建；插件侧显式改动清除） */
     docMissing?: boolean;
+    docSyncPending?: boolean;
+    docSyncBlockId?: string;
 }
 
 export interface FollowUpStore {
@@ -32,6 +34,28 @@ export const FOLLOW_UP_STORE_VERSION = 1;
 
 /** 推迟语义选项（Google Inbox snooze 语义）：不做裸日期选择器，「指定日期」为唯一显式入口 */
 export type SnoozeOption = "tomorrow" | "threeDays" | "nextMonday" | "nextMonth" | "custom";
+
+/**
+ * 人物详情中的跟进输入草稿。
+ *
+ * 标题/日期的基线来自最近一次成功创建后的表单状态；自定义推迟日期
+ * 没有保存基线，因为它只在点击「按指定日期推迟」时写入。该判断让
+ * 关闭守卫能拦截会被丢弃的输入，同时不会把「保存并离开」扩展成隐式
+ * 创建跟进或执行推迟。
+ */
+export interface FollowUpDraftState {
+    title: string;
+    dueDate: string;
+    savedTitle: string;
+    savedDueDate: string;
+    snoozeCustomDate: string;
+}
+
+export function hasFollowUpDraft(state: FollowUpDraftState): boolean {
+    return state.title.trim() !== state.savedTitle.trim()
+        || state.dueDate !== state.savedDueDate
+        || state.snoozeCustomDate.trim().length > 0;
+}
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -98,7 +122,9 @@ function isFollowUpItem(raw: unknown): raw is FollowUpItem {
         typeof item.updatedAt === "number" && Number.isFinite(item.updatedAt) &&
         (item.closedAt === undefined || (typeof item.closedAt === "number" && Number.isFinite(item.closedAt))) &&
         (item.docBlockId === undefined || (typeof item.docBlockId === "string" && item.docBlockId.length > 0)) &&
-        (item.docMissing === undefined || typeof item.docMissing === "boolean");
+        (item.docMissing === undefined || typeof item.docMissing === "boolean") &&
+        (item.docSyncPending === undefined || typeof item.docSyncPending === "boolean") &&
+        (item.docSyncBlockId === undefined || (typeof item.docSyncBlockId === "string" && /^\d{14}-[0-9a-z]{7}$/.test(item.docSyncBlockId)));
 }
 
 /** 写前检查：不丢弃损坏数据；版本或结构不兼容抛错（与互动库同纪律） */
@@ -145,7 +171,7 @@ export function appendFollowUp(store: FollowUpStore, item: FollowUpItem): Follow
 export function updateFollowUp(
     store: FollowUpStore,
     id: string,
-    patch: Partial<Pick<FollowUpItem, "dueDate" | "status" | "title" | "updatedAt" | "closedAt" | "docBlockId" | "docMissing">>,
+    patch: Partial<Pick<FollowUpItem, "dueDate" | "status" | "title" | "updatedAt" | "closedAt" | "docBlockId" | "docMissing" | "docSyncPending" | "docSyncBlockId">>,
 ): FollowUpStore {
     const index = store.items.findIndex((item) => item.id === id);
     if (index < 0) return store;

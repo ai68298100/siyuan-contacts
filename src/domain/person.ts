@@ -4,6 +4,8 @@
  */
 import type { AvRow, AvValue } from "../api/av";
 import type { FieldKey } from "./fields";
+import { validateDocumentTitle } from "./format.ts";
+import type { PersonProfile } from "./people-profiles.ts";
 
 /** 新建联系人表单草稿 */
 export interface ContactDraft {
@@ -25,9 +27,16 @@ export function emptyDraft(): ContactDraft {
 
 export function validateDraft(draft: ContactDraft): string[] {
     const errors: string[] = [];
-    if (!draft.name.trim()) errors.push("姓名不能为空");
-    if (draft.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) errors.push("邮箱格式不正确");
-    if (draft.birthday && !/^\d{4}-\d{2}-\d{2}$/.test(draft.birthday)) errors.push("生日日期格式不正确");
+    const nameError = validateDocumentTitle(draft.name);
+    if (nameError) errors.push(draft.name.trim() ? nameError : "姓名不能为空");
+    const email = draft.email.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push("邮箱格式不正确");
+    const birthday = draft.birthday.trim();
+    if (birthday && !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) {
+        errors.push("生日日期格式不正确");
+    } else if (birthday && birthdayToMs(birthday) === null) {
+        errors.push("生日不是有效日期");
+    }
     return errors;
 }
 
@@ -41,8 +50,9 @@ export function birthdayToMs(birthday: string): number | null {
 }
 
 export function msToBirthday(ms: number | undefined): string {
-    if (!ms || ms <= 0) return "";
+    if (typeof ms !== "number" || !Number.isFinite(ms)) return "";
     const date = new Date(ms);
+    if (Number.isNaN(date.getTime())) return "";
     const pad = (value: number) => String(value).padStart(2, "0");
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
@@ -74,6 +84,8 @@ export interface ContactSummary {
     relatedItemIds: string[];
     /** B11：该条目是本人档案（名册投影时按 self-identity 标记） */
     isSelf?: boolean;
+    profile?: PersonProfile;
+    aliasProfile?: { state: "known"; values: string[] } | { state: "unknown"; message: string };
 }
 
 /** 渲染响应的一行 → 联系人摘要。纯函数，逐单元格容错（缺值/未知字段跳过） */
@@ -115,7 +127,7 @@ export function summaryFromRow(row: AvRow, keyToField: Record<string, FieldKey>)
                 summary.website = value.url?.content ?? "";
                 break;
             case "birthday":
-                summary.birthday = msToBirthday(value.date?.isNotEmpty === false ? 0 : value.date?.content);
+                summary.birthday = value.date?.isNotEmpty === false ? "" : msToBirthday(value.date?.content);
                 break;
             case "lunarBirthday":
                 summary.isLunar = value.checkbox?.checked === true;

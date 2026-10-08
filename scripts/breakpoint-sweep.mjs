@@ -1,10 +1,13 @@
-/** UX-01.10 断点扫描：主页面 × 390/640/1280 三档截图，供断点收敛核对（一次性脚本可复用）。 */
+/** UX-01.10 断点扫描：主页面 × 390/575/640/1280 档截图 + Peek 场景（V-05 布局矩阵第一批：
+ *  575px 补中间档——全屏 Peek/布局在手机与小屏平板之间曾无基线覆盖）。 */
+import { createHash } from "node:crypto";
 import { createServer } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { spawn } from "node:child_process";
+import { hostBaselinePlugin } from "./e2e/host-baseline.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const browserPath = [
@@ -23,13 +26,15 @@ const server = await createServer({
        vite.config，缺插件时 .svelte 被当裸 JS 解析、缺别名时 siyuan 包无法解析——
        页面只剩 vite 报错浮层（2026-09-29 根修并补 title 校验） */
     resolve: { alias: { siyuan: resolve(root, "scripts/e2e/ui/siyuan-mock.js") } },
-    plugins: [svelte()],
+    /* V-05：sweep 页面带 host=1，但 vite 未挂 hostBaselinePlugin——/__host/*.css 404、
+       近似宿主样式又被夹具移除 → b3 桥接令牌全空（浮层透明、页面交叠）。同 ui-smoke 补挂。 */
+    plugins: [svelte(), hostBaselinePlugin()],
     server: { host: "127.0.0.1", port: 0, open: false },
 });
 await server.listen();
 const port = server.httpServer.address().port;
-const pages = ["home", "people", "graph", "settings"];
-const widths = [390, 640, 1280];
+const pages = ["home", "people", "peek", "graph", "orgs", "orgmgr", "settings"];
+const widths = [390, 575, 640, 1280];
 
 const profile = mkdtempSync(join(tmpdir(), "bp-sweep-"));
 const browser = spawn(browserPath, [
@@ -88,12 +93,26 @@ try {
                 url: `http://127.0.0.1:${port}/scripts/e2e/shot-workbench.html?view=${view}&theme=light&host=1`,
             });
             await waitReady(`${view}@${width}`);
-            await new Promise((r) => setTimeout(r, 400));
+            /* V-05：Peek 有滑入动画（lvct-peek-in），400ms 曾截到半透明中间帧（页面透出交叠） */
+            await new Promise((r) => setTimeout(r, view === "peek" ? 1200 : 400));
             const shot = await call("Page.captureScreenshot", { format: "png" });
             writeFileSync(join(outDir, `${view}-${width}.png`), Buffer.from(shot.data, "base64"));
             console.log(`${view} @ ${width}`);
         }
     }
+    /* V-26：同宽下不同页字节相同=视图映射假截图（settings-* 曾与 people-* 同哈希），直接判失败 */
+    const seen = new Map();
+    for (const view of pages) {
+        for (const width of widths) {
+            const digest = createHash("sha256")
+                .update(readFileSync(join(outDir, `${view}-${width}.png`)))
+                .digest("hex");
+            const key = `${width}#${digest}`;
+            if (seen.has(key)) throw new Error(`V-26 重复截图：${view}-${width} 与 ${seen.get(key)} 字节相同（视图映射假截图）`);
+            seen.set(key, `${view}-${width}`);
+        }
+    }
+    console.log(`V-26 去重校验：${seen.size} 景无跨页字节重复`);
     console.log("sweep done →", outDir);
 } finally {
     socket?.close();

@@ -25,7 +25,11 @@ export function attachPopover(panel: HTMLElement, wrap: HTMLElement, onClose: ()
         panel.style.left = "0px";
         panel.style.top = "0px";
         const rect = panel.getBoundingClientRect();
-        let left = anchorRect.right - rect.width;
+        // Saved-view menu has a short empty state and reads best from the
+        // anchor outward; right-aligning it can push the panel over the
+        // sidebar when the anchor is near the content's left edge.
+        const alignFromStart = panel.classList.contains("lvct-people__viewsmenu");
+        let left = alignFromStart ? anchorRect.left : anchorRect.right - rect.width;
         left = Math.max(VIEWPORT_MARGIN, Math.min(left, window.innerWidth - VIEWPORT_MARGIN - rect.width));
         let top = anchorRect.bottom + ANCHOR_GAP;
         if (top + rect.height > window.innerHeight - VIEWPORT_MARGIN) {

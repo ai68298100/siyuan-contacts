@@ -1,0 +1,56 @@
+{
+  "isolated": true,
+  "workspace": "C:\\Users\\sunku\\AppData\\Local\\Temp\\SiYuan-Lvct-AvPage-8427a710-7cfe-44f9-b2b3-fea9d792d1ba",
+  "kernelVersion": "3.8.6",
+  "total": 2,
+  "full": {
+    "rows": 2,
+    "milliseconds": 18
+  },
+  "pages": [
+    {
+      "page": 1,
+      "rows": 2,
+      "rowCount": 2
+    },
+    {
+      "page": 2,
+      "rows": 0,
+      "rowCount": 2
+    }
+  ],
+  "searchedRows": 1,
+  "results": [
+    {
+      "name": "全量基线",
+      "ok": true,
+      "detail": "rows=2 ms=18"
+    },
+    {
+      "name": "分页 page=1",
+      "ok": true,
+      "detail": "rows=2 rowCount=2 ms=13"
+    },
+    {
+      "name": "分页 page=2",
+      "ok": true,
+      "detail": "rows=0 rowCount=2 ms=17"
+    },
+    {
+      "name": "页间不重叠",
+      "ok": true,
+      "detail": "rows=2 unique=2"
+    },
+    {
+      "name": "页序符合总数",
+      "ok": true,
+      "detail": "[{\"page\":1,\"rows\":2},{\"page\":2,\"rows\":0}]"
+    },
+    {
+      "name": "分页搜索",
+      "ok": true,
+      "detail": "rows=1 needle=0001"
+    }
+  ],
+  "at": "2026-10-04T16:35:57.313Z"
+}

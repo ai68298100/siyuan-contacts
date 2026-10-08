@@ -1,6 +1,6 @@
 # 发布清单（RELEASE）
 
-> v0.4.1 已发布（2026-09-30：main 推送至 `bfe46f2`（CI run 36663898002 绿）、tag v0.4.1、Release https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.4.1 附 package.zip 380856B，sha256 `de3b9fc1…` 与本地构建一致；v0.4.0 因动态 import 拆 chunk 在真实宿主加载失败，已被本版取代）；集市提交与真实宿主/真机/多窗口验收仍待处理。本文后续发布步骤只适用于下一版本或集市上架，改版本、推送、标签、Release 与集市提交均需用户明确授权。
+> v0.4.1 已发布（2026-09-30：main 推送至 `bfe46f2`（CI run 36663898002 绿）、tag v0.4.1、Release https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.4.1 附 package.zip 380856B，sha256 `de3b9fc1781114ac431a5e1b4ec718d6d7a88038eb0315ae973eba3ad17ff0a2`）；v0.4.0 因动态 import 拆 chunk 在真实宿主加载失败，已被本版取代。当前开发分支仍未授权发布新版本或提交集市；Release 正文中的历史安装措辞不能替代当前宿主、真机和集市验收。本文后续发布步骤只适用于下一版本或集市上架，改版本、推送、标签、Release 与集市提交均需用户明确授权。
 
 ## 1. 质量门禁（全部绿才发）
 
@@ -14,11 +14,17 @@ pnpm check:release # 发布包检查
 node scripts/spike/av-spike.mjs          # 9/9（可选回归）
 node scripts/e2e/load-check.mjs          # 隔离内核加载
 node scripts/e2e/contacts-flow.mjs       # 联系人流程 10/10
+
+写型内核脚本的隔离靶场、token、残留清扫和共享工作区拒跑规则见
+[E2E-SMOKE-RUNBOOK](E2E-SMOKE-RUNBOOK.md)。不要把写型脚本直接指向日常工作区。
 ```
 
-- [x] 版本号：plugin.json 与 package.json 一致为 0.3.0，已发布（2026-09-29；v0.2.1 此前已发布）
-- [x] README.md / README.en-US.md 功能表与 v0.3.0 已交付功能一致（2026-09-29 中英能力清单已对齐）
+- [x] 版本号：plugin.json 与 package.json 一致为 0.4.1，已发布（2026-09-30；v0.4.0 加载事故由本版取代）
+- [x] README.md / README.en-US.md 功能表与 v0.4.1 已交付功能一致；下一版发布前仍需按模板补充新增能力和限制
+- [x] `package.zip` SHA-256：`de3b9fc1781114ac431a5e1b4ec718d6d7a88038eb0315ae973eba3ad17ff0a2`
 - [ ] icon.png/preview.png 终稿（当前为脚本生成的家庭视觉版，可请人重绘后替换，重跑 gen-icon 逻辑不变）
+
+下一版 Release 正文请复制 [RELEASE-NOTES-TEMPLATE](RELEASE-NOTES-TEMPLATE.md)，并同时附 `package.zip` 与 CI 生成的 `package.zip.sha256`。发布前需明确列出真实宿主、Android、多窗口和集市状态，不能用隔离浏览器结果代替。
 
 CI 在构建和上传产物前执行两套浏览器回归。内核脚本只在隔离工作区执行，先核实目标；故障模拟先保存原文件，不对用户笔记做破坏性测试。隔离 UI 使用内存替身，不证明真实 AV 写入或宿主行为。
 

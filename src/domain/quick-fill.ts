@@ -199,6 +199,8 @@ export function parseContactText(text: string): QuickFillResult {
     const items: QuickFillItem[] = [];
     const unrecognized: string[] = [];
     const lines = stripFrontmatter(text.split(/\r?\n/));
+    const tableRows = lines.filter((line) => line.trim() && line.includes("\t"));
+    if (tableRows.length > 1) return { items: [], unrecognized: ["多行人物表格需逐行确认；请每次粘贴一位人物，不合并为一个草稿", ...tableRows] };
     for (const line of lines) {
         const trimmed = line.trim().replace(LIST_MARKER_RE, "");
         if (!trimmed) continue;

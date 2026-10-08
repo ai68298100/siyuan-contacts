@@ -89,13 +89,31 @@ test("api/data/domain/bridge/services 层不得依赖组件层、panels 或 svel
     }
 });
 
-test("组件不得直接发内核请求（必须经 api/ 层）", () => {
-    for (const ext of [".svelte"]) {
-        for (const file of listFiles(SRC, ext)) {
-            const content = fs.readFileSync(file, "utf8");
-            const directFetch = content.includes("fetchPost") || content.includes("fetchSync") || content.includes("/api/");
-            assert.ok(!directFetch, `${file} 直接发内核请求，必须经 api/ 层`);
-        }
+test("内核网络请求只能出现在 api/ 层", () => {
+    const files = listFiles(SRC, ".ts").concat(listFiles(SRC, ".svelte"));
+    for (const file of files) {
+        // api/ 是内核交互的唯一边界；其它层不得直接调用宿主 fetch 或浏览器 fetch。
+        if (path.relative(SRC, file).split(path.sep)[0] === "api") continue;
+        const content = fs.readFileSync(file, "utf8");
+        const directNetworkCall = /\b(?:fetch|fetchPost|fetchSync)\s*\(/.test(content);
+        const importsKernelTransport = /\bimport\s*\{[^}]*\b(?:fetchPost|fetchSync)\b[^}]*\}\s*from\s*["']siyuan["']/.test(content);
+        assert.ok(
+            !directNetworkCall && !importsKernelTransport,
+            `${file} 直接发网络请求或导入内核传输函数，内核交互必须经 api/ 层`,
+        );
+    }
+});
+
+test("插件自管 JSON 只能通过 data/storage.ts 访问宿主存储", () => {
+    const storageFile = path.join(SRC, "data", "storage.ts");
+    for (const file of listFiles(SRC, ".ts").concat(listFiles(SRC, ".svelte"))) {
+        if (file === storageFile) continue;
+        const content = fs.readFileSync(file, "utf8");
+        // 仅拦截对宿主 Plugin 实例的直接调用，避免误报文档字符串和测试夹具。
+        assert.ok(
+            !/\b[A-Za-z_$][\w$]*\s*\.\s*(?:loadData|saveData)\s*\(/.test(content),
+            `${file} 直接访问 loadData/saveData；插件自管 JSON 必须经 data/storage.ts`,
+        );
     }
 });
 

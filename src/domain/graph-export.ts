@@ -5,6 +5,10 @@
  * 现实社交结论。纯函数：无 DOM、无 IO，node --test 直接可测。
  */
 
+import { escapeMarkdown } from "./format.ts";
+import { graphEdgeLabel } from "./graph-query.ts";
+import type { GraphQuerySnapshot } from "./graph-query.ts";
+
 export type GraphQueryKind = "path" | "common" | "second" | "direct";
 
 export interface GraphPathSegment {
@@ -58,6 +62,9 @@ function summaryLine(input: GraphResultExportInput): string {
 }
 
 export function renderGraphResultMarkdown(input: GraphResultExportInput): string {
+    input = { ...input, centerName: safeGraphText(input.centerName), compareName: input.compareName === undefined ? undefined : safeGraphText(input.compareName),
+        pathNames: input.pathNames.map(safeGraphText), resultNames: input.resultNames.map(safeGraphText),
+        filters: { ...input.filters, search: safeGraphText(input.filters.search), group: safeGraphText(input.filters.group) }, generatedAt: safeGraphText(input.generatedAt) };
     const lines: string[] = [];
     lines.push("# 关系查询结果");
     lines.push("");
@@ -92,5 +99,41 @@ export function renderGraphResultMarkdown(input: GraphResultExportInput): string
     lines.push("");
     lines.push("---");
     lines.push("范围说明：结果仅限当前展示图（经筛选与规模裁剪），不代表现实社交关系、引荐意愿或关系强弱。");
+    return lines.join("\n");
+}
+
+function safeGraphText(value: string): string {
+    return escapeMarkdown(value.replace(/[\r\n\u0000-\u001f\u007f]+/g, " ")).replace(/([|!])/g, "\\$1");
+}
+
+export function renderGraphSnapshotMarkdown(snapshot: GraphQuerySnapshot, generatedAt: string): string {
+    const { query, counts } = snapshot;
+    const byId = new Map(snapshot.graph.nodes.map((node) => [node.id, node]));
+    const label = (id: string) => `${safeGraphText(byId.get(id)?.label ?? id)}（${safeGraphText(id)}）`;
+    const lines = ["# 图查询结果", "", `- 生成时间：${safeGraphText(generatedAt)}`,
+        `- 模式：${query.mode === "relations" ? "关系图" : "文档引用图（不是整库图，未打开原生面板）"}`,
+        `- 范围：${query.scope}；中心：${safeGraphText(snapshot.center.label)}（${safeGraphText(snapshot.center.id) || "无中心"}；${snapshot.center.status}）；来源代次 ${snapshot.revision}`,
+        `- 组织聚焦：${query.orgDocId ? safeGraphText(query.orgDocId) : "无"}`,
+        `- 关系查询中心：${query.focusId ? label(query.focusId) : "未选择"}；对比人物：${query.compareId ? label(query.compareId) : "未选择"}；层级 ${query.depth}；模式 ${query.queryMode}`,
+        `- 搜索：${safeGraphText(query.search) || "无"}；分组：${safeGraphText(query.group) || "无"}；仅无关系：${query.isolatedOnly ? "是" : "否"}`,
+        `- 组织展示：${query.showOrgs ? "是" : "否"}；${query.mode === "native" ? "分组/无关系/组织展示条件保留但不用于引用图" : "筛选应用于关系图，有效中心优先保留"}`,
+        `- 状态：${snapshot.state}；登记 ${counts.registered ?? "未知"}；来源节点 ${counts.sourceNodes ?? "未知"} / 边 ${counts.sourceEdges ?? "未知"}`,
+        `- 范围内节点 ${counts.rangeNodes} / 边 ${counts.rangeEdges}；筛选后节点 ${counts.filteredNodes} / 边 ${counts.filteredEdges}`,
+        `- 范围排除 ${counts.rangeExcluded ?? "未知"}；筛选排除 ${counts.filterExcluded}`,
+        `- 展示节点 ${counts.displayedNodes} / 边 ${counts.displayedEdges}；预算 ${query.maxNodes ?? 800}；裁剪节点 ${counts.clippedNodes} / 边 ${counts.clippedEdges}`,
+        `- 来源：${Object.entries(snapshot.sourceStatus).map(([key, status]) => `${key}=${status}`).join("；")}`, "", "## 节点"];
+    for (const node of snapshot.graph.nodes) lines.push(`- ${label(node.id)} · ${node.kind === "org" ? "组织" : "人物"} · 图内连接 ${node.degree}`);
+    lines.push("", "## 边");
+    for (const edge of snapshot.graph.edges) lines.push(`- ${label(edge.source)} — ${label(edge.target)} · ${graphEdgeLabel(edge.kind)}`);
+    lines.push("", "## related 查询", `- ${snapshot.result.kind}：${snapshot.result.status}`, `- ${safeGraphText(snapshot.result.reason)}`);
+    if (snapshot.result.pathIds.length) lines.push(`- 路径：${snapshot.result.pathIds.map(label).join(" — ")}`);
+    else for (const id of snapshot.result.ids) lines.push(`- ${label(id)}`);
+    if (snapshot.retainedByRange.length) lines.push(`- 范围外中心优先保留：${snapshot.retainedByRange.map(label).join("、")}（不属于当前范围或组织成员集合，不新增关系事实）`);
+    if (snapshot.retainedByFilter.length) lines.push(`- 为保留中心而额外显示：${snapshot.retainedByFilter.map(label).join("、")}`);
+    if (snapshot.diagnostics.length) {
+        lines.push("", "## 待核实与诊断");
+        for (const diagnostic of snapshot.diagnostics) lines.push(`- ${safeGraphText(diagnostic.message)}`);
+    }
+    lines.push("", "范围说明：节点、边和查询结果来自同一展示快照；仅 related 边参与关系查询，member/ref 不推断人物关系，不代表现实社交关系、引荐意愿或关系强弱。");
     return lines.join("\n");
 }

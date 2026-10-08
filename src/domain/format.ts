@@ -16,3 +16,26 @@ export function formatMonthDay(iso: string): string {
     if (!match) return iso;
     return `${Number(match[2])}月${Number(match[3])}日`;
 }
+
+export function validateDocumentTitle(title: string): string | null {
+    if (!title.trim()) return "文档名称不能为空";
+    if (/[\/\u0000-\u001f\u007f]/.test(title)) return "文档名称不能包含斜杠或控制字符（含换行），思源内核无法原文保留这类名称";
+    return null;
+}
+
+export function documentHPath(...segments: readonly string[]): string {
+    if (!segments.length) throw new Error("文档路径不能为空");
+    return "/" + segments.map((segment) => {
+        const error = validateDocumentTitle(segment);
+        if (error) throw new Error(error);
+        return segment.trim();
+    }).join("/");
+}
+
+export function escapeMarkdown(text: string): string {
+    return text.replace(/([\\`*_\[\]#<>])/g, "\\$1");
+}
+
+export function markdownHeading(title: string): string {
+    return `# ${escapeMarkdown(title.trim())}\n\n`;
+}

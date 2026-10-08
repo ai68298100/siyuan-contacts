@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isSuspiciousBirthday, runHealthAudit } from "../src/domain/health-audit.ts";
+import { decodeAuditFollowUps, decodeAuditInteractions, decodeAuditOrganizationMembers, decodeAuditSelfIdentity, HealthAuditJsonError, isSuspiciousBirthday, runFollowUpAudit, runHealthAudit, runOrganizationMemberAudit, runSelfIdentityAudit } from "../src/domain/health-audit.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
 import type { FollowUpItem } from "../src/domain/followups.ts";
 
@@ -121,4 +121,77 @@ test("C04 余项：疑似重复对并入体检、长期无互动按阈值筛出"
     assert.ok(duplicateSuspect, "疑似重复项缺失");
     assert.deepEqual(duplicateSuspect.itemIds, ["row-dup-a"]);
     assert.ok(duplicateSuspect.samples[0].includes("张三"), "疑似重复样本应含人名");
+});
+
+test("AG-P0-012：问题带模块归属，修复预览始终零写入", () => {
+    const issue = runHealthAudit({
+        people: [person({ phone: "", name: "待补录" })],
+        interactionCounts: {},
+        followUps: [],
+    }).find((item) => item.kind === "missingPhone");
+    assert.equal(issue?.module, "roster");
+    assert.equal(issue?.repair.mode, "preview");
+    assert.equal(issue?.repair.writes, 0);
+    assert.equal(issue?.repair.confirmationRequired, true);
+});
+
+test("AG-P0-012：组织成员孤儿与重复历史分别可定位", () => {
+    const membership = {
+        id: "20260927000000-mem0001",
+        orgDocId: "20260927000000-org0001",
+        personDocId: "20260927000000-doc0001",
+        department: "",
+        title: "",
+        joinedOn: "2026-01-01",
+        leftOn: "",
+        status: "active" as const,
+    };
+    const issues = runOrganizationMemberAudit({
+        people: [person({ docId: membership.personDocId })],
+        memberships: [membership, { ...membership, id: "20260927000000-mem0002" }, { ...membership, id: "20260927000000-mem0003", personDocId: "20260927000000-gone001" }],
+        organizationDocIds: [membership.orgDocId],
+    });
+    assert.equal(issues.find((item) => item.kind === "duplicateOrganizationHistory")?.module, "organizationMembers");
+    assert.equal(issues.find((item) => item.kind === "orphanOrganizationMember")?.itemIds.includes("20260927000000-mem0003"), true);
+});
+
+test("AG-P0-012：本人身份绑定行不一致时不按正常空态处理", () => {
+    const issues = runSelfIdentityAudit({
+        people: [person({ docId: "20260927000000-doc0001", itemId: "row-current", name: "我自己" })],
+        identity: { schemaVersion: 1, selfDocId: "20260927000000-doc0001", selfItemId: "row-old", createdAt: "2026-10-04" },
+    });
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].kind, "unreachableSelfIdentity");
+    assert.equal(issues[0].repair.writes, 0);
+});
+
+test("AG-P0-012：严格体检解析不把未知版本、坏容器和非法条目当空库", () => {
+    for (const decode of [decodeAuditInteractions, decodeAuditFollowUps, decodeAuditOrganizationMembers, decodeAuditSelfIdentity]) {
+        for (const raw of ["{broken", "null", false, [], { schemaVersion: 9 }, { schemaVersion: 1 }]) {
+            assert.throws(() => decode(raw), HealthAuditJsonError);
+        }
+    }
+    assert.equal(decodeAuditSelfIdentity(null), null);
+    assert.equal(decodeAuditSelfIdentity(""), null);
+    assert.deepEqual(decodeAuditOrganizationMembers(undefined), []);
+    assert.deepEqual(decodeAuditInteractions(JSON.stringify({ schemaVersion: 1, events: [], tombstones: [] })).events, []);
+    assert.throws(() => decodeAuditFollowUps({ schemaVersion: 1, items: [followUp({}), { id: "bad" }] }), HealthAuditJsonError);
+});
+
+test("AG-P0-012：重复成员记录和异常期间保留并列出，未知期间不猜测错误", () => {
+    const member = { id: "20261004000000-member1", orgDocId: "20261004000000-org0001", personDocId: "20261004000000-person1", status: "former" as const, joinedOn: "", leftOn: "", department: "", title: "" };
+    const memberships = decodeAuditOrganizationMembers({ schemaVersion: 1, memberships: [member, { ...member, joinedOn: "2026-02-31" }, { ...member, id: "20261004000000-member2", joinedOn: "2026-09-01", leftOn: "2026-08-01" }] });
+    assert.equal(memberships.length, 3);
+    const before = JSON.stringify(memberships);
+    const issues = runOrganizationMemberAudit({ people: [{ docId: member.personDocId }], memberships, organizationDocIds: [member.orgDocId] });
+    assert.equal(issues.find((issue) => issue.kind === "abnormalOrganizationPeriod")?.itemIds.length, 2);
+    assert.ok(issues.some((issue) => issue.kind === "duplicateOrganizationHistory"));
+    assert.equal(JSON.stringify(memberships), before);
+    assert.ok(issues.every((issue) => issue.repair.writes === 0));
+});
+
+test("AG-P0-012：跟进修复预览定位记录 ID 与人物文档 ID", () => {
+    const issues = runFollowUpAudit([], [followUp({ id: "follow-up-record-1" })]);
+    assert.deepEqual(issues[0].repair.targetIds, ["follow-up-record-1"]);
+    assert.deepEqual(issues[0].repair.targetDocIds, ["20260927000000-doc0001"]);
 });

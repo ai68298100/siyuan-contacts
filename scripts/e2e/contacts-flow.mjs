@@ -4,14 +4,25 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { randomUUID } from "node:crypto";
 import {spawn} from "node:child_process";
 import { prepareIsolatedWorkspace, assertTestPortAvailable, observeTestKernel } from "./kernel-safety.mjs";
+import { guardScratch, kernelTokenFromConfig, makeApi, resolveTarget, sweepOrphans } from "../lib/smoke-kernel.mjs";
 
 const HOST = "127.0.0.1";
 const PORT = 6830;
-const BASE = `http://${HOST}:${PORT}`;
+const DEFAULT_BASE = `http://${HOST}:${PORT}`;
 const MARKER = "renmai-e2e.json";
-const workspace = process.env.LVCT_E2E_WORKSPACE || path.join(os.homedir(), "SiYuan-Renmai-E2E");
+
+function readArg(name) {
+    const index = process.argv.indexOf(name);
+    return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+const cliBase = readArg("--base-url");
+const cliToken = readArg("--token");
+const cliWorkspace = readArg("--workspace");
+const workspace = cliWorkspace || process.env.LVCT_E2E_WORKSPACE || path.join(os.tmpdir(), `SiYuan-Lvct-Contacts-${randomUUID()}`);
 
 const results = [];
 const record = (name, ok, detail) => {
@@ -20,12 +31,14 @@ const record = (name, ok, detail) => {
 };
 
 let token = "";
+let base = DEFAULT_BASE;
 let assertKernelRunning;
+let ownedNotebookId = "";
 async function api(route, body = {}) {
     assertKernelRunning?.();
     const headers = {"Content-Type": "application/json"};
     if (token) headers.Authorization = `Token ${token}`;
-    const response = await fetch(`${BASE}${route}`, {method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(5000)});
+    const response = await fetch(`${base}${route}`, {method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(5000)});
     const text = await response.text();
     assertKernelRunning?.();
     return text ? JSON.parse(text) : {};
@@ -70,6 +83,7 @@ async function initWorkspace(notebookName) {
     const notebooks = await apiChecked("/api/notebook/lsNotebooks", {});
     const notebookId = notebooks.notebooks.find((n) => n.name === notebookName).id;
     if (!notebookId) throw new Error("笔记本创建失败");
+    ownedNotebookId = notebookId;
 
     const hostDocId = await apiChecked("/api/filetree/createDocWithMd", {notebook: notebookId, path: "/联系人总表", markdown: "# 联系人总表\n\n"});
     const avId = newNodeId();
@@ -93,7 +107,7 @@ async function initWorkspace(notebookName) {
         reqId: Date.now(),
         transactions: [{doOperations: [{action: "updateAttrViewColRelation", avID: avId, keyID: fieldMap.related, id: avId, isTwoWay: true, backRelationKeyID: newNodeId(), name: "被相关人", format: "相关人"}], undoOperations: []}],
     });
-    return {notebookId, hostDocId, avId, dbBlockId, fieldMap};
+    return {notebookId, notebookName, hostDocId, avId, dbBlockId, fieldMap};
 }
 
 async function createContact(ctx, draft) {
@@ -151,22 +165,44 @@ async function waitForBoot(lines, assertRunning) {
 }
 
 async function main() {
-    const {kernel, appDir} = resolveKernel();
-    await assertTestPortAvailable(HOST, PORT);
-    prepareIsolatedWorkspace(workspace, MARKER, "renmai e2e");
-    const {child, lines} = startKernel({kernel, appDir});
-    const assertRunning = observeTestKernel(child);
-    assertKernelRunning = assertRunning;
+    const external = Boolean(cliBase || cliToken || process.env.SIYUAN_BASE_URL || process.env.SIYUAN_TOKEN);
+    let child = null;
+    const lines = [];
+    if (external) {
+        const target = resolveTarget({ baseArg: cliBase, tokenArg: cliToken });
+        base = target.base;
+        token = target.token;
+        const guardedApi = makeApi(base, token);
+        await sweepOrphans(guardedApi);
+        await guardScratch(guardedApi, { base });
+    } else {
+        const {kernel, appDir} = resolveKernel();
+        await assertTestPortAvailable(HOST, PORT);
+        prepareIsolatedWorkspace(workspace, MARKER, "renmai e2e");
+        const started = startKernel({kernel, appDir});
+        child = started.child;
+        lines.push(...started.lines);
+        const assertRunning = observeTestKernel(child);
+        assertKernelRunning = assertRunning;
+    }
     let booted = false;
     let exitCode = 0;
+    let ctx;
     try {
-        await waitForBoot(lines, assertRunning);
-        assertRunning();
-        booted = true;
-        token = JSON.parse(fs.readFileSync(path.join(workspace, "conf", "conf.json"), "utf8")).accessAuthCode || "";
+        if (!external) {
+            await waitForBoot(lines, assertKernelRunning);
+            assertKernelRunning();
+            booted = true;
+            token = kernelTokenFromConfig(JSON.parse(fs.readFileSync(path.join(workspace, "conf", "conf.json"), "utf8")));
+            const guardedApi = makeApi(base, token);
+            await sweepOrphans(guardedApi);
+            await guardScratch(guardedApi, { base });
+        } else {
+            booted = true;
+        }
         record("内核启动", true, "");
 
-        const ctx = await initWorkspace("人脉-E2E");
+        ctx = await initWorkspace(`lvct-contacts-e2e-${Date.now()}`);
         record("初始化工作空间", true, `avId=${ctx.avId}`);
 
         const birthdayMs = new Date(1990, 4, 20).getTime();
@@ -254,6 +290,43 @@ async function main() {
         record("参与人员区块写入", attendees.length === 1 && (attendees[0].markdown || "").includes(`siyuan://blocks/${zhang.docId}`),
             `blocks=${attendees.length}`);
 
+        // B13.7 组织归属链接区块：人物文档单标记块（services/org.ts 同序列）——写入/原地更新保 IAL/移除
+        const orgDoc = await apiChecked("/api/filetree/createDocWithMd", {
+            notebook: ctx.notebookId, path: "/曙光科技", markdown: "# 曙光科技\n\n",
+        });
+        await api("/api/block/insertBlock", {dataType: "markdown", parentID: orgDoc, data: `**组织**：曙光科技\n{: custom-lvct-org="1"}`});
+        const ORG_LINKS_ATTR = "custom-lvct-org-links";
+        const orgLinksMd = `**所属组织**：[曙光科技](siyuan://blocks/${orgDoc})（研发部 · 工程师）\n{: ${ORG_LINKS_ATTR}="1"}`;
+        const orgLinksIns = await api("/api/block/insertBlock", {dataType: "markdown", parentID: zhang.docId, data: orgLinksMd});
+        if (orgLinksIns.code !== 0) throw new Error(`组织链接区块插入失败: ${orgLinksIns.msg}`);
+        const orgLinksBlockId = (orgLinksIns.data?.[0]?.doOperations ?? orgLinksIns.data?.[0]?.operations)?.[0]?.id;
+        await apiChecked("/api/sqlite/flushTransaction");
+        const orgLinksFound = await apiChecked("/api/query/sql", {
+            stmt: `SELECT id, markdown, ial FROM blocks WHERE root_id = '${zhang.docId}' AND ial LIKE '%${ORG_LINKS_ATTR}="%' LIMIT 1`,
+        });
+        record("组织归属链接区块写入",
+            orgLinksFound.length === 1 && (orgLinksFound[0].markdown || "").includes(`siyuan://blocks/${orgDoc}`),
+            `blocks=${orgLinksFound.length}`);
+        // 改名同步走整块更新：markdown 换新、IAL 关联键保留
+        await api("/api/block/updateBlock", {
+            id: orgLinksBlockId, dataType: "markdown",
+            data: `**所属组织**：[新曙光](siyuan://blocks/${orgDoc})（研发部 · 工程师）\n{: ${ORG_LINKS_ATTR}="1"}`,
+        });
+        await apiChecked("/api/sqlite/flushTransaction");
+        const renamedFound = await apiChecked("/api/query/sql", {
+            stmt: `SELECT id, markdown, ial FROM blocks WHERE root_id = '${zhang.docId}' AND ial LIKE '%${ORG_LINKS_ATTR}="%' LIMIT 1`,
+        });
+        record("组织链接区块原地更新保 IAL",
+            renamedFound.length === 1 && renamedFound[0].id === orgLinksBlockId
+                && (renamedFound[0].markdown || "").includes("新曙光") && (renamedFound[0].ial || "").includes(ORG_LINKS_ATTR),
+            `ial=${(renamedFound[0]?.ial || "").slice(0, 60)}`);
+        await api("/api/block/deleteBlock", {id: orgLinksBlockId});
+        await apiChecked("/api/sqlite/flushTransaction");
+        const orgLinksGone = await apiChecked("/api/query/sql", {
+            stmt: `SELECT id FROM blocks WHERE root_id = '${zhang.docId}' AND ial LIKE '%${ORG_LINKS_ATTR}="%' LIMIT 1`,
+        });
+        record("组织链接区块移除干净", orgLinksGone.length === 0, `left=${orgLinksGone.length}`);
+
         const failures = results.filter((r) => !r.ok);
         exitCode = failures.length > 0 ? 1 : 0;
         console.log(`\n== 联系人流程验证：${results.length - failures.length}/${results.length} 通过 ==`);
@@ -262,14 +335,19 @@ async function main() {
         console.error("E2E FAIL:", error.message);
         console.error(lines.slice(-15).join("\n"));
     } finally {
-        if (booted && child.exitCode === null && child.signalCode === null) {
+        if (ownedNotebookId) {
+            await api("/api/notebook/removeNotebook", { notebook: ownedNotebookId }).catch((error) => {
+                console.warn(`WARN 临时库清理失败：${String(error).slice(0, 120)}`);
+            });
+        }
+        if (child && booted && child.exitCode === null && child.signalCode === null) {
             await api("/api/system/exit", {force: true}).catch(() => undefined);
         }
-        const exited = await Promise.race([
+        const exited = child ? await Promise.race([
             new Promise((resolve) => child.exitCode !== null || child.signalCode !== null ? resolve(true) : child.once("exit", () => resolve(true))),
             new Promise((resolve) => setTimeout(() => resolve(false), 8000)),
-        ]);
-        if (!exited) child.kill("SIGKILL");
+        ]) : true;
+        if (child && !exited) child.kill("SIGKILL");
     }
     process.exit(exitCode);
 }

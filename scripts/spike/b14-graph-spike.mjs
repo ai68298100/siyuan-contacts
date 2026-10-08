@@ -9,10 +9,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { randomUUID } from "node:crypto";
 import {spawn} from "node:child_process";
 import { prepareIsolatedWorkspace, assertTestPortAvailable, observeTestKernel } from "../e2e/kernel-safety.mjs";
 
-const WORKSPACE = path.join(os.homedir(), "SiYuan-Renmai-B14-Spike");
+const WORKSPACE = path.join(os.tmpdir(), `SiYuan-Lvct-B14-${randomUUID()}`);
 const HOST = "127.0.0.1";
 const PORT = 6834;
 const BASE = `http://${HOST}:${PORT}`;
@@ -131,9 +132,11 @@ async function main() {
         const docC = await apiChecked("/api/filetree/createDocWithMd", {notebook: notebookID, path: "/文档C", markdown: "# 文档C\n\n"});
         const docA = await apiChecked("/api/filetree/createDocWithMd", {notebook: notebookID, path: "/文档A", markdown: "# 文档A\n\n"});
         const docD = await apiChecked("/api/filetree/createDocWithMd", {notebook: notebookID, path: "/文档D", markdown: "# 文档D\n\n"});
+        const docE = await apiChecked("/api/filetree/createDocWithMd", {notebook: notebookID, path: "/协议链接", markdown: "# 协议链接\n\n"});
         const refMarkdown = "((" + docB + " '文档B'))\n((" + docC + " '文档C'))";
         await apiChecked("/api/block/insertBlock", {dataType: "markdown", parentID: docA, data: refMarkdown});
         await apiChecked("/api/block/insertBlock", {dataType: "markdown", parentID: docD, data: "((" + docA + " '文档A'))"});
+        await apiChecked("/api/block/insertBlock", {dataType: "markdown", parentID: docE, data: "[文档B](siyuan://blocks/" + docB + ")"});
         await flush();
 
         /* A：候选内核 graph 端点探测（信息性——存在/参数要求都是证据） */
@@ -156,6 +159,10 @@ async function main() {
         const edges = refs.map((row) => row.def_block_root_id);
         const refsOK = refs.length >= 2 && edges.includes(docB) && edges.includes(docC);
         record("B refs 表作为图数据源（节点=文档，边=refs）", refsOK, `edges=${JSON.stringify(edges)}`);
+        const protocolRefs = await apiChecked("/api/query/sql", {stmt: "SELECT id, def_block_id, def_block_root_id FROM refs WHERE root_id = '" + docE + "'"});
+        const protocolEdge = protocolRefs.some((row) => row.def_block_root_id === docB);
+        record("B2 siyuan://blocks 链接是否形成 refs 边", null,
+            `formed=${protocolEdge} edges=${JSON.stringify(protocolRefs.map((row) => row.def_block_root_id))}`);
 
         /* C：内核侧"打开原生图面板"入口——预期为前端域（记证据） */
         record("C 打开原生图面板", null, "内核 API 无此端点（通道A 探测仅 graph 查询类）；原生图为前端渲染，插件侧需经前端 API/协议（留真机核对）");

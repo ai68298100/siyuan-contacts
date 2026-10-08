@@ -71,6 +71,13 @@ test("parseVcf：本插件导出的 X-LVCT-BDAY-LUNAR 回读为农历生日", ()
     assert.equal(contact.isLunar, true);
 });
 
+test("parseVcf：不支持字段明确列出，非法日期进入人工核对且不猜测", () => {
+    const [contact] = parseVcf("BEGIN:VCARD\r\nFN:王五\r\nORG:示例公司\r\nADR:地址\r\nPHOTO:data\r\nBDAY:五月二十\r\nEND:VCARD");
+    assert.deepEqual(contact.unsupportedProperties, ["ORG", "ADR", "PHOTO"]);
+    assert.deepEqual(contact.needsReview, ["BDAY"]);
+    assert.equal(contact.birthday, "");
+});
+
 test("parseVcf：无 FN 时回退 N 结构名（姓+名连写）；转义的逗号/分号/换行正确还原", () => {
     const noFn = "BEGIN:VCARD\r\nVERSION:3.0\r\nN:欧阳;锋;;;item1.TEL:13900000000\r\nEND:VCARD";
     assert.equal(parseVcf(noFn)[0].name, "欧阳锋");

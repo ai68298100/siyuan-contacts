@@ -1,73 +1,196 @@
-/**
- * 本人档案服务（B11）：初始化向导数据库确认后，默认建立「我自己」人物文档并写入身份标记。
- * 幂等续建：标记已存在 → 核验名册仍含该文档（丢失仅告警，改绑走 B11.5 修复流程）；
- * 无标记但有同名「我自己」已绑定联系人 → 复用该行不改资料；
- * 残留未绑定同名文档 → createContact 断点语义自动复用（不产生重复文档）。
- * 建档/标记失败不阻断初始化（console 记录；身份可后续通过设置页指定，B11.3）。
- */
 import type { Plugin } from "siyuan";
-import { createContact } from "./contacts";
-import { loadSelfIdentity, saveSelfIdentity, SelfIdentityConflictError } from "../data/self-identity";
-import type { SelfIdentity } from "../domain/self-identity";
-import { isSelfDoc } from "../domain/self-identity";
-import { listContacts } from "./contacts";
+import { assertContactWriteReady, listContacts } from "./contacts";
+import { changeSelfIdentityVerified, loadSelfIdentity, saveSelfIdentity } from "../data/self-identity";
+import { loadJsonStrict, saveJsonVerified, withStoreLock } from "../data/storage";
+import type { SelfIdentity, SelfIdentityChangePreview, SelfProfileCheckpoint } from "../domain/self-identity";
+import { excludeSelf, isSelfDoc, parseSelfIdentity, parseSelfProfileCheckpoint } from "../domain/self-identity";
+import { toLocalDateKey } from "../domain/interactions";
 import { invalidateRoster } from "./roster";
 import type { ContactsSettings } from "../domain/model";
+import { documentHPath, markdownHeading } from "../domain/format";
+import { createDocWithMd, KernelResponseError, KernelPermissionError, newNodeId } from "../api/client";
+import { documentExists, findCreationRequestDoc, flushBlockIndex, listNotebookDocs, NOTEBOOK_DOC_PAGE_SIZE, SELF_DRAFT_ATTR } from "../api/blocks";
+import { bindDocsAsRows, mapBoundDocIds } from "../api/av";
 
 export const SELF_PERSON_NAME = "我自己";
+export const SELF_PROFILE_CHECKPOINT_KEY = "self-profile-checkpoint.json";
+export const SELF_PROFILE_LOCK_KEY = "self-profile-init";
 
-/** 确保本人档案与身份标记存在（幂等）。返回当前身份；无法建立时返回 null（已告警）。 */
-export async function ensureSelfIdentity(plugin: Plugin, settings: ContactsSettings): Promise<SelfIdentity | null> {
-    const existing = await loadSelfIdentity(plugin);
-    if (existing) {
-        /* 核验名册仍含本人文档；丢失（文档被删/移动）仅告警——改绑/找回属 B11.5 修复流程 */
-        try {
-            const roster = await listContacts(settings);
-            if (!roster.some((person) => isSelfDoc(existing, person.docId))) {
-                console.warn(`[lvct] 本人文档 ${existing.selfDocId} 不在名册中（可能已删除/移动）；身份标记保留，请通过设置页修复`);
-            }
-        } catch (error) {
-            console.warn("[lvct] 本人身份核验的名册读取失败", error);
-        }
-        return existing;
+async function findUnboundSelfDocument(settings: ContactsSettings): Promise<string | null> {
+    await flushBlockIndex();
+    const candidates: string[] = [];
+    let afterDocId: string | undefined;
+    for (;;) {
+        const docs = await listNotebookDocs(settings.notebookId, NOTEBOOK_DOC_PAGE_SIZE, 0, afterDocId);
+        candidates.push(...docs.filter((doc) => doc.content.trim() === SELF_PERSON_NAME).map((doc) => doc.id));
+        if (docs.length < NOTEBOOK_DOC_PAGE_SIZE) break;
+        afterDocId = docs.at(-1)!.id;
     }
-
-    try {
-        /* 同名「我自己」已绑定联系人 → 复用该行（不改资料）；未绑定残留/全新 → createContact
-           断点语义建文档+绑行+写字段（空草稿，仅姓名） */
-        invalidateRoster();
-        const roster = await listContacts(settings);
-        const sameName = roster.find((person) => person.name === SELF_PERSON_NAME);
-        const created = sameName
-            ? sameName
-            : await createContact(settings, {
-                name: SELF_PERSON_NAME, phone: "", email: "", wechat: "", website: "",
-                birthday: "", isLunar: false, group: "", tags: [],
-            });
-        return await saveSelfIdentity(plugin, { selfDocId: created.docId, selfItemId: created.itemId });
-    } catch (error) {
-        if (error instanceof SelfIdentityConflictError) {
-            /* 并发窗口另一上下文已标记：重新读取返回其身份 */
-            return await loadSelfIdentity(plugin);
-        }
-        console.warn("[lvct] 本人档案建立失败（初始化继续，身份可稍后在设置页指定）", error);
-        return null;
-    }
+    const mapping = candidates.length ? await mapBoundDocIds(settings.avId, candidates) : {};
+    const unbound = candidates.filter((docId) => !mapping[docId]);
+    if (unbound.length > 1) throw new Error("发现多个未绑定的本人候选，未自动选择或新建；请在设置中收编并指定具体联系人");
+    return unbound[0] ?? null;
 }
 
-/** B11.3/B11.5：把本人身份显式指定到一名已有联系人（设置页修复/旧库升级入口）。
- *  与幂等建档不同：这里**允许改绑**（调用方已确认预览影响），但目标必须真实存在于名册。 */
-export async function designateSelfIdentity(
-    plugin: Plugin,
-    settings: ContactsSettings,
-    personItemId: string,
-): Promise<SelfIdentity> {
+async function ensureSelfDocument(plugin: Plugin, settings: ContactsSettings): Promise<SelfProfileCheckpoint> {
+    let checkpoint = parseSelfProfileCheckpoint(await loadJsonStrict(plugin, SELF_PROFILE_CHECKPOINT_KEY));
+    if (checkpoint && (checkpoint.notebookId !== settings.notebookId || checkpoint.avId !== settings.avId || checkpoint.dbBlockId !== settings.dbBlockId)) {
+        throw new Error("本人建档目标与原断点不同，未创建第二份档案；请先核对原工作空间");
+    }
+    if (checkpoint) {
+        if (checkpoint.docId) {
+            if (!await documentExists(checkpoint.docId)) throw new Error("原本人请求文档不可达，未再次创建；请恢复原文档后重试");
+            if (checkpoint.source === "created") {
+                const original = await findCreationRequestDoc(settings.notebookId, checkpoint.requestId, SELF_DRAFT_ATTR);
+                if (original?.docId !== checkpoint.docId) throw new Error("本人请求标记与原文档不一致，未再次创建或自动改绑");
+            }
+            return checkpoint;
+        }
+        const original = await findCreationRequestDoc(settings.notebookId, checkpoint.requestId, SELF_DRAFT_ATTR);
+        if (original) {
+            checkpoint = { ...checkpoint, state: "verified", docId: original.docId };
+            await saveJsonVerified(plugin, SELF_PROFILE_CHECKPOINT_KEY, checkpoint);
+            return checkpoint;
+        }
+        if (checkpoint.state !== "rejected") throw new Error("上次本人建档结果仍未知，未找到原请求文档；未再次创建，请核实后重试");
+    } else {
+        const docId = await findUnboundSelfDocument(settings);
+        checkpoint = {
+            schemaVersion: 1, notebookId: settings.notebookId, avId: settings.avId, dbBlockId: settings.dbBlockId,
+            requestId: newNodeId(), source: docId ? "reused" : "created", state: docId ? "verified" : "unknown", ...(docId ? { docId } : {}),
+        };
+        await saveJsonVerified(plugin, SELF_PROFILE_CHECKPOINT_KEY, checkpoint);
+        if (docId) return checkpoint;
+    }
+    checkpoint = { ...checkpoint, state: "unknown" };
+    await saveJsonVerified(plugin, SELF_PROFILE_CHECKPOINT_KEY, checkpoint);
+    let creationError: unknown;
+    try {
+        await createDocWithMd(settings.notebookId, documentHPath(settings.notebookName, SELF_PERSON_NAME),
+            `${markdownHeading(SELF_PERSON_NAME).trimEnd()}\n{: ${SELF_DRAFT_ATTR}="${checkpoint.requestId}"}\n\n`);
+    } catch (cause) {
+        creationError = cause;
+    }
+    const original = await findCreationRequestDoc(settings.notebookId, checkpoint.requestId, SELF_DRAFT_ATTR);
+    if (!original) {
+        if (creationError instanceof KernelResponseError || creationError instanceof KernelPermissionError) {
+            await saveJsonVerified(plugin, SELF_PROFILE_CHECKPOINT_KEY, { ...checkpoint, state: "rejected" });
+            throw creationError;
+        }
+        throw new Error("本人建档请求已发出，但原请求文档尚未核实；结果未知，未再次创建", { cause: creationError });
+    }
+    checkpoint = { ...checkpoint, state: "verified", docId: original.docId };
+    await saveJsonVerified(plugin, SELF_PROFILE_CHECKPOINT_KEY, checkpoint);
+    return checkpoint;
+}
+
+export async function ensureSelfIdentity(plugin: Plugin, settings: ContactsSettings): Promise<SelfIdentity> {
+    return withStoreLock(SELF_PROFILE_LOCK_KEY, async () => {
+        const existing = await loadSelfIdentity(plugin);
+        invalidateRoster();
+        const roster = await listContacts(settings);
+        if (existing) {
+            const matches = roster.filter((person) => isSelfDoc(existing, person.docId));
+            if (matches.length !== 1 || matches[0].itemId !== existing.selfItemId) {
+                throw new Error("本人身份与当前名册绑定不一致，未重建或改绑；请先核对原文档和数据库，再在设置中显式修复");
+            }
+            if (!await documentExists(existing.selfDocId)) throw new Error("本人原文档不可达，身份未改动；请恢复原文档或显式修复");
+            return existing;
+        }
+        const checkpoint = parseSelfProfileCheckpoint(await loadJsonStrict(plugin, SELF_PROFILE_CHECKPOINT_KEY));
+        if (!checkpoint) {
+            const candidates = roster.filter((person) => person.name === SELF_PERSON_NAME);
+            if (candidates.length > 1) throw new Error("发现多个同名本人候选，未自动选择；请在设置中指定具体联系人");
+            if (candidates.length === 1) {
+                const person = candidates[0];
+                if (!await documentExists(person.docId)) throw new Error("同名候选文档不可达，未认定本人");
+                const result = await saveSelfIdentity(plugin, { selfDocId: person.docId, selfItemId: person.itemId });
+                invalidateRoster();
+                return result;
+            }
+        }
+        await assertContactWriteReady(settings);
+        const current = await ensureSelfDocument(plugin, settings);
+        const docId = current.docId!;
+        let itemId = (await mapBoundDocIds(settings.avId, [docId]))[docId];
+        if (current.itemId && current.itemId !== itemId) throw new Error("原本人文档的绑定行已变化，未按新行自动认定；请显式修复");
+        if (!itemId) {
+            let bindingError: unknown;
+            try { await bindDocsAsRows(settings.avId, settings.dbBlockId, [{ id: docId, content: SELF_PERSON_NAME }]); }
+            catch (cause) { bindingError = cause; }
+            itemId = (await mapBoundDocIds(settings.avId, [docId]))[docId];
+            if (!itemId) throw new Error("本人文档已保留，但绑定结果尚未核实；可在设置中继续，不重复建档", { cause: bindingError });
+        }
+        await saveJsonVerified(plugin, SELF_PROFILE_CHECKPOINT_KEY, { ...current, itemId });
+        invalidateRoster();
+        const matches = (await listContacts(settings)).filter((person) => person.docId === docId && person.itemId === itemId);
+        if (matches.length !== 1 || !await documentExists(docId)) throw new Error("本人文档/数据库行回读尚未核实，身份未写入；请核对后继续");
+        const identity = await saveSelfIdentity(plugin, { selfDocId: docId, selfItemId: itemId });
+        invalidateRoster();
+        return identity;
+    });
+}
+
+export async function designateSelfIdentity(plugin: Plugin, settings: ContactsSettings, personItemId: string): Promise<SelfIdentity> {
+    const preview = await previewSelfIdentityChange(plugin, settings, personItemId);
+    const identity = await applySelfIdentityChange(plugin, settings, preview);
+    if (!identity) throw new Error("本人身份未指定");
+    return identity;
+}
+
+function selfAnchorKey(settings: ContactsSettings): string {
+    return JSON.stringify([settings.notebookId, settings.avId, settings.dbBlockId]);
+}
+
+export async function previewSelfIdentityChange(plugin: Plugin, settings: ContactsSettings, targetItemId: string | null): Promise<SelfIdentityChangePreview> {
+    const previous = await loadSelfIdentity(plugin);
     invalidateRoster();
     const roster = await listContacts(settings);
-    const person = roster.find((entry) => entry.itemId === personItemId);
-    if (!person) throw new Error("目标联系人不存在或已解绑，身份未改动");
-    return await saveSelfIdentity(plugin, {
-        selfDocId: person.docId,
-        selfItemId: person.itemId,
-    }, { allowRebind: true });
+    const matches = targetItemId === null ? [] : roster.filter((entry) => entry.itemId === targetItemId);
+    if (targetItemId !== null && matches.length !== 1) throw new Error("目标联系人不存在或已解绑，或目标不唯一；身份未改动");
+    const person = matches[0];
+    if (person && (roster.filter((entry) => entry.docId === person.docId).length !== 1
+        || !await documentExists(person.docId) || (await mapBoundDocIds(settings.avId, [person.docId]))[person.docId] !== person.itemId)) {
+        throw new Error("目标人物文档或绑定行尚未核实，未生成修复计划");
+    }
+    return {
+        schemaVersion: 1, anchorKey: selfAnchorKey(settings), previous,
+        target: person ? { docId: person.docId, itemId: person.itemId, name: person.name } : null,
+        previousName: roster.find((entry) => entry.docId === previous?.selfDocId)?.name ?? previous?.selfDocId ?? "未指定",
+        ordinaryBefore: excludeSelf(roster, previous).length,
+        ordinaryAfter: roster.filter((entry) => entry.docId !== person?.docId).length,
+        createdAt: previous?.createdAt ?? toLocalDateKey(new Date()),
+    };
+}
+
+export async function applySelfIdentityChange(plugin: Plugin, settings: ContactsSettings, preview: SelfIdentityChangePreview): Promise<SelfIdentity | null> {
+    if (preview.schemaVersion !== 1 || preview.anchorKey !== selfAnchorKey(settings)) throw new Error("修复目标工作空间已变化，请重新预览");
+    const previous = parseSelfIdentity(preview.previous);
+    const next = preview.target ? parseSelfIdentity({
+        schemaVersion: 1, selfDocId: preview.target.docId, selfItemId: preview.target.itemId,
+        createdAt: preview.createdAt,
+    }) : null;
+    return withStoreLock(SELF_PROFILE_LOCK_KEY, async () => {
+        const current = await loadSelfIdentity(plugin);
+        if (JSON.stringify(current) !== JSON.stringify(previous) && JSON.stringify(current) !== JSON.stringify(next)) {
+            throw new Error("本人身份已在预览后变化，未覆盖；请重新预览");
+        }
+        invalidateRoster();
+        const roster = await listContacts(settings);
+        if (next) {
+            const matches = roster.filter((entry) => entry.docId === next.selfDocId);
+            if (matches.length !== 1 || matches[0].itemId !== next.selfItemId
+                || !await documentExists(next.selfDocId)
+                || (await mapBoundDocIds(settings.avId, [next.selfDocId]))[next.selfDocId] !== next.selfItemId) {
+                throw new Error("预览目标文档或绑定行已变化，身份未改动；请重新预览");
+            }
+        }
+        await withStoreLock(SELF_PROFILE_CHECKPOINT_KEY, async () => {
+            const checkpoint = await loadJsonStrict(plugin, SELF_PROFILE_CHECKPOINT_KEY);
+            if (checkpoint !== null && checkpoint !== "") await saveJsonVerified(plugin, SELF_PROFILE_CHECKPOINT_KEY, null);
+        });
+        const identity = await changeSelfIdentityVerified(plugin, previous, next);
+        invalidateRoster();
+        return identity;
+    });
 }

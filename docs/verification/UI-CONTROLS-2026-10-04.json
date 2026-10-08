@@ -1,0 +1,5764 @@
+{
+  "scope": "Current Svelte component source; runtime failures, conditional visibility and host behavior require separate verification",
+  "files": 26,
+  "controls": 439,
+  "findings": [
+    {
+      "id": "src/components/LvctDialog.svelte:86",
+      "kind": "keyboard_review",
+      "evidence": [
+        "onclick={(event) => { if (closeOnBackdrop && event.target === event.currentTarget) void requestClose(); }}"
+      ]
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:756",
+      "kind": "keyboard_review",
+      "evidence": [
+        "onclick={(event) => { if (event.target === event.currentTarget) mobileSheetOpen = false; }}"
+      ]
+    }
+  ],
+  "inventory": [
+    {
+      "id": "src/components/InitWizard.svelte:105",
+      "file": "src/components/InitWizard.svelte",
+      "line": 105,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={notebookName}"
+      ],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/InitWizard.svelte:143",
+      "file": "src/components/InitWizard.svelte",
+      "line": 143,
+      "tag": "button",
+      "name": "{text(\"wizardRecheck\", \"重新检测\")}",
+      "handlers": [
+        "onclick={() => void refreshPreview()}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/InitWizard.svelte:158",
+      "file": "src/components/InitWizard.svelte",
+      "line": 158,
+      "tag": "button",
+      "name": "{running ? text(\"wizardRunning\", \"正在初始化…\") : failed ? text(\"wizardContinue\", \"继续初始化\") : text(\"wizardStart\", \"开始初始化\")}",
+      "handlers": [
+        "onclick={run}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running || notebookName.trim().length === 0}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/LvctDialog.svelte:86",
+      "file": "src/components/LvctDialog.svelte",
+      "line": 86,
+      "tag": "div",
+      "name": "{title} ×",
+      "handlers": [
+        "onclick={(event) => { if (closeOnBackdrop && event.target === event.currentTarget) void requestClose(); }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "needs_review"
+    },
+    {
+      "id": "src/components/LvctDialog.svelte:105",
+      "file": "src/components/LvctDialog.svelte",
+      "line": 105,
+      "tag": "button",
+      "name": "aria-label={closeLabel}",
+      "handlers": [
+        "onclick={() => void requestClose()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:657",
+      "file": "src/components/SettingsView.svelte",
+      "line": 657,
+      "tag": "button",
+      "name": "← {text(\"settingsBack\", \"返回工作台\")}",
+      "handlers": [
+        "onclick={() => guardedClose(onBack)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:663",
+      "file": "src/components/SettingsView.svelte",
+      "line": 663,
+      "tag": "button",
+      "name": "{section.label}",
+      "handlers": [
+        "onclick={() => { if (!auditBusy) activeSection = section.id; }}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={auditBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:696",
+      "file": "src/components/SettingsView.svelte",
+      "line": 696,
+      "tag": "button",
+      "name": "打开文档",
+      "handlers": [
+        "onclick={() => facade.openHostDoc()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:709",
+      "file": "src/components/SettingsView.svelte",
+      "line": 709,
+      "tag": "button",
+      "name": "{selfBusy ? \"…\" : text(\"selfCreate\", \"创建本人档案「我自己」\")}",
+      "handlers": [
+        "onclick={createSelf}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={selfBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:717",
+      "file": "src/components/SettingsView.svelte",
+      "line": 717,
+      "tag": "select",
+      "name": "{text(\"selfDesignatePick\", \"选择联系人…\")} {person.name}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={selfDesignateTarget}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:723",
+      "file": "src/components/SettingsView.svelte",
+      "line": 723,
+      "tag": "button",
+      "name": "{text(\"selfDesignate\", \"改绑本人身份\")}",
+      "handlers": [
+        "onclick={designateSelf}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={selfBusy || !selfDesignateTarget}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:733",
+      "file": "src/components/SettingsView.svelte",
+      "line": 733,
+      "tag": "select",
+      "name": "首页 联系人 关系图谱 组织",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.defaultView}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:742",
+      "file": "src/components/SettingsView.svelte",
+      "line": 742,
+      "tag": "select",
+      "name": "按姓名 按分组 按生日临近 按最近互动",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.peopleSort}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:751",
+      "file": "src/components/SettingsView.svelte",
+      "line": 751,
+      "tag": "select",
+      "name": "卡片 表格",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.peopleView}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:760",
+      "file": "src/components/SettingsView.svelte",
+      "line": 760,
+      "tag": "button",
+      "name": "恢复默认显示",
+      "handlers": [
+        "onclick={() => { draft = { ...draft, peopleView: DEFAULT_VIEW_PREFERENCES.peopleView, tableColumns: [...DEFAULT_VIEW_PREFERENCES.tableColumns], }; }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:771",
+      "file": "src/components/SettingsView.svelte",
+      "line": 771,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:checked={draft.openOnStartup}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:775",
+      "file": "src/components/SettingsView.svelte",
+      "line": 775,
+      "tag": "button",
+      "name": "{savingPreferences ? \"保存中…\" : \"保存偏好\"}",
+      "handlers": [
+        "onclick={savePreferences}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={savingPreferences}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:788",
+      "file": "src/components/SettingsView.svelte",
+      "line": 788,
+      "tag": "button",
+      "name": "{rebindOpen ? \"收起\" : \"重新绑定已有数据库\"}",
+      "handlers": [
+        "onclick={() => (rebindOpen = !rebindOpen)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:796",
+      "file": "src/components/SettingsView.svelte",
+      "line": 796,
+      "tag": "button",
+      "name": "{scanningAnchors ? \"扫描中…\" : \"扫描全库候选（只读）\"}",
+      "handlers": [
+        "onclick={() => void runAnchorScan()}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={scanningAnchors}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:819",
+      "file": "src/components/SettingsView.svelte",
+      "line": 819,
+      "tag": "button",
+      "name": "{scanningAnchors ? \"扫描中…\" : anchorScan.status === \"blocked\" ? \"重试当前位置\" : \"继续扫描\"}",
+      "handlers": [
+        "onclick={() => void runAnchorScan(true)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={scanningAnchors}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:836",
+      "file": "src/components/SettingsView.svelte",
+      "line": 836,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:group={selectedCandidateKey}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:844",
+      "file": "src/components/SettingsView.svelte",
+      "line": 844,
+      "tag": "button",
+      "name": "填入所选候选",
+      "handlers": [
+        "onclick={applySelectedCandidate}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={!selectedCandidateKey}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:850",
+      "file": "src/components/SettingsView.svelte",
+      "line": 850,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={anchorDraft.hostDocId}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:851",
+      "file": "src/components/SettingsView.svelte",
+      "line": 851,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={anchorDraft.dbBlockId}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:852",
+      "file": "src/components/SettingsView.svelte",
+      "line": 852,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={anchorDraft.avId}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:855",
+      "file": "src/components/SettingsView.svelte",
+      "line": 855,
+      "tag": "button",
+      "name": "{rebinding ? \"验证并保存中…\" : \"验证并重新绑定\"}",
+      "handlers": [
+        "onclick={runRebind}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={rebinding}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:871",
+      "file": "src/components/SettingsView.svelte",
+      "line": 871,
+      "tag": "button",
+      "name": "{exportingRoster ? \"导出中…\" : \"导出 .vcf\"}",
+      "handlers": [
+        "onclick={runExportRoster}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={exportingRoster || (exportSummary !== null && exportSummary.peopleCount === 0)}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:884",
+      "file": "src/components/SettingsView.svelte",
+      "line": 884,
+      "tag": "button",
+      "name": "{exportingInteractions ? \"导出中…\" : \"导出 JSON\"}",
+      "handlers": [
+        "onclick={runExportInteractions}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={exportingInteractions}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:894",
+      "file": "src/components/SettingsView.svelte",
+      "line": 894,
+      "tag": "button",
+      "name": "{exportingFollowUps ? \"导出中…\" : \"导出 JSON\"}",
+      "handlers": [
+        "onclick={runExportFollowUps}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={exportingFollowUps}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:905",
+      "file": "src/components/SettingsView.svelte",
+      "line": 905,
+      "tag": "button",
+      "name": "{exportingBundle ? \"导出中…\" : \"导出迁移包\"}",
+      "handlers": [
+        "onclick={runExportBundle}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={exportingBundle}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:913",
+      "file": "src/components/SettingsView.svelte",
+      "line": 913,
+      "tag": "input",
+      "name": "id=\"lvct-migration-bundle\"",
+      "handlers": [
+        "onchange={selectMigrationBundle}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={importingBundle || previewingBundle}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:923",
+      "file": "src/components/SettingsView.svelte",
+      "line": 923,
+      "tag": "button",
+      "name": "{importingBundle ? \"恢复中…\" : bundleMessage ? \"核实并重试未完成模块\" : \"确认恢复（现状优先合并）\"}",
+      "handlers": [
+        "onclick={runImportBundle}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={importingBundle}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:936",
+      "file": "src/components/SettingsView.svelte",
+      "line": 936,
+      "tag": "input",
+      "name": "id=\"lvct-interaction-backup\"",
+      "handlers": [
+        "onchange={selectInteractionBackup}"
+      ],
+      "bindings": [
+        "bind:this={importFileInput}"
+      ],
+      "disabled": "disabled={importingInteractions}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:942",
+      "file": "src/components/SettingsView.svelte",
+      "line": 942,
+      "tag": "button",
+      "name": "{importDiffOpen ? \"收起差异明细\" : \"查看差异明细\"}",
+      "handlers": [
+        "onclick={() => (importDiffOpen = !importDiffOpen)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:986",
+      "file": "src/components/SettingsView.svelte",
+      "line": 986,
+      "tag": "button",
+      "name": "{importingInteractions ? \"合并中…\" : \"确认合并备份\"}",
+      "handlers": [
+        "onclick={runImportInteractions}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={!importPreview || previewingImport || importingInteractions}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:995",
+      "file": "src/components/SettingsView.svelte",
+      "line": 995,
+      "tag": "input",
+      "name": "id=\"lvct-followup-backup\"",
+      "handlers": [
+        "onchange={selectFollowUpBackup}"
+      ],
+      "bindings": [
+        "bind:this={fuFileInput}"
+      ],
+      "disabled": "disabled={fuImporting}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1002",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1002,
+      "tag": "button",
+      "name": "{fuImporting ? \"合并中…\" : \"确认合并备份\"}",
+      "handlers": [
+        "onclick={runImportFollowUps}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={!fuImportPreview || fuPreviewing || fuImporting}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1010",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1010,
+      "tag": "button",
+      "name": "{checking ? \"检查中…\" : \"检查字段健康\"}",
+      "handlers": [
+        "onclick={runHealthCheck}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={checking}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1033",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1033,
+      "tag": "select",
+      "name": "不映射 {column.name || column.id}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={mappingDraft[item.key]}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1042",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1042,
+      "tag": "button",
+      "name": "{mappingBusy ? \"保存映射中…\" : \"保存字段映射\"}",
+      "handlers": [
+        "onclick={runFieldMapRepair}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={mappingBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1046",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1046,
+      "tag": "button",
+      "name": "{rebuilding ? \"重建中…\" : \"补建缺失字段\"}",
+      "handlers": [
+        "onclick={runRebuild}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={rebuilding}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1056",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1056,
+      "tag": "button",
+      "name": "运行资料体检",
+      "handlers": [
+        "onclick={() => (auditOpen = true)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1072",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1072,
+      "tag": "button",
+      "name": "{dismissalsLoading ? \"读取中…\" : \"刷新列表\"}",
+      "handlers": [
+        "onclick={loadDismissedReminders}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={dismissalsLoading}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1088",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1088,
+      "tag": "button",
+      "name": "恢复提醒",
+      "handlers": [
+        "onclick={() => resumeOne(entry.personDocId, entry.kind)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={dismissalsBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1105",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1105,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.birthdayWindowDays}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1109",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1109,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.staleThresholdDays}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1113",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1113,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.reminderGraceDays}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1120",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1120,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:checked={draft.summaryEnabled}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1124",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1124,
+      "tag": "button",
+      "name": "{savingPreferences ? \"保存中…\" : \"保存偏好\"}",
+      "handlers": [
+        "onclick={savePreferences}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={savingPreferences}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1140",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1140,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:checked={draft.aiEnabled}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1146",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1146,
+      "tag": "button",
+      "name": "{savingPreferences ? \"保存中…\" : \"保存偏好\"}",
+      "handlers": [
+        "onclick={savePreferences}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={savingPreferences}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/SettingsView.svelte:1175",
+      "file": "src/components/SettingsView.svelte",
+      "line": 1175,
+      "tag": "a",
+      "name": "项目主页",
+      "handlers": [],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/StatusNotice.svelte:25",
+      "file": "src/components/StatusNotice.svelte",
+      "line": 25,
+      "tag": "button",
+      "name": "{actionLabel}",
+      "handlers": [
+        "onclick={onAction}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/Workbench.svelte:206",
+      "file": "src/components/Workbench.svelte",
+      "line": 206,
+      "tag": "button",
+      "name": "{isMobile ? view.shortLabel : view.label}",
+      "handlers": [
+        "onclick={() => selectView(view.id)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={!view.enabled}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/Workbench.svelte:217",
+      "file": "src/components/Workbench.svelte",
+      "line": 217,
+      "tag": "button",
+      "name": "{text(\"navSuggestions\", \"建议\")}",
+      "handlers": [],
+      "bindings": [],
+      "disabled": "disabled",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/Workbench.svelte:220",
+      "file": "src/components/Workbench.svelte",
+      "line": 220,
+      "tag": "button",
+      "name": "title={text(\"openSettings\", \"打开插件设置\")}",
+      "handlers": [
+        "onclick={() => selectView(\"settings\")}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/Workbench.svelte:233",
+      "file": "src/components/Workbench.svelte",
+      "line": 233,
+      "tag": "input",
+      "name": "aria-label=\"搜索联系人\"",
+      "handlers": [
+        "oninput={() => { if (globalSearch.trim() && current !== \"people\") selectView(\"people\"); }}"
+      ],
+      "bindings": [
+        "bind:value={globalSearch}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/Workbench.svelte:235",
+      "file": "src/components/Workbench.svelte",
+      "line": 235,
+      "tag": "button",
+      "name": "新建联系人",
+      "handlers": [
+        "onclick={() => { selectView(\"people\"); createRequested += 1; }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/Workbench.svelte:241",
+      "file": "src/components/Workbench.svelte",
+      "line": 241,
+      "tag": "button",
+      "name": "重新读取偏好",
+      "handlers": [
+        "onclick={() => preferenceRequests.load().catch(() => {})}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:310",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 310,
+      "tag": "button",
+      "name": "{text(\"captureRetry\", \"重试\")}",
+      "handlers": [
+        "onclick={load}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:311",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 311,
+      "tag": "button",
+      "name": "关闭",
+      "handlers": [
+        "onclick={closeIfIdle}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:361",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 361,
+      "tag": "button",
+      "name": "{text(\"captureOpenNote\", \"打开原笔记\")}",
+      "handlers": [
+        "onclick={() => facade.openDoc(docId)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:362",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 362,
+      "tag": "button",
+      "name": "{text(\"captureOpenDiary\", \"打开当日日记\")}",
+      "handlers": [
+        "onclick={() => openOptionalDoc(result?.dateDocId)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:363",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 363,
+      "tag": "button",
+      "name": "{text(\"captureOpenPlace\", \"打开地点\")}",
+      "handlers": [
+        "onclick={() => openOptionalDoc(result?.placeDocId)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:365",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 365,
+      "tag": "button",
+      "name": "{text(\"captureOpenPerson\", \"打开{nm}\", { nm: person.name })}",
+      "handlers": [
+        "onclick={() => facade.openPersonDoc(person.docId)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:370",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 370,
+      "tag": "button",
+      "name": "{running ? text(\"captureRetrying\", \"核实并重试中…\") : text(\"captureRetryIncomplete\", \"仅重试未完成项\")}",
+      "handlers": [
+        "onclick={retryIncomplete}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:377",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 377,
+      "tag": "button",
+      "name": "{running ? text(\"captureRetryingAi\", \"核实 AI 写入中…\") : text(\"captureRetryAi\", \"仅重试未核实的 AI 写入\")}",
+      "handlers": [
+        "onclick={retryAiExtras}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:383",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 383,
+      "tag": "button",
+      "name": "{text(\"captureDone\", \"完成\")}",
+      "handlers": [
+        "onclick={closeIfIdle}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:408",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 408,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:checked={checked[person.docId]}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:418",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 418,
+      "tag": "button",
+      "name": "{aiRunning ? text(\"captureAiRunning\", \"AI 分析中…\") : aiDone ? text(\"captureAiDone\", \"AI 已分析（可再次分析）\") : text(\"captureAiButton\", \"AI 分析本页（识别未链接的人名/日期/地点）\")}",
+      "handlers": [
+        "onclick={runAi}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={aiRunning}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:435",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 435,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={newNamesText}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:448",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 448,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:checked={candidate.checked}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:462",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 462,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:checked={candidate.checked}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:483",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 483,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={date}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:487",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 487,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={place}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:492",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 492,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={note}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:507",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 507,
+      "tag": "button",
+      "name": "{text(\"captureBackToIdentify\", \"返回识别\")}",
+      "handlers": [
+        "onclick={() => (step = 1)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:508",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 508,
+      "tag": "button",
+      "name": "{running ? text(\"captureRecording\", \"记录中…\") : text(\"captureRecordAndWrite\", \"记录互动并建立事项双链\")}",
+      "handlers": [
+        "onclick={submit}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running || !hasTarget}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:520",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 520,
+      "tag": "button",
+      "name": "{text(\"captureCancel\", \"取消\")}",
+      "handlers": [
+        "onclick={closeIfIdle}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/capture/CaptureDialog.svelte:521",
+      "file": "src/components/capture/CaptureDialog.svelte",
+      "line": 521,
+      "tag": "button",
+      "name": "{text(\"captureNextConfirm\", \"下一步：确认记录\")}",
+      "handlers": [
+        "onclick={() => (step = 2)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={!hasTarget || aiRunning}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:446",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 446,
+      "tag": "button",
+      "name": "{text(\"dashReload\", \"重新加载\")}",
+      "handlers": [
+        "onclick={refresh}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:475",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 475,
+      "tag": "button",
+      "name": "{text(\"dashCollapse\", \"收起\")}",
+      "handlers": [
+        "onclick={() => (summaryHiddenThisSession = true)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:476",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 476,
+      "tag": "button",
+      "name": "{text(\"dashDismissToday\", \"今日不再展示\")}",
+      "handlers": [
+        "onclick={dismissSummaryToday}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={summaryBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:486",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 486,
+      "tag": "button",
+      "name": "aria-label=\"查看今天过生日的联系人\"",
+      "handlers": [
+        "onclick={openBirthdayPeople}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:494",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 494,
+      "tag": "button",
+      "name": "{data.people} {text(\"dashStatPeople\", \"联系人\")} {text(\"dashStatPeopleFt\", \"其中 {n} 人从未互动\", { n: data.neverContacted })}",
+      "handlers": [
+        "onclick={() => onOpenPeople()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:500",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 500,
+      "tag": "button",
+      "name": "{data.relations} {text(\"dashStatRelations\", \"关系\")} {text(\"dashStatRelationsFt\", \"人均 {n} 条\", { n: (data.relations / data.people).toFixed(1) })}",
+      "handlers": [
+        "onclick={onOpenGraph}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:506",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 506,
+      "tag": "button",
+      "name": "{data.birthdaysThisWeek} {text(\"dashStatBirthdaysWeek\", \"本周生日\")} {text(\"dashStatBirthdaysFt\", \"窗口内共 {n} 人\", { n: data.birthdays.length })}",
+      "handlers": [
+        "onclick={openBirthdayPeople}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:512",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 512,
+      "tag": "button",
+      "name": "{data.neverContacted} {text(\"dashStatNever\", \"从未互动\")} {text(\"dashStatNeverFt\", \"另有久未联系 {n} 人\", { n: data.staleTotal })}",
+      "handlers": [
+        "onclick={openNeverContactedPeople}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:525",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 525,
+      "tag": "button",
+      "name": "{text(\"dashReview\", \"交往回顾\")}",
+      "handlers": [
+        "onclick={() => (reviewOpen = true)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:527",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 527,
+      "tag": "button",
+      "name": "{alBusy ? text(\"dashPostponing\", \"顺延中…\") : text(\"dashPostponeOverdue\", \"把 {n} 条逾期跟进顺延到今天\", { n: overdueCount })}",
+      "handlers": [
+        "onclick={postponeOverdueToToday}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={alBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:536",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 536,
+      "tag": "button",
+      "name": "{text(\"dashBrowsePeople\", \"浏览联系人\")}",
+      "handlers": [
+        "onclick={() => onOpenPeople()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:542",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 542,
+      "tag": "button",
+      "name": "{card.person.name} {reason.label}",
+      "handlers": [
+        "onclick={() => onOpenDetail(card.person)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:550",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 550,
+      "tag": "button",
+      "name": "{card.bucket === \"stale\" ? text(\"dashTakeALook\", \"去看看\") : text(\"dashProcess\", \"处理\")}",
+      "handlers": [
+        "onclick={() => onOpenDetail(card.person)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:553",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 553,
+      "tag": "button",
+      "name": "aria-label={`更多处置：${card.person.name}`}",
+      "handlers": [
+        "onclick={() => toggleRowMenu(`action:${card.person.docId}`)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:563",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 563,
+      "tag": "button",
+      "name": "今天先跳过",
+      "handlers": [
+        "onclick={() => runRowAction(() => dismissNeverToday(card.person))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={alBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:565",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 565,
+      "tag": "button",
+      "name": "顺延 3 天",
+      "handlers": [
+        "onclick={() => runRowAction(() => snoozeStale(card.person, 3))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={alBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:566",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 566,
+      "tag": "button",
+      "name": "顺延 1 周",
+      "handlers": [
+        "onclick={() => runRowAction(() => snoozeStale(card.person, 7))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={alBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:567",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 567,
+      "tag": "button",
+      "name": "顺延 1 个月",
+      "handlers": [
+        "onclick={() => runRowAction(() => snoozeStale(card.person, 30))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={alBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:569",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 569,
+      "tag": "button",
+      "name": "跳过本年",
+      "handlers": [
+        "onclick={() => runRowAction(() => dismissBirthday(card.person))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={alBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:571",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 571,
+      "tag": "button",
+      "name": "建跟进（联系一下）",
+      "handlers": [
+        "onclick={() => runRowAction(() => createFollowUpFor(card.person))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={alBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:573",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 573,
+      "tag": "button",
+      "name": "不再提醒",
+      "handlers": [
+        "onclick={() => runRowAction(() => dismissStaleReminder(card.person))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={alBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:583",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 583,
+      "tag": "button",
+      "name": "{isGroupCollapsed(group) ? \"▸\" : \"▾\"} {group.label} {group.cards.length}",
+      "handlers": [
+        "onclick={() => toggleGroup(group)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:595",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 595,
+      "tag": "button",
+      "name": "全部顺延 30 天",
+      "handlers": [
+        "onclick={settleNeverGroup}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={alBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:599",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 599,
+      "tag": "button",
+      "name": "撤销",
+      "handlers": [
+        "onclick={undoSettle}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={alBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:621",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 621,
+      "tag": "button",
+      "name": "查看联系人",
+      "handlers": [
+        "onclick={() => onOpenPeople()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:626",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 626,
+      "tag": "div",
+      "name": "{item.person.name} {item.projection.label} {item.person.isLunar ? \"（农历）\" : \"\"} {item.projection.daysUntil === 0 ? text(\"dashFuToday\", \"今天\") : text(\"dashDaysUntilN\", \"{n}天\", { n: item.projection.daysUntil })} 跳过本年",
+      "handlers": [
+        "onclick={() => onOpenDetail(item.person)}",
+        "onkeydown={(event) => { if (event.target !== event.currentTarget || (event.key !== \"Enter\" && event.key !== \" \")) return; event.preventDefault(); onOpenDetail(item.person); }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "tabindex=\"0\""
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:643",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 643,
+      "tag": "button",
+      "name": "title={`跳过 ${item.person.name} 本年生日提醒`}",
+      "handlers": [
+        "onclick={(event) => { event.stopPropagation(); runRowAction(() => dismissBirthday(item.person)); }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:653",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 653,
+      "tag": "button",
+      "name": "{showAllBirthdays ? text(\"dashShowLess\", \"收起\") : text(\"dashShowAllN\", \"查看全部（共 {n} 条）\", { n: data.birthdays.length })}",
+      "handlers": [
+        "onclick={() => (showAllBirthdays = !showAllBirthdays)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:667",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 667,
+      "tag": "button",
+      "name": "{text(\"dashGoContacts\", \"前往联系人\")}",
+      "handlers": [
+        "onclick={() => onOpenPeople()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:673",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 673,
+      "tag": "button",
+      "name": "{item.person.name} {item.lastDaysAgo === undefined ? text(\"dashNeverContacted\", \"从未互动\") : text(\"dashDaysAgo\", \"{n} 天前\", { n: item.lastDaysAgo })} {text(\"dashReachOut\", \"联系一下\")}",
+      "handlers": [
+        "onclick={() => onOpenDetail(item.person)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:682",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 682,
+      "tag": "input",
+      "name": "aria-label={text(\"dashQuickNoteLabel\", \"与{name}互动的备注\", { name: item.person.name })}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={quickNote}"
+      ],
+      "disabled": "disabled={quickBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:683",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 683,
+      "tag": "button",
+      "name": "{quickBusy ? text(\"dashRecording\", \"记录中…\") : text(\"dashRecord\", \"记录\")}",
+      "handlers": [
+        "onclick={() => recordQuick(item.person)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={quickBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:684",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 684,
+      "tag": "button",
+      "name": "{text(\"dashCancel\", \"取消\")}",
+      "handlers": [
+        "onclick={() => { quickPersonId = \"\"; quickError = \"\"; }}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={quickBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:687",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 687,
+      "tag": "button",
+      "name": "{quickDoneId === item.person.itemId ? text(\"dashRecordedDone\", \"已记录 ✓\") : text(\"dashQuickRecord\", \"记一笔\")}",
+      "handlers": [
+        "onclick={() => { quickPersonId = item.person.itemId; quickNote = \"\"; }}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={quickBusy || quickDoneId === item.person.itemId}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:691",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 691,
+      "tag": "button",
+      "name": "aria-label={`更多处置：${item.person.name}`}",
+      "handlers": [
+        "onclick={(event) => { event.stopPropagation(); toggleRowMenu(`stale:${item.person.docId}`); }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:700",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 700,
+      "tag": "button",
+      "name": "顺延 3 天",
+      "handlers": [
+        "onclick={() => runRowAction(() => snoozeStale(item.person, 3))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={alBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:701",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 701,
+      "tag": "button",
+      "name": "顺延 1 周",
+      "handlers": [
+        "onclick={() => runRowAction(() => snoozeStale(item.person, 7))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={alBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:702",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 702,
+      "tag": "button",
+      "name": "顺延 1 个月",
+      "handlers": [
+        "onclick={() => runRowAction(() => snoozeStale(item.person, 30))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={alBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:703",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 703,
+      "tag": "button",
+      "name": "不再提醒",
+      "handlers": [
+        "onclick={() => runRowAction(() => dismissStaleReminder(item.person))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={alBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:709",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 709,
+      "tag": "button",
+      "name": "{showAllStale ? text(\"dashShowLess\", \"收起\") : text(\"dashShowAllN\", \"查看全部（共 {n} 条）\", { n: data.stale.length })}",
+      "handlers": [
+        "onclick={() => (showAllStale = !showAllStale)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:723",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 723,
+      "tag": "button",
+      "name": "{text(\"dashGoContacts\", \"前往联系人\")}",
+      "handlers": [
+        "onclick={() => onOpenPeople()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:729",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 729,
+      "tag": "button",
+      "name": "title={card.reachable ? undefined : text(\"dashFuUnreachableTitle\", \"人物文档不可达（可能已解绑），仍可推迟或跳过\")}",
+      "handlers": [
+        "onclick={() => card.person && onOpenDetail(card.person)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={!card.reachable || fuBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:740",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 740,
+      "tag": "button",
+      "name": "{text(\"dashSnoozeTomorrow\", \"明天\")}",
+      "handlers": [
+        "onclick={() => snoozeFollowUp(card.item.id, \"tomorrow\", text(\"dashSnoozeTomorrow\", \"明天\"), card.item.title || text(\"dashKeepInTouch\", \"保持联系\"), card.item.dueDate)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={fuBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:741",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 741,
+      "tag": "button",
+      "name": "{text(\"dashSnoozeThreeDays\", \"三天后\")}",
+      "handlers": [
+        "onclick={() => snoozeFollowUp(card.item.id, \"threeDays\", text(\"dashSnoozeThreeDays\", \"三天后\"), card.item.title || text(\"dashKeepInTouch\", \"保持联系\"), card.item.dueDate)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={fuBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:742",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 742,
+      "tag": "button",
+      "name": "{text(\"dashSnoozeNextMonday\", \"下周一\")}",
+      "handlers": [
+        "onclick={() => snoozeFollowUp(card.item.id, \"nextMonday\", text(\"dashSnoozeNextMonday\", \"下周一\"), card.item.title || text(\"dashKeepInTouch\", \"保持联系\"), card.item.dueDate)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={fuBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:743",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 743,
+      "tag": "button",
+      "name": "{text(\"dashSnoozeNextMonth\", \"一个月后\")}",
+      "handlers": [
+        "onclick={() => snoozeFollowUp(card.item.id, \"nextMonth\", text(\"dashSnoozeNextMonth\", \"一个月后\"), card.item.title || text(\"dashKeepInTouch\", \"保持联系\"), card.item.dueDate)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={fuBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:744",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 744,
+      "tag": "input",
+      "name": "aria-label={text(\"dashSnoozeDateLabel\", \"指定推迟日期\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={fuCustomDate}"
+      ],
+      "disabled": "disabled={fuBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:745",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 745,
+      "tag": "button",
+      "name": "{text(\"dashSnoozeByDate\", \"按日期\")}",
+      "handlers": [
+        "onclick={() => snoozeFollowUpCustom(card.item.id, card.item.title || text(\"dashKeepInTouch\", \"保持联系\"))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={fuBusy || !fuCustomDate}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:746",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 746,
+      "tag": "button",
+      "name": "{text(\"dashCollapse\", \"收起\")}",
+      "handlers": [
+        "onclick={() => { fuSnoozeForId = \"\"; fuCustomDate = \"\"; }}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={fuBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:751",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 751,
+      "tag": "button",
+      "name": "{text(\"dashFuProcess\", \"处理\")}",
+      "handlers": [
+        "onclick={() => card.person && onOpenDetail(card.person)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={fuBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:753",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 753,
+      "tag": "button",
+      "name": "{text(\"dashFuPostpone\", \"推迟\")}",
+      "handlers": [
+        "onclick={() => { fuSnoozeForId = fuSnoozeForId === card.item.id ? \"\" : card.item.id; fuCustomDate = \"\"; }}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={fuBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:754",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 754,
+      "tag": "button",
+      "name": "{text(\"dashFuComplete\", \"完成\")}",
+      "handlers": [
+        "onclick={() => completeFollowUp(card.item.id, card.item.title || text(\"dashKeepInTouch\", \"保持联系\"))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={fuBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:755",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 755,
+      "tag": "button",
+      "name": "{text(\"dashFuSkip\", \"跳过\")}",
+      "handlers": [
+        "onclick={() => skipFollowUp(card.item.id, card.item.title || text(\"dashKeepInTouch\", \"保持联系\"))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={fuBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:762",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 762,
+      "tag": "button",
+      "name": "{showAllFollowUps ? text(\"dashShowLess\", \"收起\") : text(\"dashShowAllN\", \"查看全部（共 {n} 条）\", { n: (data.followUps ?? []).length })}",
+      "handlers": [
+        "onclick={() => (showAllFollowUps = !showAllFollowUps)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:773",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 773,
+      "tag": "summary",
+      "name": "{text(\"dashLowFreqTitle\", \"工作空间与联动\")}",
+      "handlers": [],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/DashboardView.svelte:779",
+      "file": "src/components/dashboard/DashboardView.svelte",
+      "line": 779,
+      "tag": "button",
+      "name": "{text(\"dashOpenHostDoc\", \"打开联系人总表\")}",
+      "handlers": [
+        "onclick={() => facade.openHostDoc()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/ReviewReportDialog.svelte:187",
+      "file": "src/components/dashboard/ReviewReportDialog.svelte",
+      "line": 187,
+      "tag": "button",
+      "name": "重新读取体检",
+      "handlers": [
+        "onclick={loadAudit}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/ReviewReportDialog.svelte:193",
+      "file": "src/components/dashboard/ReviewReportDialog.svelte",
+      "line": 193,
+      "tag": "button",
+      "name": "重新核实全部模块",
+      "handlers": [
+        "onclick={loadAudit}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={auditLoading}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/ReviewReportDialog.svelte:195",
+      "file": "src/components/dashboard/ReviewReportDialog.svelte",
+      "line": 195,
+      "tag": "button",
+      "name": "只重试失败模块",
+      "handlers": [
+        "onclick={retryFailedAudit}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={auditLoading}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/ReviewReportDialog.svelte:215",
+      "file": "src/components/dashboard/ReviewReportDialog.svelte",
+      "line": 215,
+      "tag": "button",
+      "name": "预览修复范围",
+      "handlers": [
+        "onclick={() => (auditPreviewIssue = issue)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/ReviewReportDialog.svelte:217",
+      "file": "src/components/dashboard/ReviewReportDialog.svelte",
+      "line": 217,
+      "tag": "button",
+      "name": "查看这 {issue.itemIds.length} 人",
+      "handlers": [
+        "onclick={() => onOpenPeople?.({ itemIds: issue.itemIds, label: auditJumpLabels[issue.kind]! })}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/ReviewReportDialog.svelte:235",
+      "file": "src/components/dashboard/ReviewReportDialog.svelte",
+      "line": 235,
+      "tag": "button",
+      "name": "关闭预览",
+      "handlers": [
+        "onclick={() => (auditPreviewIssue = null)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/ReviewReportDialog.svelte:248",
+      "file": "src/components/dashboard/ReviewReportDialog.svelte",
+      "line": 248,
+      "tag": "select",
+      "name": "aria-label={text(\"reviewRangeLabel\", \"统计区间\")}",
+      "handlers": [
+        "onchange={() => load()}"
+      ],
+      "bindings": [
+        "bind:value={mode}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/ReviewReportDialog.svelte:255",
+      "file": "src/components/dashboard/ReviewReportDialog.svelte",
+      "line": 255,
+      "tag": "input",
+      "name": "aria-label={text(\"reviewFrom\", \"报表开始日期\")}",
+      "handlers": [
+        "onchange={() => load()}"
+      ],
+      "bindings": [
+        "bind:value={customFrom}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/ReviewReportDialog.svelte:257",
+      "file": "src/components/dashboard/ReviewReportDialog.svelte",
+      "line": 257,
+      "tag": "input",
+      "name": "aria-label={text(\"reviewTo\", \"报表结束日期\")}",
+      "handlers": [
+        "onchange={() => load()}"
+      ],
+      "bindings": [
+        "bind:value={customTo}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/ReviewReportDialog.svelte:267",
+      "file": "src/components/dashboard/ReviewReportDialog.svelte",
+      "line": 267,
+      "tag": "button",
+      "name": "{text(\"reviewRetry\", \"重试读取报表\")}",
+      "handlers": [
+        "onclick={load}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/ReviewReportDialog.svelte:274",
+      "file": "src/components/dashboard/ReviewReportDialog.svelte",
+      "line": 274,
+      "tag": "button",
+      "name": "{text(\"reviewRetry\", \"重试读取报表\")}",
+      "handlers": [
+        "onclick={load}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/dashboard/ReviewReportDialog.svelte:301",
+      "file": "src/components/dashboard/ReviewReportDialog.svelte",
+      "line": 301,
+      "tag": "button",
+      "name": "{showEntries ? text(\"reviewToggleHide\", \"收起明细\") : text(\"reviewToggleShow\", \"查看明细（{n} 条）\", { n: report.entries.length })}",
+      "handlers": [
+        "onclick={() => (showEntries = !showEntries)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:653",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 653,
+      "tag": "button",
+      "name": "{text(\"graphModeRelations\", \"关系图\")}",
+      "handlers": [
+        "onclick={() => void switchGraphMode(\"relations\")}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:660",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 660,
+      "tag": "button",
+      "name": "{text(\"graphModeNative\", \"文档引用\")}",
+      "handlers": [
+        "onclick={() => void switchGraphMode(\"native\")}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:668",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 668,
+      "tag": "input",
+      "name": "aria-label={text(\"graphSearchNodes\", \"搜索关系图谱节点\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={searchText}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:672",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 672,
+      "tag": "select",
+      "name": "aria-label={text(\"graphOrgNarrowLabel\", \"按组织收窄\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={orgNarrowId}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:680",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 680,
+      "tag": "select",
+      "name": "aria-label={text(\"graphNativeScopeLabel\", \"引用图范围\")}",
+      "handlers": [
+        "onchange={(event) => void switchNativeScope(event.currentTarget.value)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:699",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 699,
+      "tag": "select",
+      "name": "aria-label={text(\"graphFilterByGroup\", \"按分组过滤\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={groupFilter}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:705",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 705,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:checked={isolatedOnly}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:706",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 706,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:checked={showOrgs}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:741",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 741,
+      "tag": "select",
+      "name": "aria-label={text(\"graphDepthLabel\", \"关系层级\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={relationDepth}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:747",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 747,
+      "tag": "select",
+      "name": "aria-label={text(\"graphQueryModeLabel\", \"关系查询模式\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={queryMode}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:758",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 758,
+      "tag": "button",
+      "name": "{text(\"graphClearSelection\", \"清除选择\")}",
+      "handlers": [
+        "onclick={() => { focusId = \"\"; compareId = \"\"; }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:759",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 759,
+      "tag": "button",
+      "name": "title={text(\"graphExportTitle\", \"导出查询结果说明（Markdown）\")}",
+      "handlers": [
+        "onclick={exportResultMarkdown}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:770",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 770,
+      "tag": "button",
+      "name": "{person.name}",
+      "handlers": [
+        "onclick={() => onOpenDetail(person)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:776",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 776,
+      "tag": "button",
+      "name": "{person.name}",
+      "handlers": [
+        "onclick={() => onOpenDetail(person)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:815",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 815,
+      "tag": "button",
+      "name": "{text(\"graphReload\", \"重新加载\")}",
+      "handlers": [
+        "onclick={refresh}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:819",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 819,
+      "tag": "button",
+      "name": "{text(\"graphReload\", \"重新加载\")}",
+      "handlers": [
+        "onclick={() => void loadNativeGraph()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:823",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 823,
+      "tag": "button",
+      "name": "{text(\"graphReload\", \"重新加载\")}",
+      "handlers": [
+        "onclick={() => void loadNativeGraph()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:829",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 829,
+      "tag": "button",
+      "name": "{text(\"graphReload\", \"重新加载\")}",
+      "handlers": [
+        "onclick={() => void loadNativeGraph()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:837",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 837,
+      "tag": "button",
+      "name": "{text(\"graphClearFilters\", \"清除筛选\")}",
+      "handlers": [
+        "onclick={() => { searchText = \"\"; groupFilter = \"\"; isolatedOnly = false; }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:839",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 839,
+      "tag": "button",
+      "name": "{text(\"graphGoContacts\", \"前往联系人\")}",
+      "handlers": [
+        "onclick={onOpenPeople}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:846",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 846,
+      "tag": "button",
+      "name": "aria-label={text(\"graphFit\", \"适应\")}",
+      "handlers": [
+        "onclick={() => graphInstance?.fit()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:847",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 847,
+      "tag": "button",
+      "name": "aria-label={text(\"graphZoomIn\", \"放大\")}",
+      "handlers": [
+        "onclick={() => zoomBy(1.2)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:848",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 848,
+      "tag": "button",
+      "name": "aria-label={text(\"graphZoomOut\", \"缩小\")}",
+      "handlers": [
+        "onclick={() => zoomBy(1 / 1.2)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:849",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 849,
+      "tag": "button",
+      "name": "aria-label={text(\"graphRelayout\", \"重新布局\")}",
+      "handlers": [
+        "onclick={relayout}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:850",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 850,
+      "tag": "button",
+      "name": "aria-label={text(\"graphRefresh\", \"刷新\")}",
+      "handlers": [
+        "onclick={refresh}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:853",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 853,
+      "tag": "div",
+      "name": "{hoveredOrg.label} {text(\"graphOrgChip\", \"组织\")} {text(\"graphOrgHoverMembers\", \"图内成员连接：{n}\", { n: hoveredOrg.degree })} {text(\"graphOrgHoverOpen\", \"打开组织视图\")}",
+      "handlers": [
+        "onmouseenter={() => clearHoverTimer && clearTimeout(clearHoverTimer)}",
+        "onmouseleave={scheduleClearHover}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "tabindex=\"-1\""
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:867",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 867,
+      "tag": "button",
+      "name": "{text(\"graphOrgHoverOpen\", \"打开组织视图\")}",
+      "handlers": [
+        "onclick={() => { const open = onOpenOrgs; clearHover(); open(); }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:872",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 872,
+      "tag": "div",
+      "name": "{hoveredPerson.name} {hoveredPerson.group} {text(\"graphNativeDegree\", \"图内连接：{n}\", { n: hoveredNativeDegree })} {text(\"graphDegreeLabel\", \"关系度数：{n}\", { n: hoveredPerson.relatedItemIds.length })} {text(\"graphPhoneLabel\", \"电话：{n}\", { n: hovere",
+      "handlers": [
+        "onmouseenter={() => clearHoverTimer && clearTimeout(clearHoverTimer)}",
+        "onmouseleave={scheduleClearHover}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "tabindex=\"-1\""
+    },
+    {
+      "id": "src/components/graph/RelationGraph.svelte:903",
+      "file": "src/components/graph/RelationGraph.svelte",
+      "line": 903,
+      "tag": "button",
+      "name": "{text(\"graphOpenDetail\", \"查看人物详情\")}",
+      "handlers": [
+        "onclick={openHoveredPerson}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:378",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 378,
+      "tag": "button",
+      "name": "{org.name} （ {org.memberships.length} ）",
+      "handlers": [
+        "onclick={() => selectOrg(org.docId)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:388",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 388,
+      "tag": "button",
+      "name": "{showArchived ? text(\"orgArchivedHide\", \"收起已归档\") : text(\"orgArchivedShow\", \"已归档（{n}）\", { n: archivedOrgs.length })}",
+      "handlers": [
+        "onclick={() => (showArchived = !showArchived)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:395",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 395,
+      "tag": "button",
+      "name": "{org.name} （ {text(\"orgArchivedTag\", \"已归档\")} ）",
+      "handlers": [
+        "onclick={() => selectOrg(org.docId)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:408",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 408,
+      "tag": "input",
+      "name": "aria-label={text(\"orgCreateLabel\", \"新建组织名称\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={newOrgName}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:415",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 415,
+      "tag": "button",
+      "name": "{text(\"orgCreate\", \"新建组织\")}",
+      "handlers": [
+        "onclick={createOrg}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy || !newOrgName.trim()}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:424",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 424,
+      "tag": "input",
+      "name": "aria-label={text(\"orgRenameLabel\", \"新组织名称\")}",
+      "handlers": [
+        "onkeydown={(event) => { if (event.key === \"Enter\") saveRename(); }}"
+      ],
+      "bindings": [
+        "bind:value={renameValue}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:427",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 427,
+      "tag": "button",
+      "name": "{text(\"orgRenameSave\", \"保存名称\")}",
+      "handlers": [
+        "onclick={saveRename}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy || !renameValue.trim()}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:429",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 429,
+      "tag": "button",
+      "name": "{text(\"orgMemberCancel\", \"取消\")}",
+      "handlers": [
+        "onclick={cancelRename}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:435",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 435,
+      "tag": "button",
+      "name": "{text(\"orgRename\", \"改名\")}",
+      "handlers": [
+        "onclick={startRename}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:438",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 438,
+      "tag": "button",
+      "name": "{text(\"orgRestore\", \"恢复组织\")}",
+      "handlers": [
+        "onclick={restoreCurrentOrg}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:441",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 441,
+      "tag": "button",
+      "name": "{text(\"orgArchive\", \"归档组织\")}",
+      "handlers": [
+        "onclick={archiveCurrentOrg}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:452",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 452,
+      "tag": "input",
+      "name": "aria-label={text(\"orgMemberSearch\", \"搜索姓名、部门或职位\")}",
+      "handlers": [
+        "oninput={reloadMembers}"
+      ],
+      "bindings": [
+        "bind:value={memberQuery}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:456",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 456,
+      "tag": "select",
+      "name": "aria-label={text(\"orgMemberStatusFilter\", \"成员状态\") }",
+      "handlers": [
+        "onchange={reloadMembers}"
+      ],
+      "bindings": [
+        "bind:value={memberStatus}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:465",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 465,
+      "tag": "button",
+      "name": "{text(\"commonRetry\", \"重试\")}",
+      "handlers": [
+        "onclick={reloadMembers}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy || memberLoading}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:479",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 479,
+      "tag": "select",
+      "name": "aria-label={text(\"orgMemberReplacementPick\", \"接替联系人\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={replacementPersonId}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:488",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 488,
+      "tag": "input",
+      "name": "aria-label={text(\"orgMemberDeptLabel\", \"部门\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={replacementDepartment}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:491",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 491,
+      "tag": "input",
+      "name": "aria-label={text(\"orgMemberTitleLabel\", \"职位\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={replacementTitle}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:494",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 494,
+      "tag": "input",
+      "name": "aria-label={text(\"orgMemberFormerLeftLabel\", \"原成员离开日期\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={replacementLeftOn}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:497",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 497,
+      "tag": "input",
+      "name": "aria-label={text(\"orgMemberReplacementJoinedLabel\", \"接替成员加入日期\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={replacementJoinedOn}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:500",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 500,
+      "tag": "button",
+      "name": "{text(\"orgMemberReplaceSave\", \"保存接替\")}",
+      "handlers": [
+        "onclick={saveReplaceMember}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy || !replacementPersonId || !replacementJoinedOn || !replacementLeftOn}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:503",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 503,
+      "tag": "button",
+      "name": "{text(\"orgMemberReplaceCancel\", \"取消\")}",
+      "handlers": [
+        "onclick={cancelReplaceMember}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:510",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 510,
+      "tag": "input",
+      "name": "aria-label={text(\"orgMemberDeptLabel\", \"部门\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={editDepartment}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:513",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 513,
+      "tag": "input",
+      "name": "aria-label={text(\"orgMemberTitleLabel\", \"职位\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={editTitle}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:516",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 516,
+      "tag": "input",
+      "name": "aria-label={text(\"orgMemberJoinedLabel\", \"加入日期\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={editJoinedOn}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:519",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 519,
+      "tag": "input",
+      "name": "aria-label={text(\"orgMemberLeftLabel\", \"离开日期\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={editLeftOn}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:522",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 522,
+      "tag": "select",
+      "name": "aria-label={text(\"orgMemberStatusLabel\", \"状态\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={editStatus}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:528",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 528,
+      "tag": "button",
+      "name": "{text(\"orgMemberSave\", \"保存\")}",
+      "handlers": [
+        "onclick={saveEditMember}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:530",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 530,
+      "tag": "button",
+      "name": "{text(\"orgMemberCancel\", \"取消\")}",
+      "handlers": [
+        "onclick={cancelEditMember}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:537",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 537,
+      "tag": "button",
+      "name": "{text(\"orgMemberEdit\", \"编辑\")}",
+      "handlers": [
+        "onclick={() => startEditMember(member)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:540",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 540,
+      "tag": "button",
+      "name": "{text(\"orgMemberReplace\", \"接替\")}",
+      "handlers": [
+        "onclick={() => startReplaceMember(member)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:543",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 543,
+      "tag": "button",
+      "name": "{text(\"orgMemberRemove\", \"移除\")}",
+      "handlers": [
+        "onclick={() => removeMember(member.id)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:555",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 555,
+      "tag": "button",
+      "name": "{memberLoading ? text(\"orgMembersLoading\", \"正在加载成员…\") : text(\"orgMembersLoadMore\", \"加载更多\")}",
+      "handlers": [
+        "onclick={loadMoreMembers}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy || memberLoading}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:561",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 561,
+      "tag": "select",
+      "name": "aria-label={text(\"orgAddMemberLabel\", \"选择要添加的联系人\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={addPersonId}"
+      ],
+      "disabled": "disabled={busy || memberLoading || !!memberError}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:568",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 568,
+      "tag": "button",
+      "name": "{text(\"orgMemberAdd\", \"添加成员\")}",
+      "handlers": [
+        "onclick={addMember}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy || memberLoading || !!memberError || !addPersonId}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgManagerDialog.svelte:579",
+      "file": "src/components/org/OrgManagerDialog.svelte",
+      "line": 579,
+      "tag": "button",
+      "name": "{text(\"orgClose\", \"关闭\")}",
+      "handlers": [
+        "onclick={() => void guardedClose(onClose)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgsView.svelte:69",
+      "file": "src/components/org/OrgsView.svelte",
+      "line": 69,
+      "tag": "button",
+      "name": "{text(\"orgsManage\", \"组织管理\")}",
+      "handlers": [
+        "onclick={onOpenOrgManager}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgsView.svelte:76",
+      "file": "src/components/org/OrgsView.svelte",
+      "line": 76,
+      "tag": "button",
+      "name": "{text(\"graphReload\", \"重新加载\")}",
+      "handlers": [
+        "onclick={() => void refresh()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgsView.svelte:83",
+      "file": "src/components/org/OrgsView.svelte",
+      "line": 83,
+      "tag": "button",
+      "name": "{text(\"orgsCreateFirst\", \"新建组织\")}",
+      "handlers": [
+        "onclick={onOpenOrgManager}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/org/OrgsView.svelte:98",
+      "file": "src/components/org/OrgsView.svelte",
+      "line": 98,
+      "tag": "button",
+      "name": "{text(\"orgsManageOrg\", \"管理\")}",
+      "handlers": [
+        "onclick={onOpenOrgManager}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/AddPersonDialog.svelte:107",
+      "file": "src/components/people/AddPersonDialog.svelte",
+      "line": 107,
+      "tag": "button",
+      "name": "{text(\"qfOpen\", \"粘贴并识别\")}",
+      "handlers": [
+        "onclick={() => (quickFillOpen = true)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/AddPersonDialog.svelte:113",
+      "file": "src/components/people/AddPersonDialog.svelte",
+      "line": 113,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.name}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/AddPersonDialog.svelte:118",
+      "file": "src/components/people/AddPersonDialog.svelte",
+      "line": 118,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.phone}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/AddPersonDialog.svelte:122",
+      "file": "src/components/people/AddPersonDialog.svelte",
+      "line": 122,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.wechat}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/AddPersonDialog.svelte:126",
+      "file": "src/components/people/AddPersonDialog.svelte",
+      "line": 126,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.email}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/AddPersonDialog.svelte:130",
+      "file": "src/components/people/AddPersonDialog.svelte",
+      "line": 130,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.website}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/AddPersonDialog.svelte:134",
+      "file": "src/components/people/AddPersonDialog.svelte",
+      "line": 134,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.birthday}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/AddPersonDialog.svelte:138",
+      "file": "src/components/people/AddPersonDialog.svelte",
+      "line": 138,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:checked={draft.isLunar}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/AddPersonDialog.svelte:142",
+      "file": "src/components/people/AddPersonDialog.svelte",
+      "line": 142,
+      "tag": "select",
+      "name": "{text(\"formUngrouped\", \"未分组\")} {group}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.group}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/AddPersonDialog.svelte:151",
+      "file": "src/components/people/AddPersonDialog.svelte",
+      "line": 151,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={tagsText}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/AddPersonDialog.svelte:160",
+      "file": "src/components/people/AddPersonDialog.svelte",
+      "line": 160,
+      "tag": "button",
+      "name": "{text(\"formCancel\", \"取消\")}",
+      "handlers": [
+        "onclick={() => guardedClose(onClose)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/AddPersonDialog.svelte:161",
+      "file": "src/components/people/AddPersonDialog.svelte",
+      "line": 161,
+      "tag": "button",
+      "name": "{running ? text(\"formCreating\", \"创建中…\") : text(\"formCreate\", \"创建联系人\")}",
+      "handlers": [
+        "onclick={submit}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running || draft.name.trim().length === 0}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ExchangeLedger.svelte:181",
+      "file": "src/components/people/ExchangeLedger.svelte",
+      "line": 181,
+      "tag": "select",
+      "name": "{text(\"exchangeMoney\", \"金钱\")} {text(\"exchangeItem\", \"物品\")} {text(\"exchangeFavor\", \"人情\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={kind}"
+      ],
+      "disabled": "disabled={formDisabled}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ExchangeLedger.svelte:189",
+      "file": "src/components/people/ExchangeLedger.svelte",
+      "line": 189,
+      "tag": "select",
+      "name": "{text(\"exchangeReceivable\", \"对方欠我\")} {text(\"exchangePayable\", \"我欠对方\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={direction}"
+      ],
+      "disabled": "disabled={formDisabled}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ExchangeLedger.svelte:196",
+      "file": "src/components/people/ExchangeLedger.svelte",
+      "line": 196,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={description}"
+      ],
+      "disabled": "disabled={formDisabled}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ExchangeLedger.svelte:201",
+      "file": "src/components/people/ExchangeLedger.svelte",
+      "line": 201,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={amountText}"
+      ],
+      "disabled": "disabled={formDisabled}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ExchangeLedger.svelte:205",
+      "file": "src/components/people/ExchangeLedger.svelte",
+      "line": 205,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={currency}"
+      ],
+      "disabled": "disabled={formDisabled}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ExchangeLedger.svelte:210",
+      "file": "src/components/people/ExchangeLedger.svelte",
+      "line": 210,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={occurredOn}"
+      ],
+      "disabled": "disabled={formDisabled}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ExchangeLedger.svelte:214",
+      "file": "src/components/people/ExchangeLedger.svelte",
+      "line": 214,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={dueOn}"
+      ],
+      "disabled": "disabled={formDisabled}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ExchangeLedger.svelte:219",
+      "file": "src/components/people/ExchangeLedger.svelte",
+      "line": 219,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={note}"
+      ],
+      "disabled": "disabled={formDisabled}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ExchangeLedger.svelte:222",
+      "file": "src/components/people/ExchangeLedger.svelte",
+      "line": 222,
+      "tag": "button",
+      "name": "{busy ? text(\"exchangeSaving\", \"保存中…\") : saveUnknown ? text(\"exchangeVerifyRetry\", \"核实并重试本笔往来\") : text(\"exchangeAdd\", \"记一笔往来\")}",
+      "handlers": [
+        "onclick={submit}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy || loading || readFailed || !description.trim()}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ExchangeLedger.svelte:230",
+      "file": "src/components/people/ExchangeLedger.svelte",
+      "line": 230,
+      "tag": "button",
+      "name": "{text(\"retryLoad\", \"重新读取\")}",
+      "handlers": [
+        "onclick={() => void load()}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ExchangeLedger.svelte:243",
+      "file": "src/components/people/ExchangeLedger.svelte",
+      "line": 243,
+      "tag": "button",
+      "name": "结清",
+      "handlers": [
+        "onclick={() => changeStatus(record, \"settled\")}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={formDisabled || loading || readFailed}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ExchangeLedger.svelte:244",
+      "file": "src/components/people/ExchangeLedger.svelte",
+      "line": 244,
+      "tag": "button",
+      "name": "取消",
+      "handlers": [
+        "onclick={() => changeStatus(record, \"cancelled\")}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={formDisabled || loading || readFailed}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ExchangeLedger.svelte:246",
+      "file": "src/components/people/ExchangeLedger.svelte",
+      "line": 246,
+      "tag": "button",
+      "name": "重新打开",
+      "handlers": [
+        "onclick={() => changeStatus(record, \"open\")}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={formDisabled || loading || readFailed}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ImportDialog.svelte:148",
+      "file": "src/components/people/ImportDialog.svelte",
+      "line": 148,
+      "tag": "select",
+      "name": "aria-label={text(\"importPickNotebook\", \"选择待收编文档的笔记本\")}",
+      "handlers": [
+        "onchange={() => search()}"
+      ],
+      "bindings": [
+        "bind:value={notebookId}"
+      ],
+      "disabled": "disabled={importing || !loaded}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ImportDialog.svelte:153",
+      "file": "src/components/people/ImportDialog.svelte",
+      "line": 153,
+      "tag": "input",
+      "name": "aria-label={text(\"importFilterNameAria\", \"按文档名过滤\")}",
+      "handlers": [
+        "oninput={onKeywordInput}"
+      ],
+      "bindings": [
+        "bind:value={keyword}"
+      ],
+      "disabled": "disabled={importing || !notebookId}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ImportDialog.svelte:162",
+      "file": "src/components/people/ImportDialog.svelte",
+      "line": 162,
+      "tag": "input",
+      "name": "aria-label={text(\"importFilterFolderAria\", \"按文件夹前缀过滤\")}",
+      "handlers": [
+        "oninput={onFolderInput}"
+      ],
+      "bindings": [
+        "bind:value={folderPrefix}"
+      ],
+      "disabled": "disabled={importing || !notebookId}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ImportDialog.svelte:182",
+      "file": "src/components/people/ImportDialog.svelte",
+      "line": 182,
+      "tag": "button",
+      "name": "{text(\"importRescan\", \"重新扫描\")}",
+      "handlers": [
+        "onclick={() => notebookId ? search() : loadNotebooks()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ImportDialog.svelte:190",
+      "file": "src/components/people/ImportDialog.svelte",
+      "line": 190,
+      "tag": "button",
+      "name": "{text(\"importClearKeyword\", \"清除关键词\")}",
+      "handlers": [
+        "onclick={() => { keyword = \"\"; void search(); }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ImportDialog.svelte:192",
+      "file": "src/components/people/ImportDialog.svelte",
+      "line": 192,
+      "tag": "button",
+      "name": "{text(\"importRefreshNotebooks\", \"刷新笔记本\")}",
+      "handlers": [
+        "onclick={loadNotebooks}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ImportDialog.svelte:197",
+      "file": "src/components/people/ImportDialog.svelte",
+      "line": 197,
+      "tag": "input",
+      "name": "",
+      "handlers": [
+        "onchange={(event) => toggleAll((event.currentTarget as HTMLInputElement).checked)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ImportDialog.svelte:207",
+      "file": "src/components/people/ImportDialog.svelte",
+      "line": 207,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:checked={selected[candidate.docId]}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ImportDialog.svelte:216",
+      "file": "src/components/people/ImportDialog.svelte",
+      "line": 216,
+      "tag": "select",
+      "name": "{text(\"importNoGroup\", \"不设置分组\")} {group}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={importGroup}"
+      ],
+      "disabled": "disabled={importing}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ImportDialog.svelte:223",
+      "file": "src/components/people/ImportDialog.svelte",
+      "line": 223,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={importTagsText}"
+      ],
+      "disabled": "disabled={importing}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ImportDialog.svelte:230",
+      "file": "src/components/people/ImportDialog.svelte",
+      "line": 230,
+      "tag": "button",
+      "name": "{text(\"importDone\", \"完成\")}",
+      "handlers": [
+        "onclick={onClose}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ImportDialog.svelte:232",
+      "file": "src/components/people/ImportDialog.svelte",
+      "line": 232,
+      "tag": "button",
+      "name": "{text(\"importCancel\", \"取消\")}",
+      "handlers": [
+        "onclick={() => guardedClose(onClose)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={importing}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ImportDialog.svelte:233",
+      "file": "src/components/people/ImportDialog.svelte",
+      "line": 233,
+      "tag": "button",
+      "name": "{importing ? text(\"importAdopting\", \"收编中…\") : text(\"importAdoptAs\", \"收编为联系人（{n}）\", { n: selectedIds.length })}",
+      "handlers": [
+        "onclick={runImport}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={importing || loading || !!errorText || selectedIds.length === 0}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:572",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 572,
+      "tag": "button",
+      "name": "aria-label={text(\"peopleViews\", \"视图\")}",
+      "handlers": [
+        "onclick={() => (viewsOpen = !viewsOpen)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:581",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 581,
+      "tag": "div",
+      "name": "{view.name}",
+      "handlers": [],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "needs_review"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:582",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 582,
+      "tag": "button",
+      "name": "title={`应用视图 ${view.name}`}",
+      "handlers": [
+        "onclick={() => applySavedView(view)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:584",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 584,
+      "tag": "button",
+      "name": "aria-label={`重命名视图 ${view.name}`}",
+      "handlers": [
+        "onclick={() => renameSavedView(view)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:585",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 585,
+      "tag": "button",
+      "name": "aria-label={`删除视图 ${view.name}`}",
+      "handlers": [
+        "onclick={() => deleteSavedView(view)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:590",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 590,
+      "tag": "button",
+      "name": "保存当前筛选为视图",
+      "handlers": [
+        "onclick={saveCurrentAsView}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:597",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 597,
+      "tag": "select",
+      "name": "{text(\"peopleAllGroups\", \"全部分组\")} {group}",
+      "handlers": [
+        "onchange={() => (visibleCount = PAGE_SIZE)}"
+      ],
+      "bindings": [
+        "bind:value={groupFilter}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:603",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 603,
+      "tag": "select",
+      "name": "aria-label={text(\"peopleSortLabel\", \"排序方式\")}",
+      "handlers": [
+        "onchange={() => (visibleCount = PAGE_SIZE)}"
+      ],
+      "bindings": [
+        "bind:value={sortMode}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:610",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 610,
+      "tag": "button",
+      "name": "{text(\"peopleMoreFilters\", \"更多筛选\")} {isExtraFilterActive(extraFilter) ? \" ·\" : \"\"}",
+      "handlers": [
+        "onclick={() => (moreOpen = !moreOpen)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:621",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 621,
+      "tag": "select",
+      "name": "同时拥有全部所选标签 拥有任一所选标签",
+      "handlers": [],
+      "bindings": [
+        "bind:value={extraFilter.tagMatch}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:629",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 629,
+      "tag": "input",
+      "name": "aria-label=\"最近互动起始日期\"",
+      "handlers": [],
+      "bindings": [
+        "bind:value={extraFilter.recentFrom}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:631",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 631,
+      "tag": "input",
+      "name": "aria-label=\"最近互动截止日期\"",
+      "handlers": [],
+      "bindings": [
+        "bind:value={extraFilter.recentTo}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:635",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 635,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:checked={extraFilter.neverContacted}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:643",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 643,
+      "tag": "input",
+      "name": "",
+      "handlers": [
+        "onchange={() => (extraFilter = { ...extraFilter, profileGap: extraFilter.profileGap === gap.key ? \"\" : gap.key })}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:653",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 653,
+      "tag": "button",
+      "name": "逐个补录（ {filtered.length} ）",
+      "handlers": [
+        "onclick={() => { completionPeople = filtered.map((person) => ({ ...person, tags: [...person.tags] })); completing = true; }}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={filtered.length === 0}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:667",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 667,
+      "tag": "button",
+      "name": "{text(\"peopleCleanup\", \"整理\")} {duplicatePairs.length > 0 ? ` ·${duplicatePairs.length}` : \"\"}",
+      "handlers": [
+        "onclick={() => (dupOpen = true)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:670",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 670,
+      "tag": "button",
+      "name": "{text(\"peopleImportDocs\", \"导入已有文档\")}",
+      "handlers": [
+        "onclick={() => (importing = true)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:671",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 671,
+      "tag": "button",
+      "name": "{text(\"peopleVcard\", \"vCard 导入/导出\")}",
+      "handlers": [
+        "onclick={() => (vcarding = true)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:676",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 676,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={searchText}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:686",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 686,
+      "tag": "button",
+      "name": "{text(\"peopleCards\", \"卡片\")}",
+      "handlers": [
+        "onclick={() => setViewMode(\"cards\")}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:693",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 693,
+      "tag": "button",
+      "name": "{text(\"peopleTable\", \"表格\")}",
+      "handlers": [
+        "onclick={() => setViewMode(\"table\")}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:703",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 703,
+      "tag": "button",
+      "name": "aria-label=\"表格列设置\"",
+      "handlers": [
+        "onclick={() => (colMenuOpen = !colMenuOpen)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:713",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 713,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [],
+      "disabled": "disabled",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:719",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 719,
+      "tag": "input",
+      "name": "aria-label={`显示${columnLabel(key)}列`}",
+      "handlers": [
+        "onchange={(event) => toggleColumn(key, (event.currentTarget as HTMLInputElement).checked)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:727",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 727,
+      "tag": "button",
+      "name": "aria-label={`上移${columnLabel(key)}列`}",
+      "handlers": [
+        "onclick={() => moveColumn(key, -1)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={tableColumns.indexOf(key) <= 0}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:728",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 728,
+      "tag": "button",
+      "name": "aria-label={`下移${columnLabel(key)}列`}",
+      "handlers": [
+        "onclick={() => moveColumn(key, 1)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={tableColumns.indexOf(key) < 0 || tableColumns.indexOf(key) >= tableColumns.length - 1}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:733",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 733,
+      "tag": "button",
+      "name": "恢复默认显示",
+      "handlers": [
+        "onclick={resetDisplayPreferences}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:744",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 744,
+      "tag": "button",
+      "name": "{text(\"peopleCreate\", \"新建联系人\")}",
+      "handlers": [
+        "onclick={() => (adding = true)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:746",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 746,
+      "tag": "button",
+      "name": "aria-label={text(\"peopleCreate\", \"新建联系人\")}",
+      "handlers": [
+        "onclick={() => (adding = true)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:747",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 747,
+      "tag": "button",
+      "name": "aria-label={text(\"peopleMobileTools\", \"筛选与整理\")}",
+      "handlers": [
+        "onclick={() => (mobileSheetOpen = true)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:756",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 756,
+      "tag": "div",
+      "name": "",
+      "handlers": [
+        "onclick={(event) => { if (event.target === event.currentTarget) mobileSheetOpen = false; }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "needs_review"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:760",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 760,
+      "tag": "button",
+      "name": "{text(\"dashCollapse\", \"收起\")}",
+      "handlers": [
+        "onclick={() => (mobileSheetOpen = false)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:766",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 766,
+      "tag": "button",
+      "name": "{text(\"peopleCreate\", \"新建联系人\")}",
+      "handlers": [
+        "onclick={() => { mobileSheetOpen = false; adding = true; }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:779",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 779,
+      "tag": "button",
+      "name": "title=\"点击清除该条件\"",
+      "handlers": [
+        "onclick={() => clearCondition(chip.key)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:785",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 785,
+      "tag": "button",
+      "name": "清除全部",
+      "handlers": [
+        "onclick={clearAllConditions}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:793",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 793,
+      "tag": "button",
+      "name": "{tag}",
+      "handlers": [
+        "onclick={() => toggleTag(tag)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:796",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 796,
+      "tag": "button",
+      "name": "清除筛选",
+      "handlers": [
+        "onclick={() => { tagFilter = []; visibleCount = PAGE_SIZE; }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:804",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 804,
+      "tag": "button",
+      "name": "批量编辑",
+      "handlers": [
+        "onclick={() => { batchError = \"\"; batchOpen = true; }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:805",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 805,
+      "tag": "button",
+      "name": "导出 vCard",
+      "handlers": [
+        "onclick={exportSelected}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:806",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 806,
+      "tag": "button",
+      "name": "从人脉移除",
+      "handlers": [
+        "onclick={removeSelected}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={batchBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:807",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 807,
+      "tag": "button",
+      "name": "取消选择",
+      "handlers": [
+        "onclick={() => (selectedIds = [])}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:818",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 818,
+      "tag": "button",
+      "name": "清除首页筛选",
+      "handlers": [
+        "onclick={onClearFocus}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:841",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 841,
+      "tag": "button",
+      "name": "＋ 新建联系人",
+      "handlers": [
+        "onclick={() => (adding = true)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:842",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 842,
+      "tag": "button",
+      "name": "收编文档",
+      "handlers": [
+        "onclick={() => (importing = true)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:843",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 843,
+      "tag": "button",
+      "name": "导入 vCard",
+      "handlers": [
+        "onclick={() => (vcarding = true)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:847",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 847,
+      "tag": "button",
+      "name": "清除所有筛选",
+      "handlers": [
+        "onclick={() => { searchText = \"\"; groupFilter = \"\"; tagFilter = []; visibleCount = PAGE_SIZE; onClearFocus?.(); }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:878",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 878,
+      "tag": "input",
+      "name": "aria-label=\"选择当前列表联系人\"",
+      "handlers": [
+        "onchange={(event) => toggleAllVisible((event.currentTarget as HTMLInputElement).checked)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:886",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 886,
+      "tag": "tr",
+      "name": "aria-label={`查看 ${person.name} 的详情`}",
+      "handlers": [
+        "onclick={() => onOpenDetail(person)}",
+        "onkeydown={(event) => { if (event.target !== event.currentTarget || (event.key !== \"Enter\" && event.key !== \" \")) return; event.preventDefault(); onOpenDetail(person); }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "tabindex=\"0\""
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:894",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 894,
+      "tag": "input",
+      "name": "aria-label={`选择 ${person.name}`}",
+      "handlers": [
+        "onclick={(event) => event.stopPropagation()}",
+        "onchange={(event) => toggleSelected(person.itemId, (event.currentTarget as HTMLInputElement).checked)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:902",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 902,
+      "tag": "button",
+      "name": "aria-label={`打开 ${person.name} 的文档`}",
+      "handlers": [
+        "onclick={(event) => { event.stopPropagation(); onOpenPersonDoc(person.docId); }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:922",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 922,
+      "tag": "button",
+      "name": "加载更多（已显示 {visible.length} / {filtered.length} ）",
+      "handlers": [
+        "onclick={() => (visibleCount += PAGE_SIZE)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:969",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 969,
+      "tag": "select",
+      "name": "保持不变 清空分组 {group} {group}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={batchGroup}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:978",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 978,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={batchTagsText}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:985",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 985,
+      "tag": "button",
+      "name": "取消",
+      "handlers": [
+        "onclick={closeBatch}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={batchBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:987",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 987,
+      "tag": "button",
+      "name": "{batchBusy ? \"重试中…\" : text(\"formRetryFailed\", \"核实并重试未完成字段\")}",
+      "handlers": [
+        "onclick={() => runBatchUpdate(true)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={batchBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:989",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 989,
+      "tag": "button",
+      "name": "{batchBusy ? \"保存中…\" : \"应用到所选联系人\"}",
+      "handlers": [
+        "onclick={() => runBatchUpdate()}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={batchBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:1015",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 1015,
+      "tag": "button",
+      "name": "查看 {pair.a.name}",
+      "handlers": [
+        "onclick={() => { dupOpen = false; onOpenDetail(pair.a); }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PeopleView.svelte:1020",
+      "file": "src/components/people/PeopleView.svelte",
+      "line": 1020,
+      "tag": "button",
+      "name": "查看 {pair.b.name}",
+      "handlers": [
+        "onclick={() => { dupOpen = false; onOpenDetail(pair.b); }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonAliases.svelte:120",
+      "file": "src/components/people/PersonAliases.svelte",
+      "line": 120,
+      "tag": "button",
+      "name": "{text(\"retryLoad\", \"重新读取\")}",
+      "handlers": [
+        "onclick={() => void load()}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonAliases.svelte:126",
+      "file": "src/components/people/PersonAliases.svelte",
+      "line": 126,
+      "tag": "button",
+      "name": "{text(\"personAliasesRemove\", \"删除\")}",
+      "handlers": [
+        "onclick={() => void remove(item.id)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonAliases.svelte:136",
+      "file": "src/components/people/PersonAliases.svelte",
+      "line": 136,
+      "tag": "input",
+      "name": "aria-label={text(\"personAliasesInputLabel\", \"新增别名\")}",
+      "handlers": [
+        "onkeydown={(event) => { if (event.key === \"Enter\") void add(); }}"
+      ],
+      "bindings": [
+        "bind:value={aliasDraft}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonAliases.svelte:145",
+      "file": "src/components/people/PersonAliases.svelte",
+      "line": 145,
+      "tag": "button",
+      "name": "{busy ? text(\"personAliasesSaving\", \"保存中…\") : text(\"personAliasesAdd\", \"添加\")}",
+      "handlers": [
+        "onclick={() => void add()}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy || loading || readFailed || !aliasDraft.trim()}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonCard.svelte:46",
+      "file": "src/components/people/PersonCard.svelte",
+      "line": 46,
+      "tag": "div",
+      "name": "aria-label={`查看 ${person.name} 的详情`}",
+      "handlers": [
+        "onclick={() => onOpen(person)}",
+        "onkeydown={(event) => { if (event.target !== event.currentTarget || (event.key !== \"Enter\" && event.key !== \" \")) return; event.preventDefault(); onOpen(person); }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "tabindex=\"0\""
+    },
+    {
+      "id": "src/components/people/PersonCard.svelte:55",
+      "file": "src/components/people/PersonCard.svelte",
+      "line": 55,
+      "tag": "input",
+      "name": "aria-label={`选择 ${person.name}`}",
+      "handlers": [
+        "onclick={(event) => event.stopPropagation()}",
+        "onchange={(event) => onToggleSelected?.((event.currentTarget as HTMLInputElement).checked)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonCard.svelte:79",
+      "file": "src/components/people/PersonCard.svelte",
+      "line": 79,
+      "tag": "button",
+      "name": "aria-label={`打开 ${person.name} 的文档`}",
+      "handlers": [
+        "onclick={(event) => { event.stopPropagation(); onOpenPersonDoc(person.docId); }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonCard.svelte:82",
+      "file": "src/components/people/PersonCard.svelte",
+      "line": 82,
+      "tag": "a",
+      "name": "{person.phone}",
+      "handlers": [
+        "onclick={(event) => event.stopPropagation()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonCard.svelte:84",
+      "file": "src/components/people/PersonCard.svelte",
+      "line": 84,
+      "tag": "a",
+      "name": "{person.email}",
+      "handlers": [
+        "onclick={(event) => event.stopPropagation()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:688",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 688,
+      "tag": "button",
+      "name": "{text(\"detailEdit\", \"编辑\")}",
+      "handlers": [
+        "onclick={() => (editing = true)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy || deleting}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:689",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 689,
+      "tag": "button",
+      "name": "{text(\"detailPrevious\", \"上一位\")}",
+      "handlers": [
+        "onclick={() => navigate(previousPerson)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={!previousPerson || busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:690",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 690,
+      "tag": "button",
+      "name": "{text(\"detailNext\", \"下一位\")}",
+      "handlers": [
+        "onclick={() => navigate(nextPerson)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={!nextPerson || busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:694",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 694,
+      "tag": "div",
+      "name": "aria-label=\"人物详情内容\"",
+      "handlers": [
+        "onkeydown={handleTabKeydown}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "tabindex=\"-1\""
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:695",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 695,
+      "tag": "button",
+      "name": "{text(\"detailOverview\", \"概览\")}",
+      "handlers": [
+        "onclick={() => void selectTab(\"overview\")}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:696",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 696,
+      "tag": "button",
+      "name": "{text(\"detailActivity\", \"互动\")}",
+      "handlers": [
+        "onclick={() => void selectTab(\"activity\")}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:697",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 697,
+      "tag": "button",
+      "name": "{text(\"detailRelations\", \"相关人\")}",
+      "handlers": [
+        "onclick={() => void selectTab(\"relations\")}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:703",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 703,
+      "tag": "button",
+      "name": "编辑资料",
+      "handlers": [
+        "onclick={() => (editing = true)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:707",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 707,
+      "tag": "a",
+      "name": "{current.phone}",
+      "handlers": [],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:708",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 708,
+      "tag": "a",
+      "name": "{current.email}",
+      "handlers": [],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:716",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 716,
+      "tag": "button",
+      "name": "导出会面简报",
+      "handlers": [
+        "onclick={openBriefingExport}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:724",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 724,
+      "tag": "select",
+      "name": "aria-label=\"选用备注模板\"",
+      "handlers": [
+        "onchange={applyTemplate}"
+      ],
+      "bindings": [
+        "bind:value={templateChoice}"
+      ],
+      "disabled": "disabled={busy || templates.length === 0}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:728",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 728,
+      "tag": "button",
+      "name": "{text(\"tplManage\", \"管理模板\")}",
+      "handlers": [
+        "onclick={() => (templateManagerOpen = true)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:732",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 732,
+      "tag": "input",
+      "name": "",
+      "handlers": [
+        "oninput={() => (recorded = false)}"
+      ],
+      "bindings": [
+        "bind:value={noteText}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:740",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 740,
+      "tag": "button",
+      "name": "{recorded ? text(\"detailRecorded\", \"已记录 ✓\") : text(\"detailRecord\", \"记录\")}",
+      "handlers": [
+        "onclick={() => mutate(persistNote)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:756",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 756,
+      "tag": "button",
+      "name": "{text(\"orgSectionManage\", \"管理归属\")}",
+      "handlers": [
+        "onclick={onOpenOrgManager}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:778",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 778,
+      "tag": "button",
+      "name": "aria-label={text(\"orgMembershipRemoveLabel\", \"移除归属 {name}\", { name: membership.orgName })}",
+      "handlers": [
+        "onclick={() => void removeOrgMembership(membership.id)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={addOrgBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:788",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 788,
+      "tag": "select",
+      "name": "aria-label={text(\"orgAddOrgLabel\", \"选择要加入的组织\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={addOrgDocId}"
+      ],
+      "disabled": "disabled={addOrgBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:795",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 795,
+      "tag": "input",
+      "name": "aria-label={text(\"orgAddDeptLabel\", \"归属部门\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={addOrgDepartment}"
+      ],
+      "disabled": "disabled={addOrgBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:797",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 797,
+      "tag": "input",
+      "name": "aria-label={text(\"orgAddTitleLabel\", \"归属职位\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={addOrgTitle}"
+      ],
+      "disabled": "disabled={addOrgBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:799",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 799,
+      "tag": "input",
+      "name": "aria-label={text(\"orgAddJoinedLabel\", \"加入日期\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={addOrgJoinedOn}"
+      ],
+      "disabled": "disabled={addOrgBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:801",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 801,
+      "tag": "button",
+      "name": "{text(\"orgAddSubmit\", \"添加归属\")}",
+      "handlers": [
+        "onclick={() => void addOrgMembership()}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={addOrgBusy || addOrgDocId === \"\"}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:828",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 828,
+      "tag": "button",
+      "name": "{text(\"orgCommonOpen\", \"查看详情\")}",
+      "handlers": [
+        "onclick={() => void navigate(contact)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:846",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 846,
+      "tag": "button",
+      "name": "{text(\"commonRetry\", \"重试\")}",
+      "handlers": [
+        "onclick={loadFollowUps}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:864",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 864,
+      "tag": "button",
+      "name": "{text(\"fuSnoozeTomorrow\", \"明天\")}",
+      "handlers": [
+        "onclick={() => snooze(item, \"tomorrow\")}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={followUpBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:865",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 865,
+      "tag": "button",
+      "name": "{text(\"fuSnoozeThreeDays\", \"三天后\")}",
+      "handlers": [
+        "onclick={() => snooze(item, \"threeDays\")}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={followUpBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:866",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 866,
+      "tag": "button",
+      "name": "{text(\"fuSnoozeNextMonday\", \"下周一\")}",
+      "handlers": [
+        "onclick={() => snooze(item, \"nextMonday\")}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={followUpBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:867",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 867,
+      "tag": "button",
+      "name": "{text(\"fuSnoozeNextMonth\", \"一个月后\")}",
+      "handlers": [
+        "onclick={() => snooze(item, \"nextMonth\")}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={followUpBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:869",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 869,
+      "tag": "input",
+      "name": "aria-label={text(\"fuSnoozeDateLabel\", \"指定日期\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={snoozeCustomDate}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:870",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 870,
+      "tag": "button",
+      "name": "{text(\"fuSnoozeByDate\", \"按指定日期推迟\")}",
+      "handlers": [
+        "onclick={() => snooze(item, \"custom\")}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={followUpBusy || !snoozeCustomDate}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:875",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 875,
+      "tag": "button",
+      "name": "{text(\"fuPostpone\", \"推迟\")}",
+      "handlers": [
+        "onclick={() => { snoozeForId = snoozeForId === item.id ? \"\" : item.id; snoozeCustomDate = \"\"; }}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={followUpBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:876",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 876,
+      "tag": "button",
+      "name": "{text(\"fuComplete\", \"完成\")}",
+      "handlers": [
+        "onclick={() => completeFollowUp(item)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={followUpBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:877",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 877,
+      "tag": "button",
+      "name": "{text(\"fuCancelPlan\", \"取消计划\")}",
+      "handlers": [
+        "onclick={() => cancelFollowUp(item)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={followUpBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:886",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 886,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={followUpTitle}"
+      ],
+      "disabled": "disabled={followUpBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:893",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 893,
+      "tag": "input",
+      "name": "aria-label={text(\"fuDateLabel\", \"计划日期\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={followUpDate}"
+      ],
+      "disabled": "disabled={followUpBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:894",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 894,
+      "tag": "button",
+      "name": "{followUpBusy ? text(\"fuAdding\", \"添加中…\") : followUpRecorded ? text(\"fuAddAnother\", \"再加一条\") : text(\"fuAddPlan\", \"添加计划\")}",
+      "handlers": [
+        "onclick={createFollowUp}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={followUpBusy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:915",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 915,
+      "tag": "select",
+      "name": "aria-label={text(\"cadenceModeLabel\", \"联系节奏模式\")}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={cadenceMode}"
+      ],
+      "disabled": "disabled={cadenceSaving}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:921",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 921,
+      "tag": "input",
+      "name": "aria-label=\"自定义天数\"",
+      "handlers": [],
+      "bindings": [
+        "bind:value={cadenceDays}"
+      ],
+      "disabled": "disabled={cadenceSaving}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:923",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 923,
+      "tag": "button",
+      "name": "{cadenceSaving ? text(\"cadenceSaving\", \"保存中…\") : text(\"cadenceSave\", \"保存节奏\")}",
+      "handlers": [
+        "onclick={saveCadence}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={cadenceSaving}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:968",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 968,
+      "tag": "input",
+      "name": "aria-label=\"搜索互动备注或日期\"",
+      "handlers": [
+        "oninput={() => (activityLimit = 20)}"
+      ],
+      "bindings": [
+        "bind:value={activitySearch}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:969",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 969,
+      "tag": "select",
+      "name": "aria-label=\"互动来源\"",
+      "handlers": [
+        "onchange={() => (activityLimit = 20)}"
+      ],
+      "bindings": [
+        "bind:value={activitySource}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:977",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 977,
+      "tag": "input",
+      "name": "aria-label=\"互动开始日期\"",
+      "handlers": [
+        "onchange={() => (activityLimit = 20)}"
+      ],
+      "bindings": [
+        "bind:value={activityFrom}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:979",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 979,
+      "tag": "input",
+      "name": "aria-label=\"互动结束日期\"",
+      "handlers": [
+        "onchange={() => (activityLimit = 20)}"
+      ],
+      "bindings": [
+        "bind:value={activityTo}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:980",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 980,
+      "tag": "button",
+      "name": "最近 30 天",
+      "handlers": [
+        "onclick={() => setQuickRange(30)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:981",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 981,
+      "tag": "button",
+      "name": "最近 90 天",
+      "handlers": [
+        "onclick={() => setQuickRange(90)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:983",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 983,
+      "tag": "button",
+      "name": "清除日期",
+      "handlers": [
+        "onclick={clearDateRange}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:997",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 997,
+      "tag": "button",
+      "name": "{text(\"commonRetry\", \"重试\")}",
+      "handlers": [
+        "onclick={loadInsights}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1010",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1010,
+      "tag": "button",
+      "name": "aria-label={`删除 ${item.localDate} 的互动`}",
+      "handlers": [
+        "onclick={() => deleteTimelineItem(item.eventId)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1019",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1019,
+      "tag": "button",
+      "name": "加载更多",
+      "handlers": [
+        "onclick={() => (activityLimit += 20)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1024",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1024,
+      "tag": "button",
+      "name": "清除筛选",
+      "handlers": [
+        "onclick={() => { activitySearch = \"\"; activitySource = \"\"; activityFrom = \"\"; activityTo = \"\"; activityLimit = 20; }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1028",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1028,
+      "tag": "button",
+      "name": "去记一笔",
+      "handlers": [
+        "onclick={() => void selectTab(\"overview\")}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1040",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1040,
+      "tag": "button",
+      "name": "重试",
+      "handlers": [
+        "onclick={loadOthers}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1046",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1046,
+      "tag": "button",
+      "name": "选择联系人",
+      "handlers": [
+        "onclick={() => relationPicker?.openPicker()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1048",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1048,
+      "tag": "button",
+      "name": "返回工作台",
+      "handlers": [
+        "onclick={onClose}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1055",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1055,
+      "tag": "button",
+      "name": "{other.name}",
+      "handlers": [
+        "onclick={() => { onOpenPersonDoc(other.docId); }}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1056",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1056,
+      "tag": "button",
+      "name": "title=\"解除关系\"",
+      "handlers": [
+        "onclick={() => mutate(() => removeRelation(settings, current, other))}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1086",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1086,
+      "tag": "button",
+      "name": "{text(\"relationProjectionRetry\", \"只重试未完成文档\")}",
+      "handlers": [
+        "onclick={retryRelatedDocuments}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1097",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1097,
+      "tag": "button",
+      "name": "{text(\"closeDialog\", \"关闭\")}",
+      "handlers": [
+        "onclick={() => void (async () => { if (await canLeave.requestClose()) onClose(); })()}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy || deleting}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1098",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1098,
+      "tag": "button",
+      "name": "{text(\"detailOpenDoc\", \"打开文档\")}",
+      "handlers": [
+        "onclick={() => onOpenPersonDoc(current.docId)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1099",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1099,
+      "tag": "button",
+      "name": "{deleting ? text(\"detailRemoving\", \"移除中…\") : text(\"detailRemove\", \"从人脉移除\")}",
+      "handlers": [
+        "onclick={confirmDelete}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy || deleting}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1126",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1126,
+      "tag": "select",
+      "name": "aria-label=\"互动条数范围\"",
+      "handlers": [],
+      "bindings": [
+        "bind:value={briefingLimit}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1135",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1135,
+      "tag": "button",
+      "name": "关闭",
+      "handlers": [
+        "onclick={() => (briefingExportOpen = false)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonDetail.svelte:1136",
+      "file": "src/components/people/PersonDetail.svelte",
+      "line": 1136,
+      "tag": "button",
+      "name": "下载 .md",
+      "handlers": [
+        "onclick={downloadBriefing}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonEditDialog.svelte:150",
+      "file": "src/components/people/PersonEditDialog.svelte",
+      "line": 150,
+      "tag": "button",
+      "name": "{text(\"qfOpen\", \"粘贴并识别\")}",
+      "handlers": [
+        "onclick={() => (quickFillOpen = true)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonEditDialog.svelte:157",
+      "file": "src/components/people/PersonEditDialog.svelte",
+      "line": 157,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.phone}"
+      ],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonEditDialog.svelte:161",
+      "file": "src/components/people/PersonEditDialog.svelte",
+      "line": 161,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.wechat}"
+      ],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonEditDialog.svelte:165",
+      "file": "src/components/people/PersonEditDialog.svelte",
+      "line": 165,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.email}"
+      ],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonEditDialog.svelte:169",
+      "file": "src/components/people/PersonEditDialog.svelte",
+      "line": 169,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.website}"
+      ],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonEditDialog.svelte:173",
+      "file": "src/components/people/PersonEditDialog.svelte",
+      "line": 173,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.birthday}"
+      ],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonEditDialog.svelte:177",
+      "file": "src/components/people/PersonEditDialog.svelte",
+      "line": 177,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:checked={draft.isLunar}"
+      ],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonEditDialog.svelte:181",
+      "file": "src/components/people/PersonEditDialog.svelte",
+      "line": 181,
+      "tag": "select",
+      "name": "{text(\"formUngrouped\", \"未分组\")} {group}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.group}"
+      ],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonEditDialog.svelte:190",
+      "file": "src/components/people/PersonEditDialog.svelte",
+      "line": 190,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={tagsText}"
+      ],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonEditDialog.svelte:199",
+      "file": "src/components/people/PersonEditDialog.svelte",
+      "line": 199,
+      "tag": "button",
+      "name": "{text(\"formCancel\", \"取消\")}",
+      "handlers": [
+        "onclick={() => guardedClose(onClose)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonEditDialog.svelte:201",
+      "file": "src/components/people/PersonEditDialog.svelte",
+      "line": 201,
+      "tag": "button",
+      "name": "{text(\"formRetryFailed\", \"核实并重试未完成字段\")}",
+      "handlers": [
+        "onclick={retryFailed}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonEditDialog.svelte:203",
+      "file": "src/components/people/PersonEditDialog.svelte",
+      "line": 203,
+      "tag": "button",
+      "name": "{running ? text(\"formSaving\", \"保存中…\") : text(\"formSave\", \"保存\")}",
+      "handlers": [
+        "onclick={submit}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonPicker.svelte:93",
+      "file": "src/components/people/PersonPicker.svelte",
+      "line": 93,
+      "tag": "button",
+      "name": "aria-label={ariaLabel}",
+      "handlers": [
+        "onclick={() => (open ? (open = false) : void show())}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={disabled}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonPicker.svelte:109",
+      "file": "src/components/people/PersonPicker.svelte",
+      "line": 109,
+      "tag": "input",
+      "name": "aria-label={text(\"pickerSearch\", searchText)}",
+      "handlers": [
+        "onkeydown={onSearchKeydown}",
+        "oninput={() => (highlight = 0)}"
+      ],
+      "bindings": [
+        "bind:this={inputEl}",
+        "bind:value={query}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/PersonPicker.svelte:128",
+      "file": "src/components/people/PersonPicker.svelte",
+      "line": 128,
+      "tag": "button",
+      "name": "{item.label} {item.hint}",
+      "handlers": [
+        "onmouseenter={() => (highlight = index)}",
+        "onclick={() => choose(item)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ProfileCompletionDialog.svelte:154",
+      "file": "src/components/people/ProfileCompletionDialog.svelte",
+      "line": 154,
+      "tag": "button",
+      "name": "{text(\"formDone\", \"完成\")}",
+      "handlers": [
+        "onclick={onClose}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ProfileCompletionDialog.svelte:167",
+      "file": "src/components/people/ProfileCompletionDialog.svelte",
+      "line": 167,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft[field.key]}"
+      ],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ProfileCompletionDialog.svelte:173",
+      "file": "src/components/people/ProfileCompletionDialog.svelte",
+      "line": 173,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.birthday}"
+      ],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ProfileCompletionDialog.svelte:177",
+      "file": "src/components/people/ProfileCompletionDialog.svelte",
+      "line": 177,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:checked={draft.isLunar}"
+      ],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ProfileCompletionDialog.svelte:183",
+      "file": "src/components/people/ProfileCompletionDialog.svelte",
+      "line": 183,
+      "tag": "select",
+      "name": "{text(\"formUngrouped\", \"未分组\")} {group}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={draft.group}"
+      ],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ProfileCompletionDialog.svelte:194",
+      "file": "src/components/people/ProfileCompletionDialog.svelte",
+      "line": 194,
+      "tag": "input",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={tagsText}"
+      ],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ProfileCompletionDialog.svelte:205",
+      "file": "src/components/people/ProfileCompletionDialog.svelte",
+      "line": 205,
+      "tag": "button",
+      "name": "{text(\"qfCompletionSkip\", \"跳过此人\")}",
+      "handlers": [
+        "onclick={skip}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ProfileCompletionDialog.svelte:209",
+      "file": "src/components/people/ProfileCompletionDialog.svelte",
+      "line": 209,
+      "tag": "button",
+      "name": "{text(\"formRetryFailed\", \"核实并重试未完成字段\")}",
+      "handlers": [
+        "onclick={retryCurrent}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/ProfileCompletionDialog.svelte:211",
+      "file": "src/components/people/ProfileCompletionDialog.svelte",
+      "line": 211,
+      "tag": "button",
+      "name": "{running ? text(\"formSaving\", \"保存中…\") : text(\"qfCompletionSaveNext\", \"保存并下一位\")}",
+      "handlers": [
+        "onclick={saveAndNext}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={running || !draftIsDirty()}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/QuickFillDialog.svelte:153",
+      "file": "src/components/people/QuickFillDialog.svelte",
+      "line": 153,
+      "tag": "button",
+      "name": "{templateCopied ? text(\"qfCopied\", \"已复制 ✓\") : text(\"qfCopyTemplate\", \"复制空白模板\")}",
+      "handlers": [
+        "onclick={copyTemplate}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/QuickFillDialog.svelte:157",
+      "file": "src/components/people/QuickFillDialog.svelte",
+      "line": 157,
+      "tag": "textarea",
+      "name": "",
+      "handlers": [],
+      "bindings": [
+        "bind:value={pasteText}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/QuickFillDialog.svelte:161",
+      "file": "src/components/people/QuickFillDialog.svelte",
+      "line": 161,
+      "tag": "button",
+      "name": "{text(\"formCancel\", \"取消\")}",
+      "handlers": [
+        "onclick={() => void guardedClose(onClose)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/QuickFillDialog.svelte:162",
+      "file": "src/components/people/QuickFillDialog.svelte",
+      "line": 162,
+      "tag": "button",
+      "name": "{text(\"qfRecognize\", \"识别\")}",
+      "handlers": [
+        "onclick={recognize}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={pasteText.trim().length === 0}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/QuickFillDialog.svelte:170",
+      "file": "src/components/people/QuickFillDialog.svelte",
+      "line": 170,
+      "tag": "input",
+      "name": "",
+      "handlers": [
+        "onchange={() => toggle(item, index)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={notWritable(item)}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/QuickFillDialog.svelte:196",
+      "file": "src/components/people/QuickFillDialog.svelte",
+      "line": 196,
+      "tag": "button",
+      "name": "{text(\"formCancel\", \"取消\")}",
+      "handlers": [
+        "onclick={() => void guardedClose(onClose)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/QuickFillDialog.svelte:197",
+      "file": "src/components/people/QuickFillDialog.svelte",
+      "line": 197,
+      "tag": "button",
+      "name": "{text(\"qfApply\", \"应用到表单（{n}）\", { n: checked.size })}",
+      "handlers": [
+        "onclick={apply}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={checked.size === 0}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/TemplateManager.svelte:80",
+      "file": "src/components/people/TemplateManager.svelte",
+      "line": 80,
+      "tag": "input",
+      "name": "aria-label={text(\"tplNameAria\", \"模板 {n} 名称\", { n: index + 1 })}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={item.name}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/TemplateManager.svelte:81",
+      "file": "src/components/people/TemplateManager.svelte",
+      "line": 81,
+      "tag": "button",
+      "name": "title={text(\"tplDeleteTitle\", \"删除模板 {n}\", { n: index + 1 })}",
+      "handlers": [
+        "onclick={() => removeTemplate(item.id)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/TemplateManager.svelte:83",
+      "file": "src/components/people/TemplateManager.svelte",
+      "line": 83,
+      "tag": "textarea",
+      "name": "aria-label={text(\"tplContentAria\", \"模板 {n} 内容\", { n: index + 1 })}",
+      "handlers": [],
+      "bindings": [
+        "bind:value={item.content}"
+      ],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/TemplateManager.svelte:87",
+      "file": "src/components/people/TemplateManager.svelte",
+      "line": 87,
+      "tag": "button",
+      "name": "{text(\"tplManagerAdd\", \"＋ 新增模板\")}",
+      "handlers": [
+        "onclick={addTemplate}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/TemplateManager.svelte:89",
+      "file": "src/components/people/TemplateManager.svelte",
+      "line": 89,
+      "tag": "button",
+      "name": "{text(\"tplManagerClose\", \"关闭\")}",
+      "handlers": [
+        "onclick={() => void guardedClose(onClose)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/TemplateManager.svelte:90",
+      "file": "src/components/people/TemplateManager.svelte",
+      "line": 90,
+      "tag": "button",
+      "name": "{busy ? text(\"tplManagerSaving\", \"保存中…\") : text(\"tplManagerSave\", \"保存模板\")}",
+      "handlers": [
+        "onclick={save}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={busy}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:209",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 209,
+      "tag": "button",
+      "name": "{exporting ? text(\"vcardExporting\", \"导出中…\") : text(\"vcardExportAll\", \"导出全部联系人为 .vcf\")}",
+      "handlers": [
+        "onclick={runExport}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={exporting || parsing || importing || retrying}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:218",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 218,
+      "tag": "button",
+      "name": "{parsing ? text(\"vcardParsing\", \"解析中…\") : text(\"vcardPickFile\", \"选择 .vcf 文件…\")}",
+      "handlers": [
+        "onclick={() => guardedClose(() => fileInput?.click())}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={parsing || importing || exporting || retrying}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:221",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 221,
+      "tag": "input",
+      "name": "",
+      "handlers": [
+        "onchange={onFileChange}"
+      ],
+      "bindings": [
+        "bind:this={fileInput}"
+      ],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:239",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 239,
+      "tag": "button",
+      "name": "{text(\"vcardPickAgain\", \"重新选择文件\")}",
+      "handlers": [
+        "onclick={() => fileInput?.click()}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:245",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 245,
+      "tag": "button",
+      "name": "{text(\"vcardBackToPeople\", \"返回联系人\")}",
+      "handlers": [
+        "onclick={() => guardedClose(onClose)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:246",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 246,
+      "tag": "button",
+      "name": "{text(\"vcardPickOtherFile\", \"选择其他文件\")}",
+      "handlers": [
+        "onclick={() => guardedClose(() => fileInput?.click())}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={retrying}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:247",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 247,
+      "tag": "button",
+      "name": "{text(\"vcardDiagnostics\", \"保存诊断信息\")}",
+      "handlers": [
+        "onclick={downloadDiagnostics}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={retrying}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:249",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 249,
+      "tag": "button",
+      "name": "{retrying ? text(\"vcardRetrying\", \"核对并重试中…\") : text(\"vcardRetryButton\", \"核对名册并重试（{n} 项）\", { n: reportFailed.length + reportUnknown.length })}",
+      "handlers": [
+        "onclick={runRetry}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={retrying}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:261",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 261,
+      "tag": "summary",
+      "name": "{text(\"vcardReportImported\", \"✓ 成功（{n}）\", { n: reportImported.length })}",
+      "handlers": [],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:267",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 267,
+      "tag": "summary",
+      "name": "{text(\"vcardReportSkipped\", \"⊘ 跳过（{n}）\", { n: reportSkipped.length })}",
+      "handlers": [],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:273",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 273,
+      "tag": "summary",
+      "name": "{text(\"vcardReportFailed\", \"! 失败（{n}）\", { n: reportFailed.length })}",
+      "handlers": [],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:279",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 279,
+      "tag": "summary",
+      "name": "{text(\"vcardReportUnknown\", \"? 待核对（{n}）\", { n: reportUnknown.length })}",
+      "handlers": [],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:295",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 295,
+      "tag": "button",
+      "name": "重新选择文件",
+      "handlers": [
+        "onclick={() => fileInput?.click()}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={parsing || importing}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:301",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 301,
+      "tag": "input",
+      "name": "",
+      "handlers": [
+        "onchange={(event) => toggleAll((event.currentTarget as HTMLInputElement).checked)}"
+      ],
+      "bindings": [],
+      "disabled": null,
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:311",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 311,
+      "tag": "input",
+      "name": "",
+      "handlers": [
+        "onchange={(event) => (selected[index] = (event.currentTarget as HTMLInputElement).checked)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={plan.duplicate}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:336",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 336,
+      "tag": "button",
+      "name": "选择文件",
+      "handlers": [
+        "onclick={() => fileInput?.click()}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={exporting}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:345",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 345,
+      "tag": "button",
+      "name": "关闭",
+      "handlers": [
+        "onclick={() => guardedClose(onClose)}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={importing || parsing || exporting}",
+      "keyboard": "native"
+    },
+    {
+      "id": "src/components/people/VCardDialog.svelte:346",
+      "file": "src/components/people/VCardDialog.svelte",
+      "line": 346,
+      "tag": "button",
+      "name": "{importing ? \"导入中…\" : report ? \"导入完成\" : `导入为联系人（${selectedCount}）`}",
+      "handlers": [
+        "onclick={runImport}"
+      ],
+      "bindings": [],
+      "disabled": "disabled={importing || parsing || exporting || !!errorText || !plans || selectedCount === 0 || report !== null}",
+      "keyboard": "native"
+    }
+  ]
+}

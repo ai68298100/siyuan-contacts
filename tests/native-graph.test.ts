@@ -20,7 +20,7 @@ test("原生图映射：过滤非登记节点并丢弃其边，保留集合内�
         { allowedDocIds: new Set(["self", "p1"]) },
     );
     assert.deepEqual(graph.nodes.map((node) => node.id).sort(), ["p1", "self"]);
-    assert.deepEqual(graph.edges, [{ source: "self", target: "p1" }]);
+    assert.deepEqual(graph.edges, [{ source: "self", target: "p1", kind: "ref" }]);
 });
 
 test("原生图映射：度数按图内保留边重算，非全库 refs/defs", () => {

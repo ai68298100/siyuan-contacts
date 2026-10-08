@@ -19,6 +19,7 @@ export interface NativeGraphMapOptions {
     allowedDocIds: ReadonlySet<string>;
     /** docId → 联系人分组（着色/图例用；缺省按「其他」灰） */
     docGroups?: ReadonlyMap<string, string>;
+    docKinds?: ReadonlyMap<string, "person" | "org">;
 }
 
 export function mapNativeGraph(native: NativeGraphPayload, options: NativeGraphMapOptions): PersonGraph {
@@ -33,6 +34,7 @@ export function mapNativeGraph(native: NativeGraphPayload, options: NativeGraphM
             label: typeof node.label === "string" && node.label !== "" ? node.label : node.id,
             group: options.docGroups?.get(node.id) ?? "其他",
             degree: 0,
+            kind: options.docKinds?.get(node.id),
         });
     }
     const byId = new Map(nodes.map((node) => [node.id, node]));
@@ -48,7 +50,7 @@ export function mapNativeGraph(native: NativeGraphPayload, options: NativeGraphM
         const key = [from, to].sort().join("~");
         if (seen.has(key)) continue;
         seen.add(key);
-        edges.push({ source: from, target: to });
+        edges.push({ source: from, target: to, kind: "ref" });
         const a = byId.get(from);
         const b = byId.get(to);
         if (a) a.degree += 1;

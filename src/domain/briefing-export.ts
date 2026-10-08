@@ -7,6 +7,9 @@
  */
 import { nextBirthday } from "./occasions.ts";
 import type { ContactSummary } from "./person.ts";
+import { escapeMarkdown } from "./format.ts";
+import { profileText } from "./people-profiles.ts";
+export { escapeMarkdown } from "./format.ts";
 
 export interface BriefingTimelineEntry {
     localDate: string;
@@ -39,9 +42,6 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 /** Markdown 行内转义：防止用户文本（姓名/备注）破坏文档结构 */
-export function escapeMarkdown(text: string): string {
-    return text.replace(/([\\`*_\[\]#<>])/g, "\\$1");
-}
 
 export function buildBriefingMarkdown(input: BriefingExportInput): string {
     const { person, timeline, followUps, relatedNames, coAttendance, limit, generatedAt } = input;
@@ -57,6 +57,12 @@ export function buildBriefingMarkdown(input: BriefingExportInput): string {
     if (person.email) profile.push(`- 邮箱：${escapeMarkdown(person.email)}`);
     if (person.wechat) profile.push(`- 微信：${escapeMarkdown(person.wechat)}`);
     if (person.tags.length > 0) profile.push(`- 标签：${person.tags.map(escapeMarkdown).join("、")}`);
+    if (person.profile) {
+        profile.push(`- 工作单位：${escapeMarkdown(profileText(person.profile, "work"))}`);
+        profile.push(`- 学校：${escapeMarkdown(profileText(person.profile, "education"))}`);
+        profile.push(`- 与我的关系：${escapeMarkdown(profileText(person.profile, "relationship"))}`);
+        profile.push("- 来源：组织成员分类与当前本人参照下的人工称谓；历史任职另见组织归属");
+    }
     if (profile.length > 0) {
         lines.push("");
         lines.push("## 基本资料");

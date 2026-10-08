@@ -1,49 +1,26 @@
-/**
- * 对外人员服务桥 v1（window.LvContacts）——D-0012：人脉插件作为"人员服务"提供方。
- * 其他插件（任务管理等）可：搜索人、查或建人（ensurePerson）、给一批人记共同交集
- * （recordInteraction，externalRef 幂等）。协议文档见 docs/BRIDGE.md。
- * 纪律：只提供服务，不读取/监听其他插件的私有存储。
- */
 import type { Plugin } from "siyuan";
-import { createContact, filterContacts, listContacts } from "../services/contacts";
-import { recordInteractionWithResult } from "../data/interactions";
-import { toLocalDateKey, defaultBridgeRef } from "../domain/interactions";
-import { birthdayToMs, emptyDraft } from "../domain/person";
+import { newNodeId } from "../api/client";
+import { documentExists } from "../api/blocks";
+import { createContact, ContactCreationError, ContactNameAmbiguityError, filterContacts, listContacts, previewContactCreation } from "../services/contacts";
+import type { ContactCreationRequest } from "../services/contacts";
+import { createExternalBridgeApi } from "../services/external-bridge.ts";
+import type { LvContactsBridgeApi } from "../services/external-bridge.ts";
+import { recordInteractionWithResult, INTERACTION_STORAGE_KEY } from "../data/interactions";
+import { loadJsonStrict, saveJsonVerified, withStoreLock } from "../data/storage";
+import { defaultBridgeRef } from "../domain/interactions.ts";
+import {
+    BRIDGE_STORAGE_KEY, BridgeError, BridgePersonAmbiguityError, bridgeEventEvidence, bridgePerson, normalizeBridgeRequestStore,
+    resolveBridgePerson,
+} from "../domain/external-bridge.ts";
+import { documentHPath } from "../domain/format.ts";
+import { emptyDraft } from "../domain/person.ts";
+import { invalidateRoster } from "../services/roster";
 import type { ContactsSettings } from "../domain/model";
 
 export { defaultBridgeRef };
-
-export const BRIDGE_PROTOCOL = 1;
-
-export interface BridgePerson {    docId: string;
-    itemId: string;
-    name: string;
-    group: string;
-    tags: string[];
-}
-
-export interface BridgeInteractionMeta {
-    /** 场合身份（幂等键）。缺省 = `bridge:<日期>:<排序后的人员>`，同批重复调用不会重复记录 */
-    ref?: string;
-    /** 场合日期 YYYY-MM-DD，缺省今天 */
-    date?: string;
-    place?: string;
-    note?: string;
-}
-
-export interface LvContactsBridgeApi {
-    readonly protocol: number;
-    readonly capabilities: readonly string[];
-    searchPeople(keyword?: string): Promise<BridgePerson[]>;
-    getPerson(docId: string): Promise<BridgePerson | null>;
-    /** 按名查人，不存在则创建；返回 created 标记新建 */
-    ensurePerson(name: string): Promise<BridgePerson & { created: boolean }>;
-    /** 给一批人记录共同交集（幂等） */
-    recordInteraction(
-        personDocIds: readonly string[],
-        meta?: BridgeInteractionMeta,
-    ): Promise<{ recorded: number }>;
-}
+export { BRIDGE_PROTOCOL, BridgeError, BridgePersonAmbiguityError } from "../domain/external-bridge.ts";
+export type { BridgePerson, BridgeInteractionMeta, BridgeEnsureOptions, BridgeInteractionResult } from "../domain/external-bridge.ts";
+export type { LvContactsBridgeApi } from "../services/external-bridge.ts";
 
 declare global {
     interface Window {
@@ -51,81 +28,88 @@ declare global {
     }
 }
 
-function toBridgePerson(person: {
-    docId: string;
-    itemId: string;
-    name: string;
-    group: string;
-    tags: string[];
-}): BridgePerson {
-    return { docId: person.docId, itemId: person.itemId, name: person.name, group: person.group, tags: person.tags };
-}
+let mounted: { api: LvContactsBridgeApi; deactivate(): void } | undefined;
 
-/** 初始化对外桥。settings 经 getter 延迟读取（向导完成后自动可用） */
 export function initExternalBridge(plugin: Plugin, getSettings: () => ContactsSettings | null): void {
+    disposeExternalBridge();
+    let active = true;
     const requireSettings = (): ContactsSettings => {
+        if (!active) throw new BridgeError("disposed", "getPerson");
         const settings = getSettings();
-        if (!settings) throw new Error("人脉工作空间尚未初始化（请先在小驴人脉中完成初始化）");
-        return settings;
+        if (!settings) throw new BridgeError("not_initialized", "getPerson");
+        return { ...settings, fieldMap: { ...settings.fieldMap } };
     };
-
-    const api: LvContactsBridgeApi = {
-        protocol: BRIDGE_PROTOCOL,
-        capabilities: ["searchPeople", "getPerson", "ensurePerson", "recordInteraction"],
-
-        async searchPeople(keyword = "") {
-            const people = await listContacts(requireSettings());
-            return filterContacts(people, keyword ?? "").map(toBridgePerson);
+    const guard = (original?: ContactsSettings): void => {
+        const current = requireSettings();
+        if (original && (original.notebookId !== current.notebookId || original.avId !== current.avId
+            || original.dbBlockId !== current.dbBlockId || original.hostDocId !== current.hostDocId
+            || original.notebookName !== current.notebookName || JSON.stringify(original.fieldMap) !== JSON.stringify(current.fieldMap))) {
+            throw new BridgeError("configuration_changed", "getPerson");
+        }
+    };
+    const people = async (settings: ContactsSettings) => {
+        invalidateRoster();
+        return listContacts(settings);
+    };
+    const api = createExternalBridgeApi({
+        settings: requireSettings,
+        guard,
+        lock: (task) => withStoreLock(BRIDGE_STORAGE_KEY, task),
+        readRequests: async () => normalizeBridgeRequestStore(await loadJsonStrict(plugin, BRIDGE_STORAGE_KEY)),
+        saveRequests: async (store) => saveJsonVerified(plugin, BRIDGE_STORAGE_KEY, normalizeBridgeRequestStore(store)),
+        people,
+        reachable: documentExists,
+        search: async (settings, keyword) => {
+            const roster = await people(settings);
+            for (const person of roster) resolveBridgePerson(roster, person.docId, "searchPeople");
+            return filterContacts(roster, keyword).map(bridgePerson);
         },
-
-        async getPerson(docId) {
-            const people = await listContacts(requireSettings());
-            const hit = people.find((person) => person.docId === docId);
-            return hit ? toBridgePerson(hit) : null;
-        },
-
-        async ensurePerson(name) {
-            const trimmed = (name ?? "").trim();
-            if (!trimmed) throw new Error("姓名不能为空");
-            const settings = requireSettings();
-            const people = await listContacts(settings);
-            const existing = people.find((person) => person.name === trimmed);
-            if (existing) return { ...toBridgePerson(existing), created: false };
-            const created = await createContact(settings, { ...emptyDraft(), name: trimmed });
-            return { ...toBridgePerson(created), created: true };
-        },
-
-        async recordInteraction(personDocIds, meta = {}) {
-            requireSettings();
-            const occurredAt = meta.date === undefined ? Date.now() : birthdayToMs(meta.date);
-            if (occurredAt === null) throw new Error("场合日期必须是有效的 YYYY-MM-DD 公历日期");
-            const docIds = [...new Set([...personDocIds].filter((id) => typeof id === "string" && id))];
-            if (docIds.length === 0) return { recorded: 0 };
-            const externalRef = meta.ref?.trim() || defaultBridgeRef(docIds, toLocalDateKey(new Date(occurredAt)));
-            const noteParts = [meta.place?.trim() ? `@${meta.place.trim()}` : "", meta.note?.trim() ?? ""].filter(
-                (part) => part.length > 0,
-            );
-            let recorded = 0;
-            for (const personDocId of docIds) {
-                const result = await recordInteractionWithResult(plugin, {
-                    personDocId,
-                    source: "api",
-                    externalRef,
-                    occurredAt,
-                    note: noteParts.length > 0 ? noteParts.join(" ") : undefined,
-                });
-                if (result.recorded) {
-                    recorded += 1;
+        newRequest: (settings, name) => ({
+            checkpoint: { requestId: newNodeId(), notebookId: settings.notebookId, avId: settings.avId, dbBlockId: settings.dbBlockId,
+                name, path: documentHPath(settings.notebookName, name), draftKey: "[]", state: "new" },
+            bindingState: "new",
+        }),
+        create: async (settings, name, previous) => {
+            const request: ContactCreationRequest = { draft: { ...emptyDraft(), name }, checkpoint: previous.checkpoint,
+                source: "created", bindingState: previous.bindingState };
+            try {
+                if (request.checkpoint.state === "new") {
+                    const preview = await previewContactCreation(settings, name);
+                    guard(settings);
+                    if (preview.existing.length || preview.unbound.length) throw new BridgePersonAmbiguityError(preview.existing.map(bridgePerson),
+                        preview.unbound.map((candidate) => ({ docId: candidate.docId, name: candidate.name })));
                 }
+                const person = await createContact(settings, request.draft, { request });
+                guard(settings);
+                return bridgePerson(person);
+            } catch (error) {
+                if (error instanceof BridgePersonAmbiguityError) throw error;
+                if (error instanceof ContactNameAmbiguityError) throw new BridgePersonAmbiguityError(error.preview.existing.map(bridgePerson),
+                    error.preview.unbound.map((candidate) => ({ docId: candidate.docId, name: candidate.name })));
+                const rejected = request.checkpoint.state === "rejected" || request.bindingState === "rejected";
+                if (error instanceof ContactCreationError) {
+                    throw new BridgeError(rejected ? "write_failed" : "write_unknown", "ensurePerson", rejected ? "rejected" : "unknown");
+                }
+                throw new BridgeError("write_unknown", "ensurePerson", "unknown");
+            } finally {
+                previous.checkpoint = request.checkpoint;
+                previous.bindingState = request.bindingState;
             }
-            return { recorded };
         },
-    };
-
+        event: async (docId, ref) => {
+            return bridgeEventEvidence(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY), docId, ref);
+        },
+        record: (personDocId, externalRef, occurredAt, note) => recordInteractionWithResult(plugin, {
+            personDocId, source: "api", externalRef, occurredAt, ...(note ? { note } : {}),
+        }),
+    });
+    mounted = { api, deactivate: () => { active = false; } };
     window.LvContacts = api;
-    console.info("[lvct] 人员服务桥已挂载：window.LvContacts protocol", BRIDGE_PROTOCOL);
 }
 
 export function disposeExternalBridge(): void {
-    delete window.LvContacts;
+    if (!mounted) return;
+    mounted.deactivate();
+    if (window.LvContacts === mounted.api) delete window.LvContacts;
+    mounted = undefined;
 }

@@ -4,6 +4,7 @@
     import { nextBirthday } from "../../domain/occasions";
     import { formatRelativeInteraction } from "../../domain/format";
     import { ExternalLink, Phone, MessageCircle, Mail, Clock3 } from "@lucide/svelte";
+    import PersonProfileSummary from "./PersonProfileSummary.svelte";
 
     let {
         person,
@@ -72,7 +73,8 @@
         <div class="lvct-person-card__sub">
             {#if birthday}{birthday.label}生日 · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}{person.isLunar ? " · 农历" : ""}{:else}生日未填写{/if}
         </div>
-        {#if orgLine}
+        {#if person.profile}<PersonProfileSummary profile={person.profile} compact />
+        {:else if orgLine}
             <div class="lvct-person-card__org" aria-label="单位">{orgLine}</div>
         {/if}
     </div>

@@ -56,6 +56,12 @@ export const FIELD_SPECS: readonly FieldSpec[] = [
     },
 ] as const;
 
+export const PROFILE_FACT_SOURCES = {
+    work: { storageKey: "org-membership.json", classification: "work", reference: "membershipId" },
+    education: { storageKey: "org-membership.json", classification: "education", reference: "membershipId" },
+    relationshipLabels: { storageKey: "person-relationship-labels.json", reference: "selfDocId+personDocId" },
+} as const;
+
 export function fieldSpec(key: FieldKey): FieldSpec {
     const spec = FIELD_SPECS.find((item) => item.key === key);
     if (!spec) throw new Error(`未知字段键: ${key}`);

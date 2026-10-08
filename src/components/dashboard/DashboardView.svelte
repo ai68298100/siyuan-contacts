@@ -13,6 +13,7 @@
     import { detectCheckinBridge } from "../../bridge/checkin";
     import ViewState from "../ViewState.svelte";
     import StatusNotice from "../StatusNotice.svelte";
+    import PersonProfileSummary from "../people/PersonProfileSummary.svelte";
     import LvctDialog from "../LvctDialog.svelte";
     import ReviewReportDialog from "./ReviewReportDialog.svelte";
     import { translateText } from "../../domain/translation";
@@ -47,6 +48,7 @@
         cadences: ["storeModuleCadences", "联系节奏"],
         dismissals: ["storeModuleDismissals", "提醒暂缓"],
         registry: ["storeModuleRegistry", "收编时间"],
+        self: ["selfSectionTitle", "本人档案"],
     };
     function moduleLabel(key: string): string {
         const entry = MODULE_LABELS[key];
@@ -193,21 +195,90 @@
         const pad = (value: number) => String(value).padStart(2, "0");
         return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     }
-    // C02 批量安顿：「从未互动」组整体暂缓 30 天（dismissal），保留此前暂缓快照供一次性撤销
-    let settleUndo: ReminderDismissal[] | null = $state(null);
+    // C02 批量安顿：「从未互动」组整体暂缓 30 天；撤销只携带本批前值并做冲突核对。
+    type SettleUndoEntry = { personDocId: string; kind: "stale"; previous?: ReminderDismissal };
+    type SettleUndo = { until: string; entries: SettleUndoEntry[] };
+    type SettleRetry = { until: string; cards: ActionCard[]; entries: SettleUndoEntry[] };
+    let settleUndo: SettleUndo | null = $state(null);
+    let settleRetry: SettleRetry | null = $state(null);
+
+    async function settleCards(
+        cards: readonly ActionCard[],
+        until: string,
+        preserved: readonly SettleUndoEntry[] = [],
+        previousOverrides: readonly SettleUndoEntry[] = [],
+    ): Promise<void> {
+        if (cards.length === 0) return;
+        if (preserved.length === 0) settleUndo = null;
+        settleRetry = null;
+        const snapshot = await facade.loadReminderDismissals();
+        const previousByKey = new Map<string, ReminderDismissal>(
+            snapshot
+                .filter((entry) => entry.kind === "stale")
+                .map((entry) => [`${entry.personDocId}|${entry.kind}`, entry] as const),
+        );
+        const retryConflicts: string[] = [];
+        const blockedRetryKeys = new Set<string>();
+        for (const entry of previousOverrides) {
+            const key = `${entry.personDocId}|${entry.kind}`;
+            const actual = previousByKey.get(key);
+            const expected = entry.previous;
+            const matches = expected
+                ? actual?.until === expected.until
+                : !actual;
+            if (!matches) {
+                blockedRetryKeys.add(key);
+                retryConflicts.push(entry.personDocId);
+                continue;
+            }
+            if (expected) previousByKey.set(key, expected);
+            else previousByKey.delete(key);
+        }
+        const completed: SettleUndoEntry[] = [...preserved];
+        const failed: ActionCard[] = [];
+        const failedEntries: SettleUndoEntry[] = [];
+        const errors: string[] = [];
+        for (const card of cards) {
+            if (blockedRetryKeys.has(`${card.person.docId}|stale`)) continue;
+            try {
+                await facade.dismissReminder(card.person.docId, "stale", until);
+                completed.push({
+                    personDocId: card.person.docId,
+                    kind: "stale",
+                    ...(previousByKey.get(`${card.person.docId}|stale`) ? { previous: previousByKey.get(`${card.person.docId}|stale`) } : {}),
+                });
+            } catch (error) {
+                failed.push(card);
+                const previous = previousByKey.get(`${card.person.docId}|stale`);
+                failedEntries.push({
+                    personDocId: card.person.docId,
+                    kind: "stale",
+                    ...(previous ? { previous } : {}),
+                });
+                errors.push(`${card.person.name}：${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
+        if (completed.length > 0) settleUndo = { until, entries: completed };
+        if (failed.length > 0) settleRetry = { until, cards: failed, entries: failedEntries };
+        if (failed.length === 0 && retryConflicts.length === 0) {
+            alMessage = `已把 ${completed.length} 位从未互动的提醒整体暂缓 30 天`;
+            alError = "";
+        } else {
+            const conflictMessage = retryConflicts.length > 0 ? `另有 ${retryConflicts.length} 位在重试前已被修改，已保留现状` : "";
+            alMessage = failed.length > 0
+                ? `已完成 ${completed.length} 位，${failed.length} 位失败；可重试失败项`
+                : `批量暂缓已完成，${conflictMessage}`;
+            alError = [...errors, ...retryConflicts.map((docId) => `${docId}：重试前已被其他窗口修改`)].join("；");
+        }
+    }
+
     async function settleNeverGroup(): Promise<void> {
         const group = actionGroupsOf(data).find((item) => item.key === "never");
         if (!group || group.cards.length === 0 || alBusy) return;
         alBusy = true;
         alError = "";
         try {
-            const snapshot = await facade.loadReminderDismissals();
-            const until = addDaysToToday(30);
-            for (const card of group.cards) {
-                await facade.dismissReminder(card.person.docId, "stale", until);
-            }
-            settleUndo = snapshot;
-            alMessage = `已把 ${group.cards.length} 位从未互动的提醒整体暂缓 30 天`;
+            await settleCards(group.cards, addDaysToToday(30));
             rowMenuKey = "";
             await refresh();
         } catch (error) {
@@ -216,22 +287,49 @@
             alBusy = false;
         }
     }
+
+    async function retrySettle(): Promise<void> {
+        const retry = settleRetry;
+        if (!retry || alBusy) return;
+        const preserved = settleUndo?.entries ?? [];
+        alBusy = true;
+        alError = "";
+        try {
+            await settleCards(retry.cards, retry.until, preserved, retry.entries);
+            await refresh();
+        } catch (error) {
+            alError = error instanceof Error ? error.message : String(error);
+        } finally {
+            alBusy = false;
+        }
+    }
+
     async function undoSettle(): Promise<void> {
         if (!settleUndo || alBusy) return;
+        const batch = settleUndo;
         alBusy = true;
+        alError = "";
         try {
-            /* 一次性撤销：把批量暂缓前的暂缓快照原样写回（覆盖式恢复） */
             const current = await facade.loadReminderDismissals();
-            for (const entry of current) {
-                if (!settleUndo.some((item) => item.personDocId === entry.personDocId && item.kind === entry.kind)) {
-                    await facade.resumeReminder(entry.personDocId, entry.kind);
+            const currentByKey = new Map<string, ReminderDismissal>(current.map((entry) => [`${entry.personDocId}|${entry.kind}`, entry]));
+            let conflicts = 0;
+            let restored = 0;
+            for (const entry of batch.entries) {
+                const key = `${entry.personDocId}|${entry.kind}`;
+                const currentEntry = currentByKey.get(key);
+                // 只有本批写入仍在当前位置时才恢复，避免覆盖另一窗口的修改或新增。
+                if (!currentEntry || currentEntry.until !== batch.until) {
+                    conflicts += 1;
+                    continue;
                 }
-            }
-            for (const entry of settleUndo) {
-                await facade.dismissReminder(entry.personDocId, entry.kind, entry.until);
+                if (entry.previous) await facade.dismissReminder(entry.personDocId, entry.kind, entry.previous.until);
+                else await facade.resumeReminder(entry.personDocId, entry.kind);
+                restored += 1;
             }
             settleUndo = null;
-            alMessage = "已撤销批量暂缓";
+            alMessage = conflicts > 0
+                ? `已撤销 ${restored} 位；${conflicts} 位已被其他窗口修改，保留现状`
+                : `已撤销批量暂缓（${restored} 位）`;
             await refresh();
         } catch (error) {
             alError = error instanceof Error ? error.message : String(error);
@@ -286,6 +384,7 @@
         revision;
         preferences.birthdayWindowDays;
         preferences.staleThresholdDays;
+        preferences.reminderGraceDays;
         void refresh();
     });
 
@@ -331,7 +430,6 @@
         try {
             await action();
             fuMessage = message;
-            console.log("[lvct-debug] fuMessage set:", message, "undo:", Boolean(undoAction));
             await refresh();
         } catch (error) {
             fuError = error instanceof Error ? error.message : String(error);
@@ -368,12 +466,44 @@
     let alBusy = $state(false);
     let alError = $state("");
     let alMessage = $state("");
+    type OverdueRetry = { ids: string[]; today: string; titles: string[] };
+    let overdueRetry = $state<OverdueRetry | null>(null);
     const actions: ActionCard[] = $derived(pickActions(data));
     const overdueFollowUpIds: string[] = $derived(actions.flatMap((card: ActionCard) =>
         card.reasons
             .filter((reason) => reason.kind === "followup" && reason.bucket === "overdue" && reason.followUpId)
             .map((reason) => reason.followUpId as string)));
     const overdueCount: number = $derived(overdueFollowUpIds.length);
+
+    function overdueTitle(id: string): string {
+        return actions
+            .flatMap((card) => card.reasons)
+            .find((reason) => reason.kind === "followup" && reason.followUpId === id)
+            ?.label ?? id;
+    }
+
+    async function postponeOverdue(ids: readonly string[], today: string): Promise<void> {
+        let done = 0;
+        const failed: Array<{ id: string; title: string; error: string }> = [];
+        for (const id of ids) {
+            try {
+                await facade.snoozeFollowUp(id, "custom", today);
+                done += 1;
+            } catch (error) {
+                const title = overdueTitle(id);
+                failed.push({ id, title, error: error instanceof Error ? error.message : String(error) });
+            }
+        }
+        if (failed.length > 0) {
+            overdueRetry = { ids: failed.map((item) => item.id), today, titles: failed.map((item) => item.title) };
+            alMessage = text("dashPostponePartial", "已顺延 {done} 条，{failed} 条失败；可重试失败项", { done, failed: failed.length });
+            alError = failed.map((item) => `${item.title}：${item.error}`).join("；");
+        } else {
+            overdueRetry = null;
+            alMessage = `已把 ${done} 条逾期跟进顺延到今天`;
+            alError = "";
+        }
+    }
 
     async function postponeOverdueToToday() {
         if (alBusy || overdueCount === 0) return;
@@ -384,16 +514,22 @@
         const now = new Date();
         const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
         try {
-            let done = 0;
-            for (const id of overdueFollowUpIds) {
-                try {
-                    await facade.snoozeFollowUp(id, "custom", today);
-                    done += 1;
-                } catch (error) {
-                    console.warn("顺延单条逾期跟进失败", error);
-                }
-            }
-            alMessage = `已把 ${done} 条逾期跟进顺延到今天`;
+            await postponeOverdue(overdueFollowUpIds, today);
+            await refresh();
+        } catch (error) {
+            alError = error instanceof Error ? error.message : String(error);
+        } finally {
+            alBusy = false;
+        }
+    }
+
+    async function retryOverdue() {
+        const retry = overdueRetry;
+        if (!retry || alBusy) return;
+        alBusy = true;
+        alError = "";
+        try {
+            await postponeOverdue(retry.ids, retry.today);
             await refresh();
         } catch (error) {
             alError = error instanceof Error ? error.message : String(error);
@@ -406,6 +542,7 @@
     let reviewOpen = $state(false);
     let summaryHiddenThisSession = $state(false);
     let summaryBusy = $state(false);
+    let summaryError = $state("");
     const localTodayKey = $derived.by(() => {
         const now = new Date();
         const pad = (value: number) => String(value).padStart(2, "0");
@@ -424,9 +561,12 @@
     async function dismissSummaryToday() {
         if (summaryBusy) return;
         summaryBusy = true;
+        summaryError = "";
         try {
             await onPreferencesChange?.({ ...preferences, summaryDismissedOn: localTodayKey });
             summaryHiddenThisSession = true;
+        } catch (error) {
+            summaryError = error instanceof Error ? error.message : String(error);
         } finally {
             summaryBusy = false;
         }
@@ -454,6 +594,11 @@
             onAction={refresh}
         />
     {/if}
+    {#if data?.ordinaryScopeUnknown}
+        <StatusNotice error message={text("dashSelfUnknown", "本人身份尚未核实，普通联系人统计与提醒暂停。请在设置中核实身份后重新加载。")} />
+    {:else if data?.excludedSelfDocId}
+        <StatusNotice message={text("dashSelfExcluded", "统计、生日和待联系提醒已排除本人；本人档案及跟进记录仍保留在联系人详情。")} />
+    {/if}
     {#if !data && !errorText}
         <div class="lvct-dash__skeleton" aria-busy="true" aria-label={text("dashSkeletonLabel", "仪表盘加载中")}>
             {#each Array(4) as _, index (index)}<span class="lvct-skeleton"></span>{/each}
@@ -462,7 +607,7 @@
         </div>
     {:else if data}
         {#if summaryVisible}
-            <div class="lvct-dash__summary" role="region" aria-label={text("dashSummaryLabel", "今日关注摘要")}>
+            <div class="lvct-dash__summary" role="region" aria-label={text("dashSummaryLabel", "今日关注摘要")} aria-busy={summaryBusy}>
                 <div class="lvct-dash__summary-main">
                     <b>{text("dashSummaryTitle", "今天有 {n} 件值得处理的事", { n: summary.total })}</b>
                     <span class="lvct-dash__summary-chips">
@@ -473,8 +618,9 @@
                 </div>
                 <div class="lvct-dash__summary-actions">
                     <button class="b3-button b3-button--text" onclick={() => (summaryHiddenThisSession = true)}>{text("dashCollapse", "收起")}</button>
-                    <button class="b3-button b3-button--outline" disabled={summaryBusy} onclick={dismissSummaryToday}>{text("dashDismissToday", "今日不再展示")}</button>
+                    <button class="b3-button b3-button--outline" disabled={summaryBusy} onclick={dismissSummaryToday}>{summaryBusy ? text("dashSavingDismiss", "保存中…") : text("dashDismissToday", "今日不再展示")}</button>
                 </div>
+                <StatusNotice error message={summaryError ? text("dashSummaryDismissFailed", "今日隐藏保存失败：{msg}，请重试。", { msg: summaryError }) : ""} />
             </div>
         {/if}
         <div class="lvct-dash__welcome">
@@ -493,25 +639,25 @@
         <div class="lvct-dash__stats">
             <button class="lvct-dash__stat" onclick={() => onOpenPeople()}>
                 <span class="lvct-dash__stat-ic" aria-hidden="true"><Users size={14} /></span>
-                <b>{data.people}</b>
+                <b>{data.ordinaryScopeUnknown ? "—" : data.people}</b>
                 <span>{text("dashStatPeople", "联系人")}</span>
                 {#if data.relations > 0}<span class="lvct-dash__stat-ft">{text("dashStatPeopleFt", "其中 {n} 人从未互动", { n: data.neverContacted })}</span>{/if}
             </button>
             <button class="lvct-dash__stat" onclick={onOpenGraph}>
                 <span class="lvct-dash__stat-ic" aria-hidden="true"><Share2 size={14} /></span>
-                <b>{data.relations}</b>
+                <b>{data.ordinaryScopeUnknown ? "—" : data.relations}</b>
                 <span>{text("dashStatRelations", "关系")}</span>
                 {#if data.people > 0}<span class="lvct-dash__stat-ft">{text("dashStatRelationsFt", "人均 {n} 条", { n: (data.relations / data.people).toFixed(1) })}</span>{/if}
             </button>
-            <button class="lvct-dash__stat" onclick={openBirthdayPeople}>
+            <button class="lvct-dash__stat" onclick={openBirthdayPeople} disabled={data.ordinaryScopeUnknown}>
                 <span class="lvct-dash__stat-ic lvct-dash__stat-ic--hl" aria-hidden="true"><Cake size={14} /></span>
-                <b>{data.birthdaysThisWeek}</b>
+                <b>{data.ordinaryScopeUnknown ? "—" : data.birthdaysThisWeek}</b>
                 <span>{text("dashStatBirthdaysWeek", "本周生日")}</span>
                 {#if data.birthdays.length > data.birthdaysThisWeek}<span class="lvct-dash__stat-ft">{text("dashStatBirthdaysFt", "窗口内共 {n} 人", { n: data.birthdays.length })}</span>{/if}
             </button>
-            <button class="lvct-dash__stat" onclick={openNeverContactedPeople}>
+            <button class="lvct-dash__stat" onclick={openNeverContactedPeople} disabled={data.ordinaryScopeUnknown}>
                 <span class="lvct-dash__stat-ic lvct-dash__stat-ic--warn" aria-hidden="true"><UserX size={14} /></span>
-                <b>{data.neverContacted}</b>
+                <b>{data.ordinaryScopeUnknown ? "—" : data.neverContacted}</b>
                 <span>{text("dashStatNever", "从未互动")}</span>
                 {#if data.staleTotal > data.neverContacted}<span class="lvct-dash__stat-ft">{text("dashStatNeverFt", "另有久未联系 {n} 人", { n: data.staleTotal })}</span>{/if}
             </button>
@@ -522,16 +668,23 @@
                 <h3>{text("dashActionsTitle", "今日行动")}</h3>
                 <span class="ft__smaller ft__on-surface">{text("dashActionsSub", "生日 · 联系节奏 · 跟进事项")}</span>
                 <span style="flex:1"></span>
-                <button class="b3-button b3-button--outline" onclick={() => (reviewOpen = true)}>{text("dashReview", "交往回顾")}</button>
-                {#if overdueCount > 0}
-                    <button class="b3-button b3-button--outline" onclick={postponeOverdueToToday} disabled={alBusy}>
+                <button class="b3-button b3-button--outline lvct-dash__head-action" onclick={() => (reviewOpen = true)}>{text("dashReview", "交往回顾")}</button>
+                {#if overdueCount > 0 && !overdueRetry}
+                    <button class="b3-button b3-button--outline lvct-dash__head-action" onclick={postponeOverdueToToday} disabled={alBusy}>
                         {alBusy ? text("dashPostponing", "顺延中…") : text("dashPostponeOverdue", "把 {n} 条逾期跟进顺延到今天", { n: overdueCount })}
+                    </button>
+                {/if}
+                {#if overdueRetry}
+                    <button class="b3-button b3-button--text lvct-dash__head-action" onclick={retryOverdue} disabled={alBusy} title={overdueRetry.titles.join("、")}>
+                        {text("dashRetryFailed", "重试失败项（{n}）", { n: overdueRetry.ids.length })}
                     </button>
                 {/if}
             </div>
             <StatusNotice message={alError ? text("dashOpFailed", "操作失败：{msg}", { msg: alError }) : ""} error />
             <StatusNotice message={alMessage} actionLabel={undoAction ? "撤销" : undefined} onAction={undoAction ? runUndo : undefined} onDismiss={() => { alMessage = ""; undoAction = null; }} />
-            {#if actions.length === 0}
+            {#if data.ordinaryScopeUnknown}
+                <ViewState compact title={text("dashSelfUnverifiedTitle", "提醒范围尚未核实")} description={text("dashSelfUnverifiedDesc", "核实本人身份后可恢复统计和提醒；原始记录保留。")} />
+            {:else if actions.length === 0}
                 <ViewState compact icon="✅" title={text("dashActionsEmptyTitle", "今天没有需要处理的事")} description={text("dashActionsEmptyDesc", "生日、联系节奏和跟进计划都安顿好了。")}>
                     <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>{text("dashBrowsePeople", "浏览联系人")}</button>
                 </ViewState>
@@ -540,7 +693,10 @@
                     <div class="lvct-dash__rowwrap">
                         <div class="lvct-dash__row">
                             <button class="lvct-dash__row-main" onclick={() => onOpenDetail(card.person)}>
-                                <b>{card.person.name}</b>
+                                <span class="lvct-dash__row-primary">
+                                    <b>{card.person.name}</b>
+                                    <PersonProfileSummary profile={card.person.profile} compact />
+                                </span>
                                 <span class="lvct-dash__reasons">
                                     {#each card.reasons as reason (reason.kind + (reason.followUpId ?? ""))}
                                         <span class="lvct-chip lvct-action-chip lvct-action-chip--{reason.bucket}">{reason.label}</span>
@@ -595,6 +751,9 @@
                                     <button class="b3-button b3-button--outline lvct-dash__quick-button" disabled={alBusy} onclick={settleNeverGroup}>
                                         全部顺延 30 天
                                     </button>
+                                    {#if settleRetry}
+                                        <button class="b3-button b3-button--text lvct-dash__quick-button" disabled={alBusy} onclick={retrySettle}>重试失败项（{settleRetry.cards.length}）</button>
+                                    {/if}
                                     {#if settleUndo}
                                         <button class="b3-button b3-button--text lvct-dash__quick-button" disabled={alBusy} onclick={undoSettle}>撤销</button>
                                     {/if}
@@ -616,30 +775,24 @@
         <div class="lvct-dash__grid">
             <div class="lvct-home__card">
                 <h3>近期生日</h3>
-                {#if data.birthdays.length === 0}
+                {#if data.ordinaryScopeUnknown}
+                    <ViewState compact title={text("dashSelfUnverifiedTitle", "提醒范围尚未核实")} description={text("dashSelfUnverifiedDesc", "核实本人身份后可恢复统计和提醒；原始记录保留。")} />
+                {:else if data.birthdays.length === 0}
                     <ViewState compact icon="🎂" title="提醒窗口内没有生日" description="可以到联系人档案补充生日，或在设置中调整提醒天数。">
                         <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>查看联系人</button>
                     </ViewState>
                 {:else}
                     <div class="lvct-dash__list">
                         {#each previewList(data?.birthdays ?? [], showAllBirthdays, BIRTHDAY_PREVIEW_LIMIT) as item (item.person.itemId)}
-                            <div
-                                class="lvct-dash__row"
-                                role="button"
-                                tabindex="0"
-                                onclick={() => onOpenDetail(item.person)}
-                                onkeydown={(event) => {
-                                    if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
-                                    event.preventDefault();
-                                    onOpenDetail(item.person);
-                                }}
-                            >
-                                <b>{item.person.name}</b>
-                                <span class="ft__smaller ft__on-surface">{item.projection.label}{item.person.isLunar ? "（农历）" : ""}</span>
-                                <span class="lvct-bucket {bucketStyles[item.bucket]}">
-                                    {item.projection.daysUntil === 0 ? text("dashFuToday", "今天") : text("dashDaysUntilN", "{n}天", { n: item.projection.daysUntil })}
-                                </span>
-                                <span style="flex:1"></span>
+                            <div class="lvct-dash__row">
+                                <button type="button" class="lvct-dash__row-main" onclick={() => onOpenDetail(item.person)}>
+                                    <b>{item.person.name}</b>
+                                    <PersonProfileSummary profile={item.person.profile} compact />
+                                    <span class="ft__smaller ft__on-surface">{item.projection.label}{item.person.isLunar ? "（农历）" : ""}</span>
+                                    <span class="lvct-bucket {bucketStyles[item.bucket]}">
+                                        {item.projection.daysUntil === 0 ? text("dashFuToday", "今天") : text("dashDaysUntilN", "{n}天", { n: item.projection.daysUntil })}
+                                    </span>
+                                </button>
                                 <button
                                     type="button"
                                     class="b3-button b3-button--text lvct-dash__quick-button"
@@ -657,11 +810,13 @@
                 {/if}
             </div>
 
-            <div class="lvct-home__card">
+            <div class="lvct-home__card lvct-dash__secondary-card lvct-dash__stale-card">
                 <h3>{text("dashStaleTitle", "久未联系")}</h3>
                 <StatusNotice message={quickError ? text("dashRecordFail", "记录失败：{msg}", { msg: quickError }) : ""} error />
                 <StatusNotice message={quickMessage} onDismiss={() => (quickMessage = "")} />
-                {#if data.stale.length === 0}
+                {#if data.ordinaryScopeUnknown}
+                    <ViewState compact title={text("dashSelfUnverifiedTitle", "提醒范围尚未核实")} description={text("dashSelfUnverifiedDesc", "核实本人身份后可恢复统计和提醒；原始记录保留。")} />
+                {:else if data.stale.length === 0}
                     <ViewState compact icon="✓" title={data.people === 0 ? text("dashStaleEmptyNoPeopleTitle", "先添加一位联系人") : text("dashStaleEmptyTitle", "暂无久未联系的人")}
                         description={data.people === 0 ? text("dashStaleEmptyNoPeopleDesc", "创建或导入联系人后，就能开始记录互动。") : text("dashStaleEmptyDesc", "可以继续在联系人档案中记录新的互动。")}>
                         <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>{text("dashGoContacts", "前往联系人")}</button>
@@ -672,6 +827,7 @@
                             <div class="lvct-dash__row">
                                 <button class="lvct-dash__row-main" onclick={() => onOpenDetail(item.person)}>
                                     <b>{item.person.name}</b>
+                                    <PersonProfileSummary profile={item.person.profile} compact />
                                     <span class="ft__smaller ft__on-surface">
                                         {item.lastDaysAgo === undefined ? text("dashNeverContacted", "从未互动") : text("dashDaysAgo", "{n} 天前", { n: item.lastDaysAgo })}
                                     </span>
@@ -713,7 +869,7 @@
                 {/if}
             </div>
 
-            <div class="lvct-home__card">
+            <div class="lvct-home__card lvct-dash__secondary-card lvct-dash__followup-card">
                 <h3>{text("dashFollowupsTitle", "待办跟进")}</h3>
                 <StatusNotice message={fuError ? text("dashOpFailed", "操作失败：{msg}", { msg: fuError }) : ""} error />
                 <StatusNotice message={fuMessage} onDismiss={() => (fuMessage = "")} />

@@ -9,6 +9,36 @@ import {
     emptyDraft,
 } from "../src/domain/person.ts";
 import { FIELD_SPECS } from "../src/domain/fields.ts";
+import { profileText, matchesProfileFilters } from "../src/domain/people-profiles.ts";
+import type { PersonProfile } from "../src/domain/people-profiles.ts";
+import { mergeRelationshipLabelBackup, parsePersonRelationshipLabelStore } from "../src/domain/person-relationship-labels.ts";
+
+test("B12 三项资料：未知不当空，当前分类组合筛选不匹配历史与称谓提示", () => {
+    const profile: PersonProfile = { readAt: 1, affiliations: { state: "known", value: { work: [], education: [], unspecified: [], history: [], unresolved: [] } },
+        relationship: { state: "known", labels: ["同学"], recordId: null, updatedAt: null } };
+    assert.equal(profileText(profile, "work"), "未填写");
+    assert.equal(matchesProfileFilters(profile, { relationshipLabel: "同学" }), true);
+    assert.equal(matchesProfileFilters(profile, { workQuery: "未填写" }), false);
+    assert.equal(matchesProfileFilters({ ...profile, relationship: { state: "unknown", labels: null } }, { relationshipLabel: "同学" }), false);
+    assert.equal(profileText({ ...profile, affiliations: { state: "unknown", message: "fail" } }, "education"), "组织归属尚未核实");
+    assert.equal(matchesProfileFilters(undefined, {}), true);
+});
+
+test("B12 称谓恢复：空值保现状、组合冲突不覆盖、其他本人不转移", () => {
+    const record = { id: "20261004000000-label01", selfDocId: "20261004000000-self001", personDocId: "20261004000000-person1", labels: ["朋友"], createdAt: 1, updatedAt: 2 };
+    const incoming = parsePersonRelationshipLabelStore({ schemaVersion: 1, labels: [record] });
+    const current = parsePersonRelationshipLabelStore({ schemaVersion: 1, labels: [{ ...record, labels: [], updatedAt: 3 }] });
+    const reachable = new Set([record.selfDocId, record.personDocId]);
+    const conflict = mergeRelationshipLabelBackup(current, incoming, record.selfDocId, reachable);
+    assert.deepEqual(conflict.store, current);
+    assert.equal(conflict.summary.issues[0].reason, "conflict");
+    const empty = { schemaVersion: 1 as const, labels: [] };
+    assert.equal(mergeRelationshipLabelBackup(empty, incoming, "20261004000000-self002", reachable).summary.issues[0].selfDocId, record.selfDocId);
+    const merged = mergeRelationshipLabelBackup(empty, incoming, record.selfDocId, reachable);
+    assert.equal(merged.summary.merged, 1);
+    assert.equal(mergeRelationshipLabelBackup(merged.store, incoming, null, new Set()).summary.merged, 0);
+    assert.equal(mergeRelationshipLabelBackup(empty, incoming, record.selfDocId, new Set([record.selfDocId])).summary.issues[0].reason, "unreachable");
+});
 
 test("validateDraft：姓名必填，邮箱与生日格式校验", () => {
     const errors = validateDraft({ ...emptyDraft() });
@@ -16,6 +46,7 @@ test("validateDraft：姓名必填，邮箱与生日格式校验", () => {
     assert.deepEqual(validateDraft({ ...emptyDraft(), name: "张三" }), []);
     assert.ok(validateDraft({ ...emptyDraft(), name: "张三", email: "bad-mail" }).includes("邮箱格式不正确"));
     assert.ok(validateDraft({ ...emptyDraft(), name: "张三", birthday: "1990/05/20" }).includes("生日日期格式不正确"));
+    assert.ok(validateDraft({ ...emptyDraft(), name: "张三", birthday: "2026-02-30" }).includes("生日不是有效日期"));
 });
 
 test("birthdayToMs / msToBirthday：本地时区日期与毫秒互转", () => {
@@ -29,6 +60,20 @@ test("birthdayToMs / msToBirthday：本地时区日期与毫秒互转", () => {
     assert.equal(birthdayToMs(""), null);
     assert.equal(msToBirthday(birthdayToMs("2024-02-29")!), "2024-02-29");
     assert.equal(msToBirthday(undefined), "");
+});
+
+test("生日回读：1970 年之前和零时间戳有效，空日期由标记决定", () => {
+    for (const date of ["1950-01-02", "1969-12-31", "1970-01-01"]) {
+        assert.equal(msToBirthday(birthdayToMs(date)!), date);
+    }
+    assert.notEqual(msToBirthday(0), "");
+    assert.equal(msToBirthday(NaN), "");
+    const row = { id: "row", cells: [{ valueType: "date", value: {
+        keyID: "birth", type: "date", date: { content: 0, isNotEmpty: false },
+    } }] };
+    assert.equal(summaryFromRow(row, { birth: "birthday" }).birthday, "");
+    row.cells[0].value.date.isNotEmpty = true;
+    assert.equal(summaryFromRow(row, { birth: "birthday" }).birthday, msToBirthday(0));
 });
 
 test("invertFieldMap：keyID 与稳定键互逆", () => {

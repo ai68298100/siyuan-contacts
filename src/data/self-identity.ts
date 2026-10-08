@@ -4,9 +4,11 @@
  */
 import type { Plugin } from "siyuan";
 import { loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage";
-import { normalizeSelfIdentity } from "../domain/self-identity";
+import { parseSelfIdentity } from "../domain/self-identity";
 import { toLocalDateKey } from "../domain/interactions";
 import type { SelfIdentity } from "../domain/self-identity";
+import { MigrationWriteUnknownError } from "../domain/migration-records.ts";
+import type { MigrationRecordSummary } from "../domain/migration-records.ts";
 
 export const SELF_IDENTITY_STORAGE_KEY = "self-identity.json";
 
@@ -25,12 +27,13 @@ function requirePlugin(): Plugin {
 
 /** 绑定插件的严格展示读（roster 投影用；FUNC-01.12：失败上抛不按无本人处理） */
 export async function loadSelfIdentityBound(): Promise<SelfIdentity | null> {
-    return normalizeSelfIdentity(await loadJsonStrict(requirePlugin(), SELF_IDENTITY_STORAGE_KEY));
+    if (!identityPlugin) return null;
+    return parseSelfIdentity(await loadJsonStrict(requirePlugin(), SELF_IDENTITY_STORAGE_KEY));
 }
 
 /** 严格展示读（FUNC-01.12）：键不存在返回 null（无本人），读取失败/损坏抛错 */
 export async function loadSelfIdentity(plugin: Plugin): Promise<SelfIdentity | null> {
-    return normalizeSelfIdentity(await loadJsonStrict(plugin, SELF_IDENTITY_STORAGE_KEY));
+    return parseSelfIdentity(await loadJsonStrict(plugin, SELF_IDENTITY_STORAGE_KEY));
 }
 
 export class SelfIdentityConflictError extends Error {
@@ -51,18 +54,68 @@ export async function saveSelfIdentity(
     identity: { selfDocId: string; selfItemId: string; createdAt?: string },
     options: SaveSelfIdentityOptions = {},
 ): Promise<SelfIdentity> {
+    const submitted = parseSelfIdentity({ schemaVersion: 1, ...identity, createdAt: identity.createdAt ?? toLocalDateKey(new Date()) });
+    if (!submitted) throw new Error("本人身份输入无效，未写入");
     return withStoreLock(SELF_IDENTITY_STORAGE_KEY, async () => {
-        const existing = normalizeSelfIdentity(await loadJsonStrict(plugin, SELF_IDENTITY_STORAGE_KEY));
+        const existing = await loadSelfIdentity(plugin);
         if (existing && existing.selfDocId !== identity.selfDocId && !options.allowRebind) {
             throw new SelfIdentityConflictError(existing.selfDocId);
         }
         const next: SelfIdentity = {
             schemaVersion: 1,
-            selfDocId: identity.selfDocId,
-            selfItemId: identity.selfItemId,
-            createdAt: existing?.createdAt ?? identity.createdAt ?? toLocalDateKey(new Date()),
+            selfDocId: submitted.selfDocId,
+            selfItemId: submitted.selfItemId,
+            createdAt: existing?.createdAt ?? submitted.createdAt,
         };
+        if (existing && JSON.stringify(existing) === JSON.stringify(next)) return existing;
         await saveJsonVerified(plugin, SELF_IDENTITY_STORAGE_KEY, next);
         return next;
+    });
+}
+
+export async function mergeSelfIdentity(
+    plugin: Plugin,
+    incoming: SelfIdentity,
+    targetItemId: string | null,
+): Promise<MigrationRecordSummary> {
+    const identity = parseSelfIdentity(incoming);
+    if (!identity) throw new Error("本人恢复输入无效，未写入");
+    return withStoreLock(SELF_IDENTITY_STORAGE_KEY, async () => {
+        const current = await loadSelfIdentity(plugin);
+        const reason = current && current.selfDocId !== identity.selfDocId ? "conflict" : targetItemId === null ? "unreachable" : null;
+        if (reason) return { merged: 0, skipped: 1, removed: 0, issues: [{
+            id: identity.selfDocId, personDocId: identity.selfDocId, reason,
+            message: reason === "conflict" ? "当前本人是另一份档案，未覆盖；请核对后在设置中显式换绑"
+                : "原本人文档不在当前数据库，未按同名替代；请恢复原文档并重绑后重试",
+        }] };
+        const next = parseSelfIdentity({ ...identity, selfItemId: targetItemId, createdAt: current?.createdAt ?? identity.createdAt });
+        if (!next) throw new Error("本人目标绑定无效，未写入");
+        if (current && JSON.stringify(current) === JSON.stringify(next)) return { merged: 0, skipped: 1, removed: 0, issues: [] };
+        try {
+            await saveJsonVerified(plugin, SELF_IDENTITY_STORAGE_KEY, next);
+        } catch (cause) {
+            throw new MigrationWriteUnknownError(cause);
+        }
+        return { merged: 1, skipped: 0, removed: 0, issues: [] };
+    });
+}
+
+export async function changeSelfIdentityVerified(
+    plugin: Plugin,
+    expected: SelfIdentity | null,
+    next: SelfIdentity | null,
+): Promise<SelfIdentity | null> {
+    const previous = parseSelfIdentity(expected);
+    const submitted = parseSelfIdentity(next);
+    return withStoreLock(SELF_IDENTITY_STORAGE_KEY, async () => {
+        const current = await loadSelfIdentity(plugin);
+        if (JSON.stringify(current) === JSON.stringify(submitted)) return current;
+        if (JSON.stringify(current) !== JSON.stringify(previous)) throw new Error("本人身份已在预览后变化，未覆盖；请重新预览");
+        try {
+            await saveJsonVerified(plugin, SELF_IDENTITY_STORAGE_KEY, submitted);
+        } catch (cause) {
+            throw new Error("本人身份保存结果未知，请保留预览并先核实后重试", { cause });
+        }
+        return submitted;
     });
 }

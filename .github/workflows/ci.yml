@@ -2,20 +2,31 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'dev/**'
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
-          version: 12.3.4
+          version: 12.5.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -26,14 +37,16 @@ jobs:
       - name: Type check (tsc + svelte-check)
         run: pnpm check
 
-      - name: Unit tests
-        run: pnpm test
-
       - name: Set up Chrome
-        uses: browser-actions/setup-chrome@v1
+        uses: browser-actions/setup-chrome@v2
         id: chrome
         with:
           install-dependencies: true
+
+      - name: Unit tests
+        run: pnpm test
+        env:
+          LVCT_TEST_BROWSER: ${{ steps.chrome.outputs.chrome-path }}
 
       - name: Desktop UI regression
         run: pnpm test:ui
@@ -48,13 +61,18 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Generate package checksum
+        run: sha256sum package.zip > package.zip.sha256
+
       - name: Release gate
         run: node scripts/check-release.mjs
 
       - name: Upload dist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist
+          retention-days: 7
           path: |
             dist/
             package.zip
+            package.zip.sha256

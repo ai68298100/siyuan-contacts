@@ -15,6 +15,23 @@ export interface RosterEntry {
     fetchedAt: number;
 }
 
+export interface RosterPageState {
+    page: number;
+    pageSize: number;
+    total: number;
+    loaded: number;
+    hasMore: boolean;
+}
+
+/** 分页读取的纯状态判定，避免空页或未知总数被误报为完整名册。 */
+export function rosterPageState(page: number, pageSize: number, total: number, loaded: number): RosterPageState {
+    if (!Number.isSafeInteger(page) || page < 1) throw new Error("名册页码必须为正整数");
+    if (!Number.isSafeInteger(pageSize) || pageSize < 1) throw new Error("名册分页大小必须为正整数");
+    if (!Number.isSafeInteger(total) || total < 0) throw new Error("名册总数必须为非负整数");
+    if (!Number.isSafeInteger(loaded) || loaded < 0) throw new Error("名册已加载数必须为非负整数");
+    return { page, pageSize, total, loaded, hasMore: page * pageSize < total };
+}
+
 /** 纯判定：缓存是否可用（avId 匹配 + TTL 内） */
 export function isRosterFresh(entry: RosterEntry | null, avId: string, now: number, ttl: number = ROSTER_TTL_MS): boolean {
     return entry !== null && entry.avId === avId && now - entry.fetchedAt < ttl;

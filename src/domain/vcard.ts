@@ -20,6 +20,23 @@ export interface VCardContact {
     isLunar: boolean;
     /** CATEGORIES 属性 */
     tags: string[];
+    /** 输入卡片里未映射到联系人字段契约的属性名；仅提示，不写入。 */
+    unsupportedProperties?: string[];
+    /** 日期等已识别但无法安全映射的属性说明；仅提示，不猜测写入。 */
+    needsReview?: string[];
+}
+
+export interface VcfDocumentCheckpoint {
+    requestId: string;
+    notebookId: string;
+    avId: string;
+    dbBlockId: string;
+    name: string;
+    path: string;
+    draftKey: string;
+    state: "new" | "unknown" | "rejected" | "verified";
+    docId?: string;
+    itemId?: string;
 }
 
 interface VCardProperty {
@@ -82,6 +99,35 @@ export function parseVcf(text: string): VCardContact[] {
     return contacts;
 }
 
+export function parseVcfForImport(text: string): VCardContact[] {
+    if (!text.trim()) throw new Error("vCard 文件为空，请选择包含姓名的通讯录文件");
+    let current: string[] | null = null;
+    let cardNumber = 0;
+    const contacts: VCardContact[] = [];
+    for (const line of unfoldVcfLines(text)) {
+        const marker = line.trim().toUpperCase();
+        if (marker === "BEGIN:VCARD") {
+            if (current) throw new Error(`第 ${cardNumber} 张卡片缺少 END:VCARD，请修复文件后重试`);
+            current = [];
+            cardNumber += 1;
+        } else if (marker === "END:VCARD") {
+            if (!current) throw new Error("vCard 的开始/结束标记不匹配，请修复文件后重试");
+            const contact = contactFromCard(current);
+            if (!contact) throw new Error(`第 ${cardNumber} 张卡片缺少 FN/N 姓名，未生成空联系人`);
+            contacts.push(contact);
+            current = null;
+        } else if (current) {
+            if (line.trim() && !parsePropertyLine(line)) throw new Error(`第 ${cardNumber} 张卡片含损坏属性行，请核对原文件`);
+            current.push(line);
+        } else if (line.trim()) {
+            throw new Error("文件包含卡片以外的内容，请选择有效的 vCard 文件");
+        }
+    }
+    if (current) throw new Error(`第 ${cardNumber} 张卡片未结束，请修复文件后重试`);
+    if (!contacts.length) throw new Error("文件没有有效 vCard 卡片，请核对 BEGIN:VCARD/END:VCARD 标记");
+    return contacts;
+}
+
 function contactFromCard(lines: string[]): VCardContact | null {
     const props: VCardProperty[] = [];
     for (const line of lines) {
@@ -117,6 +163,15 @@ function contactFromCard(lines: string[]): VCardContact | null {
         }
     }
 
+    const supported = new Set(["VERSION", "FN", "N", "TEL", "EMAIL", "URL", "BDAY", "CATEGORIES", "X-LVCT-BDAY-LUNAR"]);
+    const unsupportedProperties = [...new Set(props.map((prop) => prop.name).filter((name) => !supported.has(name)))];
+    for (const property of ["EMAIL", "URL"]) {
+        if (all(property).length > 1) unsupportedProperties.push(`${property}（第 2 项起）`);
+    }
+    const needsReview: string[] = [];
+    if (first("BDAY") && !bday) needsReview.push("BDAY");
+    if (first("X-LVCT-BDAY-LUNAR") && !isLunar && !birthday) needsReview.push("X-LVCT-BDAY-LUNAR");
+
     return {
         name,
         phone: [...new Set(phones)].join(" / "),
@@ -125,6 +180,8 @@ function contactFromCard(lines: string[]): VCardContact | null {
         birthday,
         isLunar,
         tags,
+        ...(unsupportedProperties.length > 0 ? { unsupportedProperties } : {}),
+        ...(needsReview.length > 0 ? { needsReview } : {}),
     };
 }
 

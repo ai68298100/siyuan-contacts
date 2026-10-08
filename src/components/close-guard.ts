@@ -13,7 +13,8 @@
  * - 语义与旧版一致：busy 时不关；脏时先过弹窗；「保存并离开」失败留在原地。
  * 文案经 configureCloseGuardI18n 接入双语（模块层拿不到组件的 i18n prop）。
  */
-import { getContext, onMount, setContext } from "svelte";
+import { getContext, onDestroy, onMount, setContext } from "svelte";
+import { decideClose, type CloseGuardState } from "../domain/close-policy";
 import { translateText } from "../domain/translation";
 
 const KEY = Symbol("lvct-close-guard");
@@ -44,6 +45,7 @@ export interface CloseScope {
 
 interface ScopeInternals {
     parent?: CloseScope & ScopeInternals;
+    children: Set<CloseScope>;
 }
 
 let guardI18n: Readonly<Record<string, string>> | undefined;
@@ -62,7 +64,8 @@ function aggregate(items: Iterable<CloseGuardItem>): CloseGuardSummary | null {
     let canSave = true;
     const saves: Array<() => Promise<void>> = [];
     for (const item of items) {
-        if (item.busy() || !item.dirty()) continue;
+        const state = readGuardState(item);
+        if (state.busy || !state.dirty) continue;
         changes.push(...(item.changes?.() ?? [text("guardGenericChange", "有未保存的修改")]));
         if (item.save) saves.push(item.save);
         else canSave = false;
@@ -71,19 +74,42 @@ function aggregate(items: Iterable<CloseGuardItem>): CloseGuardSummary | null {
     return { changes, canSave, save: async () => { for (const save of saves) await save(); } };
 }
 
-function createRegistryScope(): CloseScope {
-    const items = new Set<CloseGuardItem>();
+function combineSummaries(summaries: Array<CloseGuardSummary | null>): CloseGuardSummary | null {
+    const present = summaries.filter((summary): summary is CloseGuardSummary => summary !== null);
+    if (present.length === 0) return null;
     return {
-        hasBlocked: () => [...items].some((item) => item.busy()),
-        dirtyChanges: () => aggregate(items),
+        changes: present.flatMap((summary) => summary.changes),
+        canSave: present.every((summary) => summary.canSave),
+        save: async () => { for (const summary of present) await summary.save(); },
+    };
+}
+
+function createRegistryScope(): CloseScope & ScopeInternals {
+    const items = new Set<CloseGuardItem>();
+    const children = new Set<CloseScope>();
+    const scope: CloseScope & ScopeInternals = {
+        children,
+        hasBlocked: () => [...items].some((item) => decideClose(readGuardState(item)) === "blocked")
+            || [...children].some((child) => child.hasBlocked()),
+        dirtyChanges: () => combineSummaries([aggregate(items), ...[...children].map((child) => child.dirtyChanges())]),
         /* CODE-02.1：busy 独立于脏草稿阻断——不脏也可能在写入/AI/迁移/扫描/导出中 */
         requestClose: async () => {
-            if ([...items].some((item) => item.busy())) return false;
-            return requestScopeClose(aggregate(items));
+            if (scope.hasBlocked()) return false;
+            return requestScopeClose(scope.dirtyChanges());
         },
         addItem: (item) => { items.add(item); allGuardItems.add(item); },
         removeItem: (item) => { items.delete(item); allGuardItems.delete(item); },
     };
+    return scope;
+}
+
+function readGuardState(item: CloseGuardItem): CloseGuardState {
+    try {
+        if (item.busy()) return { busy: true, dirty: false };
+        return { busy: false, dirty: item.dirty() };
+    } catch {
+        return { busy: true, dirty: false };
+    }
 }
 
 /** FUNC-01.7：跨作用域的脏草稿全量查询（工作台数据变化提示用）。
@@ -95,13 +121,15 @@ export function anyDirtyChanges(): CloseGuardSummary | null {
 }
 
 /** 无上下文的独立挂载内容（svelteDialog 直挂的弹窗等）兜底作用域 */
-const orphanScope: CloseScope = createRegistryScope();
+const orphanScope: CloseScope & ScopeInternals = createRegistryScope();
 
 export function createCloseScope(): CloseScope {
-    const parent = getContext<CloseScope & ScopeInternals | undefined>(KEY);
+    const parent = getContext<CloseScope & ScopeInternals | undefined>(KEY) ?? orphanScope;
     const scope = createRegistryScope();
     const withParent = scope as CloseScope & ScopeInternals;
     withParent.parent = parent;
+    parent.children.add(scope);
+    onDestroy(() => parent.children.delete(scope));
     // 对话框的 X 按钮走「busy 阻断 → 自身 → 父链 → 孤儿」解析：内容守卫按 snippet 语义落在根作用域
     scope.requestClose = async () => {
         if (resolveBusy(withParent)) return false; /* CODE-02.1：忙碌即不关（静默），无论有无脏草稿 */
@@ -159,8 +187,9 @@ export function useCloseGuard(item: CloseGuardItem): (close: () => void) => Prom
         return () => { scope.removeItem(item); };
     });
     return async (close: () => void) => {
-        if (item.busy()) return;
-        if (!item.dirty()) {
+        const decision = decideClose(readGuardState(item));
+        if (decision === "blocked") return;
+        if (decision === "allow") {
             close();
             return;
         }
@@ -185,16 +214,39 @@ export type CloseGuardChoice = "save" | "discard" | "cancel";
 /** 三选一弹窗（DOM 直挂 body，带 lvct-dialog-root 令牌根）。Esc/遮罩 = 取消。只出选择，不执行保存。 */
 function openGuardDialog(summary: { changes: string[]; canSave: boolean }): Promise<CloseGuardChoice> {
     return new Promise((resolve) => {
+        const previousActive = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        let finished = false;
         const onKeydown = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
                 event.preventDefault();
                 event.stopPropagation();
                 finish("cancel");
+                return;
+            }
+            if (event.key !== "Tab") return;
+            const focusable = [...overlay.querySelectorAll<HTMLElement>(
+                "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])",
+            )];
+            if (focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (!overlay.contains(document.activeElement)) {
+                event.preventDefault();
+                first.focus();
+            } else if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
             }
         };
         const finish = (choice: CloseGuardChoice) => {
+            if (finished) return;
+            finished = true;
             document.removeEventListener("keydown", onKeydown, true);
             overlay.remove();
+            if (previousActive?.isConnected) queueMicrotask(() => previousActive.focus());
             resolve(choice);
         };
 

@@ -1,8 +1,10 @@
 <script lang="ts">
     /** 人物详情 Peek：档案字段、互动与关系列表（增删，内核自动维护双向回链） */
-    import { untrack } from "svelte";
+    import { onDestroy, untrack } from "svelte";
     import { listContacts, removeContact } from "../../services/contacts";
-    import { addRelation, removeRelation, refreshPerson } from "../../services/relations";
+    import { addRelation, removeRelation, refreshPerson, retryRelationProjections } from "../../services/relations";
+    import { resolveRelated } from "../../services/doc-section";
+    import type { RelationMutationReport, RelationProjectionResult } from "../../domain/relations";
 import LvctDialog from "../LvctDialog.svelte";
 import PersonEditDialog from "./PersonEditDialog.svelte";
 import ViewState from "../ViewState.svelte";
@@ -14,15 +16,22 @@ import StatusNotice from "../StatusNotice.svelte";
     import { translateText } from "../../domain/translation";
     import PersonPicker from "./PersonPicker.svelte";
     import type { PickerItem } from "./PersonPicker.svelte";
-    import { dueLabel } from "../../domain/followups";
+    import { dueLabel, hasFollowUpDraft } from "../../domain/followups";
     import type { FollowUpItem, SnoozeOption } from "../../domain/followups";
     import type { PersonCadence } from "../../domain/cadence";
     import { renderTemplate } from "../../domain/interaction-templates";
     import type { NoteTemplate } from "../../domain/interaction-templates";
     import TemplateManager from "./TemplateManager.svelte";
+    import ExchangeLedger from "./ExchangeLedger.svelte";
+    import PersonAliases from "./PersonAliases.svelte";
+    import RelationshipLabels from "./RelationshipLabels.svelte";
+    import PersonProfileSummary from "./PersonProfileSummary.svelte";
     import { buildBriefingMarkdown } from "../../domain/briefing-export";
     import { addReviewDays, groupByMonth, inDateRange, onThisDay } from "../../domain/date-review";
     import { toLocalDateKey } from "../../domain/interactions";
+    import OrgMembershipResult from "../org/OrgMembershipResult.svelte";
+    import type { OrgMembershipWriteReport } from "../../services/org-member-writes";
+    import type { OrgAffiliationKind, OrgMembership, OrgMembershipPatch } from "../../domain/org-membership";
 
     let {
         settings,
@@ -32,15 +41,21 @@ import StatusNotice from "../StatusNotice.svelte";
         revision = 0,
         onLoadOrgMemberships,
         onOpenOrgManager,
+        onOpenOrganization,
         onLoadOrgCandidates,
         onAddOrgMembership,
         onRemoveOrgMembership,
+        onUpdateOrgMembership,
         onLoadCommonOrgs,
         onRecord,
         onDeleteInteraction,
         onLoadInsights,
+        onLoadPersonNote,
+        onSavePersonNote,
         onOpenPersonDoc,
         onNavigate,
+        onNavigateDocId,
+        closeLabel,
         navigationOrder,
         onChanged,
         onDeleted,
@@ -53,6 +68,14 @@ import StatusNotice from "../StatusNotice.svelte";
         onSaveCadence,
         onListTemplates,
         onSaveTemplates,
+        onLoadExchanges,
+        onCreateExchange,
+        onChangeExchangeStatus,
+        onLoadAliases,
+        onAddAlias,
+        onRemoveAlias,
+        onLoadRelationshipLabels,
+        onSaveRelationshipLabels,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
@@ -63,20 +86,26 @@ import StatusNotice from "../StatusNotice.svelte";
         onDeleteInteraction?: (personDocId: string, eventId: string) => Promise<void>;
         /** 人物洞察（时间线+共同出席） */
         onLoadInsights: (docId: string) => Promise<import("../../services/insights").PersonInsights>;
+        onLoadPersonNote?: (docId: string) => Promise<string>;
+        onSavePersonNote?: (docId: string, note: string, expected?: string) => Promise<string>;
         /** B12：组织归属投影（可选：未接线时隐藏该区） */
         onLoadOrgMemberships?: (docId: string) => Promise<import("../../services/org").PersonOrgMembershipView[]>;
         /** B13.5 双向编辑（可选）：打开组织管理弹窗维护归属；未接线时隐藏按钮 */
         onOpenOrgManager?: () => void;
+        onOpenOrganization?: (docId: string) => void;
         /** B13.5 双向编辑完整版（可选）：归属候选（活跃组织）；未接线时隐藏添加表单 */
         onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string }>>;
         /** B13.5：为当前人物添加组织归属（orgDocId 单独传递，避免与 personDocId 混淆） */
-        onAddOrgMembership?: (personDocId: string, orgDocId: string, extra?: { department?: string; title?: string; joinedOn?: string }) => Promise<void>;
+        onAddOrgMembership?: (personDocId: string, orgDocId: string, extra?: { department?: string; title?: string; joinedOn?: string; affiliationKind?: OrgAffiliationKind }) => Promise<OrgMembershipWriteReport | void>;
         /** B13.5：移除一条组织归属（membership id） */
-        onRemoveOrgMembership?: (membershipId: string) => Promise<void>;
+        onRemoveOrgMembership?: (membershipId: string, expected?: OrgMembership) => Promise<OrgMembershipWriteReport | void>;
+        onUpdateOrgMembership?: (membershipId: string, patch: OrgMembershipPatch, expected?: OrgMembership) => Promise<OrgMembershipWriteReport | void>;
         /** B13.6：共同背景投影（同组织联系人；未接线时隐藏该区） */
         onLoadCommonOrgs?: (docId: string) => Promise<import("../../domain/org-membership").CommonOrgBackground[]>;
         onOpenPersonDoc: (docId: string) => void;
         onNavigate: (person: ContactSummary) => void;
+        onNavigateDocId?: (docId: string) => Promise<void>;
+        closeLabel?: string;
         navigationOrder?: readonly ContactSummary[];
         onChanged: () => void;
         onDeleted: () => void;
@@ -92,6 +121,14 @@ import StatusNotice from "../StatusNotice.svelte";
         /** 互动备注模板（F09，可选：未接线时隐藏选用入口） */
         onListTemplates?: () => Promise<NoteTemplate[]>;
         onSaveTemplates?: (templates: NoteTemplate[]) => Promise<NoteTemplate[]>;
+        onLoadExchanges?: (personDocId: string) => Promise<import("../../domain/exchanges").ExchangeRecord[]>;
+        onCreateExchange?: (input: import("../../services/exchanges").CreatePersonExchangeInput) => Promise<import("../../domain/exchanges").ExchangeRecord>;
+        onChangeExchangeStatus?: (id: string, status: import("../../domain/exchanges").ExchangeStatus, settledOn?: string) => Promise<import("../../domain/exchanges").ExchangeRecord>;
+        onLoadAliases?: (personDocId: string) => Promise<import("../../domain/person-aliases").PersonAlias[]>;
+        onAddAlias?: (personDocId: string, alias: string) => Promise<import("../../domain/person-aliases").PersonAlias>;
+        onRemoveAlias?: (id: string) => Promise<void>;
+        onLoadRelationshipLabels?: (personDocId: string) => Promise<import("../../services/people-profiles").RelationshipLabelEditorState>;
+        onSaveRelationshipLabels?: (personDocId: string, selfDocId: string, labels: string[], expected: import("../../domain/person-relationship-labels").PersonRelationshipLabels | null) => Promise<import("../../domain/person-relationship-labels").PersonRelationshipLabels>;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -100,17 +137,53 @@ import StatusNotice from "../StatusNotice.svelte";
     // svelte-ignore state_referenced_locally
     let current: ContactSummary = $state(person);
     let others: ContactSummary[] = $state([]);
+    let detailAlive = true;
+    let othersRequest = 0;
+    let relationProjections: RelationProjectionResult[] = $state([]);
+    const pendingRelationProjections = $derived(relationProjections.filter((item) => item.status !== "applied"));
+    onDestroy(() => {
+        detailAlive = false;
+        othersRequest += 1;
+        insightsRequest += 1;
+        personNoteRequest += 1;
+        followUpRequest += 1;
+    });
     /* B03 可搜索选人器：候选（排除本人与已关联）→ 选中即建关系，写入语义不变 */
     const relationCandidates = $derived.by((): PickerItem[] => candidates.map((person) => ({
         id: person.itemId,
         label: person.name,
-        hint: [person.group, ...person.tags].filter(Boolean).join(" · "),
+        docId: person.docId,
+        itemId: person.itemId,
+        hint: [person.group, person.phone || person.email, ...person.tags].filter(Boolean).join(" · "),
         keywords: `${person.phone} ${person.wechat} ${person.email}`.toLowerCase(),
     })));
     let relationPicker: { openPicker: () => void } | undefined = $state(undefined);
     let busy: boolean = $state(false);
     let errorText: string = $state("");
     let noteText: string = $state("");
+    let personNote: string = $state("");
+    let personNoteDraft: string = $state("");
+    let personNoteLoading = $state(false);
+    let personNoteSaving = $state(false);
+    let personNoteError = $state("");
+    let personNoteErrorKind: "load" | "save" | "" = $state("");
+    let personNoteSaved = $state(false);
+    // 联系节奏草稿与已保存基线必须在关闭守卫注册前建立，避免守卫首次读取时引用未初始化状态。
+    let cadenceMode: "global" | "custom" | "paused" = $state("global");
+    let cadenceDays = $state(14);
+    let cadenceSavedMode: "global" | "custom" | "paused" = $state("global");
+    let cadenceSavedDays = $state(14);
+    let cadenceSaving = $state(false);
+    let cadenceMessage = $state("");
+    let cadenceError = $state("");
+    let cadenceLoadError = $state("");
+    let cadenceRequest = 0;
+    const cadenceDirty = $derived(cadenceMode !== cadenceSavedMode
+        || (String(cadenceMode) === "custom" && cadenceDays !== cadenceSavedDays));
+    // 备注读取可能跨越 revision 刷新、人物切换或用户开始编辑；只允许
+    // 仍属于当前人物且没有被新草稿淘汰的请求提交结果。
+    let personNoteRequest = 0;
+    let personNoteDraftRevision = 0;
     const canLeave = createCloseScope();
     // B06：互动备注草稿给出明细与「保存并离开」（保存=记录这条互动）
     async function persistNote(): Promise<void> {
@@ -120,14 +193,68 @@ import StatusNotice from "../StatusNotice.svelte";
         noteText = "";
         await loadInsights();
     }
+
+    async function loadPersonNoteState(preserveSaved = false): Promise<void> {
+        if (!onLoadPersonNote) return;
+        const request = ++personNoteRequest;
+        const targetDocId = current.docId;
+        const targetItemId = current.itemId;
+        const draftRevision = personNoteDraftRevision;
+        personNoteLoading = true;
+        personNoteError = "";
+        personNoteErrorKind = "";
+        try {
+            const loaded = await onLoadPersonNote(targetDocId);
+            if (!detailAlive || request !== personNoteRequest || current.docId !== targetDocId || current.itemId !== targetItemId || personNoteDraftRevision !== draftRevision) return;
+            personNote = loaded;
+            personNoteDraft = loaded;
+            if (!preserveSaved) personNoteSaved = false;
+        } catch (error) {
+            if (detailAlive && request === personNoteRequest && current.docId === targetDocId && current.itemId === targetItemId && personNoteDraftRevision === draftRevision) {
+                personNoteError = error instanceof Error ? error.message : String(error);
+                personNoteErrorKind = "load";
+            }
+        } finally {
+            if (detailAlive && request === personNoteRequest) personNoteLoading = false;
+        }
+    }
+
+    async function savePersonNoteState(rethrowOnFailure = false): Promise<void> {
+        if (!onSavePersonNote || personNoteSaving) return;
+        personNoteSaving = true;
+        personNoteError = "";
+        personNoteErrorKind = "";
+        personNoteSaved = false;
+        try {
+            const saved = await onSavePersonNote(current.docId, personNoteDraft, personNote);
+            personNote = saved;
+            personNoteDraft = saved;
+            personNoteSaved = true;
+            onChanged();
+        } catch (error) {
+            personNoteError = error instanceof Error ? error.message : String(error);
+            personNoteErrorKind = "save";
+            if (rethrowOnFailure) throw error;
+        } finally {
+            personNoteSaving = false;
+        }
+    }
     useCloseGuard({
-        busy: () => busy || deleting,
-        dirty: () => noteText.trim().length > 0,
-        changes: () => [text("guardNoteDraft", "互动备注尚未记录：{text}", { text: noteText.trim() })],
-        save: persistNote,
+        busy: () => busy || deleting || personNoteSaving || personNoteLoading || followUpBusy || cadenceSaving,
+        dirty: () => noteText.trim().length > 0 || personNoteDraft !== personNote || cadenceDirty,
+        changes: () => [
+            ...(noteText.trim() ? [text("guardNoteDraft", "互动备注尚未记录：{text}", { text: noteText.trim() })] : []),
+            ...(personNoteDraft !== personNote ? ["人物独立备注尚未保存"] : []),
+            ...(cadenceDirty ? [text("guardCadenceDraft", "联系节奏尚未保存")] : []),
+        ],
+        save: async () => {
+            if (noteText.trim()) await persistNote();
+            if (personNoteDraft !== personNote) await savePersonNoteState(true);
+            if (cadenceDirty) await saveCadence(true);
+        },
     });
-    function navigate(person: ContactSummary | null) {
-        if (person) onNavigate(person);
+    async function navigate(person: ContactSummary | null) {
+        if (person && await canLeave.requestClose()) onNavigate(person);
     }
     let recorded: boolean = $state(false);
     let insights: import("../../services/insights").PersonInsights | null = $state(null);
@@ -140,13 +267,19 @@ import StatusNotice from "../StatusNotice.svelte";
     let deleting = $state(false);
     let activeTab: "overview" | "activity" | "relations" = $state("overview");
     const tabIds = ["overview", "activity", "relations"] as const;
-    function handleTabKeydown(event: KeyboardEvent) {
+    async function selectTab(next: typeof activeTab): Promise<boolean> {
+        if (next === activeTab) return true;
+        if (!(await canLeave.requestClose())) return false;
+        activeTab = next;
+        return true;
+    }
+    async function handleTabKeydown(event: KeyboardEvent) {
         if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") return;
         event.preventDefault();
         const index = tabIds.indexOf(activeTab);
         const next = event.key === "Home" ? 0 : event.key === "End" ? 2 : (index + (event.key === "ArrowRight" ? 1 : 2)) % 3;
-        activeTab = tabIds[next];
-        (event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus();
+        const tablist = event.currentTarget as HTMLElement;
+        if (await selectTab(tabIds[next])) tablist.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus();
     }
     let activitySearch = $state("");
     let activitySource = $state("");
@@ -212,6 +345,7 @@ import StatusNotice from "../StatusNotice.svelte";
     }
 
     loadInsights();
+    loadPersonNoteState();
 
     // ---- 互动备注模板（F09） ----
     const templatesSupported = $derived(Boolean(onListTemplates && onSaveTemplates));
@@ -254,12 +388,10 @@ import StatusNotice from "../StatusNotice.svelte";
     }
 
     const relatedPeople = $derived(
-        current.relatedItemIds
-            .map((itemId) => others.find((item) => item.itemId === itemId))
-            .filter((item): item is ContactSummary => Boolean(item)),
+        resolveRelated(current, others),
     );
     const candidates = $derived(
-        others.filter((item) => item.itemId !== current.itemId && !item.isSelf && !current.relatedItemIds.includes(item.itemId)),
+        others.filter((item) => item.itemId !== current.itemId && !item.isSelf && !relatedPeople.some((related) => related.itemId === item.itemId)),
     );
     const orderedPeople = $derived(navigationOrder ?? others);
     const currentIndex = $derived(orderedPeople.findIndex((item) => item.itemId === current.itemId));
@@ -268,35 +400,75 @@ import StatusNotice from "../StatusNotice.svelte";
     const birthday = $derived(nextBirthday(current.birthday, current.isLunar));
 
     async function loadOthers() {
+        if (!detailAlive) return;
+        const request = ++othersRequest;
         othersLoading = true;
         othersError = "";
+        const target = { docId: current.docId, itemId: current.itemId };
         try {
             const people = await listContacts(settings);
+            if (!detailAlive || request !== othersRequest || current.docId !== target.docId || current.itemId !== target.itemId) return;
             others = people;
-            const fresh = people.find((item) => item.itemId === current.itemId);
-            if (fresh) current = fresh;
+            const matches = people.filter((item) => item.docId === target.docId || item.itemId === target.itemId);
+            if (matches.length === 1 && matches[0].docId === target.docId && matches[0].itemId === target.itemId) current = matches[0];
+            else othersError = "原人物的文档与行绑定已变化或不唯一，当前详情保留；请重新核对稳定文档 ID";
         } catch (error) {
-            othersError = error instanceof Error ? error.message : String(error);
+            if (detailAlive && request === othersRequest && current.docId === target.docId && current.itemId === target.itemId) {
+                othersError = error instanceof Error ? error.message : String(error);
+            }
         } finally {
-            othersLoading = false;
+            if (detailAlive && request === othersRequest) othersLoading = false;
         }
     }
 
     loadOthers();
 
-    async function mutate(action: () => Promise<void>) {
+    function isRelationMutationReport(value: unknown): value is RelationMutationReport {
+        return typeof value === "object" && value !== null && "fact" in value && "projections" in value;
+    }
+
+    function rememberRelationProjections(results: readonly RelationProjectionResult[]) {
+        const merged = new Map(relationProjections.map((item) => [item.docId, item]));
+        for (const result of results) merged.set(result.docId, result);
+        relationProjections = [...merged.values()];
+    }
+
+    async function retryRelatedDocuments() {
+        if (busy || !detailAlive) return;
+        busy = true;
+        errorText = "";
+        try {
+            const result = await retryRelationProjections(settings, pendingRelationProjections.map((item) => item.docId));
+            if (!detailAlive) return;
+            rememberRelationProjections(result);
+            onChanged();
+            await loadOthers();
+        } catch (error) {
+            if (detailAlive) errorText = error instanceof Error ? error.message : String(error);
+        } finally {
+            if (detailAlive) busy = false;
+        }
+    }
+
+    async function mutate(action: () => Promise<unknown>) {
         if (busy) return;
         busy = true;
         errorText = "";
         try {
-            await action();
+            const result = await action();
+            if (!detailAlive) return;
             onChanged();
             const fresh = await refreshPerson(settings, current);
+            if (!detailAlive) return;
             if (fresh) current = fresh;
+            if (isRelationMutationReport(result)) {
+                rememberRelationProjections(result.projections);
+                await loadOthers();
+            }
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            if (detailAlive) errorText = error instanceof Error ? error.message : String(error);
         } finally {
-            busy = false;
+            if (detailAlive) busy = false;
         }
     }
 
@@ -360,27 +532,74 @@ import StatusNotice from "../StatusNotice.svelte";
     const orgSectionSupported = $derived(Boolean(onLoadOrgMemberships));
     let followUps: FollowUpItem[] = $state([]);
     let followUpsLoading = $state(true);
+    const initialFollowUpDate = toLocalDateKey(new Date());
     let followUpTitle = $state("");
-    let followUpDate = $state(toLocalDateKey(new Date()));
+    let followUpDate = $state(initialFollowUpDate);
+    let followUpSavedTitle = $state("");
+    let followUpSavedDate = $state(initialFollowUpDate);
     let followUpBusy = $state(false);
     let followUpRecorded = $state(false);
     let followUpError = $state("");
+    /* 写入已经成功但随后列表回读失败时，不能把成功误报为写入失败。 */
+    let followUpActionError = $state("");
+    let followUpRefreshWarning = $state("");
+    let followUpRequest = 0;
     let snoozeForId = $state("");
     let snoozeCustomDate = $state("");
     const todayKey = $derived(toLocalDateKey(new Date()));
+    const followUpPlanDirty = $derived(hasFollowUpDraft({
+        title: followUpTitle,
+        dueDate: followUpDate,
+        savedTitle: followUpSavedTitle,
+        savedDueDate: followUpSavedDate,
+        snoozeCustomDate: "",
+    }));
+    const followUpSnoozeDirty = $derived(snoozeCustomDate.trim().length > 0);
+    const followUpDraftDirty = $derived(followUpPlanDirty || followUpSnoozeDirty);
     const openFollowUps = $derived(followUps.filter((item) => item.status === "open"));
     const closedFollowUps = $derived(followUps.filter((item) => item.status !== "open"));
 
-    async function loadFollowUps() {
-        if (!onListFollowUps) return;
+    /* 跟进输入没有「保存并离开」：离开确认只能放弃或取消，避免隐式创建/推迟。 */
+    useCloseGuard({
+        busy: () => busy || deleting || personNoteSaving || personNoteLoading || followUpBusy || cadenceSaving,
+        dirty: () => followUpDraftDirty,
+        changes: () => [
+            ...(followUpPlanDirty ? [text("guardFollowUpDraft", "跟进计划草稿尚未添加")] : []),
+            ...(followUpSnoozeDirty ? [text("guardSnoozeDraft", "推迟日期尚未应用")] : []),
+        ],
+    });
+
+    async function loadFollowUps(): Promise<boolean> {
+        if (!onListFollowUps) return false;
+        const request = ++followUpRequest;
+        const targetDocId = current.docId;
         followUpsLoading = true;
         followUpError = ""; /* FUNC-01.12：重试先清错误态，成功后不得残留旧错误分支 */
         try {
-            followUps = await onListFollowUps(current.docId);
+            const next = await onListFollowUps(targetDocId);
+            /* 旧请求被新请求取代时，交给当前请求继续显示结果，不制造假失败。 */
+            if (!detailAlive || request !== followUpRequest || current.docId !== targetDocId) return true;
+            followUps = next;
+            followUpRefreshWarning = "";
+            return true;
         } catch (error) {
-            followUpError = error instanceof Error ? error.message : String(error);
+            if (detailAlive && request === followUpRequest && current.docId === targetDocId) {
+                followUpError = error instanceof Error ? error.message : String(error);
+                return false;
+            }
+            return true;
         } finally {
-            followUpsLoading = false;
+            if (detailAlive && request === followUpRequest) followUpsLoading = false;
+        }
+    }
+
+    async function refreshFollowUpsAfterMutation(): Promise<void> {
+        const refreshed = await loadFollowUps();
+        if (!refreshed && detailAlive) {
+            followUpRefreshWarning = text(
+                "fuSavedRefreshFail",
+                "已保存，但跟进列表刷新失败。请点击“重试”核实最新状态；不要重复提交。",
+            );
         }
     }
 
@@ -388,15 +607,42 @@ import StatusNotice from "../StatusNotice.svelte";
 
     /* ---- B12：组织归属投影（可选：未接线时隐藏该区） ---- */
     let orgMemberships: import("../../services/org").PersonOrgMembershipView[] = $state([]);
+    let orgLoading = $state(false);
+    let orgReadError = $state("");
+    let orgReadRequest = 0;
+    let orgCandidatesRequest = 0;
+    let orgCandidatesLoading = $state(false);
+    let orgCandidatesError = $state("");
+    let orgMembershipReport = $state<OrgMembershipWriteReport | null>(null);
+    let removingOrgMembershipId = $state("");
+    let editingOrgMembershipId = $state("");
+    let editOrgDepartment = $state("");
+    let editOrgTitle = $state("");
+    let editOrgJoinedOn = $state("");
+    let editOrgLeftOn = $state("");
+    let editOrgStatus = $state<"active" | "former">("active");
+    let editOrgAffiliationKind = $state<OrgAffiliationKind>("unspecified");
+    let editingOrgSnapshot = $state<OrgMembership | null>(null);
+    let removingOrgSnapshot = $state<OrgMembership | null>(null);
+
+    function orgMembershipSnapshot(membership: import("../../services/org").PersonOrgMembershipView): OrgMembership {
+        return { id: membership.id, orgDocId: membership.orgDocId, personDocId: current.docId,
+            department: membership.department, title: membership.title, joinedOn: membership.joinedOn,
+            leftOn: membership.leftOn, status: membership.status,
+            ...(membership.affiliationKind === undefined ? {} : { affiliationKind: membership.affiliationKind }) };
+    }
     async function loadOrgMemberships(): Promise<void> {
         if (!onLoadOrgMemberships) return;
+        const request = ++orgReadRequest;
+        const docId = current.docId;
+        orgLoading = true;
+        orgReadError = "";
         try {
-            orgMemberships = await onLoadOrgMemberships(current.docId);
+            const next = await onLoadOrgMemberships(docId);
+            if (detailAlive && request === orgReadRequest && docId === current.docId) orgMemberships = next;
         } catch (error) {
-            /* 投影失败降级为空区块（console 留痕）；不阻断 Peek 其余分区 */
-            console.warn("[lvct] 组织归属投影读取失败", error);
-            orgMemberships = [];
-        }
+            if (detailAlive && request === orgReadRequest && docId === current.docId) orgReadError = error instanceof Error ? error.message : String(error);
+        } finally { if (detailAlive && request === orgReadRequest && docId === current.docId) orgLoading = false; }
     }
 
     loadOrgMemberships();
@@ -409,58 +655,108 @@ import StatusNotice from "../StatusNotice.svelte";
     let addOrgDepartment = $state("");
     let addOrgTitle = $state("");
     let addOrgJoinedOn = $state("");
+    let addOrgAffiliationKind = $state<OrgAffiliationKind>("unspecified");
     let addOrgBusy = $state(false);
     let addOrgError = $state("");
     /* 候选 = 活跃组织 − 已加入（含历史 former 记录的组织也在已加入之列，避免重复建档） */
     const orgCandidateOptions = $derived(
-        orgCandidates.filter((org) => !orgMemberships.some((membership) => membership.orgDocId === org.docId)),
+        orgCandidates.filter((org) => !orgMemberships.some((membership) => membership.orgDocId === org.docId && membership.status === "active")),
     );
+    useCloseGuard({
+        busy: () => addOrgBusy || orgLoading || orgCandidatesLoading,
+        dirty: () => Boolean(addOrgDocId || addOrgDepartment.trim() || addOrgTitle.trim() || addOrgJoinedOn || addOrgAffiliationKind !== "unspecified"
+            || editingOrgMembershipId || removingOrgMembershipId),
+        changes: () => [text("orgUnsaved", "组织管理中的修改尚未完成")],
+    });
     async function loadOrgCandidates(): Promise<void> {
         if (!onLoadOrgCandidates) return;
+        const request = ++orgCandidatesRequest;
+        orgCandidatesLoading = true;
+        orgCandidatesError = "";
         try {
-            orgCandidates = await onLoadOrgCandidates();
+            const next = await onLoadOrgCandidates();
+            if (detailAlive && request === orgCandidatesRequest) orgCandidates = next;
         } catch (error) {
-            console.warn("[lvct] 归属候选读取失败", error);
-            orgCandidates = [];
-        }
+            if (detailAlive && request === orgCandidatesRequest) orgCandidatesError = error instanceof Error ? error.message : String(error);
+        } finally { if (detailAlive && request === orgCandidatesRequest) orgCandidatesLoading = false; }
     }
     async function addOrgMembership(): Promise<void> {
-        if (!onAddOrgMembership || addOrgBusy || addOrgDocId === "") return;
+        if (!onAddOrgMembership || addOrgBusy || orgLoading || orgReadError || orgCandidatesError || orgCandidatesLoading || addOrgDocId === "") return;
         addOrgBusy = true;
         addOrgError = "";
         try {
-            await onAddOrgMembership(current.docId, addOrgDocId, {
+            const report = await onAddOrgMembership(current.docId, addOrgDocId, {
                 department: addOrgDepartment.trim(),
                 title: addOrgTitle.trim(),
                 joinedOn: addOrgJoinedOn,
+                affiliationKind: addOrgAffiliationKind,
             });
+            if (!detailAlive) return;
+            orgMembershipReport = report ?? null;
             addOrgDocId = "";
             addOrgDepartment = "";
             addOrgTitle = "";
             addOrgJoinedOn = "";
+            addOrgAffiliationKind = "unspecified";
             onChanged();
             await loadOrgMemberships();
             await loadOrgCandidates();
         } catch (error) {
-            addOrgError = error instanceof Error ? error.message : String(error);
+            if (detailAlive) addOrgError = error instanceof Error ? error.message : String(error);
         } finally {
-            addOrgBusy = false;
+            if (detailAlive) addOrgBusy = false;
         }
     }
     async function removeOrgMembership(membershipId: string): Promise<void> {
-        if (!onRemoveOrgMembership || addOrgBusy) return;
+        if (!onRemoveOrgMembership || addOrgBusy || orgLoading || orgReadError || removingOrgMembershipId !== membershipId) return;
         addOrgBusy = true;
         addOrgError = "";
         try {
-            await onRemoveOrgMembership(membershipId);
+            const report = await onRemoveOrgMembership(membershipId, removingOrgSnapshot ?? undefined);
+            if (!detailAlive) return;
+            orgMembershipReport = report ?? null;
+            removingOrgMembershipId = "";
             onChanged();
             await loadOrgMemberships();
             await loadOrgCandidates();
         } catch (error) {
-            addOrgError = error instanceof Error ? error.message : String(error);
+            if (detailAlive) addOrgError = error instanceof Error ? error.message : String(error);
         } finally {
-            addOrgBusy = false;
+            if (detailAlive) addOrgBusy = false;
         }
+    }
+
+    function startEditOrgMembership(membership: import("../../services/org").PersonOrgMembershipView): void {
+        if (addOrgBusy || orgLoading || orgReadError) return;
+        editingOrgMembershipId = membership.id;
+        editingOrgSnapshot = orgMembershipSnapshot(membership);
+        editOrgDepartment = membership.department;
+        editOrgTitle = membership.title;
+        editOrgJoinedOn = membership.joinedOn;
+        editOrgLeftOn = membership.leftOn;
+        editOrgStatus = membership.status;
+        editOrgAffiliationKind = membership.affiliationKind ?? "unspecified";
+    }
+
+    async function saveEditOrgMembership(): Promise<void> {
+        if (!onUpdateOrgMembership || addOrgBusy || !editingOrgMembershipId || orgLoading || orgReadError) return;
+        addOrgBusy = true;
+        addOrgError = "";
+        try {
+            const report = await onUpdateOrgMembership(editingOrgMembershipId, { department: editOrgDepartment, title: editOrgTitle,
+                joinedOn: editOrgJoinedOn, leftOn: editOrgLeftOn, status: editOrgStatus, affiliationKind: editOrgAffiliationKind }, editingOrgSnapshot ?? undefined);
+            if (!detailAlive) return;
+            orgMembershipReport = report ?? null;
+            editingOrgMembershipId = "";
+            onChanged();
+            await loadOrgMemberships();
+            await loadOrgCandidates();
+        } catch (error) { if (detailAlive) addOrgError = error instanceof Error ? error.message : String(error); }
+        finally { if (detailAlive) addOrgBusy = false; }
+    }
+
+    function affiliationLabel(kind: OrgAffiliationKind | undefined): string {
+        return kind === "work" ? text("orgAffiliationWork", "工作单位") : kind === "education" ? text("orgAffiliationEducation", "学校") : text("orgAffiliationUnspecified", "未分类");
     }
 
     loadOrgCandidates();
@@ -469,13 +765,18 @@ import StatusNotice from "../StatusNotice.svelte";
     const commonOrgsSupported = $derived(Boolean(onLoadCommonOrgs));
     let commonOrgs: import("../../domain/org-membership").CommonOrgBackground[] = $state([]);
     let commonOrgsFailed = $state(false);
+    let commonOrgsRequest = 0;
     async function loadCommonOrgs(): Promise<void> {
         if (!onLoadCommonOrgs) return;
+        const request = ++commonOrgsRequest;
+        const docId = current.docId;
         try {
-            commonOrgs = await onLoadCommonOrgs(current.docId);
+            const next = await onLoadCommonOrgs(docId);
+            if (!detailAlive || request !== commonOrgsRequest || docId !== current.docId) return;
+            commonOrgs = next;
             commonOrgsFailed = false;
         } catch (error) {
-            console.warn("[lvct] 共同背景读取失败", error);
+            if (!detailAlive || request !== commonOrgsRequest || docId !== current.docId) return;
             commonOrgs = [];
             commonOrgsFailed = true;
         }
@@ -486,26 +787,47 @@ import StatusNotice from "../StatusNotice.svelte";
     /* FUNC-01.7-a：数据变化（跨窗口/宿主）→ 原地重载洞察与跟进；写入/操作挂起时跳过
        （Workbench 对草稿场景给出可见提示条），当前人物与输入草稿保留 */
     let lastSeenRevision = untrack(() => revision);
+    let refreshPending = $state(false);
+    let orgRefreshPending = $state(false);
     $effect(() => {
-        if (revision === lastSeenRevision) return;
-        lastSeenRevision = revision;
-        if (busy || followUpBusy) return;
-        void loadInsights();
-        void loadFollowUps();
+        if (revision !== lastSeenRevision) {
+            lastSeenRevision = revision;
+            refreshPending = true;
+            orgRefreshPending = true;
+        }
+        if (busy || followUpBusy || personNoteSaving || cadenceSaving || personNoteDraft !== personNote) return;
+        if (refreshPending) {
+            refreshPending = false;
+            void loadOthers();
+            void loadInsights();
+            void loadFollowUps();
+            void loadPersonNoteState(true);
+            if (!cadenceDirty) void loadCadence();
+        }
+        if (orgRefreshPending && !addOrgBusy && !editingOrgMembershipId && !removingOrgMembershipId && !addOrgDocId) {
+            orgRefreshPending = false;
+            void loadOrgMemberships();
+            void loadOrgCandidates();
+            void loadCommonOrgs();
+        }
     });
 
     async function createFollowUp() {
         if (followUpBusy || !onCreateFollowUp) return;
         followUpBusy = true;
         followUpError = "";
+        followUpActionError = "";
+        followUpRefreshWarning = "";
         try {
             await onCreateFollowUp(current.docId, followUpTitle.trim(), followUpDate);
             followUpTitle = "";
+            followUpSavedTitle = "";
+            followUpSavedDate = followUpDate;
             followUpRecorded = true;
             onChanged();
-            followUps = await onListFollowUps?.(current.docId) ?? followUps;
+            await refreshFollowUpsAfterMutation();
         } catch (error) {
-            followUpError = error instanceof Error ? error.message : String(error);
+            followUpActionError = error instanceof Error ? error.message : String(error);
         } finally {
             followUpBusy = false;
         }
@@ -515,12 +837,14 @@ import StatusNotice from "../StatusNotice.svelte";
         if (followUpBusy || !onSetFollowUpStatus) return;
         followUpBusy = true;
         followUpError = "";
+        followUpActionError = "";
+        followUpRefreshWarning = "";
         try {
             await onSetFollowUpStatus(item.id, "done");
-            followUps = await onListFollowUps?.(current.docId) ?? followUps;
+            await refreshFollowUpsAfterMutation();
             onChanged();
         } catch (error) {
-            followUpError = error instanceof Error ? error.message : String(error);
+            followUpActionError = error instanceof Error ? error.message : String(error);
         } finally {
             followUpBusy = false;
         }
@@ -531,12 +855,14 @@ import StatusNotice from "../StatusNotice.svelte";
         if (!window.confirm(`取消跟进「${item.title || text("fuKeepInTouch", "保持联系")}」？取消后不再出现在待办中。`)) return;
         followUpBusy = true;
         followUpError = "";
+        followUpActionError = "";
+        followUpRefreshWarning = "";
         try {
             await onSetFollowUpStatus(item.id, "cancelled");
-            followUps = await onListFollowUps?.(current.docId) ?? followUps;
+            await refreshFollowUpsAfterMutation();
             onChanged();
         } catch (error) {
-            followUpError = error instanceof Error ? error.message : String(error);
+            followUpActionError = error instanceof Error ? error.message : String(error);
         } finally {
             followUpBusy = false;
         }
@@ -547,14 +873,16 @@ import StatusNotice from "../StatusNotice.svelte";
         if (option === "custom" && !snoozeCustomDate) return;
         followUpBusy = true;
         followUpError = "";
+        followUpActionError = "";
+        followUpRefreshWarning = "";
         try {
             await onSnoozeFollowUp(item.id, option, option === "custom" ? snoozeCustomDate : undefined);
             snoozeForId = "";
             snoozeCustomDate = "";
-            followUps = await onListFollowUps?.(current.docId) ?? followUps;
+            await refreshFollowUpsAfterMutation();
             onChanged();
         } catch (error) {
-            followUpError = error instanceof Error ? error.message : String(error);
+            followUpActionError = error instanceof Error ? error.message : String(error);
         } finally {
             followUpBusy = false;
         }
@@ -563,11 +891,6 @@ import StatusNotice from "../StatusNotice.svelte";
     // ---- 联系节奏（F06） ----
     const cadenceSupported = $derived(Boolean(onGetCadence && onSaveCadence));
     let cadenceLoaded = $state(false);
-    let cadenceMode: "global" | "custom" | "paused" = $state("global");
-    let cadenceDays = $state(14);
-    let cadenceSaving = $state(false);
-    let cadenceMessage = $state("");
-    let cadenceError = $state("");
     const lastContactLabel = $derived.by(() => {
         const first = insights?.timeline?.[0];
         return first?.localDate ?? "";
@@ -575,18 +898,30 @@ import StatusNotice from "../StatusNotice.svelte";
 
     async function loadCadence() {
         if (!onGetCadence) return;
+        const request = ++cadenceRequest;
+        const targetDocId = current.docId;
+        cadenceLoaded = false;
+        cadenceError = "";
+        cadenceLoadError = "";
         try {
-            const cadence = await onGetCadence(current.docId);
+            const cadence = await onGetCadence(targetDocId);
+            if (!detailAlive || request !== cadenceRequest || current.docId !== targetDocId) return;
             cadenceMode = cadence?.paused ? "paused" : cadence ? "custom" : "global";
-            if (cadence) cadenceDays = cadence.days;
+            cadenceDays = cadence?.days ?? 14;
+            cadenceSavedMode = cadenceMode;
+            cadenceSavedDays = cadenceDays;
+            cadenceLoadError = "";
             cadenceLoaded = true;
         } catch (error) {
-            cadenceError = error instanceof Error ? error.message : String(error);
+            if (detailAlive && request === cadenceRequest && current.docId === targetDocId) {
+                cadenceLoadError = error instanceof Error ? error.message : String(error);
+                cadenceLoaded = true;
+            }
         }
     }
     loadCadence();
 
-    async function saveCadence() {
+    async function saveCadence(rethrowOnFailure = false) {
         if (cadenceSaving || !onSaveCadence) return;
         cadenceSaving = true;
         cadenceError = "";
@@ -595,6 +930,9 @@ import StatusNotice from "../StatusNotice.svelte";
             const days = Math.max(1, Math.min(365, Math.round(cadenceDays || 14)));
             const next: PersonCadence | null = cadenceMode === "global" ? null : { days, paused: cadenceMode === "paused" };
             await onSaveCadence(current.docId, next);
+            cadenceDays = days;
+            cadenceSavedMode = cadenceMode;
+            cadenceSavedDays = days;
             cadenceMessage = cadenceMode === "global"
                 ? "已清除覆盖，跟随全局阈值"
                 : cadenceMode === "paused"
@@ -603,6 +941,7 @@ import StatusNotice from "../StatusNotice.svelte";
             onChanged();
         } catch (error) {
             cadenceError = error instanceof Error ? error.message : String(error);
+            if (rethrowOnFailure) throw error;
         } finally {
             cadenceSaving = false;
         }
@@ -627,12 +966,16 @@ import StatusNotice from "../StatusNotice.svelte";
     </div>
 
     <div class="lvct-detail__tabs" role="tablist" tabindex="-1" aria-label="人物详情内容" onkeydown={handleTabKeydown}>
-        <button type="button" role="tab" aria-selected={activeTab === "overview"} tabindex={activeTab === "overview" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "overview"} onclick={() => (activeTab = "overview")}>{text("detailOverview", "概览")}</button>
-        <button type="button" role="tab" aria-selected={activeTab === "activity"} tabindex={activeTab === "activity" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "activity"} onclick={() => (activeTab = "activity")}>{text("detailActivity", "互动")}</button>
-        <button type="button" role="tab" aria-selected={activeTab === "relations"} tabindex={activeTab === "relations" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "relations"} onclick={() => (activeTab = "relations")}>{text("detailRelations", "相关人")}</button>
+        <button type="button" role="tab" aria-selected={activeTab === "overview"} tabindex={activeTab === "overview" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "overview"} onclick={() => void selectTab("overview")}>{text("detailOverview", "概览")}</button>
+        <button type="button" role="tab" aria-selected={activeTab === "activity"} tabindex={activeTab === "activity" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "activity"} onclick={() => void selectTab("activity")}>{text("detailActivity", "互动")}</button>
+        <button type="button" role="tab" aria-selected={activeTab === "relations"} tabindex={activeTab === "relations" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "relations"} onclick={() => void selectTab("relations")}>{text("detailRelations", "相关人")}</button>
     </div>
 
     {#if activeTab === "overview"}
+    <PersonProfileSummary profile={current.profile} />
+    {#if onLoadRelationshipLabels && onSaveRelationshipLabels && !current.isSelf}
+        <RelationshipLabels personDocId={current.docId} {revision} onLoad={onLoadRelationshipLabels} onSave={onSaveRelationshipLabels} {onChanged} />
+    {/if}
     {#if !current.phone && !current.email && !current.wechat && !current.website && current.tags.length === 0}
         <ViewState compact title="联系资料还未填写" description="补充电话、邮箱或标签，方便下次查找。">
             <button class="b3-button b3-button--outline" onclick={() => (editing = true)}>编辑资料</button>
@@ -646,6 +989,46 @@ import StatusNotice from "../StatusNotice.svelte";
         {#if current.tags.length > 0}<div><dt>标签</dt><dd>{current.tags.join(" · ")}</dd></div>{/if}
         {#if birthday}<div><dt>下次生日</dt><dd>{birthday.date.toLocaleDateString("zh-CN")} · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}</dd></div>{/if}
     </dl>
+
+    {#if onLoadPersonNote && onSavePersonNote}
+        <section class="lvct-detail__section lvct-detail__person-note">
+            <div class="lvct-detail__section-head">
+                <div>
+                    <h4>个人备注</h4>
+                    <p class="ft__smaller ft__on-surface">记录特殊情况、偏好或下次见面要注意的事。写入该人物文档，不计入互动次数。</p>
+                </div>
+                {#if personNoteSaved}<span class="lvct-chip lvct-bucket--today">已保存</span>{/if}
+            </div>
+            {#if personNoteLoading}
+                <p class="ft__smaller ft__on-surface" role="status">正在读取个人备注…</p>
+            {:else}
+                <textarea
+                    class="b3-text-field lvct-detail__person-note-input"
+                    rows="4"
+                    maxlength="5000"
+                    aria-label="个人备注"
+                    placeholder="例如：偏好安静的环境，下次见面前提醒准备资料"
+                    bind:value={personNoteDraft}
+                    oninput={() => { personNoteDraftRevision += 1; personNoteSaved = false; personNoteError = ""; personNoteErrorKind = ""; }}
+                    disabled={personNoteSaving}
+                ></textarea>
+                <div class="lvct-detail__person-note-actions">
+                    <span class="ft__smaller ft__on-surface">{personNoteDraft.length} / 5000</span>
+                    <button type="button" class="b3-button b3-button--text" disabled={personNoteSaving || personNoteDraft === personNote} onclick={() => void savePersonNoteState()}>
+                        {personNoteSaving ? "保存中…" : "保存备注"}
+                    </button>
+                </div>
+            {/if}
+            {#if personNoteError}
+                <div class="lvct-form__error" role="alert">个人备注保存失败：{personNoteError}</div>
+                {#if personNoteErrorKind === "save"}
+                    <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving} onclick={() => void savePersonNoteState()}>重试保存</button>
+                {:else}
+                    <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving} onclick={() => void loadPersonNoteState()}>重新读取</button>
+                {/if}
+            {/if}
+        </section>
+    {/if}
 
     <div class="lvct-detail__briefing-row">
         <button class="b3-button b3-button--outline" onclick={openBriefingExport}>导出会面简报</button>
@@ -692,39 +1075,80 @@ import StatusNotice from "../StatusNotice.svelte";
                     {text("orgSectionManage", "管理归属")}</button>
             {/if}
         </div>
-        {#if orgMemberships.length === 0}
+        {#if orgReadError}
+            <p class="lvct-form__error" role="alert">{text("orgMembershipReadUnknown", "组织归属读取失败，结果尚未核实。")}{orgReadError}</p>
+            <button class="b3-button b3-button--outline" disabled={addOrgBusy || orgLoading} onclick={() => void loadOrgMemberships()}>{text("orgMembershipReload", "重新读取归属")}</button>
+        {:else if orgLoading}
+            <p role="status">{text("orgMembersLoading", "正在加载成员…")}</p>
+        {:else if orgMemberships.length === 0}
             <p class="ft__smaller ft__on-surface">{text("orgSectionEmpty", "未加入任何组织")}</p>
         {:else}
             <ul class="lvct-detail__timeline">
                 {#each orgMemberships as membership (membership.id)}
-                    <li class="lvct-detail__timeline-row">
+                    <li class="lvct-detail__timeline-row lvct-detail__org-timeline-row">
                         <span class="lvct-detail__timeline-note">
                             {membership.orgName}
+                            <span class="ft__smaller"> · {affiliationLabel(membership.affiliationKind)}</span>
                             {#if membership.department}<span class="ft__smaller"> · {membership.department}</span>{/if}
                             {#if membership.title}<span class="ft__smaller"> · {membership.title}</span>{/if}
                         </span>
                         <span class="lvct-chip {membership.status === "former" ? "lvct-bucket--stale" : "lvct-bucket--today"}">
-                            {membership.status === "former" ? text("orgMembershipFormer", "已离开") : text("orgMembershipActive", "在职/在学")}
+                            {membership.reachable === false ? text("orgMembershipUnreachable", "组织待核实") : membership.archived ? text("orgMembershipArchived", "组织已归档") : membership.status === "former" ? text("orgMembershipFormer", "已离开") : text("orgMembershipActive", "在职/在学")}
                         </span>
                         {#if membership.joinedOn || membership.leftOn}
                             <span class="ft__on-surface">{membership.joinedOn || "?"}{membership.leftOn ? ` – ${membership.leftOn}` : " –"}</span>
                         {/if}
-                        {#if orgRemoveSupported}
-                            <button type="button" class="b3-button b3-button--cancel" disabled={addOrgBusy}
-                                aria-label={text("orgMembershipRemoveLabel", "移除归属 {name}", { name: membership.orgName })}
-                                onclick={() => void removeOrgMembership(membership.id)}>{text("orgMembershipRemove", "移除")}</button>
+                        {#if orgRemoveSupported || onUpdateOrgMembership}
+                            <span class="lvct-detail__org-actions">
+                                {#if orgRemoveSupported}
+                                    <button type="button" class="b3-button b3-button--cancel" disabled={addOrgBusy}
+                                        aria-label={text("orgMembershipRemoveLabel", "移除归属 {name}", { name: membership.orgName })}
+                                        onclick={() => { removingOrgMembershipId = membership.id; removingOrgSnapshot = orgMembershipSnapshot(membership); }}>{text("orgMembershipRemove", "移除")}</button>
+                                {/if}
+                                {#if onUpdateOrgMembership}
+                                    <button class="b3-button b3-button--text" disabled={addOrgBusy} onclick={() => startEditOrgMembership(membership)}>{text("orgMemberEdit", "编辑")}</button>
+                                {/if}
+                            </span>
+                        {/if}
+                        {#if editingOrgMembershipId === membership.id}
+                            <div class="lvct-org-add">
+                                <input class="b3-text-field" bind:value={editOrgDepartment} disabled={addOrgBusy} aria-label={text("orgMemberDeptLabel", "部门")} />
+                                <input class="b3-text-field" bind:value={editOrgTitle} disabled={addOrgBusy} aria-label={text("orgMemberTitleLabel", "职位")} />
+                                <input class="b3-text-field" type="date" bind:value={editOrgJoinedOn} disabled={addOrgBusy} aria-label={text("orgMemberJoinedLabel", "加入日期")} />
+                                <input class="b3-text-field" type="date" bind:value={editOrgLeftOn} disabled={addOrgBusy} aria-label={text("orgMemberLeftLabel", "离开日期")} />
+                                <select class="b3-select" bind:value={editOrgStatus} disabled={addOrgBusy} aria-label={text("orgMemberStatusLabel", "状态")}>
+                                    <option value="active">{text("orgStatusActive", "在职/在读")}</option><option value="former">{text("orgStatusFormer", "已离开")}</option>
+                                </select>
+                                <select class="b3-select" bind:value={editOrgAffiliationKind} disabled={addOrgBusy} aria-label={text("orgAffiliationKind", "归属分类")}>
+                                    <option value="unspecified">{affiliationLabel("unspecified")}</option><option value="work">{affiliationLabel("work")}</option><option value="education">{affiliationLabel("education")}</option>
+                                </select>
+                                <p>{text("orgMembershipEditImpact", "保存会更新这段成员记录及双方当前双链；离开保留历史。恢复在职/在学须清空离开日期。")}</p>
+                                <button class="b3-button b3-button--text" disabled={addOrgBusy} onclick={() => void saveEditOrgMembership()}>{text("orgMemberSave", "保存")}</button>
+                                <button class="b3-button b3-button--cancel" disabled={addOrgBusy} onclick={() => (editingOrgMembershipId = "")}>{text("orgMemberCancel", "取消")}</button>
+                            </div>
+                        {/if}
+                        {#if removingOrgMembershipId === membership.id}
+                            <div role="group" aria-label={text("orgMembershipRemoveConfirm", "确认移除这段成员历史")}>
+                                <p>{text("orgMembershipRemoveImpact", "将删除这段成员历史并重建双方当前双链。普通离职请编辑为已离开；人物和组织文档保留。")}</p>
+                                <button class="b3-button b3-button--cancel" disabled={addOrgBusy} onclick={() => void removeOrgMembership(membership.id)}>{text("orgMembershipRemoveConfirm", "确认移除这段成员历史")}</button>
+                                <button class="b3-button b3-button--outline" disabled={addOrgBusy} onclick={() => (removingOrgMembershipId = "")}>{text("orgMemberCancel", "取消")}</button>
+                            </div>
                         {/if}
                     </li>
                 {/each}
             </ul>
         {/if}
         {#if orgAddSupported}
+            <p>{text("orgMembershipAddImpact", "添加会登记新期间并更新双方当前双链；已离开的期间保留，重复添加当前成员不新增记录。")}</p>
+            {#if orgCandidatesError}<p class="lvct-form__error" role="alert">{orgCandidatesError}</p>
+                <button class="b3-button b3-button--outline" disabled={addOrgBusy || orgCandidatesLoading} onclick={() => void loadOrgCandidates()}>{text("orgMembershipReloadCandidates", "重新读取组织候选")}</button>
+            {/if}
             <div class="lvct-org-add">
                 <select class="b3-select" bind:value={addOrgDocId} disabled={addOrgBusy}
                     aria-label={text("orgAddOrgLabel", "选择要加入的组织")}>
                     <option value="">{text("orgAddOrgPick", "选择组织…")}</option>
                     {#each orgCandidateOptions as org (org.docId)}
-                        <option value={org.docId}>{org.name}</option>
+                        <option value={org.docId}>{org.name} · {org.docId}</option>
                     {/each}
                 </select>
                 <input class="b3-text-field" placeholder={text("orgMemberDeptLabel", "部门")} bind:value={addOrgDepartment}
@@ -733,10 +1157,17 @@ import StatusNotice from "../StatusNotice.svelte";
                     disabled={addOrgBusy} aria-label={text("orgAddTitleLabel", "归属职位")} />
                 <input class="b3-text-field" type="date" bind:value={addOrgJoinedOn} disabled={addOrgBusy}
                     aria-label={text("orgAddJoinedLabel", "加入日期")} />
-                <button type="button" class="b3-button b3-button--text" disabled={addOrgBusy || addOrgDocId === ""}
+                <select class="b3-select" bind:value={addOrgAffiliationKind} disabled={addOrgBusy} aria-label={text("orgAffiliationKind", "归属分类")}>
+                    <option value="unspecified">{affiliationLabel("unspecified")}</option><option value="work">{affiliationLabel("work")}</option><option value="education">{affiliationLabel("education")}</option>
+                </select>
+                <button type="button" class="b3-button b3-button--text" disabled={addOrgBusy || orgLoading || orgCandidatesLoading || !!orgReadError || !!orgCandidatesError || addOrgDocId === ""}
                     onclick={() => void addOrgMembership()}>{text("orgAddSubmit", "添加归属")}</button>
             </div>
-            {#if addOrgError}<div class="lvct-form__error" role="alert">{addOrgError}</div>{/if}
+        {/if}
+        <OrgMembershipResult report={orgMembershipReport} {i18n} />
+        {#if addOrgError}
+            <p class="lvct-form__error" role="alert">{addOrgError}</p>
+            <button class="b3-button b3-button--outline" disabled={addOrgBusy || orgLoading} onclick={() => void loadOrgMemberships()}>{text("orgMembershipReload", "重新读取归属")}</button>
         {/if}
     </section>
     {/if}
@@ -750,6 +1181,9 @@ import StatusNotice from "../StatusNotice.svelte";
             {#each commonOrgs as entry (entry.orgDocId)}
                 <div class="lvct-org-common">
                     <b>{entry.orgName}</b>
+                    {#if onOpenOrganization}
+                        <button class="b3-button b3-button--text" onclick={() => onOpenOrganization?.(entry.orgDocId)}>{text("routeOpenOrganization", "查看组织")}</button>
+                    {/if}
                     {#each entry.peers as peer (peer.docId)}
                         {@const contact = peer.contact}
                         <div class="lvct-org-common__peer">
@@ -761,7 +1195,11 @@ import StatusNotice from "../StatusNotice.svelte";
                             {#if contact}
                                 <!-- B13.6 点击同伴开详情（onNavigate 即切换详情弹窗人物） -->
                                 <button type="button" class="b3-button b3-button--text"
-                                    onclick={() => onNavigate(contact)}>{text("orgCommonOpen", "查看详情")}</button>
+                                    onclick={() => void (async () => {
+                                        if (!detailAlive) return;
+                                        if (onNavigateDocId) await onNavigateDocId(peer.docId);
+                                        else if (await canLeave.requestClose() && detailAlive) onNavigate(contact);
+                                    })()}>{text("orgCommonOpen", "查看详情")}</button>
                             {/if}
                         </div>
                     {/each}
@@ -775,6 +1213,12 @@ import StatusNotice from "../StatusNotice.svelte";
     {#if followUpSupported}
     <section class="lvct-detail__section">
         <h4>{text("fuSectionTitle", "跟进计划")}</h4>
+        {#if followUpActionError}
+            <div class="lvct-form__error" role="alert">{text("fuActionFail", "跟进操作失败：{msg}", { msg: followUpActionError })}</div>
+        {/if}
+        {#if followUpRefreshWarning}
+            <StatusNotice error message={followUpRefreshWarning} actionLabel={text("commonRetry", "重试")} onAction={() => void loadFollowUps()} />
+        {/if}
         {#if followUpError}
             <!-- FUNC-01.12：读取失败显式报错并可重试，不与「没有跟进计划」空态同时呈现 -->
             <ViewState compact error title={text("fuLoadFailTitle", "跟进计划加载失败")} description={followUpError}>
@@ -838,10 +1282,14 @@ import StatusNotice from "../StatusNotice.svelte";
     {#if cadenceSupported}
     <section class="lvct-detail__section">
         <h4>{text("cadenceSectionTitle", "联系节奏")}</h4>
-        {#if cadenceError}<div class="lvct-form__error" role="alert">{cadenceError}</div>{/if}
-        {#if !cadenceLoaded}
+        {#if cadenceLoadError}
+            <ViewState compact error title={text("cadenceLoadFailTitle", "联系节奏读取失败")} description={cadenceLoadError}>
+                <button type="button" class="b3-button b3-button--outline" onclick={loadCadence}>{text("commonRetry", "重试")}</button>
+            </ViewState>
+        {:else if !cadenceLoaded}
             <ViewState compact loading title={text("cadenceLoading", "正在读取联系节奏")} />
         {:else}
+            {#if cadenceError}<div class="lvct-form__error" role="alert">{cadenceError}</div>{/if}
             <p class="ft__smaller ft__on-surface">
                 {text("cadenceLastLabel", "上次互动：")}{lastContactLabel || text("cadenceNoInteraction", "还没有互动记录")} · {text("cadenceCurrentLabel", "当前：")}
                 {cadenceMode === "paused" ? text("cadencePausedDesc", "已暂停提醒") : cadenceMode === "custom" ? text("cadenceCustomDesc", "自定义 {n} 天", { n: cadenceDays }) : text("cadenceGlobalDesc", "跟随全局阈值")}
@@ -855,7 +1303,7 @@ import StatusNotice from "../StatusNotice.svelte";
                 {#if cadenceMode === "custom"}
                     <input type="number" class="b3-text-field" min="1" max="365" aria-label="自定义天数" bind:value={cadenceDays} disabled={cadenceSaving} />
                 {/if}
-                <button class="b3-button b3-button--text" onclick={saveCadence} disabled={cadenceSaving}>
+                <button class="b3-button b3-button--text" onclick={() => void saveCadence()} disabled={cadenceSaving}>
                     {cadenceSaving ? text("cadenceSaving", "保存中…") : text("cadenceSave", "保存节奏")}
                 </button>
             </div>
@@ -863,6 +1311,34 @@ import StatusNotice from "../StatusNotice.svelte";
             <p class="ft__smaller ft__on-surface">{text("cadenceNote", "仅影响首页「久未联系」提醒，不写入联系人的数据库字段。")}</p>
         {/if}
     </section>
+    {/if}
+    {#if (onLoadExchanges && onCreateExchange && onChangeExchangeStatus) || (onLoadAliases && onAddAlias && onRemoveAlias)}
+        <details class="lvct-detail__advanced">
+            <summary>
+                <span>更多资料与辅助记录</span>
+                <span class="ft__smaller ft__on-surface">往来账本 · 别名</span>
+            </summary>
+            {#if onLoadExchanges && onCreateExchange && onChangeExchangeStatus}
+                <ExchangeLedger
+                    personDocId={current.docId}
+                    {i18n}
+                    onLoad={onLoadExchanges}
+                    onCreate={onCreateExchange}
+                    onChangeStatus={onChangeExchangeStatus}
+                    onChanged={onChanged}
+                />
+            {/if}
+            {#if onLoadAliases && onAddAlias && onRemoveAlias}
+                <PersonAliases
+                    personDocId={current.docId}
+                    {i18n}
+                    onLoad={onLoadAliases}
+                    onAdd={onAddAlias}
+                    onRemove={onRemoveAlias}
+                    {onChanged}
+                />
+            {/if}
+        </details>
     {/if}
     {:else if activeTab === "activity"}
 
@@ -940,7 +1416,7 @@ import StatusNotice from "../StatusNotice.svelte";
             </ViewState>
         {:else}
             <ViewState compact title="还没有互动记录" description="从一次聊天或见面开始，记录你们的往来。">
-                <button class="b3-button b3-button--text" onclick={() => (activeTab = "overview")}>去记一笔</button>
+                <button class="b3-button b3-button--text" onclick={() => void selectTab("overview")}>去记一笔</button>
             </ViewState>
         {/if}
     </section>
@@ -994,15 +1470,22 @@ import StatusNotice from "../StatusNotice.svelte";
             />
         </div>
         <p class="ft__smaller ft__on-surface">关系为双向：添加后对方的「被相关人」列会自动出现你。</p>
+        {#if pendingRelationProjections.length > 0}
+            <div role="alert" class="lvct-form__error">
+                <p>{text("relationProjectionPending", "关系事实已保存，但部分文档投影尚未核实。")}</p>
+                <ul>{#each pendingRelationProjections as item (item.docId)}<li>{item.docId}：{item.message}</li>{/each}</ul>
+                <button type="button" class="b3-button b3-button--outline" disabled={busy} onclick={retryRelatedDocuments}>{text("relationProjectionRetry", "只重试未完成文档")}</button>
+            </div>
+        {/if}
     </section>
     {/if}
 
     {#if errorText}
-        <div class="lvct-form__error">{errorText}</div>
+        <div class="lvct-form__error" role="alert">{errorText}</div>
     {/if}
 
     <div class="lvct-form__actions">
-        <button class="b3-button b3-button--cancel" onclick={() => void (async () => { if (await canLeave.requestClose()) onClose(); })()} disabled={busy || deleting}>{text("closeDialog", "关闭")}</button>
+        <button class="b3-button b3-button--cancel" onclick={() => void (async () => { if (await canLeave.requestClose()) onClose(); })()} disabled={busy || deleting}>{closeLabel ?? text("closeDialog", "关闭")}</button>
         <button class="b3-button b3-button--text" onclick={() => onOpenPersonDoc(current.docId)}>{text("detailOpenDoc", "打开文档")}</button>
         <button class="b3-button b3-button--cancel lvct-detail__delete" onclick={confirmDelete} disabled={busy || deleting}>{deleting ? text("detailRemoving", "移除中…") : text("detailRemove", "从人脉移除")}</button>
     </div>

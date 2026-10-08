@@ -4,7 +4,10 @@
  * 成员关系存本键（多对多、同组织多段历史、active|former）；组织维度不写 related。
  */
 
+import { parseStoreRecords, StoreIntegrityError } from "./store-integrity.ts";
+
 export type OrgMembershipStatus = "active" | "former";
+export type OrgAffiliationKind = "work" | "education" | "unspecified";
 
 export interface OrgMembership {
     /** 成员记录 ID（yyyyMMddHHmmss-xxxxxxx，与人物/组织文档 ID 相互独立） */
@@ -20,33 +23,86 @@ export interface OrgMembership {
     /** YYYY-MM-DD；空串表示在职/在学中 */
     leftOn: string;
     status: OrgMembershipStatus;
+    affiliationKind?: OrgAffiliationKind;
 }
 
 export interface OrgMembershipStore {
     schemaVersion: 1;
     memberships: OrgMembership[];
+    tombstones?: string[];
+}
+
+export type OrgMembershipStatusFilter = "all" | "active" | "former";
+
+export interface OrgMembershipPage<T> {
+    items: T[];
+    offset: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+}
+
+export function sortOrgMemberships<T extends Pick<OrgMembership, "status" | "joinedOn" | "id">>(items: readonly T[]): T[] {
+    return [...items].sort((left, right) =>
+        Number(left.status !== "active") - Number(right.status !== "active")
+        || left.joinedOn.localeCompare(right.joinedOn)
+        || left.id.localeCompare(right.id));
+}
+
+export function pageOrgMemberships<T extends Pick<OrgMembership, "status" | "joinedOn" | "id">>(
+    items: readonly T[],
+    options: { status?: OrgMembershipStatusFilter; offset?: number; limit?: number } = {},
+): OrgMembershipPage<T> {
+    const status = options.status ?? "all";
+    if (!["all", "active", "former"].includes(status)) throw new Error("成员状态筛选无效");
+    const filtered = status === "all" ? [...items] : items.filter((item) => item.status === status);
+    const ordered = sortOrgMemberships(filtered);
+    const offset = options.offset ?? 0;
+    const limit = options.limit ?? 200;
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new Error("成员分页 offset 必须是非负整数");
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) throw new Error("成员分页 limit 必须为 1-500");
+    const page = ordered.slice(offset, offset + limit);
+    return { items: page, offset, limit, total: ordered.length, hasMore: offset + page.length < ordered.length };
 }
 
 const ID_PATTERN = /^\d{14}-[0-9a-z]{7}$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function validMembershipDate(value: string): boolean {
+    if (value === "") return true;
+    if (!DATE_PATTERN.test(value)) return false;
+    const [year, month, day] = value.split("-").map(Number);
+    const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    const days = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    return year > 0 && month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1];
+}
+
+function validMembershipPeriod(joinedOn: string, leftOn: string, status: OrgMembershipStatus): boolean {
+    return validMembershipDate(joinedOn) && validMembershipDate(leftOn)
+        && !(joinedOn && leftOn && joinedOn > leftOn) && !(status === "active" && leftOn);
+}
 
 function isNonEmptyString(value: unknown): value is string {
     return typeof value === "string" && value.trim().length > 0;
 }
 
 function parseMembership(raw: unknown): OrgMembership | null {
-    if (raw === null || typeof raw !== "object") return null;
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
     const record = raw as Partial<OrgMembership>;
     if (!isNonEmptyString(record.id) || !ID_PATTERN.test(record.id)) return null;
     if (!isNonEmptyString(record.orgDocId) || !ID_PATTERN.test(record.orgDocId)) return null;
     if (!isNonEmptyString(record.personDocId) || !ID_PATTERN.test(record.personDocId)) return null;
     const status = record.status === "former" ? "former" : record.status === "active" ? "active" : null;
     if (!status) return null;
+    if (record.affiliationKind !== undefined && !isOrgAffiliationKind(record.affiliationKind)) return null;
+    if (record.department !== undefined && typeof record.department !== "string") return null;
+    if (record.title !== undefined && typeof record.title !== "string") return null;
+    if (record.joinedOn !== undefined && typeof record.joinedOn !== "string") return null;
+    if (record.leftOn !== undefined && typeof record.leftOn !== "string") return null;
     const joinedOn = typeof record.joinedOn === "string" ? record.joinedOn : "";
     const leftOn = typeof record.leftOn === "string" ? record.leftOn : "";
     /* 日期字段存在但格式非法 → 视为坏条目过滤（不静默改写为空） */
-    if (joinedOn !== "" && !DATE_PATTERN.test(joinedOn)) return null;
-    if (leftOn !== "" && !DATE_PATTERN.test(leftOn)) return null;
+    if (!validMembershipPeriod(joinedOn, leftOn, status)) return null;
     return {
         id: record.id,
         orgDocId: record.orgDocId,
@@ -56,6 +112,7 @@ function parseMembership(raw: unknown): OrgMembership | null {
         joinedOn,
         leftOn,
         status,
+        ...(record.affiliationKind === undefined ? {} : { affiliationKind: record.affiliationKind }),
     };
 }
 
@@ -77,30 +134,25 @@ export function normalizeOrgMembershipStore(raw: unknown): OrgMembershipStore {
 
 /** 写前严格检查：不丢弃损坏数据；版本或结构不兼容抛错（与跟进库同纪律） */
 export function normalizeOrgMembershipStoreForWrite(raw: unknown): OrgMembershipStore {
-    if (raw === null || raw === "") return { schemaVersion: 1, memberships: [] };
-    if (typeof raw !== "object" || (raw as Partial<OrgMembershipStore>).schemaVersion !== 1
-        || !Array.isArray((raw as Partial<OrgMembershipStore>).memberships)
-        || !(raw as Partial<OrgMembershipStore>).memberships!.every(isStrictMembership)) {
-        throw new Error("组织成员存储内容损坏，操作已停止；请先备份并检查原文件");
+    const memberships = parseStoreRecords<OrgMembership>(raw, "组织成员", "memberships", parseMembership);
+    const tombstones = raw !== null && typeof raw === "object" ? (raw as OrgMembershipStore).tombstones : undefined;
+    if (tombstones !== undefined && (!Array.isArray(tombstones) || tombstones.some((id) => typeof id !== "string" || !ID_PATTERN.test(id))
+        || new Set(tombstones).size !== tombstones.length || memberships.some((membership) => tombstones.includes(membership.id)))) {
+        throw new StoreIntegrityError("组织成员", "删除标记损坏、重复或与当前记录冲突", memberships.length);
     }
-    return normalizeOrgMembershipStore(raw);
+    const activeKeys = memberships.filter((membership) => membership.status === "active")
+        .map((membership) => `${membership.orgDocId}/${membership.personDocId}`);
+    if (new Set(activeKeys).size !== activeKeys.length) throw new StoreIntegrityError("组织成员", "同一人物和组织有多条当前成员记录", memberships.length);
+    return { schemaVersion: 1, memberships, ...(tombstones === undefined ? {} : { tombstones: [...tombstones] }) };
 }
 
-function isStrictMembership(raw: unknown): boolean {
-    if (raw === null || typeof raw !== "object") return false;
-    const item = raw as Partial<OrgMembership>;
-    return typeof item.id === "string" && item.id.length > 0
-        && typeof item.orgDocId === "string" && item.orgDocId.length > 0
-        && typeof item.personDocId === "string" && item.personDocId.length > 0
-        && (item.status === "active" || item.status === "former")
-        && (item.department === undefined || typeof item.department === "string")
-        && (item.title === undefined || typeof item.title === "string")
-        && (item.joinedOn === undefined || (typeof item.joinedOn === "string" && (item.joinedOn === "" || DATE_PATTERN.test(item.joinedOn))))
-        && (item.leftOn === undefined || (typeof item.leftOn === "string" && (item.leftOn === "" || DATE_PATTERN.test(item.leftOn))));
+export function isOrgAffiliationKind(value: unknown): value is OrgAffiliationKind {
+    return value === "work" || value === "education" || value === "unspecified";
 }
 
 /** 追加成员记录（纯函数返回新 store）；同 id 视为重复静默跳过 */
 export function appendMembership(store: OrgMembershipStore, membership: OrgMembership): OrgMembershipStore {
+    if (store.tombstones?.includes(membership.id)) return store;
     if (store.memberships.some((existing) => existing.id === membership.id)) return store;
     return { ...store, memberships: [...store.memberships, membership] };
 }
@@ -108,7 +160,7 @@ export function appendMembership(store: OrgMembershipStore, membership: OrgMembe
 /** 移除成员记录（纯函数返回新 store）；找不到 id 返回原 store */
 export function removeMembership(store: OrgMembershipStore, id: string): OrgMembershipStore {
     if (!store.memberships.some((existing) => existing.id === id)) return store;
-    return { ...store, memberships: store.memberships.filter((existing) => existing.id !== id) };
+    return { ...store, memberships: store.memberships.filter((existing) => existing.id !== id), tombstones: [...new Set([...(store.tombstones ?? []), id])] };
 }
 
 /* ---------- B13.4 成员字段编辑：身份字段（id/orgDocId/personDocId）不可变 ---------- */
@@ -119,6 +171,7 @@ export interface OrgMembershipPatch {
     joinedOn?: string;
     leftOn?: string;
     status?: OrgMembershipStatus;
+    affiliationKind?: OrgAffiliationKind;
 }
 
 /**
@@ -126,15 +179,54 @@ export interface OrgMembershipPatch {
  * 非法返回 null（写前拒绝，绝不静默改写）；department/title trim。
  */
 export function applyMembershipPatch(membership: OrgMembership, patch: OrgMembershipPatch): OrgMembership | null {
+    if (patch.department !== undefined && typeof patch.department !== "string" || patch.title !== undefined && typeof patch.title !== "string") return null;
     const department = patch.department === undefined ? membership.department : patch.department.trim();
     const title = patch.title === undefined ? membership.title : patch.title.trim();
     const joinedOn = patch.joinedOn === undefined ? membership.joinedOn : patch.joinedOn;
     const leftOn = patch.leftOn === undefined ? membership.leftOn : patch.leftOn;
-    if (joinedOn !== "" && !DATE_PATTERN.test(joinedOn)) return null;
-    if (leftOn !== "" && !DATE_PATTERN.test(leftOn)) return null;
     const status = patch.status === undefined ? membership.status : patch.status;
     if (status !== "active" && status !== "former") return null;
-    return { ...membership, department, title, joinedOn, leftOn, status };
+    if (typeof joinedOn !== "string" || typeof leftOn !== "string" || !validMembershipPeriod(joinedOn, leftOn, status)) return null;
+    if (patch.affiliationKind !== undefined && !isOrgAffiliationKind(patch.affiliationKind)) return null;
+    return {
+        ...membership, department, title, joinedOn, leftOn, status,
+        ...(patch.affiliationKind === undefined ? {} : { affiliationKind: patch.affiliationKind }),
+    };
+}
+
+export interface PersonAffiliation extends OrgMembership {
+    affiliationKind: OrgAffiliationKind;
+    orgName: string | null;
+    scope: "current" | "former" | "archived" | "unreachable";
+}
+
+export interface PersonAffiliationProjection {
+    work: PersonAffiliation[];
+    education: PersonAffiliation[];
+    unspecified: PersonAffiliation[];
+    history: PersonAffiliation[];
+    unresolved: PersonAffiliation[];
+}
+
+export function projectPersonAffiliations(
+    personDocId: string,
+    memberships: readonly OrgMembership[],
+    organizations: ReadonlyMap<string, { name: string; archived: boolean }>,
+): PersonAffiliationProjection {
+    const result: PersonAffiliationProjection = { work: [], education: [], unspecified: [], history: [], unresolved: [] };
+    for (const membership of sortOrgMemberships(memberships.filter((item) => item.personDocId === personDocId))) {
+        const organization = organizations.get(membership.orgDocId);
+        const affiliation: PersonAffiliation = {
+            ...membership,
+            affiliationKind: membership.affiliationKind ?? "unspecified",
+            orgName: organization?.name ?? null,
+            scope: !organization ? "unreachable" : membership.status === "former" ? "former" : organization.archived ? "archived" : "current",
+        };
+        if (affiliation.scope === "unreachable") result.unresolved.push(affiliation);
+        else if (affiliation.scope !== "current") result.history.push(affiliation);
+        else result[affiliation.affiliationKind].push(affiliation);
+    }
+    return result;
 }
 
 /** 按 id 更新成员记录字段（纯函数返回新 store）；找不到 id 返回原 store */
@@ -143,10 +235,77 @@ export function updateMembership(store: OrgMembershipStore, id: string, patch: O
     if (index < 0) return null;
     const updated = applyMembershipPatch(store.memberships[index], patch);
     if (!updated) return null;
-    if (updated === store.memberships[index]) return store;
+    if (updated.status === "active" && store.memberships.some((entry) => entry.id !== id && entry.status === "active"
+        && entry.orgDocId === updated.orgDocId && entry.personDocId === updated.personDocId)) return null;
+    if (JSON.stringify(updated) === JSON.stringify(store.memberships[index])) return store;
     const memberships = [...store.memberships];
     memberships[index] = updated;
     return { ...store, memberships };
+}
+
+export function replaceMembership(
+    store: OrgMembershipStore,
+    formerId: string,
+    successor: OrgMembership,
+    leftOn: string,
+): OrgMembershipStore | null {
+    const formerIndex = store.memberships.findIndex((item) => item.id === formerId);
+    if (formerIndex < 0) return null;
+    const former = store.memberships[formerIndex];
+    if (!parseMembership(successor) || store.memberships.some((entry) => entry.id === successor.id) || store.tombstones?.includes(successor.id)) return null;
+    if (former.status !== "active" || successor.status !== "active" || successor.leftOn !== "") return null;
+    if (successor.orgDocId !== former.orgDocId || successor.personDocId === former.personDocId) return null;
+    if (store.memberships.some((item) => item.orgDocId === former.orgDocId && item.personDocId === successor.personDocId && item.status === "active")) {
+        return null;
+    }
+    const closedFormer = applyMembershipPatch(former, { status: "former", leftOn });
+    if (!closedFormer) return null;
+    const memberships = [...store.memberships];
+    memberships[formerIndex] = closedFormer;
+    memberships.push(successor);
+    return { ...store, memberships };
+}
+/* ---------- B13.7 人物文档组织归属链接区块（active × 活跃组织投影，契约 §8） ---------- */
+
+export interface OrgLinkEntry {
+    orgDocId: string;
+    orgName: string;
+    department: string;
+    title: string;
+}
+
+/**
+ * 组织归属链接区块文本（纯函数）：`**所属组织**：[名](siyuan://blocks/<id>)（部门 · 职位）、…`。
+ * 空条目返回空串（调用方据此移除区块）；部门/职位按存在性拼接，两者皆空不加括注。
+ * 组织名含 Markdown 语法字符的显示瑕疵与人物姓名同水位（C-14 通道统一处理，不在此转义）。
+ */
+export function buildOrgLinksSection(entries: readonly OrgLinkEntry[]): string {
+    if (entries.length === 0) return "";
+    const links = entries.map((entry) => {
+        const suffix = entry.department && entry.title ? `（${entry.department} · ${entry.title}）`
+            : entry.department ? `（${entry.department}）`
+            : entry.title ? `（${entry.title}）`
+            : "";
+        return `[${entry.orgName}](siyuan://blocks/${entry.orgDocId})${suffix}`;
+    });
+    return `**所属组织**：${links.join("、")}`;
+}
+
+/**
+ * B13.9 悬空 org-links 区块判定（纯函数）：文档存在归属链接区块、但该人物已无任何
+ * active 成员记录＝悬空（历史对账失败残留）。返回待清理的块 ID 清单。
+ */
+export function findDanglingOrgLinks(
+    /** 文档 rootId → org-links 块 id（SQL 反查结果） */
+    blockRoots: ReadonlyMap<string, string>,
+    /** 有 active 成员记录的人物 docId 集合 */
+    activePersonDocIds: ReadonlySet<string>,
+): { blockId: string; rootId: string }[] {
+    const dangling: { blockId: string; rootId: string }[] = [];
+    for (const [rootId, blockId] of blockRoots) {
+        if (!activePersonDocIds.has(rootId)) dangling.push({ rootId, blockId });
+    }
+    return dangling;
 }
 
 /* ---------- B13.6 共同背景：同组织联系人投影（纯展示，零写入，不写 related/称谓） ---------- */
@@ -202,6 +361,8 @@ function startKnown(membership: OrgMembership): boolean {
  * - 排除本人；双方多段记录任一交集非空即收录，重叠文本取最大交集；
  * - samePeriod 仅在双方 joinedOn 均已知时为 true——时间未知只展示同组织事实，不推断「同期」；
  * - 不写 related、不产生称谓、零写入（B13.6 验收口径）。
+ * - B13.5b 查询规模：一次遍历建「组织 → 成员记录」索引后按组织直取候选，同伴查重用
+ *   Set——不再对每段归属全索引扫描、不对 peers 做线性 some；输出语义与全量扫描一致。
  */
 export function buildCommonOrgBackground(options: {
     personDocId: string;
@@ -215,7 +376,23 @@ export function buildCommonOrgBackground(options: {
     const { personDocId, membershipIndex, namesByDoc, orgNames, contactsByDoc } = options;
     const ownRecords = membershipIndex.get(personDocId) ?? [];
     if (ownRecords.length === 0) return [];
+    /* 组织 →（人物 → 该组织成员记录）：键序沿用 membershipIndex 首现序，保证同伴顺序稳定 */
+    const membersByOrg = new Map<string, Map<string, OrgMembership[]>>();
+    for (const [peerDocId, peerRecords] of membershipIndex) {
+        if (peerDocId === personDocId) continue;
+        for (const record of peerRecords) {
+            let byPerson = membersByOrg.get(record.orgDocId);
+            if (!byPerson) {
+                byPerson = new Map();
+                membersByOrg.set(record.orgDocId, byPerson);
+            }
+            const list = byPerson.get(peerDocId);
+            if (list) list.push(record);
+            else byPerson.set(peerDocId, [record]);
+        }
+    }
     const byOrg = new Map<string, CommonOrgBackground>();
+    const seenPeersByOrg = new Map<string, Set<string>>();
     for (const own of ownRecords) {
         const ownRange = membershipRange(own);
         let entry = byOrg.get(own.orgDocId);
@@ -226,13 +403,15 @@ export function buildCommonOrgBackground(options: {
                 peers: [],
             };
             byOrg.set(own.orgDocId, entry);
+            seenPeersByOrg.set(own.orgDocId, new Set());
         }
-        for (const [peerDocId, peerRecords] of membershipIndex) {
-            if (peerDocId === personDocId) continue;
-            if (entry.peers.some((peer) => peer.docId === peerDocId)) continue;
+        const seenPeers = seenPeersByOrg.get(own.orgDocId)!;
+        const candidates = membersByOrg.get(own.orgDocId);
+        if (!candidates) continue;
+        for (const [peerDocId, peerRecords] of candidates) {
+            if (seenPeers.has(peerDocId)) continue;
             let best: { range: { start: string; end: string }; samePeriod: boolean } | null = null;
             for (const peerRecord of peerRecords) {
-                if (peerRecord.orgDocId !== own.orgDocId) continue;
                 const intersection = rangeIntersection(ownRange, membershipRange(peerRecord));
                 if (!intersection) continue;
                 const candidate = {
@@ -244,6 +423,7 @@ export function buildCommonOrgBackground(options: {
             if (!best) continue;
             const peerName = namesByDoc.get(peerDocId);
             if (!peerName) continue;
+            seenPeers.add(peerDocId);
             entry.peers.push({
                 docId: peerDocId,
                 name: peerName,

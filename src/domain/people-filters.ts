@@ -5,6 +5,8 @@
  * 非法日期串视为该侧不限制。「从未联系」与日期范围同时启用时按 AND 语义为空集（互相矛盾的条件）。
  */
 import type { ContactSummary } from "./person";
+import { matchesProfileFilters } from "./people-profiles.ts";
+import { isValidDateKey } from "./followups.ts";
 
 export type TagMatchMode = "all" | "any";
 
@@ -28,6 +30,9 @@ export interface PeopleFilterState {
     neverContacted: boolean;
     /** 资料完整度（C03）；空串表示不限 */
     profileGap: ProfileGap | "";
+    workQuery?: string;
+    educationQuery?: string;
+    relationshipLabel?: string;
 }
 
 export const EMPTY_PEOPLE_FILTER: PeopleFilterState = {
@@ -46,8 +51,10 @@ export interface ExtraFilterChip {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function isDateKey(value: string): boolean {
-    return DATE_RE.test(value);
+function isDateKey(value: unknown): value is string {
+    // 筛选值可能来自持久化视图或旧版本配置，不能只看字符串形状：
+    // 2026-02-31 会通过正则，却会让闭区间比较产生一个不存在的日期。
+    return typeof value === "string" && DATE_RE.test(value) && isValidDateKey(value);
 }
 
 /** 标签交并匹配：未选标签时恒为命中 */
@@ -70,7 +77,8 @@ export function hasProfileGap(person: ContactSummary, gap: ProfileGap): boolean 
 
 /** 附加筛选（标签模式之外的部分）是否生效 */
 export function isExtraFilterActive(filter: PeopleFilterState): boolean {
-    return filter.tagMatch !== "all" || !!filter.recentFrom || !!filter.recentTo || filter.neverContacted || !!filter.profileGap;
+    return filter.tagMatch !== "all" || !!filter.recentFrom || !!filter.recentTo || filter.neverContacted || !!filter.profileGap
+        || !!filter.workQuery || !!filter.educationQuery || !!filter.relationshipLabel;
 }
 
 /** 当前生效的附加条件（固定顺序），供生效条件行渲染与单项清除 */
@@ -93,6 +101,7 @@ export function applyPeopleFilters(
     const to = isDateKey(filter.recentTo) ? filter.recentTo : "";
     const rangeActive = !!(from || to);
     return people.filter((person) => {
+        if (!matchesProfileFilters(person.profile, filter)) return false;
         if (filter.profileGap && !hasProfileGap(person, filter.profileGap)) return false;
         const last = recent[person.docId];
         if (filter.neverContacted && last) return false;

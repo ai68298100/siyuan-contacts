@@ -6,7 +6,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { FIELD_SPECS, fieldSpec, reconcileFieldMap } from "../src/domain/fields.ts";
-import { parseAvIdFromBlockMarkdown } from "../src/domain/init-plan.ts";
+import {
+    ANCHOR_SCAN_CURSOR_VERSION,
+    anchorCandidateKey,
+    isAnchorScanCursor,
+    isAnchorScanNotebookExhausted,
+    parseAvIdFromBlockMarkdown,
+} from "../src/domain/init-plan.ts";
 
 const column = (id: string, name: string, type: string) => ({ id, name, type });
 
@@ -32,6 +38,48 @@ test("avID 还原：非数据库块/非法 ID/非字符串一律 undefined", () 
     assert.equal(parseAvIdFromBlockMarkdown('<div data-av-id="not-an-id"></div>'), undefined);
     assert.equal(parseAvIdFromBlockMarkdown(undefined), undefined);
     assert.equal(parseAvIdFromBlockMarkdown(123), undefined);
+});
+
+test("锚点扫描游标：合法快照可续做，计数和节点归属必须一致", () => {
+    const notebookIds = ["20261003000000-book001", "20261003000001-book002"];
+    assert.equal(isAnchorScanCursor({
+        version: ANCHOR_SCAN_CURSOR_VERSION,
+        notebookIds,
+        notebookId: notebookIds[0],
+        afterDocId: "20261003000002-doc0001",
+        scannedDocuments: 12,
+        scannedInNotebook: 4,
+    }), true);
+    assert.equal(anchorCandidateKey({
+        notebookId: notebookIds[0],
+        hostDocId: "20261003000003-host001",
+        dbBlockId: "20261003000004-block01",
+        avId: "20261003000005-av00001",
+    }), "20261003000000-book001/20261003000003-host001/20261003000004-block01/20261003000005-av00001");
+});
+
+test("锚点扫描游标：快照重复、跨快照笔记本、非法文档 ID 和逆序计数均拒绝", () => {
+    const base = {
+        version: ANCHOR_SCAN_CURSOR_VERSION,
+        notebookIds: ["20261003000000-book001", "20261003000001-book002"],
+        notebookId: "20261003000000-book001",
+        afterDocId: null,
+        scannedDocuments: 3,
+        scannedInNotebook: 2,
+    };
+    assert.equal(isAnchorScanCursor({ ...base, notebookIds: ["20261003000000-book001", "20261003000000-book001"] }), false);
+    assert.equal(isAnchorScanCursor({ ...base, notebookId: "20261003000002-book003" }), false);
+    assert.equal(isAnchorScanCursor({ ...base, afterDocId: "bad-id" }), false);
+    assert.equal(isAnchorScanCursor({ ...base, scannedInNotebook: 4 }), false);
+    assert.equal(isAnchorScanCursor({ ...base, scannedDocuments: Number.MAX_SAFE_INTEGER + 1 }), false);
+});
+
+test("锚点扫描分页：短页才表示当前笔记本耗尽，满页必须保留续扫可能", () => {
+    assert.equal(isAnchorScanNotebookExhausted(0, 500), true);
+    assert.equal(isAnchorScanNotebookExhausted(499, 500), true);
+    assert.equal(isAnchorScanNotebookExhausted(500, 500), false);
+    assert.equal(isAnchorScanNotebookExhausted(501, 500), false);
+    assert.equal(isAnchorScanNotebookExhausted(-1, 500), false);
 });
 
 test("对账：默认列名全部命中，无缺失", () => {

@@ -1,6 +1,7 @@
 <script lang="ts">
     /** 新建联系人弹窗 */
-    import { createContact, PRESET_GROUPS } from "../../services/contacts";
+    import { ContactCreationError, ContactNameAmbiguityError, createContact, PRESET_GROUPS } from "../../services/contacts";
+    import type { ContactCreationPreview, ContactCreationRequest } from "../../services/contacts";
     import { emptyDraft } from "../../domain/person";
     import type { ContactDraft, ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
@@ -13,6 +14,7 @@
         settings,
         i18n,
         initial,
+        hostCloseChannel,
         onCreated,
         onClose,
     }: {
@@ -20,6 +22,8 @@
         i18n?: Readonly<Record<string, string>>;
         /** FAST-01.3：识别资料后预填的初始草稿（打开快照，不随外部变化） */
         initial?: ContactDraft;
+        /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
+        hostCloseChannel?: { request?: (close: () => void) => void };
         onCreated: (person: ContactSummary) => void;
         onClose: () => void;
     } = $props();
@@ -33,6 +37,10 @@
     let running: boolean = $state(false);
     let errorText: string = $state("");
     let saved = $state(false);
+    let creationPreview = $state<ContactCreationPreview | null>(null);
+    let creationChoice = $state("");
+    let creationRequest = $state<ContactCreationRequest | undefined>();
+    const currentPreview = $derived(creationPreview?.name === draft.name.trim() ? creationPreview : null);
     // FAST-01.1：粘贴并识别（识别结果经勾选后回填草稿，不直接写库）
     let quickFillOpen = $state(false);
     function applyQuickFill(patch: {
@@ -57,9 +65,23 @@
     // B06：新建草稿给出明细 + 「保存并离开」（persist 抛错则留在原地）
     async function persist(): Promise<void> {
         const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
-        const person = await createContact(settings, { ...draft, tags });
-        saved = true;
-        onCreated(person);
+        running = true;
+        try {
+            const person = await createContact(settings, { ...draft, tags }, {
+                request: creationRequest,
+                allowSameName: currentPreview !== null && creationChoice === "new",
+                reuseDocId: currentPreview && creationChoice !== "new" ? creationChoice || undefined : undefined,
+            });
+            saved = true;
+            onCreated(person);
+        } catch (error) {
+            if (error instanceof ContactNameAmbiguityError) {
+                creationPreview = error.preview;
+                creationChoice = "";
+            }
+            if (error instanceof ContactCreationError) creationRequest = error.request;
+            throw error;
+        } finally { running = false; }
     }
     function draftChanges(): string[] {
         if (saved) return [];
@@ -83,8 +105,18 @@
     const guardedClose = useCloseGuard({
         busy: () => running,
         dirty: () => !saved && (JSON.stringify(draft) !== JSON.stringify(emptyDraft()) || tagsText.trim().length > 0),
-        changes: draftChanges,
+        changes: () => [...draftChanges(), ...(creationRequest ? [text("contactCheckpointWarning", "原请求断点仅保留在当前窗口。关闭不会删除已保存文档；请核实后继续，不能凭同名重新建档。")] : [])],
         save: persist,
+    });
+    /* D-40：宿主 X/Esc/遮罩经同一守卫路由（返回 Promise 供拦截层重入门） */
+    $effect(() => {
+        if (hostCloseChannel) hostCloseChannel.request = (close) => guardedClose(close);
+    });
+
+    /* D-35：错误出现时焦点迁入错误块（键盘/读屏用户可 Tab 继续操作） */
+    let errorEl: HTMLElement | undefined = $state();
+    $effect(() => {
+        if (errorText && errorEl) errorEl.focus();
     });
 
     async function submit() {
@@ -104,10 +136,11 @@
 
 <div class="lvct-form">
     <div class="lvct-form__toolbar">
-        <button type="button" class="b3-button b3-button--text lvct-form__toolbar-btn" onclick={() => (quickFillOpen = true)}>
+        <button type="button" class="b3-button b3-button--text lvct-form__toolbar-btn" disabled={running || !!creationRequest} onclick={() => (quickFillOpen = true)}>
             <ClipboardPaste size={14}/>{text("qfOpen", "粘贴并识别")}
         </button>
     </div>
+    <fieldset class="lvct-form__fields" disabled={running || !!creationRequest}>
     <label class="lvct-form__item">
         <span>{text("formName", "姓名")} <b class="ft__error">*</b></span>
         <input class="b3-text-field fn__block" type="text" bind:value={draft.name} placeholder={text("formNameHint", "联系人文档名将以此为题")} />
@@ -151,19 +184,45 @@
             <input class="b3-text-field fn__block" type="text" bind:value={tagsText} placeholder={text("formTagsPlaceholder", "球友 重点")} />
         </label>
     </div>
+    </fieldset>
 
-    {#if errorText}
-        <div class="lvct-form__error">{errorText}</div>
+    {#if currentPreview && !creationRequest}
+        <fieldset class="lvct-form__fields" disabled={running}>
+            <legend>{text("contactSameNameReview", "同名候选，请核对人物身份")}</legend>
+            {#each currentPreview.existing as person (person.docId)}
+                <p class="ft__smaller">{person.name} · {person.phone || person.email || person.group || "—"}<br />{person.docId} · {person.itemId}</p>
+            {/each}
+            {#each currentPreview.unbound as doc (doc.docId)}
+                <label class="lvct-form__item lvct-form__item--inline">
+                    <input type="radio" name="lvct-contact-choice" value={doc.docId} bind:group={creationChoice} />
+                    <span>{text("contactReuseDocument", "收编这个文档")}：{doc.hpath}<br /><small>{doc.docId}</small></span>
+                </label>
+            {/each}
+            <label class="lvct-form__item lvct-form__item--inline">
+                <input type="radio" name="lvct-contact-choice" value="new" bind:group={creationChoice} />
+                <span>{text("contactCreateDistinct", "这是另一个同名的人，创建独立人物文档")}</span>
+            </label>
+        </fieldset>
     {/if}
+
+    {#if creationRequest}
+        <p class="ft__smaller" role="status">{text("contactCheckpointFrozen", "已保留原请求，资料暂时锁定；继续将先核实原文档和绑定行。")}
+            <br />{creationRequest.checkpoint.requestId}{creationRequest.checkpoint.docId ? ` · ${creationRequest.checkpoint.docId}` : ""}</p>
+    {/if}
+
+        {#if errorText}
+            <!-- D-35：读屏即时播报（role=alert），focus 落到错误块便于键盘继续操作 -->
+            <div class="lvct-form__error" role="alert" tabindex="-1" bind:this={errorEl}>{errorText}</div>
+        {/if}
 
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={running}>{text("formCancel", "取消")}</button>
-        <button class="b3-button b3-button--text" onclick={submit} disabled={running || draft.name.trim().length === 0}>
-            {running ? text("formCreating", "创建中…") : text("formCreate", "创建联系人")}
+        <button class="b3-button b3-button--text" onclick={submit} disabled={running || draft.name.trim().length === 0 || !!currentPreview && !creationRequest && !creationChoice}>
+            {running ? text("formCreating", "创建中…") : creationRequest ? text("contactContinueCreation", "核实并继续原请求") : text("formCreate", "创建联系人")}
         </button>
     </div>
     <p class="ft__smaller ft__on-surface lvct-form__hint">
-        {text("formCreateHint", "将创建文档「{name}」并绑定为数据库一行；同名未绑定文档会被收编为联系人。", { name: draft.name || "…" })}
+        {text("formCreateHint", "将创建文档「{name}」并绑定为数据库一行；同名候选须核对后选择具体文档或独立人物。", { name: draft.name || "…" })}
     </p>
 </div>
 

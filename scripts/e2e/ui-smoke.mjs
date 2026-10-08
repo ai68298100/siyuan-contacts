@@ -3,11 +3,12 @@
  *  用于在真实宿主 CSS 下跑同一套断言；本机无思源安装（如 CI）时自动回退近似样式。 */
 import { createServer } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { spawn } from "node:child_process";
 import { hostBaselinePlugin } from "./host-baseline.mjs";
+import { readBrowserDebuggingPort, removeIsolatedBrowserProfile, stopIsolatedBrowser } from "./browser-cleanup.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const browserPath = [
@@ -35,19 +36,26 @@ const server = await createServer({
             });
         },
     }],
-    server: { host: "127.0.0.1", port: 0, open: false },
+    server: {
+        host: "127.0.0.1",
+        port: Number(process.env.LVCT_E2E_PORT || 0),
+        strictPort: Number(process.env.LVCT_E2E_PORT) > 0,
+        open: false,
+        hmr: false,
+    },
 });
 let browser;
 let debuggerSocket;
 let profile;
 let timeout;
+let requestBrowserClose;
 try {
     await server.listen();
     const address = server.httpServer.address();
     profile = mkdtempSync(join(tmpdir(), "lvct-ui-"));
     console.log(`隔离浏览器临时目录：${profile}`);
     browser = spawn(browserPath, [
-        "--headless=new", "--no-first-run", "--no-default-browser-check", "--disable-gpu",
+        "--headless=new", "--no-first-run", "--no-default-browser-check", "--disable-gpu", "--disable-extensions",
         // Linux runner（无 user-namespace）上 Chromium 必须关闭沙箱才能启动
         "--no-sandbox", "--disable-dev-shm-usage",
         "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank",
@@ -56,8 +64,8 @@ try {
     browser.stderr?.on("data", (chunk) => { chromeStartupError += chunk.toString(); });
     let debugPort;
     for (let attempt = 0; attempt < 100; attempt++) {
-        const portFile = join(profile, "DevToolsActivePort");
-        if (existsSync(portFile)) { debugPort = Number(readFileSync(portFile, "utf8").split(/\r?\n/)[0]); break; }
+        debugPort = readBrowserDebuggingPort(profile);
+        if (debugPort) break;
         await new Promise((resolveWait) => setTimeout(resolveWait, 100));
     }
     if (!debugPort) throw new Error("浏览器调试端口未启动" + (chromeStartupError ? `：${chromeStartupError.slice(0, 300)}` : ""));
@@ -90,24 +98,28 @@ try {
         pending.set(id, (reply) => reply.error ? rejectCall(new Error(reply.error.message)) : resolveCall(reply.result));
         debuggerSocket.send(JSON.stringify({ id, method, params }));
     });
+    requestBrowserClose = () => call("Browser.close");
     const mobile = process.env.LVCT_UI_MOBILE === "1";
     await call("Runtime.enable");
     await call("Emulation.setDeviceMetricsOverride", { width: mobile ? 390 : 1280, height: mobile ? 844 : 900, deviceScaleFactor: 1, mobile });
-    const hostBaseline = process.env.LVCT_UI_HOST === "1" ? "?host=1" : "";
-    await call("Page.navigate", { url: `http://127.0.0.1:${address.port}/scripts/e2e/ui/index.html${hostBaseline}` });
+    const parameters = new URLSearchParams();
+    if (mobile) parameters.set("mobile", "1");
+    if (process.env.LVCT_UI_HOST === "1") parameters.set("host", "1");
+    if (process.env.LVCT_UI_FILTER) parameters.set("filter", process.env.LVCT_UI_FILTER);
+    await call("Page.navigate", { url: `http://127.0.0.1:${address.port}/scripts/e2e/ui/index.html?${parameters}` });
 await new Promise((r) => setTimeout(r, 300));
     const results = await Promise.race([
         report,
         new Promise((_, reject) => {
             timeout = setTimeout(async () => {
                 try {
-                    const state = await call("Runtime.evaluate", { expression: "(async () => { const q = navigator.locks ? await navigator.locks.query() : {held:[],pending:[]}; return JSON.stringify({stage: window.__stage||'none', held: q.held.map(function(l){return l.name}), pending: q.pending.map(function(l){return l.name})}); })()", awaitPromise: true, returnByValue: true });
+                    const state = await call("Runtime.evaluate", { expression: "(async () => { const q = navigator.locks ? await navigator.locks.query() : {held:[],pending:[]}; return JSON.stringify({stage: window.__stage||'none', currentCase: window.__cases?.at(-1), results: document.querySelector('#results')?.textContent?.slice(-6000), fixture: document.querySelector('#fixture')?.textContent?.slice(0,2000), held: q.held.map(function(l){return l.name}), pending: q.pending.map(function(l){return l.name})}); })()", awaitPromise: true, returnByValue: true });
                     console.log("--- 回归超时，页面进度：", state.result.value);
                     console.log("--- 浏览器 console 尾部 ---");
                     console.log(browserConsole.slice(-40).join(String.fromCharCode(10)));
                 } catch { console.log("--- 回归超时（页面状态不可读）"); }
-                reject(new Error("浏览器回归 240 秒超时"));
-            }, 240000);
+                reject(new Error("浏览器回归 420 秒超时"));
+            }, 420000);
         }),
         new Promise((_, reject) => browser.once("error", reject)),
     ]);
@@ -120,15 +132,22 @@ await new Promise((r) => setTimeout(r, 300));
     }
 } finally {
     clearTimeout(timeout);
-    debuggerSocket?.close();
-    browser?.kill();
-    if (process.platform === "win32" && browser?.pid) {
-        /* kill() 只结束主进程，Chrome 子进程残留句柄会让 rmSync 失败，须整树杀 */
-        spawn("taskkill", ["/pid", String(browser.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
-        await new Promise((r) => setTimeout(r, 300));
+    let browserStopped = false;
+    try {
+        await stopIsolatedBrowser(browser, { requestClose: requestBrowserClose });
+        browserStopped = true;
+    } catch (error) {
+        console.error("隔离浏览器停止失败，保留本轮临时目录：", profile, error);
+        process.exitCode = 1;
+    } finally {
+        debuggerSocket?.close();
     }
-    if (profile) {
-        rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    try {
+        if (profile && browserStopped) await removeIsolatedBrowserProfile(profile);
+    } catch (error) {
+        console.error("隔离浏览器临时目录清理失败，原始回归结果保留：", profile, error);
+        process.exitCode = 1;
+    } finally {
+        await server.close();
     }
-    await server.close();
 }

@@ -43,6 +43,7 @@ export const DEFAULT_DASHBOARD_OPTIONS: DashboardOptions = {
 export interface FollowUpCard {
     item: FollowUpItem;
     bucket: FollowUpBucket;
+    documentSync: "verified" | "pending" | "missing" | "not_created";
     /** 人物已被解绑（从名册移除）时缺省，此时 reachable 为 false，不指向他人 */
     person?: import("../domain/person").ContactSummary;
     reachable: boolean;
@@ -71,6 +72,8 @@ export interface DashboardData {
      * 受影响模块以空数据参与投影并在 UI 显式提示，绝不把故障静默呈现为正常空态。
      */
     readFailures?: readonly string[];
+    ordinaryScopeUnknown?: boolean;
+    excludedSelfDocId?: string;
 }
 
 /** 供组件派生使用的取值函数：把可空数据收窄为行动卡列表 */
@@ -123,14 +126,20 @@ export async function loadDashboard(
     ]);
     /* B11.4：本人不是"待联系对象"——首页统计与行动清单排除本人（名册本身仍保留并标识）。
        身份读取失败按模块降级（readFailures 指名 self，横幅提示），不静默按无本人处理 */
-    const people = excludeSelf(peopleAll, identity);
+    const selfMatches = identity ? peopleAll.filter((person) => person.docId === identity.selfDocId) : [];
+    if (identity && (selfMatches.length !== 1 || selfMatches[0].itemId !== identity.selfItemId)) readFailures.push("self");
+    const ordinaryScopeUnknown = readFailures.includes("self");
+    const people = ordinaryScopeUnknown ? [] : excludeSelf(peopleAll, identity);
     const today = toLocalDateKey(new Date());
     // C02：首次发现补记收编时间（幂等，失败按缺失降级）；宽限期内不计入「从未互动」提醒
     await ensureRegistryEntriesSaved(plugin, people.map((person) => person.docId), today);
     const registry = await readModule(readFailures, "registry", () => loadRegistryStrict(plugin), EMPTY_REGISTRY);
     const graceDays = options.reminderGraceDays ?? 0;
-    // B08：提醒暂缓只屏蔽呈现——生日与久未联系提醒行过滤，统计与名单口径保持真实
-    const birthdays = upcomingBirthdays(people)
+    // B08：提醒暂缓只屏蔽呈现——生日与久未联系提醒行过滤，统计与名单口径保持真实。
+    // C-32：`birthdaysThisWeek` 按原始事实计算（不经提醒窗口截断、不受暂缓影响）——
+    // 窗口小于 7 天时本周生日不得漏报，暂缓生日不得让本周统计下降（FUNC-01.2a 口径）
+    const birthdaysAll = upcomingBirthdays(people);
+    const birthdays = birthdaysAll
         .filter((item) => item.projection.daysUntil <= options.birthdayWindowDays)
         .filter((item) => !isDismissed(dismissals, item.person.docId, "birthday", today));
     const staleAll = staleContacts(store, people, options.staleThresholdDays, new Date(), cadences);
@@ -149,6 +158,7 @@ export async function loadDashboard(
         return {
             item,
             bucket: item.dueDate < today ? "overdue" : item.dueDate === today ? "today" : "upcoming",
+            documentSync: item.docSyncPending ? "pending" : item.docMissing ? "missing" : item.docBlockId ? "verified" : "not_created",
             ...(person ? { person } : {}),
             reachable: Boolean(person),
         };
@@ -158,7 +168,7 @@ export async function loadDashboard(
         ...buckets.overdue,
         ...buckets.today,
         ...buckets.upcoming,
-    ].map(withBucket);
+    ].filter((item) => !ordinaryScopeUnknown && item.personDocId !== identity?.selfDocId).map(withBucket);
 
     // 行动清单（F07）：生日 + 节奏 + 跟进三源按人聚合
     const followUpsByDoc = new Map<string, { id: string; title: string; dueDate: string }[]>();
@@ -192,7 +202,7 @@ export async function loadDashboard(
         people: people.length,
         relations: Math.round(people.reduce((sum, person) => sum + person.relatedItemIds.length, 0) / 2),
         birthdays,
-        birthdaysThisWeek: birthdays.filter((item) => item.bucket === "today" || item.bucket === "week").length,
+        birthdaysThisWeek: birthdaysAll.filter((item) => item.bucket === "today" || item.bucket === "week").length,
         stale: staleRemindable,
         staleTotal: staleAll.length,
         neverContacted: neverContactedPeople.length,
@@ -200,6 +210,8 @@ export async function loadDashboard(
         followUps,
         actions,
         neverOrder,
+        ...(ordinaryScopeUnknown ? { ordinaryScopeUnknown: true } : {}),
+        ...(identity && !ordinaryScopeUnknown ? { excludedSelfDocId: identity.selfDocId } : {}),
         ...(readFailures.length > 0 ? { readFailures } : {}),
     };
 }

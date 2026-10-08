@@ -1,0 +1,237 @@
+{
+  "isolated": true,
+  "syntheticOnly": true,
+  "kernelRequests": 0,
+  "kernelCallsForbidden": true,
+  "node": "v24.15.0",
+  "platform": "win32/x64",
+  "cpu": "11th Gen Intel(R) Core(TM) i5-11300H @ 3.10GHz",
+  "memoryBytes": 16952647680,
+  "pageSize": 200,
+  "budgets": {
+    "firstPageProjectionP95Ms": 100,
+    "fullProjectionP95Ms": 2000,
+    "clientFilterP95Ms": 100,
+    "peakHeapDeltaBytes": 134217728
+  },
+  "contacts": [
+    {
+      "fixtureSize": 1000,
+      "rows": [
+        {
+          "name": "contacts.firstPageProjection",
+          "iterations": 7,
+          "outputCount": 200,
+          "medianMs": 0.1986,
+          "p95Ms": 0.5289,
+          "peakHeapDeltaBytes": 153048,
+          "gcAvailable": true
+        },
+        {
+          "name": "contacts.fullProjection",
+          "iterations": 7,
+          "outputCount": 1000,
+          "medianMs": 0.9318,
+          "p95Ms": 1.2952,
+          "peakHeapDeltaBytes": 651864,
+          "gcAvailable": true
+        },
+        {
+          "name": "contacts.clientFilter",
+          "iterations": 7,
+          "outputCount": 1000,
+          "medianMs": 0.9776,
+          "p95Ms": 2.1639,
+          "peakHeapDeltaBytes": 202216,
+          "gcAvailable": true
+        },
+        {
+          "name": "contacts.groupFilter",
+          "iterations": 7,
+          "outputCount": 500,
+          "medianMs": 0.1804,
+          "p95Ms": 0.5629,
+          "peakHeapDeltaBytes": 52280,
+          "gcAvailable": true
+        }
+      ]
+    },
+    {
+      "fixtureSize": 10000,
+      "rows": [
+        {
+          "name": "contacts.firstPageProjection",
+          "iterations": 7,
+          "outputCount": 200,
+          "medianMs": 0.1954,
+          "p95Ms": 0.4593,
+          "peakHeapDeltaBytes": 63400,
+          "gcAvailable": true
+        },
+        {
+          "name": "contacts.fullProjection",
+          "iterations": 7,
+          "outputCount": 10000,
+          "medianMs": 4.102,
+          "p95Ms": 4.8141,
+          "peakHeapDeltaBytes": 2571232,
+          "gcAvailable": true
+        },
+        {
+          "name": "contacts.clientFilter",
+          "iterations": 7,
+          "outputCount": 10000,
+          "medianMs": 5.8358,
+          "p95Ms": 9.9106,
+          "peakHeapDeltaBytes": 1955600,
+          "gcAvailable": true
+        },
+        {
+          "name": "contacts.groupFilter",
+          "iterations": 7,
+          "outputCount": 5000,
+          "medianMs": 0.8019,
+          "p95Ms": 0.8573,
+          "peakHeapDeltaBytes": 557224,
+          "gcAvailable": true
+        }
+      ]
+    }
+  ],
+  "organizations": [
+    {
+      "fixtureSize": 1000,
+      "rows": [
+        {
+          "name": "organizations.firstPageProjection",
+          "iterations": 7,
+          "outputCount": 200,
+          "medianMs": 0.8166,
+          "p95Ms": 15.0641,
+          "peakHeapDeltaBytes": 249880,
+          "gcAvailable": true
+        },
+        {
+          "name": "organizations.fullProjection",
+          "iterations": 7,
+          "outputCount": 1000,
+          "medianMs": 2.2046,
+          "p95Ms": 2.6815,
+          "peakHeapDeltaBytes": 1043344,
+          "gcAvailable": true
+        }
+      ]
+    },
+    {
+      "fixtureSize": 10000,
+      "rows": [
+        {
+          "name": "organizations.firstPageProjection",
+          "iterations": 7,
+          "outputCount": 200,
+          "medianMs": 0.5077,
+          "p95Ms": 0.9596,
+          "peakHeapDeltaBytes": 330392,
+          "gcAvailable": true
+        },
+        {
+          "name": "organizations.fullProjection",
+          "iterations": 7,
+          "outputCount": 10000,
+          "medianMs": 24.5777,
+          "p95Ms": 59.1209,
+          "peakHeapDeltaBytes": 11117000,
+          "gcAvailable": true
+        }
+      ]
+    }
+  ],
+  "at": "2026-10-04T18:34:22.822Z",
+  "budgetChecks": [
+    {
+      "name": "contacts.firstPageProjection",
+      "fixtureSize": 1000,
+      "ok": true,
+      "p95Ms": 0.5289,
+      "peakHeapDeltaBytes": 153048
+    },
+    {
+      "name": "contacts.fullProjection",
+      "fixtureSize": 1000,
+      "ok": true,
+      "p95Ms": 1.2952,
+      "peakHeapDeltaBytes": 651864
+    },
+    {
+      "name": "contacts.clientFilter",
+      "fixtureSize": 1000,
+      "ok": true,
+      "p95Ms": 2.1639,
+      "peakHeapDeltaBytes": 202216
+    },
+    {
+      "name": "contacts.groupFilter",
+      "fixtureSize": 1000,
+      "ok": true,
+      "p95Ms": 0.5629,
+      "peakHeapDeltaBytes": 52280
+    },
+    {
+      "name": "contacts.firstPageProjection",
+      "fixtureSize": 10000,
+      "ok": true,
+      "p95Ms": 0.4593,
+      "peakHeapDeltaBytes": 63400
+    },
+    {
+      "name": "contacts.fullProjection",
+      "fixtureSize": 10000,
+      "ok": true,
+      "p95Ms": 4.8141,
+      "peakHeapDeltaBytes": 2571232
+    },
+    {
+      "name": "contacts.clientFilter",
+      "fixtureSize": 10000,
+      "ok": true,
+      "p95Ms": 9.9106,
+      "peakHeapDeltaBytes": 1955600
+    },
+    {
+      "name": "contacts.groupFilter",
+      "fixtureSize": 10000,
+      "ok": true,
+      "p95Ms": 0.8573,
+      "peakHeapDeltaBytes": 557224
+    },
+    {
+      "name": "organizations.firstPageProjection",
+      "fixtureSize": 1000,
+      "ok": true,
+      "p95Ms": 15.0641,
+      "peakHeapDeltaBytes": 249880
+    },
+    {
+      "name": "organizations.fullProjection",
+      "fixtureSize": 1000,
+      "ok": true,
+      "p95Ms": 2.6815,
+      "peakHeapDeltaBytes": 1043344
+    },
+    {
+      "name": "organizations.firstPageProjection",
+      "fixtureSize": 10000,
+      "ok": true,
+      "p95Ms": 0.9596,
+      "peakHeapDeltaBytes": 330392
+    },
+    {
+      "name": "organizations.fullProjection",
+      "fixtureSize": 10000,
+      "ok": true,
+      "p95Ms": 59.1209,
+      "peakHeapDeltaBytes": 11117000
+    }
+  ],
+  "ok": true
+}

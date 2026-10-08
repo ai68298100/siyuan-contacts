@@ -1,0 +1,23 @@
+{
+  "isolated": true,
+  "uuidWorkspace": true,
+  "randomPort": true,
+  "configurationRead": false,
+  "externalServiceCalled": false,
+  "version": "3.8.6",
+  "unconfigured": {
+    "route": "/api/ai/chatGPT",
+    "requestKeys": [
+      "msg"
+    ],
+    "code": 0,
+    "dataType": "string",
+    "dataIsNull": false,
+    "dataCharacters": 0,
+    "emptyReply": true,
+    "configurationReply": false,
+    "message": "unclassified (raw message omitted)"
+  },
+  "unconfiguredVerified": true,
+  "successfulGeneration": "host_pending: requires explicitly configured isolated AI; no external service called"
+}

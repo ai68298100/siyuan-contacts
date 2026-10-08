@@ -5,3 +5,4 @@ package.zip
 *.tsbuildinfo
 .mimosa/
 scripts/e2e/shots/
+output/

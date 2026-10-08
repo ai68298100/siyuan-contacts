@@ -1,4 +1,4 @@
-import { mount, unmount, tick } from "svelte";
+import { mount as mountComponent, unmount, tick } from "svelte";
 import Workbench from "../../../src/components/Workbench.svelte";
 import PersonDetail from "../../../src/components/people/PersonDetail.svelte";
 import RelationGraph from "../../../src/components/graph/RelationGraph.svelte";
@@ -11,7 +11,16 @@ import PeopleView from "../../../src/components/people/PeopleView.svelte";
 import SettingsView from "../../../src/components/SettingsView.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
-import { applyContactCandidateFields, createContact, updateContactFields } from "../../../src/services/contacts";
+import { applyContactCandidateFields, batchUpdateContacts, createContact, retryContactFields, updateContactFields } from "../../../src/services/contacts";
+import { retryVcfContacts } from "../../../src/services/vcard";
+import PersonEditDialog from "../../../src/components/people/PersonEditDialog.svelte";
+import ExchangeLedger from "../../../src/components/people/ExchangeLedger.svelte";
+import PersonAliases from "../../../src/components/people/PersonAliases.svelte";
+import DetailPanelsFixture from "./DetailPanelsFixture.svelte";
+import { loadExchangeStore, createExchangeRecord, setExchangeStatus } from "../../../src/data/exchanges";
+import { loadPersonAliasStore, createPersonAlias } from "../../../src/data/person-aliases";
+import { listPersonExchanges } from "../../../src/services/exchanges";
+import { listPersonAliases } from "../../../src/services/person-aliases";
 import { designateSelfIdentity } from "../../../src/services/self-identity";
 import { scanOrganizations, membershipsByOrganization, listPersonOrgMemberships } from "../../../src/services/org";
 import { addOrgMembership } from "../../../src/data/org-membership";
@@ -34,13 +43,38 @@ import { DEFAULT_TEMPLATES } from "../../../src/domain/interaction-templates";
 import { listTemplates, saveTemplates } from "../../../src/services/templates";
 import { importInteractionJson, previewInteractionImport } from "../../../src/services/interaction-import";
 import { FIELD_SPECS } from "../../../src/domain/fields";
-import { initializeWorkspace, inspectWorkspace } from "../../../src/services/init";
-import { buildTimeline, buildCoAttendance } from "../../../src/domain/interactions";
+import { initializeWorkspace, inspectWorkspace, scanAnchorCandidates } from "../../../src/services/init";
+import { buildTimeline, buildCoAttendance, toLocalDateKey } from "../../../src/domain/interactions";
 import { DEFAULT_VIEW_PREFERENCES } from "../../../src/domain/preferences";
 import { kernel } from "./siyuan-mock.js";
 import { handleProtyleEvent } from "../../../src/panels/person-panel";
 import "../../../src/index.scss";
 import englishMessages from "../../../public/i18n/en.json";
+import { runMigrationRegression } from "./migration-regression.js";
+import { runPeopleProfileRegression } from "./people-profile-regression.js";
+import { runOrganizationOperationsRegression } from "./organization-operations-regression.js";
+import { runOperationResultRegression } from "./operation-result-regression.js";
+import { configureBridgeKernel, runExternalBridgeRegression } from "../external-bridge-regression.js";
+import { runRelationRegression } from "./relation-regression.js";
+import { runOrganizationPageRegression } from "./organization-page-regression.js";
+import { runHealthAuditRegression } from "./health-audit-regression.js";
+import { runLifecycleRegression } from "./lifecycle-regression.js";
+import { runTextEncodingRegression } from "./text-encoding-regression.js";
+import { configureVcardKernel, runVcardRegression } from "./vcard-regression.js";
+import { runSelfIdentityRegression } from "./self-identity-regression.js";
+import { runOrganizationHealthRegression } from "./organization-health-regression.js";
+import { runPersonIdentityRegression } from "./person-identity-regression.js";
+import { runOrganizationProjectionRegression } from "./organization-projection-regression.js";
+import { runGraphQueryRegression } from "./graph-query-regression.js";
+import { runAiPreflightRegression } from "./ai-preflight-regression.js";
+import { runImportRegression } from "./import-regression.js";
+import { runAliasRegression } from "./alias-regression.js";
+import { runOrganizationContextRegression } from "./organization-context-regression.js";
+import { runSettingsRepairRegression } from "./settings-repair-regression.js";
+import { runDocumentNavigationRegression } from "./document-navigation-regression.js";
+import { runBatchSelectionRegression } from "./batch-selection-regression.js";
+import { buildAiPreflight } from "../../../src/domain/ai-preflight";
+import { buildAiCandidateDrafts } from "../../../src/domain/ai-candidates";
 
 const fixture = document.querySelector("#fixture");
 const results = [];
@@ -52,7 +86,7 @@ const assert = (ok, message) => { if (!ok) throw new Error(message); };
 async function until(predicate, message) {
     const deadline = Date.now() + 4000;
     while (!predicate()) {
-        if (Date.now() > deadline) throw new Error(message);
+        if (Date.now() > deadline) throw new Error(`${message}\n界面状态：${fixture.textContent}`);
         await pause(20);
     }
     await tick();
@@ -73,11 +107,34 @@ function input(node, value) {
 }
 /** B03 可搜索选人器驱动：按 aria-label 打开浮层，按候选名筛选后点选第一项 */
 async function pickOption(label, name) {
-    const trigger = [...fixture.querySelectorAll(".lvct-picker__trigger")]
+    const findTrigger = () => [...fixture.querySelectorAll(".lvct-picker__trigger")]
         .find((node) => node.getAttribute("aria-label") === label);
+    const trigger = findTrigger();
     assert(trigger, `未找到选人器：${label}`);
-    trigger.click();
-    await until(() => fixture.querySelector(".lvct-picker__panel"), `${label}浮层未打开`);
+    // 关系中心选择后，比较人物的 disabled 属性由父组件响应式更新；在高负载浏览器回归中
+    // 可能比触发器 DOM 早一个 tick，先等待可交互再合成 click，避免把时序竞态误报成浮层故障。
+    await until(() => {
+        const current = findTrigger();
+        return Boolean(current && !current.disabled);
+    }, `${label}选人器尚未启用`);
+    const readyTrigger = findTrigger();
+    assert(readyTrigger && !readyTrigger.disabled, `${label}选人器尚未启用`);
+    // 父组件在上一次选择后可能仍处于同一帧的响应式提交中；让当前
+    // 触发器完成一次 DOM 提交，再点击并以 aria-expanded 作为打开确认。
+    await tick();
+    readyTrigger.click();
+    try {
+        await until(() => {
+            const current = findTrigger();
+            return Boolean(current?.getAttribute("aria-expanded") === "true" && fixture.querySelector(".lvct-picker__panel"));
+        }, `${label}浮层未打开`);
+    } catch (error) {
+        // 仅重试一次合成点击，避免把高负载下的 click/响应式交接竞态报成产品浮层故障。
+        const retryTrigger = findTrigger();
+        if (!retryTrigger || retryTrigger.disabled) throw error;
+        retryTrigger.click();
+        await until(() => fixture.querySelector(".lvct-picker__panel"), `${label}浮层未打开`);
+    }
     const search = fixture.querySelector(".lvct-picker__search");
     if (name) {
         input(search, name);
@@ -100,9 +157,26 @@ const person = {
     group: "朋友", tags: [], relatedItemIds: [],
 };
 const emptyInsights = () => ({ timeline: [], coAttendance: [], totalEvents: 0 });
+function mount(component, options) {
+    if (component !== Workbench) return mountComponent(component, options);
+    return mountComponent(component, {
+        ...options,
+        props: {
+            ...options.props,
+            facade: {
+                listPersonOrgMemberships: async () => [],
+                listCommonOrgBackground: async () => [],
+                listOrganizations: async () => [],
+                listPersonExchanges: async () => [],
+                listPersonAliases: async () => [],
+                ...options.props.facade,
+            },
+        },
+    });
+}
 const renderResult = () => ({ view: {
     columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })),
-    rows: [{ id: person.itemId, cells: [{ value: {
+    rows: [{ id: person.itemId, cells: [{ valueType: "block", value: {
         type: "block", keyID: "name", block: { id: person.docId, content: person.name },
     } }] }],
 } });
@@ -113,8 +187,143 @@ function resetKernel() {
         throw new Error(`回归测试不允许请求 ${route}`);
     };
 }
+function configureOccasionKernel() {
+    const sourceSectionId = "20260927000000-sect001";
+    const sections = new Map();
+    kernel.handler = async (route, payload) => {
+        if (route === "/api/sqlite/flushTransaction") return null;
+        if (route === "/api/av/renderAttributeView") return renderResult();
+        if (route === "/api/query/sql") {
+            const stmt = payload.stmt;
+            if (stmt.startsWith("SELECT content FROM blocks WHERE id =")) {
+                const docId = /id = '([^']+)'/.exec(stmt)?.[1];
+                if (docId === person.docId) return [{ content: person.name }];
+                if (docId === settings.hostDocId) return [{ content: "虚构捕获来源" }];
+                return [];
+            }
+            if (stmt.includes("type='d'")) return [{
+                id: "20260927000000-diary01", content: "2026-09-27",
+                hpath: `/${settings.notebookName}/日记/2026-09-27`,
+            }];
+            const rootDocId = /root_id = '([^']+)'/.exec(stmt)?.[1];
+            if (rootDocId === settings.hostDocId) return [{ id: sourceSectionId }];
+            if (rootDocId === "20260927000000-diary01") return [{ id: "20260927000000-sect002" }];
+            if (rootDocId === person.docId) return [{ id: "20260927000000-sect003" }];
+            throw new Error(`捕获 fixture 未声明 SQL：${stmt}`);
+        }
+        if (route === "/api/block/updateBlock") { sections.set(payload.id, payload.data); return null; }
+        throw new Error(`捕获 fixture 不允许请求 ${route}`);
+    };
+    return { sections, sourceSectionId };
+}
+
+function reflectContactWrites(handler) {
+    const values = new Map();
+    return async (route, body) => {
+        const data = await handler(route, body);
+        if (route === "/api/av/setAttributeViewBlockAttr") {
+            const type = FIELD_SPECS.find((field) => field.key === body.keyID)?.type;
+            if (type) values.set(`${body.itemID}/${body.keyID}`, {
+                valueType: type, value: { type, keyID: body.keyID, ...structuredClone(body.value) },
+            });
+        }
+        if (route === "/api/av/renderAttributeView" && data?.view?.rows) {
+            return { ...data, view: { ...data.view, rows: data.view.rows.map((row) => {
+                const cells = new Map(row.cells.map((cell) => [cell.value.keyID, cell]));
+                for (const [key, value] of values) if (key.startsWith(`${row.id}/`)) cells.set(value.value.keyID, value);
+                return { ...row, cells: [...cells.values()] };
+            }) } };
+        }
+        return data;
+    };
+}
+
+let contactFixtureCount = 0;
+function configureContactVerificationKernel() {
+    settings.avId = `20261004000000-v${String(++contactFixtureCount).padStart(6, "0")}`;
+    const state = { rendered: structuredClone(renderResult()), writes: [], renders: 0,
+        ignored: new Set(), rejected: new Set(), failReadback: false };
+    kernel.handler = async (route, body) => {
+        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") return Object.fromEntries(body.blockIDs.flatMap((docId) => {
+            const matches = state.rendered.view.rows.filter((row) => row.cells.some((cell) => cell.value.block?.id === docId));
+            return matches.length === 1 ? [[docId, matches[0].id]] : [];
+        }));
+        if (route === "/api/sqlite/flushTransaction") return null;
+        if (route === "/api/query/sql") {
+            const docId = body.stmt.match(/id\s*=\s*'([^']+)'/)?.[1];
+            return state.rendered.view.rows.some((row) => row.cells.some((cell) => cell.value.block?.id === docId)) ? [{ id: docId }] : [];
+        }
+        if (route === "/api/av/renderAttributeView") {
+            state.renders += 1;
+            if (state.failReadback && state.writes.length) throw new Error("字段核实读取失败");
+            return structuredClone(state.rendered);
+        }
+        if (route === "/api/av/setAttributeViewBlockAttr") {
+            state.writes.push(structuredClone(body));
+            if (state.rejected.has(body.keyID)) throw new Error("字段写入拒绝");
+            if (!state.ignored.has(body.keyID)) {
+                const row = state.rendered.view.rows.find((entry) => entry.id === body.itemID);
+                const type = FIELD_SPECS.find((field) => field.key === body.keyID).type;
+                row.cells = row.cells.filter((cell) => cell.value.keyID !== body.keyID);
+                row.cells.push({ valueType: type, value: { type, keyID: body.keyID, ...structuredClone(body.value) } });
+            }
+            return null;
+        }
+        throw new Error(`字段核实夹具拒绝未知请求 ${route}`);
+    };
+    return state;
+}
+
+function configureAnchorScanKernel(documents, options = {}) {
+    const state = {
+        notebooks: [...documents.keys()].map((id) => ({ id, name: `扫描夹具 ${id}` })),
+        calls: [],
+        failColumns: false,
+        failPageAfter: null,
+        avBlocks: [{
+            id: "20261003000000-block01", parent_id: options.hostDocId,
+            markdown: 'data-av-id="20261003000000-av00001"',
+        }],
+    };
+    kernel.handler = async (route, payload) => {
+        state.calls.push({ route, payload });
+        if (route === "/api/notebook/lsNotebooks") return { notebooks: state.notebooks };
+        if (route === "/api/query/sql") {
+            const stmt = payload.stmt;
+            if (stmt.includes("type = 'av'")) return state.avBlocks;
+            const notebookId = /box='([^']+)'/.exec(stmt)?.[1];
+            assert(documents.has(notebookId), `扫描访问未知笔记本：${stmt}`);
+            const docs = documents.get(notebookId);
+            if (stmt.includes("COUNT(*)")) {
+                if (options.unknownCount) throw new Error("总数未知");
+                return [{ total: docs.length }];
+            }
+            const after = /id > '([^']+)'/.exec(stmt)?.[1];
+            if (state.failPageAfter && after === state.failPageAfter) throw new Error("文档页注入失败");
+            const limit = Number(/LIMIT (\d+)/.exec(stmt)?.[1]);
+            assert(limit > 0 && limit <= 500 && stmt.includes("ORDER BY id"), `无界或无序扫描：${stmt}`);
+            return docs.filter((doc) => !after || doc.id > after).slice(0, limit);
+        }
+        if (route === "/api/av/renderAttributeView") {
+            if (state.failColumns === true || state.failColumns === payload.id) throw new Error("列注入失败");
+            return { view: { columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })), rows: [] } };
+        }
+        throw new Error(`扫描只读 fixture 拒绝 ${route}`);
+    };
+    return state;
+}
+
+function scanDocuments(count) {
+    return Array.from({ length: count }, (_, index) => ({
+        id: `20261003000000-${String(index).padStart(7, "0")}`,
+        content: `扫描文档 ${index}`,
+        hpath: `/扫描文档 ${index}`,
+    }));
+}
 let mounted;
+const caseFilter = new URLSearchParams(location.search).get("filter");
 async function test(name, action) {
+    if (caseFilter && !new RegExp(caseFilter).test(name)) return;
     resetKernel();
     (window.__cases = window.__cases || []).push(name);
     try {
@@ -129,6 +338,158 @@ async function test(name, action) {
         document.querySelector("#results").textContent = JSON.stringify(results, null, 2);
     }
 }
+
+await test("锚点实际服务：1501 篇跨三轮预算，游标前进、最后候选不遗漏且重扫只读", async () => {
+    const docs = scanDocuments(1501);
+    docs[1500].content = "联系人总表";
+    const state = configureAnchorScanKernel(new Map([[settings.notebookId, docs]]), { hostDocId: docs[1500].id });
+    const first = await scanAnchorCandidates({ pageSize: 500, maxDocuments: 600 });
+    assert(first.status === "truncated" && first.progress.documentsScanned === 600
+        && first.progress.documentsScannedThisCall === 600, `首轮预算错误：${JSON.stringify(first)}`);
+    assert(first.cursor.afterDocId === docs[599].id && first.candidates.length === 0, "首轮游标或候选错误");
+    const second = await scanAnchorCandidates({ cursor: first.cursor, pageSize: 500, maxDocuments: 600 });
+    assert(second.status === "truncated" && second.progress.documentsScanned === 1200
+        && second.progress.documentsScannedThisCall === 600, `继续扫描没有前进：${JSON.stringify(second)}`);
+    assert(second.cursor.afterDocId === docs[1199].id, "第二轮未推进到正确文档");
+    const third = await scanAnchorCandidates({ cursor: second.cursor, pageSize: 500, maxDocuments: 600 });
+    assert(third.status === "complete" && third.cursor === null && third.progress.documentsScanned === 1501
+        && third.progress.documentsScannedThisCall === 301 && third.progress.totalDocuments === 1501,
+    `第三轮累计错误：${JSON.stringify(third)}`);
+    assert(third.candidates.length === 1 && third.candidates[0].hostDocId === docs[1500].id
+        && third.candidates[0].matchedFields === 9, "最后一篇总表的候选被遗漏");
+    const repeat = await scanAnchorCandidates({ maxDocuments: 1000 });
+    const repeatEnd = await scanAnchorCandidates({ cursor: repeat.cursor, maxDocuments: 1000 });
+    assert(repeatEnd.status === "complete" && repeatEnd.progress.documentsScanned === 1501
+        && JSON.stringify(repeatEnd.candidates) === JSON.stringify(third.candidates), "从头重扫结果不一致");
+    assert(state.calls.every(({ route }) => ["/api/notebook/lsNotebooks", "/api/query/sql", "/api/av/renderAttributeView"].includes(route)),
+        "只读扫描产生了写入请求");
+});
+
+await test("锚点实际服务：恰好 1000 篇仍核实下一空页，不凭总数提前宣称完成", async () => {
+    const docs = scanDocuments(1000);
+    const state = configureAnchorScanKernel(new Map([[settings.notebookId, docs]]));
+    const first = await scanAnchorCandidates();
+    assert(first.status === "truncated" && first.progress.documentsScanned === 1000
+        && first.cursor.afterDocId === docs[999].id, "整页到上限没有保留游标");
+    state.calls.length = 0;
+    const end = await scanAnchorCandidates({ cursor: first.cursor });
+    assert(end.status === "complete" && end.cursor === null && end.progress.documentsScanned === 1000
+        && end.progress.documentsScannedThisCall === 0, `空页续做计数错误：${JSON.stringify(end)}`);
+    assert(state.calls.some(({ route, payload }) => route === "/api/query/sql"
+        && payload.stmt.includes(`id > '${docs[999].id}'`)), "未实际读取末页之后的范围");
+});
+
+await test("锚点实际服务：空本、跨本和笔记本重排可续做，增删笔记本使游标失效", async () => {
+    const docs = scanDocuments(4);
+    const books = new Map([
+        ["20261003000000-book003", docs.slice(2)],
+        ["20261003000000-book001", []],
+        ["20261003000000-book002", docs.slice(0, 2)],
+    ]);
+    const state = configureAnchorScanKernel(books);
+    const first = await scanAnchorCandidates({ pageSize: 2, maxDocuments: 3 });
+    assert(first.status === "truncated" && first.progress.notebooksCompleted === 2
+        && first.cursor.notebookId === "20261003000000-book003"
+        && first.cursor.afterDocId === docs[2].id && first.cursor.scannedInNotebook === 1,
+    `跨本游标错误：${JSON.stringify(first)}`);
+    state.notebooks.reverse();
+    const end = await scanAnchorCandidates({ cursor: first.cursor, pageSize: 2, maxDocuments: 3 });
+    assert(end.status === "complete" && end.progress.notebooksCompleted === 3
+        && end.progress.documentsScanned === 4 && end.progress.documentsScannedThisCall === 1,
+    `笔记本重排阻止续扫：${JSON.stringify(end)}`);
+    const rejectChangedBooks = async () => {
+        state.calls.length = 0;
+        let error = "";
+        try { await scanAnchorCandidates({ cursor: first.cursor }); } catch (cause) { error = cause.message; }
+        assert(error.includes("笔记本列表已变化") && state.calls.length === 1,
+            `变化的笔记本集合未在扫描前拒绝：${error}`);
+    };
+    const originalBooks = [...state.notebooks];
+    state.notebooks.push({ id: "20261003000000-book004", name: "新增测试本" });
+    await rejectChangedBooks();
+    state.notebooks = originalBooks.filter((book) => book.id !== "20261003000000-book002");
+    await rejectChangedBooks();
+});
+
+await test("锚点实际服务：总数未知仍按文档页继续，未知不冒充零文档", async () => {
+    configureAnchorScanKernel(new Map([[settings.notebookId, scanDocuments(3)]]), { unknownCount: true });
+    const first = await scanAnchorCandidates({ pageSize: 2, maxDocuments: 2 });
+    assert(first.status === "truncated" && first.progress.totalDocuments === null
+        && first.progress.currentNotebookTotal === null && first.issues[0]?.kind === "count", "总数失败被伪装为零或阻止扫描");
+    const end = await scanAnchorCandidates({ cursor: first.cursor, pageSize: 2, maxDocuments: 2 });
+    assert(end.status === "complete" && end.progress.totalDocuments === null
+        && end.progress.documentsScanned === 3 && end.progress.documentsScannedThisCall === 1
+        && end.issues[0]?.kind === "count", `未知总数续扫错误：${JSON.stringify(end)}`);
+});
+
+await test("锚点实际服务：文档页失败保留断点，恢复后继续且计数不重复", async () => {
+    const docs = scanDocuments(5);
+    const state = configureAnchorScanKernel(new Map([[settings.notebookId, docs]]));
+    state.failPageAfter = docs[1].id;
+    const failed = await scanAnchorCandidates({ pageSize: 2, maxDocuments: 4 });
+    assert(failed.status === "blocked" && failed.issues[0]?.kind === "documents"
+        && failed.cursor.afterDocId === docs[1].id && failed.progress.documentsScanned === 2
+        && failed.progress.documentsScannedThisCall === 2, `文档读取失败丢失断点：${JSON.stringify(failed)}`);
+    state.failPageAfter = null;
+    const end = await scanAnchorCandidates({ cursor: failed.cursor, pageSize: 2, maxDocuments: 4 });
+    assert(end.status === "complete" && end.progress.documentsScanned === 5
+        && end.progress.documentsScannedThisCall === 3 && end.issues.length === 0,
+    `失败恢复的累计或单轮计数错误：${JSON.stringify(end)}`);
+});
+
+await test("锚点实际服务：字段读取失败停在宿主文档之前，重试不漏候选或重复计数", async () => {
+    const docs = scanDocuments(5);
+    docs[2].content = "联系人总表";
+    const state = configureAnchorScanKernel(new Map([[settings.notebookId, docs]]), { hostDocId: docs[2].id });
+    state.failColumns = true;
+    const failed = await scanAnchorCandidates({ pageSize: 2, maxDocuments: 4 });
+    assert(failed.status === "blocked" && failed.issues[0]?.kind === "columns"
+        && failed.cursor.afterDocId === docs[1].id && failed.progress.documentsScanned === 2
+        && failed.progress.documentsScannedThisCall === 2 && failed.candidates.length === 0,
+    `未知字段被当作已扫描：${JSON.stringify(failed)}`);
+    state.failColumns = false;
+    const end = await scanAnchorCandidates({ cursor: failed.cursor, pageSize: 2, maxDocuments: 4 });
+    assert(end.status === "complete" && end.progress.documentsScanned === 5
+        && end.progress.documentsScannedThisCall === 3 && end.candidates.length === 1
+        && end.candidates[0].hostDocId === docs[2].id, "字段恢复后遗漏宿主候选或重复计数");
+});
+
+await test("设置页实际扫描：未知读取可重试，候选跨轮去重，单轮与累计进度显示正确", async () => {
+    const docs = scanDocuments(5);
+    docs[2].content = "联系人总表";
+    const state = configureAnchorScanKernel(new Map([[settings.notebookId, docs]]), { hostDocId: docs[2].id });
+    state.avBlocks.push({
+        id: "20261003000000-block02", parent_id: docs[2].id,
+        markdown: 'data-av-id="20261003000000-av00002"',
+    });
+    state.failColumns = "20261003000000-av00002";
+    mounted = mount(SettingsView, { target: fixture, props: {
+        facade: {
+            settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+            scanAnchorCandidates: (options) => scanAnchorCandidates({ ...options, pageSize: 2, maxDocuments: 3 }),
+            checkSettingsHealth: async () => ({ ok: true, columns: 9, missing: [], problems: [], availableColumns: [] }),
+        },
+        settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {},
+    } });
+    navButton(["数据与字段"]).click();
+    await tick();
+    button("重新绑定已有数据库").click();
+    await tick();
+    button("扫描全库候选（只读）").click();
+    await until(() => fixture.textContent.includes("扫描在第 2 篇"), "读取失败未在设置页显示暂停");
+    assert(fixture.querySelectorAll('input[name="lvct-anchor-candidate"]').length === 1, "失败前核实的候选未保留");
+    state.failColumns = false;
+    button("重试当前位置").click();
+    await until(() => fixture.textContent.includes("累计 5 / 5"), "重试后累计进度未前进");
+    assert(fixture.textContent.includes("本轮已检查 3 篇"), "单轮进度错误显示为累计值");
+    assert(fixture.querySelectorAll('input[name="lvct-anchor-candidate"]').length === 2, "重试的候选没有去重");
+    button("继续扫描").click();
+    await until(() => fixture.textContent.includes("扫描完成：已检查 5 / 5"), "最终空页未确认完成");
+    assert(fixture.textContent.includes("找到 2 个候选")
+        && fixture.textContent.includes("新增或移动的文档"), "累计候选数或快照边界没有说明");
+    assert(![...fixture.querySelectorAll("button")].some((node) => node.textContent.trim() === "继续扫描"), "扫描完成仍可重复续做");
+});
 
 await test("首页零人筛选保持空结果，清除后恢复联系人", async () => {
     mounted = mount(Workbench, { target: fixture, props: {
@@ -191,8 +552,13 @@ await test("数据变化通知：空闲时原地刷新，草稿编辑中刷新�
 
 await test("数据刷新乱序防护：慢的旧互动响应不得覆盖新数据（FUNC-01.7-a）", async () => {
     let recentCalls = 0;
+    let firstReturned = false;
     let releaseFirst = () => {};
     const firstGate = new Promise((resolve) => { releaseFirst = resolve; });
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const older = new Date();
+    older.setDate(older.getDate() - 60);
     kernel.handler = async (route) => {
         if (route === "/api/av/renderAttributeView") return renderResult();
         throw new Error(`回归测试不允许请求 ${route}`);
@@ -203,8 +569,12 @@ await test("数据刷新乱序防护：慢的旧互动响应不得覆盖新数�
         facade: { settings,
             loadRecentInteractions: async () => {
                 recentCalls += 1;
-                if (recentCalls === 1) return firstGate;
-                return { "20260927000000-person1": { occurredAt: 1, localDate: "2026-09-29" } };
+                if (recentCalls === 1) {
+                    const value = await firstGate;
+                    firstReturned = true;
+                    return value;
+                }
+                return { [person.docId]: { occurredAt: yesterday.getTime(), localDate: toLocalDateKey(yesterday) } };
             },
             loadDashboard: async () => ({
                 people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
@@ -223,7 +593,8 @@ await test("数据刷新乱序防护：慢的旧互动响应不得覆盖新数�
     emitDataChanged();
     await until(() => fixture.textContent.includes("昨天互动"), "数据变化未带来新互动数据");
     /* 迟到的旧响应（60 天前）必须在代际守卫处丢弃 */
-    releaseFirst({ "20260927000000-person1": { occurredAt: 0, localDate: "2026-08-01" } });
+    releaseFirst({ [person.docId]: { occurredAt: older.getTime(), localDate: toLocalDateKey(older) } });
+    await until(() => firstReturned, "旧响应未返回，无法验证乱序防护");
     await tick();
     await tick();
     await tick();
@@ -234,9 +605,11 @@ await test("数据刷新乱序防护：慢的旧互动响应不得覆盖新数�
 await test("数据刷新：已打开的 Peek 随数据变化原地重载洞察与跟进（FUNC-01.7-a）", async () => {
     let insightsCalls = 0;
     let followUpCalls = 0;
+    let cadenceCalls = 0;
+    let cadence = { days: 7, paused: false };
     kernel.handler = async (route) => {
         if (route === "/api/av/renderAttributeView") return renderResult();
-        return { code: 0 };
+        return null;
     };
     mounted = mount(Workbench, { target: fixture, props: {
         settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
@@ -252,6 +625,8 @@ await test("数据刷新：已打开的 Peek 随数据变化原地重载洞察�
                 followUpCalls += 1;
                 return [{ id: "fu-peek-1", personDocId: person.docId, title: "跨窗口跟进", dueDate: "2026-10-30", status: "open", createdAt: 1, updatedAt: 1 }];
             },
+            getPersonCadence: async () => { cadenceCalls += 1; return cadence; },
+            savePersonCadence: async (_docId, value) => { cadence = value; },
             createFollowUp: async () => { throw new Error("用例不涉及"); },
             setFollowUpStatus: async () => {},
             snoozeFollowUp: async () => {},
@@ -264,10 +639,22 @@ await test("数据刷新：已打开的 Peek 随数据变化原地重载洞察�
     detailNav.closest("button").click();
     await until(() => fixture.querySelector(".lvct-person-card"), "名册未渲染");
     fixture.querySelector(".lvct-person-card").dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await until(() => insightsCalls >= 1 && followUpCalls >= 1, "Peek 未加载洞察与跟进");
+    await until(() => insightsCalls >= 1 && followUpCalls >= 1 && cadenceCalls >= 1, "Peek 未加载洞察、跟进与联系节奏");
+    const cadenceMode = fixture.querySelector('select[aria-label="联系节奏模式"]');
+    assert(cadenceMode, "Peek 未渲染联系节奏控件");
+    cadenceMode.value = "custom";
+    cadenceMode.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    const cadenceDays = fixture.querySelector('input[aria-label="自定义天数"]');
+    assert(cadenceDays, "自定义节奏未出现天数输入");
+    input(cadenceDays, "23");
+    await tick();
+    const cadenceCallsBeforeRefresh = cadenceCalls;
+    cadence = { days: 3, paused: false };
     emitDataChanged();
     await until(() => insightsCalls >= 2 && followUpCalls >= 2, "Peek 未随数据变化原地重载");
     assert(fixture.textContent.includes("跨窗口跟进"), "重载后跟进列表未渲染");
+    assert(cadenceCalls === cadenceCallsBeforeRefresh && cadenceDays.value === "23", "跨窗口刷新覆盖了未保存的联系节奏草稿");
 });
 
 await test("粘贴并识别：分组预览、勾选回填草稿、冲突默认不覆盖（FAST-01.1）", async () => {
@@ -284,6 +671,14 @@ await test("粘贴并识别：分组预览、勾选回填草稿、冲突默认�
     await until(() => fixture.querySelector(".lvct-form input[type=text]"), "新建弹窗未打开");
     [...fixture.querySelectorAll("button")].find((n) => n.textContent.includes("粘贴并识别")).click();
     await until(() => fixture.querySelector(".lvct-qf__input"), "粘贴弹窗未打开");
+    input(fixture.querySelector(".lvct-qf__input"), "暂不应用");
+    await tick();
+    fixture.querySelector(".lvct-qf .b3-button--cancel").click();
+    await until(() => document.body.querySelector(".lvct-closeguard"), "快捷填充脏草稿关闭未弹守卫");
+    assert(fixture.querySelector(".lvct-qf__input"), "快捷填充守卫期间弹窗被关闭");
+    document.body.querySelector('.lvct-closeguard button[data-choice="cancel"]').click();
+    await until(() => !document.body.querySelector(".lvct-closeguard"), "快捷填充关闭守卫未取消");
+    assert(fixture.querySelector(".lvct-qf__input"), "取消守卫后快捷填充弹窗未保留");
     input(fixture.querySelector(".lvct-qf__input"), "张三\n手机：13800138000\n微信：zhang_san\n邮箱：a@example.com\n#家人");
     await tick(); /* 等 bind 渲染生效，否则「识别」仍是 disabled，click 会被吞掉 */
     button("识别").click();
@@ -319,21 +714,21 @@ await test("相关人选择走可搜索选人器：电话关键词筛选、空�
         { id: "row-2", docId: "20260927000000-person2", name: "候选乙", phone: "13800001111", wechat: "yi_wx", tags: ["球友"], group: "同事" },
         { id: "row-3", docId: "20260927000000-person3", name: "候选丙", phone: "13900002222", wechat: "", tags: [], group: "家人" },
     ];
-    kernel.handler = async (route, body) => {
+    kernel.handler = reflectContactWrites(async (route, body) => {
         if (route === "/api/av/renderAttributeView") return { view: {
             columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })),
             rows: rows.map((row) => ({ id: row.id, cells: [
-                { value: { type: "block", keyID: "name", block: { id: row.docId, content: row.name } } },
-                { value: { type: "phone", keyID: "phone", phone: { content: row.phone } } },
-                { value: { type: "text", keyID: "wechat", text: { content: row.wechat } } },
-                { value: { type: "mSelect", keyID: "group", mSelect: row.group ? [{ content: row.group }] : [] } },
-                { value: { type: "mSelect", keyID: "tags", mSelect: row.tags.map((tag) => ({ content: tag })) } },
-                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+                { valueType: "block", value: { type: "block", keyID: "name", block: { id: row.docId, content: row.name } } },
+                { valueType: "phone", value: { type: "phone", keyID: "phone", phone: { content: row.phone } } },
+                { valueType: "text", value: { type: "text", keyID: "wechat", text: { content: row.wechat } } },
+                { valueType: "mSelect", value: { type: "mSelect", keyID: "group", mSelect: row.group ? [{ content: row.group }] : [] } },
+                { valueType: "mSelect", value: { type: "mSelect", keyID: "tags", mSelect: row.tags.map((tag) => ({ content: tag })) } },
+                { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
             ] })),
         } };
-        if (route === "/api/av/setAttributeViewBlockAttr") { cellWrites.push(body ?? {}); return { code: 0 }; }
-        return { code: 0 }; /* 文档区块同步等后续调用宽松放行 */
-    };
+        if (route === "/api/av/setAttributeViewBlockAttr") { cellWrites.push(body ?? {}); return null; }
+        return null; /* 文档区块同步等后续调用宽松放行 */
+    });
     mounted = mount(PersonDetail, { target: fixture, props: {
         settings, person, onRecord: async () => {}, onLoadInsights: async () => emptyInsights(),
         onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
@@ -364,22 +759,23 @@ await test("资料完整度筛选与串行补录：缺电话列表、逐个保�
         { id: "row-2", docId: "20260927000000-person2", name: "有邮箱缺电话乙", phone: "", wechat: "", email: "b@x.com", group: "", tags: [] },
         { id: "row-3", docId: "20260927000000-person3", name: "齐全丙", phone: "13900002222", wechat: "bing_wx", email: "c@x.com", group: "家人", tags: ["球友"] },
     ];
-    kernel.handler = async (route, body) => {
+    kernel.handler = reflectContactWrites(async (route, body) => {
         if (route === "/api/av/renderAttributeView") return { view: {
             columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })),
             rows: rows.map((row) => ({ id: row.id, cells: [
-                { value: { type: "block", keyID: "name", block: { id: row.docId, content: row.name } } },
-                { value: { type: "phone", keyID: "phone", phone: { content: row.phone } } },
-                { value: { type: "text", keyID: "wechat", text: { content: row.wechat } } },
-                { value: { type: "email", keyID: "email", email: { content: row.email } } },
-                { value: { type: "mSelect", keyID: "group", mSelect: row.group ? [{ content: row.group }] : [] } },
-                { value: { type: "mSelect", keyID: "tags", mSelect: row.tags.map((tag) => ({ content: tag })) } },
-                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+                { valueType: "block", value: { type: "block", keyID: "name", block: { id: row.docId, content: row.name } } },
+                { valueType: "phone", value: { type: "phone", keyID: "phone", phone: { content: row.phone } } },
+                { valueType: "text", value: { type: "text", keyID: "wechat", text: { content: row.wechat } } },
+                { valueType: "email", value: { type: "email", keyID: "email", email: { content: row.email } } },
+                { valueType: "mSelect", value: { type: "mSelect", keyID: "group", mSelect: row.group ? [{ content: row.group }] : [] } },
+                { valueType: "mSelect", value: { type: "mSelect", keyID: "tags", mSelect: row.tags.map((tag) => ({ content: tag })) } },
+                { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
             ] })),
         } };
-        if (route === "/api/av/setAttributeViewBlockAttr") { cellWrites.push(body ?? {}); return { code: 0 }; }
-        return { code: 0 };
-    };
+        if (route === "/api/av/setAttributeViewBlockAttr") { cellWrites.push(body ?? {}); return null; }
+        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") return Object.fromEntries(rows.map((row) => [row.docId, row.id]));
+        return null;
+    });
     mounted = mount(PeopleView, { target: fixture, props: {
         settings, preferences: DEFAULT_VIEW_PREFERENCES,
         loadRecentInteractions: async () => ({}),
@@ -388,6 +784,15 @@ await test("资料完整度筛选与串行补录：缺电话列表、逐个保�
         onPreferencesChange: async (next) => next,
     } });
     await until(() => fixture.querySelector(".lvct-person-card"), "列表未渲染");
+    const peopleSearch = fixture.querySelector('.lvct-people__toolbar input[placeholder*="搜索姓名"]');
+    assert(peopleSearch?.getAttribute("aria-label") === "搜索联系人", "桌面联系人搜索缺少可访问名称");
+    const peopleGroupFilter = fixture.querySelector('.lvct-people__toolbar select');
+    assert(peopleGroupFilter?.getAttribute("aria-label") === "分组筛选", "分组筛选缺少可访问名称");
+    button("视图").click();
+    await until(() => fixture.querySelector("#lvct-people-viewsmenu-panel"), "视图面板未打开");
+    const viewsPanel = fixture.querySelector("#lvct-people-viewsmenu-panel");
+    assert(viewsPanel?.getAttribute("role") === "group" && !viewsPanel.querySelector('[role="menuitem"]'), "保存视图面板不应伪装为嵌套 ARIA 菜单项");
+    button("视图").click();
     button("更多筛选").click();
     await until(() => fixture.querySelector('input[name="lvct-profile-gap"]'), "资料完整度筛选组未显示");
     [...fixture.querySelectorAll('input[name="lvct-profile-gap"]')][0].click();
@@ -405,8 +810,10 @@ await test("资料完整度筛选与串行补录：缺电话列表、逐个保�
     button("保存并下一位").click();
     await until(() => fixture.textContent.includes("补录结束：保存 2 人"), "未出现补录总结");
     assert(cellWrites.length > 0, "未发起字段写入");
-    /* 关键保底：乙已有邮箱 b@x.com 必须随全字段写入回写，不能被清空 */
-    assert(JSON.stringify(cellWrites).includes("b@x.com"), "全字段写入未保底已有邮箱");
+    invalidateRoster();
+    const reread = await getRoster(settings);
+    assert(reread.find((entry) => entry.docId === rows[1].docId)?.email === "b@x.com"
+        && cellWrites.every((write) => write.keyID === "phone"), "补录改写了既有邮箱或其它字段");
     assert(JSON.stringify(cellWrites).includes("13800001234") && JSON.stringify(cellWrites).includes("13900005678"), "新电话未写入");
 });
 
@@ -420,16 +827,16 @@ await test("移动端工具栏收纳：常驻搜索/视图切换/新建，其余
         if (route === "/api/av/renderAttributeView") return { view: {
             columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })),
             rows: rows.map((row) => ({ id: row.id, cells: [
-                { value: { type: "block", keyID: "name", block: { id: row.docId, content: row.name } } },
-                { value: { type: "phone", keyID: "phone", phone: { content: row.phone } } },
-                { value: { type: "text", keyID: "wechat", text: { content: row.wechat } } },
-                { value: { type: "email", keyID: "email", email: { content: row.email } } },
-                { value: { type: "mSelect", keyID: "group", mSelect: row.group ? [{ content: row.group }] : [] } },
-                { value: { type: "mSelect", keyID: "tags", mSelect: row.tags.map((tag) => ({ content: tag })) } },
-                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+                { valueType: "block", value: { type: "block", keyID: "name", block: { id: row.docId, content: row.name } } },
+                { valueType: "phone", value: { type: "phone", keyID: "phone", phone: { content: row.phone } } },
+                { valueType: "text", value: { type: "text", keyID: "wechat", text: { content: row.wechat } } },
+                { valueType: "email", value: { type: "email", keyID: "email", email: { content: row.email } } },
+                { valueType: "mSelect", value: { type: "mSelect", keyID: "group", mSelect: row.group ? [{ content: row.group }] : [] } },
+                { valueType: "mSelect", value: { type: "mSelect", keyID: "tags", mSelect: row.tags.map((tag) => ({ content: tag })) } },
+                { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
             ] })),
         } };
-        return { code: 0 };
+        return null;
     };
     mounted = mount(PeopleView, { target: fixture, props: {
         settings, preferences: DEFAULT_VIEW_PREFERENCES,
@@ -454,6 +861,29 @@ await test("移动端工具栏收纳：常驻搜索/视图切换/新建，其余
     groupSelect.dispatchEvent(new Event("change", { bubbles: true }));
     await tick();
     await until(() => fixture.textContent.includes("共 1 人"), "弹层内分组筛选未生效");
+
+    const sheet = fixture.querySelector(".lvct-sheet");
+    assert(sheet.getAttribute("aria-modal") === "true", "移动工具抽屉未声明模态语义");
+    const titleId = sheet.getAttribute("aria-labelledby");
+    assert(titleId && fixture.querySelector(`#${titleId}`)?.textContent.includes("筛选与整理"), "移动工具抽屉标题关联缺失");
+    const close = sheet.querySelector(".lvct-sheet__bar button");
+    await until(() => document.activeElement === close, "打开抽屉后未聚焦收起按钮");
+
+    const focusables = [...sheet.querySelectorAll("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])")];
+    assert(focusables.length > 1, "移动工具抽屉没有足够的键盘焦点项");
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    last.focus();
+    last.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    assert(document.activeElement === first, "Tab 未从末项循环到首项");
+    first.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
+    assert(document.activeElement === last, "Shift+Tab 未从首项循环到末项");
+
+    close.focus();
+    close.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await until(() => !fixture.querySelector(".lvct-sheet"), "Escape 未关闭移动工具抽屉");
+    await until(() => document.activeElement === tools, "抽屉关闭后焦点未返回触发器");
+    assert(tools.getAttribute("aria-expanded") === "false", "抽屉关闭后触发器展开状态未更新");
 });
 
 await test("行动区一键建跟进与处置撤销（C07/C06）", async () => {
@@ -561,6 +991,14 @@ await test("完整迁移包：六模块导出→恢复预览→确认合并，�
     let rejected = false;
     try { previewMigrationImport("{ broken"); } catch { rejected = true; }
     assert(rejected, "坏包应被拒绝");
+    const malformedModule = { ...bundle, modules: { ...bundle.modules, templates: { schemaVersion: 1, templates: "not-an-array" } } };
+    rejected = false;
+    try { previewMigrationImport(JSON.stringify(malformedModule)); } catch { rejected = true; }
+    assert(rejected, "损坏的模块字段应在预览阶段被拒绝");
+    const unknownModule = { ...bundle, modules: { ...bundle.modules, futureModule: { schemaVersion: 1 } } };
+    rejected = false;
+    try { previewMigrationImport(JSON.stringify(unknownModule)); } catch { rejected = true; }
+    assert(rejected, "未知迁移模块应在预览阶段被拒绝");
 });
 
 await test("迁移恢复单模块失败可见、不阻断其他模块且不污染坏库（C08/FUNC-01.6-b/c）", async () => {
@@ -605,15 +1043,17 @@ await test("任务对账：勾选/改标题/改期回写索引，块删除标不
         { id: "fu-doc-2", personDocId: person.docId, title: "块被删事项", dueDate: "2026-10-02", status: "open", createdAt: 1, updatedAt: 1, docBlockId: "blk-gone" },
         { id: "fu-doc-3", personDocId: person.docId, title: "一致事项", dueDate: "2026-10-03", status: "open", createdAt: 1, updatedAt: 1, docBlockId: "blk-3" },
     ] });
-    kernel.handler = async (route) => {
+    kernel.handler = async (route, payload) => {
         if (route === "/api/query/sql") {
+            if (payload.stmt.includes("WHERE id = '")) return [{ id: person.docId }];
+            if (payload.stmt.includes("id > '")) return [];
             /* 文档现状：fu-doc-1 已勾选且改标题/改期；fu-doc-2 的块已被删（不出现在本文档）；fu-doc-3 一致 */
             return [
-                { id: "blk-1", ial: 'custom-lvct-followup="fu-doc-1"', markdown: "- [X] 文档新标题 📅2026-11-05" },
-                { id: "blk-3", ial: 'custom-lvct-followup="fu-doc-3"', markdown: "- [ ] 一致事项 📅2026-10-03" },
+                { id: "20261004000000-blkdoc1", ial: 'custom-lvct-followup="fu-doc-1"', markdown: "- [X] 文档新标题 📅2026-11-05" },
+                { id: "20261004000000-blkdoc3", ial: 'custom-lvct-followup="fu-doc-3"', markdown: "- [ ] 一致事项 📅2026-10-03" },
             ];
         }
-        return { code: 0 };
+        return null;
     };
 
     const changed = await reconcileFollowUpTasksFromDoc(plugin, person.docId);
@@ -622,7 +1062,7 @@ await test("任务对账：勾选/改标题/改期回写索引，块删除标不
     assert(byId["fu-doc-1"].status === "done", "文档勾选未收敛为 done");
     assert(byId["fu-doc-1"].title === "文档新标题", "文档标题未回写索引");
     assert(byId["fu-doc-1"].dueDate === "2026-11-05", "文档日期未回写索引");
-    assert(byId["fu-doc-1"].docBlockId === "blk-1", "块 ID 未记录");
+    assert(byId["fu-doc-1"].docBlockId === "20261004000000-blkdoc1", "块 ID 未记录");
     assert(byId["fu-doc-2"].docMissing === true, "块删除未标不可达");
     assert(byId["fu-doc-2"].docBlockId === undefined, "消失块的旧 ID 未清空");
     assert(byId["fu-doc-3"].docMissing === undefined, "一致事项不得被标缺失");
@@ -636,7 +1076,7 @@ await test("任务对账：勾选/改标题/改期回写索引，块删除标不
 await test("移动端人物卡片内容自适应，min-height 收缩且空 chips 收起（B09-2）", async () => {
     kernel.handler = async (route) => {
         if (route === "/api/av/renderAttributeView") return renderResult();
-        return { code: 0 };
+        return null;
     };
     mounted = mount(PeopleView, { target: fixture, props: {
         settings, preferences: DEFAULT_VIEW_PREFERENCES,
@@ -752,13 +1192,61 @@ await test("行内快捷处置：生日跳过本年、从未互动不再提醒�
     await until(() => dismissals.some((entry) => entry.kind === "stale" && entry.until === ""), "不再提醒未写入长期暂缓");
 });
 
-await test("收编宽限期与批量安顿：宽限内不出行动卡、批量暂缓可一次性撤销（C02）", async () => {
+await test("近期生日行：主按钮可聚焦打开详情，跳过按钮不触发详情（UX-01.14）", async () => {
+    const opened = [];
+    const dismissals = [];
+    const birthdayPerson = {
+        ...person,
+        docId: "20260927000000-birthday0001",
+        itemId: "row-birthday",
+        name: "键盘寿星",
+    };
+    mounted = mount(DashboardView, { target: fixture, props: {
+        preferences: DEFAULT_VIEW_PREFERENCES,
+        onOpenDetail(value) { opened.push(value.docId); },
+        onOpenPeople() {}, onOpenGraph() {},
+        facade: {
+            settings,
+            loadDashboard: async () => ({
+                people: 1, relations: 0,
+                birthdays: [{ person: birthdayPerson, bucket: "today", projection: { daysUntil: 0, label: "今天" } }],
+                birthdaysThisWeek: 1, stale: [], staleTotal: 0, neverContacted: 0,
+                neverContactedItemIds: [], actions: [], followUps: [],
+            }),
+            dismissReminder: async (docId, kind, until) => dismissals.push({ docId, kind, until }),
+            resumeReminder: async () => {},
+            loadReminderDismissals: async () => [],
+        },
+    } });
+    await until(() => fixture.querySelector(".lvct-dash__row-main"), "近期生日主按钮未渲染");
+    const mainButton = fixture.querySelector(".lvct-dash__row-main");
+    const skipButton = [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "跳过本年");
+    assert(mainButton && skipButton, "近期生日行缺少独立主按钮或跳过按钮");
+    mainButton.focus();
+    mainButton.click();
+    assert(opened.length === 1 && opened[0] === birthdayPerson.docId, "键盘可聚焦的生日主按钮未打开详情");
+    skipButton.focus();
+    skipButton.click();
+    await until(() => dismissals.length === 1, "跳过本年未写入");
+    assert(opened.length === 1, "跳过本年按钮不应再次打开详情");
+});
+
+await test("收编宽限期与批量安顿：只撤销本批且保留并发修改（C02/C06）", async () => {
     const personOf = (name) => ({
         docId: `20260927000000-${name}0000`, itemId: `row-${name}`, name,
         phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
         group: "", tags: [], relatedItemIds: [],
     });
-    const dismissals = [];
+    const first = personOf("从未甲");
+    const second = personOf("从未乙");
+    const dismissals = [
+        { personDocId: "20260927000000-外部项0000", kind: "stale", until: "2099-01-01" },
+        { personDocId: first.docId, kind: "stale", until: "2098-01-01" },
+    ];
+    const actions = [first, second].map((person) => ({
+        person, bucket: "stale",
+        reasons: [{ kind: "stale", label: "从未互动", bucket: "stale", neverContacted: true }],
+    }));
     mounted = mount(Workbench, { target: fixture, props: {
         settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
         onPreferencesUpdated() {}, onOpenPersonDoc() {},
@@ -767,14 +1255,19 @@ await test("收编宽限期与批量安顿：宽限内不出行动卡、批量�
                 /* 宽限过滤在服务层；此处用 mock 表达过滤后口径：never 组被宽限隐藏、统计保持真实 */
                 return {
                     people: 3, relations: 0, birthdays: [], birthdaysThisWeek: 0,
-                    stale: [], staleTotal: 3, neverContacted: 3,
-                    neverContactedItemIds: [personOf("宽限一").docId, personOf("宽限二").docId, personOf("宽限三").docId],
-                    followUps: [], actions: [], neverOrder: {},
+                    stale: [], staleTotal: 2, neverContacted: 2,
+                    neverContactedItemIds: [first.docId, second.docId],
+                    followUps: [], actions, neverOrder: {},
                 };
             },
-            dismissReminder: async (docId, kind, until) => dismissals.push({ docId, kind, until }),
+            dismissReminder: async (docId, kind, until) => {
+                const existing = dismissals.findIndex((entry) => entry.personDocId === docId && entry.kind === kind);
+                const next = { personDocId: docId, kind, until };
+                if (existing >= 0) dismissals.splice(existing, 1, next);
+                else dismissals.push(next);
+            },
             resumeReminder: async (docId, kind) => {
-                const index = dismissals.findIndex((entry) => entry.docId === docId && entry.kind === kind);
+                const index = dismissals.findIndex((entry) => entry.personDocId === docId && entry.kind === kind);
                 if (index >= 0) dismissals.splice(index, 1);
             },
             loadReminderDismissals: async () => [...dismissals],
@@ -782,12 +1275,30 @@ await test("收编宽限期与批量安顿：宽限内不出行动卡、批量�
             savePersonCadence: async () => {},
         },
     } });
-    await until(() => fixture.querySelector(".lvct-dash__stat"), "首页未加载");
-    /* 宽限期口径：统计卡保持真实 3，行动区无 never 卡（空态） */
-    assert(fixture.querySelector(".lvct-dash__stats").textContent.includes("3"), "统计应保持真实");
-    assert(fixture.textContent.includes("今天没有需要处理的事"), "宽限期内行动区应安静");
-    /* 批量安顿依赖真组——此处直接验证该口径由服务级用例与域单测覆盖；UI 侧验证撤销按钮挂载逻辑 */
-    assert(!fixture.querySelector(".lvct-dash__settle"), "无 never 组时不应出现批量安顿");
+    await until(() => fixture.querySelector(".lvct-dash__group-head"), "行动分组未加载");
+    const neverHead = [...fixture.querySelectorAll(".lvct-dash__group-head")]
+        .find((node) => node.textContent.includes("从未互动"));
+    assert(neverHead, "从未互动组未渲染");
+    neverHead.click();
+    await until(() => fixture.querySelector(".lvct-dash__settle"), "批量安顿入口未渲染");
+    const settleButton = [...fixture.querySelectorAll(".lvct-dash__settle button")]
+        .find((node) => node.textContent.includes("全部顺延"));
+    settleButton.click();
+    await until(() => dismissals.filter((entry) => entry.personDocId === first.docId || entry.personDocId === second.docId)
+        .every((entry) => entry.until === (() => { const date = new Date(); date.setDate(date.getDate() + 30); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; })()), "批量暂缓未完成");
+    const batchUntil = dismissals.find((entry) => entry.personDocId === first.docId).until;
+    /* 模拟另一窗口：新增无关提醒，同时修改本批中的一人。撤销不得覆盖两者。 */
+    dismissals.push({ personDocId: "20260927000000-并发项0000", kind: "birthday", until: "2099-12-31" });
+    dismissals.find((entry) => entry.personDocId === first.docId).until = "2099-02-02";
+    const undoButton = [...fixture.querySelectorAll(".lvct-dash__settle button")]
+        .find((node) => node.textContent.trim() === "撤销");
+    assert(undoButton, "批量完成后缺少撤销入口");
+    undoButton.click();
+    await until(() => !fixture.textContent.includes("已撤销批量暂缓（"), "批量撤销未完成");
+    assert(dismissals.some((entry) => entry.personDocId === "20260927000000-外部项0000" && entry.until === "2099-01-01"), "原有无关提醒被撤销覆盖");
+    assert(dismissals.some((entry) => entry.personDocId === "20260927000000-并发项0000"), "并发新增提醒被撤销删除");
+    assert(dismissals.some((entry) => entry.personDocId === first.docId && entry.until === "2099-02-02"), "同人并发修改被撤销覆盖");
+    assert(!dismissals.some((entry) => entry.personDocId === second.docId && entry.until === batchUntil), "未修改的本批项应被撤销");
 });
 
 await test("新建草稿关闭前三选一：取消保留草稿，放弃后关闭且弹窗列明细", async () => {
@@ -827,12 +1338,23 @@ await test("busy 独立阻断：创建挂起时关闭不卸载弹窗，完成后
     let releaseCreate = () => {};
     const createGate = new Promise((resolve) => { releaseCreate = resolve; });
     let created = false;
-    kernel.handler = async (route) => {
-        if (route === "/api/filetree/createDocWithMd") { created = true; return createGate; }
+    let creationRequestId;
+    kernel.handler = async (route, body) => {
+        if (route === "/api/filetree/createDocWithMd") {
+            created = true;
+            creationRequestId = body.markdown.match(/custom-lvct-contact-draft="([^"]+)"/)?.[1];
+            return createGate;
+        }
+        if (route === "/api/sqlite/flushTransaction") return null;
+        if (route === "/api/query/sql") {
+            if (body.stmt.includes("SELECT DISTINCT root_id")) return created && body.stmt.includes(creationRequestId) ? [{ root_id: "20260930000000-newdoc5" }] : [];
+            if (body.stmt.includes("AND id='20260930000000-newdoc5'")) return created ? [{ id: "20260930000000-newdoc5", content: "挂起中的人" }] : [];
+            return [];
+        }
         if (route === "/api/av/renderAttributeView") {
             const base = renderResult();
             return created ? { view: { ...base.view, rows: [...base.view.rows, { id: "row-new5", cells: [
-                { value: { type: "block", keyID: "name", block: { id: "20260930000000-newdoc5", content: "挂起中的人" } } },
+                { valueType: "block", value: { type: "block", keyID: "name", block: { id: "20260930000000-newdoc5", content: "挂起中的人" } } },
             ] } ] } } : base;
         }
         if (route === "/api/av/addAttributeViewBlocks") return null;
@@ -878,28 +1400,30 @@ await test("B07-b 同步失败分项：单块失败不阻断其余，复合错�
     const docBlocks = { "20260930000000-blks001": { followUpId: "fu-s1", markdown: "- [ ] 旧标题 📅2026-10-01" } };
     let failUpdates = true; /* 首轮注入：fu-s1 的 updateBlock 失败 */
     let appendCount = 0;
-    kernel.handler = async (route, body) => {
+    kernel.handler = reflectContactWrites(async (route, body) => {
         if (route === "/api/query/sql") {
+            if (body.stmt.includes("type = 'd'")) return [{ id: person.docId }];
+            if (body.stmt.includes("id > '")) return [];
             return Object.entries(docBlocks).map(([id, block]) => ({ id, ial: `custom-lvct-followup="${block.followUpId}"`, markdown: block.markdown }));
         }
         if (route === "/api/block/updateBlock") {
             if (failUpdates) throw new Error("updateBlock 注入失败");
-            docBlocks[body.id].markdown = body.data;
-            return { code: 0 };
+            docBlocks[body.id].markdown = "- [ ] 改期项 📅2026-10-02";
+            return null;
         }
         if (route === "/api/block/insertBlock") {
             appendCount += 1;
-            const newId = `20260930000000-blknew${appendCount}`;
-            docBlocks[newId] = { followUpId: "", markdown: body.data };
-            return [{ doOperations: [{ id: newId }] }];
+            const newId = `20260930000000-blznew${appendCount}`;
+            docBlocks[newId] = { followUpId: "fu-s2", markdown: "- [ ] 新插入项 📅2026-10-03" };
+            return [{ doOperations: [{ id: newId, action: "insert" }] }];
         }
         if (route === "/api/attr/setBlockAttrs") {
             const entry = docBlocks[body.id];
             if (entry) entry.followUpId = body.attrs["custom-lvct-followup"];
-            return { code: 0 };
+            return null;
         }
-        return { code: 0 };
-    };
+        return null;
+    });
 
     /* 首轮同步：fu-s1 更新失败（注入），fu-s2 插入成功——分项报告互不阻断 */
     const report = await syncFollowUpTasksToDoc(plugin, person.docId);
@@ -916,12 +1440,14 @@ await test("B07-b 同步失败分项：单块失败不阻断其余，复合错�
     assert(s2Blocks === 1, `重试产生重复块：${s2Blocks} 个 fu-s2 块`);
 
     /* mutator 复合错误：状态变更的文档打勾失败 → 抛「已保存，但…」且插件库不回退 */
-    kernel.handler = async (route) => {
+    kernel.handler = async (route, body) => {
         if (route === "/api/query/sql") {
+            if (body.stmt.includes("type = 'd'")) return [{ id: person.docId }];
+            if (body.stmt.includes("id > '")) return [];
             return Object.entries(docBlocks).map(([id, block]) => ({ id, ial: `custom-lvct-followup="${block.followUpId}"`, markdown: block.markdown }));
         }
         if (route === "/api/block/updateTaskListItemMarker") throw new Error("打勾注入失败");
-        return { code: 0 };
+        return null;
     };
     let composite = "";
     try { await setFollowUpStatus(plugin, "fu-s1", "done"); } catch (error) { composite = error.message; }
@@ -940,20 +1466,23 @@ await test("FUNC-01.15 断点续做：残留文档复用不重建，字段失败
     const bindings = {};
     const cellWrites = [];
     const draftOf = (name, phone) => ({ name, phone, email: "", wechat: "", website: "", birthday: "", isLunar: false, group: "", tags: [] });
-    kernel.handler = async (route, body) => {
+    kernel.handler = reflectContactWrites(async (route, body) => {
         if (route === "/api/query/sql") {
-            /* findResumableDocId 残留探测：只返回尚未绑定的同名遗留文档 */
+            if (String(body.stmt).includes("root_id =")) return [];
+            const docId = String(body.stmt).match(/\bid\s*=\s*'([^']+)'/)?.[1];
+            if (docId) return Object.entries(staged).filter(([, id]) => id === docId).map(([name, id]) => ({ id, content: name }));
             return Object.entries(staged)
                 .filter(([name]) => !boundNames.has(name))
-                .map(([name, id]) => ({ id, content: name }));
+                .map(([name, id]) => ({ id, content: name, hpath: `/${name}` }));
         }
+        if (route === "/api/sqlite/flushTransaction") return null;
         if (route === "/api/filetree/createDocWithMd") { createDocCalls += 1; return "20260930000000-doc9999"; }
         if (route === "/api/av/renderAttributeView") {
             const base = renderResult();
             const rows = [...base.view.rows];
             for (const [name, id] of Object.entries(staged)) {
                 if (boundNames.has(name) && bindings[id]) {
-                    rows.push({ id: bindings[id], cells: [{ value: { type: "block", keyID: "name", block: { id, content: name } } }] });
+                    rows.push({ id: bindings[id], cells: [{ valueType: "block", value: { type: "block", keyID: "name", block: { id, content: name } } }] });
                 }
             }
             return { view: { ...base.view, rows } };
@@ -963,19 +1492,22 @@ await test("FUNC-01.15 断点续做：残留文档复用不重建，字段失败
             boundNames.add(body.srcs[0].content);
             rowCount += 1;
             bindings[docId] = `row-new${rowCount}`;
-            return { code: 0 };
+            return null;
         }
         if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") return { ...bindings };
         if (route === "/api/av/setAttributeViewBlockAttr") {
             if (body.keyID === "phone" && failPhone) { failPhone = false; throw new Error("phone 注入失败"); }
             cellWrites.push({ keyID: body.keyID, itemID: body.itemID });
-            return { code: 0 };
+            return null;
         }
         throw new Error(`断点续做用例不允许请求 ${route}`);
-    };
+    });
 
     /* 场景 A：上次尝试残留的未绑定文档 → 复用（createDocWithMd 零调用）→ 绑行 + 写字段完成 */
-    const created = await createContact(settings, draftOf("断点甲", "13800001234"));
+    let ambiguity;
+    try { await createContact(settings, draftOf("断点甲", "13800001234")); } catch (error) { ambiguity = error; }
+    assert(ambiguity?.preview?.unbound[0]?.docId === staged["断点甲"] && createDocCalls === 0, "同名遗留文档未要求按 ID 确认");
+    const created = await createContact(settings, draftOf("断点甲", "13800001234"), { reuseDocId: staged["断点甲"] });
     assert(createDocCalls === 0, "残留文档未被复用（重复调用了建文档）");
     assert(created.docId === "20260930000000-doc0001", `未复用残留文档：${created.docId}`);
 
@@ -983,7 +1515,7 @@ await test("FUNC-01.15 断点续做：残留文档复用不重建，字段失败
     failPhone = true;
     invalidateRoster();
     let composite = "";
-    try { await createContact(settings, draftOf("断点乙", "13900002222")); }
+    try { await createContact(settings, draftOf("断点乙", "13900002222"), { reuseDocId: staged["断点乙"] }); }
     catch (error) { composite = error.message; }
     assert(composite.includes("资料字段写入失败") && composite.includes("电话") && composite.includes("row-new"),
         `字段失败上浮缺失：${composite}`);
@@ -999,13 +1531,13 @@ await test("B13.2 组织扫描与成员索引：标记区块扫描发现组织�
     const files = new Map();
     const plugin = { loadData: async (key) => files.get(key) ?? "", saveData: async (key, value) => { files.set(key, value); } };
     files.set("contacts-settings.json", settings);
-    kernel.handler = async (route, body) => {
+    kernel.handler = reflectContactWrites(async (route, body) => {
         if (route === "/api/notebook/lsNotebooks") return { notebooks: [{ id: "20260930000000-book001", name: "B13_spike" }] };
         if (route === "/api/query/sql") {
             const stmt = String(body?.stmt ?? "");
             if (stmt.includes("ial LIKE '%custom-lvct-org")) {
                 /* 标记区块根文档：只有组织文档命中 */
-                return [{ root_id: "20260930000000-org0001" }];
+                return [{ root_id: "20260930000000-org0001", ial: '{: custom-lvct-org="1"}', markerCount: 1 }];
             }
             if (stmt.includes("type='d'") && stmt.includes("id IN")) {
                 /* 按 ID 批量取组织文档名 */
@@ -1014,7 +1546,7 @@ await test("B13.2 组织扫描与成员索引：标记区块扫描发现组织�
             return [];
         }
         throw new Error(`组织扫描用例不允许请求 ${route}`);
-    };
+    });
     invalidateRoster();
     const orgs = await scanOrganizations();
     assert(orgs.length === 1 && orgs[0].name === "测试公司" && orgs[0].docId === "20260930000000-org0001",
@@ -1080,10 +1612,13 @@ await test("B13.3 组织管理弹窗：新建组织、添加/移除成员经 fac
     await until(() => fixture.textContent.includes("测试公司"), `新建组织未出现在列表：${fixture.querySelector(".lvct-org-manager")?.textContent?.slice(0, 200)}`);
     assert(createdOrgs.length === 1, "新建未走 facade.createOrganization");
     /* 添加成员 */
-    await until(() => fixture.querySelector(".lvct-org-manager__add select"), "添加成员选择器未出现");
-    const select = fixture.querySelector(".lvct-org-manager__add select");
-    select.value = "20260930000000-per0001";
-    select.dispatchEvent(new Event("change", { bubbles: true }));
+    await until(() => fixture.querySelector('.lvct-org-manager__add .lvct-picker__trigger[aria-label="选择要添加的联系人"]'), "添加成员选择器未出现");
+    const picker = fixture.querySelector('.lvct-org-manager__add .lvct-picker__trigger[aria-label="选择要添加的联系人"]');
+    picker.click();
+    await until(() => fixture.querySelector(".lvct-picker__panel"), "添加成员选人器浮层未打开");
+    const option = [...fixture.querySelectorAll(".lvct-picker__option")].find((node) => node.textContent.includes("张三"));
+    assert(option, "添加成员候选未显示");
+    option.click();
     await tick();
     await tick();
     button("添加成员").click();
@@ -1093,9 +1628,19 @@ await test("B13.3 组织管理弹窗：新建组织、添加/移除成员经 fac
         "添加成员未生效",
     );
     assert(memberOps.length === 1 && memberOps[0].personDocId === "20260930000000-per0001", "成员未写入");
+    /* V-02：窄视口下组织弹窗双栏纵向堆叠，成员行不横向溢出。 */
+    if (window.innerWidth <= 640) {
+        const layout = fixture.querySelector(".lvct-org-manager__layout");
+        assert(layout && getComputedStyle(layout).flexDirection === "column", "窄视口组织弹窗未堆叠（仍双栏）");
+        const memberRow = fixture.querySelector(".lvct-org-manager__member");
+        assert(memberRow && memberRow.scrollWidth <= memberRow.clientWidth + 2, "窄视口成员行仍横向溢出");
+    }
     /* 移除成员（B13.4 起行内含编辑与移除两个按钮，按文案定位） */
     const removeRow = [...fixture.querySelectorAll(".lvct-org-manager__member")].find((node) => node.textContent.includes("张三"));
     button("移除", removeRow).click();
+    await until(() => removeRow.textContent.includes("确认移除这段成员历史"), "成员历史移除确认未显示");
+    assert(memberOps.length === 1, "未确认就移除成员历史");
+    button("确认移除这段成员历史", removeRow).click();
     await until(() => !fixture.querySelector(".lvct-org-manager__member"), "移除成员未生效");
     assert(memberOps.length === 0, "移除未走 facade.removeOrganizationMember");
     assert(!closed, "成员操作不应关闭弹窗");
@@ -1148,12 +1693,12 @@ await test("B13.4/B13 组织成员字段编辑与归档恢复（facade 全链路
     await until(() => updateCalls.length === 1, "成员更新未走 facade");
     assert(updateCalls[0].id === "20260930000000-mem0001", "更新 id 错误");
     assert(updateCalls[0].patch.department === "研发部" && updateCalls[0].patch.title === "工程师" && updateCalls[0].patch.status === "former", "更新补丁字段错误");
-    await until(() => fixture.textContent.includes("研发部"), "保存后成员行未刷新");
+    await until(() => fixture.textContent.includes("研发部") && !fixture.querySelector('input[aria-label="部门"]')
+        && !button("归档组织").disabled, "保存后成员行未刷新");
     /* 归档：列表进归档分组，详情出现恢复按钮 */
     button("归档组织").click();
     await until(() => archiveCalls === 1, "归档未走 facade");
-    await until(() => fixture.textContent.includes("已归档（1）"), "归档分组未出现");
-    button("已归档（1）").click();
+    await until(() => fixture.textContent.includes("收起已归档"), "当前归档组织未自动保留并展开");
     await until(() => [...fixture.querySelectorAll(".lvct-org-manager__org-item")].some((node) => node.textContent.includes("曙光科技")), "归档组织未在分组中显示");
     [...fixture.querySelectorAll(".lvct-org-manager__org-item")]
         .find((node) => node.textContent.includes("曙光科技")).click();
@@ -1162,7 +1707,7 @@ await test("B13.4/B13 组织成员字段编辑与归档恢复（facade 全链路
     /* 恢复 */
     button("恢复组织").click();
     await until(() => restoreCalls === 1, "恢复未走 facade");
-    await until(() => !fixture.textContent.includes("已归档（1）"), "恢复后归档分组未消失");
+    await until(() => !fixture.textContent.includes("收起已归档"), "恢复后归档分组未消失");
 });
 
 await test("B13.4 组织改名：renameOrganization 全链路 + 同名拒绝显示错误", async () => {
@@ -1237,16 +1782,17 @@ await test("CODE-02.5 关系并发：写前回读防丢边，幂等不重写，�
     let relatedWrites = 0;
     let failSectionA = false;
     const sectionInserts = [];
+    const markedSections = new Map();
     const docOf = { "row-a": "20260927000000-doca001", "row-b": "20260927000000-docb001", "row-c": "20260927000000-docc001" };
     kernel.handler = async (route, body) => {
         if (route === "/api/av/renderAttributeView") {
             const rows = [
                 { id: "row-a", cells: [
-                    { value: { type: "block", keyID: "name", block: { id: docOf["row-a"], content: "关系甲" } } },
-                    { value: { type: "relation", keyID: "related", relation: { blockIDs: [...relatedOfA] } } },
+                    { valueType: "block", value: { type: "block", keyID: "name", block: { id: docOf["row-a"], content: "关系甲" } } },
+                    { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: [...relatedOfA] } } },
                 ] },
-                { id: "row-b", cells: [{ value: { type: "block", keyID: "name", block: { id: docOf["row-b"], content: "关系乙" } } }] },
-                { id: "row-c", cells: [{ value: { type: "block", keyID: "name", block: { id: docOf["row-c"], content: "关系丙" } } }] },
+                { id: "row-b", cells: [{ valueType: "block", value: { type: "block", keyID: "name", block: { id: docOf["row-b"], content: "关系乙" } } }] },
+                { id: "row-c", cells: [{ valueType: "block", value: { type: "block", keyID: "name", block: { id: docOf["row-c"], content: "关系丙" } } }] },
             ];
             return { view: { columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })), rows } };
         }
@@ -1255,50 +1801,584 @@ await test("CODE-02.5 关系并发：写前回读防丢边，幂等不重写，�
                 relatedWrites += 1;
                 relatedOfA = [...body.value.relation.blockIDs];
             }
-            return { code: 0 };
+            return null;
         }
-        if (route === "/api/query/sql") return [];
+        if (route === "/api/query/sql") {
+            if (body.stmt.includes("AND type = 'd'")) {
+                const docId = body.stmt.match(/WHERE id = '([^']+)'/)?.[1];
+                return Object.values(docOf).includes(docId) ? [{ id: docId }] : [];
+            }
+            const rootId = body.stmt.match(/root_id = '([^']+)'/)?.[1];
+            return markedSections.has(rootId) ? [structuredClone(markedSections.get(rootId))] : [];
+        }
         if (route === "/api/block/insertBlock") {
             sectionInserts.push(body.parentID);
             if (failSectionA && body.parentID === docOf["row-a"]) throw new Error("区块注入失败");
-            return [{ doOperations: [{ id: `20260930000000-blk000${sectionInserts.length}` }] }];
+            const id = `20260930000000-bl${String(sectionInserts.length).padStart(5, "0")}`;
+            markedSections.set(body.parentID, { id, markdown: body.data });
+            return [{ doOperations: [{ id, action: "insert" }] }];
         }
-        return { code: 0 };
+        if (route === "/api/block/updateBlock" || route === "/api/block/deleteBlock") {
+            const entry = [...markedSections.entries()].find(([, block]) => block.id === body.id);
+            if (failSectionA && entry?.[0] === docOf["row-a"]) throw new Error("区块注入失败");
+            if (route.endsWith("deleteBlock")) markedSections.delete(entry[0]);
+            else markedSections.set(entry[0], { id: body.id, markdown: body.data });
+            return null;
+        }
+        return null;
     };
     /* 调用方快照过期（relatedItemIds 为空），内核里甲已有乙的边——写前回读不得丢边 */
     const staleA = { docId: docOf["row-a"], itemId: "row-a", name: "关系甲", phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false, group: "", tags: [], relatedItemIds: [] };
     const 丙 = { docId: docOf["row-c"], itemId: "row-c", name: "关系丙", phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false, group: "", tags: [], relatedItemIds: [] };
-    await addRelation(settings, staleA, 丙);
+    const firstReport = await addRelation(settings, staleA, 丙);
+    assert(firstReport.fact.status === "applied" && firstReport.projections.every((projection) => projection.status === "applied"),
+        `关系写入后核实或投影报告异常：${JSON.stringify(firstReport)}`);
     assert(relatedOfA.includes("row-b") && relatedOfA.includes("row-c"),
         `并发边被覆盖丢失：${JSON.stringify(relatedOfA)}`);
     /* 幂等：重复建立同一关系不产生第二次写入 */
     const writesBefore = relatedWrites;
-    await addRelation(settings, staleA, 丙);
+    const unchangedReport = await addRelation(settings, staleA, 丙);
+    assert(unchangedReport.fact.status === "unchanged", `重复关系未报告 unchanged：${JSON.stringify(unchangedReport)}`);
     assert(relatedWrites === writesBefore, "幂等建立仍重复写入 relation 单元格");
     /* 区块失败逐文档隔离：甲的区块写失败 → 整个关系编辑不抛出、relation 数据不受影响
        （甲的区块插入被尝试并失败；丙无边、其区块本为无操作） */
     failSectionA = true;
-    await removeRelation(settings, staleA, 丙);
+    const removeReport = await removeRelation(settings, staleA, 丙);
     assert(relatedOfA.includes("row-b") && !relatedOfA.includes("row-c"), "解除关系写失败");
-    await addRelation(settings, staleA, 丙);
+    assert(removeReport.fact.status === "applied" && removeReport.projections.some((projection) => projection.status === "failed"),
+        `关系事实与文档投影未分离报告：${JSON.stringify(removeReport)}`);
+    const retryReport = await addRelation(settings, staleA, 丙);
+    assert(retryReport.fact.status === "applied", `投影失败后的关系重试未保留事实：${JSON.stringify(retryReport)}`);
     assert(sectionInserts.filter((parent) => parent === docOf["row-a"]).length >= 1,
         "甲的区块同步未被尝试（隔离失效）");
     assert(relatedOfA.includes("row-b") && relatedOfA.includes("row-c"), "区块失败影响了关系数据");
 });
 
-await test("CODE-02.4 编辑写前预校验：非法生日/邮箱零写入，逐字段失败复合错误不回退", async () => {
+await test("字段实际服务：生日与农历连续保存、1970 年之前生日和清空均经回读核实", async () => {
+    const state = configureContactVerificationKernel();
+    const draft = { ...person, birthday: "1950-01-02", isLunar: true, tags: ["甲", "乙", "甲"] };
+    const first = await updateContactFields(settings, person.itemId, draft);
+    assert(first.complete && first.accepted.includes("birthday") && first.accepted.includes("lunarBirthday")
+        && first.applied.length === 8 && state.renders === 2,
+        `未实际回读并核实生日：${JSON.stringify(first)}`);
+    invalidateRoster();
+    const saved = (await getRoster(settings))[0];
+    assert(saved.birthday === "1950-01-02" && saved.isLunar && saved.tags.length === 2, "早年生日、农历或标签回读不一致");
+    const second = await updateContactFields(settings, person.itemId, { ...draft, birthday: "1970-01-01", isLunar: false });
+    assert(second.complete, `连续更改生日未核实：${JSON.stringify(second)}`);
+    const cleared = await updateContactFields(settings, person.itemId, { ...draft, birthday: "", isLunar: false, tags: [], group: "" });
+    const reread = (await getRoster(settings))[0];
+    assert(cleared.complete && reread.birthday === "" && !reread.isLunar && reread.tags.length === 0 && reread.group === "",
+        "清空生日/农历/标签/分组未保真");
+});
+
+await test("账本和别名实际服务：损坏及读取失败停止读写和捕获，不覆盖原文件、不按空库新建", async () => {
+    const files = new Map();
+    let writes = 0;
+    let kernelCalls = 0;
+    let failRead = false;
+    const plugin = { loadData: async (key) => {
+        if (failRead) throw new Error("隔离读失败");
+        return structuredClone(files.get(key) ?? "");
+    }, saveData: async (key, value) => { writes += 1; files.set(key, structuredClone(value)); } };
+    assert((await loadExchangeStore(plugin)).records.length === 0 && (await loadPersonAliasStore(plugin)).aliases.length === 0, "首次空库被误报损坏");
+    kernel.handler = async () => { kernelCalls += 1; throw new Error("坏别名不能触发内核写入"); };
+    for (const raw of [{ schemaVersion: 99 }, { schemaVersion: 1, records: {}, aliases: {} }, { schemaVersion: 1, records: [null], aliases: [null] }]) {
+        files.set("exchange-records.json", raw);
+        files.set("person-aliases.json", raw);
+        const before = JSON.stringify([...files]);
+        for (const [actionName, action] of [
+            ["load exchange", () => loadExchangeStore(plugin)], ["load alias", () => loadPersonAliasStore(plugin)],
+            ["create exchange", () => createExchangeRecord(plugin, { requestId: "20261004000000-req0001", personDocId: person.docId, kind: "item", direction: "payable", description: "借用书籍", occurredOn: "2026-10-04" })],
+            ["create alias", () => createPersonAlias(plugin, person.docId, "老张")],
+            ["capture", () => captureFromDoc(plugin, settings, "20260927000000-diary01", { date: "2026-10-04", newNames: ["老张"], personDocIds: [] })],
+        ]) {
+            let errorText = "";
+            try { await action(); } catch (error) { errorText = error.message; }
+            assert(errorText.includes("存储内容损坏"), `坏数据被当成正常空库（模块 ${raw.schemaVersion ?? "未知"}，动作 ${actionName}：${errorText}）`);
+        }
+        assert(writes === 0 && kernelCalls === 0 && JSON.stringify([...files]) === before, "损坏存储仍触发写入或新建");
+    }
+    failRead = true;
+    for (const action of [() => loadExchangeStore(plugin), () => loadPersonAliasStore(plugin)]) {
+        let errorText = "";
+        try { await action(); } catch (error) { errorText = error.message; }
+        assert(errorText.includes("存储读取失败"), "I/O 失败被当空库");
+    }
+});
+
+await test("账本和别名界面：坏库显示错误与只读重试，修复后恢复空态，草稿保留且零写入", async () => {
+    for (const module of ["exchange", "alias"]) {
+        let raw = { schemaVersion: 99 };
+        let writes = 0;
+        const plugin = { loadData: async () => structuredClone(raw), saveData: async () => { writes += 1; } };
+        mounted = mount(module === "exchange" ? ExchangeLedger : PersonAliases, { target: fixture, props: module === "exchange" ? {
+            personDocId: person.docId, onLoad: (docId) => listPersonExchanges(plugin, docId),
+            onCreate: (input) => createExchangeRecord(plugin, input), onChangeStatus: async () => {},
+        } : {
+            personDocId: person.docId, onLoad: (docId) => listPersonAliases(plugin, docId),
+            onAdd: (docId, alias) => createPersonAlias(plugin, docId, alias), onRemove: async () => {}, onChanged() {},
+        } });
+        await until(() => fixture.textContent.includes("存储内容损坏"), "坏库未显示错误");
+        assert(!fixture.textContent.includes("还没有记录") && !fixture.textContent.includes("还没有设置别名"), "错误与正常空态同时出现");
+        const draft = module === "exchange" ? fixture.querySelector('input[type="text"]') : fixture.querySelector('input[aria-label="新增别名"]');
+        input(draft, module === "exchange" ? "修复后再记录" : "老张");
+        await tick();
+        assert(button(module === "exchange" ? "记一笔往来" : "添加").disabled, "未知库仍允许写入");
+        raw = module === "exchange" ? { schemaVersion: 1, records: [] } : { schemaVersion: 1, aliases: [] };
+        button("重新读取").click();
+        await until(() => fixture.textContent.includes(module === "exchange" ? "还没有记录" : "还没有设置别名"), "修复后未恢复正常空态");
+        assert(draft.value === (module === "exchange" ? "修复后再记录" : "老张") && writes === 0, "只读重试丢失草稿或触发写入");
+        await unmount(mounted);
+        mounted = undefined;
+    }
+});
+
+await test("账本实际服务：未知保存同请求零重写、并发最多一条、不同请求同内容保留两笔", async () => {
+    let raw = "";
+    let writes = 0;
+    let failRead = false;
+    let failAfterSave = true;
+    const plugin = { loadData: async () => {
+        if (failRead) throw new Error("账本回读失败");
+        return structuredClone(raw);
+    }, saveData: async (_key, value) => {
+        writes += 1;
+        raw = structuredClone(value);
+        if (failAfterSave) failRead = true;
+    } };
+    const input = { requestId: "20261004000000-req0001", personDocId: person.docId,
+        kind: "money", direction: "receivable", description: "代垫交通费", amount: 35, currency: "CNY", occurredOn: "2026-10-04" };
+    let error;
+    try { await createExchangeRecord(plugin, input); } catch (failure) { error = failure; }
+    assert(error?.name === "ExchangeWriteUnknownError" && error.requestId === input.requestId
+        && raw.records.length === 1, "未知保存缺稳定请求身份或产生重复记录");
+    const before = writes;
+    try { await createExchangeRecord(plugin, input); } catch (failure) { error = failure; }
+    assert(error.message.includes("存储读取失败") && writes === before, "核实读取失败仍重发未知保存");
+    failRead = false;
+    failAfterSave = false;
+    const repeated = await Promise.all([createExchangeRecord(plugin, input), createExchangeRecord(plugin, input)]);
+    assert(repeated.every((record) => record.id === input.requestId) && writes === before && raw.records.length === 1, "同请求核实或并发重写");
+    await setExchangeStatus(plugin, input.requestId, "settled", "2026-10-04");
+    const afterStatus = writes;
+    const settled = await createExchangeRecord(plugin, input);
+    assert(settled.status === "settled" && writes === afterStatus, "旧创建请求重开已结清往来");
+    let conflict = "";
+    try { await createExchangeRecord(plugin, { ...input, description: "另一个事项" }); } catch (failure) { conflict = failure.message; }
+    assert(conflict.includes("不同内容") && writes === afterStatus, "同请求内容变更覆盖已有事实");
+    const secondInput = { ...input, requestId: "20261004000000-req0002" };
+    const created = await Promise.all([createExchangeRecord(plugin, secondInput), createExchangeRecord(plugin, secondInput)]);
+    assert(created[0].id === created[1].id && raw.records.length === 2 && writes === afterStatus + 1, "合法同内容往来被合并或并发追加重复");
+});
+
+await test("账本界面：已写未知保留原输入与请求，读取失败不重发，核实后另开新请求", async () => {
+    let raw = "";
+    let writes = 0;
+    let failRead = false;
+    let failAfterSave = true;
+    let changed = 0;
+    const requests = [];
+    const plugin = { loadData: async () => {
+        if (failRead) throw new Error("隔离回读失败");
+        return structuredClone(raw);
+    }, saveData: async (_key, value) => {
+        writes += 1;
+        raw = structuredClone(value);
+        if (failAfterSave) failRead = true;
+    } };
+    mounted = mount(ExchangeLedger, { target: fixture, props: {
+        personDocId: person.docId, onLoad: (docId) => listPersonExchanges(plugin, docId),
+        onCreate: (input) => { requests.push(structuredClone(input)); return createExchangeRecord(plugin, input); },
+        onChangeStatus: async () => {}, onChanged: () => { changed += 1; },
+    } });
+    await until(() => fixture.textContent.includes("还没有记录"), "账本未进入空态");
+    const description = fixture.querySelector('input[type="text"]');
+    const amount = fixture.querySelector('input[type="number"]');
+    input(description, "代垫交通费");
+    input(amount, "35");
+    await tick();
+    button("记一笔往来").click();
+    await until(() => fixture.textContent.includes("保存结果未知"), "未知保存未明确显示");
+    assert(raw.records.length === 1 && description.value === "代垫交通费" && description.disabled && amount.disabled && changed === 0,
+        "未知保存清空草稿、允许改输入或误报已保存");
+    const before = writes;
+    button("核实并重试本笔往来").click();
+    await until(() => fixture.textContent.includes("存储读取失败"), "核实失败未显示");
+    assert(writes === before && description.disabled && requests[0].requestId === requests[1].requestId, "核实失败改键、解锁输入或重发保存");
+    failRead = false;
+    failAfterSave = false;
+    button("核实并重试本笔往来").click();
+    await until(() => changed === 1 && !description.disabled, "核实已保存记录未恢复表单");
+    assert(description.value === "" && writes === before && raw.records.length === 1, "核实成功仍重复保存");
+    input(description, "代垫交通费");
+    input(amount, "35");
+    await tick();
+    button("记一笔往来").click();
+    await until(() => changed === 2, "第二笔真实往来未保存");
+    assert(raw.records.length === 2 && requests.at(-1).requestId !== requests[0].requestId, "新业务沿用旧请求被合并");
+});
+
+await test("详情子面板：草稿取消保留原标签和人物，保存挂起阻断切标签、切人与关闭", async () => {
+    for (const module of ["exchange", "alias"]) {
+        let closed = false;
+        let navigated = 0;
+        let writes = 0;
+        let release;
+        const gatedWrite = async (docId) => {
+            writes += 1;
+            await new Promise((resolve) => { release = resolve; });
+            return module === "exchange" ? {
+                id: "20261004000000-ex00001", personDocId: docId, kind: "money", direction: "receivable", description: "草稿", amount: 35,
+                currency: "CNY", occurredOn: "2026-10-04", dueOn: "", status: "open", settledOn: "", note: "", createdAt: 1, updatedAt: 1,
+            } : { id: "20261004000000-alias01", personDocId: docId, alias: "老张", createdAt: 1, updatedAt: 1 };
+        };
+        mounted = mount(PersonDetail, { target: fixture, props: {
+            settings, person, navigationOrder: [person, { ...person, docId: "20260927000000-person2", itemId: "row-2", name: "回归测试乙" }],
+            onRecord: async () => {}, onLoadInsights: async () => emptyInsights(), onOpenPersonDoc() {},
+            onNavigate: () => { navigated += 1; }, onChanged() {}, onDeleted() {}, onClose: () => { closed = true; },
+            onLoadExchanges: async () => [], onCreateExchange: (input) => gatedWrite(input.personDocId), onChangeExchangeStatus: async () => {},
+            onLoadAliases: async () => [], onAddAlias: (docId) => gatedWrite(docId), onRemoveAlias: async () => {},
+        } });
+        await until(() => fixture.textContent.includes("还没有记录") && fixture.textContent.includes("还没有设置别名"), "详情子面板未加载");
+        const ledger = fixture.querySelector('section[aria-label="往来账本"]');
+        const draft = module === "exchange" ? ledger.querySelector('input[type="text"]') : fixture.querySelector('input[aria-label="新增别名"]');
+        input(draft, module === "exchange" ? "草稿" : "老张");
+        if (module === "exchange") input(ledger.querySelector('input[type="number"]'), "35");
+        await tick();
+        for (const label of ["互动", "下一位", "关闭"]) {
+            button(label).click();
+            await until(() => document.querySelector(".lvct-closeguard"), "子面板草稿离开未触发守卫");
+            document.querySelector('.lvct-closeguard button[data-choice="cancel"]').click();
+            await until(() => !document.querySelector(".lvct-closeguard"), "草稿守卫未取消");
+            assert(!closed && navigated === 0 && draft.value === (module === "exchange" ? "草稿" : "老张")
+                && button("概览").getAttribute("aria-selected") === "true" && writes === 0, "取消丢草稿、切人、切标签或写入");
+        }
+        button(module === "exchange" ? "记一笔往来" : "添加").click();
+        await until(() => writes === 1, "挂起保存未开始");
+        for (const label of ["互动", "下一位", "关闭"]) button(label).click();
+        await tick();
+        assert(!closed && navigated === 0 && !document.querySelector(".lvct-closeguard") && button("概览").getAttribute("aria-selected") === "true",
+            "保存挂起仍允许离开子面板");
+        release();
+        await until(() => !draft.disabled, "保存结束仍阻断输入");
+        button("互动").click();
+        await until(() => button("互动").getAttribute("aria-selected") === "true", "保存结束后无法切换标签");
+        await unmount(mounted);
+        mounted = undefined;
+    }
+});
+
+await test("人物独立备注：详情加载、保存失败重试与清空写回均保留输入", async () => {
+    let storedNote = "已有特殊情况";
+    let saveAttempts = 0;
+    const saves = [];
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person, onRecord: async () => {}, onLoadInsights: async () => emptyInsights(),
+        onLoadPersonNote: async (docId) => {
+            assert(docId === person.docId, "独立备注读取使用了错误人物文档");
+            return storedNote;
+        },
+        onSavePersonNote: async (docId, note, expected) => {
+            assert(docId === person.docId && expected === storedNote, "独立备注保存未携带当前版本");
+            saveAttempts += 1;
+            if (saveAttempts === 1) throw new Error("临时保存失败");
+            storedNote = note;
+            saves.push({ docId, note, expected });
+            return storedNote;
+        },
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+    } });
+    await until(() => fixture.querySelector('textarea[aria-label="个人备注"]')?.value === "已有特殊情况", "个人备注初始内容未加载");
+    const noteInput = fixture.querySelector('textarea[aria-label="个人备注"]');
+    input(noteInput, "下次见面前提醒准备资料");
+    await tick();
+    button("保存备注").click();
+    await until(() => fixture.querySelector('[role="alert"]')?.textContent.includes("临时保存失败"), "个人备注失败态未显示");
+    assert(noteInput.value === "下次见面前提醒准备资料" && saveAttempts === 1, "个人备注保存失败后丢失草稿或重复提交");
+    button("重试保存").click();
+    await until(() => fixture.querySelector(".lvct-detail__person-note .lvct-chip")?.textContent.includes("已保存"), "个人备注重试未成功");
+    assert(storedNote === "下次见面前提醒准备资料" && saves.length === 1 && noteInput.value === storedNote, "个人备注重试未写回并显示已保存状态");
+    input(noteInput, "");
+    await tick();
+    button("保存备注").click();
+    await until(() => saves.length === 2 && storedNote === "", "清空个人备注未写回");
+    assert(noteInput.value === "" && saves[1].note === "" && saves[1].expected === "下次见面前提醒准备资料", "清空个人备注保存参数错误");
+});
+
+await test("详情子面板：甲乙加载乱序与卸载后的保存回调均不能回填或通知旧实例", async () => {
+    const firstDocId = person.docId;
+    const secondDocId = "20260927000000-person2";
+    let releaseOldExchanges;
+    let releaseOldAliases;
+    let releaseSave;
+    let changed = 0;
+    const oldExchanges = new Promise((resolve) => { releaseOldExchanges = resolve; });
+    const oldAliases = new Promise((resolve) => { releaseOldAliases = resolve; });
+    const aliasOf = (docId, label) => ({ id: "20261004000000-alias01", personDocId: docId, alias: label, createdAt: 1, updatedAt: 1 });
+    mounted = mount(DetailPanelsFixture, { target: fixture, props: {
+        firstDocId, secondDocId,
+        loadExchanges: (docId) => docId === firstDocId ? oldExchanges : Promise.resolve([]),
+        loadAliases: (docId) => docId === firstDocId ? oldAliases : Promise.resolve([aliasOf(docId, "乙的别名")]),
+        addAlias: async (docId) => { await new Promise((resolve) => { releaseSave = resolve; }); return aliasOf(docId, "迟到新增"); },
+        onChanged: () => { changed += 1; },
+    } });
+    await tick();
+    button("切换测试人物").click();
+    await until(() => fixture.textContent.includes("乙的别名") && fixture.textContent.includes("还没有记录"), "乙数据未加载");
+    releaseOldExchanges([{
+        id: "20261004000000-ex00001", personDocId: firstDocId, kind: "item", direction: "receivable", description: "甲的往来",
+        currency: "CNY", occurredOn: "2026-10-04", dueOn: "", status: "open", settledOn: "", note: "", createdAt: 1, updatedAt: 1,
+    }]);
+    releaseOldAliases([aliasOf(firstDocId, "甲的别名")]);
+    await pause(50);
+    assert(fixture.textContent.includes("乙的别名") && !fixture.textContent.includes("甲的别名") && !fixture.textContent.includes("甲的往来"), "甲的迟到读取显示在乙名下");
+    input(fixture.querySelector('input[aria-label="新增别名"]'), "迟到新增");
+    await tick();
+    button("添加").click();
+    await until(() => releaseSave, "别名保存未挂起");
+    await unmount(mounted);
+    mounted = undefined;
+    releaseSave();
+    await pause(50);
+    assert(changed === 0, "卸载后保存仍通知旧实例");
+    releaseSave = undefined;
+    mounted = mount(ExchangeLedger, { target: fixture, props: {
+        personDocId: firstDocId, onLoad: async () => [], onChangeStatus: async () => {},
+        onCreate: async (input) => {
+            await new Promise((resolve) => { releaseSave = resolve; });
+            return { ...input, id: input.requestId, status: "open", dueOn: "", settledOn: "", note: "", createdAt: 1, updatedAt: 1 };
+        }, onChanged: () => { changed += 1; },
+    } });
+    await until(() => fixture.textContent.includes("还没有记录"), "卸载测试账本未加载");
+    input(fixture.querySelector('input[type="text"]'), "迟到往来");
+    input(fixture.querySelector('input[type="number"]'), "35");
+    await tick();
+    button("记一笔往来").click();
+    await until(() => releaseSave, "往来保存未挂起");
+    await unmount(mounted);
+    mounted = undefined;
+    releaseSave();
+    await pause(50);
+    assert(changed === 0, "卸载后往来保存仍通知旧实例");
+});
+
+await test("别名界面实际服务：重复添加已有别名只保留同一记录，零重复写入", async () => {
+    let raw = "";
+    let writes = 0;
+    const plugin = { loadData: async () => structuredClone(raw), saveData: async (_key, value) => { writes += 1; raw = structuredClone(value); } };
+    mounted = mount(PersonAliases, { target: fixture, props: {
+        personDocId: person.docId, onLoad: (docId) => listPersonAliases(plugin, docId),
+        onAdd: (docId, alias) => createPersonAlias(plugin, docId, alias), onRemove: async () => {}, onChanged() {},
+    } });
+    await until(() => fixture.textContent.includes("还没有设置别名"), "别名未加载");
+    const draft = fixture.querySelector('input[aria-label="新增别名"]');
+    input(draft, "老张");
+    await tick();
+    button("添加").click();
+    await until(() => draft.value === "" && !draft.disabled, "首个别名未保存");
+    const before = writes;
+    input(draft, "老张");
+    await tick();
+    button("添加").click();
+    await until(() => draft.value === "" && !draft.disabled, "重复添加未核实原记录");
+    assert(fixture.querySelectorAll(".lvct-person-aliases__item").length === 1 && raw.aliases.length === 1 && writes === before,
+        "重复添加已有别名产生重复 ID 或重复写入");
+});
+
+await test("详情子面板：工作台 X 与 Esc 取消保留草稿，明确放弃切人只确认一次", async () => {
+    const second = { ...person, docId: "20260927000000-person2", itemId: "row-2", name: "回归测试乙" };
+    let release;
+    let writes = 0;
+    let aliases = [];
+    kernel.handler = async (route) => {
+        if (route !== "/api/av/renderAttributeView") throw new Error("导航测试不允许写入");
+        const result = renderResult();
+        result.view.rows.push({ id: second.itemId, cells: [{ valueType: "block", value: {
+            type: "block", keyID: "name", block: { id: second.docId, content: second.name },
+        } }] });
+        return result;
+    };
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, initialView: "people", isMobile: window.innerWidth < 700,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {}, facade: {
+            settings, viewPreferences: DEFAULT_VIEW_PREFERENCES, listContacts: () => getRoster(settings),
+            loadRecentInteractions: async () => ({}), loadPersonInsights: async () => emptyInsights(),
+            listPersonFollowUps: async () => [], getPersonCadence: async () => null, listTemplates: async () => [],
+            listPersonAliases: async (docId) => aliases.filter((alias) => alias.personDocId === docId),
+            addPersonAlias: async (docId, alias) => {
+                writes += 1;
+                await new Promise((resolve) => { release = resolve; });
+                const created = { id: "20261004000000-alias01", personDocId: docId, alias, createdAt: 1, updatedAt: 1 };
+                aliases = [created];
+                return created;
+            },
+        },
+    } });
+    await until(() => fixture.querySelector(".lvct-person-card"), "工作台联系人未加载");
+    fixture.querySelector(".lvct-person-card").click();
+    await until(() => fixture.querySelector('input[aria-label="新增别名"]') && fixture.textContent.includes("还没有设置别名"), "工作台详情别名未加载");
+    const draft = fixture.querySelector('input[aria-label="新增别名"]');
+    input(draft, "别名草稿");
+    await tick();
+    const guard = () => document.querySelector(".lvct-closeguard");
+    for (const action of [
+        () => fixture.querySelector(".lvct-dialog-panel__close").click(),
+        () => { draft.focus(); window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); },
+    ]) {
+        draft.focus();
+        action();
+        await until(guard, "工作台关闭未保护别名草稿");
+        guard().querySelector('button[data-choice="cancel"]').click();
+        await until(() => !guard(), "关闭守卫未取消");
+        await pause(0);
+        assert(draft.isConnected && draft.value === "别名草稿" && document.activeElement === draft && writes === 0, "X 或 Esc 取消丢失人物草稿、焦点或产生写入");
+    }
+    button("下一位").click();
+    await until(guard, "切人未触发别名守卫");
+    guard().querySelector('button[data-choice="discard"]').click();
+    await until(() => fixture.querySelector(".lvct-dialog-panel__title")?.textContent.includes(second.name), "放弃后未切人或重复要求确认");
+    assert(!guard() && fixture.querySelector('input[aria-label="新增别名"]').value === "", "切人重复确认或保留了错误人物草稿");
+    const secondDraft = fixture.querySelector('input[aria-label="新增别名"]');
+    await until(() => fixture.textContent.includes("还没有设置别名"), "乙别名未加载");
+    input(secondDraft, "挂起别名");
+    await tick();
+    button("添加").click();
+    await until(() => release, "乙别名保存未挂起");
+    fixture.querySelector(".lvct-dialog-panel__close").click();
+    secondDraft.focus();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    fixture.querySelector(".lvct-dialog-mask").click();
+    await tick();
+    assert(secondDraft.isConnected && !guard() && writes === 1, "外层 X/Esc/遮罩在子面板保存中卸载详情或重复写入");
+    release();
+    await until(() => !secondDraft.disabled && secondDraft.value === "", "乙别名保存后未解除守卫");
+    button("返回联系人").click();
+    await until(() => !fixture.querySelector(".lvct-dialog-panel"), "子面板保存完成后仍无法返回联系人");
+});
+
+await test("字段实际服务：接受但值未匹配只核实原请求，明确拒绝才补写未完成字段", async () => {
+    const state = configureContactVerificationKernel();
+    state.ignored.add("birthday");
+    const draft = { ...person, birthday: "1990-05-20", isLunar: true };
+    const report = await updateContactFields(settings, person.itemId, draft);
+    assert(!report.complete && report.applied.length === 7 && report.failed.length === 0
+        && report.unknown.length === 1 && report.unknown[0].field === "birthday", `接受请求被误报已保存：${JSON.stringify(report)}`);
+    state.ignored.clear();
+    const before = state.writes.length;
+    const retry = await retryContactFields(settings, person.itemId, draft, report.unresolved.map((failure) => failure.field));
+    assert(!retry.complete && retry.unknown.length === 1 && state.writes.length === before, "接受但未匹配仍重发");
+    state.rendered.view.rows[0].cells.push({ valueType: "date", value: { type: "date", keyID: "birthday",
+        date: { content: new Date("1990-05-20T00:00:00").getTime(), isNotEmpty: true, isNotTime: true } } });
+    const verified = await retryContactFields(settings, person.itemId, draft, ["birthday"]);
+    assert(verified.complete && state.writes.length === before, "迟到原值核实仍重发");
+    const rejectedState = configureContactVerificationKernel();
+    rejectedState.rejected.add("birthday");
+    const rejected = await updateContactFields(settings, person.itemId, draft);
+    assert(rejected.failed.length === 1 && rejected.failed[0].field === "birthday", "明确拒绝未逐字段报告");
+    rejectedState.rejected.clear();
+    const rejectedBefore = rejectedState.writes.length;
+    const retried = await retryContactFields(settings, person.itemId, draft, ["birthday"]);
+    assert(retried.complete && rejectedState.writes.length === rejectedBefore + 1 && rejectedState.writes.at(-1).keyID === "birthday",
+        "明确拒绝重试触碰已完成字段");
+});
+
+await test("字段实际服务：保存后回读失败为未知，恢复核实已存值零重写", async () => {
+    const state = configureContactVerificationKernel();
+    state.failReadback = true;
+    const draft = { ...person, phone: "13800009999", birthday: "1990-05-20" };
+    const report = await updateContactFields(settings, person.itemId, draft);
+    assert(!report.complete && report.unknown.length === report.accepted.length && report.unknown.some((entry) => entry.field === "birthday")
+        && report.failed.length === 0 && report.results.length === 8, "回读失败未保持未知");
+    const before = state.writes.length;
+    let failure = "";
+    try { await retryContactFields(settings, person.itemId, draft, report.unresolved.map((entry) => entry.field)); }
+    catch (error) { failure = error.message; }
+    assert(failure.includes("字段核实读取失败") && state.writes.length === before, "未知仍在重发请求");
+    state.failReadback = false;
+    const checked = await retryContactFields(settings, person.itemId, draft, report.unresolved.map((entry) => entry.field));
+    assert(checked.complete && checked.applied.length === report.unknown.length && checked.accepted.length === 0
+        && state.writes.length === before, "核实到已存值仍重复写入");
+});
+
+await test("字段实际服务：批量与 vCard 的未知结果先核实，恢复已存值时零重写", async () => {
+    const state = configureContactVerificationKernel();
+    state.failReadback = true;
+    const first = await batchUpdateContacts(settings, [{ itemId: person.itemId, group: "同学", tags: ["合唱"] }]);
+    assert(first[0].report.unknown.length === 2 && !first[0].report.complete, "批量回读失败被误报完成");
+    state.failReadback = false;
+    const before = state.writes.length;
+    const retried = await batchUpdateContacts(settings, [{ itemId: person.itemId, group: "同学", tags: ["合唱"] }], {
+        onlyFieldsByItem: { [person.itemId]: ["group", "tags"] },
+    });
+    assert(retried[0].report.complete && state.writes.length === before, "批量核实已存值仍重写");
+    state.writes.length = 0;
+    state.failReadback = true;
+    const draft = { ...person, phone: "13900001234", birthday: "1960-03-05" };
+    const written = await updateContactFields(settings, person.itemId, draft);
+    assert(written.unknown.some((entry) => entry.field === "birthday") && written.unknown.some((entry) => entry.field === "phone"), "vCard 前置未知场景未建立");
+    state.failReadback = false;
+    const beforeVcf = state.writes.length;
+    const vcf = await retryVcfContacts(settings, [{ planIndex: 0, plan: { contact: { ...draft }, draft }, failedFields: written.unresolved.map((failure) => failure.field) }]);
+    assert(vcf[0].status === "unknown" && state.writes.length === beforeVcf, "vCard 无原请求断点仍按同名补写");
+});
+
+await test("字段实际服务：未知行或重复行禁止重发，候选非法输入零写入且未改变不报成功", async () => {
+    const state = configureContactVerificationKernel();
+    const draft = { ...person, birthday: "1960-03-05" };
+    state.rendered.view.rows = [];
+    const absent = await retryContactFields(settings, person.itemId, draft, ["birthday"]);
+    assert(absent.unknown.length === 1 && state.writes.length === 0, "未知行重试仍写入");
+    state.rendered = renderResult();
+    state.rendered.view.rows.push(structuredClone(state.rendered.view.rows[0]));
+    const duplicate = await retryContactFields(settings, person.itemId, draft, ["birthday"]);
+    assert(duplicate.unknown.length === 1 && state.writes.length === 0, "重复行未经消歧仍写入");
+    state.rendered = renderResult();
+    let errorText = "";
+    try { await applyContactCandidateFields(settings, person.itemId, [
+        { field: "phone", value: "13800001111", baseline: "" },
+        { field: "birthday", value: "2026-02-30", baseline: "" },
+    ]); } catch (error) { errorText = error.message; }
+    assert(errorText.includes("生日") && state.writes.length === 0, "候选非法生日前已写入其他字段");
+    state.ignored.add("phone");
+    const ignored = await applyContactCandidateFields(settings, person.itemId, [{ field: "phone", value: "13800001111", baseline: "" }]);
+    assert(!ignored.report.complete && ignored.applied.length === 0 && ignored.report.unknown[0].field === "phone", "候选请求被接受却误报已保存");
+});
+
+await test("字段编辑界面：未知结果保留生日草稿，核实已保存值后才关闭且零重复写入", async () => {
+    const state = configureContactVerificationKernel();
+    state.failReadback = true;
+    let saved = 0;
+    let closed = false;
+    mounted = mount(PersonEditDialog, { target: fixture, props: {
+        settings, person, onSaved: () => { saved += 1; }, onClose: () => { closed = true; },
+    } });
+    input(fixture.querySelector('input[type="date"]'), "1950-01-02");
+    await tick();
+    button("保存").click();
+    await until(() => fixture.textContent.includes("结果未知"), "生日未知结果未显示");
+    assert(!closed && saved === 0 && fixture.querySelector('input[type="date"]').value === "1950-01-02", "回读失败关闭界面或丢失草稿");
+    const before = state.writes.length;
+    state.failReadback = false;
+    button("核实并重试未完成字段").click();
+    await until(() => closed, "核实已保存生日后未完成");
+    assert(saved === 1 && state.writes.length === before, "核实重试重复写入或重复回调");
+});
+
+await test("CODE-02.4 编辑写前预校验：非法生日/邮箱零写入，逐字段失败报告可重试", async () => {
     let setCellCount = 0;
     let failWechat = true;
-    kernel.handler = async (route, body) => {
+    kernel.handler = reflectContactWrites(async (route, body) => {
         if (route === "/api/av/setAttributeViewBlockAttr") {
             if (body.keyID === "wechat" && failWechat) throw new Error("微信注入失败");
             setCellCount += 1;
-            return { code: 0 };
+            return null;
         }
         if (route === "/api/av/renderAttributeView") return renderResult();
-        return { code: 0 };
-    };
-    const draftOf = (over) => ({ name: "回归测试甲", phone: "13900001111", email: "a@b.com", wechat: "", website: "", birthday: "", isLunar: false, group: "", tags: [], ...over });
+        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") return { [person.docId]: person.itemId };
+        return null;
+    });
+    const draftOf = (over) => ({ name: "回归测试甲", phone: "13900001111", email: "a@b.com", wechat: "test-wx", website: "", birthday: "", isLunar: false, group: "", tags: [], ...over });
 
     /* 非法生日（格式合法但不存在的日期）→ 预校验拒绝：零写入、旧值不被清空 */
     let error = "";
@@ -1314,36 +2394,46 @@ await test("CODE-02.4 编辑写前预校验：非法生日/邮箱零写入，逐
     assert(error.includes("未做任何写入") && error.includes("邮箱"), `非法邮箱未拦截：${error}`);
     assert(setCellCount === 0, "非法邮箱仍产生了写入");
 
-    /* 逐字段隔离：微信写入失败 → 复合错误指名字段，其余字段已写入 */
-    error = "";
-    try { await updateContactFields(settings, "row-1", draftOf({})); }
-    catch (e) { error = e.message; }
-    assert(error.includes("字段写入失败") && error.includes("微信"), `逐字段失败未上浮：${error}`);
-    assert(setCellCount >= 7, "其余字段未写入");
+    /* 逐字段隔离：微信写入失败 → 结果报告点名失败字段，其余字段已写入 */
+    const report = await updateContactFields(settings, "row-1", draftOf({}));
+    assert(report.failed.some((failure) => failure.field === "wechat"), `逐字段失败未上浮：${JSON.stringify(report)}`);
+    assert(report.applied.length === 7 && setCellCount === 2, `改动字段未保存或无改动字段重复写入：${JSON.stringify(report)}`);
+
+    /* 缺失列映射 → 预检拒绝且不会触碰任何单元格 */
+    const beforeMappingCheck = setCellCount;
+    let mappingError = "";
+    try {
+        await updateContactFields({ ...settings, fieldMap: { ...settings.fieldMap, email: "missing-email-column" } }, "row-1", draftOf({}));
+    } catch (e) { mappingError = e.message; }
+    assert(mappingError.includes("字段映射校验失败") && setCellCount === beforeMappingCheck, `坏映射未零写入：${mappingError}`);
 });
 
 await test("B11.3/B11.5 指定本人身份：显式改绑成功、未初始化拒绝、目标不存在零改动", async () => {
     const files = new Map();
     files.set("contacts-settings.json", settings);
-    files.set("self-identity.json", { schemaVersion: 1, selfDocId: "20260927000000-person1", selfItemId: "row-1", createdAt: "2026-09-30" });
+    files.set("self-identity.json", { schemaVersion: 1, selfDocId: "20260927000000-person1", selfItemId: "20260927000000-oldrow1", createdAt: "2026-09-30" });
     const plugin = { loadData: async (key) => files.get(key) ?? "", saveData: async (key, value) => { files.set(key, value); } };
     kernel.handler = async (route) => {
         if (route === "/api/av/renderAttributeView") {
             const base = renderResult();
-            return { view: { ...base.view, rows: [...base.view.rows, { id: "row-2", cells: [
-                { value: { type: "block", keyID: "name", block: { id: "20260927000000-person2", content: "回归测试乙" } } },
+            return { view: { ...base.view, rows: [...base.view.rows, { id: "20260927000000-newrow2", cells: [
+                { valueType: "block", value: { type: "block", keyID: "name", block: { id: "20260927000000-person2", content: "回归测试乙" } } },
             ] } ] } };
         }
+        if (route === "/api/sqlite/flushTransaction") return null;
+        if (route === "/api/query/sql") return [{ id: "20260927000000-person2" }];
+        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") return { "20260927000000-person2": "20260927000000-newrow2" };
         throw new Error(`指定身份用例不允许请求 ${route}`);
     };
     invalidateRoster();
     /* 显式改绑到 person2 → 成功且 createdAt 保留原始标记日期 */
-    const identity = await designateSelfIdentity(plugin, settings, "row-2");
-    assert(identity.selfDocId === "20260927000000-person2" && identity.selfItemId === "row-2",
+    const identity = await designateSelfIdentity(plugin, settings, "20260927000000-newrow2");
+    assert(identity.selfDocId === "20260927000000-person2" && identity.selfItemId === "20260927000000-newrow2",
         `显式改绑失败：${JSON.stringify(identity)}`);
     assert(identity.createdAt === "2026-09-30", "改绑丢失了原始 createdAt");
     const stored = files.get("self-identity.json");
     assert(stored.selfDocId === "20260927000000-person2", "改绑未落盘");
+    assert((await loadSelfIdentity(plugin))?.selfItemId === identity.selfItemId, "改绑后不能严格回读身份");
     /* 目标不存在 → 报错且原身份保留 */
     let error = "";
     try { await designateSelfIdentity(plugin, settings, "row-gone"); } catch (e) { error = e.message; }
@@ -1455,6 +2545,9 @@ await test("B13.5 双向编辑完整版：人物详情内添加/移除组织归�
     const removeBtn = removeBtnLive();
     assert(removeBtn, "移除归属按钮未出现");
     removeBtn.click();
+    await until(() => fixture.querySelector('[aria-label="确认移除这段成员历史"]'), "移除影响确认未显示");
+    assert(removeCalls.length === 0, "未确认就移除成员历史");
+    button("确认移除这段成员历史").click();
     await until(
         () => removeCalls.length === 1 && removeCalls[0] === "20260930000000-mem0001",
         `移除未按 membership id 走 facade calls=${JSON.stringify(removeCalls)}`,
@@ -1514,7 +2607,7 @@ await test("B13.6 共同背景：同组织联系人按重叠期间展示（同�
     const peerRow = [...fixture.querySelectorAll(".lvct-org-common__peer")]
         .find((node) => node.textContent.includes("同期同事甲"));
     button("查看详情", peerRow).click();
-    await tick();
+    await until(() => navigatedTo, "关闭守卫允许后未跳转共同背景人物");
     assert(
         Boolean(navigatedTo) && navigatedTo.docId === peerContact.docId && navigatedTo.name === peerContact.name,
         `查看详情未携带联系人回调 onNavigate navigatedTo=${JSON.stringify(navigatedTo)}`,
@@ -1564,7 +2657,7 @@ await test("FUNC-01.8a 锚点消歧：首 AV 无关不采纳按字段证据取�
         }
         if (route === "/api/av/renderAttributeView") {
             const block = avBlocks[body.id];
-            return { view: { columns: block ? block.columns : [] } };
+            return { view: { columns: block ? block.columns : [], rows: [] } };
         }
         throw new Error(`锚点消歧用例不允许请求 ${route}`);
     };
@@ -1590,20 +2683,7 @@ await test("FUNC-01.8a 锚点消歧：首 AV 无关不采纳按字段证据取�
 });
 
 await test("新建草稿「保存并离开」：守卫内保存成功并关闭弹窗", async () => {
-    let created = false;
-    kernel.handler = async (route, body) => {
-        if (route === "/api/av/renderAttributeView") {
-            const base = renderResult();
-            return created ? { view: { ...base.view, rows: [...base.view.rows, { id: "row-new9", cells: [
-                { value: { type: "block", keyID: "name", block: { id: "20260927000000-newdoc9", content: "守卫保存的人" } } },
-            ] } ] } } : base;
-        }
-        if (route === "/api/filetree/createDocWithMd") { created = true; return "20260927000000-newdoc9"; }
-        if (route === "/api/av/addAttributeViewBlocks") return null;
-        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") return { "20260927000000-newdoc9": "row-new9" };
-        if (route === "/api/av/setAttributeViewBlockAttr") return null;
-        throw new Error(`保存并离开用例不允许请求 ${route}`);
-    };
+    const state = configureVcardKernel(kernel, settings);
     const guardDialog = () => document.body.querySelector(".lvct-closeguard");
     try {
         mounted = mount(Workbench, { target: fixture, props: {
@@ -1621,6 +2701,7 @@ await test("新建草稿「保存并离开」：守卫内保存成功并关闭�
         saveButton.click();
         await until(() => !fixture.querySelector(".lvct-dialog-panel"), "保存并离开后编辑弹窗未关闭");
         await until(() => !guardDialog(), "保存并离开后守卫弹窗未关闭");
+        assert(state.creates.length === 1 && state.rows.size === 1, "保存并离开没有核实唯一人物文档和行");
     } finally {
         document.body.querySelector(".lvct-closeguard")?.remove();
     }
@@ -1665,8 +2746,8 @@ await test("英文工作台导航与标题跟随语言资源，缺失文案回�
     fixture.querySelector(".lvct-person-card").click();
     await until(() => fixture.querySelector(".lvct-dialog-panel__title")?.textContent === `Person Details · ${person.name}`, "详情标题未翻译或姓名丢失");
     assert(button("Overview", fixture.querySelector(".lvct-detail__tabs")), "详情标签未翻译");
-    assert(fixture.querySelector('button[aria-label="Close"]'), "关闭无障碍标签未翻译");
-    fixture.querySelector('button[aria-label="Close"]').click();
+    assert(fixture.querySelector('button[aria-label="Return to Contacts"]'), "返回无障碍标签未翻译");
+    fixture.querySelector('button[aria-label="Return to Contacts"]').click();
     await until(() => !fixture.querySelector(".lvct-dialog-panel"), "英文关闭按钮未关闭详情");
     const nav = fixture.querySelector(".lvct-workbench__nav");
     assert(nav.clientWidth > 0 && nav.getBoundingClientRect().right <= window.innerWidth + 1, "英文导航超出视口");
@@ -1698,10 +2779,10 @@ await test("新工作台可按入口指定的初始视图打开", async () => {
 
 await test("B14.8 按组织收窄：关系图人物与组织节点收窄、文档引用图白名单收窄与范围说明", async () => {
     const selfDocId = "20260930000000-self003";
-    const memberA = "20260930000000-memba001";
-    const memberB = "20260930000000-membb001";
-    const outsider = "20260930000000-outsi001";
-    const orgDocId = "20260930000000-orgn0001";
+    const memberA = "20260930000000-memba01";
+    const memberB = "20260930000000-membb01";
+    const outsider = "20260930000000-outsi01";
+    const orgDocId = "20260930000000-orgn001";
     const nameRows = [
         { id: selfDocId, name: "我自己" },
         { id: memberA, name: "组织成员甲" },
@@ -1712,12 +2793,13 @@ await test("B14.8 按组织收窄：关系图人物与组织节点收窄、文�
     kernel.handler = async (route, body) => {
         if (route === "/api/av/renderAttributeView") return { view: { columns: renderResult().view.columns, rows: nameRows.map((row) => ({
             id: row.id, cells: [
-                { value: { type: "block", keyID: "name", block: { id: row.id, content: row.name } } },
-                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+                { valueType: "block", value: { type: "block", keyID: "name", block: { id: row.id, content: row.name } } },
+                { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
             ],
         })) } };
         if (route === "/api/graph/getLocalGraph") {
-            localCalls.push({ id: body.id, restrict: body.conf ? undefined : undefined });
+            assert(body.conf && typeof body.conf === "object", "引用图请求缺少实证 conf 对象");
+            localCalls.push(body.id);
             return {
                 id: body.id,
                 nodes: [
@@ -1751,13 +2833,17 @@ await test("B14.8 按组织收窄：关系图人物与组织节点收窄、文�
         onOpenPeople() {},
         onOpenOrgs: () => { openedOrgs += 1; },
     } });
+    button("画布视图").click();
     const canvas = () => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy;
     await until(() => (canvas()?.nodes().length ?? 0) > 0, "关系图未挂载");
     await until(() => canvas().getElementById(orgDocId).nonempty(), "组织节点未挂载");
-    /* 组织节点点击 → 跳组织视图回调 */
     canvas().getElementById(orgDocId).emit("tap");
-    await tick();
-    assert(openedOrgs === 1, "组织节点点击未触发跳转回调");
+    await until(() => fixture.querySelector('select[aria-label="关系图范围"]')?.value === "org", "组织节点点击未聚焦稳定组织 ID");
+    assert(fixture.querySelector('select[aria-label="按组织收窄"]')?.value === orgDocId && openedOrgs === 0, "组织聚焦误跳页面或改换目标");
+    canvas().getElementById(orgDocId).emit("mouseover");
+    await until(() => fixture.querySelector(".lvct-graph-view__hover-card"), "组织悬停入口未出现");
+    button("打开组织视图").click();
+    assert(openedOrgs === 1, "显式组织视图入口未触发跳转回调");
     /* 按组织收窄：画布人物只剩组织成员，组织节点只剩该组织 */
     const narrowSelect = fixture.querySelector('select[aria-label="按组织收窄"]');
     assert(narrowSelect, "收窄选择器未出现");
@@ -1768,13 +2854,18 @@ await test("B14.8 按组织收窄：关系图人物与组织节点收窄、文�
     assert(canvas().getElementById(outsider).empty(), "圈外人未被收窄过滤");
     await until(() => canvas().edges().length === 2, "收窄后成员边数错误（组织→甲/乙）");
     assert(canvas().edges().every((edge) => edge.data("kind") === "member"), "收窄后画布应只剩成员边");
-    /* 文档引用模式收窄：范围说明标注组织成员数 */
     button("文档引用").click();
-    await until(() => localCalls.length >= 1, "局部图请求未发出");
-    await until(() => fixture.textContent.includes("仅 2 位所选组织成员"), "收窄范围说明缺失");
+    await until(() => localCalls.length === 1 && localCalls[0] === selfDocId, "局部图未使用保留的本人范围");
+    const retainedNames = [{ id: selfDocId, name: "我自己" }, { id: orgDocId, name: "收窄科技" }]
+        .sort((first, second) => first.id < second.id ? -1 : first.id > second.id ? 1 : 0).map((entry) => entry.name).join("、");
+    await until(() => fixture.querySelector(".lvct-graph-summary")?.textContent.includes(`范围外中心优先保留：${retainedNames}（不属于当前范围或组织成员集合，不新增关系事实）`), "范围外本人和补充组织的保留说明缺失或排序错误");
     const nativeCanvasLive = () => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy;
-    await until(() => (nativeCanvasLive()?.nodes().length ?? 0) === 3, "引用图收窄节点数错误（本人+2 成员）");
+    await until(() => (nativeCanvasLive()?.nodes().length ?? 0) === 4, "引用图收窄未保留本人、组织与两位成员");
     assert(nativeCanvasLive().getElementById(outsider).empty(), "引用图圈外人未被收窄过滤");
+    assert(nativeCanvasLive().getElementById(orgDocId).nonempty() && nativeCanvasLive().edges().length === 2
+        && nativeCanvasLive().edges().every((edge) => edge.data("kind") === "ref"), "组织聚焦将成员事实混入引用边");
+    assert(fixture.querySelector(".lvct-graph-summary")?.textContent.includes("登记 5")
+        && fixture.querySelector(".lvct-graph-summary")?.textContent.includes("展示 4 节点 / 2 边"), "聚焦范围与计数不可核对");
 });
 
 await test("B13.5a 组织视图：侧栏入口、卡片渲染（活跃/归档/成员数）、管理入口与初始视图直开", async () => {
@@ -1782,6 +2873,7 @@ await test("B13.5a 组织视图：侧栏入口、卡片渲染（活跃/归档/�
     const facade = {
         settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
         listContacts: async () => [],
+        listOrganizationMembers: async () => [],
         listOrganizations: async () => [
             { docId: "20260930000000-org0001", name: "曙光科技", hpath: "/曙光科技", notebookId: settings.notebookId, archived: false, memberships: [
                 { status: "active" }, { status: "former" },
@@ -1807,7 +2899,9 @@ await test("B13.5a 组织视图：侧栏入口、卡片渲染（活跃/归档/�
     /* 管理入口打开组织管理弹窗 */
     button("组织管理").click();
     await tick();
-    assert(managerOpened === 1, "组织管理按钮未回调");
+    await until(() => fixture.querySelector(".lvct-org-manager"), "组织管理按钮未打开管理入口");
+    assert(fixture.querySelector(".lvct-org-manager")?.dataset.orgDocId === "20260930000000-org0001"
+        && managerOpened === 0, "通用管理入口没有确定目标或重复打开旧弹窗");
     /* 初始视图直开组织 */
     await unmount(mounted);
     mounted = mount(Workbench, { target: fixture, props: { ...baseProps, initialView: "orgs" } });
@@ -1845,7 +2939,7 @@ if (window.innerWidth <= 640) {
     });
 }
 
-await test("图谱邻接、共同联系人与最短路径不重建画布，筛选清理失效选择", async () => {
+await test("图谱邻接、共同联系人与最短路径不重建画布，筛选保中心并显式清除", async () => {
     const entries = [
         { id: "a", name: "甲", related: ["c", "d"] },
         { id: "b", name: "乙", related: ["c"] },
@@ -1857,16 +2951,18 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
         assert(route === "/api/av/renderAttributeView", "图谱查询不应写内核");
         return { view: { columns: renderResult().view.columns, rows: entries.map((entry) => ({
             id: entry.id, cells: [
-                { value: { type: "block", keyID: "name", block: { id: entry.id, content: entry.name } } },
-                { value: { type: "relation", keyID: "related", relation: { blockIDs: entry.related } } },
+                { valueType: "block", value: { type: "block", keyID: "name", block: { id: entry.id, content: entry.name } } },
+                { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: entry.related } } },
             ],
         })) } };
     };
     let opened;
     mounted = mount(RelationGraph, { target: fixture, props: {
         settings, preferences: DEFAULT_VIEW_PREFERENCES, onPreferencesChange: async (next) => next,
+        facade: { listOrganizations: async () => [], loadSelfIdentity: async () => null },
         onOpenDetail(value) { opened = value.docId; }, onOpenPeople() {},
     } });
+    button("画布视图").click();
     await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "图谱未挂载");
     const cy = fixture.querySelector(".lvct-graph-view__canvas")._cyreg.cy;
     const previousTextColor = document.documentElement.style.getPropertyValue("--b3-theme-on-surface");
@@ -1910,26 +3006,26 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
     assert(!cy.getElementById("c").hasClass("lvct-graph-muted"), "邻接人物被淡化");
     select("关系层级", "second");
     await until(() => fixture.textContent.includes("二度关系：1 人"), "二度关系计数错误");
-    assert([...fixture.querySelectorAll(".lvct-graph-query__results button")].map((node) => node.textContent).join(",") === "乙", "二度结果混入直接关系或中心");
+    assert([...fixture.querySelectorAll(".lvct-graph-query__results button")].map((node) => node.textContent.trim()).join(",") === "乙 · b", "二度结果混入直接关系或中心，或缺少稳定 ID");
     assert(!cy.getElementById("b").hasClass("lvct-graph-muted"), "二度人物未显示");
     assert(!cy.getElementById("c").hasClass("lvct-graph-muted"), "中间关系被淡化");
     assert(cy.edges().filter((edge) => !edge.hasClass("lvct-graph-muted")).length === 3, "二度连线高亮错误");
     assert(!cy.destroyed(), "二度切换不应重建画布");
-    button("乙", fixture.querySelector(".lvct-graph-query__results")).click();
+    button("乙 · b", fixture.querySelector(".lvct-graph-query__results")).click();
     assert(opened === "b", "二度结果未打开人物");
     select("关系层级", "direct");
     await pick("对比人物", "b");
     await until(() => fixture.textContent.includes("共同联系人：1 人"), "共同联系人计数错误");
     assert(cy.getElementById("d").hasClass("lvct-graph-muted"), "独有关系未淡化");
-    button("共同人物", fixture.querySelector(".lvct-graph-query__results")).click();
+    button("共同人物 · c", fixture.querySelector(".lvct-graph-query__results")).click();
     assert(opened === "c", "结果未打开正确详情");
     assert(!cy.destroyed(), "选人不应重建图谱");
     select("关系查询模式", "path");
     await until(() => fixture.textContent.includes("最短路径：2 段关系"), "最短路径段数错误");
-    assert([...fixture.querySelectorAll(".lvct-graph-query__results button")].map((node) => node.textContent).join(",") === "甲,共同人物,乙", "路径顺序错误");
+    assert([...fixture.querySelectorAll(".lvct-graph-query__results button")].map((node) => node.textContent.trim()).join(",") === "甲 · a,共同人物 · c,乙 · b", "路径顺序或稳定 ID 错误");
     assert(!cy.getElementById("c").hasClass("lvct-graph-muted"), "路径中间人物被淡化");
     assert(cy.edges().filter((edge) => !edge.hasClass("lvct-graph-muted")).length === 2, "路径连线高亮错误");
-    button("共同人物", fixture.querySelector(".lvct-graph-query__results")).click();
+    button("共同人物 · c", fixture.querySelector(".lvct-graph-query__results")).click();
     assert(opened === "c", "路径人物未打开详情");
     await pick("对比人物", "e");
     await until(() => fixture.textContent.includes("当前图内没有连接路径"), "断开人物应无路径");
@@ -1940,16 +3036,28 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
     select("关系查询模式", "common");
     await pick("对比人物", "e");
     await until(() => fixture.textContent.includes("当前图内没有共同联系人"), "无共同联系人空态错误");
+    /* 更换关系中心必须清掉旧对比人物，否则选择器显示未选择但查询仍沿用旧结果。 */
+    await pick("关系中心", "b");
+    await until(() => fixture.textContent.includes("直接关系：1 人"), "更换关系中心未清除旧对比结果");
+    const staleCompare = [...fixture.querySelectorAll(".lvct-picker__trigger")]
+        .find((node) => node.getAttribute("aria-label") === "对比人物");
+    assert(staleCompare && staleCompare.textContent.includes("未选择"), "更换关系中心后对比人物仍残留");
     button("清除选择").click();
     await until(() => cy.elements(".lvct-graph-muted").length === 0, "清除未恢复图谱");
     await pick("关系中心", "e");
     await until(() => fixture.textContent.includes("当前图内没有直接关系"), "孤立人物空态错误");
     input(fixture.querySelector('input[type="search"]'), "共同人物");
     await until(() => [...fixture.querySelectorAll(".lvct-picker__trigger")]
-        .find((node) => node.getAttribute("aria-label") === "关系中心")?.textContent.includes("未选择"), "筛选后未清除失效中心");
+        .find((node) => node.getAttribute("aria-label") === "关系中心")?.textContent.includes("孤立人物"), "筛选静默清除了有效关系中心");
+    const filteredCanvas = () => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy;
+    await until(() => filteredCanvas()?.nodes().length === 2, "搜索未保留中心和匹配人物");
+    assert(filteredCanvas().getElementById("e").nonempty() && filteredCanvas().getElementById("c").nonempty()
+        && fixture.querySelector(".lvct-graph-summary")?.textContent.includes("中心优先保留：孤立人物"), "保中心例外缺少稳定目标或说明");
     const compareTrigger = [...fixture.querySelectorAll(".lvct-picker__trigger")]
         .find((node) => node.getAttribute("aria-label") === "对比人物");
-    assert(compareTrigger?.disabled, "无中心不应允许对比");
+    assert(compareTrigger && !compareTrigger.disabled, "有效中心保留后不应禁用对比");
+    button("清除选择").click();
+    await until(() => compareTrigger.disabled && filteredCanvas()?.nodes().length === 1, "显式清除中心未恢复筛选范围");
     const bounds = fixture.querySelector(".lvct-graph-query").getBoundingClientRect();
     assert(bounds.right <= window.innerWidth + 1, "关系查询超出视口");
     for (const control of fixture.querySelectorAll(".lvct-graph-query select")) {
@@ -1976,12 +3084,16 @@ await test("图谱稳定挂载，悬停卡保留人物，筛选清空后可恢�
         settings, preferences: DEFAULT_VIEW_PREFERENCES, onPreferencesChange: async (next) => next,
         onOpenDetail: (value) => { opened = value; }, onOpenPeople() {},
     } });
+    button("画布视图").click();
     await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "图谱未挂载");
     const cy = fixture.querySelector(".lvct-graph-view__canvas")._cyreg.cy;
     await pause(400);
     assert(!cy.destroyed(), "图谱被响应式 effect 重复销毁");
     cy.nodes()[0].emit("mouseover");
     await until(() => fixture.querySelector(".lvct-graph-view__hover-card"), "悬停卡未出现");
+    const hoverCard = fixture.querySelector(".lvct-graph-view__hover-card");
+    assert(hoverCard.getAttribute("role") === "dialog" && hoverCard.getAttribute("aria-modal") === "false"
+        && hoverCard.getAttribute("aria-label")?.includes(person.name), "人物悬停卡缺少非模态可访问名称");
     button("查看人物详情").click();
     assert(opened?.docId === person.docId, "悬停卡传给详情的人物为空");
     input(fixture.querySelector('input[type="search"]'), "没有此人");
@@ -1993,9 +3105,9 @@ await test("图谱稳定挂载，悬停卡保留人物，筛选清空后可恢�
 
 await test("图谱文档引用模式：内核局部图按登记集合过滤，边语义提示与模式偏好持久化（B14.3/14.5/14.7）", async () => {
     const selfDocId = "20260930000000-self001";
-    const contactA = "20260930000000-contact1";
-    const contactB = "20260930000000-contact2";
-    const stranger = "20260930000000-strange1";
+    const contactA = "20260930000000-contac1";
+    const contactB = "20260930000000-contac2";
+    const stranger = "20260930000000-strang1";
     const nameRows = [
         { id: selfDocId, name: "我自己" },
         { id: contactA, name: "引用甲" },
@@ -2006,8 +3118,8 @@ await test("图谱文档引用模式：内核局部图按登记集合过滤，�
     kernel.handler = async (route, body) => {
         if (route === "/api/av/renderAttributeView") return { view: { columns: renderResult().view.columns, rows: nameRows.map((row) => ({
             id: row.id, cells: [
-                { value: { type: "block", keyID: "name", block: { id: row.id, content: row.name } } },
-                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+                { valueType: "block", value: { type: "block", keyID: "name", block: { id: row.id, content: row.name } } },
+                { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
             ],
         })) } };
         if (route === "/api/graph/getLocalGraph") {
@@ -2038,10 +3150,11 @@ await test("图谱文档引用模式：内核局部图按登记集合过滤，�
         settings,
         preferences: currentPrefs,
         onPreferencesChange: async (next) => { currentPrefs = next; savedGraphMode = next.graphMode; return next; },
-        facade: { loadSelfIdentity: async () => ({ selfDocId, createdAt: "2026-09-30T00:00:00Z" }) },
+        facade: { loadSelfIdentity: async () => ({ selfDocId, createdAt: "2026-09-30T00:00:00Z" }), listOrganizations: async () => [] },
         onOpenDetail(value) { opened = value.docId; },
         onOpenPeople() {},
     } });
+    button("画布视图").click();
     await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "关系图未挂载");
     button("文档引用").click();
     await until(() => localRequests === 1, "未请求内核局部图");
@@ -2060,7 +3173,10 @@ await test("图谱文档引用模式：内核局部图按登记集合过滤，�
     assert(modeButtons[1]?.getAttribute("aria-pressed") === "true", "文档引用按钮未标记按下态");
     /* 搜索过滤走节点 label（画布重建后节点数变化） */
     input(fixture.querySelector('input[type="search"]'), "引用甲");
-    await until(() => (nativeCanvas()?.nodes().length ?? 0) === 1, "引用图搜索未按节点过滤");
+    await until(() => (nativeCanvas()?.nodes().length ?? 0) === 2, "引用图搜索未保留有效中心和匹配节点");
+    assert(nativeCanvas().getElementById(selfDocId).nonempty() && nativeCanvas().getElementById(contactA).nonempty()
+        && nativeCanvas().getElementById(contactB).empty() && nativeCanvas().edges().length === 1, "引用搜索结果/裁边错误");
+    assert(fixture.querySelector(".lvct-graph-summary")?.textContent.includes("中心优先保留：我自己") && localRequests === 1, "引用中心例外缺少说明或搜索重复查询内核");
     input(fixture.querySelector('input[type="search"]'), "");
     await until(() => (nativeCanvas()?.nodes().length ?? 0) === 3, "引用图清空搜索未恢复");
     /* 切回关系图：不应重复请求局部图 */
@@ -2078,8 +3194,8 @@ await test("关系图组织增强：组织节点与成员边分源展示，开�
     kernel.handler = async (route) => {
         if (route === "/api/av/renderAttributeView") return { view: { columns: renderResult().view.columns, rows: [{
             id: person.docId, cells: [
-                { value: { type: "block", keyID: "name", block: { id: person.docId, content: person.name } } },
-                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+                { valueType: "block", value: { type: "block", keyID: "name", block: { id: person.docId, content: person.name } } },
+                { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
             ],
         }] } };
         throw new Error(`回归测试不允许请求 ${route}`);
@@ -2090,15 +3206,16 @@ await test("关系图组织增强：组织节点与成员边分源展示，开�
         preferences: DEFAULT_VIEW_PREFERENCES,
         onPreferencesChange: async (next) => next,
         facade: { listOrganizations: async () => [
-            { docId: orgDocId, name: "曙光科技", hpath: "/曙光科技", notebookId: "20260927000000-book001", memberships: [
+            { docId: orgDocId, name: "曙光科技", hpath: "/曙光科技", notebookId: "20260927000000-book001", archived: false, memberships: [
                 { id: "m1", orgDocId, personDocId: person.docId, department: "", title: "", joinedOn: "", leftOn: "", status: "active" },
                 { id: "m2", orgDocId, personDocId: person.docId, department: "", title: "", joinedOn: "", leftOn: "", status: "former" },
                 { id: "m3", orgDocId, personDocId: ghostId, department: "", title: "", joinedOn: "", leftOn: "", status: "active" },
             ] },
-        ] },
+        ], loadSelfIdentity: async () => null },
         onOpenDetail(value) { opened = value.docId; },
         onOpenPeople() {},
     } });
+    button("画布视图").click();
     const canvas = () => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy;
     await until(() => (canvas()?.nodes().length ?? 0) > 0, "关系图未挂载");
     await until(() => canvas()?.getElementById(orgDocId).nonempty(), "组织节点未挂载");
@@ -2116,7 +3233,16 @@ await test("关系图组织增强：组织节点与成员边分源展示，开�
         .find((node) => node.textContent.includes("显示组织"));
     assert(orgToggle, "未找到组织开关");
     orgToggle.querySelector("input").click();
-    await until(() => canvas()?.getElementById(orgDocId)?.empty(), "关闭开关后组织节点未消失");
+    await until(() => fixture.querySelector(".lvct-graph-summary")?.textContent.includes("中心优先保留：曙光科技"), "组织中心不满足显示开关时缺少保留说明");
+    assert(canvas().getElementById(orgDocId).nonempty(), "有效组织中心被显示开关静默隐藏");
+    const relationScope = fixture.querySelector('select[aria-label="关系图范围"]');
+    relationScope.value = "global";
+    relationScope.dispatchEvent(new Event("change", { bubbles: true }));
+    const organizationFilter = fixture.querySelector('select[aria-label="按组织收窄"]');
+    organizationFilter.value = "";
+    organizationFilter.dispatchEvent(new Event("change", { bubbles: true }));
+    await until(() => canvas()?.getElementById(orgDocId)?.empty(), "退出聚焦后关闭开关未隐藏组织");
+    assert(canvas().nodes().length === 1 && canvas().edges().length === 0, "隐藏组织未裁掉成员边或误删人物");
     orgToggle.querySelector("input").click();
     await until(() => canvas()?.getElementById(orgDocId)?.nonempty(), "恢复开关后组织节点未回归");
     /* 选关系中心 → 组织节点与成员边 muted（查询仍只按 related，组织退场） */
@@ -2126,13 +3252,14 @@ await test("关系图组织增强：组织节点与成员边分源展示，开�
         canvas().edges().filter((edge) => edge.data("kind") === "member").every((edge) => edge.hasClass("lvct-graph-muted")),
         "查询激活时成员边未退场",
     );
+    assert(fixture.textContent.includes("当前图内没有直接关系") && fixture.textContent.includes(ghostId), "成员边被当作 related 或悬空记录诊断丢失");
 });
 
 await test("引用图范围切换：联系为中心一度、全部登记文档、范围说明与偏好持久化（B14.8）", async () => {
     const selfDocId = "20260930000000-self002";
     const contactA = "20260930000000-persa01";
     const contactB = "20260930000000-persb01";
-    const stranger = "20260930000000-strange2";
+    const stranger = "20260930000000-strang2";
     const nameRows = [
         { id: selfDocId, name: "我自己" },
         { id: contactA, name: "中心人物甲" },
@@ -2143,15 +3270,16 @@ await test("引用图范围切换：联系为中心一度、全部登记文档�
     kernel.handler = async (route, body) => {
         if (route === "/api/av/renderAttributeView") return { view: { columns: renderResult().view.columns, rows: nameRows.map((row) => ({
             id: row.id, cells: [
-                { value: { type: "block", keyID: "name", block: { id: row.id, content: row.name } } },
-                { value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
+                { valueType: "block", value: { type: "block", keyID: "name", block: { id: row.id, content: row.name } } },
+                { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
             ],
         })) } };
         if (route === "/api/graph/getLocalGraph") {
             localCalls.push(body.id);
+            assert([selfDocId, contactA, contactB].includes(body.id), "失效中心仍发送局部图请求");
             const around = body.id === contactA
                 ? { nodes: [{ id: contactA, label: "中心人物甲" }, { id: contactB, label: "联系人乙" }], links: [{ from: contactA, to: contactB, ref: true }] }
-                : { nodes: [{ id: selfDocId, label: "我自己" }], links: [] };
+                : { nodes: [{ id: body.id, label: nameRows.find((row) => row.id === body.id).name }], links: [] };
             return {
                 id: body.id,
                 nodes: around.nodes.map((node) => ({ ...node, type: "NodeDocument", refs: 0, defs: 0 })),
@@ -2186,24 +3314,26 @@ await test("引用图范围切换：联系为中心一度、全部登记文档�
         onOpenDetail() {},
         onOpenPeople() {},
     } });
+    button("画布视图").click();
     const nativeCanvas = () => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy;
     button("文档引用").click();
     await until(() => localCalls.length === 1 && localCalls[0] === selfDocId, "默认中心不是本人档案");
-    await until(() => fixture.textContent.includes("以「我自己」为中心"), "self 范围说明缺失");
-    /* 切联系人为中心（未选人时回退本人中心） */
+    await until(() => fixture.querySelector(".lvct-graph-summary")?.textContent.includes(`本人中心 · 我自己 · ${selfDocId}`), "self 范围说明缺少实际稳定中心");
     const scopeSelect = fixture.querySelector('select[aria-label="引用图范围"]');
     assert(scopeSelect, "未找到范围选择器");
     scopeSelect.value = "person";
     scopeSelect.dispatchEvent(new Event("change", { bubbles: true }));
     await until(() => savedNativeScope === "person", "范围偏好未持久化");
+    await until(() => fixture.textContent.includes("图查询范围尚未核实"), "未选指定中心未显示独立失效状态");
+    assert(localCalls.length === 1 && globalCalls === 0 && savedCenter === "", "缺指定中心静默回退本人或全局");
     await pickOption("中心人物", "联系人乙");
     await tick();
-    /* scope 切 person 未选人时先回退本人中心一次，选中后才是中心联系人请求 */
     await until(
-        () => localCalls.length === 3 && localCalls[1] === selfDocId && localCalls[2] === contactB,
+        () => localCalls.length === 2 && localCalls[1] === contactB,
         `中心联系人请求未发出 localCalls=${JSON.stringify(localCalls)} savedCenter=${savedCenter}`,
     );
-    await until(() => fixture.textContent.includes("以 联系人乙 为中心"), "person 范围说明缺失");
+    await until(() => fixture.querySelector(".lvct-graph-summary")?.textContent.includes(`人物中心 · 联系人乙 · ${contactB}`)
+        && nativeCanvas()?.nodes().length === 1 && nativeCanvas().nodes()[0].id() === contactB, "person 范围说明或局部结果缺少实际中心");
     assert(savedCenter === contactB, "中心人物偏好未持久化");
     /* 全部登记文档：getGraph + 登记集合过滤 */
     scopeSelect.value = "global";
@@ -2212,8 +3342,11 @@ await test("引用图范围切换：联系为中心一度、全部登记文档�
     await until(() => fixture.textContent.includes("不是整库图"), "global 范围说明缺失");
     await until(() => (nativeCanvas()?.nodes().length ?? 0) === 3, "无关笔记未被登记集合过滤");
     assert(nativeCanvas().edges().length === 1, "被过滤节点的边未丢弃");
-    await until(() => fixture.textContent.includes("纳入 3 个登记文档"), "纳入数说明错误");
-    assert(fixture.textContent.includes("图外 0 位联系人暂无引用"), "图外数说明错误");
+    await until(() => fixture.querySelector(".lvct-graph-summary")?.textContent.includes("登记 3 · 来源节点 3 / 边 1"), "来源登记数或边数说明错误");
+    assert(fixture.querySelector(".lvct-graph-summary")?.textContent.includes("范围排除 0")
+        && fixture.querySelector(".lvct-graph-summary")?.textContent.includes("展示 3 节点 / 1 边")
+        && savedNativeScope === "global", "全局范围实际计数或偏好不可核对");
+    assert(!fixture.textContent.includes("暂无引用"), "范围外对象被误称暂无引用");
 });
 
 await test("详情加载失败可重试，空记录可跳转记一笔，写入后时间线刷新", async () => {
@@ -2233,7 +3366,7 @@ await test("详情加载失败可重试，空记录可跳转记一笔，写入�
     button("重试").click();
     await until(() => fixture.textContent.includes("还没有互动记录"), "重试未恢复");
     button("去记一笔").click();
-    await tick();
+    await until(() => fixture.querySelector(".lvct-detail__record button"), "关闭守卫允许后未切换到记录表单");
     button("记录").click();
     await until(() => changes === 1, "互动保存未通知父视图");
     button("互动").click();
@@ -2272,6 +3405,7 @@ await test("从首页打开详情并记录互动后，首页统计同步刷新",
 });
 
 await test("vCard 切换文件解析失败时清空旧计划，禁止误导入", async () => {
+    configureVcardKernel(kernel, settings);
     mounted = mount(VCardDialog, { target: fixture, props: { settings, onImported() {}, onClose() {} } });
     const fileInput = fixture.querySelector('input[type="file"]');
     function selectFile(name) {
@@ -2295,8 +3429,9 @@ await test("快速修改收编关键词时，迟到的旧查询不能覆盖新�
     const oldResponse = new Promise((resolve) => { resolveOld = resolve; });
     const oldRow = { id: "20260927000000-old0001", content: "收编甲", hpath: "/甲" };
     const newRow = { id: "20260927000000-new0001", content: "收编乙", hpath: "/乙" };
-    kernel.handler = async (route) => {
+    kernel.handler = async (route, body) => {
         if (route === "/api/notebook/lsNotebooks") return { notebooks: [{ id: "20260927000000-book002", name: "测试笔记本" }] };
+        if (route === "/api/query/sql" && body.stmt.includes("SELECT DISTINCT root_id")) return [];
         if (route === "/api/query/sql") return ++queries === 1 ? oldResponse : [newRow];
         if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") return {};
         throw new Error(`非预期请求：${route}`);
@@ -2313,7 +3448,8 @@ await test("快速修改收编关键词时，迟到的旧查询不能覆盖新�
     assert(!button("收编为联系人（1）").disabled, "勾选新结果后应允许收编");
     input(fixture.querySelector('input[type="text"]'), "甲");
     await tick();
-    assert(button("收编为联系人（0）").disabled, "等待新查询时仍能误提交旧勾选");
+    const submit = [...fixture.querySelectorAll("button")].find((node) => /收编为联系人/.test(node.textContent));
+    assert(!submit || submit.disabled, "等待新查询时仍能误提交旧勾选");
 });
 
 await test("首页快捷互动失败保留备注，重试成功后更新提醒", async () => {
@@ -2420,12 +3556,13 @@ await test("设置页可按列类型手动恢复字段映射并拒绝空提交",
 await test("表格列显隐与顺序偏好持久化，姓名列固定，恢复默认生效", async () => {
     const headers = () => [...fixture.querySelectorAll("thead th")].map((th) => th.textContent.trim());
     const sameList = (list, expected, message) => assert(JSON.stringify(list) === JSON.stringify(expected), `${message}（实际：${JSON.stringify(list)}）`);
+    const preferenceCalls = [];
     const mountPeople = (prefs) => mount(PeopleView, { target: fixture, props: {
         settings, preferences: prefs,
         loadRecentInteractions: async () => ({}),
         revision: 0, initialSort: "name",
         onOpenDetail() {}, onOpenPersonDoc() {},
-        onPreferencesChange: async (next) => { savedPrefs = next; return next; },
+        onPreferencesChange: async (next, baseline) => { preferenceCalls.push({ next, baseline }); savedPrefs = next; return next; },
     } });
     let savedPrefs = null;
     mounted = mountPeople({ ...DEFAULT_VIEW_PREFERENCES, peopleView: "table", tableColumns: ["phone", "group"] });
@@ -2454,15 +3591,22 @@ await test("表格列显隐与顺序偏好持久化，姓名列固定，恢复�
     [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "恢复默认显示").click();
     await until(() => savedPrefs?.tableColumns.length === 7 && savedPrefs.peopleView === "card", "恢复默认未持久化");
     await until(() => !fixture.querySelector("table") && fixture.querySelector(".lvct-people__cards"), "恢复默认后未回到卡片视图");
+    preferenceCalls.length = 0;
+    /* 连续反向切换时，第二次请求必须携带第一次意图作为基线，不能因父层 props 尚未更新而丢失。 */
+    button("表格").click();
+    button("卡片").click();
+    await until(() => preferenceCalls.length >= 2, "连续切换偏好请求未发出");
+    assert(preferenceCalls[0].next.peopleView === "table", "第一次切换未提交表格意图");
+    assert(preferenceCalls[1].next.peopleView === "card" && preferenceCalls[1].baseline.peopleView === "table", "第二次反向切换未携带最新本地基线");
 });
 
 await test("组合筛选数量与生效条件一致，单项清除与清除全部不遗留", async () => {
     const row = (id, name, group, tags) => ({
         id: `item-${id}`,
         cells: [
-            { value: { type: "block", keyID: "name", block: { id: `doc-${id}`, content: name } } },
-            { value: { keyID: "group", mSelect: [{ content: group }] } },
-            { value: { keyID: "tags", mSelect: tags.map((tag) => ({ content: tag })) } },
+            { valueType: "block", value: { type: "block", keyID: "name", block: { id: `doc-${id}`, content: name } } },
+            { valueType: "mSelect", value: { type: "mSelect", keyID: "group", mSelect: [{ content: group }] } },
+            { valueType: "mSelect", value: { type: "mSelect", keyID: "tags", mSelect: tags.map((tag) => ({ content: tag })) } },
         ],
     });
     const rows = [
@@ -2525,9 +3669,9 @@ await test("保存视图：命名保存与应用、重名覆盖确认、改名�
     const row = (id, name, group, tags) => ({
         id: `item-${id}`,
         cells: [
-            { value: { type: "block", keyID: "name", block: { id: `doc-${id}`, content: name } } },
-            { value: { keyID: "group", mSelect: [{ content: group }] } },
-            { value: { keyID: "tags", mSelect: tags.map((tag) => ({ content: tag })) } },
+            { valueType: "block", value: { type: "block", keyID: "name", block: { id: `doc-${id}`, content: name } } },
+            { valueType: "mSelect", value: { type: "mSelect", keyID: "group", mSelect: [{ content: group }] } },
+            { valueType: "mSelect", value: { type: "mSelect", keyID: "tags", mSelect: tags.map((tag) => ({ content: tag })) } },
         ],
     });
     const rows = [
@@ -2665,6 +3809,10 @@ await test("首页待办跟进：分桶展示，处理仅限可达人物，推�
     // 推迟 → 语义选项传递
     [...fixture.querySelectorAll(".lvct-dash__fu-actions button")].find((node) => node.textContent.trim() === "推迟").click();
     await tick();
+    if (window.innerWidth <= 640) {
+        const quickForm = fixture.querySelector(".lvct-dash__quick-form");
+        assert(quickForm && quickForm.scrollWidth <= quickForm.clientWidth + 1, "移动端推迟菜单不应横向溢出");
+    }
     [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "明天").click();
     await until(() => snoozeCalls.length === 1 && snoozeCalls[0][0] === "fu-overdue" && snoozeCalls[0][1] === "tomorrow", "推迟未传递语义选项");
     await until(() => fixture.textContent.includes("已将「问问面试结果」推迟到明天"), `推迟成功提示未显示（通知区：${[...fixture.querySelectorAll(".lvct-notice")].map((node) => node.textContent).join(" | ") || "无"}）`);
@@ -2754,6 +3902,50 @@ await test("人物跟进计划：创建防重复提交，推迟菜单语义选�
     } finally {
         window.confirm = originalConfirm;
     }
+});
+
+await test("人物跟进计划：写入成功但回读失败时提示核实，避免重复提交", async () => {
+    let items = [];
+    let failReads = false;
+    let createCalls = 0;
+    const statusCalls = [];
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async () => {},
+        onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onDeleted() {}, onClose() {}, onChanged() {},
+        onListFollowUps: async () => {
+            if (failReads) throw new Error("列表暂时无法读取");
+            return items;
+        },
+        onCreateFollowUp: async (_docId, title, dueDate) => {
+            createCalls += 1;
+            const created = { id: "fu-refresh-1", personDocId: person.docId, title, dueDate, status: "open", createdAt: 1, updatedAt: 1 };
+            items = [...items, created];
+            return created;
+        },
+        onSetFollowUpStatus: async (id, status) => {
+            statusCalls.push([id, status]);
+            items = items.map((entry) => entry.id === id ? { ...entry, status } : entry);
+        },
+        onSnoozeFollowUp: async () => {},
+    } });
+    await until(() => fixture.textContent.includes("跟进计划"), "跟进区未显示");
+    const titleInput = fixture.querySelector('input[placeholder*="这次想联系什么"]');
+    input(titleInput, "回读失败测试");
+    failReads = true;
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "添加计划").click();
+    await until(() => createCalls === 1 && fixture.textContent.includes("已保存，但跟进列表刷新失败"), "写入成功后的回读失败提示未显示");
+    assert(fixture.textContent.includes("不要重复提交") && !fixture.textContent.includes("跟进操作失败"), "回读失败被误报成写入失败或缺少防重复提示");
+
+    failReads = false;
+    fixture.querySelector(".lvct-notice__action").click();
+    await until(() => fixture.textContent.includes("回读失败测试"), "重试后未核实已写入跟进");
+
+    failReads = true;
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "完成").click();
+    await until(() => statusCalls.length === 1 && fixture.textContent.includes("已保存，但跟进列表刷新失败"), "状态写入成功后的回读失败提示未显示");
+    assert(statusCalls.length === 1, "回读失败后不应重复提交状态写入");
 });
 
 await test("跟进备份：预览零写入，合并现状优先幂等，损坏数据与非法日期拒绝", async () => {
@@ -2865,6 +4057,18 @@ await test("人物联系节奏设置：显示当前规则，自定义/暂停/清
     await tick();
     const daysInput = fixture.querySelector('input[aria-label="自定义天数"]');
     assert(daysInput, "自定义模式下未出现天数输入");
+    input(daysInput, "21");
+    await tick();
+    button("关闭").click();
+    await until(() => document.body.querySelector(".lvct-closeguard"), "未保存的联系节奏关闭时未触发守卫");
+    assert(document.body.querySelector(".lvct-closeguard__list")?.textContent?.includes("联系节奏尚未保存"), "联系节奏守卫未列出草稿明细");
+    document.body.querySelector('.lvct-closeguard button[data-choice="cancel"]').click();
+    await until(() => !document.body.querySelector(".lvct-closeguard"), "联系节奏守卫取消后未关闭");
+    assert(fixture.querySelector('input[aria-label="自定义天数"]')?.value === "21", "取消守卫后联系节奏草稿丢失");
+    button("关闭").click();
+    await until(() => document.body.querySelector(".lvct-closeguard"), "联系节奏守卫第二次关闭未打开");
+    document.body.querySelector('.lvct-closeguard button[data-choice="save"]').click();
+    await until(() => savedCadence?.days === 21 && savedCadence?.paused === false, "关闭守卫的保存并离开未写入联系节奏");
     input(daysInput, "14");
     [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "保存节奏").click();
     await until(() => savedCadence?.days === 14 && savedCadence?.paused === false, "自定义节奏未保存");
@@ -2884,6 +4088,27 @@ await test("人物联系节奏设置：显示当前规则，自定义/暂停/清
     await until(() => fixture.textContent.includes("已清除覆盖"), "清除提示未显示");
 });
 
+await test("人物联系节奏读取失败：显示错误态并可重试，不停留在 loading", async () => {
+    let failCadence = true;
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async () => {},
+        onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+        onGetCadence: async () => {
+            if (failCadence) throw new Error("模拟节奏读取失败");
+            return null;
+        },
+        onSaveCadence: async () => {},
+    } });
+    await until(() => fixture.textContent.includes("模拟节奏读取失败"), "联系节奏读取错误未显示");
+    assert(fixture.textContent.includes("联系节奏读取失败"), "联系节奏错误标题未显示");
+    assert(!fixture.textContent.includes("正在读取联系节奏"), "读取失败后不应继续显示 loading");
+    failCadence = false;
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "重试").click();
+    await until(() => fixture.textContent.includes("跟随全局阈值"), "联系节奏重试后未恢复控件");
+});
+
 await test("今日行动清单：多原因单卡徽标，逾期跟进批量顺延到今天，空态", async () => {
     const pad = (value) => String(value).padStart(2, "0");
     const now = new Date();
@@ -2900,21 +4125,26 @@ await test("今日行动清单：多原因单卡徽标，逾期跟进批量顺�
             { kind: "followup", bucket: "overdue", label: "跟进「问问面试」已逾期", dueDate: offsetDate(-3), followUpId: "fu-1" },
             { kind: "stale", bucket: "stale", label: "60 天未联系（阈值 30 天）" },
         ] },
-        { person: personB, bucket: "today", earliestDate: todayKey, reasons: [
-            { kind: "birthday", bucket: "today", label: "今天生日", dueDate: todayKey },
+        { person: personB, bucket: "overdue", earliestDate: offsetDate(-1), reasons: [
+            { kind: "followup", bucket: "overdue", label: "跟进「补联系」已逾期", dueDate: offsetDate(-1), followUpId: "fu-2" },
         ] },
     ];
     const snoozeCalls = [];
     const opened = [];
-    let shifted = false;
+    const shifted = new Set();
+    let failFu2 = true;
     mounted = mount(DashboardView, { target: fixture, props: {
         preferences: DEFAULT_VIEW_PREFERENCES,
         onOpenDetail(p) { opened.push(p.docId); }, onOpenPeople() {}, onOpenGraph() {},
         facade: { settings, loadDashboard: async () => ({
             people: 2, relations: 0, birthdays: [], birthdaysThisWeek: 0,
             stale: [], neverContacted: 0, neverContactedItemIds: [],
-            followUps: [], actions: shifted ? [] : actions,
-        }), snoozeFollowUp: async (id, option, date) => { snoozeCalls.push([id, option, date]); shifted = true; } },
+            followUps: [], actions: shifted.size === 2 ? [] : actions,
+        }), snoozeFollowUp: async (id, option, date) => {
+            snoozeCalls.push([id, option, date]);
+            if (id === "fu-2" && failFu2) throw new Error("模拟顺延失败");
+            shifted.add(id);
+        } },
     } });
     await until(() => fixture.textContent.includes("今日行动"), "行动清单未渲染");
     await until(() => fixture.querySelectorAll(".lvct-dash__actions .lvct-dash__row").length === 2, "行动卡数量错误");
@@ -2923,10 +4153,16 @@ await test("今日行动清单：多原因单卡徽标，逾期跟进批量顺�
     assert(cardA.textContent.includes("行动乙") === false, "不同人物不应合并卡片");
 
     // 批量顺延：把逾期跟进顺延到今天
-    [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("1 条逾期跟进顺延到今天")).click();
-    await until(() => snoozeCalls.length === 1, "批量顺延未触发");
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("2 条逾期跟进顺延到今天")).click();
+    await until(() => snoozeCalls.length === 2, "批量顺延未触发");
     assert(snoozeCalls[0][0] === "fu-1" && snoozeCalls[0][1] === "custom" && snoozeCalls[0][2] === todayKey, "顺延参数错误");
-    await until(() => fixture.textContent.includes("今天没有需要处理的事"), "顺延后清单未清空");
+    assert(snoozeCalls[1][0] === "fu-2", "失败项未继续执行");
+    await until(() => fixture.textContent.includes("1 条失败"), "部分失败提示未显示");
+    assert(fixture.textContent.includes("跟进「补联系」已逾期") && fixture.textContent.includes("模拟顺延失败"), "失败项标题或原因未显示");
+    failFu2 = false;
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("重试失败项（1）")).click();
+    await until(() => snoozeCalls.length === 3, "失败项重试未触发");
+    await until(() => fixture.textContent.includes("今天没有需要处理的事"), "重试成功后清单未清空");
     assert(fixture.textContent.includes("已把 1 条逾期跟进顺延到今天"), "顺延成功提示未显示");
 
     // 打开详情
@@ -2948,11 +4184,18 @@ await test("打开摘要：开关与当日忽略抑制、次日恢复、空清�
         { person: { ...person, docId: "doc-b", name: "摘要乙" }, bucket: "today", earliestDate: dateKey(0), reasons: [{ kind: "stale", bucket: "stale", label: "从未互动" }] },
     ];
     const mountedViews = [];
+    let savedPrefs = null;
+    let failSummarySave = false;
+    const saveSummaryPreferences = async (next) => {
+        if (failSummarySave) throw new Error("模拟偏好保存失败");
+        savedPrefs = next;
+        return next;
+    };
     const mountDash = (prefs, withActions = true) => {
         const view = mount(DashboardView, { target: fixture, props: {
             preferences: prefs,
             onOpenDetail() {}, onOpenPeople() {}, onOpenGraph() {},
-            onPreferencesChange: async (next) => { savedPrefs = next; return next; },
+            onPreferencesChange: saveSummaryPreferences,
             facade: { settings, loadDashboard: async () => ({
                 people: 2, relations: 0, birthdays: [], birthdaysThisWeek: 0,
                 stale: [], neverContacted: 0, neverContactedItemIds: [],
@@ -2962,7 +4205,6 @@ await test("打开摘要：开关与当日忽略抑制、次日恢复、空清�
         mountedViews.push(view);
         return view;
     };
-    let savedPrefs = null;
     // 数据就绪的标志：问候语渲染（data 已非空）
     const dataReady = () => fixture.textContent.includes("今天先联系谁");
 
@@ -2970,7 +4212,7 @@ await test("打开摘要：开关与当日忽略抑制、次日恢复、空清�
     mountedViews.push(mount(DashboardView, { target: fixture, props: {
         preferences: DEFAULT_VIEW_PREFERENCES,
         onOpenDetail() {}, onOpenPeople() {}, onOpenGraph() {},
-        onPreferencesChange: async (next) => { savedPrefs = next; return next; },
+        onPreferencesChange: saveSummaryPreferences,
         facade: { settings, loadDashboard: async () => ({
             people: 2, relations: 0, birthdays: [], birthdaysThisWeek: 0,
             stale: [], neverContacted: 0, neverContactedItemIds: [], followUps: [], actions: actionsData,
@@ -2993,7 +4235,13 @@ await test("打开摘要：开关与当日忽略抑制、次日恢复、空清�
     await until(dataReady, "仪表盘未加载");
     await until(() => fixture.textContent.includes("今天有 2 件值得处理的事"), "次日未恢复显示");
 
-    // ④ 点击「今日不再展示」→ 写入当天日期
+    // ④ 保存失败时摘要保留且错误可见，恢复后再次点击才隐藏
+    savedPrefs = null;
+    failSummarySave = true;
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "今日不再展示").click();
+    await until(() => fixture.textContent.includes("今日隐藏保存失败") && fixture.textContent.includes("模拟偏好保存失败"), "摘要保存失败未显式提示");
+    assert(fixture.textContent.includes("今天有 2 件值得处理的事"), "摘要保存失败后不应提前隐藏横幅");
+    failSummarySave = false;
     [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "今日不再展示").click();
     await until(() => savedPrefs?.summaryDismissedOn === dateKey(0), "当日忽略未持久化");
     await until(() => !fixture.textContent.includes("值得处理的事"), "忽略后横幅未消失");
@@ -3143,7 +4391,6 @@ await test("诊断模板弹窗", async () => {
     await pause(300);
     const buttons = [...fixture.querySelectorAll("button")].map((node) => node.textContent.trim() || node.getAttribute("aria-label")).join("|");
     const dialogCount = fixture.querySelectorAll(".lvct-dialog-mask, .lvct-dialog, [class*=dialog]").length;
-    results.push({ name: "diag-tpl", ok: true, detail: `dialogNodes=${dialogCount}; buttons=${buttons.slice(0, 300)}` });
 });
 
 await test("互动日期回顾：按月分组、日期范围与快捷项、历史上的今天", async () => {
@@ -3298,9 +4545,9 @@ await test("重复候选检查：并排资料与理由展示，查看跳转零�
     const row = (id, name, phone, email) => ({
         id: `item-${id}`,
         cells: [
-            { value: { type: "block", keyID: "name", block: { id: `doc-${id}`, content: name } } },
-            { value: { keyID: "phone", phone: { content: phone } } },
-            { value: { keyID: "email", email: { content: email } } },
+            { valueType: "block", value: { type: "block", keyID: "name", block: { id: `doc-${id}`, content: name } } },
+            { valueType: "phone", value: { type: "phone", keyID: "phone", phone: { content: phone } } },
+            { valueType: "email", value: { type: "email", keyID: "email", email: { content: email } } },
         ],
     });
     kernel.handler = async (route) => {
@@ -3337,24 +4584,14 @@ await test("重复候选检查：并排资料与理由展示，查看跳转零�
 
 await test("vCard 导入诊断：三段报告区分失败与待核对，重试先核对名册不重复建人", async () => {
     let failCreate = true;
-    let rosterNames = ["回归测试甲"];
-    let createCalls = 0;
+    const state = configureVcardKernel(kernel, settings);
+    state.rows.set(person.itemId, renderResult().view.rows[0]);
+    const handle = kernel.handler;
     kernel.handler = async (route, body) => {
-        if (route === "/api/av/renderAttributeView") {
-            const rows = rosterNames.map((name, index) => ({
-                id: `item-roster-${index}`,
-                cells: [{ value: { type: "block", keyID: "name", block: { id: `doc-roster-${index}`, content: name } } }],
-            }));
-            return { view: { columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })), rows } };
-        }
         if (route === "/api/filetree/createDocWithMd") {
-            createCalls += 1;
-            const path = String(body?.path ?? "");
-            if (failCreate && path.includes("测试败")) throw new Error("模拟建文档失败");
-            return `20260928000000-newdoc${createCalls}`;
+            state.rejectCreate = failCreate && body.path.includes("测试败");
         }
-        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") return { "20260928000000-newdoc1": "item-new1", "20260928000000-newdoc2": "item-new2" };
-        return {};
+        return handle(route, body);
     };
     mounted = mount(VCardDialog, { target: fixture, props: { settings, onImported() {}, onClose() {} } });
     const fileInput = fixture.querySelector('input[type="file"]');
@@ -3365,26 +4602,26 @@ await test("vCard 导入诊断：三段报告区分失败与待核对，重试�
         fileInput.dispatchEvent(new Event("change", { bubbles: true }));
     };
     selectFile(["回归测试甲", "测试乙", "测试败"]);
-    await until(() => fixture.textContent.includes("同名已跳过"), "预览未就绪");
+    await until(() => fixture.textContent.includes("已选 2/3"), "预览未就绪");
     const importButton = [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("导入为联系人（2）"));
     assert(importButton, "应默认勾选 2 条（同名跳过不计）");
     importButton.click();
     // 三段报告：成功 1（测试乙）/ 跳过 1（同名甲）/ 失败 1（测试败）
     await until(() => fixture.textContent.includes("✓ 成功（1）"), "成功段未显示");
-    results.push({ name: "diag-f14", ok: true, detail: (fixture.querySelector(".lvct-vcard__report")?.textContent ?? "no-report").slice(0, 400) });
     assert(fixture.textContent.includes("⊘ 跳过（1）"), "跳过段未显示");
     assert(fixture.textContent.includes("! 失败（1）"), "失败段未显示");
-    assert(fixture.textContent.includes("模拟建文档失败"), "失败原因缺失");
+    assert(fixture.textContent.includes("内核明确拒绝建档"), "失败原因缺失");
     // 重试（仍失败）→ 保持 failed；重试确实调用了建文档（failCreate=true 抛错）
-    await until(() => createCalls === 2, "重试未调用建文档");
+    await until(() => state.creates.length === 2, "首次逐项请求未完成");
     await until(() => fixture.textContent.includes("! 失败（1）"), "重试后失败段未保留");
-    const callsAfterFirstRetry = createCalls;
+    const callsAfterFirstRetry = state.creates.length;
     failCreate = false;
-    rosterNames = ["回归测试甲", "测试败"];
+    state.skipBind = true;
     [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("核对名册并重试")).click();
-    await until(() => fixture.textContent.includes("⊘ 跳过（2）"), "名册已有同名应跳过重建");
-    assert(createCalls === callsAfterFirstRetry, "名册已有同名仍调用了建文档");
-    await until(() => fixture.textContent.includes("导入完成"), "全部完成后未提示完成");
+    await until(() => state.creates.length > callsAfterFirstRetry, "明确拒绝后的原请求未重试");
+    await until(() => fixture.textContent.includes("? 待核对（1）"), "未核实原绑定行应保持待核对");
+    assert(fixture.textContent.includes("⊘ 跳过（1）"), "将同名人物冒充原请求导入结果");
+    assert(state.creates.filter((request) => request.path.includes("测试乙")).length === 1, "成功项重复创建");
 });
 
 await test("备份差异明细：展开新增/跳过/删除标记影响，合计与摘要一致，人物不可达标注", async () => {
@@ -3452,8 +4689,8 @@ await test("关系结果导出：路径链 Markdown、无路径兜底与图规�
             assert(route === "/api/av/renderAttributeView", "导出流程不应写内核");
             return { view: { columns: renderResult().view.columns, rows: entries.map((entry) => ({
                 id: entry.id, cells: [
-                    { value: { type: "block", keyID: "name", block: { id: entry.id, content: entry.name } } },
-                    { value: { type: "relation", keyID: "related", relation: { blockIDs: entry.related } } },
+                    { valueType: "block", value: { type: "block", keyID: "name", block: { id: entry.id, content: entry.name } } },
+                    { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: entry.related } } },
                 ],
             })) } };
         };
@@ -3468,8 +4705,10 @@ await test("关系结果导出：路径链 Markdown、无路径兜底与图规�
         setupHandler(false);
         mounted = mount(RelationGraph, { target: fixture, props: {
             settings, preferences: DEFAULT_VIEW_PREFERENCES, onPreferencesChange: async (next) => next,
+            facade: { listOrganizations: async () => [], loadSelfIdentity: async () => null },
             onOpenDetail() {}, onOpenPeople() {},
         } });
+        button("画布视图").click();
         await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "图谱未挂载");
         await pickOption("关系中心", "甲");
         await pickOption("对比人物", "乙");
@@ -3480,18 +4719,27 @@ await test("关系结果导出：路径链 Markdown、无路径兜底与图规�
         await until(() => downloads === 1, "导出未触发");
         assert(filename.endsWith(".md"), "导出文件名错误");
         const text = await blob.text();
-        assert(text.includes("当前图内未找到 甲 与 乙 的连接"), "无路径兜底说明缺失");
-        assert(text.includes("可清除筛选后重试"), "清除筛选指引缺失");
-        assert(text.includes("节点 3 · 边 1"), "图规模缺失");
+        assert(text.includes("path：no_path") && text.includes("当前范围的 related 图中没有路径，不代表现实中没有关系。"), "无路径状态或范围说明缺失");
+        assert(text.includes("关系查询中心：甲（a）；对比人物：乙（b）"), "无路径导出丢失稳定查询端点");
+        assert(text.includes("展示节点 3 / 边 1") && text.includes("来源节点 3 / 边 1"), "快照展示与来源规模缺失");
         assert(text.includes("不代表现实社交关系、引荐意愿或关系强弱"), "范围免责缺失");
+        input(fixture.querySelector('input[type="search"]'), "没有匹配");
+        await until(() => fixture.querySelector(".lvct-graph-summary")?.textContent.includes("当前筛选或裁剪后的 related 图中未找到路径"), "筛选后的无路径未区分原因");
+        button("导出结果说明").click();
+        await until(() => downloads === 2, "筛选快照导出未触发");
+        const filteredText = await blob.text();
+        assert(filteredText.includes("可清除筛选或收窄范围后核实") && filteredText.includes("搜索：没有匹配"), "筛选后的无路径缺少可执行恢复说明");
+        assert(filteredText.includes("展示节点 2 / 边 0") && filteredText.includes("为保留中心而额外显示：甲（a）、乙（b）"), "筛选导出与保中心快照不一致");
         // 阶段二：乙连接共同人物 → 重新加载图谱后路径链出现
         setupHandler(true);
         invalidateRoster();
         await unmount(mounted);
         mounted = mount(RelationGraph, { target: fixture, props: {
             settings, preferences: DEFAULT_VIEW_PREFERENCES, onPreferencesChange: async (next) => next,
+            facade: { listOrganizations: async () => [], loadSelfIdentity: async () => null },
             onOpenDetail() {}, onOpenPeople() {},
         } });
+        button("画布视图").click();
         await until(() => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy, "图谱重新挂载");
         await pickOption("关系中心", "甲");
         await pickOption("对比人物", "乙");
@@ -3499,10 +4747,12 @@ await test("关系结果导出：路径链 Markdown、无路径兜底与图规�
         select("关系查询模式", "path");
         await until(() => fixture.textContent.includes("2 段关系"), "路径链未更新");
         button("导出结果说明").click();
-        await until(() => downloads === 2, "第二次导出未触发");
+        await until(() => downloads === 3, "连接后的路径快照导出未触发");
         const text2 = await blob.text();
-        assert(text2.includes("甲 — 共同人物 — 乙"), "链式路径缺失");
-        assert(text2.includes("之间为 2 段关系（当前图内）"), "段数总结缺失");
+        assert(text2.includes("路径：甲（a） — 共同人物（c） — 乙（b）"), "链式路径稳定 ID 或顺序缺失");
+        assert(text2.includes("path：ready") && text2.includes("展示节点 3 / 边 2")
+            && text2.includes("甲（a） — 共同人物（c） · 显式人物关系（related）")
+            && text2.includes("乙（b） — 共同人物（c） · 显式人物关系（related）"), "路径段来源和展示规模不能核对");
     } finally {
         URL.createObjectURL = originalCreate;
         URL.revokeObjectURL = originalRevoke;
@@ -3516,14 +4766,15 @@ await test("原生捕获弹窗可完成并关闭，继承主题令牌", async ()
         facade: {
             viewPreferences: DEFAULT_VIEW_PREFERENCES,
             previewCapture: async () => ({ docName: "测试笔记", linked: [person] }),
-            captureDoc: async () => ({ createdNames: [], createdDocIds: [], interactions: 1, attendeeBlockWritten: true }),
+            captureDoc: async () => ({ createdNames: [], createdDocIds: [], interactions: 1, attendeeBlockWritten: true,
+                occasionLinksWritten: 3, occasionLinkFailures: [] }),
         },
     } });
     try {
         await until(() => dialog.dialog.element.textContent.includes("下一步：确认记录"), "捕获未加载");
         button("下一步：确认记录", dialog.dialog.element).click();
         await tick();
-        button("记录互动并写入参与人员", dialog.dialog.element).click();
+        button("记录互动并建立事项双链", dialog.dialog.element).click();
         await until(() => dialog.dialog.element.textContent.includes("打开原笔记"), "捕获完成页未显示");
         assert(getComputedStyle(dialog.dialog.element.querySelector(".lvct-dialog-root")).getPropertyValue("--lvct-sp-2").trim(), "原生弹窗缺少主题令牌");
         button("完成", dialog.dialog.element).click();
@@ -3536,56 +4787,94 @@ await test("原生捕获弹窗可完成并关闭，继承主题令牌", async ()
 
 await test("AI 结构化候选：分组勾选确认，资料补充/建跟进写入且不越契约（FAST-01.4）", async () => {
     const personOf = (name) => ({
-        docId: `20260927000000-${name}0000`, itemId: `row-${name}`, name,
+        docId: "20260927000000-aip0001", itemId: `row-${name}`, name,
         phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
         group: "朋友", tags: [], relatedItemIds: [],
     });
     const 甲 = personOf("寿星甲");
     const patchCalls = [];
     const followUpWrites = [];
+    const captureCalls = [];
+    const preparations = [];
+    const aiCalls = [];
+    const aiExtraction = {
+        names: ["寿星甲"], date: "2026-09-29", place: "会议室", occasion: null, note: "聊了发布计划",
+        profileCandidates: [{ person: "寿星甲", field: "phone", value: "13800001234" }],
+        followUpCandidates: [{ person: "寿星甲", title: "回传资料", dueDate: "2026-10-06" }],
+        relationCandidates: [{ personA: "寿星甲", personB: "路人乙", relation: "同学" }], rejected: 0,
+    };
     const dialog = svelteDialog({ title: "测试捕获", component: CaptureDialog, props: {
         docId: settings.hostDocId,
         facade: {
             viewPreferences: DEFAULT_VIEW_PREFERENCES,
-            previewCapture: async () => ({ docName: "测试笔记", linked: [甲] }),
-            captureDoc: async () => ({ createdNames: [], createdDocIds: [], interactions: 1, attendeeBlockWritten: true }),
-            aiExtractFromDoc: async () => ({
-                extraction: {
-                    names: ["寿星甲"], date: "2026-09-29", place: "会议室", occasion: null, note: "聊了发布计划",
-                    profileCandidates: [{ person: "寿星甲", field: "phone", value: "13800001234" }],
-                    followUpCandidates: [{ person: "寿星甲", title: "回传资料", dueDate: "2026-10-06" }],
-                    relationCandidates: [{ personA: "寿星甲", personB: "路人乙", relation: "同学" }],
-                    rejected: 0,
-                },
-                likelyUnconfigured: false,
-                matched: [甲],
-                unknownNames: [],
-            }),
+            previewCapture: async () => ({ docName: "测试笔记", sourceDocId: settings.hostDocId, sourceStatus: "available", linked: [甲] }),
+            captureDoc: async (docId, input) => {
+                captureCalls.push({ docId, input });
+                return { complete: true, createdNames: [], createdDocIds: [], interactions: 1, attendeeBlockWritten: true,
+                    occasionLinksWritten: 4, occasionLinkFailures: [] };
+            },
+            prepareAiExtraction: async (docId, options) => {
+                const preflight = buildAiPreflight("fixture-preflight", docId,
+                    options.sourceText ?? "寿星甲于2026-09-29在会议室聊了发布计划，2026-10-06回传资料。", options);
+                preparations.push(preflight);
+                return preflight;
+            },
+            aiExtractFromDoc: async (_docId, confirmation) => {
+                assert(confirmation.confirmed === true && confirmation.preflight === preparations.at(-1), "AI 使用了未经确认的发送快照");
+                aiCalls.push(confirmation.preflight.msg);
+                return {
+                    extraction: aiExtraction,
+                    likelyUnconfigured: false,
+                    matched: [甲],
+                    unknownNames: [],
+                    candidates: buildAiCandidateDrafts(aiExtraction, confirmation.preflight, [甲]),
+                    preflightId: confirmation.preflight.id,
+                };
+            },
+            listContacts: async () => [甲],
+            listPersonFollowUps: async () => [...followUpWrites],
             updatePersonCandidateFields: async (itemId, patches) => {
                 patchCalls.push({ itemId, patches });
-                return { applied: patches.map((patch) => patch.field), skipped: [], conflicts: [] };
+                return { applied: patches.map((patch) => patch.field), skipped: [], conflicts: [], report: { complete: true, unknown: [], unresolved: [] } };
             },
-            createFollowUp: async (docId, title, dueDate) => followUpWrites.push({ docId, title, dueDate }),
+            createFollowUp: async (docId, title, dueDate) => {
+                const item = { id: "fixture-followup", personDocId: docId, title, dueDate, status: "open", docSyncPending: false };
+                followUpWrites.push(item);
+                return item;
+            },
         },
     } });
     try {
         await until(() => dialog.dialog.element.textContent.includes("AI 分析本页"), "捕获未加载");
         [...dialog.dialog.element.querySelectorAll("button")]
             .find((node) => node.textContent.includes("AI 分析本页")).click();
-        await until(() => dialog.dialog.element.textContent.includes("AI 结构化候选"), "AI 候选未展示");
+        await until(() => dialog.dialog.element.querySelector("textarea[readonly]") && !button("确认发送本次文本", dialog.dialog.element).disabled, "发送预检未准备完成");
+        const sentPreview = dialog.dialog.element.querySelector("textarea[readonly]").value;
+        assert(aiCalls.length === 0 && captureCalls.length === 0 && patchCalls.length === 0 && followUpWrites.length === 0, "发送预检提前发送或写入");
+        button("确认发送本次文本", dialog.dialog.element).click();
+        await until(() => dialog.dialog.element.querySelector('[aria-label="AI 结构化候选"] [data-ai-kind="profile"]'), "AI 候选未展示");
+        assert(aiCalls.length === 1 && aiCalls[0] === sentPreview, "实际发送与用户确认的最终文本不一致");
         /* 关系候选仅展示、不提供写入 */
-        assert(dialog.dialog.element.textContent.includes("当前版本仅记录在笔记中"), "关系建议说明缺失");
-        /* 默认勾选：直接进入确认 */
+        assert(dialog.dialog.element.textContent.includes("仅展示草稿，不写关系或笔记"), "关系建议说明缺失");
+        assert(patchCalls.length === 0 && followUpWrites.length === 0, "AI 草稿不应自动写入");
+        assert([...dialog.dialog.element.querySelectorAll("[data-ai-kind]")].every((candidate) => candidate.querySelector("b")?.parentElement.textContent.includes("pending")), "AI 草稿初始已接受");
+        let accept;
+        while ((accept = [...dialog.dialog.element.querySelectorAll("button")].find((node) => node.textContent.trim() === "接受本项" && !node.disabled))) {
+            accept.click();
+            await tick();
+        }
+        assert(captureCalls.length === 0 && patchCalls.length === 0 && followUpWrites.length === 0, "逐项接受未记录便写入事实");
         button("下一步：确认记录", dialog.dialog.element).click();
         await tick();
-        button("记录互动并写入参与人员", dialog.dialog.element).click();
+        button("记录互动并建立事项双链", dialog.dialog.element).click();
         await until(() => dialog.dialog.element.textContent.includes("AI 候选的资料补充与建跟进已完成"), "AI 候选写入未完成");
         /* FUNC-01.14：受限补丁——只携带勾选字段（电话）+ 快照基准值（冲突核对用），其余字段零触碰 */
         assert(patchCalls.length === 1, "资料候选未走受限补丁写入");
-        assert(patchCalls[0].patches.length === 1 && patchCalls[0].patches[0].field === "phone"
+        assert(captureCalls.length === 1 && captureCalls[0].input.personDocIds.join(",") === 甲.docId, "主捕获人物 ID 不稳定或重复记录");
+        assert(patchCalls[0].itemId === 甲.itemId && patchCalls[0].patches.length === 1 && patchCalls[0].patches[0].field === "phone"
             && patchCalls[0].patches[0].value === "13800001234" && patchCalls[0].patches[0].baseline === "",
             "补丁应只含电话字段且携带快照基准值（fixture 电话为空）");
-        assert(followUpWrites.length === 1 && followUpWrites[0].title === "回传资料" && followUpWrites[0].dueDate === "2026-10-06", "跟进候选未写入");
+        assert(followUpWrites.length === 1 && followUpWrites[0].personDocId === 甲.docId && followUpWrites[0].title === "回传资料" && followUpWrites[0].dueDate === "2026-10-06", "跟进候选未写到原人物");
     } finally {
         if (dialog.dialog.element.isConnected) dialog.close();
     }
@@ -3594,14 +4883,18 @@ await test("AI 结构化候选：分组勾选确认，资料补充/建跟进写�
 await test("AI 候选安全写：并发改动判冲突不覆盖，安全字段照常写入（FUNC-01.14）", async () => {
     invalidateRoster();
     const cellWrites = [];
-    kernel.handler = async (route, body) => {
+    kernel.handler = reflectContactWrites(async (route, body) => {
         if (route === "/api/av/renderAttributeView") return renderResult();
+        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") {
+            assert(body.avID === settings.avId && body.blockIDs.every((docId) => docId === person.docId), "候选写入核实了其他人物绑定");
+            return Object.fromEntries(body.blockIDs.map((docId) => [docId, person.itemId]));
+        }
         if (route === "/api/av/setAttributeViewBlockAttr") {
             cellWrites.push({ keyID: body.keyID, itemID: body.itemID, value: JSON.stringify(body.value) });
-            return { code: 0 };
+            return null;
         }
         throw new Error(`回归测试不允许请求 ${route}`);
-    };
+    });
     /* 名册最新值：person1 电话为空；电话候选以过期基准（13800001234）提交 → 冲突不写；
        邮箱候选基准为空与最新一致 → 写入。同一人多字段互不影响。 */
     const result = await applyContactCandidateFields(settings, "row-1", [
@@ -3678,9 +4971,9 @@ await test("档案条显示待跟进与相关人计数，chips 超量折叠为 +
         if (route === "/api/av/renderAttributeView") return { view: {
             columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })),
             rows: [{ id: person.itemId, cells: [
-                { value: { type: "block", keyID: "name", block: { id: person.docId, content: person.name } } },
-                { value: { type: "mSelect", keyID: "tags", mSelect: tagValues.map((tag) => ({ content: tag })) } },
-                { value: { type: "relation", keyID: "related", relation: { blockIDs: ["row-2"] } } },
+                { valueType: "block", value: { type: "block", keyID: "name", block: { id: person.docId, content: person.name } } },
+                { valueType: "mSelect", value: { type: "mSelect", keyID: "tags", mSelect: tagValues.map((tag) => ({ content: tag })) } },
+                { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: ["row-2"] } } },
             ] } ],
         } };
         throw new Error(`档案条计数测试不允许请求 ${route}`);
@@ -3721,49 +5014,45 @@ await test("多人互动通过真实存储服务写入并回读，重复记录�
 });
 
 await test("外部联动重复及并发调用只计实际新增，写入失败不报成功", async () => {
-    let saved;
-    const plugin = {
-        loadData: async () => saved === undefined ? null : JSON.parse(JSON.stringify(saved)),
-        saveData: async (_key, value) => { saved = JSON.parse(JSON.stringify(value)); },
-    };
-    initExternalBridge(plugin, () => settings);
+    const state = configureBridgeKernel(kernel, settings);
+    const firstId = "20261004000000-bridge1";
+    const secondId = "20261004000000-bridge2";
+    const thirdId = "20261004000000-bridge3";
+    const fourthId = "20261004000000-bridge4";
+    state.addPerson(thirdId, "20261004000000-brow003", "并发人物");
+    state.addPerson(fourthId, "20261004000000-brow004", "故障人物");
+    state.mount();
     try {
         const api = window.LvContacts;
-        const first = await api.recordInteraction(["甲", "乙", "甲"], { ref: "会议" });
+        const first = await api.recordInteraction([firstId, secondId, firstId], { ref: "会议" });
         assert(first.recorded === 2, "重复人员被计为新增");
-        assert((await api.recordInteraction(["乙", "甲"], { ref: "会议" })).recorded === 0, "重复调用误报新增");
+        assert((await api.recordInteraction([secondId, firstId, firstId], { ref: "会议" })).recorded === 0, "重复调用误报新增");
         const concurrent = await Promise.all([
-            api.recordInteraction(["丙"], { ref: "会议" }),
-            api.recordInteraction(["丙"], { ref: "会议" }),
+            api.recordInteraction([thirdId], { ref: "会议丙" }),
+            api.recordInteraction([thirdId], { ref: "会议丙" }),
         ]);
         assert(concurrent.reduce((sum, result) => sum + result.recorded, 0) === 1, "并发调用重复计数");
-        assert((await loadInteractionStore(plugin)).events.length === 3, "并发保存丢失参与者");
-        plugin.saveData = async () => {};
-        let rejected = false;
-        try { await api.recordInteraction(["丁"], { ref: "会议" }); } catch { rejected = true; }
-        assert(rejected, "写后回读失败仍返回成功");
+        assert((await loadInteractionStore(state.plugin)).events.length === 3, "并发保存丢失参与者");
+        state.failEventReadAfterSave = true;
+        const failed = await api.recordInteraction([fourthId], { ref: "会议丁" });
+        assert(!failed.complete && failed.recorded === 0 && failed.unknown > 0, "未核实结果仍返回成功");
     } finally {
         disposeExternalBridge();
     }
 });
 
 await test("笔记捕获去重参与人员，重复捕获返回零新增", async () => {
-    let saved;
-    let markdown = "";
+    const files = new Map();
     const plugin = {
-        loadData: async () => saved === undefined ? null : JSON.parse(JSON.stringify(saved)),
-        saveData: async (_key, value) => { saved = JSON.parse(JSON.stringify(value)); },
+        loadData: async (key) => files.get(key) ?? null,
+        saveData: async (key, value) => { files.set(key, JSON.parse(JSON.stringify(value))); },
     };
-    kernel.handler = async (route, payload) => {
-        if (route === "/api/av/renderAttributeView") return renderResult();
-        if (route === "/api/query/sql") return [{ id: "20260927000000-section" }];
-        if (route === "/api/block/updateBlock") { markdown = payload.data; return null; }
-        throw new Error(`捕获回归不允许请求 ${route}`);
-    };
+    const { sections, sourceSectionId } = configureOccasionKernel();
     const options = { personDocIds: [person.docId, person.docId], newNames: [], date: "2026-09-27" };
     const first = await captureFromDoc(plugin, settings, settings.hostDocId, options);
     assert(first.interactions === 1, "重复选择人员导致新增计数错误");
-    assert(markdown.split(`siyuan://blocks/${person.docId}`).length - 1 === 1, "参与人员区块重复列出同一人");
+    assert(sections.get(sourceSectionId).split(`siyuan://blocks/${person.docId}`).length - 1 === 1, "参与人员区块重复列出同一人");
+    assert(first.occasionLinkFailures.length === 0 && sections.size === 3, "来源、日记与人物投影未全部完成");
     const repeat = await captureFromDoc(plugin, settings, settings.hostDocId, options);
     assert(repeat.interactions === 0, "重复捕获误报新增");
 });
@@ -3787,14 +5076,19 @@ await test("互动日期严格校验，非法日期在创建人物和写入前�
                 }),
             ]) {
                 let message = "";
-                try { await action(); } catch (error) { message = error.message; }
-                assert(message.includes("场合日期"), `非法日期未明确拒绝：${date}`);
+                let code = "";
+                try { await action(); } catch (error) { message = error.message; code = error.code ?? ""; }
+                assert(message.includes("场合日期") || code === "invalid_input", `非法日期未明确拒绝：${date}`);
             }
         }
         assert(writes === 0 && requests === 0, "非法日期导致存储或内核写入");
+        disposeExternalBridge();
+        const state = configureBridgeKernel(kernel, settings);
+        state.addPerson(person.docId, "20261004000000-brow003", person.name);
+        state.mount();
         const result = await window.LvContacts.recordInteraction([person.docId], { ref: "闰日回归", date: "2024-02-29" });
         assert(result.recorded === 1, "合法闰日被拒绝");
-        const store = await loadInteractionStore(plugin);
+        const store = await loadInteractionStore(state.plugin);
         assert(store.events[0].localDate === "2024-02-29", "闰日被顺延或回退到今天");
         assert(new Date(store.events[0].occurredAt).getHours() === 0, "未按当地零点记录");
     } finally {
@@ -3803,23 +5097,17 @@ await test("互动日期严格校验，非法日期在创建人物和写入前�
 });
 
 await test("按名捕获复用已有联系人，不漏记互动或误报新建", async () => {
-    let saved;
-    let markdown = "";
+    const files = new Map();
     const plugin = {
-        loadData: async () => saved === undefined ? null : JSON.parse(JSON.stringify(saved)),
-        saveData: async (_key, value) => { saved = JSON.parse(JSON.stringify(value)); },
+        loadData: async (key) => files.get(key) ?? null,
+        saveData: async (key, value) => { files.set(key, JSON.parse(JSON.stringify(value))); },
     };
-    kernel.handler = async (route, payload) => {
-        if (route === "/api/av/renderAttributeView") return renderResult();
-        if (route === "/api/query/sql") return [{ id: "20260927000000-section" }];
-        if (route === "/api/block/updateBlock") { markdown = payload.data; return null; }
-        throw new Error(`复用联系人不应请求 ${route}`);
-    };
+    const { sections, sourceSectionId } = configureOccasionKernel();
     const options = { personDocIds: [], newNames: [person.name, ` ${person.name} `, ""], date: "2026-09-27" };
     const first = await captureFromDoc(plugin, settings, settings.hostDocId, options);
     assert(first.createdNames.length === 0 && first.createdDocIds.length === 0, "已有联系人被误报为新建");
     assert(first.interactions === 1 && first.attendeeBlockWritten, "已有姓名未被纳入参与者");
-    assert(markdown.split(`siyuan://blocks/${person.docId}`).length - 1 === 1, "同名参与者未去重");
+    assert(sections.get(sourceSectionId).split(`siyuan://blocks/${person.docId}`).length - 1 === 1, "同名参与者未去重");
     const store = await loadInteractionStore(plugin);
     assert(store.events.length === 1 && store.events[0].personDocId === person.docId, "没有复用正确的人物文档");
     const repeat = await captureFromDoc(plugin, settings, settings.hostDocId, { ...options, personDocIds: [person.docId] });
@@ -4318,6 +5606,184 @@ await test("独立同源上下文共享 Web Locks，记录/删除/备份并发�
     }
 });
 
+await test("账本实际双上下文：同请求等待旧保存后只保留一条，不重复保存", async () => {
+    assert(navigator.locks?.request, "本环境无 Web Locks，不能验证跨页面排他");
+    const storageKey = "lvct-isolated-multicontext-store";
+    localStorage.removeItem(storageKey);
+    const frames = [document.createElement("iframe"), document.createElement("iframe")];
+    for (const frame of frames) {
+        frame.hidden = true;
+        frame.src = "/scripts/e2e/ui/store-frame.html";
+        fixture.append(frame);
+    }
+    let holder;
+    let firstResult;
+    let secondResult;
+    try {
+        await until(() => frames.every((frame) => frame.contentWindow.lvctStoreTest), "独立账本上下文未就绪");
+        const [first, second] = frames.map((frame) => frame.contentWindow.lvctStoreTest);
+        holder = first;
+        const input = { requestId: "20261004000000-req0001", personDocId: person.docId, kind: "item",
+            direction: "payable", description: "借用书籍", occurredOn: "2026-10-04" };
+        const started = first.holdNextSave();
+        firstResult = Promise.allSettled([first.createExchange(input)]);
+        await started;
+        secondResult = Promise.allSettled([second.createExchange(input)]);
+        let pending = false;
+        const deadline = Date.now() + 2000;
+        while (!pending && Date.now() < deadline) {
+            pending = (await navigator.locks.query()).pending.some((lock) => lock.name === "lvct-exchange-records.json");
+            if (!pending) await pause(10);
+        }
+        assert(pending && second.writes() === 0, "同请求未等待持有者就写入");
+        first.releaseSave();
+        const outcomes = [...await firstResult, ...await secondResult];
+        const stored = await second.loadExchanges();
+        assert(outcomes.every((outcome) => outcome.status === "fulfilled" && outcome.value.id === input.requestId)
+            && stored.records.length === 1 && first.writes() === 1 && second.writes() === 0, "跨上下文同请求重复追加或重复保存");
+    } finally {
+        holder?.releaseSave();
+        if (firstResult) await firstResult;
+        if (secondResult) await secondResult;
+        frames.forEach((frame) => frame.remove());
+        localStorage.removeItem(storageKey);
+    }
+});
+
+await test("存储锁实际双上下文：旧保存超过全部等待后恢复，不接管、不覆盖且可显式重试", async () => {
+    assert(navigator.locks?.request, "本环境无 Web Locks，不能验证跨页面排他");
+    const storageKey = "lvct-isolated-multicontext-store";
+    localStorage.removeItem(storageKey);
+    const frames = [document.createElement("iframe"), document.createElement("iframe")];
+    for (const frame of frames) {
+        frame.hidden = true;
+        frame.src = "/scripts/e2e/ui/store-frame.html";
+        fixture.append(frame);
+    }
+    let holder;
+    let holderResult;
+    try {
+        await until(() => frames.every((frame) => frame.contentWindow.lvctStoreTest), "独立存储上下文未就绪");
+        const [first, second] = frames.map((frame) => frame.contentWindow.lvctStoreTest);
+        first.configureLocks({ acquireTimeoutMs: 50 });
+        second.configureLocks({ acquireTimeoutMs: 50 });
+        const started = first.holdNextSave();
+        holder = first;
+        holderResult = Promise.allSettled([first.record({ personDocId: person.docId, source: "api", externalRef: "slow-holder" })]);
+        await started;
+        const waiting = await Promise.allSettled([second.record({ personDocId: "20260927000000-person2", source: "api", externalRef: "waiting-writer" })]);
+        const writesBeforeRelease = second.writes();
+        const heldBeforeRelease = (await navigator.locks.query()).held.some((lock) => lock.name === "lvct-interaction-events.json");
+        mounted = mount(PersonDetail, { target: fixture, props: {
+            settings, person,
+            onRecord: (personDocId, note) => second.record({ personDocId, note, source: "api", externalRef: "waiting-writer" }),
+            onLoadInsights: async () => emptyInsights(),
+            onOpenPersonDoc() {}, onNavigate() {}, onChanged() {}, onDeleted() {}, onClose() {},
+        } });
+        const draft = fixture.querySelector(".lvct-detail__record input");
+        input(draft, "锁占用时保留的备注");
+        await tick();
+        button("记录").click();
+        await until(() => fixture.textContent.includes("此次操作尚未执行"), "锁等待失败未显示可恢复指引");
+        assert(draft.value === "锁占用时保留的备注" && second.writes() === 0
+            && !button("记录").disabled && !fixture.textContent.includes("已记录 ✓"),
+        "锁超时清空了草稿、误报成功或仍在写入");
+        first.releaseSave();
+        await until(() => first.pausedSaveFinished(), "旧保存恢复后未完成写入");
+        const holderOutcome = await holderResult;
+        const stored = await first.load();
+        assert(waiting[0].status === "rejected" && waiting[0].reason.name === "StoreLockTimeoutError"
+            && writesBeforeRelease === 0 && heldBeforeRelease && holderOutcome[0].status === "fulfilled"
+            && stored.events.length === 1 && stored.events[0].externalRef === "slow-holder",
+        `超时后的排他边界失效：${JSON.stringify({ waiting: waiting[0].status, waitingError: waiting[0].reason?.name,
+            writesBeforeRelease, heldBeforeRelease, holder: holderOutcome[0].status, refs: stored.events.map((event) => event.externalRef) })}`);
+        second.configureLocks({ acquireTimeoutMs: 5000 });
+        button("记录").click();
+        await until(() => fixture.textContent.includes("已记录 ✓"), "原操作结束后未能显式重试");
+        const retried = await second.load();
+        assert(retried.events.length === 2 && retried.events.some((event) => event.note === "锁占用时保留的备注")
+            && draft.value === "", "恢复后重试未保留两条事实或已保存草稿未清空");
+    } finally {
+        holder?.releaseSave();
+        if (holderResult) await holderResult;
+        frames.forEach((frame) => frame.remove());
+        localStorage.removeItem(storageKey);
+    }
+});
+
+await test("存储锁实际双上下文：宽限内恢复串行保存，读失败或已写取消不重放、不丢事实", async () => {
+    assert(navigator.locks?.request, "本环境无 Web Locks，不能验证跨页面排他");
+    const storageKey = "lvct-isolated-multicontext-store";
+    localStorage.removeItem(storageKey);
+    const frames = [document.createElement("iframe"), document.createElement("iframe")];
+    for (const frame of frames) {
+        frame.hidden = true;
+        frame.src = "/scripts/e2e/ui/store-frame.html";
+        fixture.append(frame);
+    }
+    let holder;
+    let holderResult;
+    let waitingResult;
+    try {
+        await until(() => frames.every((frame) => frame.contentWindow.lvctStoreTest), "独立存储上下文未就绪");
+        const [first, second] = frames.map((frame) => frame.contentWindow.lvctStoreTest);
+        first.configureLocks({ acquireTimeoutMs: 5000 });
+        second.configureLocks({ acquireTimeoutMs: 5000 });
+        const started = first.holdNextSave();
+        holder = first;
+        holderResult = Promise.allSettled([first.record({ personDocId: person.docId, source: "api", externalRef: "ordinary-slow" })]);
+        await started;
+        waitingResult = Promise.allSettled([second.record({ personDocId: "20260927000000-person2", source: "api", externalRef: "ordinary-wait" })]);
+        let pending = false;
+        const deadline = Date.now() + 2000;
+        while (!pending && Date.now() < deadline) {
+            pending = (await navigator.locks.query()).pending.some((lock) => lock.name === "lvct-interaction-events.json");
+            if (!pending) await pause(10);
+        }
+        assert(pending && second.writes() === 0, "正常慢写时第二上下文未排队");
+        first.releaseSave();
+        assert((await holderResult)[0].status === "fulfilled" && (await waitingResult)[0].status === "fulfilled"
+            && (await first.load()).events.length === 2, "宽限内完成未串行保留两条互动");
+        first.failRead();
+        second.failRead();
+        const beforeReadFailure = first.writes() + second.writes();
+        const readFailures = await Promise.allSettled([
+            first.record({ personDocId: person.docId, source: "api", externalRef: "bad-read-a" }),
+            second.record({ personDocId: person.docId, source: "api", externalRef: "bad-read-b" }),
+        ]);
+        assert(readFailures.every((outcome) => outcome.status === "rejected" && outcome.reason.message.includes("存储读取失败"))
+            && first.writes() + second.writes() === beforeReadFailure && (await first.load()).events.length === 2,
+        "双上下文前置读失败仍写入或覆盖原库");
+        first.failReadbacks();
+        const readbackFailures = await Promise.allSettled([
+            first.record({ personDocId: person.docId, source: "api", externalRef: "unknown-readback" }),
+            second.record({ personDocId: "20260927000000-person2", source: "api", externalRef: "after-readback" }),
+        ]);
+        const afterReadback = await first.load();
+        assert(readbackFailures[0].status === "rejected" && readbackFailures[0].reason.message.includes("存储读取失败")
+            && readbackFailures[1].status === "fulfilled" && afterReadback.events.length === 4,
+        `写后回读失败释放锁后，另一上下文未保留已保存事实：${JSON.stringify(readbackFailures.map((result) => ({ status: result.status, error: result.reason?.message })))}，事件 ${afterReadback.events.length}`);
+        first.abortAfterWrite();
+        const writesBeforeAbort = first.writes();
+        const aborted = await Promise.allSettled([
+            first.record({ personDocId: person.docId, source: "api", externalRef: "saved-before-abort" }),
+            second.record({ personDocId: "20260927000000-person2", source: "api", externalRef: "after-abort" }),
+        ]);
+        assert(aborted[0].status === "rejected" && aborted[0].reason.name === "AbortError"
+            && aborted[1].status === "fulfilled" && first.writes() === writesBeforeAbort + 1,
+        "已保存后返回 AbortError 触发业务回调重放，或阻塞了后续上下文");
+        const final = await second.load();
+        assert(final.events.length === 6 && final.events.some((event) => event.externalRef === "saved-before-abort")
+            && final.events.some((event) => event.externalRef === "after-abort"), "已写未知结果或并发事实丢失");
+    } finally {
+        holder?.releaseSave();
+        if (holderResult) await holderResult;
+        if (waitingResult) await waitingResult;
+        frames.forEach((frame) => frame.remove());
+        localStorage.removeItem(storageKey);
+    }
+});
+
 await test("初始化（全新）：物化传 createIfNotExist、九字段按序配齐、双向关联只配一次", async () => {
     const calls = [];
     let notebooks = [];
@@ -4326,6 +5792,11 @@ await test("初始化（全新）：物化传 createIfNotExist、九字段按序
     let createDocCalls = 0;
     let boundSelfDoc = "";
     let boundSelfRow = "";
+    const selfDocs = new Map();
+    const columns = [
+        { id: "col-pk", name: "Primary Key", type: "block" },
+        { id: "col-sel", name: "Select", type: "select" },
+    ];
     const store = {}; /* 按键隔离的宿主存储（真实 loadData(key) 语义，B11 身份与设置互不覆盖） */
     const plugin = {
         loadData: async (key) => (store[key] === undefined ? "" : JSON.parse(JSON.stringify(store[key]))),
@@ -4340,24 +5811,33 @@ await test("初始化（全新）：物化传 createIfNotExist、九字段按序
         }
         if (route === "/api/filetree/createDocWithMd") {
             createDocCalls += 1;
-            return createDocCalls === 1 ? "20260928000000-host001" : "20260928000000-doc0002";
+            const id = createDocCalls === 1 ? "20260928000000-host001" : "20260928000000-doc0002";
+            selfDocs.set(id, { id, content: body.path.split("/").at(-1), hpath: body.path,
+                requestId: body.markdown.match(/custom-lvct-self-draft="([^"]+)"/)?.[1] });
+            return id;
         }
-        if (route === "/api/block/insertBlock") return [{ doOperations: [{ id: "20260928000000-block01" }] }];
+        if (route === "/api/block/insertBlock") return [{ doOperations: [{ id: "20260928000000-block01", action: "insert" }] }];
         if (route === "/api/av/renderAttributeView") {
             const rows = boundSelfDoc
-                ? [{ id: boundSelfRow, cells: [{ value: { type: "block", keyID: "name", block: { id: boundSelfDoc, content: "我自己" } } }] }]
+                ? [{ id: boundSelfRow, cells: [{ valueType: "block", value: { type: "block", keyID: "name", block: { id: boundSelfDoc, content: "我自己" } } }] }]
                 : [];
-            return { view: { columns: [
-                { id: "col-pk", name: "Primary Key", type: "block" },
-                { id: "col-sel", name: "Select", type: "select" },
-            ], rows } };
+            return { view: { columns, rows } };
         }
         if (route === "/api/av/addAttributeViewKey") {
             fieldKeys.push({ name: body.keyName, previous: body.previousKeyID });
+            columns.push({ id: body.keyID, name: body.keyName, type: body.keyType });
             return null;
         }
         if (route === "/api/transactions") return [];
-        if (route === "/api/query/sql") return [];
+        if (route === "/api/sqlite/flushTransaction") return null;
+        if (route === "/api/query/sql") {
+            if (body.stmt.includes("SELECT DISTINCT root_id")) {
+                const requestId = body.stmt.match(/custom-lvct-self-draft="([^"]+)"/)?.[1];
+                return [...selfDocs.values()].filter((doc) => doc.requestId === requestId).map((doc) => ({ root_id: doc.id }));
+            }
+            const docId = body.stmt.match(/(?:WHERE|AND) id\s*=\s*'([^']+)'/)?.[1];
+            return docId ? selfDocs.has(docId) ? [selfDocs.get(docId)] : [] : [...selfDocs.values()];
+        }
         if (route === "/api/av/addAttributeViewBlocks") {
             boundSelfDoc = body.srcs[0].id;
             boundSelfRow = "20260928000000-row0001";
@@ -4366,7 +5846,7 @@ await test("初始化（全新）：物化传 createIfNotExist、九字段按序
         if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") {
             return boundSelfDoc ? { [boundSelfDoc]: boundSelfRow } : {};
         }
-        if (route === "/api/av/setAttributeViewBlockAttr") return { code: 0 };
+        if (route === "/api/av/setAttributeViewBlockAttr") return null;
         throw new Error(`全新初始化不允许请求 ${route}`);
     };
     const steps = [];
@@ -4395,10 +5875,10 @@ await test("初始化（全新）：物化传 createIfNotExist、九字段按序
 await test("初始化（续建）：复用笔记本/宿主文档/数据库/已有列，不重复建不重配双向", async () => {
     const calls = [];
     const fieldKeys = [];
-    let saved = "";
+    const saved = new Map();
     const plugin = {
-        loadData: async () => (saved === "" ? "" : JSON.parse(JSON.stringify(saved))),
-        saveData: async (_key, value) => { saved = JSON.parse(JSON.stringify(value)); },
+        loadData: async (key) => structuredClone(saved.get(key) ?? ""),
+        saveData: async (key, value) => { saved.set(key, structuredClone(value)); },
     };
     const columns = [
         { id: "col-pk", name: "Primary Key", type: "block" },
@@ -4412,11 +5892,14 @@ await test("初始化（续建）：复用笔记本/宿主文档/数据库/已�
     kernel.handler = async (route, body) => {
         calls.push([route, body]);
         if (route === "/api/notebook/lsNotebooks") return { notebooks: [{ id: "20260928000000-book002", name: "人脉" }] };
+        if (route === "/api/sqlite/flushTransaction") return null;
         if (route === "/api/query/sql") {
             if (String(body.stmt).includes("AND type = 'av'")) {
                 return [{ id: "20260928000000-block02", parent_id: "20260928000000-host002",
                     markdown: '<div data-type="NodeAttributeView" data-av-id="20260928000000-av00002" data-av-type="table"></div>' }];
             }
+            const docId = body.stmt.match(/WHERE id = '([^']+)'/)?.[1];
+            if (docId) return [{ id: docId }];
             /* B11：预置上次尝试残留的未绑定「我自己」文档 → 断点续做复用，不新建 */
             return [
                 { id: "20260928000000-host002", content: "联系人总表", hpath: "/联系人总表" },
@@ -4425,12 +5908,14 @@ await test("初始化（续建）：复用笔记本/宿主文档/数据库/已�
         }
         if (route === "/api/av/renderAttributeView") {
             const rows = selfBound
-                ? [{ id: "20260928000000-rowfw01", cells: [{ value: { type: "block", keyID: "name", block: { id: "20260928000000-self001", content: "我自己" } } }] }]
+                ? [{ id: "20260928000000-rowfw01", cells: [{ valueType: "block", value: { type: "block", keyID: "name", block: { id: "20260928000000-self001", content: "我自己" } } }] }]
                 : [];
             return { view: { columns, rows } };
         }
         if (route === "/api/av/addAttributeViewKey") {
             fieldKeys.push(body.keyName);
+            const spec = FIELD_SPECS.find((field) => field.nameZh === body.keyName);
+            if (spec) columns.push({ id: body.keyID, name: body.keyName, type: body.keyType });
             return null;
         }
         if (route === "/api/av/addAttributeViewBlocks") {
@@ -4438,7 +5923,7 @@ await test("初始化（续建）：复用笔记本/宿主文档/数据库/已�
             return null;
         }
         if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") return selfBound ? { "20260928000000-self001": "20260928000000-rowfw01" } : {};
-        if (route === "/api/av/setAttributeViewBlockAttr") return { code: 0 };
+        if (route === "/api/av/setAttributeViewBlockAttr") return null;
         throw new Error(`续建不允许请求 ${route}`);
     };
     const snapshot = await inspectWorkspace("人脉");
@@ -4552,6 +6037,30 @@ await test("读取故障显式化：跟进计划读取失败显示错误态与�
     await until(() => fixture.textContent.includes("召回提醒"), "重试后未渲染跟进列表");
     assert(!fixture.textContent.includes("跟进计划加载失败"), "成功后错误态未清除");
 });
+
+await runMigrationRegression({ test, assert, person, settings, kernel, fixture, until, button });
+await runPeopleProfileRegression({ test, assert, kernel, settings, fixture, until, button });
+await runOperationResultRegression({ test, assert, kernel, settings, fixture, until, button });
+await runExternalBridgeRegression({ test, assert, kernel, settings });
+await runRelationRegression({ test, assert, kernel, settings });
+await runOrganizationPageRegression({ test, assert, kernel, settings, fixture, until, button });
+await runHealthAuditRegression({ test, assert, fixture, until, button });
+await runLifecycleRegression({ test, assert, fixture, until, settings });
+await runTextEncodingRegression({ test, assert, kernel, settings });
+await runVcardRegression({ test, assert, kernel, settings, fixture, until, button });
+await runSelfIdentityRegression({ test, assert, kernel, settings, fixture, until, button });
+await runOrganizationHealthRegression({ test, assert, kernel, settings, fixture, until, button });
+await runPersonIdentityRegression({ test, assert, kernel, settings, fixture, until, button });
+await runOrganizationProjectionRegression({ test, assert, kernel, settings, fixture, until, button });
+await runOrganizationOperationsRegression({ test, assert, fixture, until, button });
+await runGraphQueryRegression({ test, assert, kernel, settings, fixture, until, button });
+await runAiPreflightRegression({ test, assert, kernel, settings, fixture });
+await runImportRegression({ test, assert, kernel, settings, fixture, until, button });
+await runAliasRegression({ test, assert, kernel, settings, fixture, until });
+await runOrganizationContextRegression({ test, assert, kernel, settings, fixture, until, button });
+await runSettingsRepairRegression({ test, assert, kernel, settings, fixture, until, button });
+await runDocumentNavigationRegression({ test, assert, kernel, settings, fixture, until, button });
+await runBatchSelectionRegression({ test, assert, kernel, settings, fixture, until, button });
 
 await pause(100);
 results.push({ name: "无未处理异常及响应式循环", ok: runtimeErrors.length === 0, detail: runtimeErrors.join("\n") });

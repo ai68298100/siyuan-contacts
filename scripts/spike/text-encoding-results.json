@@ -1,0 +1,137 @@
+{
+  "workspace": "C:\\Users\\sunku\\AppData\\Local\\Temp\\SiYuan-Contacts-Text-Spike-94014830-20e9-49d5-9cf8-dab800b77c3d",
+  "kernel": "D:/biji/SiYuan/resources/kernel/SiYuan-Kernel.exe",
+  "port": 3523,
+  "observations": [
+    {
+      "title": "中文 空格 [甲](乙)#",
+      "kind": "raw",
+      "before": {
+        "content": "中文 空格 [甲](乙)#",
+        "hpath": "/raw/中文 空格 [甲](乙)#",
+        "id": "20261004052701-oz6jyos",
+        "path": "/20261004052701-7krm1t0/20261004052701-oz6jyos.sy"
+      },
+      "after": {
+        "content": "中文 空格 [甲](乙)#",
+        "hpath": "/raw/中文 空格 [甲](乙)#",
+        "id": "20261004052701-oz6jyos",
+        "path": "/20261004052701-7krm1t0/20261004052701-oz6jyos.sy"
+      }
+    },
+    {
+      "title": "中文 空格 [甲](乙)#",
+      "kind": "encoded",
+      "before": {
+        "content": "%E4%B8%AD%E6%96%87%20%E7%A9%BA%E6%A0%BC%20%5B%E7%94%B2%5D(%E4%B9%99)%23",
+        "hpath": "/encoded/%E4%B8%AD%E6%96%87%20%E7%A9%BA%E6%A0%BC%20%5B%E7%94%B2%5D(%E4%B9%99)%23",
+        "id": "20261004052701-3b4imhk",
+        "path": "/20261004052701-dfebhk3/20261004052701-3b4imhk.sy"
+      },
+      "after": {
+        "content": "中文 空格 [甲](乙)#",
+        "hpath": "/encoded/中文 空格 [甲](乙)#",
+        "id": "20261004052701-3b4imhk",
+        "path": "/20261004052701-dfebhk3/20261004052701-3b4imhk.sy"
+      }
+    },
+    {
+      "title": "斜/杠\\与%字符",
+      "kind": "raw",
+      "before": {
+        "content": "杠\\与%字符",
+        "hpath": "/raw/斜/杠\\与%字符",
+        "id": "20261004052702-g3a5j38",
+        "path": "/20261004052701-7krm1t0/20261004052702-1dd9x9y/20261004052702-g3a5j38.sy"
+      },
+      "after": {
+        "content": "斜杠\\与%字符",
+        "hpath": "/raw/斜/斜杠\\与%字符",
+        "id": "20261004052702-g3a5j38",
+        "path": "/20261004052701-7krm1t0/20261004052702-1dd9x9y/20261004052702-g3a5j38.sy"
+      }
+    },
+    {
+      "title": "斜/杠\\与%字符",
+      "kind": "encoded",
+      "before": {
+        "content": "%E6%96%9C%2F%E6%9D%A0%5C%E4%B8%8E%25%E5%AD%97%E7%AC%A6",
+        "hpath": "/encoded/%E6%96%9C%2F%E6%9D%A0%5C%E4%B8%8E%25%E5%AD%97%E7%AC%A6",
+        "id": "20261004052702-3hu3jrz",
+        "path": "/20261004052701-dfebhk3/20261004052702-3hu3jrz.sy"
+      },
+      "after": {
+        "content": "斜杠\\与%字符",
+        "hpath": "/encoded/斜杠\\与%字符",
+        "id": "20261004052702-3hu3jrz",
+        "path": "/20261004052701-dfebhk3/20261004052702-3hu3jrz.sy"
+      }
+    },
+    {
+      "title": "换\n行\r姓名",
+      "kind": "raw",
+      "before": {
+        "content": "换行姓名",
+        "hpath": "/raw/换行姓名",
+        "id": "20261004052703-adzkigl",
+        "path": "/20261004052701-7krm1t0/20261004052703-adzkigl.sy"
+      },
+      "after": {
+        "content": "换行姓名",
+        "hpath": "/raw/换行姓名",
+        "id": "20261004052703-adzkigl",
+        "path": "/20261004052701-7krm1t0/20261004052703-adzkigl.sy"
+      }
+    },
+    {
+      "title": "换\n行\r姓名",
+      "kind": "encoded",
+      "before": {
+        "content": "%E6%8D%A2%0A%E8%A1%8C%0D%E5%A7%93%E5%90%8D",
+        "hpath": "/encoded/%E6%8D%A2%0A%E8%A1%8C%0D%E5%A7%93%E5%90%8D",
+        "id": "20261004052703-mrhvl5m",
+        "path": "/20261004052701-dfebhk3/20261004052703-mrhvl5m.sy"
+      },
+      "after": {
+        "content": "换行姓名",
+        "hpath": "/encoded/换行姓名",
+        "id": "20261004052703-mrhvl5m",
+        "path": "/20261004052701-dfebhk3/20261004052703-mrhvl5m.sy"
+      }
+    }
+  ],
+  "version": "3.8.6",
+  "requestMarker": {
+    "markedDocId": "20261004052704-6pskvwe",
+    "requestId": "20261004000000-vcfreq1",
+    "markers": [
+      {
+        "box": "20261004052701-bg6xgx8",
+        "ial": "{: custom-lvct-vcard=\"20261004000000-vcfreq1\" id=\"20261004052704-klaq3fb\" updated=\"20261004052704\"}",
+        "root_id": "20261004052704-6pskvwe"
+      }
+    ]
+  },
+  "contactRequestMarker": [
+    {
+      "attrName": "custom-lvct-contact-draft",
+      "requestId": "20261004000000-cont001",
+      "docId": "20261004052704-3mimtvq",
+      "roots": [
+        {
+          "root_id": "20261004052704-3mimtvq"
+        }
+      ]
+    },
+    {
+      "attrName": "custom-lvct-self-draft",
+      "requestId": "20261004000000-self001",
+      "docId": "20261004052704-uxao22o",
+      "roots": [
+        {
+          "root_id": "20261004052704-uxao22o"
+        }
+      ]
+    }
+  ]
+}

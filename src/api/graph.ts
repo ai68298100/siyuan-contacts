@@ -5,7 +5,7 @@
  * - 节点字段 {id, label, type, refs, defs}；边字段 {from, to, ref}（不是 source/target）；
  * - getLocalGraph 为双向一度（出链与回链都在图内）。
  */
-import { kernelPost } from "./client";
+import { KernelProtocolError, kernelPost } from "./client";
 
 export interface NativeGraphNode {
     id: string;
@@ -34,7 +34,21 @@ const GRAPH_CONF = { type: {} };
 function assertGraphShape(route: string, data: NativeGraphData | undefined): NativeGraphData {
     /* CODE-02.6：形状异常上抛，不归一为空图——空图与读失败必须可区分 */
     if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.links)) {
-        throw new Error(`${route} 返回异常形状（缺 nodes/links 数组）`);
+        throw new KernelProtocolError(route, `${route} 返回异常形状（缺 nodes/links 数组）`);
+    }
+    if (data.nodes.some((node) => !node
+        || typeof node.id !== "string"
+        || typeof node.label !== "string"
+        || typeof node.type !== "string"
+        || typeof node.refs !== "number"
+        || typeof node.defs !== "number")) {
+        throw new KernelProtocolError(route, `${route} 返回异常形状（nodes 项字段非法）`);
+    }
+    if (data.links.some((link) => !link
+        || typeof link.from !== "string"
+        || typeof link.to !== "string"
+        || (link.ref !== undefined && typeof link.ref !== "boolean"))) {
+        throw new KernelProtocolError(route, `${route} 返回异常形状（links 项字段非法）`);
     }
     return data;
 }

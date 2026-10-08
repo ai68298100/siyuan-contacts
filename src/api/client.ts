@@ -6,33 +6,131 @@
  */
 import { fetchPost } from "siyuan";
 import { withTimeout } from "../shared/async";
+import { validateDocumentTitle } from "../domain/format";
+import {
+    assertKernelArray,
+    assertKernelRecord,
+    decodeKernelResponse,
+    KernelProtocolError,
+    KernelTransportError,
+} from "./kernel-contract.ts";
 
-export interface KernelResponse<T> {
-    code: number;
-    msg: string;
-    data: T;
-}
+export type {
+    KernelDataState,
+    KernelFailureKind,
+    KernelResponse,
+} from "./kernel-contract.ts";
+export {
+    assertKernelArray,
+    assertKernelRecord,
+    classifyKernelData,
+    decodeKernelResponse,
+    KernelError,
+    KernelPermissionError,
+    KernelProtocolError,
+    KernelResponseError,
+    KernelTransportError,
+} from "./kernel-contract.ts";
 
 /** 内核请求等待上限；宿主卡顿时以超时拒绝，用户可在界面重试（写入严禁自动重试） */
 export const kernelConfig = { timeoutMs: 15_000 };
 
-function kernelPost<T>(route: string, body: Record<string, unknown> = {}): Promise<T> {
+export interface KernelPostOptions<T> {
+    timeoutMs?: number;
+    signal?: AbortSignal;
+    decode?: (data: unknown) => T;
+}
+
+function kernelPost<T>(
+    route: string,
+    body: Record<string, unknown> = {},
+    options: KernelPostOptions<T> = {},
+): Promise<T> {
     return withTimeout(
         () => new Promise<T>((resolve, reject) => {
-            fetchPost(route, body, (response: { code?: number; msg?: string; data?: T }) => {
-                if (!response || typeof response.code !== "number") {
-                    reject(new Error(`${route} 返回异常响应`));
-                } else if (response.code !== 0) {
-                    reject(new Error(`${route} code=${response.code} msg=${response.msg || ""}`));
-                } else {
-                    resolve(response.data as T);
+            const handleResponse = (response: unknown) => {
+                try {
+                    const envelope = decodeKernelResponse<T>(route, response);
+                    resolve(options.decode ? options.decode(envelope.data) : envelope.data);
+                } catch (error) {
+                    reject(error);
                 }
-            });
+            };
+
+            const handleFailure = (response: unknown) => {
+                if (typeof response === "object" && response !== null &&
+                    ("code" in response || "msg" in response || "data" in response)) {
+                    handleResponse(response);
+                    return;
+                }
+                reject(new KernelTransportError(route, response));
+            };
+
+            try {
+                fetchPost(
+                    route,
+                    body,
+                    handleResponse,
+                    undefined,
+                    handleFailure,
+                );
+            } catch (error) {
+                reject(new KernelTransportError(route, error));
+            }
         }),
-        kernelConfig.timeoutMs,
+        options.timeoutMs ?? kernelConfig.timeoutMs,
         route,
+        { signal: options.signal },
     );
 }
+
+function decodeNotebookList(route: string, data: unknown): NotebookMeta[] {
+    const record = assertKernelRecord(route, data);
+    const notebooks = assertKernelArray<unknown>(route, record.notebooks);
+    if (notebooks.some((notebook) => {
+        if (typeof notebook !== "object" || notebook === null || Array.isArray(notebook)) return true;
+        const candidate = notebook as Record<string, unknown>;
+        return typeof candidate.id !== "string" || typeof candidate.name !== "string";
+    })) {
+        throw new KernelProtocolError(route, `${route} 返回异常形状（notebooks 项缺 id/name）`);
+    }
+    return notebooks as NotebookMeta[];
+}
+
+function decodeString(route: string, data: unknown): string {
+    if (typeof data !== "string") {
+        throw new KernelProtocolError(route, `${route} 返回异常形状（非字符串）`);
+    }
+    return data;
+}
+
+function decodeDocumentExport(route: string, data: unknown): { hPath: string; content: string } {
+    const record = assertKernelRecord(route, data);
+    if (typeof record.hPath !== "string" || typeof record.content !== "string") {
+        throw new KernelProtocolError(route, `${route} 返回异常形状（缺 hPath/content）`);
+    }
+    return { hPath: record.hPath, content: record.content };
+}
+
+function decodeStringMap(route: string, data: unknown): Record<string, string> {
+    const record = assertKernelRecord(route, data);
+    for (const value of Object.values(record)) {
+        if (typeof value !== "string") throw new KernelProtocolError(route, `${route} 返回异常形状（映射值非字符串）`);
+    }
+    return record as Record<string, string>;
+}
+
+function decodeArray<T>(route: string, data: unknown): T[] {
+    return assertKernelArray<T>(route, data);
+}
+
+export {
+    decodeArray,
+    decodeDocumentExport,
+    decodeNotebookList,
+    decodeString,
+    decodeStringMap,
+};
 
 /**
  * 生成合法节点 ID（yyyyMMddHHmmss-xxxxxxx，同 Lute.NewNodeID 格式）。
@@ -57,10 +155,7 @@ export interface NotebookMeta {
 }
 
 export async function listNotebooks(): Promise<NotebookMeta[]> {
-    const data = await kernelPost<{ notebooks?: NotebookMeta[] }>("/api/notebook/lsNotebooks", {});
-    /* CODE-02.6：缺 notebooks 字段是协议异常，不得按「没有笔记本」处理（会引导重复建库） */
-    if (!Array.isArray(data?.notebooks)) throw new Error("/api/notebook/lsNotebooks 返回异常形状（缺 notebooks 数组）");
-    return data.notebooks;
+    return kernelPost("/api/notebook/lsNotebooks", {}, { decode: (data) => decodeNotebookList("/api/notebook/lsNotebooks", data) });
 }
 
 /** 思源在部分版本下 createNotebook 的返回值不是 ID，创建后统一重新列表获取（spike 结论） */
@@ -74,17 +169,45 @@ export async function createNotebook(name: string): Promise<NotebookMeta> {
 }
 
 export async function createDocWithMd(notebookId: string, hPath: string, markdown: string): Promise<string> {
-    return kernelPost<string>("/api/filetree/createDocWithMd", { notebook: notebookId, path: hPath, markdown });
+    return kernelPost("/api/filetree/createDocWithMd", { notebook: notebookId, path: hPath, markdown }, {
+        decode: (data) => decodeString("/api/filetree/createDocWithMd", data),
+    });
 }
 
 /**
  * 文档改名（B13 组织改名）。spike:b13 通道7 实证（v3.8.6）：
- * path 参数必须是物理路径 `/{docId}.sy`（传 hpath 报 invalid document path）；
+ * path 参数必须是回读核实的物理路径（含嵌套父文档；传 hpath 报 invalid document path）；
  * 改名后 blocks.content（文档标题）更新，正文与 custom-* 标记块 IAL 保留。
  */
 export async function renameDoc(notebookId: string, docId: string, title: string): Promise<void> {
     if (!/^\d{14}-[0-9a-z]{7}$/.test(docId)) throw new Error("docId 不是合法的思源 ID");
-    await kernelPost("/api/filetree/renameDoc", { notebook: notebookId, path: `/${docId}.sy`, title });
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(notebookId)) throw new Error("notebookId 不是合法的思源 ID");
+    const titleError = validateDocumentTitle(title);
+    if (titleError) throw new Error(titleError);
+    await kernelPost("/api/sqlite/flushTransaction");
+    const rows = await querySql<unknown>(`SELECT path, box, content FROM blocks WHERE type='d' AND id='${docId}'`);
+    const target = rows.length === 1 ? assertKernelRecord("/api/query/sql", rows[0]) : null;
+    if (!target || target.box !== notebookId || typeof target.content !== "string" || typeof target.path !== "string"
+        || !/^\/(?:\d{14}-[0-9a-z]{7}\/)*\d{14}-[0-9a-z]{7}\.sy$/.test(target.path)
+        || !target.path.endsWith(`/${docId}.sy`)) {
+        throw new KernelProtocolError("/api/query/sql", "改名目标的文档路径与笔记本尚未核实，未写入");
+    }
+    const requestedTitle = title.trim();
+    if (target.content === requestedTitle) return;
+    let writeError: unknown;
+    try {
+        await kernelPost("/api/filetree/renameDoc", { notebook: notebookId, path: target.path, title: requestedTitle });
+    } catch (error) {
+        writeError = error;
+    }
+    try {
+        await kernelPost("/api/sqlite/flushTransaction");
+        const verifiedRows = await querySql<unknown>(`SELECT content, box FROM blocks WHERE type='d' AND id='${docId}'`);
+        const verified = verifiedRows.length === 1 ? assertKernelRecord("/api/query/sql", verifiedRows[0]) : null;
+        if (!verified || verified.box !== notebookId || verified.content !== requestedTitle) throw new Error("标题未核实");
+    } catch (cause) {
+        throw new Error(`文档 ${docId} 改名请求已发出，但结果未知；请先重新读取核实，未自动重放`, { cause: writeError ?? cause });
+    }
 }
 
 /* ---------- SQL（仅用于文档/块查询；数据库没有 SQL 表，见 DATA-CONTRACT §1.5） ---------- */
@@ -98,10 +221,7 @@ export interface DocRow {
 
 /** 跑一条只读 SQL；思源索引异步刷新，写后立刻查可能短暂滞后 */
 export async function querySql<T = Record<string, unknown>>(stmt: string): Promise<T[]> {
-    const data = await kernelPost<T[]>("/api/query/sql", { stmt });
-    /* CODE-02.6：非数组是协议异常（挂起/损坏响应），不得静默按空结果处理 */
-    if (!Array.isArray(data)) throw new Error("/api/query/sql 返回异常形状（非数组）");
-    return data;
+    return kernelPost("/api/query/sql", { stmt }, { decode: (data) => decodeArray<T>("/api/query/sql", data) });
 }
 
 /* ---------- block ---------- */
@@ -124,6 +244,32 @@ interface TransactionResult {
  */
 export type InsertBlockData = TransactionResult[] | TransactionResult;
 
+function isDoOperation(value: unknown): value is DoOperation {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+    const candidate = value as Record<string, unknown>;
+    return typeof candidate.id === "string" && typeof candidate.action === "string";
+}
+
+function isTransactionResult(value: unknown): value is TransactionResult {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+    const candidate = value as Record<string, unknown>;
+    const hasOperations = Array.isArray(candidate.operations) || Array.isArray(candidate.doOperations);
+    return hasOperations
+        && (candidate.operations === undefined || (Array.isArray(candidate.operations) && candidate.operations.every(isDoOperation)))
+        && (candidate.doOperations === undefined || (Array.isArray(candidate.doOperations) && candidate.doOperations.every(isDoOperation)));
+}
+
+export function decodeInsertBlockData(route: string, data: unknown): InsertBlockData {
+    if (Array.isArray(data)) {
+        if (!data.every(isTransactionResult)) {
+            throw new KernelProtocolError(route, `${route} 返回异常形状（事务结果数组非法）`);
+        }
+        return data as TransactionResult[];
+    }
+    if (isTransactionResult(data)) return data;
+    throw new KernelProtocolError(route, `${route} 返回异常形状（事务结果非法）`);
+}
+
 export function firstOperationId(data: InsertBlockData | undefined): string {
     const results: TransactionResult[] = Array.isArray(data) ? data : data ? [data] : [];
     for (const result of results) {
@@ -135,13 +281,13 @@ export function firstOperationId(data: InsertBlockData | undefined): string {
 
 /** 向文档追加一个块（DOM），返回新块 ID */
 export async function appendBlockDom(parentBlockId: string, dom: string): Promise<string> {
-    const data = await kernelPost<InsertBlockData>("/api/block/insertBlock", {
+    const data = await kernelPost("/api/block/insertBlock", {
         dataType: "dom",
         parentID: parentBlockId,
         data: dom,
-    });
+    }, { decode: (value) => decodeInsertBlockData("/api/block/insertBlock", value) });
     const id = firstOperationId(data);
-    if (!id) throw new Error("insertBlock 未返回新块 ID");
+    if (!id) throw new KernelProtocolError("/api/block/insertBlock", "/api/block/insertBlock 返回异常形状（未返回新块 ID）");
     return id;
 }
 

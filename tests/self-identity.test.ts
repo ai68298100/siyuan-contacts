@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeSelfIdentity, isSelfDoc, excludeSelf } from "../src/domain/self-identity.ts";
+import { normalizeSelfIdentity, parseSelfIdentity, parseSelfProfileCheckpoint, isSelfDoc, excludeSelf } from "../src/domain/self-identity.ts";
 
 const IDENTITY = { schemaVersion: 1, selfDocId: "20260930000000-self001", selfItemId: "20260930000000-row0001", createdAt: "2026-09-30" };
 
@@ -10,6 +10,15 @@ test("B11 归一：合法身份通过；坏版本/坏 ID/坏日期/非对象返�
     assert.equal(normalizeSelfIdentity({ ...IDENTITY, schemaVersion: 2 }), null);
     assert.equal(normalizeSelfIdentity({ ...IDENTITY, selfDocId: "blk-s1" }), null, "文档 ID 须过格式校验");
     assert.equal(normalizeSelfIdentity({ ...IDENTITY, createdAt: "2026/09/30" }), null);
+    assert.equal(normalizeSelfIdentity({ ...IDENTITY, createdAt: "2026-02-31" }), null);
+});
+
+test("B11 严格身份：旧库缺键合法为空，损坏和未知版本拒绝重建", () => {
+    for (const absent of [null, undefined, ""]) assert.equal(parseSelfIdentity(absent), null);
+    assert.deepEqual(parseSelfIdentity(IDENTITY), IDENTITY);
+    for (const broken of [false, [], "{}", {}, { ...IDENTITY, schemaVersion: 9 }, { ...IDENTITY, selfItemId: "bad" }, { ...IDENTITY, createdAt: "2026-02-31" }]) {
+        assert.throws(() => parseSelfIdentity(broken), /本人身份存储内容损坏/);
+    }
 });
 
 test("B11 isSelfDoc/excludeSelf：本人保留在名册，统计面摘除", () => {
@@ -24,4 +33,17 @@ test("B11 isSelfDoc/excludeSelf：本人保留在名册，统计面摘除", () =
     assert.deepEqual(kept.map((person) => person.name), ["张三"]);
     assert.equal(people.length, 2, "excludeSelf 不得改动原数组");
     assert.deepEqual(excludeSelf(people, null), people);
+});
+
+test("B11 本人断点严格区分无记录、未知创建和已核实目标；坏版本与失配结构拒绝", () => {
+    const checkpoint = { schemaVersion: 1, notebookId: "20261004000000-book001", avId: "20261004000000-av00001",
+        dbBlockId: "20261004000000-block01", requestId: "20261004000000-req0001", source: "created", state: "unknown" };
+    assert.equal(parseSelfProfileCheckpoint(null), null);
+    assert.deepEqual(parseSelfProfileCheckpoint(checkpoint), checkpoint);
+    const verified = { ...checkpoint, state: "verified", docId: IDENTITY.selfDocId, itemId: IDENTITY.selfItemId };
+    assert.deepEqual(parseSelfProfileCheckpoint(verified), verified);
+    for (const broken of [[], false, {}, { ...checkpoint, schemaVersion: 9 }, { ...checkpoint, source: "guessed" },
+        { ...checkpoint, state: "verified" }, { ...checkpoint, notebookId: "bad" }, { ...checkpoint, itemId: IDENTITY.selfItemId }]) {
+        assert.throws(() => parseSelfProfileCheckpoint(broken), /本人建档断点存储内容损坏/);
+    }
 });

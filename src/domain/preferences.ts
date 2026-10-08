@@ -11,17 +11,18 @@ export type PeopleSortMode = "name" | "group" | "birthday" | "recent";
 export type PeopleViewMode = "card" | "table";
 /** 表格可选列（F02）。「姓名」是固定列，不参与显隐与排序，恒为首列。
  *  B12 新增「org」虚拟列：值来自成员索引投影（组织名 · 部门），不在数据库 fieldMap 中。 */
-export type PeopleTableColumn = "group" | "phone" | "wechat" | "birthday" | "recent" | "tags" | "org";
+export type PeopleTableColumn = "group" | "phone" | "wechat" | "birthday" | "recent" | "tags" | "org" | "school" | "relationship";
 /** 图谱数据源模式（B14.5）：relations=关系图（related 边）；native=文档引用图（内核图数据，边=块引用） */
 export type GraphViewMode = "relations" | "native";
 /** 文档引用图范围（B14.8/B14.4）：self=以本人为中心一度；person=以指定联系人为中心一度；global=全部登记文档 */
 export type NativeGraphScope = "self" | "person" | "global";
 
 /** 表格可选列的展示顺序默认值（常用常驻、次要折叠的排序基础） */
-export const PEOPLE_TABLE_COLUMNS: readonly PeopleTableColumn[] = ["group", "phone", "wechat", "birthday", "recent", "tags", "org"];
+export const PEOPLE_TABLE_COLUMNS: readonly PeopleTableColumn[] = ["group", "phone", "wechat", "birthday", "recent", "tags", "org", "school", "relationship"];
 
 export interface ViewPreferences {
     readonly schemaVersion: number;
+    readonly revision: number;
     readonly defaultView: DefaultView;
     readonly peopleSort: PeopleSortMode;
     readonly openOnStartup: boolean;
@@ -49,6 +50,7 @@ export interface ViewPreferences {
 
 export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
     schemaVersion: VIEW_PREFERENCES_VERSION,
+    revision: 0,
     defaultView: "home",
     peopleSort: "name",
     openOnStartup: false,
@@ -56,7 +58,7 @@ export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
     birthdayWindowDays: 30,
     staleThresholdDays: 30,
     peopleView: "card",
-    tableColumns: [...PEOPLE_TABLE_COLUMNS],
+    tableColumns: ["group", "phone", "wechat", "birthday", "recent", "tags", "org"],
     graphMode: "relations",
     nativeScope: "self",
     nativeCenterDocId: "",
@@ -109,6 +111,7 @@ export function normalizeViewPreferences(raw: unknown): ViewPreferences {
     const record = raw as Record<string, unknown>;
     return {
         schemaVersion: VIEW_PREFERENCES_VERSION,
+        revision: typeof record.revision === "number" && Number.isSafeInteger(record.revision) && record.revision >= 0 ? record.revision : 0,
         defaultView: isDefaultView(record.defaultView) ? record.defaultView : DEFAULT_VIEW_PREFERENCES.defaultView,
         peopleSort: isPeopleSortMode(record.peopleSort) ? record.peopleSort : DEFAULT_VIEW_PREFERENCES.peopleSort,
         openOnStartup: typeof record.openOnStartup === "boolean" ? record.openOnStartup : DEFAULT_VIEW_PREFERENCES.openOnStartup,

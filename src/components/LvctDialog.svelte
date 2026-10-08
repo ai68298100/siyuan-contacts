@@ -11,7 +11,6 @@
         modal = !peek,
         closeOnBackdrop = true,
         onClose,
-        beforeClose,
         children,
     }: {
         title: string;
@@ -21,12 +20,12 @@
         modal?: boolean;
         closeOnBackdrop?: boolean;
         onClose: () => void;
-        beforeClose?: () => boolean | Promise<boolean>;
         children: Snippet;
     } = $props();
 
     let panel: HTMLDivElement | undefined = $state();
     let closing = false;
+    let lastContentFocus: HTMLElement | null = null;
     const canClose = createCloseScope();
     const titleId = `lvct-dialog-title-${Math.random().toString(36).slice(2)}`;
     const previousActive = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -40,12 +39,38 @@
 
     async function requestClose() {
         if (closing) return;
+        const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const fields = [...(panel?.querySelectorAll<HTMLElement>(
+            "input:not([disabled]), textarea:not([disabled]), select:not([disabled])",
+        ) ?? [])];
+        const editableFields = fields.filter((field) => field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement);
+        const draftField = editableFields.find((field) => field.getAttribute("aria-label") === "新增别名")
+            ?? editableFields.find((field) => String((field as HTMLInputElement).value ?? "").length > 0)
+            ?? editableFields[0]
+            ?? fields[0]
+            ?? null;
+        const restoreTarget = lastContentFocus?.isConnected
+            ? lastContentFocus
+            : active && panel?.contains(active) && !active.classList.contains("lvct-dialog-panel__close") ? active : draftField;
         closing = true;
         try {
             // B06：聚合作用域内全部脏项，弹一次三选一（保存并离开/放弃/取消）
             const allowed = await canClose.requestClose();
-            if (!allowed) return;
-            if (beforeClose && !(await beforeClose())) return;
+            if (!allowed) {
+                await tick();
+                if (restoreTarget?.isConnected) {
+                    // A draft can live inside a collapsed details block. Open
+                    // its owning disclosure before asking the browser to focus it.
+                    let disclosure = restoreTarget.parentElement?.closest("details");
+                    while (disclosure) {
+                        disclosure.open = true;
+                        disclosure = disclosure.parentElement?.closest("details");
+                    }
+                    await tick();
+                    restoreTarget.focus({ preventScroll: true });
+                }
+                return;
+            }
             onClose();
         } finally {
             closing = false;
@@ -102,10 +127,22 @@
         aria-modal={modal ? "true" : undefined}
         aria-labelledby={titleId}
         bind:this={panel}
+        onfocusin={(event) => {
+            const target = event.target;
+            if (target instanceof HTMLElement && panel?.contains(target) && !target.classList.contains("lvct-dialog-panel__close")) {
+                lastContentFocus = target;
+            }
+        }}
     >
         <div class="lvct-dialog-panel__header">
             <h2 id={titleId} class="lvct-dialog-panel__title">{title}</h2>
-            <button class="lvct-dialog-panel__close" type="button" aria-label={closeLabel} onclick={() => void requestClose()}>×</button>
+            <button class="lvct-dialog-panel__close" type="button" aria-label={closeLabel}
+                onmousedown={(event) => {
+                    const active = document.activeElement;
+                    if (active instanceof HTMLElement && panel?.contains(active) && !active.classList.contains("lvct-dialog-panel__close")) lastContentFocus = active;
+                    event.preventDefault();
+                }}
+                onclick={() => void requestClose()}>×</button>
         </div>
         {@render children()}
     </div>
