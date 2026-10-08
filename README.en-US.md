@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: one person, one document, backed by a native SiYuan database.**
 
-**Latest stable release: v0.4.1** · [Install from GitHub Releases](https://github.com/ai68298100/siyuan-contacts/releases) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.0** · [Install from GitHub Releases](https://github.com/ai68298100/siyuan-contacts/releases) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -65,7 +65,7 @@ Lv Contacts makes **every contact a regular SiYuan document** (bidirectional lin
 
 Before uninstalling, export the interaction backup or full migration bundle from Settings. Person documents remain in the SiYuan workspace; interactions, follow-ups, reminders and templates are plugin-managed data and should not be treated as native SiYuan backups.
 
-The current release baseline is **v0.4.1** (a load-fix on top of v0.4.0 plus data-trust hardening and three major capabilities over v0.3.0 — self profile, organizations and the dual graph, see [CHANGELOG](docs/CHANGELOG.md)). Treat the `package.zip` attached to GitHub Releases as the installable build; later development changes wait for the next Release.
+The current release baseline is **v0.5.0** (the unified two-machine release with deeper organization and person-profile capabilities, per-person notes, and continued mobile, accessibility and concurrency hardening; see [CHANGELOG](docs/CHANGELOG.md)). Treat the `package.zip` attached to GitHub Releases as the installable build; later development changes wait for the next Release.
 
 - **Self profile (B11)** — auto-created "Myself" document + identity mark + roster exclusion + rebinding from Settings
 - **Organizations (B13)** — org documents with a membership index (multiple orgs / tenures / active-former), workspace orgs view, org manager dialog (rename / archive-restore / member editing), direct membership editing in person detail, common-background projection
@@ -74,7 +74,7 @@ The current release baseline is **v0.4.1** (a load-fix on top of v0.4.0 plus dat
 
 Real-host, real-device and marketplace submission remain gated per [RELEASE](docs/RELEASE.md).
 
-CardDAV address-book sync and CalDAV calendar/follow-up reminders are roadmap candidates only; v0.4.1 supports vCard file import/export, not online sync. Any future sync will be introduced after server compatibility, credential handling, field allowlists, conflict and deletion policies are verified.
+CardDAV address-book sync and CalDAV calendar/follow-up reminders are roadmap candidates only; v0.5.0 supports vCard file import/export, not online sync. Any future sync will be introduced after server compatibility, credential handling, field allowlists, conflict and deletion policies are verified.
 
 ## 🚀 Quick start
 
