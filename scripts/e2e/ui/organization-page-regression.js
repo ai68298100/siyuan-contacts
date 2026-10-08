@@ -90,9 +90,14 @@ export async function runOrganizationPageRegression({ test, assert, kernel, sett
             await until(() => fixture.querySelectorAll(".lvct-org-manager__member").length === 1, "搜索未重置分页");
             window.__stage = "organization-page-assert";
             assert(fixture.textContent.includes("成员999") && fixture.textContent.includes("1 条记录"), "筛选后的对象或计数错误");
-            const addOptions = [...fixture.querySelector('[aria-label="选择要添加的联系人"]').options];
-            assert(addOptions.length === 501 && addOptions.some((option) => option.value === memberships[999].personDocId)
-                && !addOptions.some((option) => option.value === memberships[1000].personDocId), "分页后当前成员成为候选，或历史成员不能重新加入");
+            const addPicker = fixture.querySelector('[aria-label="选择要添加的联系人"]');
+            addPicker.click();
+            await until(() => fixture.querySelector(".lvct-picker__panel"), "组织成员候选器未打开");
+            const addOptions = [...fixture.querySelectorAll(".lvct-picker__option")];
+            assert(addOptions.length === 500 && addOptions.some((option) => option.textContent.includes(memberships[999].personDocId))
+                && !addOptions.some((option) => option.textContent.includes(memberships[1000].personDocId)), "分页后当前成员成为候选，或历史成员不能重新加入");
+            fixture.querySelector(".lvct-picker__search")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+            await tick();
         } finally {
             window.__stage = "organization-page-unmount";
             await unmount(instance);
