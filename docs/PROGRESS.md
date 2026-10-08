@@ -1,5 +1,13 @@
 # 进度（PROGRESS）
 
+## 2026-10-08 两机统一发布候选 v0.5.0
+
+- PR #12 已把主力机与本机开发线普通合并至 `main`；本机原 `dev/thispc-1002` 已普通推送并与合并后的主线一致。本次从统一主线建立 `codex/release-0.5.0`，将 `package.json` 与 `plugin.json` 同步升级到 0.5.0。
+- 更新中英文 README、CHANGELOG、RELEASE、BRANCH-PROTOCOL、ROADMAP、PRODUCT-PLAN、FEEDBACK-BACKLOG、ACTIVE-BACKLOG 与 HANDOFF，区分当前候选和历史快照；增加 GitHub Release 正文草稿 `docs/RELEASE-NOTES-v0.5.0.md`。未修改功能逻辑、未提交集市 PR。
+- 验证：`pnpm check` 0 错误 / 0 警告；`pnpm test` 537/537；桌面 UI 319/319；移动视口 UI 320/320；`pnpm build` 与 `pnpm check:release` 通过。本地 `package.zip` 509825 bytes，SHA-256 `69af65b61f37231770765565d8715852a7fda9277ebfbe166686deede95ca140`。
+- 隔离内核 3.8.6：API spike 9/9、插件加载显示 v0.5.0、联系人流程 13/13。该证据不代替实际用户工作区、Android 真机、真实多窗口或集市验收。
+- 当前仍为发布候选：PR/main CI、annotated tag、GitHub Release 与 Release 附件需待后续流程完成；bazaar#2289 维持独立待审状态。
+
 ## 2026-10-08 当前开发分支收口
 
 - 批量暂缓只记录本批人物的前值；撤销逐项核对当前值，保留无关提醒和其他窗口修改；部分失败显示逐项错误并可重试。首页逾期跟进批量顺延同样逐项报告失败并支持失败项重试；摘要“今日不再展示”的偏好保存失败会保留横幅并提示重试；联系节奏读取失败可重试，跟进列表刷新会丢弃迟到响应。

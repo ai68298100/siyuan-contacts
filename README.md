@@ -9,7 +9,7 @@
 
 **在思源笔记里管理人脉与人际关系：一人一文档，数据库作主干。**
 
-**最新稳定版：v0.4.1** · [从 GitHub Releases 安装](https://github.com/ai68298100/siyuan-contacts/releases) · [提交 Issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**最新稳定版：v0.5.0** · [从 GitHub Releases 安装](https://github.com/ai68298100/siyuan-contacts/releases) · [提交 Issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 [English](README.en-US.md) | 简体中文
 
@@ -81,7 +81,7 @@
 
 从联系人数据库安全解绑不会删除人物文档或互动。时间线删除只删除当前人物的一条互动，不删除来源笔记或其他参与者的记录。
 
-当前发布基线为 **v0.4.1**（v0.4.0 的加载修复版 + v0.3.0 之上的数据可信加固与组织/双图/本人档案三大能力，详见 [CHANGELOG](docs/CHANGELOG.md)）。GitHub Releases 中的 `package.zip` 才是可安装版本，后续开发改动需等下一次 Release。
+当前发布基线为 **v0.5.0**（两机合并后的统一功能版本，补齐组织关系、人物资料与独立备注，并继续收口移动端、无障碍和数据并发保护，详见 [CHANGELOG](docs/CHANGELOG.md)）。GitHub Releases 中的 `package.zip` 才是可安装版本，后续开发改动需等下一次 Release。
 
 - **本人档案（B11）**：自动建档「我自己」+ 身份标记 + 名册排除 + 设置页改绑
 - **组织模块（B13）**：组织建档与成员归属索引（多组织/多段/在职离职）、工作台组织视图、组织管理弹窗（改名/归档恢复/成员编辑）、人物详情直接增删归属、共同背景投影
