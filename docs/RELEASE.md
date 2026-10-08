@@ -1,13 +1,14 @@
 # 发布清单（RELEASE）
 
-> 当前准备发布 v0.5.1：包含自定义联系人分组、README 系列介绍恢复和已验证的常规依赖更新。完成全部门禁、普通合并、tag 与 GitHub Release 后，再把本段补为已发布记录。
+> v0.5.1 已于 2026-10-08 发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.1)，annotated tag 指向 PR #18 merge commit `3a3de430f6b08f3cbfb20df55a113dc8beb1125c`。本版本包含自定义联系人分组、README 系列介绍恢复和已验证的常规依赖更新；未修改 bazaar。
 
 ## v0.5.1 本轮状态
 
-- [ ] `package.json` 与 `plugin.json` 版本均为 0.5.1
-- [ ] `pnpm check`、`pnpm test`、桌面/移动 UI 回归、`pnpm build`、`pnpm check:release` 全部通过
-- [ ] 通过开发分支 PR 普通合并进 `main`
-- [ ] annotated tag `v0.5.1` 与 GitHub Release 已创建，附件校验和已核对
+- [x] `package.json` 与 `plugin.json` 版本均为 0.5.1
+- [x] `pnpm check`、`pnpm test`、桌面/移动 UI 回归、`pnpm build`、`pnpm check:release` 全部通过
+- [x] 通过开发分支 PR #18 普通合并进 `main`
+- [x] annotated tag `v0.5.1` 与 GitHub Release 已创建，`package.zip` 为 506502 bytes，SHA-256 为 `31792cc96764c4a10f92678cb06d5b579cdaa3e50da7fb96bc2148dafd6a5d6f`
+- [x] GitHub Actions build run `37761460576` 成功（含类型、538 项单测、桌面/移动 UI、构建和发布门禁）
 - [ ] 真实思源宿主、Android 真机、真实多窗口、原生图入口、任务管理器互读和集市可见性仍按下方手工清单单独验收
 
 ## v0.5.0 历史发布记录
