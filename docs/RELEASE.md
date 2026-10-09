@@ -1,5 +1,16 @@
 # 发布清单（RELEASE）
 
+> v0.5.5 发布准备中：PR #25 已普通合并至 `main`（合并提交 `e33b653`），待本轮门禁、版本提交、annotated tag 和 GitHub Release 完成。
+
+## v0.5.5 本轮状态
+
+- [x] PR #25 已通过 GitHub CI 并以普通合并方式进入 `main`
+- [ ] `package.json` 与 `plugin.json` 版本统一为 0.5.5
+- [ ] README 中英文安装入口、CHANGELOG 与发布说明已切换到 v0.5.5
+- [ ] `pnpm check`、`pnpm test`、桌面/移动/宿主 UI、构建与发布门禁
+- [ ] annotated tag `v0.5.5`、GitHub Latest Release 与附件下载校验
+- [ ] 真实思源宿主、Android 真机、真实多窗口、原生图入口、任务管理器互读和集市客户端可见性仍需单独验收；CardDAV 在线同步未实现
+
 > v0.5.4 已于 2026-10-09 发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.4)，annotated tag 指向 PR #23 main 合并提交 `7fa442471901a53d8d32900d2aeac22463870468`。安装包来自该提交的 [main CI run 37898536920](https://github.com/ai68298100/siyuan-contacts/actions/runs/37898536920)，下载附件后再次核对校验和一致。
 
 ## v0.5.4 本轮状态

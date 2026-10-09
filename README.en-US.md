@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.4** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.4) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.5** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.5) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -20,6 +20,22 @@ English | [简体中文](README.md)
 ---
 
 Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
+
+## What's new in v0.5.5
+
+Added: contact creation prerequisites
+
+- When relationship labels are entered, a new contact can create or select the self profile first. Failed prerequisites keep the current draft and do not leave a partial contact.
+
+Improved: self profile editing and async states
+
+- The self profile editor now exposes work and school organization choices, hides the inapplicable self relationship field, and keeps a stable loading state.
+- Busy actions in import, batch operations and profile editing are disabled consistently to prevent duplicate submissions.
+
+Fixed: related-person reads and self entry points
+
+- Empty relation cells that omit `relation` or `blockIDs` are treated as empty; malformed non-empty relation data still stops writes for verification.
+- Self markers are consistent across roster, search and detail entry points, so organization memberships can be edited from every route.
 
 ## 🐴 Little Donkey plugin series
 
@@ -49,7 +65,7 @@ Each plugin is maintained independently and can be used on its own or alongside 
 
 Manual installation from GitHub Releases is currently recommended. The Marketplace submission has been merged, but availability in the client has not been verified on a real device.
 
-1. Download package.zip from the [v0.5.4 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.4).
+1. Download package.zip from the [v0.5.5 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.5).
 2. Extract its contents into data/plugins/siyuan-contacts/ in your SiYuan workspace. plugin.json must be at that directory root.
 3. Restart SiYuan and enable **Lv Contacts** under **Settings → Marketplace → Installed**.
 
@@ -70,7 +86,7 @@ The migration bundle is a JSON value snapshot with a preview and merge flow, not
 - The in-app English translation is incomplete, so some interface text may appear in Chinese.
 - CardDAV address-book sync and CalDAV calendar sync are not supported. Contacts can be exchanged using vCard files.
 
-See the [v0.5.4 release notes](docs/RELEASE-NOTES-v0.5.4.md) for validation scope.
+See the [v0.5.5 release notes](docs/RELEASE-NOTES-v0.5.5.md) for validation scope.
 
 ## Quick start
 
