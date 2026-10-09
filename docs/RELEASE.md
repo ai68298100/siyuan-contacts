@@ -1,6 +1,15 @@
 # 发布清单（RELEASE）
 
-> v0.5.2 发布准备：本版本包含农历生日排序修复、生日历法标注和联系人资料编辑入口；发布资产与校验和将在本次构建后写入 GitHub Release。
+> v0.5.3 发布准备：本版本收口组织资料、联系人扩展字段、农历生日选择、提醒处置和全页面交互审计；发布资产与校验和将在本次构建后写入 GitHub Release。
+
+## v0.5.3 本轮状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.3
+- [x] README 中英文安装入口和发布说明已切换到 v0.5.3
+- [x] `pnpm check`、549 项单测、桌面 322/322、移动 323/323、宿主 322/322、`pnpm build`、`pnpm check:release`
+- [ ] 开发分支通过 PR 普通合并进 `main`
+- [ ] annotated tag `v0.5.3`、GitHub Release 和 package.zip 校验和
+- [ ] 真实思源宿主、Android 真机、真实多窗口、原生图入口、任务管理器互读和 CardDAV 在线同步仍需单独验收
 
 > v0.5.1 已于 2026-10-08 发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.1)，annotated tag 指向 PR #18 merge commit `3a3de430f6b08f3cbfb20df55a113dc8beb1125c`。本版本包含自定义联系人分组、README 系列介绍恢复和已验证的常规依赖更新；未修改 bazaar。
 

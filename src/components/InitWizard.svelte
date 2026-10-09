@@ -39,6 +39,8 @@
         wizardStepRelationCreate: "配置「{name}」双向关联…",
         wizardStepRelationKept: "双向关联已存在，跳过配置…",
         wizardStepSettings: "保存工作空间设置…",
+        wizardStepFamilyOrganization: "建立默认组织「家庭」…",
+        wizardStepFamilyPending: "工作空间已就绪，默认组织待续做：{message}。可进入组织页手动新建。",
         wizardStepSelfCreate: "建立本人档案「{name}」…",
         wizardStepSelfPending: "工作空间已就绪，本人档案待续做：{message}。可进入后在设置中继续。",
         wizardStepSelfSkipped: "已跳过本人建档，可稍后在设置中创建或指定。",
@@ -56,26 +58,43 @@
     let failed: boolean = $state(false);
     let logLines: string[] = $state([]);
     let snapshot: WorkspaceSnapshot | null = $state(null);
+    let previewLoading = $state(false);
+    let previewError = $state("");
     let previewToken: number = 0;
     let createSelf = $state(true);
     let selfPending = $state(false);
     let completedSettings: import("../domain/model").ContactsSettings | null = $state(null);
     useCloseGuard({ busy: () => running, dirty: () => false });
 
-    /** 只读预检：预检自身失败不阻断向导（真实错误在运行时呈现） */
+    /** 只读预检：未核实现有工作空间前不允许开始写入，避免重复创建。 */
     async function refreshPreview() {
         const token = ++previewToken;
+        previewLoading = true;
+        previewError = "";
         try {
             const next = await facade.previewInitialize(notebookName);
+            if (!next || typeof next !== "object" || !Array.isArray(next.notebooks) || !Array.isArray(next.existingFields)) {
+                throw new Error("工作空间预检返回结果无法核实，请重新检测");
+            }
             if (token === previewToken) snapshot = next;
-        } catch {
-            if (token === previewToken) snapshot = null;
+        } catch (error) {
+            if (token === previewToken) {
+                snapshot = null;
+                previewError = error instanceof Error ? error.message : String(error);
+            }
+        } finally {
+            if (token === previewToken) previewLoading = false;
         }
     }
 
     // 打开即检、改名后重检（防抖，避免逐字请求内核）
     $effect(() => {
         void notebookName;
+        // 输入发生变化后，旧计划立即失效；初始化只能基于最新一次成功预检。
+        previewToken += 1;
+        previewLoading = false;
+        snapshot = null;
+        previewError = "";
         const timer = window.setTimeout(() => void refreshPreview(), 250);
         return () => window.clearTimeout(timer);
     });
@@ -86,7 +105,7 @@
     }
 
     async function run() {
-        if (running) return;
+        if (running || previewLoading || previewError || !snapshot) return;
         running = true;
         errorText = "";
         logLines = [];
@@ -171,6 +190,16 @@
         </div>
     {/if}
 
+    {#if previewLoading}
+        <p class="ft__smaller ft__on-surface" role="status" aria-live="polite">{text("wizardPreviewLoading", "正在核对已有工作空间…")}</p>
+    {:else if previewError}
+        <div class="lvct-wizard__error" role="alert">
+            <div>{text("wizardPreviewFailed", "无法核对已有工作空间：")}{previewError}</div>
+            <p class="ft__smaller lvct-wizard__error-hint">{text("wizardPreviewRetryHint", "为避免重复创建，请先重新检测；检测成功后才能开始初始化。")}</p>
+            <button class="b3-button b3-button--text ft__smaller" onclick={() => void refreshPreview()} disabled={running}>{text("wizardRecheck", "重新检测")}</button>
+        </div>
+    {/if}
+
     {#if errorText}
         <!-- D-32：读屏即时播报 + 焦点迁移 -->
         <div class="lvct-wizard__error" role="alert" tabindex="-1" bind:this={errorEl}>
@@ -187,9 +216,13 @@
             {text("wizardEnterWorkspace", "进入工作空间")}
         </button>
     {:else}
-    <button class="b3-button lvct-wizard__cta" onclick={run} disabled={running || notebookName.trim().length === 0}>
+    <button class="b3-button lvct-wizard__cta" onclick={run} disabled={running || previewLoading || !!previewError || !snapshot || notebookName.trim().length === 0}>
         {running
             ? text("wizardRunning", "正在初始化…")
+            : previewLoading
+                ? text("wizardPreviewLoading", "正在核对已有工作空间…")
+                : previewError || !snapshot
+                    ? text("wizardRecheck", "请先完成检测")
             : failed
                 ? text("wizardContinue", "继续初始化")
                 : text("wizardStart", "开始初始化")}

@@ -51,16 +51,20 @@
     // svelte-ignore state_referenced_locally
     let result = $state<QuickFillResult | null>(initialResult ?? null);
     let checked = $state(new Set<string>());
-    /* FAST-01.2：可复制空白模板（剪贴板不可用时静默，用户仍可从文档手抄） */
+    /* FAST-01.2：可复制空白模板；失败时显示提示，仍可手动填写 */
     let templateCopied = $state(false);
+    let templateCopyError = $state("");
     let templateTimer: ReturnType<typeof setTimeout> | undefined;
     async function copyTemplate() {
+        templateCopyError = "";
         try {
             await navigator.clipboard.writeText(CONTACT_TEMPLATE);
             templateCopied = true;
             clearTimeout(templateTimer);
             templateTimer = setTimeout(() => (templateCopied = false), 2000);
-        } catch { /* 非安全上下文等场景忽略 */ }
+        } catch (error) {
+            templateCopyError = error instanceof Error ? error.message : "剪贴板不可用";
+        }
     }
 
     function fieldLabel(item: QuickFillItem): string {
@@ -167,6 +171,7 @@
                 <button type="button" class="b3-button b3-button--text lvct-qf__copy" onclick={copyTemplate}>
                     {templateCopied ? text("qfCopied", "已复制 ✓") : text("qfCopyTemplate", "复制空白模板")}
                 </button>
+                {#if templateCopyError}<span class="lvct-form__error" role="alert">复制失败：{templateCopyError}。可手动填写下方内容。</span>{/if}
             </p>
             <textarea class="b3-text-field fn__block lvct-qf__input" rows="7"
                 placeholder={text("qfPlaceholder", "张三\n手机：13800138000\n微信：zhang_san\n邮箱：a@example.com")}

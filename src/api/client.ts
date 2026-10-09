@@ -11,6 +11,7 @@ import {
     assertKernelArray,
     assertKernelRecord,
     decodeKernelResponse,
+    decodeNodeId,
     KernelProtocolError,
     KernelTransportError,
 } from "./kernel-contract.ts";
@@ -114,10 +115,15 @@ function decodeDocumentExport(route: string, data: unknown): { hPath: string; co
 
 function decodeStringMap(route: string, data: unknown): Record<string, string> {
     const record = assertKernelRecord(route, data);
-    for (const value of Object.values(record)) {
+    /* 思源不同版本对 getAttributeViewItemIDsByBoundIDs 有两种成功形状：
+       直接返回 {boundId: itemId}，或包在 itemIDsByBoundBlockIDs 下。 */
+    const mapping = assertKernelRecord(route, Object.hasOwn(record, "itemIDsByBoundBlockIDs")
+        ? record.itemIDsByBoundBlockIDs
+        : record);
+    for (const value of Object.values(mapping)) {
         if (typeof value !== "string") throw new KernelProtocolError(route, `${route} 返回异常形状（映射值非字符串）`);
     }
-    return record as Record<string, string>;
+    return mapping as Record<string, string>;
 }
 
 function decodeArray<T>(route: string, data: unknown): T[] {
@@ -127,6 +133,7 @@ function decodeArray<T>(route: string, data: unknown): T[] {
 export {
     decodeArray,
     decodeDocumentExport,
+    decodeNodeId,
     decodeNotebookList,
     decodeString,
     decodeStringMap,
@@ -170,7 +177,7 @@ export async function createNotebook(name: string): Promise<NotebookMeta> {
 
 export async function createDocWithMd(notebookId: string, hPath: string, markdown: string): Promise<string> {
     return kernelPost("/api/filetree/createDocWithMd", { notebook: notebookId, path: hPath, markdown }, {
-        decode: (data) => decodeString("/api/filetree/createDocWithMd", data),
+        decode: (data) => decodeNodeId("/api/filetree/createDocWithMd", data),
     });
 }
 

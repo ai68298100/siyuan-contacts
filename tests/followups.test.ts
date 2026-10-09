@@ -37,6 +37,8 @@ test("日期工具：加天、下周一、次月收敛与闰日校验", () => {
     assert.equal(isValidDateKey("2026-02-29"), false);
     assert.equal(isValidDateKey("2028-02-29"), true);
     assert.equal(isValidDateKey(""), false);
+    assert.equal(isValidDateKey("2026-02-30"), false);
+    assert.equal(isValidDateKey("2028-02-29"), true);
     assert.equal(daysBetween("2026-09-28", "2026-09-30"), 2);
 });
 
@@ -70,6 +72,7 @@ test("归一化：坏条目容错过滤、按 id 去重；写前严格模式抛�
             item({ id: "a" }),
             item({ id: "a", dueDate: "2026-10-01" }),
             item({ id: "b", dueDate: "bogus" }),
+            item({ id: "bad-date", dueDate: "2026-02-30" }),
             item({ id: "c", status: "weird" }),
             null,
         ],

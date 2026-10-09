@@ -187,6 +187,9 @@ M0-M4 核心、M5 收口以及 F01–F16 已在源码落地；v0.5.0 是两机�
 
 用户希望把人脉与手机通讯录、待办提醒打通。该方向有价值，但必须拆成两个独立协议和两个可回滚的同步域：CardDAV 只同步联系人卡片，CalDAV 只同步跟进/重要日期；不能把整个人脉库或互动历史直接外发。
 
+2026-10-09 补充协议与当前代码审计见 [CardDAV 通讯录同步研究](CARDAV-RESEARCH-2026-10-09.md)。RFC/字段边界研究已完成；真实思源宿主的第三方 HTTPS、CSP/CORS、代理与鉴权 spike 仍未验证，因此在线同步仍未实现。
+2026-10-09 补充联系人与个人 CRM 细节对标见 [CONTACT-CRM-BENCHMARK-2026-10-09](CONTACT-CRM-BENCHMARK-2026-10-09.md)；本轮已将生日历法、公历投影、跟进语义、vCard 选择统计和重复候选上限提示落到界面。
+
 ### CARDAV-01：CardDAV 能力调研与契约 spike（P2 / candidate）
 
 - 先验证 RFC 6352/ vCard 3.0、4.0 的发现流程：`/.well-known/carddav`、principal、addressbook-home-set、addressbook collection、`REPORT addressbook-query/addressbook-multiget`、ETag/`If-Match`、`sync-token` 和分页。
@@ -222,3 +225,5 @@ MVP 先做“手动预览 → 单向导出/导入”；双向同步再增加每�
 2. CARDAV-01 与 CALDAV-01 只读调研和受控测试，不写主流程、不采集真实用户通讯录。
 3. 通过契约后先做 CardDAV 手动单向预览/导出，再做双向；CalDAV 先做 follow-up → VTODO，再评估生日 VEVENT。
 4. 两条同步都必须有“同步哪些/不哪些”清单、每条冲突解释、可暂停/断开、脱敏日志、凭据清除和完整回滚说明；不承诺后台常驻通知或所有手机厂商一致行为。
+
+- 2026-10-09 补充 CardDAV 同步状态、权限、冲突、错误和空态交互细节见 [CARDAV-UX-DETAILS-2026-10-09](CARDAV-UX-DETAILS-2026-10-09.md)。在线同步仍未实现，先按 P0/P1/P2 清单完善契约与界面边界。

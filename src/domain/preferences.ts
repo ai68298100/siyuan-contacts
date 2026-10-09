@@ -68,6 +68,11 @@ export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
     reminderGraceDays: 14,
 };
 
+/** 设置页数字输入的保存前校验：必须是 0–365 的整数。 */
+export function isValidPreferenceDays(value: unknown): value is number {
+    return typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value >= 0 && value <= 365;
+}
+
 function isDefaultView(value: unknown): value is DefaultView {
     return value === "home" || value === "people" || value === "graph" || value === "orgs";
 }

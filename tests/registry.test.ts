@@ -14,6 +14,7 @@ test("normalizeRegistryStore：丢弃非法键/非法日期，坏包回空库", 
             "20260927000000-aaaaaaa": "2026-09-28",
             "bad-id": "2026-09-28",
             "20260927000000-bbbbbbb": "not-a-date",
+            "20260927000000-ccccccc": "2026-02-30",
         },
     });
     assert.deepEqual(store.registeredAt, { "20260927000000-aaaaaaa": "2026-09-28" });

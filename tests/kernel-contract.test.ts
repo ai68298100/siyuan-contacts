@@ -5,6 +5,7 @@ import {
     assertKernelRecord,
     classifyKernelData,
     decodeKernelResponse,
+    decodeNodeId,
     KernelPermissionError,
     KernelProtocolError,
     KernelResponseError,
@@ -59,4 +60,12 @@ test("CODE-02.6 数据分类：null/undefined/空字符串与有值结果可区�
     assert.equal(classifyKernelData("  "), "empty");
     assert.equal(classifyKernelData({}), "value");
     assert.equal(classifyKernelData(["row"]), "value");
+});
+
+test("M-06 文档创建返回值：仅接受合法思源节点 ID，拒绝错误文本", () => {
+    const route = "/api/filetree/createDocWithMd";
+    assert.equal(decodeNodeId(route, "20261009000000-abc1234"), "20261009000000-abc1234");
+    assert.throws(() => decodeNodeId(route, "创建失败"), KernelProtocolError);
+    assert.throws(() => decodeNodeId(route, "true"), KernelProtocolError);
+    assert.throws(() => decodeNodeId(route, "20261009000000-ABC1234"), KernelProtocolError);
 });

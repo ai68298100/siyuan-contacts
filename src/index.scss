@@ -1705,6 +1705,20 @@
     small { margin-top: 2px; color: var(--lvct-text-3); font-size: var(--lvct-fs-caption); }
 }
 
+.lvct-settings__row--status {
+    align-items: flex-start;
+
+    > span {
+        flex: 0 0 auto;
+        padding: 3px 8px;
+        border: 1px solid color-mix(in srgb, var(--lvct-accent) 30%, var(--lvct-border-subtle));
+        border-radius: 999px;
+        color: var(--lvct-text-2);
+        background: color-mix(in srgb, var(--lvct-accent) 8%, var(--lvct-bg-surface));
+        white-space: nowrap;
+    }
+}
+
 .lvct-settings__identity-controls {
     display: inline-flex;
     align-items: center;
@@ -2234,6 +2248,83 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
+}
+
+/* 生日字段：先选历法，再展示对应的日期控件，避免把农历当成公历后的附加开关。 */
+.lvct-birthday-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.lvct-birthday-field__mode {
+    display: inline-flex;
+    align-self: flex-start;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-pill);
+    background: var(--lvct-bg-app);
+}
+
+.lvct-birthday-field__mode > .b3-button {
+    min-height: 28px;
+    padding: 2px 12px;
+    border-radius: var(--lvct-r-pill);
+    color: var(--lvct-text-2);
+    line-height: 1.2;
+}
+
+.lvct-birthday-field__mode > .b3-button:hover,
+.lvct-birthday-field__mode > .b3-button:focus-visible {
+    color: var(--lvct-text-1);
+}
+
+.lvct-birthday-field__mode > .lvct-birthday-field__mode-active {
+    background: var(--lvct-bg-surface);
+    color: var(--lvct-text-1);
+    box-shadow: var(--lvct-shadow-1);
+}
+
+.lvct-birthday-field__lunar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.lvct-birthday-field__lunar .b3-select {
+    min-width: 0;
+}
+
+.lvct-form__optional {
+    border-top: 1px solid var(--lvct-border-subtle);
+    padding-top: var(--lvct-sp-1);
+}
+
+.lvct-form__optional-toggle {
+    width: 100%;
+    justify-content: flex-start;
+    padding-inline: 2px;
+    color: var(--lvct-text-1);
+    font-weight: 600;
+}
+
+.lvct-form__optional-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-2);
+    margin-top: var(--lvct-sp-1);
+    padding: var(--lvct-sp-2);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-sm);
+    background: var(--lvct-surface-2);
+}
+
+.lvct-form__inline-action {
+    min-height: unset;
+    padding: 0 4px;
+    vertical-align: baseline;
 }
 
 /* FAST-01.1 粘贴并识别预览 */
@@ -3388,6 +3479,48 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     }
 }
 
+.lvct-detail__relationship-snapshot {
+    padding-bottom: var(--lvct-sp-1);
+}
+
+.lvct-detail__relationship-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--lvct-sp-2);
+    margin: var(--lvct-sp-2) 0 0;
+
+    > div {
+        min-width: 0;
+        padding: var(--lvct-sp-2);
+        border: 1px solid var(--lvct-border-subtle);
+        border-radius: var(--lvct-r-md);
+        background: var(--lvct-bg-app);
+    }
+
+    dt {
+        overflow: hidden;
+        color: var(--lvct-text-3);
+        font-size: var(--lvct-fs-caption);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    dd {
+        min-height: 1.5em;
+        margin: 4px 0 0;
+        overflow-wrap: anywhere;
+        color: var(--lvct-text-1);
+        font-size: var(--lvct-fs-body);
+        line-height: 1.4;
+    }
+}
+
+@media (max-width: 640px) {
+    .lvct-detail__relationship-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 .lvct-detail__person-note {
     gap: var(--lvct-sp-2);
 }
@@ -4267,6 +4400,56 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     background: var(--lvct-bg-surface);
 }
 
+.lvct-vcard__boundary {
+    padding: var(--lvct-sp-3);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-lg);
+    background: var(--lvct-bg-surface);
+}
+
+.lvct-vcard__preview-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--lvct-sp-1) var(--lvct-sp-3);
+    margin: var(--lvct-sp-2) 0;
+    padding: var(--lvct-sp-2) var(--lvct-sp-3);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-md);
+    background: var(--lvct-bg-app);
+    color: var(--lvct-text-2);
+    font-size: var(--lvct-fs-caption);
+
+    span { min-width: 0; }
+    &--warn { color: var(--lvct-danger); }
+}
+
+.lvct-vcard__boundary summary {
+    cursor: pointer;
+    color: var(--lvct-text-1);
+    font-weight: 600;
+}
+
+.lvct-vcard__boundary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--lvct-sp-2);
+    margin-top: var(--lvct-sp-2);
+}
+
+.lvct-vcard__boundary-grid > div {
+    padding: var(--lvct-sp-2);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-sm);
+    background: var(--lvct-bg-app);
+}
+
+.lvct-vcard__boundary-grid p {
+    margin: 4px 0 0;
+    color: var(--lvct-text-2);
+    font-size: var(--lvct-fs-caption);
+    line-height: 1.55;
+}
+
 .lvct-vcard__section-title {
     color: var(--lvct-text-1);
     font-size: var(--lvct-fs-caption);
@@ -4294,6 +4477,10 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 }
 
 @media (max-width: 640px) {
+    .lvct-vcard__boundary-grid {
+        grid-template-columns: 1fr;
+    }
+
     .lvct-vcard > .lvct-people__toolbar {
         align-items: stretch;
         flex-direction: column;
@@ -5097,6 +5284,55 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 
     .b3-select { max-width: 180px; }
     .b3-text-field { max-width: 130px; }
+}
+
+/* 组织资料编辑器：新建/编辑共享的清晰分区，移动端单列。 */
+.lvct-org-profile-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-3);
+    max-height: min(78vh, 900px);
+    overflow: auto;
+    padding: var(--lvct-sp-1);
+
+    &__intro, &__section-head, &__footer, &__logo-row, &__repeat-row { display: flex; gap: var(--lvct-sp-2); align-items: center; }
+    &__intro { justify-content: space-between; align-items: flex-start; padding-bottom: var(--lvct-sp-2); border-bottom: 1px solid var(--lvct-border-subtle); }
+    &__intro h3 { margin: 2px 0 4px; }
+    &__eyebrow { margin: 0; color: var(--lvct-accent); font-size: var(--lvct-fs-caption); font-weight: 600; }
+    &__section { display: flex; flex-direction: column; gap: var(--lvct-sp-2); padding: var(--lvct-sp-3); border: 1px solid var(--lvct-border-subtle); border-radius: var(--lvct-r-md); background: var(--lvct-bg-surface); }
+    &__section-head { justify-content: space-between; align-items: flex-start; }
+    &__section-head h4 { margin: 0 0 2px; }
+    &__required { color: var(--lvct-danger); font-size: var(--lvct-fs-caption); }
+    &__form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--lvct-sp-2); }
+    &__field { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: var(--lvct-fs-caption); }
+    &__field--wide { grid-column: 1 / -1; }
+    &__field small { color: var(--lvct-text-3); }
+    &__preset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--lvct-sp-2); }
+    &__preset { display: flex; align-items: center; gap: var(--lvct-sp-2); min-height: 58px; padding: var(--lvct-sp-2); text-align: left; border: 1px solid var(--lvct-border-subtle); border-radius: var(--lvct-r-sm); background: var(--lvct-bg-surface); cursor: pointer; }
+    &__preset:hover, &__preset:focus-visible, &__preset--active { border-color: var(--lvct-accent); background: var(--lvct-accent-soft); }
+    &__preset-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex: 0 0 28px; border-radius: 50%; background: var(--lvct-accent-soft); color: var(--lvct-accent); font-weight: 600; }
+    &__preset span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    &__preset small { color: var(--lvct-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    &__logo-row { align-items: flex-start; }
+    &__logo-preview { display: flex; align-items: center; justify-content: center; width: 72px; height: 72px; flex: 0 0 72px; overflow: hidden; border: 1px solid var(--lvct-border-subtle); border-radius: var(--lvct-r-md); background: var(--lvct-accent-soft); color: var(--lvct-accent); font-size: 22px; font-weight: 700; }
+    &__logo-preview img { width: 100%; height: 100%; object-fit: cover; }
+    &__logo-actions { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: var(--lvct-sp-2); }
+    &__logo-actions .lvct-org-profile-editor__field { flex: 1 1 240px; }
+    &__file { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    &__repeat-list { display: flex; flex-direction: column; gap: var(--lvct-sp-2); }
+    &__repeat-row { align-items: center; }
+    &__repeat-row .b3-text-field, &__repeat-row .b3-select { flex: 1 1 0; min-width: 0; }
+    &__index { width: 20px; color: var(--lvct-text-3); text-align: center; }
+    &__empty { margin: 0; color: var(--lvct-text-3); font-size: var(--lvct-fs-caption); }
+    &__footer { align-items: center; padding-top: var(--lvct-sp-1); }
+}
+
+@media (max-width: 640px) {
+    .lvct-org-profile-editor__form-grid { grid-template-columns: 1fr; }
+    .lvct-org-profile-editor__field--wide { grid-column: auto; }
+    .lvct-org-profile-editor__logo-row, .lvct-org-profile-editor__repeat-row { align-items: stretch; flex-direction: column; }
+    .lvct-org-profile-editor__logo-preview { align-self: flex-start; }
+    .lvct-org-profile-editor__footer { align-items: stretch; flex-wrap: wrap; }
 }
 
 /* B13.4 成员行内编辑表单 */

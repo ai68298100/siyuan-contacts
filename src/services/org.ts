@@ -28,6 +28,9 @@ import type { CommonOrgBackground } from "../domain/org-membership";
 import type { ContactsSettings } from "../domain/model";
 import { getRoster } from "./roster";
 import { listOrganizationMarkerPage, readOrganizationDocuments } from "../api/organization";
+import { loadOrganizationProfile, loadOrganizationProfiles, saveOrganizationProfile } from "../data/organization-profiles";
+import { organizationTemplateDraft } from "../domain/organization-profile";
+import type { OrganizationProfileDraft } from "../domain/organization-profile";
 
 export const ORG_SECTION_ATTR = "custom-lvct-org";
 /** B13 归档语义：标记区块值 custom-lvct-org="archived" 表示组织已归档（文档与成员记录保留） */
@@ -160,6 +163,7 @@ export async function membershipsByPerson(
 
 export interface OrganizationWithMembers extends OrganizationSummary {
     memberships: OrgMembership[];
+    profile?: OrganizationProfileDraft;
 }
 
 export interface OrganizationPage {
@@ -290,11 +294,12 @@ export async function listPersonOrgMemberships(
 export async function listOrganizationsWithMembers(
     plugin: Plugin,
 ): Promise<OrganizationWithMembers[]> {
-    const [orgs, byOrg] = await Promise.all([
+    const [orgs, byOrg, profiles] = await Promise.all([
         scanOrganizations(),
         membershipsByOrganization(plugin),
+        loadOrganizationProfiles(plugin),
     ]);
-    return orgs.map((org) => ({ ...org, memberships: byOrg.get(org.docId) ?? [] }));
+    return orgs.map((org) => ({ ...org, memberships: byOrg.get(org.docId) ?? [], profile: profiles[org.docId] }));
 }
 
 /** B13.5c：组织标记按根文档游标渐进读取；重复标记由域层拒绝完整结论。 */
@@ -306,9 +311,9 @@ export async function listOrganizationsPage(
     const states = organizationMarkerStates(markerPage.rows);
     const docs = await readOrganizationDocuments([...states.keys()]);
     const organizations = organizationsFromDocs(states, docs);
-    const byOrg = await membershipsByOrganization(plugin);
+    const [byOrg, profiles] = await Promise.all([membershipsByOrganization(plugin), loadOrganizationProfiles(plugin)]);
     return {
-        organizations: organizations.map((org) => ({ ...org, memberships: byOrg.get(org.docId) ?? [] })),
+        organizations: organizations.map((org) => ({ ...org, memberships: byOrg.get(org.docId) ?? [], profile: profiles[org.docId] })),
         hasMore: markerPage.hasMore,
         nextRootId: markerPage.nextRootId,
     };
@@ -319,12 +324,39 @@ export async function createOrganization(
     settings: ContactsSettings,
     name: string,
     plugin?: Plugin,
-): Promise<{ docId: string }> {
+    profile?: OrganizationProfileDraft,
+): Promise<{ docId: string; profileSaved?: boolean; profileError?: string }> {
     const titleError = validateDocumentTitle(name);
     if (titleError) throw new Error(titleError);
     const result = await startOrganizationCreate(plugin ?? plugin0(), settings, name);
     if (result.status !== "complete") throw new Error(`${result.message}（请求 ${result.operation.requestId}）`);
-    return { docId: result.docId };
+    if (!profile) return { docId: result.docId };
+    try {
+        await saveOrganizationProfile(plugin ?? plugin0(), result.docId, { ...profile, name });
+        return { docId: result.docId, profileSaved: true };
+    } catch (error) {
+        return { docId: result.docId, profileSaved: false, profileError: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+export async function getOrganizationProfile(plugin: Plugin, docId: string): Promise<OrganizationProfileDraft | null> {
+    return loadOrganizationProfile(plugin, docId);
+}
+
+export async function updateOrganizationProfile(plugin: Plugin, docId: string, profile: OrganizationProfileDraft): Promise<OrganizationProfileDraft> {
+    const organization = (await scanOrganizations()).find((item) => item.docId === docId);
+    if (!organization) throw new Error("组织不存在，资料未保存");
+    if (organization.name.trim() !== profile.name.trim()) throw new Error("组织名称已变化，请先完成组织改名后再保存资料");
+    return saveOrganizationProfile(plugin, docId, profile);
+}
+
+/** 初始化时保证内置“家庭”组织存在；重复运行只读检查，不会重复建档。 */
+export async function ensureDefaultFamilyOrganization(plugin: Plugin, settings: ContactsSettings): Promise<{ docId: string; created: boolean }> {
+    const existing = (await scanOrganizations()).find((org) => org.name.trim() === "家庭");
+    if (existing) return { docId: existing.docId, created: false };
+    const profile = organizationTemplateDraft("family");
+    const created = await createOrganization(settings, profile.name, plugin, profile);
+    return { docId: created.docId, created: true };
 }
 
 /** 归档组织（B13）：标记区块值写为 archived——活跃分组不再列出，文档与成员记录保留可恢复。

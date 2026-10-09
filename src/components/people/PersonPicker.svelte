@@ -96,6 +96,17 @@
         return attachPopover(panel, wrap, () => (open = false));
     });
 
+    // 浮层由全局 Escape 监听关闭时，把焦点还给触发按钮，避免键盘用户落到页面随机位置。
+    $effect(() => {
+        if (!open) return;
+        const onEscape = (event: KeyboardEvent) => {
+            if (event.key !== "Escape") return;
+            void tick().then(() => triggerEl?.focus());
+        };
+        window.addEventListener("keydown", onEscape);
+        return () => window.removeEventListener("keydown", onEscape);
+    });
+
     export function openPicker(): void {
         if (!disabled) void show();
     }
@@ -179,7 +190,7 @@
             {#if aliasLoading}
                 <p class="lvct-picker__status" role="status">{text("pickerAliasLoading", "正在读取别名…")}</p>
             {/if}
-            {#if filtered.length === 0}
+            {#if filtered.length === 0 && !aliasLoading}
                 <div class="lvct-picker__empty" role="status">{emptyText}</div>
             {/if}
             <ul class="lvct-picker__list" id={listboxId} role="listbox" bind:this={listEl}>

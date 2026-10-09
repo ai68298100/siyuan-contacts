@@ -7,7 +7,7 @@
     import StatusNotice from "./StatusNotice.svelte";
     import { SlidersHorizontal, Database, Bell, Sparkles, Plug, Info } from "@lucide/svelte";
     import { translateText } from "../domain/translation";
-    import { DEFAULT_VIEW_PREFERENCES, normalizeViewPreferences } from "../domain/preferences";
+    import { DEFAULT_VIEW_PREFERENCES, isValidPreferenceDays, normalizeViewPreferences } from "../domain/preferences";
     import { rebasePreferenceDraft } from "../domain/preferences-concurrency";
     import { savePreferenceChanges } from "../services/preferences";
     import { onDestroy, untrack, tick } from "svelte";
@@ -203,28 +203,43 @@
     let dismissalsLoading = $state(false);
     let dismissalsBusy = $state(false);
     let dismissalsError = $state("");
+    let dismissalsRequest = 0;
+    onDestroy(() => { dismissalsRequest += 1; });
     async function loadDismissedReminders(): Promise<void> {
-        if (dismissalsLoading) return;
+        if (dismissalsLoading || dismissalsBusy) return;
+        const request = ++dismissalsRequest;
         dismissalsLoading = true;
         dismissalsError = "";
         try {
-            dismissedReminders = await facade.loadReminderDismissals();
+            const result = await facade.loadReminderDismissals();
+            if (!selfAlive || request !== dismissalsRequest) return;
+            dismissedReminders = result;
         } catch (error) {
-            dismissalsError = error instanceof Error ? error.message : String(error);
+            if (selfAlive && request === dismissalsRequest) dismissalsError = error instanceof Error ? error.message : String(error);
         } finally {
-            dismissalsLoading = false;
+            // A resume action can supersede this read so its stale result is
+            // ignored, but the read's own loading indicator must still end.
+            if (selfAlive) dismissalsLoading = false;
         }
     }
     async function resumeOne(personDocId: string, kind: "birthday" | "stale"): Promise<void> {
-        if (dismissalsBusy) return;
+        if (dismissalsBusy || dismissalsLoading) return;
+        const request = ++dismissalsRequest;
         dismissalsBusy = true;
+        dismissalsError = "";
         try {
             await facade.resumeReminder(personDocId, kind);
-            dismissedReminders = await facade.loadReminderDismissals();
+            const result = await facade.loadReminderDismissals();
+            if (!selfAlive || request !== dismissalsRequest) return;
+            dismissedReminders = result;
         } catch (error) {
-            dismissalsError = error instanceof Error ? error.message : String(error);
+            if (selfAlive && request === dismissalsRequest) dismissalsError = error instanceof Error ? error.message : String(error);
         } finally {
-            dismissalsBusy = false;
+            // A concurrent refresh may advance dismissalsRequest while this
+            // write is in flight. The busy guard still belongs to this
+            // component operation and must be released on every live exit;
+            // otherwise the restore buttons can remain disabled forever.
+            if (selfAlive) dismissalsBusy = false;
         }
     }
     let rebuilding = $state(false);
@@ -296,6 +311,7 @@
     let fuFileInput = $state<HTMLInputElement>();
     let importPreview: InteractionImportSummary | null = $state(null);
     let importDiff: InteractionImportDiff | null = $state(null);
+    let importDiffError = $state("");
     let importDiffOpen = $state(false);
     let importText = "";
     let importRequest = 0;
@@ -426,6 +442,17 @@
 
     async function savePreferences() {
         if (savingPreferences) return;
+        const invalidDays = [
+            [draft.birthdayWindowDays, "生日提醒窗口"],
+            [draft.staleThresholdDays, "久未联系阈值"],
+            [draft.reminderGraceDays, "收编宽限期"],
+        ] as const;
+        const invalid = invalidDays.find(([value]) => !isValidPreferenceDays(value));
+        if (invalid) {
+            errorText = `${invalid[1]}必须是 0–365 的整数`;
+            preferencesMessage = "";
+            return;
+        }
         const request = ++preferencesRequest;
         const submitted = normalizeViewPreferences(draft);
         const baseline = normalizeViewPreferences(savedDraft);
@@ -722,12 +749,27 @@
         }
     }
 
+    async function loadInteractionDiff(request = importRequest): Promise<void> {
+        if (!importText) return;
+        importDiffError = "";
+        try {
+            const diff = await facade.previewInteractionImportDiff(importText);
+            if (request !== importRequest) return;
+            importDiff = diff;
+        } catch (error) {
+            if (request !== importRequest) return;
+            importDiff = null;
+            importDiffError = error instanceof Error ? error.message : String(error);
+        }
+    }
+
     async function selectInteractionBackup(event: Event) {
         if (importingInteractions) return;
         const request = ++importRequest;
         const file = (event.currentTarget as HTMLInputElement).files?.[0];
         importPreview = null;
         importText = "";
+        importDiffError = "";
         importMessage = "";
         errorText = "";
         previewingImport = Boolean(file);
@@ -739,11 +781,7 @@
             if (request !== importRequest) return;
             importText = text;
             importPreview = preview;
-            try {
-                importDiff = await facade.previewInteractionImportDiff(text);
-            } catch {
-                importDiff = null; // 明细为辅助信息，失败不影响合并
-            }
+            await loadInteractionDiff(request);
         } catch (error) {
             if (request === importRequest) errorText = error instanceof Error ? error.message : String(error);
         } finally {
@@ -762,6 +800,7 @@
             importMessage = `合并完成：新增 ${result.added} 条，跳过 ${result.skipped} 条，移除 ${result.removed} 条，新增删除标记 ${result.tombstonesAdded} 条`;
             importPreview = null;
             importDiff = null;
+            importDiffError = "";
             importDiffOpen = false;
             importText = "";
             if (importFileInput) importFileInput.value = "";
@@ -928,6 +967,23 @@
                                 <option value="table">表格</option>
                             </select>
                         </label>
+                        <label class="lvct-form__item">
+                            <span>图谱默认数据源</span>
+                            <select class="b3-select fn__block" bind:value={draft.graphMode}>
+                                <option value="relations">关系图（联系人关系）</option>
+                                <option value="native">文档引用图（思源引用）</option>
+                            </select>
+                            <small>进入关系图谱时使用；页面内仍可临时切换。</small>
+                        </label>
+                        <label class="lvct-form__item">
+                            <span>文档引用图默认范围</span>
+                            <select class="b3-select fn__block" bind:value={draft.nativeScope}>
+                                <option value="self">以本人为中心</option>
+                                <option value="person">以联系人为中心</option>
+                                <option value="global">全部登记文档</option>
+                            </select>
+                            <small>仅在图谱数据源为“文档引用图”时生效；中心联系人可在图谱页选择。</small>
+                        </label>
                     </div>
 
                     <div class="lvct-settings__row">
@@ -1074,6 +1130,13 @@
                             {exportingRoster ? "导出中…" : "导出 .vcf"}
                         </button>
                     </div>
+                    <div class="lvct-settings__row lvct-settings__row--status" role="status" aria-label="在线通讯录同步状态">
+                        <div>
+                            <b>在线通讯录同步</b>
+                            <small>CardDAV 尚未接入；当前通过 .vcf 文件交换。后续同步会单独选择地址簿、方向、字段和冲突策略。</small>
+                        </div>
+                        <span class="ft__smaller ft__on-surface">未接入</span>
+                    </div>
                     {#if exportSummary && exportSummary.peopleCount === 0}
                         <p class="lvct-settings__inline-hint">名册为空：先在联系人页新建或收编联系人，再来导出。</p>
                     {/if}
@@ -1159,7 +1222,12 @@
                     {#if previewingImport}<p class="lvct-settings__inline-hint" role="status">正在检查备份…</p>{/if}
                     {#if importPreview}
                         <p class="lvct-settings__inline-hint">预计新增 {importPreview.added} 条，跳过 {importPreview.skipped} 条，移除 {importPreview.removed} 条，新增删除标记 {importPreview.tombstonesAdded} 条</p>
-                        {#if importDiff}
+                        {#if importDiffError}
+                            <div class="lvct-form__error" role="alert">
+                                差异明细读取失败：{importDiffError}
+                                <button type="button" class="b3-button b3-button--outline" disabled={previewingImport || importingInteractions} onclick={() => void loadInteractionDiff(importRequest)}>重试差异明细</button>
+                            </div>
+                        {:else if importDiff}
                             <button class="b3-button b3-button--text" aria-expanded={importDiffOpen} onclick={() => (importDiffOpen = !importDiffOpen)}>
                                 {importDiffOpen ? "收起差异明细" : "查看差异明细"}
                             </button>
@@ -1307,7 +1375,7 @@
                     <!-- B08：已暂缓的提醒（reminder-dismissals）一键恢复，避免"点过就找不回" -->
                     <div class="lvct-settings__sub-heading">
                         <b>已暂缓的提醒</b>
-                        <button class="b3-button b3-button--outline" onclick={loadDismissedReminders} disabled={dismissalsLoading}>
+                        <button class="b3-button b3-button--outline" onclick={loadDismissedReminders} disabled={dismissalsLoading || dismissalsBusy}>
                             {dismissalsLoading ? "读取中…" : "刷新列表"}
                         </button>
                     </div>
@@ -1326,7 +1394,7 @@
                                         <button
                                             type="button"
                                             class="b3-button b3-button--outline"
-                                            disabled={dismissalsBusy}
+                                            disabled={dismissalsBusy || dismissalsLoading}
                                             onclick={() => resumeOne(entry.personDocId, entry.kind)}
                                         >恢复提醒</button>
                                     </li>
@@ -1340,15 +1408,17 @@
                     <div class="lvct-settings__form-grid">
                         <label class="lvct-form__item">
                             <span>生日提醒窗口（天）</span>
-                            <input class="b3-text-field fn__block" type="number" min="0" max="365" bind:value={draft.birthdayWindowDays} />
+                            <input class="b3-text-field fn__block" type="number" min="0" max="365" step="1" bind:value={draft.birthdayWindowDays} />
+                            <small>请输入 0–365 的整数</small>
                         </label>
                         <label class="lvct-form__item">
                             <span>久未联系阈值（天）</span>
-                            <input class="b3-text-field fn__block" type="number" min="0" max="365" bind:value={draft.staleThresholdDays} />
+                            <input class="b3-text-field fn__block" type="number" min="0" max="365" step="1" bind:value={draft.staleThresholdDays} />
+                            <small>请输入 0–365 的整数</small>
                         </label>
                         <label class="lvct-form__item">
                             <span>收编宽限期（天）</span>
-                            <input class="b3-text-field fn__block" type="number" min="0" max="365" bind:value={draft.reminderGraceDays} />
+                            <input class="b3-text-field fn__block" type="number" min="0" max="365" step="1" bind:value={draft.reminderGraceDays} />
                             <small>新收编的联系人在此期限内不计入「从未互动」提醒；0 为关闭（C02）</small>
                         </label>
                     </div>

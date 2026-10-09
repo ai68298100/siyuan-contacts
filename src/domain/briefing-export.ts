@@ -5,7 +5,7 @@
  * 交往次数只陈述事实（「同场 N 次」），不表述关系亲疏。
  * 纯函数：无 DOM、无 IO，node --test 直接可测。
  */
-import { nextBirthday } from "./occasions.ts";
+import { formatBirthdayDisplay, nextBirthday } from "./occasions.ts";
 import type { ContactSummary } from "./person.ts";
 import { escapeMarkdown } from "./format.ts";
 import { profileText } from "./people-profiles.ts";
@@ -97,7 +97,7 @@ export function buildBriefingMarkdown(input: BriefingExportInput): string {
         const lunar = person.isLunar ? " · 农历" : "";
         lines.push("");
         lines.push("## 重要日期");
-        lines.push(`- 生日：${birthday.date.toLocaleDateString("zh-CN")}（${birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}）${lunar}`);
+        lines.push(`- 生日：${formatBirthdayDisplay(person.birthday, person.isLunar)}${lunar}；下次为 ${birthday.date.toLocaleDateString("zh-CN")}（${birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}）`);
     }
 
     // 相关人物

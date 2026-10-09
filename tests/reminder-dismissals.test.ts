@@ -16,6 +16,7 @@ test("normalizeDismissalStore：丢弃非法条目、去重保留最后、坏包
             d("bad-id", "stale", ""),
             d("20260927000000-bbbbbbb", "weekly", ""),
             d("20260927000000-ccccccc", "stale", "not-a-date"),
+            d("20260927000000-ddddddd", "stale", "2026-02-30"),
             d("20260927000000-aaaaaaa", "birthday", ""),
         ],
     });

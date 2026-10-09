@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { nextBirthday, bucketOf, upcomingBirthdays } from "../src/domain/occasions.ts";
+import { formatBirthdayDisplay, nextBirthday, bucketOf, upcomingBirthdays } from "../src/domain/occasions.ts";
 import { lunarToSolar, solarToLunar } from "../src/domain/lunar.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
 
@@ -60,6 +60,13 @@ test("农历生日：输入月日直接按农历解读，不再先按公历换�
     assert.ok(expected);
     assert.equal(projection.date.getTime(), expected.getTime());
     assert.ok(projection.daysUntil >= 0);
+});
+
+test("生日显示：农历使用农历月日，公历明确标注口径", () => {
+    assert.equal(formatBirthdayDisplay("1990-01-01", true), "正月初一（农历，出生年 1990）");
+    assert.equal(formatBirthdayDisplay("1990-02-03", false), "1990-02-03（公历）");
+    assert.equal(formatBirthdayDisplay("1990-02-30", true), "1990-02-30（农历，日期待核实）");
+    assert.equal(formatBirthdayDisplay("invalid", true), "invalid");
 });
 
 test("upcomingBirthdays：混合公历与农历按各自下一次公历发生日排序", () => {

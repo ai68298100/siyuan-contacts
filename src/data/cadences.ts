@@ -3,9 +3,9 @@
  * 键：person-cadences.json（契约见 docs/DATA-CONTRACT.md §3）。
  */
 import type { Plugin } from "siyuan";
-import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage";
-import { isPersonDocId, normalizeCadenceMap, normalizeCadenceMapForWrite } from "../domain/cadence";
-import type { PersonCadence } from "../domain/cadence";
+import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage.ts";
+import { isPersonDocId, normalizeCadenceMap, normalizeCadenceMapForWrite } from "../domain/cadence.ts";
+import type { PersonCadence } from "../domain/cadence.ts";
 
 export const CADENCE_STORAGE_KEY = "person-cadences.json";
 
@@ -19,9 +19,14 @@ export async function loadCadenceMapStrict(plugin: Plugin): Promise<Record<strin
     return normalizeCadenceMap(await loadJsonStrict(plugin, CADENCE_STORAGE_KEY));
 }
 
-/** 读某人的覆盖项；未登记返回 null（跟随全局） */
+/**
+ * 读某人的覆盖项；未登记返回 null（跟随全局）。
+ *
+ * 详情页需要把“读取失败”与“没有覆盖项”区分开，否则磁盘故障会被
+ * 容错读伪装成“跟随全局”，并让页面的重试反馈永远无法触发。
+ */
 export async function loadPersonCadence(plugin: Plugin, docId: string): Promise<PersonCadence | null> {
-    const map = await loadCadenceMap(plugin);
+    const map = await loadCadenceMapStrict(plugin);
     return map[docId] ?? null;
 }
 

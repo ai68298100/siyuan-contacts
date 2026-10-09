@@ -6,6 +6,7 @@ import type { AvRow, AvValue } from "../api/av";
 import type { FieldKey } from "./fields";
 import { validateDocumentTitle } from "./format.ts";
 import type { PersonProfile } from "./people-profiles.ts";
+import { lunarToSolar } from "./lunar.ts";
 
 /** 新建联系人表单草稿 */
 export interface ContactDraft {
@@ -37,8 +38,14 @@ export function validateDraft(draft: ContactDraft): string[] {
     const birthday = draft.birthday.trim();
     if (birthday && !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) {
         errors.push("生日日期格式不正确");
-    } else if (birthday && birthdayToMs(birthday) === null) {
-        errors.push("生日不是有效日期");
+    } else if (birthday) {
+        const [year, month, day] = birthday.split("-").map(Number);
+        if (draft.isLunar) {
+            if (!lunarToSolar(year, month, day)) errors.push("农历生日不是有效日期");
+            else if (birthdayToMs(birthday) === null) errors.push("农历生日日期暂不支持，请重新选择");
+        } else if (birthdayToMs(birthday) === null) {
+            errors.push("生日不是有效日期");
+        }
     }
     return errors;
 }

@@ -19,6 +19,13 @@ test("日期范围：闭区间端点、跨年区间、非法端点视为不限�
     assert.equal(inDateRange("2027-01-04", "2026-12-28", "2027-01-03"), false, "上界之外应排除");
     assert.equal(inDateRange("2020-01-01", "", "2026-06-30"), true, "空 from 不限制");
     assert.equal(inDateRange("2030-01-01", "bogus", ""), true, "非法 from 视为不限制");
+    assert.equal(inDateRange("2026-02-31", "", ""), false, "不存在的互动日期不应被范围放行");
+});
+
+test("非法日期不会生成月份或历史今天投影", () => {
+    const groups = groupByMonth([entry("2026-02-31", "坏日期"), entry("2026-09-28", "正常")]);
+    assert.deepEqual(groups.map((group) => group.month), ["2026-09"]);
+    assert.deepEqual(onThisDay([entry("2025-09-28", "正常"), entry("2025-02-31", "坏日期")], "2026-09-28").map((item) => item.note), ["正常"]);
 });
 
 test("按月分组：组序沿用输入（倒序），跨年分组，空月份不生成，计数正确", () => {

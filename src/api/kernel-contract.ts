@@ -123,3 +123,14 @@ export function assertKernelRecord(route: string, value: unknown): Record<string
     }
     return value;
 }
+
+/**
+ * 解码内核返回的文档/块 ID。
+ * createDocWithMd 的返回值会被多个服务写入事实关系，不能把错误文本当作 ID 持久化。
+ */
+export function decodeNodeId(route: string, value: unknown): string {
+    if (typeof value !== "string" || !/^\d{14}-[0-9a-z]{7}$/.test(value)) {
+        throw new KernelProtocolError(route, `${route} 返回异常形状（非法节点 ID）`);
+    }
+    return value;
+}

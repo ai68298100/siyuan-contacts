@@ -67,8 +67,10 @@ async function syncAfterIdChange(plugin: Plugin, id: string): Promise<void> {
     try {
         store = await loadFollowUpStoreStrict(plugin);
     } catch (error) {
-        console.warn("[lvct] 跟进库读取失败，本次文档任务同步已跳过", error);
-        return;
+        // 状态/日期已经写入插件库，但无法回读人物文档归属。静默跳过会让
+        // 用户误以为文档任务块也已同步，下一次打开详情前不会得到补救提示。
+        // 将其作为“已保存但同步未核实”上浮，由界面提供明确的重试/重新打开入口。
+        throw new Error("跟进已保存，但无法读取跟进库以核实文档任务同步；请重新打开该人物详情重试。", { cause: error });
     }
     const item = store.items.find((entry) => entry.id === id);
     if (!item) return;

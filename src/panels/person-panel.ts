@@ -12,7 +12,7 @@ import { lastInteractionByPerson } from "../domain/interactions";
 import { buildMeetingBriefing } from "../domain/briefing";
 import type { MeetingBriefingItem } from "../domain/briefing";
 import { getOrgDisplayForDoc } from "../services/org";
-import { nextBirthday } from "../domain/occasions";
+import { formatBirthdayDisplay, nextBirthday } from "../domain/occasions";
 import { svelteDialog } from "../libs/dialog";
 import { requestPersonNavigation, subscribeDataChanged } from "../libs/data-events";
 import PersonEditDialog from "../components/people/PersonEditDialog.svelte";
@@ -207,7 +207,7 @@ function buildStrip(
     if (person.phone) chipData.push(`📞 ${person.phone}`);
     if (person.wechat) chipData.push(`💬 ${person.wechat}`);
     if (person.email) chipData.push(`✉️ ${person.email}`);
-    if (person.birthday) chipData.push(`🎂 ${person.birthday}${person.isLunar ? t(context, "stripLunarSuffix", "（农历）") : ""}`);
+    if (person.birthday) chipData.push(`🎂 ${formatBirthdayDisplay(person.birthday, person.isLunar)}`);
     for (const tag of person.tags) chipData.push(`#${tag}`);
     if (chipData.length === 0) {
         const empty = document.createElement("span");

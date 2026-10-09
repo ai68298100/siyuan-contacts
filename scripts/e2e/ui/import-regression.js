@@ -250,4 +250,5 @@ export async function runImportRegression({ test, assert, kernel, settings, fixt
             assert(applied.birthday === "1990-01-01" && applied.isLunar === false, "公历日期沿用旧农历标记");
         } finally { await unmount(component); }
     });
+
 }

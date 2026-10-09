@@ -21,7 +21,8 @@ export interface ReminderDismissalStore {
 
 export const REMINDER_DISMISSALS_STORE_VERSION = 1;
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+import { isValidDateKey } from "./date-key.ts";
+
 /** 人物文档 ID（与 SQL 安全面同一校验，对齐 cadence） */
 const DOC_ID_RE = /^\d{14}-[0-9a-z]{7}$/;
 
@@ -45,7 +46,7 @@ export function normalizeDismissalStore(raw: unknown): ReminderDismissalStore {
         const candidate = entry as Record<string, unknown>;
         if (typeof candidate.personDocId !== "string" || !DOC_ID_RE.test(candidate.personDocId)) continue;
         if (!isValidKind(candidate.kind)) continue;
-        if (typeof candidate.until !== "string" || (candidate.until !== "" && !DATE_RE.test(candidate.until))) continue;
+        if (typeof candidate.until !== "string" || (candidate.until !== "" && !isValidDateKey(candidate.until))) continue;
         byKey.set(`${candidate.personDocId}|${candidate.kind}`, {
             personDocId: candidate.personDocId,
             kind: candidate.kind,

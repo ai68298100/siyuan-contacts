@@ -12,6 +12,7 @@
  */
 import type { ContactSummary } from "./person.ts";
 import type { InteractionEvent } from "./interactions.ts";
+import { isValidDateKey } from "./date-key.ts";
 
 export interface ReviewRange {
     from: string;
@@ -49,7 +50,7 @@ export interface ReviewReport {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function isValidDate(value: string): boolean {
-    return DATE_RE.test(value);
+    return DATE_RE.test(value) && isValidDateKey(value);
 }
 
 function addDays(dateKey: string, days: number): string {
@@ -67,6 +68,7 @@ function daysBetween(from: string, to: string): number {
 
 /** 上一同长度区间（紧邻，不重叠） */
 export function previousRange(range: ReviewRange): ReviewRange {
+    if (!isValidDate(range.from) || !isValidDate(range.to) || range.from > range.to) return { from: "", to: "" };
     const length = Math.max(0, daysBetween(range.from, range.to)) + 1;
     const from = addDays(range.from, -length);
     return { from, to: addDays(range.to, -length) };
@@ -93,7 +95,7 @@ export function buildReviewReport(params: {
     const from = isValidDate(range.from) ? range.from : "";
     const to = isValidDate(range.to) ? range.to : "";
     const inRange = (event: InteractionEvent) =>
-        (!from || event.localDate >= from) && (!to || event.localDate <= to);
+        isValidDate(event.localDate) && (!from || event.localDate >= from) && (!to || event.localDate <= to);
 
     const nameByDoc = new Map(roster.map((person) => [person.docId, person.name]));
     const groupSizeByActivity = new Map<string, Set<string>>();
@@ -142,7 +144,7 @@ export function buildReviewReport(params: {
     const total = entries.length;
     const previous = previousRange({ from: from || to, to: to || from });
     const previousTotal = events.filter((event) =>
-        (!previous.from || event.localDate >= previous.from) && (!previous.to || event.localDate <= previous.to)).length;
+        isValidDate(event.localDate) && (!previous.from || event.localDate >= previous.from) && (!previous.to || event.localDate <= previous.to)).length;
 
     return {
         range: { from, to },

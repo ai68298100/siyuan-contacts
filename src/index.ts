@@ -12,6 +12,7 @@ import CaptureDialog from "./components/capture/CaptureDialog.svelte";
 import OrgManagerDialog from "./components/org/OrgManagerDialog.svelte";
 import QuickFillDialog from "./components/people/QuickFillDialog.svelte";
 import AddPersonDialog from "./components/people/AddPersonDialog.svelte";
+import type { ContactExtendedDraft } from "./domain/contact-create";
 import PersonEditDialog from "./components/people/PersonEditDialog.svelte";
 import { parseContactText } from "./domain/quick-fill";
 import { invalidateRoster } from "./services/roster";
@@ -50,6 +51,9 @@ import {
     removeOrgLinkBlocks,
     listPersonOrgMemberships,
     listCommonOrgBackground,
+    getOrganizationProfile,
+    updateOrganizationProfile,
+    ensureDefaultFamilyOrganization,
 } from "./services/org";
 import { exportMigrationBundle, importMigrationBundle, previewMigrationImport } from "./services/migration-bundle";
 import { previewOrganizationProjections, repairOrganizationProjection } from "./services/org-projections";
@@ -231,6 +235,13 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         if (!this.isLifecycleActive(lifecycleToken) || !this.preferencesActive || preferencesEpoch !== this.preferencesEpoch) return;
         this.settings = settings;
         emitWorkspaceState(this.workspaceState);
+        if (settings && this.workspaceState.kind === "ready") {
+            void ensureDefaultFamilyOrganization(this, settings).then((result) => {
+                if (result.created && this.isLifecycleActive(lifecycleToken)) emitDataChanged({ topics: ["organizations"] }, lifecycleToken);
+            }).catch((error) => {
+                console.warn("[lvct] 默认组织“家庭”初始化待续做", error);
+            });
+        }
         try {
             await this.loadViewPreferences();
         } catch (error) {
@@ -480,7 +491,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         }
         const person = resolution.status === "bound" ? resolution.person : null;
         const existing = person
-            ? { name: person.name, phone: person.phone, email: person.email, wechat: person.wechat, website: person.website, birthday: person.birthday, group: person.group, tags: person.tags }
+            ? { name: person.name, phone: person.phone, email: person.email, wechat: person.wechat, website: person.website, birthday: person.birthday, isLunar: person.isLunar, group: person.group, tags: person.tags }
             : { name: "", phone: "", email: "", wechat: "", website: "", birthday: "", group: "", tags: [] as string[] };
         const container = document.createElement("div");
         container.className = "lvct-dialog-root";
@@ -519,7 +530,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         if (!this.isLifecycleActive()) return;
         const dialogToken = createLifecycleToken(this.lifecycleToken);
         const props = { ...args.props };
-        for (const name of ["onSaved", "onCreated", "onChanged"]) {
+        for (const name of ["onSaved", "onCreated", "onChanged", "onSaveExtended"]) {
             const callback = props[name];
             if (typeof callback === "function") {
                 props[name] = (...values: unknown[]) => {
@@ -570,6 +581,31 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
                 settings: this.settings,
                 i18n: this.i18n,
                 person: merged,
+                onLoadRelationshipLabels: (docId: string) => this.loadPersonRelationshipLabels(docId),
+                onSaveRelationshipLabels: (docId: string, selfDocId: string, labels: string[], expected: import("./domain/person-relationship-labels").PersonRelationshipLabels | null) =>
+                    this.savePersonRelationshipLabels(docId, selfDocId, labels, expected),
+                onLoadOrgMemberships: (docId: string) => this.listPersonOrgMemberships(docId),
+                onLoadOrgCandidates: async () => (await this.listOrganizations()).filter((org) => !org.archived).map((org) => ({ docId: org.docId, name: org.name })),
+                onCreateOrganization: () => {
+                    if (document.querySelector(".lvct-workbench")) {
+                        return new Promise<void>((resolve) => {
+                            window.dispatchEvent(new CustomEvent("lvct-workbench-create-organization", {
+                                detail: { facade: this, returnToContact: true, completion: () => resolve() },
+                            }));
+                        });
+                    }
+                    return new Promise<void>((resolve) => {
+                        let settled = false;
+                        const finish = () => {
+                            if (settled) return;
+                            settled = true;
+                            resolve();
+                        };
+                        this.openOrgManagerDialog(undefined, finish, finish);
+                    });
+                },
+                onAddOrgMembership: (personDocId: string, orgDocId: string, extra?: { department?: string; title?: string; joinedOn?: string; affiliationKind?: import("./domain/org-membership").OrgAffiliationKind }) =>
+                    this.addOrganizationMember(orgDocId, personDocId, extra),
                 onSaved: () => {
                     if (this.isLifecycleActive(lifecycleToken)) emitDataChanged({}, lifecycleToken);
                 },
@@ -600,6 +636,64 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
                 settings: this.settings,
                 i18n: this.i18n,
                 initial: draft,
+                onLoadOrgCandidates: async () => (await this.listOrganizations()).filter((org) => !org.archived).map((org) => ({ docId: org.docId, name: org.name })),
+                onCreateOrganization: () => {
+                    if (document.querySelector(".lvct-workbench")) {
+                        return new Promise<void>((resolve) => {
+                            window.dispatchEvent(new CustomEvent("lvct-workbench-create-organization", {
+                                detail: { facade: this, returnToContact: true, completion: () => resolve() },
+                            }));
+                        });
+                    } else {
+                        return new Promise<void>((resolve) => {
+                            let settled = false;
+                            const finish = () => {
+                                if (settled) return;
+                                settled = true;
+                                resolve();
+                            };
+                            this.openOrgManagerDialog(undefined, finish, finish);
+                        });
+                    }
+                },
+                onSaveExtended: async (person: ContactSummary, details: ContactExtendedDraft) => {
+                    if (details.orgDocId) {
+                        const memberships = await this.listPersonOrgMemberships(person.docId);
+                        if (!memberships.some((membership) => membership.orgDocId === details.orgDocId && membership.status === "active")) {
+                            await this.addOrganizationMember(details.orgDocId, person.docId, {
+                                department: details.orgDepartment,
+                                title: details.orgTitle,
+                                joinedOn: details.orgJoinedOn,
+                                affiliationKind: details.orgAffiliationKind,
+                            });
+                        }
+                    }
+                    if (details.relationshipLabels.trim()) {
+                        const identity = await this.loadSelfIdentity();
+                        if (!identity) throw new Error("请先在设置中指定“我”的档案，再保存与我的关系称谓");
+                        const labels = details.relationshipLabels.split(/[、,，\n]/).map((label: string) => label.trim()).filter(Boolean);
+                        const current = await this.loadPersonRelationshipLabels(person.docId);
+                        if (current.selfDocId !== identity.selfDocId || JSON.stringify(current.record?.labels ?? []) !== JSON.stringify(labels)) {
+                            await this.savePersonRelationshipLabels(person.docId, identity.selfDocId, labels, current.record);
+                        }
+                    }
+                    if (details.aliases.trim()) {
+                        const existingAliases = await this.listPersonAliases(person.docId);
+                        const existing = new Set(existingAliases.map((alias) => alias.alias.trim().toLocaleLowerCase()));
+                        const aliases = details.aliases.split(/[、,，\n]/).map((alias: string) => alias.trim()).filter(Boolean);
+                        for (const alias of aliases) {
+                            const key = alias.toLocaleLowerCase();
+                            if (!existing.has(key)) {
+                                await this.addPersonAlias(person.docId, alias);
+                                existing.add(key);
+                            }
+                        }
+                    }
+                    if (details.note.trim()) {
+                        const currentNote = await this.loadPersonNote(person.docId);
+                        if (currentNote !== details.note.trim()) await this.savePersonNote(person.docId, details.note.trim(), currentNote);
+                    }
+                },
                 onCreated: () => {
                     if (this.isLifecycleActive(lifecycleToken)) emitDataChanged({}, lifecycleToken);
                 },
@@ -881,11 +975,24 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     /** B13.3：新建组织（文档 + custom-lvct-org 标记区块；同名拒绝） */
-    async createOrganization(name: string) {
+    async createOrganization(name: string, profile?: import("./domain/organization-profile").OrganizationProfileDraft) {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
         const token = this.lifecycleToken;
-        const result = await createOrganization(this.settings, name, this);
+        const result = await createOrganization(this.settings, name, this, profile);
         emitDataChanged({ topics: ["organizations"] }, token);
+        return result;
+    }
+
+    async loadOrganizationProfile(orgDocId: string) {
+        if (!this.isLifecycleActive() || !this.settings) throw new Error("人脉工作空间尚未初始化");
+        return getOrganizationProfile(this, orgDocId);
+    }
+
+    async saveOrganizationProfile(orgDocId: string, profile: import("./domain/organization-profile").OrganizationProfileDraft) {
+        if (!this.isLifecycleActive() || !this.settings) throw new Error("人脉工作空间尚未初始化");
+        const result = await updateOrganizationProfile(this, orgDocId, profile);
+        if (!this.isLifecycleActive()) return result;
+        emitDataChanged({ topics: ["organizations"] }, this.lifecycleToken);
         return result;
     }
 
@@ -1001,10 +1108,14 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     /** B13.3：打开组织管理弹窗（B13.6a：携目标组织定位；成员行可跨弹窗导航到工作台人物详情） */
-    openOrgManagerDialog(initialOrgDocId?: string): void {
-        if (!this.isLifecycleActive()) return;
+    openOrgManagerDialog(initialOrgDocId?: string, onCreated?: (docId: string) => void, onDone?: () => void): void {
+        if (!this.isLifecycleActive()) {
+            onDone?.();
+            return;
+        }
         if (!this.settings) {
             showMessage("请先完成人脉工作空间初始化", 3000);
+            onDone?.();
             return;
         }
         this.openOwnedDialog({
@@ -1016,12 +1127,14 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
                 facade: this,
                 i18n: this.i18n,
                 initialOrgDocId,
+                onCreated,
                 onOpenPerson: (person: unknown) => {
                     /* 组织弹窗为宿主级弹窗，人物详情 Peek 由工作台承载：
                        经窗口事件交给已挂载的工作台打开（组织弹窗先于 Peek 关闭，避免遮挡） */
                     window.dispatchEvent(new CustomEvent("lvct-workbench-person", { detail: { person } }));
                 },
             },
+            callback: onDone,
         });
     }
 
