@@ -5,7 +5,7 @@
  */
 import type { Plugin } from "siyuan";
 import type { ContactsSettings } from "../domain/model";
-import { loadInteractionStore } from "../data/interactions";
+import { loadInteractionStoreStrict } from "../data/interactions";
 import { getRoster } from "./roster";
 
 export interface ExportSummary {
@@ -15,6 +15,6 @@ export interface ExportSummary {
 }
 
 export async function loadExportSummary(plugin: Plugin, settings: ContactsSettings): Promise<ExportSummary> {
-    const [roster, store] = await Promise.all([getRoster(settings), loadInteractionStore(plugin)]);
+    const [roster, store] = await Promise.all([getRoster(settings), loadInteractionStoreStrict(plugin)]);
     return { peopleCount: roster.length, interactionCount: store.events.length };
 }

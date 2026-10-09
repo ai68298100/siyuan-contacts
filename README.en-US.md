@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.3** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.3) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.4** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.4) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -47,9 +47,9 @@ Each plugin is maintained independently and can be used on its own or alongside 
 
 ## Install
 
-Manual installation from GitHub Releases is currently supported; the plugin is not listed in the SiYuan Marketplace.
+Manual installation from GitHub Releases is currently recommended. The Marketplace submission has been merged, but availability in the client has not been verified on a real device.
 
-1. Download package.zip from the [v0.5.3 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.3).
+1. Download package.zip from the [v0.5.4 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.4).
 2. Extract its contents into data/plugins/siyuan-contacts/ in your SiYuan workspace. plugin.json must be at that directory root.
 3. Restart SiYuan and enable **Lv Contacts** under **Settings → Marketplace → Installed**.
 
@@ -59,9 +59,9 @@ Requires **SiYuan 3.8.5 or later**.
 
 Person documents, per-person notes and the contact database are SiYuan workspace content. The plugin sends no telemetry. AI recognition runs only after an explicit user action and sends the relevant note content to the AI service configured in SiYuan.
 
-Plugin-managed data includes interactions, follow-ups, cadence and reminder state, adoption dates, templates, exchanges, aliases, self identity, organization memberships and relationship labels. It is stored in SiYuan's plugin data directory and may be lost when that data is deleted. Export the plugin data migration bundle from **Settings → Export Center** before uninstalling or deleting plugin data.
+Plugin-managed data includes interactions, follow-ups, cadence and reminder state, adoption dates, templates, exchanges, aliases, self identity, organization memberships, organization profiles and relationship labels. It is stored in SiYuan's plugin data directory and may be lost when that data is deleted. Export the plugin data migration bundle from **Settings → Export Center** before uninstalling or deleting plugin data.
 
-The migration bundle is a JSON value snapshot with a preview and merge flow, not a workspace or byte-for-byte backup. It covers those 11 plugin-data modules, but excludes person and organization documents, the contact database, database anchors, UI preferences and unfinished operation checkpoints. A per-person note lives in its person document and is not exported as a separate bundle entry. To move to another workspace, migrate the SiYuan documents and database first, rebind the database in the plugin, then import the bundle. The plugin does not guess document identity by matching names.
+The migration bundle is a JSON value snapshot with a preview and merge flow, not a workspace or byte-for-byte backup. It covers those 12 plugin-data modules, but excludes person and organization documents, the contact database, database anchors, UI preferences and unfinished operation checkpoints. A per-person note lives in its person document and is not exported as a separate bundle entry. To move to another workspace, migrate the SiYuan documents and database first, rebind the database in the plugin, then import the bundle. The plugin does not guess document identity by matching names.
 
 ## Known limitations
 
@@ -70,7 +70,7 @@ The migration bundle is a JSON value snapshot with a preview and merge flow, not
 - The in-app English translation is incomplete, so some interface text may appear in Chinese.
 - CardDAV address-book sync and CalDAV calendar sync are not supported. Contacts can be exchanged using vCard files.
 
-See the [v0.5.3 release notes](docs/RELEASE-NOTES-v0.5.3.md) for validation scope.
+See the [v0.5.4 release notes](docs/RELEASE-NOTES-v0.5.4.md) for validation scope.
 
 ## Quick start
 

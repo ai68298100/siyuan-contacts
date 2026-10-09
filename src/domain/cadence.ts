@@ -57,7 +57,8 @@ export function normalizeCadenceMapForWrite(raw: unknown): Record<string, Person
     const cadences = (raw as { cadences: unknown }).cadences;
     for (const [docId, value] of Object.entries(cadences as Record<string, unknown>)) {
         if (!isPersonDocId(docId)) throw new Error("联系节奏存储内容损坏，操作已停止；请先备份并检查原文件");
-        if (value === null || typeof value !== "object" || clampDays((value as { days: unknown }).days) === null) {
+        if (value === null || typeof value !== "object" || clampDays((value as { days: unknown }).days) === null
+            || (Object.hasOwn(value, "paused") && typeof (value as { paused?: unknown }).paused !== "boolean")) {
             throw new Error("联系节奏存储内容损坏，操作已停止；请先备份并检查原文件");
         }
     }

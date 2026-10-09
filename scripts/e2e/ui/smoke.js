@@ -68,6 +68,7 @@ import { runOrganizationProjectionRegression } from "./organization-projection-r
 import { runGraphQueryRegression } from "./graph-query-regression.js";
 import { runAiPreflightRegression } from "./ai-preflight-regression.js";
 import { runImportRegression } from "./import-regression.js";
+
 import { runAliasRegression } from "./alias-regression.js";
 import { runOrganizationContextRegression } from "./organization-context-regression.js";
 import { runSettingsRepairRegression } from "./settings-repair-regression.js";
@@ -75,6 +76,20 @@ import { runDocumentNavigationRegression } from "./document-navigation-regressio
 import { runBatchSelectionRegression } from "./batch-selection-regression.js";
 import { buildAiPreflight } from "../../../src/domain/ai-preflight";
 import { buildAiCandidateDrafts } from "../../../src/domain/ai-candidates";
+
+/* 数据层写入要求真实的思源人物文档 ID；UI 夹具仍使用短中文名时，统一映射到稳定测试身份。 */
+const TEST_PERSON_DOC_IDS = {
+    a: "20260927000000-aaaaaaa",
+    b: "20260927000000-bbbbbbb",
+    c: "20260927000000-ccccccc",
+    locked: "20260927000000-ddddddd",
+    duplicate: "20260927000000-eeeeeee",
+    late: "20260927000000-fffffff",
+    failed: "20260927000000-ggggggg",
+    survived: "20260927000000-hhhhhhh",
+    imported: "20260927000000-iiiiiii",
+};
+const testPersonDocId = (index) => `20260927000000-${String(index).padStart(7, "0")}`;
 
 const fixture = document.querySelector("#fixture");
 const results = [];
@@ -1157,6 +1172,7 @@ await test("今日行动分组折叠：从未互动单独归组默认折叠，�
 
 await test("行内快捷处置：生日跳过本年、从未互动不再提醒，写入暂缓（B08）", async () => {
     const dismissals = [];
+    let cadenceWrites = 0;
     const personOf = (name) => ({
         docId: `20260927000000-${name}0000`, itemId: `row-${name}`, name,
         phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
@@ -1178,13 +1194,16 @@ await test("行内快捷处置：生日跳过本年、从未互动不再提醒�
                     { person: personOf("从未乙"), bucket: "stale", reasons: [
                         { kind: "stale", label: "从未互动", bucket: "stale", neverContacted: true },
                     ] },
+                    { person: personOf("久未丙"), bucket: "stale", reasons: [
+                        { kind: "stale", label: "45 天未联系（阈值 30 天）", bucket: "stale" },
+                    ] },
                 ],
             }),
             dismissReminder: async (docId, kind, until) => dismissals.push({ docId, kind, until }),
             resumeReminder: async () => {},
             loadReminderDismissals: async () => [],
             getPersonCadence: async () => null,
-            savePersonCadence: async () => {},
+            savePersonCadence: async () => { cadenceWrites += 1; },
         },
     } });
     await until(() => fixture.querySelector(".lvct-dash__row"), "行动未渲染");
@@ -1221,6 +1240,19 @@ await test("行内快捷处置：生日跳过本年、从未互动不再提醒�
     assert(neverHead, "从未互动组头未渲染");
     neverHead.click();
     await tick();
+    const staleMoreButton = [...fixture.querySelectorAll("button")]
+        .find((node) => (node.getAttribute("aria-label") ?? "").includes("更多处置") && (node.getAttribute("aria-label") ?? "").includes("久未丙"));
+    assert(staleMoreButton, "久未联系行动行缺更多处置按钮");
+    staleMoreButton.click();
+    await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent === "顺延 3 天"), "久未联系顺延菜单未展开");
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent === "顺延 3 天").click();
+    await until(() => dismissals.some((entry) => entry.kind === "stale"), "久未联系顺延未写入暂缓");
+    const staleUntil = dismissals.find((entry) => entry.kind === "stale").until;
+    const staleTarget = new Date();
+    staleTarget.setDate(staleTarget.getDate() + 3);
+    const staleTargetKey = `${staleTarget.getFullYear()}-${pad(staleTarget.getMonth() + 1)}-${pad(staleTarget.getDate())}`;
+    assert(staleUntil === staleTargetKey, "久未联系顺延应写入一次性暂缓截止日");
+    assert(cadenceWrites === 0, "久未联系顺延不应永久改写联系节奏");
     const more = [...fixture.querySelectorAll("button")]
         .find((node) => (node.getAttribute("aria-label") ?? "").includes("更多处置") && (node.getAttribute("aria-label") ?? "").includes("从未乙"));
     assert(more, "行动行缺更多处置按钮");
@@ -4078,7 +4110,7 @@ await test("人物跟进计划：写入成功但回读失败时提示核实，�
 });
 
 await test("跟进备份：预览零写入，合并现状优先幂等，损坏数据与非法日期拒绝", async () => {
-    const fu = (id, dueDate) => ({ id, personDocId: "doc-1", title: "", dueDate, status: "open", createdAt: 1, updatedAt: 1 });
+    const fu = (id, dueDate) => ({ id, personDocId: TEST_PERSON_DOC_IDS.a, title: "", dueDate, status: "open", createdAt: 1, updatedAt: 1 });
     // 宿主 loadData 返回已解析的对象；"" 表示首次未创建
     let saved = { schemaVersion: 1, items: [fu("existing", "2026-10-01")] };
     let writes = 0;
@@ -4088,7 +4120,7 @@ await test("跟进备份：预览零写入，合并现状优先幂等，损坏�
     };
     // 非法日期创建拒绝且零写入
     let rejected = false;
-    try { await createFollowUp(plugin, { personDocId: "doc-1", dueDate: "2026-13-40" }); } catch { rejected = true; }
+    try { await createFollowUp(plugin, { personDocId: TEST_PERSON_DOC_IDS.a, dueDate: "2026-13-40" }); } catch { rejected = true; }
     assert(rejected && writes === 0, "非法日期创建未被拒绝");
     // 备份：existing + new
     const backup = JSON.stringify({
@@ -5134,7 +5166,7 @@ await test("多人互动通过真实存储服务写入并回读，重复记录�
         loadData: async () => saved === undefined ? null : JSON.parse(JSON.stringify(saved)),
         saveData: async (_key, value) => { saved = JSON.parse(JSON.stringify(value)); },
     };
-    for (const personDocId of ["甲", "乙", "丙", "乙"]) {
+    for (const personDocId of [TEST_PERSON_DOC_IDS.a, TEST_PERSON_DOC_IDS.b, TEST_PERSON_DOC_IDS.c, TEST_PERSON_DOC_IDS.b]) {
         await recordInteraction(plugin, { personDocId, source: "diary", externalRef: "同场回归" });
     }
     const store = await loadInteractionStore(plugin);
@@ -5286,13 +5318,13 @@ await test("互动读取失败阻止新增与删除，恢复后保留旧记录",
         },
         saveData: async (_key, value) => { writes += 1; saved = JSON.parse(JSON.stringify(value)); },
     };
-    const first = await recordInteraction(plugin, { personDocId: "甲", source: "api", externalRef: "旧记录" });
+    const first = await recordInteraction(plugin, { personDocId: TEST_PERSON_DOC_IDS.a, source: "api", externalRef: "旧记录" });
     const snapshot = JSON.stringify(saved);
     const before = writes;
     failRead = true;
     assert((await loadInteractionStore(plugin)).events.length === 0, "展示读取未保持容错");
     for (const action of [
-        () => recordInteraction(plugin, { personDocId: "乙", source: "api", externalRef: "新记录" }),
+        () => recordInteraction(plugin, { personDocId: TEST_PERSON_DOC_IDS.b, source: "api", externalRef: "新记录" }),
         () => deleteInteraction(plugin, first.events[0].id),
     ]) {
         let message = "";
@@ -5301,7 +5333,7 @@ await test("互动读取失败阻止新增与删除，恢复后保留旧记录",
     }
     assert(writes === before && JSON.stringify(saved) === snapshot, "读取失败覆盖了已有记录");
     failRead = false;
-    const recovered = await recordInteraction(plugin, { personDocId: "乙", source: "api", externalRef: "新记录" });
+    const recovered = await recordInteraction(plugin, { personDocId: TEST_PERSON_DOC_IDS.b, source: "api", externalRef: "新记录" });
     assert(recovered.events.length === 2 && recovered.events.some((event) => event.id === first.events[0].id), "恢复后旧记录丢失");
     const deleted = await deleteInteraction(plugin, first.events[0].id);
     assert(deleted.events.length === 1 && deleted.tombstones.includes(first.events[0].id), "恢复后删除未正常写墓碑");
@@ -5314,7 +5346,7 @@ await test("互动损坏数据与未知版本禁止覆盖，宿主空字符串�
         loadData: async () => JSON.parse(JSON.stringify(saved)),
         saveData: async (_key, value) => { writes += 1; saved = JSON.parse(JSON.stringify(value)); },
     };
-    const first = await recordInteraction(plugin, { personDocId: "甲" });
+    const first = await recordInteraction(plugin, { personDocId: TEST_PERSON_DOC_IDS.a });
     assert(first.events.length === 1 && writes === 1, "宿主未创建文件的空字符串无法首次保存");
     const good = JSON.parse(JSON.stringify(saved));
     for (const damaged of [
@@ -5325,7 +5357,7 @@ await test("互动损坏数据与未知版本禁止覆盖，宿主空字符串�
         const snapshot = JSON.stringify(saved);
         const before = writes;
         for (const action of [
-            () => recordInteraction(plugin, { personDocId: "乙" }),
+            () => recordInteraction(plugin, { personDocId: TEST_PERSON_DOC_IDS.b }),
             () => deleteInteraction(plugin, good.events[0].id),
         ]) {
             let message = "";
@@ -5335,7 +5367,7 @@ await test("互动损坏数据与未知版本禁止覆盖，宿主空字符串�
         assert(writes === before && JSON.stringify(saved) === snapshot, "损坏存储被覆盖");
     }
     saved = good;
-    assert((await recordInteraction(plugin, { personDocId: "乙" })).events.length === 2, "恢复合法文件后不能继续追加");
+    assert((await recordInteraction(plugin, { personDocId: TEST_PERSON_DOC_IDS.b })).events.length === 2, "恢复合法文件后不能继续追加");
 });
 
 await test("互动导出保留原始损坏项与未知版本，读取失败不生成空备份", async () => {
@@ -5349,7 +5381,7 @@ await test("互动导出保留原始损坏项与未知版本，读取失败不�
         },
         saveData: async () => { writes += 1; },
     };
-    const event = { id: "备份事件", personDocId: "甲", source: "manual", occurredAt: Date.now(), localDate: "2026-09-27" };
+    const event = { id: "备份事件", personDocId: TEST_PERSON_DOC_IDS.a, source: "manual", occurredAt: Date.now(), localDate: "2026-09-27" };
     for (const raw of ["", null,
         { schemaVersion: 1, events: [event, event, null], tombstones: ["墓碑", 42] },
         { schemaVersion: 99, events: [event], tombstones: [], unknownField: "不能丢失" },
@@ -5472,17 +5504,17 @@ await test("备份预览不写入，合并重读当前数据并保留并发新�
         loadData: async () => JSON.parse(JSON.stringify(saved)),
         saveData: async (_key, value) => { writes += 1; saved = JSON.parse(JSON.stringify(value)); },
     };
-    const incoming = { id: "导入事件", personDocId: "甲", source: "manual", occurredAt: Date.now(), localDate: "2026-09-27" };
+    const incoming = { id: "导入事件", personDocId: TEST_PERSON_DOC_IDS.a, source: "manual", occurredAt: Date.now(), localDate: "2026-09-27" };
     const text = JSON.stringify({ schemaVersion: 1, events: [incoming], tombstones: ["删除标记"] });
     const preview = await previewInteractionImport(plugin, text);
     assert(preview.added === 1 && writes === 0, "预览发生写入或计数错误");
-    await recordInteraction(plugin, { personDocId: "乙" });
+    await recordInteraction(plugin, { personDocId: TEST_PERSON_DOC_IDS.b });
     const result = await importInteractionJson(plugin, text);
     assert(result.added === 1 && (await loadInteractionStore(plugin)).events.length === 2, "导入覆盖了预览后的新增记录");
     const before = writes;
     const repeat = await importInteractionJson(plugin, text);
     assert(repeat.added === 0 && repeat.skipped === 1 && writes === before, "重复导入不幂等");
-    const nextText = JSON.stringify({ schemaVersion: 1, events: [{ ...incoming, id: "并发导入", personDocId: "丙" }], tombstones: [] });
+    const nextText = JSON.stringify({ schemaVersion: 1, events: [{ ...incoming, id: "并发导入", personDocId: TEST_PERSON_DOC_IDS.c }], tombstones: [] });
     const concurrent = await Promise.all([importInteractionJson(plugin, nextText), importInteractionJson(plugin, nextText)]);
     assert(concurrent.reduce((sum, item) => sum + item.added, 0) === 1, "并发导入重复计数");
     const afterConcurrent = writes;
@@ -5520,7 +5552,7 @@ await test("设置页备份合并先预览，坏文件清空旧计划，取消�
     [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes("数据与字段")).click();
     await tick();
     const fileInput = fixture.querySelector("#lvct-interaction-backup");
-    const good = JSON.stringify({ schemaVersion: 1, events: [{ id: "恢复事件", personDocId: "甲", occurredAt: Date.now(), localDate: "2026-09-27", source: "manual" }], tombstones: [] });
+    const good = JSON.stringify({ schemaVersion: 1, events: [{ id: "恢复事件", personDocId: TEST_PERSON_DOC_IDS.a, occurredAt: Date.now(), localDate: "2026-09-27", source: "manual" }], tombstones: [] });
     function selectFile(text) {
         const transfer = new DataTransfer();
         transfer.items.add(new File([text], "backup.json", { type: "application/json" }));
@@ -5570,10 +5602,10 @@ await test("无浏览器锁时并发互动与备份合并仍串行，不丢记�
     };
     try {
         await Promise.all(Array.from({ length: 12 }, (_, index) => recordInteraction(plugin, {
-            personDocId: `参与者${index}`, source: "api", externalRef: "降级并发回归",
+            personDocId: testPersonDocId(index), source: "api", externalRef: "降级并发回归",
         })));
         assert((await loadInteractionStore(plugin)).events.length === 12, "无浏览器锁时并发保存丢失记录");
-        const text = JSON.stringify({ schemaVersion: 1, events: [{ id: "降级导入", personDocId: "导入参与者", source: "api", occurredAt: Date.now(), localDate: "2026-09-27" }], tombstones: [] });
+        const text = JSON.stringify({ schemaVersion: 1, events: [{ id: "降级导入", personDocId: TEST_PERSON_DOC_IDS.imported, source: "api", occurredAt: Date.now(), localDate: "2026-09-27" }], tombstones: [] });
         const results = await Promise.all([importInteractionJson(plugin, text), importInteractionJson(plugin, text)]);
         assert(results.reduce((sum, result) => sum + result.added, 0) === 1, "降级并发导入重复计数");
         assert((await loadInteractionStore(plugin)).events.length === 13, "降级合并覆盖了已有事件");
@@ -5591,7 +5623,7 @@ await test("人物互动支持加载更多、筛选及安全删除，取消/失�
     mine[0].note = "长备注回归".repeat(40);
     let saved = { schemaVersion: 1, events: [...mine,
         { id: "meeting-mine", personDocId: person.docId, source: "diary", externalRef: "会议", occurredAt: Date.now(), localDate: "2026-09-26", note: "共同会议" },
-        { id: "meeting-other", personDocId: "乙", source: "diary", externalRef: "会议", occurredAt: Date.now(), localDate: "2026-09-26" },
+        { id: "meeting-other", personDocId: TEST_PERSON_DOC_IDS.b, source: "diary", externalRef: "会议", occurredAt: Date.now(), localDate: "2026-09-26" },
     ], tombstones: [] };
     let failDelete = true;
     let changed = 0;
@@ -5652,10 +5684,10 @@ await test("人物互动删除在锁内检查归属，不能删除他人事件",
         loadData: async () => JSON.parse(JSON.stringify(saved)),
         saveData: async (_key, value) => { writes += 1; saved = JSON.parse(JSON.stringify(value)); },
     };
-    const store = await recordInteraction(plugin, { personDocId: "乙" });
+    const store = await recordInteraction(plugin, { personDocId: TEST_PERSON_DOC_IDS.b });
     const before = writes;
     let message = "";
-    try { await deleteInteraction(plugin, store.events[0].id, "甲"); } catch (error) { message = error.message; }
+    try { await deleteInteraction(plugin, store.events[0].id, TEST_PERSON_DOC_IDS.a); } catch (error) { message = error.message; }
     assert(message.includes("不属于当前人物") && writes === before, "归属不符仍执行删除");
     assert((await loadInteractionStore(plugin)).events.length === 1, "他人事件被误删");
 });
@@ -5680,7 +5712,7 @@ await test("独立同源上下文共享 Web Locks，记录/删除/备份并发�
         const gate = new Promise((resolve) => { release = resolve; });
         const blocker = navigator.locks.request("lvct-interaction-events.json", async () => { held(); await gate; });
         await ready;
-        const blocked = a.record({ personDocId: "locked", source: "api", externalRef: "gate" });
+        const blocked = a.record({ personDocId: TEST_PERSON_DOC_IDS.locked, source: "api", externalRef: "gate" });
         // 等待请求进入实际浏览器锁队列，而非依赖固定延时猜测。
         try {
             let pending = false;
@@ -5692,42 +5724,42 @@ await test("独立同源上下文共享 Web Locks，记录/删除/备份并发�
             assert(pending && a.writes() === 0, "另一页面未等待共享锁");
         } finally { release(); await blocker; await blocked; }
         const outcomes = await Promise.all(Array.from({ length: 12 }, (_, index) => (index % 2 ? a : b).record({
-            personDocId: `person-${index}`, source: "api", externalRef: "meeting",
+            personDocId: testPersonDocId(index + 100), source: "api", externalRef: "meeting",
         })));
         assert(outcomes.every((item) => item.recorded), "跨页面新增计数错误");
         assert((await a.load()).events.length === 13, "跨页面并发记录丢失");
-        const duplicates = await Promise.all([a.record({ personDocId: "duplicate", source: "api", externalRef: "same" }),
-            b.record({ personDocId: "duplicate", source: "api", externalRef: "same" })]);
+        const duplicates = await Promise.all([a.record({ personDocId: TEST_PERSON_DOC_IDS.duplicate, source: "api", externalRef: "same" }),
+            b.record({ personDocId: TEST_PERSON_DOC_IDS.duplicate, source: "api", externalRef: "same" })]);
         assert(duplicates.filter((item) => item.recorded).length === 1, "跨页面幂等失效");
         const snapshot = await a.load();
-        const victim = snapshot.events.find((item) => item.personDocId === "person-0");
+        const victim = snapshot.events.find((item) => item.personDocId === testPersonDocId(100));
         const backup = JSON.stringify(snapshot);
         const beforePreview = a.writes() + b.writes();
         await b.preview(backup);
         assert(a.writes() + b.writes() === beforePreview, "跨页面预览写入数据");
         await Promise.all([a.remove(victim.id, victim.personDocId), b.merge(backup),
-            b.record({ personDocId: "late", source: "api", externalRef: "late" })]);
+            b.record({ personDocId: TEST_PERSON_DOC_IDS.late, source: "api", externalRef: "late" })]);
         await a.merge(backup);
         const final = await b.load();
         assert(final.tombstones.includes(victim.id) && !final.events.some((item) => item.id === victim.id), "旧备份复活跨页面删除");
-        assert(final.events.some((item) => item.personDocId === "late") && final.events.length === 14, "删除/合并覆盖并发新增");
+        assert(final.events.some((item) => item.personDocId === TEST_PERSON_DOC_IDS.late) && final.events.length === 14, "删除/合并覆盖并发新增");
         a.failSave();
         const failures = await Promise.allSettled([
-            a.record({ personDocId: "failed", source: "api", externalRef: "failed" }),
-            b.record({ personDocId: "survived", source: "api", externalRef: "survived" }),
+            a.record({ personDocId: TEST_PERSON_DOC_IDS.failed, source: "api", externalRef: "failed" }),
+            b.record({ personDocId: TEST_PERSON_DOC_IDS.survived, source: "api", externalRef: "survived" }),
         ]);
         assert(failures[0].status === "rejected" && failures[1].status === "fulfilled", "失败未释放跨页面锁");
         const recovered = await a.load();
-        assert(!recovered.events.some((item) => item.personDocId === "failed")
-            && recovered.events.some((item) => item.personDocId === "survived"), "失败保存或后续操作结果错误");
+        assert(!recovered.events.some((item) => item.personDocId === TEST_PERSON_DOC_IDS.failed)
+            && recovered.events.some((item) => item.personDocId === TEST_PERSON_DOC_IDS.survived), "失败保存或后续操作结果错误");
         const incoming = JSON.stringify({ schemaVersion: 1, tombstones: [], events: [{
-            id: "imported-cross-context", personDocId: "imported", occurredAt: 1790467200000,
+            id: "imported-cross-context", personDocId: TEST_PERSON_DOC_IDS.imported, occurredAt: 1790467200000,
             localDate: "2026-09-27", source: "api", externalRef: "imported",
         }] });
         const imported = await Promise.all([a.merge(incoming), b.merge(incoming)]);
         assert(imported.reduce((sum, item) => sum + item.added, 0) === 1, "跨页面同备份新增重复计数");
         const merged = await a.load();
-        assert(merged.events.filter((item) => item.personDocId === "imported").length === 1
+        assert(merged.events.filter((item) => item.personDocId === TEST_PERSON_DOC_IDS.imported).length === 1
             && merged.events.length === 16 && merged.tombstones.includes(victim.id), "并发合并丢失记录或删除标记");
     } finally {
         frames.forEach((frame) => frame.remove());

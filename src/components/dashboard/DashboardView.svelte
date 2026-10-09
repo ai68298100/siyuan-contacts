@@ -188,14 +188,21 @@
         await refresh();
     }
     async function snoozeStale(person: ContactSummary, days: number): Promise<void> {
-        const info = data?.stale.find((item) => item.person.docId === person.docId);
-        const lastDays = info?.lastDaysAgo ?? 0;
-        const existing = await facade.getPersonCadence(person.docId);
-        const target = Math.min(365, lastDays + days);
-        await facade.savePersonCadence(person.docId, { days: target, paused: existing?.paused ?? false });
+        /*
+         * "顺延" 是一次性的提醒处置，不能改写联系节奏规则。
+         * 之前把阈值改成 lastDays + days，用户下一次互动后仍会永久
+         * 使用被抬高的阈值，导致联系节奏悄悄漂移。和生日提醒一样，
+         * 写入 stale 暂缓截止日，恢复时只还原操作前的暂缓值。
+         */
+        const previous = (await facade.loadReminderDismissals())
+            .find((entry) => entry.personDocId === person.docId && entry.kind === "stale");
+        const until = addDaysToToday(days);
+        await facade.dismissReminder(person.docId, "stale", until);
         setUndo(
-            `「${person.name}」已顺延：${target} 天内不再提醒`,
-            () => facade.savePersonCadence(person.docId, existing),
+            `「${person.name}」已顺延到 ${until}`,
+            previous
+                ? () => facade.dismissReminder(person.docId, "stale", previous.until)
+                : () => facade.resumeReminder(person.docId, "stale"),
         );
         rowMenuKey = "";
         await refresh();

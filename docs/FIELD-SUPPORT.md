@@ -15,7 +15,7 @@
 | 标签 | AV mSelect | 去重集合比较；清空为无选项 | CATEGORIES；逗号、分号和换行按 vCard 上下文转义 |
 | 相关人 | 同库 AV relation，值是对方 itemID | 双向人物关联；锁内重读、写后核实，文档双链是可补偿投影 | 不通过 vCard 推断或导入关系类型 |
 | 单位/学校/组织归属 | org-membership.json + 组织文档标记；可选 affiliationKind | 人物和组织两侧编辑分类、部门、职位、日期与状态；旧库未分类，离职/重入保留历史，清分类不删任职；过期表单零覆盖 | 迁移包保留成员 ID、分类、所有历史与删除标记；双方原文及归档属性随思源工作区备份，恢复不自动写段落；vCard ORG 不推断归属，全页筛选/投影待 B12-002 |
-| 与我的关系 | person-relationship-labels.json 预留契约，按 selfDocId + personDocId | 域层严格解析与本人参照投影已实现，生产键尚未启用；本人更换不搬移旧称谓 | 尚不能编辑、导入或声称备份；不从 related、组织背景、分组或别名推断称谓 |
+| 与我的关系 | `person-relationship-labels.json`，按 selfDocId + personDocId | 已支持联系人新建/编辑页直接编辑与选择；保存后回读核实，本人更换保留旧称谓并给出影响预览 | 迁移包保留关系标签；vCard 不推断关系类型，不从 related、组织背景、分组或别名推断称谓 |
 | 别名 | person-aliases.json，按稳定 personDocId | 独立管理；泛称禁用，同名歧义需选择具体人物 | 不作为姓名替代，不以王总等泛称自动归属 |
 | 金钱/物品/人情往来 | exchange-records.json，按稳定 personDocId | 独立账本；请求身份稳定，未知结果先核实 | 包含在迁移包；不混入人物 AV 资料或互动次数 |
 

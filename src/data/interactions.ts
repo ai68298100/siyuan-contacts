@@ -8,6 +8,10 @@ import { appendEvent, emptyStore, normalizeInteractionStore, normalizeInteractio
 import type { InteractionEvent, InteractionStore } from "../domain/interactions";
 import { newNodeId } from "../api/client";
 
+function assertPersonDocId(value: unknown): asserts value is string {
+    if (typeof value !== "string" || !/^\d{14}-[0-9a-z]{7}$/.test(value)) throw new Error("人物文档 ID 无效，未记录互动");
+}
+
 export const INTERACTION_STORAGE_KEY = "interaction-events.json";
 
 export async function loadInteractionStore(plugin: Plugin): Promise<InteractionStore> {
@@ -19,7 +23,7 @@ export async function loadInteractionStore(plugin: Plugin): Promise<InteractionS
  * 读取失败/损坏抛错，不得归一为空（首页统计、时间线、体检据此显式报错）。
  */
 export async function loadInteractionStoreStrict(plugin: Plugin): Promise<InteractionStore> {
-    return normalizeInteractionStore(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY));
+    return normalizeInteractionStoreForWrite(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY));
 }
 
 export interface RecordInteractionInput {
@@ -40,6 +44,10 @@ export async function recordInteractionWithResult(
     plugin: Plugin,
     input: RecordInteractionInput,
 ): Promise<{ store: InteractionStore; recorded: boolean }> {
+    assertPersonDocId(input.personDocId);
+    if (input.occurredAt !== undefined && (!Number.isFinite(input.occurredAt) || Number.isNaN(new Date(input.occurredAt).getTime()))) {
+        throw new Error("互动发生时间无效，未记录互动");
+    }
     return withStoreLock(INTERACTION_STORAGE_KEY, async () => {
         const store = normalizeInteractionStoreForWrite(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY));
         const occurredAt = input.occurredAt ?? Date.now();

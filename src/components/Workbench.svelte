@@ -469,7 +469,15 @@
             </button>
             {/each}
             <span class="lvct-workbench__nav-label lvct-workbench__nav-label--secondary">{text("navUpcoming", "即将推出")}</span>
-            <button class="lvct-workbench__nav-item" disabled><span class="lvct-workbench__nav-icon" aria-hidden="true"><Sparkles size={16}/></span><span class="lvct-workbench__nav-text">{text("navSuggestions", "建议")}</span></button>
+            <button
+                class="lvct-workbench__nav-item"
+                disabled
+                aria-label={text("navSuggestionsAria", "建议（即将推出）")}
+                title={text("navSuggestionsUnavailable", "建议功能尚未开放")}
+            >
+                <span class="lvct-workbench__nav-icon" aria-hidden="true"><Sparkles size={16}/></span>
+                <span class="lvct-workbench__nav-text">{text("navSuggestions", "建议")}</span>
+            </button>
             <button
                 class="lvct-workbench__nav-item lvct-workbench__nav-item--mobile-settings"
                 class:lvct-workbench__nav-item--active={current === "settings"}

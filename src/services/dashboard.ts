@@ -130,7 +130,9 @@ export async function loadDashboard(
     if (identity && (selfMatches.length !== 1 || selfMatches[0].itemId !== identity.selfItemId)) readFailures.push("self");
     const ordinaryScopeUnknown = readFailures.includes("self");
     const people = ordinaryScopeUnknown ? [] : excludeSelf(peopleAll, identity);
-    const today = toLocalDateKey(new Date());
+    /* 同一轮投影固定时间快照，避免跨午夜时生日/久未联系/提醒截止日出现一天错位。 */
+    const now = new Date();
+    const today = toLocalDateKey(now);
     // C02：首次发现补记收编时间（幂等，失败按缺失降级）；宽限期内不计入「从未互动」提醒
     await ensureRegistryEntriesSaved(plugin, people.map((person) => person.docId), today);
     const registry = await readModule(readFailures, "registry", () => loadRegistryStrict(plugin), EMPTY_REGISTRY);
@@ -138,11 +140,11 @@ export async function loadDashboard(
     // B08：提醒暂缓只屏蔽呈现——生日与久未联系提醒行过滤，统计与名单口径保持真实。
     // C-32：`birthdaysThisWeek` 按原始事实计算（不经提醒窗口截断、不受暂缓影响）——
     // 窗口小于 7 天时本周生日不得漏报，暂缓生日不得让本周统计下降（FUNC-01.2a 口径）
-    const birthdaysAll = upcomingBirthdays(people);
+    const birthdaysAll = upcomingBirthdays(people, now);
     const birthdays = birthdaysAll
         .filter((item) => item.projection.daysUntil <= options.birthdayWindowDays)
         .filter((item) => !isDismissed(dismissals, item.person.docId, "birthday", today));
-    const staleAll = staleContacts(store, people, options.staleThresholdDays, new Date(), cadences);
+    const staleAll = staleContacts(store, people, options.staleThresholdDays, now, cadences);
     const staleRemindable = staleAll.filter((info) => {
         if (isDismissed(dismissals, info.person.docId, "stale", today)) return false;
         /* C02：宽限期只豁免「从未互动」（有互动的久未联系不受影响） */

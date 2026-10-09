@@ -56,6 +56,30 @@ export function normalizeDismissalStore(raw: unknown): ReminderDismissalStore {
     return { schemaVersion: REMINDER_DISMISSALS_STORE_VERSION, dismissals: [...byKey.values()] };
 }
 
+/** 严格展示/写入读取：损坏数据抛错，避免提醒故障被当成空列表。 */
+export function normalizeDismissalStoreForWrite(raw: unknown): ReminderDismissalStore {
+    if (raw == null || raw === "") return { schemaVersion: REMINDER_DISMISSALS_STORE_VERSION, dismissals: [] };
+    if (typeof raw !== "object" || (raw as Record<string, unknown>).schemaVersion !== REMINDER_DISMISSALS_STORE_VERSION
+        || !Array.isArray((raw as Record<string, unknown>).dismissals)) {
+        throw new Error("提醒暂缓存储格式或版本不兼容，操作已停止；请先备份并检查原文件");
+    }
+    const entries = (raw as { dismissals: unknown[] }).dismissals;
+    const seen = new Set<string>();
+    for (const entry of entries) {
+        if (entry === null || typeof entry !== "object") throw new Error("提醒暂缓存储内容损坏，操作已停止；请先备份并检查原文件");
+        const candidate = entry as Record<string, unknown>;
+        if (typeof candidate.personDocId !== "string" || !DOC_ID_RE.test(candidate.personDocId)
+            || !isValidKind(candidate.kind) || typeof candidate.until !== "string"
+            || candidate.until !== "" && !isValidDateKey(candidate.until)) {
+            throw new Error("提醒暂缓存储内容损坏，操作已停止；请先备份并检查原文件");
+        }
+        const key = `${candidate.personDocId}|${candidate.kind}`;
+        if (seen.has(key)) throw new Error("提醒暂缓存储存在重复记录，操作已停止；请先备份并检查原文件");
+        seen.add(key);
+    }
+    return normalizeDismissalStore(raw);
+}
+
 /** 该人物该类提醒在 today（YYYY-MM-DD）是否处于暂缓期 */
 export function isDismissed(
     dismissals: readonly ReminderDismissal[],

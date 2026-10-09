@@ -13,6 +13,8 @@ import {
 } from "../domain/followups";
 import type { FollowUpItem, FollowUpStore } from "../domain/followups";
 import { newNodeId } from "../api/client";
+import { isValidDateKey } from "../domain/date-key";
+import { isPersonDocId } from "../domain/cadence";
 
 export const FOLLOW_UP_STORAGE_KEY = "follow-ups.json";
 
@@ -23,7 +25,7 @@ export async function loadFollowUpStore(plugin: Plugin): Promise<FollowUpStore> 
 
 /** FUNC-01.12 严格展示读：键不存在返回空库；读取失败/损坏抛错，不得按空待办呈现 */
 export async function loadFollowUpStoreStrict(plugin: Plugin): Promise<FollowUpStore> {
-    return normalizeFollowUpStore(await loadJsonStrict(plugin, FOLLOW_UP_STORAGE_KEY));
+    return normalizeFollowUpStoreForWrite(await loadJsonStrict(plugin, FOLLOW_UP_STORAGE_KEY));
 }
 
 export interface CreateFollowUpInput {
@@ -35,6 +37,9 @@ export interface CreateFollowUpInput {
 
 /** 新建跟进事项；id 在锁内生成，写入与新增判定同临界区 */
 export async function createFollowUpRecord(plugin: Plugin, input: CreateFollowUpInput): Promise<FollowUpItem> {
+    if (!isPersonDocId(input.personDocId)) throw new Error("人物文档 ID 无效，未创建跟进事项");
+    if (!isValidDateKey(input.dueDate)) throw new Error("跟进到期日期无效，未创建跟进事项");
+    if (input.title !== undefined && typeof input.title !== "string") throw new Error("跟进标题无效，未创建跟进事项");
     return withStoreLock(FOLLOW_UP_STORAGE_KEY, async () => {
         const now = Date.now();
         const item: FollowUpItem = {
@@ -48,6 +53,8 @@ export async function createFollowUpRecord(plugin: Plugin, input: CreateFollowUp
             docSyncPending: true,
         };
         const store = normalizeFollowUpStoreForWrite(await loadJsonStrict(plugin, FOLLOW_UP_STORAGE_KEY));
+        /* 极低概率的随机 ID 碰撞也不能返回一个实际未落盘的“成功”事项。 */
+        if (store.items.some((existing) => existing.id === item.id)) throw new Error("跟进事项 ID 冲突，未创建；请重试");
         await saveJsonVerified(plugin, FOLLOW_UP_STORAGE_KEY, appendFollowUp(store, item));
         return item;
     });
@@ -75,6 +82,14 @@ export async function updateFollowUpRecord(
     patch: FollowUpPatch,
     options: FollowUpPatchOptions = {},
 ): Promise<FollowUpItem> {
+    if (typeof id !== "string" || !id.trim()) throw new Error("跟进事项 ID 无效");
+    if (patch.dueDate !== undefined && !isValidDateKey(patch.dueDate)) throw new Error("跟进到期日期无效，未修改跟进事项");
+    if (patch.title !== undefined && typeof patch.title !== "string") throw new Error("跟进标题无效，未修改跟进事项");
+    if (patch.status !== undefined && !["open", "done", "cancelled"].includes(patch.status)) throw new Error("跟进状态无效，未修改跟进事项");
+    if (patch.docBlockId !== undefined && (typeof patch.docBlockId !== "string" || !/^\d{14}-[0-9a-z]{7}$/.test(patch.docBlockId))) {
+        throw new Error("跟进文档块 ID 无效，未修改跟进事项");
+    }
+    if (patch.docMissing !== undefined && typeof patch.docMissing !== "boolean") throw new Error("跟进文档状态无效，未修改跟进事项");
     return withStoreLock(FOLLOW_UP_STORAGE_KEY, async () => {
         const store = normalizeFollowUpStoreForWrite(await loadJsonStrict(plugin, FOLLOW_UP_STORAGE_KEY));
         const existing = store.items.find((item) => item.id === id);
@@ -121,7 +136,9 @@ export async function mergeFollowUpStore(plugin: Plugin, incoming: readonly Foll
     return withStoreLock(FOLLOW_UP_STORAGE_KEY, async () => {
         const store = normalizeFollowUpStoreForWrite(await loadJsonStrict(plugin, FOLLOW_UP_STORAGE_KEY));
         const existingIds = new Set(store.items.map((item) => item.id));
-        const additions = incoming.filter((item) => !existingIds.has(item.id));
+        /* 备份条目结构已归一化，但人物 ID 仍需按文档契约核实，避免导入后产生永远不可达的跟进。 */
+        const validIncoming = incoming.filter((item) => isPersonDocId(item.personDocId));
+        const additions = validIncoming.filter((item) => !existingIds.has(item.id));
         if (additions.length === 0) return { added: 0, skipped: incoming.length, personDocIds: [] };
         let merged = store;
         for (const item of additions) merged = appendFollowUp(merged, item);

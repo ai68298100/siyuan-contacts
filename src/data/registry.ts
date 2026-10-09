@@ -4,7 +4,7 @@
  */
 import type { Plugin } from "siyuan";
 import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage";
-import { ensureRegistryEntries, normalizeRegistryStore } from "../domain/registry";
+import { ensureRegistryEntries, normalizeRegistryStore, normalizeRegistryStoreForWrite } from "../domain/registry";
 import type { RegistryStore } from "../domain/registry";
 
 export const REGISTRY_STORAGE_KEY = "person-registry.json";
@@ -16,7 +16,7 @@ export async function loadRegistry(plugin: Plugin): Promise<RegistryStore> {
 
 /** FUNC-01.12 严格展示读：键不存在返回空索引；读取失败/损坏抛错（首页宽限期判断据此显式降级提示） */
 export async function loadRegistryStrict(plugin: Plugin): Promise<RegistryStore> {
-    return normalizeRegistryStore(await loadJsonStrict(plugin, REGISTRY_STORAGE_KEY));
+    return normalizeRegistryStoreForWrite(await loadJsonStrict(plugin, REGISTRY_STORAGE_KEY));
 }
 
 /** 首次发现补记：只补缺失键（幂等），读路径调用失败时静默降级（不阻断首页加载） */
@@ -39,10 +39,11 @@ export async function mergeRegistryEntries(
     plugin: Plugin,
     incoming: Record<string, string>,
 ): Promise<number> {
+    const safeIncoming = normalizeRegistryStore({ schemaVersion: 1, registeredAt: incoming }).registeredAt;
     return withStoreLock(REGISTRY_STORAGE_KEY, async () => {
-        const store = normalizeRegistryStore(await loadJsonStrict(plugin, REGISTRY_STORAGE_KEY));
+        const store = normalizeRegistryStoreForWrite(await loadJsonStrict(plugin, REGISTRY_STORAGE_KEY));
         let merged = 0;
-        for (const [docId, date] of Object.entries(incoming)) {
+        for (const [docId, date] of Object.entries(safeIncoming)) {
             store.registeredAt[docId] = date;
             merged += 1;
         }

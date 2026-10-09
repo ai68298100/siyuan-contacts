@@ -1,5 +1,16 @@
 # 发布清单（RELEASE）
 
+> v0.5.4 发布准备：本版本包含全量审计的数据边界、异常反馈、提醒顺延和发布包校验修复；发布时附 ZIP 与 SHA-256。
+
+## v0.5.4 本轮状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.4
+- [x] README 中英文安装入口、CHANGELOG 与发布说明已切换到 v0.5.4
+- [x] 最近完整门禁：`pnpm check`、549/549 单测、桌面 322/322、移动 323/323、宿主样式 322/322、构建与发布门禁
+- [ ] 发布候选经 PR 普通合并进 `main`，CI 通过
+- [ ] annotated tag `v0.5.4`、GitHub Release 和附件下载校验
+- [ ] 真实思源宿主、Android 真机、真实多窗口、原生图入口、任务管理器互读和集市客户端可见性仍需单独验收；CardDAV 在线同步未实现
+
 > v0.5.3 已于 2026-10-09 发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.3)，annotated tag 指向 main 合并提交 `2e2f465b9979152a952c810ba4dcfb4c7be03e61`。
 
 ## v0.5.3 本轮状态
