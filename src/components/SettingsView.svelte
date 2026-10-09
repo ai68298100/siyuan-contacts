@@ -853,6 +853,7 @@
                     class="lvct-settings__nav-item"
                     class:lvct-settings__nav-item--active={activeSection === section.id}
                     aria-current={activeSection === section.id ? "page" : undefined}
+                    title={auditBusy ? "资料体检进行中，完成后可切换设置分区" : orgProjectionBusy ? "组织双链核对进行中，完成后可切换设置分区" : undefined}
                     disabled={auditBusy || orgProjectionBusy}
                     onclick={() => { if (!auditBusy && !orgProjectionBusy) activeSection = section.id; }}
                 >
@@ -1112,7 +1113,7 @@
                         <b>导出中心</b>
                         {#if loadingSummary}<span class="ft__smaller ft__on-surface">统计中…</span>{/if}
                     </div>
-                    <p class="lvct-settings__fine-print">人物文档与联系人数据库是思源原生数据，随工作区保留；以下两项导出都不是完整备份。</p>
+                    <p class="lvct-settings__fine-print">人物文档与联系人数据库是思源原生数据，随工作区保留；以下导出文件都不是完整备份。</p>
                     {#if summaryError}
                         <div class="lvct-settings__notice lvct-settings__notice--error" role="alert">
                             <p>{summaryError}</p>
@@ -1126,7 +1127,7 @@
                             <b>全量名册 vCard</b>
                             <small>{#if exportSummary}{exportSummary.peopleCount} 位联系人 · {/if}标准 vCard 3.0，通讯录可导入；不含互动与关系，微信号不导出</small>
                         </div>
-                        <button class="b3-button b3-button--outline" onclick={runExportRoster} disabled={exportingRoster || (exportSummary !== null && exportSummary.peopleCount === 0)}>
+                        <button class="b3-button b3-button--outline" onclick={runExportRoster} title={exportSummary?.peopleCount === 0 ? "名册为空，请先在联系人页新建或收编联系人" : undefined} disabled={exportingRoster || (exportSummary !== null && exportSummary.peopleCount === 0)}>
                             {exportingRoster ? "导出中…" : "导出 .vcf"}
                         </button>
                     </div>
@@ -1235,7 +1236,7 @@
                                 <div class="lvct-settings__diff" role="region" aria-label="备份差异明细">
                                     <div class="lvct-settings__diff-section">
                                         <b>将新增（{importDiff.added.length} 条）</b>
-                                        {#if importDiff.added.length === 0}<p class="ft__smaller ft__on-surface">没有将新增的事件。</p>{/if}
+                                        {#if importDiff.added.length === 0}<p class="ft__smaller ft__on-surface">没有新增事件。</p>{/if}
                                         {#each importDiff.added as entry (entry.eventId)}
                                             <div class="lvct-settings__diff-row">
                                                 {entry.localDate} · {entry.personName ?? "人物不可达（可能已解绑）"} · {entry.note || "互动"} · {entry.source}

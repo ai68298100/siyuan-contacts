@@ -13,6 +13,7 @@
     import { ClipboardPaste } from "@lucide/svelte";
     import type { OrgAffiliationKind } from "../../domain/org-membership";
     import type { ContactExtendedDraft } from "../../domain/contact-create";
+    import type { SelfIdentity, SelfIdentityChangePreview } from "../../domain/self-identity";
 
     let {
         settings,
@@ -21,6 +22,11 @@
         hostCloseChannel,
         onLoadOrgCandidates,
         onCreateOrganization,
+        onValidateExtended,
+        onCreateSelfProfile,
+        onLoadSelfCandidates,
+        onPreviewSelfIdentityChange,
+        onApplySelfIdentityChange,
         onSaveExtended,
         onCreated,
         onClose,
@@ -35,6 +41,13 @@
         onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string }>>;
         /** 当前没有合适组织时，跳转到统一的新建组织页面。 */
         onCreateOrganization?: () => void | Promise<void>;
+        /** 创建文档前核验已填写的补充资料是否满足前置条件。 */
+        onValidateExtended?: (details: ContactExtendedDraft) => Promise<void>;
+        /** 关系称谓缺少本人档案时，在当前草稿中完成本人档案设置。 */
+        onCreateSelfProfile?: () => Promise<SelfIdentity | null>;
+        onLoadSelfCandidates?: () => Promise<ContactSummary[]>;
+        onPreviewSelfIdentityChange?: (personItemId: string) => Promise<SelfIdentityChangePreview>;
+        onApplySelfIdentityChange?: (preview: SelfIdentityChangePreview) => Promise<SelfIdentity | null>;
         onSaveExtended?: (person: ContactSummary, details: ContactExtendedDraft) => Promise<void>;
         onCreated: (person: ContactSummary) => void;
         onClose: () => void;
@@ -68,6 +81,13 @@
     let aliases = $state("");
     let relationshipLabels = $state("");
     let note = $state("");
+    let selfSetupOpen = $state(false);
+    let selfSetupBusy = $state(false);
+    let selfSetupError = $state("");
+    let selfSetupNotice = $state("");
+    let selfCandidates = $state<ContactSummary[]>([]);
+    let selfCandidateItemId = $state("");
+    let selfPreview = $state<SelfIdentityChangePreview | null>(null);
     const extendedSupported = $derived(Boolean(onSaveExtended));
     const currentPreview = $derived(creationPreview?.name === draft.name.trim() ? creationPreview : null);
     // FAST-01.1：粘贴并识别（识别结果经勾选后回填草稿，不直接写库）
@@ -97,6 +117,8 @@
         const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
         running = true;
         try {
+            const extendedDetails = { orgDocId, orgDepartment, orgTitle, orgJoinedOn, orgAffiliationKind, aliases, relationshipLabels, note };
+            if (!createdPerson && onValidateExtended) await onValidateExtended(extendedDetails);
             const person = createdPerson ?? await createContact(settings, { ...draft, tags }, {
                 request: creationRequest,
                 allowSameName: currentPreview !== null && creationChoice === "new",
@@ -105,7 +127,7 @@
             createdPerson = person;
             if (onSaveExtended) {
                 try {
-                    await onSaveExtended(person, { orgDocId, orgDepartment, orgTitle, orgJoinedOn, orgAffiliationKind, aliases, relationshipLabels, note });
+                    await onSaveExtended(person, extendedDetails);
                 } catch (error) {
                     throw new Error(`联系人已创建，但补充资料保存失败：${error instanceof Error ? error.message : String(error)}`);
                 }
@@ -141,6 +163,53 @@
         orgCandidates = [];
         extraError = "";
         await openExtended();
+    }
+    async function openSelfSetup(): Promise<void> {
+        selfSetupOpen = true;
+        selfSetupError = "";
+        selfSetupNotice = "";
+        if (!onLoadSelfCandidates || selfCandidates.length > 0 || selfSetupBusy) return;
+        selfSetupBusy = true;
+        try { selfCandidates = await onLoadSelfCandidates(); }
+        catch (error) { selfSetupError = error instanceof Error ? error.message : String(error); }
+        finally { selfSetupBusy = false; }
+    }
+    async function createSelfProfileFromContact(): Promise<void> {
+        if (!onCreateSelfProfile || selfSetupBusy) return;
+        selfSetupBusy = true;
+        selfSetupError = "";
+        selfSetupNotice = "";
+        try {
+            const identity = await onCreateSelfProfile();
+            if (!identity) throw new Error("本人档案未建立，请检查结果后重试");
+            selfSetupOpen = false;
+            selfSetupNotice = "本人档案已设置；当前联系人草稿已保留，请继续创建。";
+            errorText = "";
+        } catch (error) { selfSetupError = error instanceof Error ? error.message : String(error); }
+        finally { selfSetupBusy = false; }
+    }
+    async function previewSelfCandidate(): Promise<void> {
+        if (!onPreviewSelfIdentityChange || !selfCandidateItemId || selfSetupBusy || selfPreview) return;
+        selfSetupBusy = true;
+        selfSetupError = "";
+        try { selfPreview = await onPreviewSelfIdentityChange(selfCandidateItemId); }
+        catch (error) { selfSetupError = error instanceof Error ? error.message : String(error); }
+        finally { selfSetupBusy = false; }
+    }
+    async function confirmSelfCandidate(): Promise<void> {
+        if (!onApplySelfIdentityChange || !selfPreview || selfSetupBusy) return;
+        selfSetupBusy = true;
+        selfSetupError = "";
+        try {
+            const identity = await onApplySelfIdentityChange(selfPreview);
+            if (!identity) throw new Error("本人身份未指定，请核实后重试");
+            const targetName = selfPreview.target?.name ?? "所选联系人";
+            selfPreview = null;
+            selfSetupOpen = false;
+            selfSetupNotice = `已将「${targetName}」设为本人；当前联系人草稿已保留，请继续创建。`;
+            errorText = "";
+        } catch (error) { selfSetupError = error instanceof Error ? error.message : String(error); }
+        finally { selfSetupBusy = false; }
     }
     async function createOrganizationFromContact(): Promise<void> {
         if (!onCreateOrganization || creatingOrganization || running) return;
@@ -204,6 +273,7 @@
             onClose();
         } catch (error) {
             errorText = error instanceof Error ? error.message : String(error);
+            if (errorText.includes("请先在设置中指定“我”的档案")) void openSelfSetup();
         } finally {
             running = false;
         }
@@ -283,7 +353,7 @@
                         {#if extraError}<p class="lvct-form__error" role="alert">组织读取失败：{extraError} <button type="button" class="b3-button b3-button--text" onclick={() => void openExtended()}>重试</button></p>{/if}
                     {/if}
                     <label class="lvct-form__item"><span>别名 / 常用称呼</span><input class="b3-text-field fn__block" maxlength="80" bind:value={aliases} disabled={running} placeholder="例如：张老师、英文名；多个称呼用顿号分隔" /></label>
-                    <label class="lvct-form__item"><span>与我的关系称谓</span><input class="b3-text-field fn__block" maxlength="1600" bind:value={relationshipLabels} disabled={running} placeholder="例如：同事、朋友、校友；多个称谓用顿号分隔" /><small class="lvct-form__hint">需先在设置中指定“我”的档案；不填写无需设置。</small></label>
+                    <label class="lvct-form__item"><span>与我的关系称谓</span><input class="b3-text-field fn__block" maxlength="1600" bind:value={relationshipLabels} disabled={running} placeholder="例如：同事、朋友、校友；多个称谓用顿号分隔" /><small class="lvct-form__hint">需先在设置中指定“我”的档案；不填写无需设置。{#if onCreateSelfProfile}<button type="button" class="b3-button b3-button--text lvct-form__inline-action" onclick={() => void openSelfSetup()} disabled={running || selfSetupBusy}>设置本人档案</button>{/if}</small></label>
                     <label class="lvct-form__item"><span>人物备注</span><textarea class="b3-text-field fn__block" rows="3" maxlength="5000" bind:value={note} disabled={running} placeholder="记录你希望长期保留的补充信息"></textarea></label>
                 </div>
             {/if}
@@ -318,6 +388,44 @@
             <!-- D-35：读屏即时播报（role=alert），focus 落到错误块便于键盘继续操作 -->
             <div class="lvct-form__error" role="alert" tabindex="-1" bind:this={errorEl}>{errorText}</div>
         {/if}
+        {#if selfSetupOpen}
+            <section class="lvct-form__optional-body" aria-label="设置本人档案" aria-busy={selfSetupBusy}>
+                <b>设置本人档案</b>
+                <p class="lvct-form__hint">设置完成后会回到这里；当前联系人及补充资料草稿会保留。</p>
+                {#if onCreateSelfProfile}
+                    <button type="button" class="b3-button b3-button--outline" disabled={selfSetupBusy} onclick={() => void createSelfProfileFromContact()}>
+                        {selfSetupBusy ? "处理中…" : "创建本人档案「我自己」"}
+                    </button>
+                {/if}
+                {#if onLoadSelfCandidates && selfCandidates.length > 0}
+                    <label class="lvct-form__item">
+                        <span>或指定一位已有联系人</span>
+                        <select class="b3-select fn__block" bind:value={selfCandidateItemId} disabled={selfSetupBusy || !!selfPreview}>
+                            <option value="">选择联系人…</option>
+                            {#each selfCandidates as candidate (candidate.itemId)}<option value={candidate.itemId}>{candidate.name}{candidate.phone ? ` · ${candidate.phone}` : ""}</option>{/each}
+                        </select>
+                    </label>
+                    {#if !selfPreview}
+                        <button type="button" class="b3-button b3-button--outline" disabled={selfSetupBusy || !selfCandidateItemId || !onPreviewSelfIdentityChange} onclick={() => void previewSelfCandidate()}>
+                            {selfSetupBusy ? "核对中…" : "预览指定本人"}
+                        </button>
+                    {/if}
+                {:else if onLoadSelfCandidates && !selfSetupBusy}
+                    <p class="lvct-form__hint">暂无可指定的现有联系人，可以创建「我自己」档案。</p>
+                {/if}
+                {#if selfPreview}
+                    <div class="lvct-form__optional-body" role="region" aria-label="本人身份影响预览">
+                        <p>{selfPreview.previousName} → {selfPreview.target?.name ?? "未指定本人"}</p>
+                        <p>普通联系人统计：{selfPreview.ordinaryBefore} → {selfPreview.ordinaryAfter}</p>
+                        <p class="lvct-form__hint">首页行动和统计、图谱默认中心将随本人变化；原人物资料与历史记录保留。</p>
+                        <button type="button" class="b3-button" disabled={selfSetupBusy} onclick={() => void confirmSelfCandidate()}>{selfSetupBusy ? "保存中…" : "确认指定本人"}</button>
+                        <button type="button" class="b3-button b3-button--text" disabled={selfSetupBusy} onclick={() => (selfPreview = null)}>取消预览</button>
+                    </div>
+                {/if}
+                {#if selfSetupError}<p class="lvct-form__error" role="alert">{selfSetupError}</p>{/if}
+            </section>
+        {/if}
+        {#if selfSetupNotice}<p class="lvct-form__hint" role="status">{selfSetupNotice}</p>{/if}
 
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={running}>{text("formCancel", "取消")}</button>

@@ -10,7 +10,7 @@ function relationFixture(kernel, settings) {
         people, sections: new Map(), relationWrites: 0, sectionWrites: 0,
         skipRelationWrite: false, failRender: false, failAfterWrite: false,
         failSectionDoc: "", failSectionReadback: false, loseWriteResponse: false,
-        duplicateSectionDoc: "",
+        duplicateSectionDoc: "", emptyRelationShape: false, invalidRelationShape: false,
     };
     kernel.handler = async (route, body) => {
         if (route === "/api/av/renderAttributeView") {
@@ -19,7 +19,11 @@ function relationFixture(kernel, settings) {
                 columns: [{ id: settings.fieldMap.related, name: "相关人", type: "relation" }],
                 rows: people.map((person) => ({ id: person.itemId, cells: [
                     { valueType: "block", value: { keyID: "name", type: "block", block: { id: person.docId, content: person.name } } },
-                    { valueType: "relation", value: { keyID: settings.fieldMap.related, type: "relation", relation: { blockIDs: [...person.relatedItemIds] } } },
+                    state.invalidRelationShape && person.relatedItemIds.length === 0
+                        ? { valueType: "relation", value: { keyID: settings.fieldMap.related, type: "relation", relation: { blockIDs: [""] } } }
+                        : state.emptyRelationShape && person.relatedItemIds.length === 0
+                        ? { valueType: "relation", value: { keyID: settings.fieldMap.related, type: "relation" } }
+                        : { valueType: "relation", value: { keyID: settings.fieldMap.related, type: "relation", relation: { blockIDs: [...person.relatedItemIds] } } },
                 ] })),
             } };
         }
@@ -71,6 +75,23 @@ function relationFixture(kernel, settings) {
 }
 
 export async function runRelationRegression({ test, assert, kernel, settings }) {
+    await test("关系实际服务：空 relation 单元格省略 blockIDs 时按空值读取", async () => {
+        const state = relationFixture(kernel, settings);
+        state.emptyRelationShape = true;
+        const report = await addRelation(settings, state.people[0], state.people[1]);
+        assert(report.fact.status === "applied" && state.people[0].relatedItemIds.includes(state.people[1].itemId),
+            "省略 blockIDs 的空关系单元格不应阻断关系添加");
+    });
+
+    await test("关系实际服务：非空非法 blockIDs 仍阻断写入", async () => {
+        const state = relationFixture(kernel, settings);
+        state.invalidRelationShape = true;
+        let error;
+        try { await addRelation(settings, state.people[0], state.people[1]); } catch (cause) { error = cause; }
+        assert(error?.message === "相关人单元格读取异常，关系操作已停止" && state.relationWrites === 0,
+            "非法非空关系单元格不应被当作空关系覆盖");
+    });
+
     await test("关系实际服务：并发旧快照不丢边，反向重复零写入，双方文档回读核实", async () => {
         const state = relationFixture(kernel, settings);
         const [first, second, third] = state.people;

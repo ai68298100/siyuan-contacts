@@ -76,7 +76,8 @@
     const originalTags = tagsText;
     let saved = $state(false);
     // B12：编辑页面直接填写/选择组织归属与本人称谓。组织归属仍以 membership 为唯一事实源。
-    let profileLoading = $state(false);
+    // 资料区在首次挂载时先保持加载态，避免生命周期读取开始前短暂显示未初始化的输入框。
+    let profileLoading = $state(true);
     let profileBusy = $state(false);
     let profileError = $state("");
     let profileMessage = $state("");
@@ -115,15 +116,22 @@
         profileLoading = true;
         profileError = "";
         try {
-            const [relationship, memberships, candidates] = await Promise.all([
-                onLoadRelationshipLabels ? onLoadRelationshipLabels(person.docId) : Promise.resolve(null),
+            // 本人档案没有“与我的关系”这一条关系事实；跳过该读取，避免
+            // verifiedReferences 将 selfDocId === personDocId 判定为非法并阻断组织资料。
+            const [memberships, candidates] = await Promise.all([
                 onLoadOrgMemberships ? onLoadOrgMemberships(person.docId) : Promise.resolve([]),
                 onLoadOrgCandidates ? onLoadOrgCandidates() : Promise.resolve([]),
             ]);
-            relationshipSnapshot = relationship;
-            relationshipDraft = relationship?.record?.labels.join("、") ?? "";
             orgMemberships = memberships;
             orgCandidates = candidates;
+            if (!person.isSelf && onLoadRelationshipLabels) {
+                const relationship = await onLoadRelationshipLabels(person.docId);
+                relationshipSnapshot = relationship;
+                relationshipDraft = relationship?.record?.labels.join("、") ?? "";
+            } else {
+                relationshipSnapshot = null;
+                relationshipDraft = "";
+            }
         } catch (error) {
             profileError = error instanceof Error ? error.message : String(error);
         } finally { profileLoading = false; }
@@ -308,18 +316,20 @@
             <ClipboardPaste size={14}/>{text("qfOpen", "粘贴并识别")}
         </button>
     </div>
-    {#if profileSupported && !person.isSelf}
+    {#if profileSupported}
         <section class="lvct-detail__section lvct-person-edit__profile" aria-labelledby="lvct-person-edit-profile-title">
             <div class="lvct-detail__section-head">
                 <div>
-                    <h4 id="lvct-person-edit-profile-title">工作单位、学校与我的关系</h4>
-                    <p class="ft__smaller ft__on-surface">可直接填写关系称谓，或选择组织补充当前工作单位/学校。组织归属会保留历史，重复选择当前组织不会新增记录。</p>
+                    <h4 id="lvct-person-edit-profile-title">{person.isSelf ? "工作单位与学校" : "工作单位、学校与我的关系"}</h4>
+                    <p class="ft__smaller ft__on-surface">{person.isSelf
+                        ? "可选择组织补充当前工作单位/学校。组织归属会保留历史，重复选择当前组织不会新增记录。"
+                        : "可直接填写关系称谓，或选择组织补充当前工作单位/学校。组织归属会保留历史，重复选择当前组织不会新增记录。"}</p>
                 </div>
             </div>
             {#if profileLoading}
                 <p role="status">正在读取可编辑资料…</p>
             {:else}
-                {#if onLoadRelationshipLabels && onSaveRelationshipLabels}
+                {#if !person.isSelf && onLoadRelationshipLabels && onSaveRelationshipLabels}
                     <label class="lvct-form__item">
                         <span>与我的关系（多个称谓用顿号分隔）</span>
                         <input class="b3-text-field fn__block" type="text" maxlength="1600" bind:value={relationshipDraft} disabled={profileBusy} placeholder="例如：同事、朋友" />
