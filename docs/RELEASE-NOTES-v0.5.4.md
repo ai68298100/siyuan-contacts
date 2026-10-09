@@ -42,3 +42,9 @@
 ## 产物校验
 
 发布时附 `package.zip` 与 `package.zip.sha256`。下载后可通过 `Get-FileHash -Algorithm SHA256 package.zip` 或 `sha256sum package.zip` 核对。
+
+- 产物来源：main 合并提交 `7fa442471901a53d8d32900d2aeac22463870468`
+- [main CI run 37898536920](https://github.com/ai68298100/siyuan-contacts/actions/runs/37898536920)：全部通过
+- package.zip：527779 bytes
+- SHA-256：`0130fbc7eeeab99bbaa127e0a7e58392ba792e523648936d4b69227c9a39b5c3`
+- GitHub Release 下载附件已再次核验一致

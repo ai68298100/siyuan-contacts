@@ -1,11 +1,12 @@
 # 进度（PROGRESS）
 
-## 2026-10-09 v0.5.4 发布准备
+## 2026-10-09 v0.5.4 发布完成
 
 - 全量审计修复提交 `f81de94`、`2f0b598`：久未联系顺延改为一次性暂缓并恢复精确撤销；互动、跟进、节奏、收编索引、提醒和块 API 增加严格校验；迁移、报表与导出读取失败不再产生假空结果；仪表盘统一时间快照。
 - 发布门禁增加 ZIP SHA-256 实际比对；回归夹具改用合法稳定文档 ID；“建议”禁用入口显示原因；当前状态文档标明历史快照。
 - 最近完整验证：`pnpm check` 0 errors / 0 warnings、单测 549/549、桌面 UI 322/322、390px UI 323/323、宿主样式 UI 322/322、构建与发布门禁通过。
-- 按用户授权递增至 0.5.4，更新中英文 README、CHANGELOG、发布说明与清单；本次按开发分支 PR 普通合并、main CI、annotated tag 与 GitHub Release 发布。真实宿主、真机、多窗口仍未计为通过。
+- 按用户授权递增至 0.5.4，更新中英文 README、CHANGELOG、发布说明与清单；PR #23 普通合并至 main，提交 `7fa442471901a53d8d32900d2aeac22463870468`；[main CI run 37898536920](https://github.com/ai68298100/siyuan-contacts/actions/runs/37898536920) 全部通过。
+- annotated tag `v0.5.4` 指向上述 main 合并提交；[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.4) 已设为 Latest，附件来自 main CI。ZIP 527779 bytes，SHA-256 `0130fbc7eeeab99bbaa127e0a7e58392ba792e523648936d4b69227c9a39b5c3`；Release 下载包再次核验一致。本机忽略产物已替换为同一 CI 包，真实宿主、真机、多窗口仍未计为通过。
 
 ## 2026-10-08 两机统一发布 v0.5.0
 
