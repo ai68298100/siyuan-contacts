@@ -58,9 +58,15 @@ async function readFreshRoster(settings: ContactsSettings): Promise<ContactSumma
     if (columns.length !== 1 || columns[0].type !== "relation") throw new Error("相关人列映射缺失或类型不符，关系操作已停止");
     for (const row of rendered.view.rows) {
         const cells = row.cells.filter((cell) => cell.value.keyID === keyId);
-        if (cells.length > 1 || cells.some((cell) => cell.value.type !== "relation" || cell.valueType !== "relation"
-            || !Array.isArray(cell.value.relation?.blockIDs)
-            || cell.value.relation.blockIDs.some((itemId) => typeof itemId !== "string" || !itemId))) {
+        if (cells.length > 1 || cells.some((cell) => {
+            if (cell.value.type !== "relation" || cell.valueType !== "relation") return true;
+            // 思源不同版本对空 relation 单元格的渲染不完全一致：有的返回
+            // relation.blockIDs=[]，有的省略 relation 或 blockIDs。两者都表示空值；
+            // 只有出现非空但结构非法的 blockIDs 才应阻断关系写入。
+            const blockIDs = cell.value.relation?.blockIDs;
+            if (blockIDs === undefined || blockIDs === null) return false;
+            return !Array.isArray(blockIDs) || blockIDs.some((itemId) => typeof itemId !== "string" || !itemId);
+        })) {
             throw new Error("相关人单元格读取异常，关系操作已停止");
         }
     }

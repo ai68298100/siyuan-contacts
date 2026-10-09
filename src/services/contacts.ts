@@ -275,7 +275,12 @@ async function executeContactWritePlan(
  * 搜索/筛选在名册上做客户端过滤——万级以内的字符串过滤远快于反复打内核。
  */
 export async function listContacts(settings: ContactsSettings): Promise<ContactSummary[]> {
-    return enrichContactAliases(await enrichContactProfiles(await getRoster(settings)));
+    const people = await enrichContactAliases(await enrichContactProfiles(await getRoster(settings)));
+    // 与分页入口保持一致：所有打开人物详情的入口都必须保留本人标记，
+    // 否则首页/全局搜索打开「我自己」时会误显示与我的关系编辑项。
+    return people.map((person) => person.profile?.selfDocId === person.docId
+        ? { ...person, isSelf: true }
+        : person);
 }
 
 /** 客户端过滤：搜索词匹配姓名/电话/微信/邮箱/标签 */

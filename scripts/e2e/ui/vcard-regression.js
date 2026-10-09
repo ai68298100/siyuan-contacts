@@ -16,6 +16,7 @@ export function configureVcardKernel(kernel, settings) {
         markedOrganizations: new Set(),
         rejectCreate: false, loseCreate: false, hideMarker: false, failLookup: false,
         failBind: false, loseBind: false, skipBind: false, duplicateMarker: false, failField: false,
+        lookupGate: null, lookupStarted: false, releaseLookup: null,
     };
     kernel.handler = async (route, body) => {
         if (route === "/api/av/renderAttributeView") return { view: {
@@ -26,6 +27,11 @@ export function configureVcardKernel(kernel, settings) {
         if (route === "/api/query/sql") {
             if (state.failLookup) throw new Error("请求标记暂不可读");
             if (body.stmt.includes("SELECT DISTINCT root_id")) {
+                if (state.lookupGate) {
+                    state.lookupStarted = true;
+                    await state.lookupGate;
+                    state.lookupGate = null;
+                }
                 if (state.hideMarker) return [];
                 const requestId = body.stmt.match(/custom-lvct-(?:vcard|contact-draft)="([^"]+)"/)?.[1];
                 const docs = [...state.docs.values()].filter((doc) => doc.requestId === requestId);
@@ -239,7 +245,12 @@ export async function runVcardRegression({ test, assert, kernel, settings, fixtu
             await until(() => !document.querySelector('.lvct-closeguard'), "取消未恢复原报告");
             assert(closed === 0 && fixture.textContent.includes(requestId), "取消丢失原请求报告");
             state.hideMarker = false;
+            state.lookupGate = new Promise((resolve) => { state.releaseLookup = resolve; });
             [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("核对名册并重试")).click();
+            await until(() => state.lookupStarted, "重试没有进入核实名册阶段");
+            assert(button("返回联系人").disabled && [...fixture.querySelectorAll(".lvct-form__actions button")].find((node) => node.textContent.trim() === "关闭")?.disabled,
+                "核对重试期间离开按钮仍可点击，但会被关闭守卫静默阻止");
+            state.releaseLookup?.();
             await until(() => fixture.textContent.includes("✓ 成功（1）"), "恢复核实未完成导入");
             assert(state.creates.length === 1, "界面重试重复建档");
         } finally {

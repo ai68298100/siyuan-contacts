@@ -743,6 +743,14 @@ function editorController(settings: ContactsSettings, draft: ReturnType<typeof e
     return { controller, saved: () => saved, destroy: () => destroy() };
 }
 
+test("本人编辑资料保留组织入口且跳过自身关系读取", () => {
+    const source = readFileSync(new URL("../src/components/people/PersonEditDialog.svelte", import.meta.url), "utf8")
+        .replace(/\r\n/g, "\n");
+    assert.match(source, /\{#if profileSupported\}/, "本人档案也应显示工作单位/学校编辑区");
+    assert.match(source, /if \(!person\.isSelf && onLoadRelationshipLabels\)/, "本人档案不应读取自身关系称谓");
+    assert.match(source, /\{#if !person\.isSelf && onLoadRelationshipLabels && onSaveRelationshipLabels\}/, "关系称谓输入只应对非本人显示");
+});
+
 test("编辑器实际控制逻辑：重试只选未完成字段，原电话并发改变不被回退", async () => {
     const { state, settings, draft, phone } = fixture();
     state.outcomes.set("email", "reject");

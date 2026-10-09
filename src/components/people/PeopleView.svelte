@@ -53,6 +53,11 @@
         onOpenPersonDoc,
         onLoadOrgCandidates,
         onCreateOrganization,
+        onCreateSelfProfile,
+        onLoadSelfCandidates,
+        onPreviewSelfIdentityChange,
+        onApplySelfIdentityChange,
+        onValidateExtended,
         onSaveExtended,
         onPreferencesChange,
         isMobile = false,
@@ -78,6 +83,11 @@
         onOpenPersonDoc?: (docId: string) => void;
         onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string }>>;
         onCreateOrganization?: () => void;
+        onCreateSelfProfile?: () => Promise<import("../../domain/self-identity").SelfIdentity | null>;
+        onLoadSelfCandidates?: () => Promise<ContactSummary[]>;
+        onPreviewSelfIdentityChange?: (personItemId: string) => Promise<import("../../domain/self-identity").SelfIdentityChangePreview>;
+        onApplySelfIdentityChange?: (preview: import("../../domain/self-identity").SelfIdentityChangePreview) => Promise<import("../../domain/self-identity").SelfIdentity | null>;
+        onValidateExtended?: (details: ContactExtendedDraft) => Promise<void>;
         onSaveExtended?: (person: ContactSummary, details: ContactExtendedDraft) => Promise<void>;
         onPreferencesChange: (preferences: ViewPreferences, baseline?: ViewPreferences) => Promise<ViewPreferences>;
         /** B09-1：移动端工具栏收纳（常驻搜索/视图切换/新建，其余收进底部弹层） */
@@ -1148,8 +1158,8 @@
             <b>已选 {selectedIds.length} 人</b>
             <span>{selectionScopeLabel}；筛选外 {hiddenSelectionCount} 人</span>
             <button class="b3-button b3-button--outline" onclick={openBatch} disabled={batchBusy || exportingSelected}>批量编辑</button>
-            <button class="b3-button b3-button--outline" onclick={exportSelected}>导出 vCard</button>
-            <button class="b3-button b3-button--cancel lvct-people__remove" onclick={removeSelected} disabled={batchBusy}>从人脉移除</button>
+            <button class="b3-button b3-button--outline" onclick={exportSelected} disabled={batchBusy || exportingSelected}>导出 vCard</button>
+            <button class="b3-button b3-button--cancel lvct-people__remove" onclick={removeSelected} disabled={batchBusy || exportingSelected}>从人脉移除</button>
             <button class="b3-button b3-button--text" onclick={() => (selectedIds = [])} disabled={batchBusy || exportingSelected}>取消选择</button>
         </div>
     {/if}
@@ -1337,6 +1347,11 @@
                 onCreated={() => refresh()}
                 {onLoadOrgCandidates}
                 {onCreateOrganization}
+                {onCreateSelfProfile}
+                {onLoadSelfCandidates}
+                {onPreviewSelfIdentityChange}
+                {onApplySelfIdentityChange}
+                {onValidateExtended}
                 {onSaveExtended}
                 onClose={() => (adding = false)}
             />

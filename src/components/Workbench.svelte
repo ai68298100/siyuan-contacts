@@ -549,6 +549,20 @@
                     {onOpenPersonDoc}
                     onLoadOrgCandidates={async () => (await facade.listOrganizations()).filter((org) => !org.archived).map((org) => ({ docId: org.docId, name: org.name }))}
                     onCreateOrganization={openCreateOrganizationForContact}
+                    onCreateSelfProfile={() => facade.createSelfProfile()}
+                    onLoadSelfCandidates={() => facade.listContacts()}
+                    onPreviewSelfIdentityChange={(personItemId) => facade.previewSelfIdentityChange(personItemId)}
+                    onApplySelfIdentityChange={(preview) => facade.applySelfIdentityChange(preview)}
+                    onValidateExtended={async (details) => {
+                        if (details.orgDocId) {
+                            const organizations = await facade.listOrganizations();
+                            const selected = organizations.find((org) => org.docId === details.orgDocId);
+                            if (!selected || selected.archived) throw new Error("所选组织已不存在或已归档，请重新读取并选择可用组织");
+                        }
+                        if (details.relationshipLabels.trim() && !await facade.loadSelfIdentity()) {
+                            throw new Error("请先在设置中指定“我”的档案，再创建并填写与我的关系称谓");
+                        }
+                    }}
                     onSaveExtended={async (person, details) => {
                         if (details.orgDocId) {
                             const memberships = await facade.listPersonOrgMemberships(person.docId);

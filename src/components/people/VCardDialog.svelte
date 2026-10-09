@@ -167,6 +167,7 @@
     const reportUnknown = $derived(reportResults.filter((item) => item.status === "unknown"));
     const reportPending = $derived(reportResults.filter((item) => item.status === "pending"));
     const retryable: boolean = $derived(pickRetryCount(report) > 0);
+    const operationBusy = $derived(importing || parsing || exporting || retrying);
 
     async function runRetry(retryOnly = false) {
         if (!alive || retrying || !plans || !report) return;
@@ -307,7 +308,7 @@
         <ViewState compact icon={retryable ? "!" : "✓"}
             title={retryable ? text("vcardReportPartialTitle", "导入结束，部分联系人未完成") : text("vcardReportDoneTitle", "导入完成")}
             description={text("vcardReportSummary", "新增 {imported} 人，跳过 {skipped} 人，失败 {failed} 人，待核对 {unknown} 人。", { imported: report.imported, skipped: reportSkipped.length, failed: reportFailed.length, unknown: reportUnknown.length })}>
-            <button class="b3-button b3-button--text" onclick={() => guardedClose(onClose)}>{text("vcardBackToPeople", "返回联系人")}</button>
+            <button class="b3-button b3-button--text" onclick={() => guardedClose(onClose)} disabled={operationBusy}>{text("vcardBackToPeople", "返回联系人")}</button>
             <button class="b3-button b3-button--outline" onclick={() => guardedClose(() => fileInput?.click())} disabled={retrying}>{text("vcardPickOtherFile", "选择其他文件")}</button>
             <button class="b3-button b3-button--outline" onclick={downloadDiagnostics} disabled={retrying}>{text("vcardDiagnostics", "保存诊断信息")}</button>
             {#if retryable}
@@ -424,7 +425,7 @@
     {/if}
 
     <div class="lvct-form__actions">
-        <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={importing || parsing || exporting}>关闭</button>
+        <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={operationBusy}>关闭</button>
         {#if !report}
             <button class="b3-button b3-button--text" onclick={runImport} disabled={importing || parsing || exporting || !!errorText || !plans || selectedCount === 0}>
                 {importing ? "导入中…" : `导入为联系人（${selectedCount}）`}

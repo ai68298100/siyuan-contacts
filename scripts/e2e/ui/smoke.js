@@ -1411,6 +1411,45 @@ await test("新建草稿关闭前三选一：取消保留草稿，放弃后关�
     }
 });
 
+await test("新建联系人先核验组织和本人前置条件，不因补充资料失败留下半成品", async () => {
+    const state = configureVcardKernel(kernel, settings);
+    let selfIdentity = null;
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: {
+            settings,
+            loadRecentInteractions: async () => ({}),
+            loadSelfIdentity: async () => selfIdentity,
+            createSelfProfile: async () => {
+                selfIdentity = { schemaVersion: 1, selfDocId: "20260930000000-self001", selfItemId: "20260930000000-self002", createdAt: "2026-09-30" };
+                return selfIdentity;
+            },
+            loadPersonRelationshipLabels: async () => ({ selfDocId: selfIdentity?.selfDocId ?? "", record: null }),
+            savePersonRelationshipLabels: async () => {},
+            listContacts: async () => [],
+            listOrganizations: async () => [],
+        },
+    } });
+    button("新建联系人").click();
+    await until(() => fixture.querySelector(".lvct-form input[type=text]"), "新建弹窗未打开");
+    input(fixture.querySelector(".lvct-form input[type=text]"), "关系前置核验的人");
+    button("补充资料（可选）").click();
+    await tick();
+    const relationshipInput = fixture.querySelector('[placeholder^="例如：同事、朋友、校友"]');
+    input(relationshipInput, "同事");
+    button("创建联系人").click();
+    await until(() => [...fixture.querySelectorAll('[role="alert"]')].some((node) => node.textContent?.includes("先在设置中指定“我”的档案")), "本人身份缺失时没有给出创建前提示");
+    assert(state.creates.length === 0, "关系称谓缺少本人身份时仍创建了联系人文档");
+    assert(relationshipInput?.value === "同事", "前置条件失败后补充资料草稿丢失");
+    await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent?.includes("创建本人档案")), "本人档案设置入口未显示");
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent?.includes("创建本人档案"))?.click();
+    await until(() => fixture.textContent.includes("本人档案已设置"), "本人档案设置没有成功反馈");
+    assert(relationshipInput?.value === "同事", "设置本人档案后联系人补充资料草稿丢失");
+    button("创建联系人").click();
+    await until(() => state.creates.length === 1, "设置本人档案后未能继续创建联系人");
+});
+
 await test("busy 独立阻断：创建挂起时关闭不卸载弹窗，完成后可正常关闭（CODE-02.1）", async () => {
     let releaseCreate = () => {};
     const createGate = new Promise((resolve) => { releaseCreate = resolve; });
@@ -2474,6 +2513,33 @@ await test("B12 编辑界面：关系称谓可填写，工作单位与学校可�
     await until(() => saved === 1, "资料补充保存未完成");
     assert(relationship?.labels.join("、") === "同事、朋友", "关系称谓未保存");
     assert(added.length === 2 && added.some((item) => item.extra.affiliationKind === "work") && added.some((item) => item.extra.affiliationKind === "education"), "工作单位/学校归属未写入");
+});
+
+await test("B12 编辑界面：本人可选择工作单位与学校且不显示自身关系称谓", async () => {
+    const added = [];
+    let saved = 0;
+    mounted = mount(PersonEditDialog, { target: fixture, props: {
+        settings, person: { ...person, isSelf: true },
+        onLoadRelationshipLabels: async () => { throw new Error("本人不应读取关系称谓"); },
+        onSaveRelationshipLabels: async () => { throw new Error("本人不应保存关系称谓"); },
+        onLoadOrgMemberships: async () => [],
+        onLoadOrgCandidates: async () => [{ docId: "org-work", name: "测试公司" }, { docId: "org-school", name: "测试学校" }],
+        onAddOrgMembership: async (docId, orgDocId, extra) => { added.push({ docId, orgDocId, extra }); },
+        onSaved: () => { saved += 1; }, onClose: () => {},
+    } });
+    await until(() => fixture.querySelectorAll(".lvct-person-edit__profile select").length === 2, `本人编辑页未显示组织选择：${fixture.textContent}`);
+    assert(!fixture.querySelector('.lvct-person-edit__profile input[maxlength="1600"]'), "本人编辑页不应显示与我的关系输入");
+    const selects = [...fixture.querySelectorAll(".lvct-person-edit__profile select")];
+    selects[0].value = "org-work";
+    selects[0].dispatchEvent(new Event("change", { bubbles: true }));
+    selects[1].value = "org-school";
+    selects[1].dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    button("保存这些资料").click();
+    await until(() => saved === 1, "本人组织归属保存未完成");
+    assert(added.length === 2 && added.every((item) => item.docId === person.docId)
+        && added.some((item) => item.extra.affiliationKind === "work")
+        && added.some((item) => item.extra.affiliationKind === "education"), "本人工作单位/学校归属未写入");
 });
 
 await test("CODE-02.4 编辑写前预校验：非法生日/邮箱零写入，逐字段失败报告可重试", async () => {
