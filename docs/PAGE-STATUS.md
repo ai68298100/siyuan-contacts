@@ -1,6 +1,6 @@
 # 页面状态矩阵（PAGE-01.0）
 
-> **2026-10-09 当前发布候选：** v0.5.4 已完成本地构建准备（`package.json`/`plugin.json` 版本一致）；v0.5.3 仍是 GitHub Latest Release，v0.5.4 需经 PR、main CI、tag 和 Release 后才算发布。最近一次完整门禁为 `pnpm test` 549/549、`pnpm check` 0 errors / 0 warnings、桌面 UI 322/322、390px UI 323/323、宿主样式 UI 322/322；`package.zip` 与 `.sha256` 已纳入发布校验。下方 2026-10-08 及更早数字均为历史快照，不代表当前版本；真实思源多窗口、真机系统返回和宿主初始化仍保持 Host pending。
+> **2026-10-09 当前发布基线：** v0.5.4 已通过 PR #23 普通合并、main CI run 37898536920、annotated tag 和 GitHub Latest Release 发布（`package.json`/`plugin.json` 版本一致）。最近一次完整门禁为 `pnpm test` 549/549、`pnpm check` 0 errors / 0 warnings、桌面 UI 322/322、390px UI 323/323、宿主样式 UI 322/322；`package.zip` 与 `.sha256` 已纳入发布校验，Release 下载附件核验一致。下方 2026-10-08 及更早数字均为历史快照，不代表当前版本；真实思源多窗口、真机系统返回和宿主初始化仍保持 Host pending。
 
 > 2026-10-04 本人闭环增量（历史快照）：初始化可跳过本人，失败保留继续入口；设置支持指定/换绑/清除的影响预览与安全确认；首页排除本人并将身份失配/读取失败显示为未核实范围。当时记录的“九模块、304 单测”仅用于还原该日期状态；当前迁移包已覆盖 12 个插件自管模块，当前单测以顶部开发基线为准。真实宿主/真机/多窗口保持待验。
 

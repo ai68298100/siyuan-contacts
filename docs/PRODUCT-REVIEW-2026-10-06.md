@@ -4,7 +4,7 @@
 评审范围：当前工作区代码、测试、发布产物、产品文档、UI 回归与待办。
 执行入口：本文件负责产品判断和跨模块待办；可认领的原子开发任务仍登记在 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md)。
 
-> **历史文档提示（2026-10-09）：** 本文记录 2026-10-06 的阶段评审，文内 v0.4.1、旧 HEAD 与 538/538 等数字仅用于追溯。当前发布基线已更新为 v0.5.3，最新门禁数据请以 [PAGE-STATUS](PAGE-STATUS.md) 和 [UI-REGRESSION](UI-REGRESSION.md) 顶部为准。
+> **历史文档提示（2026-10-09）：** 本文记录 2026-10-06 的阶段评审，文内 v0.4.1、旧 HEAD 与 538/538 等数字仅用于追溯。当前发布基线已更新为 v0.5.4，最新门禁数据请以 [PAGE-STATUS](PAGE-STATUS.md) 和 [UI-REGRESSION](UI-REGRESSION.md) 顶部为准。
 
 > **2026-10-08 验证刷新：** 当前开发分支 `dev/thispc-1002` 的 HEAD 为 `7ac1e0e`（v0.4.1 之后的未发布开发基线）；串行单测为 **538/538**，桌面 UI 回归为 **322/322**、390px UI 回归为 **322/322**；`pnpm check` 为 0 errors / 0 warnings。`7a93553` 的 [GitHub CI](https://github.com/ai68298100/siyuan-contacts/actions/runs/37677079796) 只对应前一同步点，不代表合并后 HEAD 已发布。原评审表中的 513/513、314/315、315/316 及 536/536 是历史快照，保留用于解释当时状态，不作为当前单测数字。
 
