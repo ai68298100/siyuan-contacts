@@ -12,7 +12,8 @@ export interface RegistryStore {
 
 export const REGISTRY_STORE_VERSION = 1;
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+import { isValidDateKey } from "./date-key.ts";
+
 /** 人物文档 ID（与 SQL 安全面同一校验） */
 const DOC_ID_RE = /^\d{14}-[0-9a-z]{7}$/;
 
@@ -26,7 +27,7 @@ export function normalizeRegistryStore(raw: unknown): RegistryStore {
     const registeredAt: Record<string, string> = {};
     for (const [docId, date] of Object.entries(record.registeredAt as Record<string, unknown>)) {
         if (!DOC_ID_RE.test(docId)) continue;
-        if (typeof date !== "string" || !DATE_RE.test(date)) continue;
+        if (!isValidDateKey(date)) continue;
         registeredAt[docId] = date;
     }
     return { schemaVersion: REGISTRY_STORE_VERSION, registeredAt };
@@ -41,6 +42,7 @@ export function ensureRegistryEntries(
     docIds: readonly string[],
     today: string,
 ): { registeredAt: Record<string, string>; added: string[] } {
+    if (!isValidDateKey(today)) return { registeredAt: { ...store.registeredAt }, added: [] };
     const merged: Record<string, string> = { ...store.registeredAt };
     const added: string[] = [];
     for (const docId of docIds) {
@@ -57,14 +59,15 @@ export function ensureRegistryEntries(
  */
 export function isWithinGrace(registeredAt: string | undefined, today: string, graceDays: number): boolean {
     if (graceDays <= 0) return false;
+    if (!isValidDateKey(today)) return false;
     if (registeredAt === undefined) return true;
-    if (!DATE_RE.test(registeredAt) || !DATE_RE.test(today)) return false;
+    if (!isValidDateKey(registeredAt) || !isValidDateKey(today)) return false;
     return daysBetween(registeredAt, today) < graceDays;
 }
 
 /** registeredAt → today 的自然日差（含当天为 0）；日期非法返回 Infinity（按已过期处理） */
 export function daysBetween(from: string, to: string): number {
-    if (!DATE_RE.test(from) || !DATE_RE.test(to)) return Number.POSITIVE_INFINITY;
+    if (!isValidDateKey(from) || !isValidDateKey(to)) return Number.POSITIVE_INFINITY;
     const [fy, fm, fd] = from.split("-").map(Number);
     const [ty, tm, td] = to.split("-").map(Number);
     return Math.round((new Date(ty, tm - 1, td).getTime() - new Date(fy, fm - 1, fd).getTime()) / 86400000);

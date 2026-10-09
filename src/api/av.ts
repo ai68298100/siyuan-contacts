@@ -207,13 +207,22 @@ export interface AvBlockRef {
  */
 export async function findAvBlocksInDoc(docId: string): Promise<AvBlockRef[]> {
     if (!ID_PATTERN.test(docId)) throw new Error("docId 不是合法的思源 ID");
-    const rows = await querySql<{ id: string; parent_id: string; markdown: string }>(
+    const rows = await querySql<unknown>(
         `SELECT id, parent_id, markdown FROM blocks WHERE parent_id = '${docId}' AND type = 'av'`,
     );
     const refs: AvBlockRef[] = [];
-    for (const row of rows) {
+    for (const raw of rows) {
+        const row = assertKernelRecord("/api/query/sql", raw);
+        if (typeof row.id !== "string" || !ID_PATTERN.test(row.id)
+            || typeof row.parent_id !== "string" || !ID_PATTERN.test(row.parent_id)
+            || typeof row.markdown !== "string") {
+            throw new KernelProtocolError("/api/query/sql", "数据库块扫描返回异常形状，未继续选择锚点");
+        }
+        if (row.parent_id !== docId) {
+            throw new KernelProtocolError("/api/query/sql", "数据库块扫描返回了错误父文档，未继续选择锚点");
+        }
         const avId = parseAvIdFromBlockMarkdown(row.markdown);
-        if (!avId || !ID_PATTERN.test(row.id) || !ID_PATTERN.test(row.parent_id)) continue;
+        if (!avId) continue;
         refs.push({ dbBlockId: row.id, hostDocId: row.parent_id, avId });
     }
     return refs;

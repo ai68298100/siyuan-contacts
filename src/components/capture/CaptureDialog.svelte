@@ -374,9 +374,16 @@
     async function retryAiExtras(): Promise<void> {
         if (running || !result || result.complete === false) return;
         running = true;
+        extrasError = "";
         try {
             await applyAiExtras();
             aiExtrasApplied = aiExtrasComplete();
+        } catch (error) {
+            // The primary capture result is already complete; a failed retry
+            // must stay visible as a recoverable AI-extra error instead of
+            // becoming an unhandled promise rejection with no feedback.
+            aiExtrasApplied = false;
+            extrasError = error instanceof Error ? error.message : String(error);
         } finally {
             running = false;
         }

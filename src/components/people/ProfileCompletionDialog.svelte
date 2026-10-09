@@ -8,6 +8,7 @@
     import { importAnchor, snapshotCompletionPeople } from "../../domain/import.ts";
     import { untrack } from "svelte";
     import GroupField from "./GroupField.svelte";
+    import BirthdayField from "./BirthdayField.svelte";
     import type { ContactDraft, ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
     import { useCloseGuard } from "../close-guard";
@@ -185,14 +186,10 @@
                 </label>
             {/each}
             {#if missingBirthday}
-                <label class="lvct-form__item">
+                <div class="lvct-form__item">
                     <span>{text("formBirthday", "生日")}</span>
-                    <input class="b3-text-field fn__block" type="date" bind:value={draft.birthday} disabled={running || paused || submittedRequest !== null} />
-                </label>
-                <label class="lvct-form__item lvct-form__item--inline">
-                    <span>{text("formLunar", "农历")}</span>
-                    <input class="b3-switch" type="checkbox" bind:checked={draft.isLunar} disabled={running || paused || submittedRequest !== null} />
-                </label>
+                    <BirthdayField label={text("formBirthday", "生日")} value={draft.birthday} isLunar={draft.isLunar} disabled={running || paused || submittedRequest !== null} onValueChange={(value) => (draft.birthday = value)} onModeChange={(isLunar) => (draft.isLunar = isLunar)} />
+                </div>
             {/if}
             {#if missingGroup}
                 <GroupField {i18n} value={draft.group} onValueChange={(value) => (draft.group = value)} onValidityChange={(valid) => (groupValid = valid)} label={text("formGroup", "分组")} ungroupedLabel={text("formUngrouped", "未分组")} disabled={running || paused || submittedRequest !== null} />

@@ -66,6 +66,7 @@ test("normalize：脏数据降级为空库，合法数据过虑保留", () => {
             event({ id: "ok" }),
             { id: "", personDocId: "d", occurredAt: 1, localDate: "2026-01-01", source: "manual" },
             event({ id: "bad-date", localDate: "2026/01/01" }),
+            event({ id: "bad-calendar-date", localDate: "2026-02-30" }),
             event({ id: "bad-source", source: "hack" }),
         ],
         tombstones: ["t1", 42],

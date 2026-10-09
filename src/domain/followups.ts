@@ -32,6 +32,9 @@ export interface FollowUpStore {
 
 export const FOLLOW_UP_STORE_VERSION = 1;
 
+import { isValidDateKey } from "./date-key.ts";
+export { isValidDateKey } from "./date-key.ts";
+
 /** 推迟语义选项（Google Inbox snooze 语义）：不做裸日期选择器，「指定日期」为唯一显式入口 */
 export type SnoozeOption = "tomorrow" | "threeDays" | "nextMonday" | "nextMonth" | "custom";
 
@@ -55,15 +58,6 @@ export function hasFollowUpDraft(state: FollowUpDraftState): boolean {
     return state.title.trim() !== state.savedTitle.trim()
         || state.dueDate !== state.savedDueDate
         || state.snoozeCustomDate.trim().length > 0;
-}
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-export function isValidDateKey(value: string): boolean {
-    if (!DATE_RE.test(value)) return false;
-    const [year, month, day] = value.split("-").map(Number);
-    const date = new Date(year, month - 1, day);
-    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 
 function toDate(dateKey: string): Date {
@@ -116,7 +110,7 @@ function isFollowUpItem(raw: unknown): raw is FollowUpItem {
     return typeof item.id === "string" && item.id.length > 0 &&
         typeof item.personDocId === "string" && item.personDocId.length > 0 &&
         typeof item.title === "string" &&
-        typeof item.dueDate === "string" && DATE_RE.test(item.dueDate) &&
+        typeof item.dueDate === "string" && isValidDateKey(item.dueDate) &&
         (item.status === "open" || item.status === "done" || item.status === "cancelled") &&
         typeof item.createdAt === "number" && Number.isFinite(item.createdAt) &&
         typeof item.updatedAt === "number" && Number.isFinite(item.updatedAt) &&

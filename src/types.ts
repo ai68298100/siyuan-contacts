@@ -131,7 +131,9 @@ export interface ContactsPluginFacade {
     /** B13.5c：组织标记 keyset 分页；旧宿主未提供时由组织页回退全量列举 */
     listOrganizationsPage?(options?: { afterRootId?: string; limit?: number }): Promise<import("./services/org").OrganizationPage>;
     /** B13.3：新建组织（文档 + custom-lvct-org 标记区块；同名拒绝） */
-    createOrganization(name: string): Promise<{ docId: string }>;
+    createOrganization(name: string, profile?: import("./domain/organization-profile").OrganizationProfileDraft): Promise<{ docId: string; profileSaved?: boolean; profileError?: string }>;
+    loadOrganizationProfile?(orgDocId: string): Promise<import("./domain/organization-profile").OrganizationProfileDraft | null>;
+    saveOrganizationProfile?(orgDocId: string, profile: import("./domain/organization-profile").OrganizationProfileDraft): Promise<import("./domain/organization-profile").OrganizationProfileDraft>;
     /** B13.3：组织成员列举（join 名册姓名） */
     listOrganizationMembers(orgDocId: string): Promise<import("./services/org").OrganizationMember[]>;
     /** B13.5b：组织成员稳定分页与筛选；旧宿主未提供时由 UI 回退全量列举 */

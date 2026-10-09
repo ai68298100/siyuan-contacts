@@ -491,7 +491,7 @@ await test("设置页实际扫描：未知读取可重试，候选跨轮去重�
     assert(![...fixture.querySelectorAll("button")].some((node) => node.textContent.trim() === "继续扫描"), "扫描完成仍可重复续做");
 });
 
-await test("首页零人筛选保持空结果，清除后恢复联系人", async () => {
+await test("首页零结果统计卡进入联系人全量列表", async () => {
     mounted = mount(Workbench, { target: fixture, props: {
         settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
         onPreferencesUpdated() {}, onOpenPersonDoc() {},
@@ -502,10 +502,28 @@ await test("首页零人筛选保持空结果，清除后恢复联系人", async
     } });
     await until(() => fixture.querySelectorAll('.lvct-dash__stat').length === 4, "首页未加载");
     [...fixture.querySelectorAll('.lvct-dash__stat')].find((node) => node.textContent.includes("从未互动")).click();
-    await until(() => fixture.textContent.includes("当前筛选下没有联系人"), "零人筛选错误地显示全名册");
-    assert(!fixture.querySelector(".lvct-person-card"), "零人筛选不应出现卡片");
-    button("清除所有筛选").click();
-    await until(() => fixture.querySelector(".lvct-person-card"), "清除首页筛选未恢复联系人");
+    await until(() => fixture.querySelector(".lvct-person-card"), "零结果统计卡未恢复全量联系人");
+    assert(!fixture.textContent.includes("来自首页：从未互动"), "零结果统计卡不应留下空筛选标签");
+});
+
+await test("首页搜索下推后清除条件同步清空首页搜索框", async () => {
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadRecentInteractions: async () => ({}), loadDashboard: async () => ({
+            people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+            stale: [], neverContacted: 0, neverContactedItemIds: [],
+        }) },
+    } });
+    const homeSearch = () => fixture.querySelector('.lvct-workbench__header-actions input');
+    await until(() => homeSearch(), "首页搜索框未渲染");
+    input(homeSearch(), "不存在的人");
+    await until(() => fixture.querySelector('.lvct-people__conditions')?.textContent.includes("不存在的人"), "首页搜索未下推到联系人页");
+    [...fixture.querySelectorAll('.lvct-people__condition')].find((node) => node.textContent.includes("不存在的人")).click();
+    await until(() => fixture.querySelector('.lvct-person-card'), "清除搜索条件未恢复联系人");
+    navButton(["首页"]).click();
+    await until(() => homeSearch(), "清除搜索后未返回首页");
+    assert(homeSearch().value === "", "联系人页清除条件后首页搜索框仍保留旧值");
 });
 
 await test("工作台导航文字单行展示，不再被图标盒压成逐字竖排（UX-01.3）", async () => {
@@ -1177,6 +1195,26 @@ await test("行内快捷处置：生日跳过本年、从未互动不再提醒�
     await until(() => dismissals.some((entry) => entry.kind === "birthday"), "生日跳过未写入");
     const year = new Date().getFullYear();
     assert(dismissals.find((entry) => entry.kind === "birthday").until === `${year}-12-31`, "跳过本年 until 应为年底");
+    /* 生日行动行的更多菜单提供今日、未来 7 天和长期不再提醒，避免只有跳过本年。 */
+    const birthdayMoreButton = () => [...fixture.querySelectorAll("button")]
+        .find((node) => (node.getAttribute("aria-label") ?? "").includes("更多处置") && (node.getAttribute("aria-label") ?? "").includes("寿星甲"));
+    assert(birthdayMoreButton(), "生日行动行缺更多处置按钮");
+    birthdayMoreButton().click();
+    await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent === "今天不再提醒"), "生日暂缓菜单未展开");
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent === "今天不再提醒").click();
+    await until(() => dismissals.filter((entry) => entry.kind === "birthday").length >= 2, "生日今日暂缓未写入");
+    const today = new Date();
+    const pad = (value) => String(value).padStart(2, "0");
+    const todayKey = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+    assert(dismissals.at(-1).until === todayKey, "生日今日暂缓 until 应为今天");
+    birthdayMoreButton().click();
+    await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent === "未来 7 天不再提醒"), "生日未来暂缓菜单未展开");
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent === "未来 7 天不再提醒").click();
+    await until(() => dismissals.filter((entry) => entry.kind === "birthday").length >= 3, "生日未来暂缓未写入");
+    const future = new Date();
+    future.setDate(future.getDate() + 7);
+    const futureKey = `${future.getFullYear()}-${pad(future.getMonth() + 1)}-${pad(future.getDate())}`;
+    assert(dismissals.at(-1).until === futureKey, "生日未来 7 天暂缓 until 应为目标日期");
     /* 从未互动行动行：组默认折叠 → 展开组头 → ⋯ → 不再提醒（长期，统计口径不变由服务层保证） */
     const neverHead = [...fixture.querySelectorAll(".lvct-dash__group-head")]
         .find((node) => node.textContent.includes("从未互动"));
@@ -1229,6 +1267,13 @@ await test("近期生日行：主按钮可聚焦打开详情，跳过按钮不�
     skipButton.click();
     await until(() => dismissals.length === 1, "跳过本年未写入");
     assert(opened.length === 1, "跳过本年按钮不应再次打开详情");
+    const birthdayMore = fixture.querySelector('[aria-label="更多生日处置：键盘寿星"]');
+    assert(birthdayMore, "近期生日行缺少更多处置入口");
+    birthdayMore.click();
+    await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent === "不再提醒"), "近期生日更多处置菜单未展开");
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent === "不再提醒").click();
+    await until(() => dismissals.length === 2, "近期生日长期暂缓未写入");
+    assert(dismissals.at(-1).until === "", "近期生日长期暂缓应写入空 until");
 });
 
 await test("收编宽限期与批量安顿：只撤销本批且保留并发修改（C02/C06）", async () => {
@@ -3579,6 +3624,7 @@ await test("首页生日/跟进「查看全部」携带联系人深链集合与�
 await test("设置页可按列类型手动恢复字段映射并拒绝空提交", async () => {
     let repaired;
     let checked = false;
+    let savedPreference;
     const columns = FIELD_SPECS
         .filter((field) => field.key !== "phone")
         .map((field) => ({ id: field.key, name: field.nameZh, type: field.type }));
@@ -3594,7 +3640,7 @@ await test("设置页可按列类型手动恢复字段映射并拒绝空提交",
         repairFieldMap: async (patch) => { repaired = patch; return { ...settings, fieldMap: { ...settings.fieldMap, ...patch } }; },
         rebuildMissingFields: async () => settings,
         rebindSettings: async () => settings,
-        saveViewPreferences: async (value) => value,
+        saveViewPreferences: async (value) => { savedPreference = value; return value; },
         exportInteractionJson: async () => "{}",
         openHostDoc() {},
     };
@@ -3602,6 +3648,18 @@ await test("设置页可按列类型手动恢复字段映射并拒绝空提交",
         facade, settings, preferences: DEFAULT_VIEW_PREFERENCES,
         onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {},
     } });
+    assert(fixture.textContent.includes("图谱默认数据源") && fixture.textContent.includes("文档引用图默认范围"), "通用设置未提供图谱默认项");
+    const graphSelects = [...fixture.querySelectorAll(".lvct-settings__form-grid select")];
+    assert(graphSelects.some((node) => [...node.options].some((option) => option.value === "native")), "图谱数据源设置项缺失");
+    assert(graphSelects.some((node) => [...node.options].some((option) => option.value === "global")), "引用图范围设置项缺失");
+    const graphModeSelect = graphSelects.find((node) => [...node.options].some((option) => option.value === "native"));
+    const graphScopeSelect = graphSelects.find((node) => [...node.options].some((option) => option.value === "global"));
+    graphModeSelect.value = "native";
+    graphModeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    graphScopeSelect.value = "global";
+    graphScopeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    button("保存偏好").click();
+    await until(() => savedPreference?.graphMode === "native" && savedPreference?.nativeScope === "global", "图谱默认项未保存");
     if (window.innerWidth <= 640) {
         const layoutEl = fixture.querySelector(".lvct-settings__layout");
         const navEl = fixture.querySelector(".lvct-settings__nav");

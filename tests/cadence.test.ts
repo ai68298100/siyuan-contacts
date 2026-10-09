@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { loadPersonCadence } from "../src/data/cadences.ts";
 import { normalizeCadenceMap, normalizeCadenceMapForWrite } from "../src/domain/cadence.ts";
 import { staleContacts } from "../src/domain/interactions.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
@@ -46,6 +47,16 @@ test("节奏存储：写前包络检查，损坏抛错、空串可首次保存",
     assert.equal(normalizeCadenceMapForWrite({ schemaVersion: 1, cadences: { [DOC_A]: { days: 0 } } })[DOC_A].days, 1);
     assert.deepEqual(normalizeCadenceMapForWrite(""), {});
     assert.deepEqual(normalizeCadenceMapForWrite(null), {});
+});
+
+test("人物节奏读取：磁盘读取失败必须保留错误，不能伪装成跟随全局", async () => {
+    const failing = {
+        loadData: async () => { throw new Error("模拟磁盘故障"); },
+    } as never;
+    await assert.rejects(loadPersonCadence(failing, DOC_A), /存储读取失败.*person-cadences\.json/);
+
+    const missing = { loadData: async () => null } as never;
+    assert.equal(await loadPersonCadence(missing, DOC_A), null);
 });
 
 test("久未联系：覆盖阈值生效、暂停整体隐藏、从未互动保留、补录不错误覆盖较新记录", () => {

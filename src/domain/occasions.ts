@@ -17,6 +17,35 @@ export interface BirthdayProjection {
     label: string;
 }
 
+/**
+ * 将资料中存储的生日转换为用户可读的日期。
+ *
+ * 农历生日仍以 YYYY-MM-DD 保存（年份是出生年份，月日是农历月日），
+ * 直接把该值显示成公历格式很容易让人误以为两种日期相同。列表、详情
+ * 和导入预览统一使用此函数，明确显示农历月日和出生年份。
+ */
+export function formatBirthdayDisplay(birthday: string, isLunar: boolean): string {
+    const parsed = parseLocalDate(birthday);
+    if (!parsed) {
+        // 外部编辑/旧数据可能留下形如 YYYY-MM-DD 但实际不存在的日期。
+        // 保留原值便于核对，同时明确历法，避免用户把它当成普通公历值。
+        return /^\d{4}-\d{2}-\d{2}$/.test(birthday)
+            ? `${birthday}（${isLunar ? "农历" : "公历"}，日期待核实）`
+            : birthday;
+    }
+    if (!isLunar) return `${birthday}（公历）`;
+    if (!lunarToSolar(parsed.getFullYear(), parsed.getMonth() + 1, parsed.getDate())) {
+        return `${birthday}（农历，日期待核实）`;
+    }
+    const label = formatLunar({
+        year: parsed.getFullYear(),
+        month: parsed.getMonth() + 1,
+        day: parsed.getDate(),
+        leap: false,
+    });
+    return `${label}（农历，出生年 ${parsed.getFullYear()}）`;
+}
+
 /** YYYY-MM-DD → 本地零点 Date；非法返回 undefined */
 function parseLocalDate(value: string): Date | undefined {
     const parts = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);

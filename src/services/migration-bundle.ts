@@ -33,13 +33,16 @@ import { scanOrganizations } from "./org";
 import { loadRelationshipLabelStore, mergeRelationshipLabelStore, RELATIONSHIP_LABEL_STORAGE_KEY } from "../data/person-relationship-labels";
 import { parsePersonRelationshipLabelStore } from "../domain/person-relationship-labels";
 import type { PersonRelationshipLabelStore } from "../domain/person-relationship-labels";
+import { loadOrganizationProfiles, saveOrganizationProfile, ORGANIZATION_PROFILES_STORAGE_KEY } from "../data/organization-profiles";
+import { validateOrganizationProfile } from "../domain/organization-profile";
+import type { OrganizationProfileDraft } from "../domain/organization-profile";
 import { capturePeopleProfileLifetime, verifyRelationshipLabelReferences } from "./people-profiles";
 
 const BUNDLE_SCHEMA_VERSION = 1;
 export const MIGRATION_BUNDLE_STORAGE_KEY = "lvct-migration-bundle";
 
 export interface MigrationModulePreview {
-    key: "interactions" | "followUps" | "cadences" | "reminderDismissals" | "registry" | "templates" | "exchanges" | "aliases" | "selfIdentity" | "orgMemberships" | "relationshipLabels";
+    key: "interactions" | "followUps" | "cadences" | "reminderDismissals" | "registry" | "templates" | "exchanges" | "aliases" | "selfIdentity" | "orgMemberships" | "organizationProfiles" | "relationshipLabels";
     label: string;
     count: number;
     tombstones?: number;
@@ -56,6 +59,7 @@ export const MIGRATION_COVERAGE = [
     { key: PERSON_ALIAS_STORAGE_KEY, status: "included", module: "aliases" },
     { key: SELF_IDENTITY_STORAGE_KEY, status: "included", module: "selfIdentity" },
     { key: ORG_MEMBERSHIP_STORAGE_KEY, status: "included", module: "orgMemberships" },
+    { key: ORGANIZATION_PROFILES_STORAGE_KEY, status: "included", module: "organizationProfiles" },
     { key: RELATIONSHIP_LABEL_STORAGE_KEY, status: "included", module: "relationshipLabels" },
     { key: "org-projection-checkpoints.json", status: "excluded", reason: "本工作区未完成文档投影请求，不跨库重放" },
     { key: "organization-operations.json", status: "excluded", reason: "本工作区组织创建/改名操作断点，不跨库重放" },
@@ -75,6 +79,7 @@ interface BundleModules {
     aliases?: PersonAliasStore;
     selfIdentity?: { schemaVersion: 1; identity: SelfIdentity | null };
     orgMemberships?: OrgMembershipStore;
+    organizationProfiles?: { schemaVersion: 1; profiles: Record<string, OrganizationProfileDraft> };
     relationshipLabels?: PersonRelationshipLabelStore;
 }
 
@@ -86,7 +91,7 @@ interface MigrationBundle {
 }
 
 const MIGRATION_MODULE_KEYS = new Set<MigrationModulePreview["key"]>([
-    "interactions", "followUps", "cadences", "reminderDismissals", "registry", "templates", "exchanges", "aliases", "selfIdentity", "orgMemberships", "relationshipLabels",
+    "interactions", "followUps", "cadences", "reminderDismissals", "registry", "templates", "exchanges", "aliases", "selfIdentity", "orgMemberships", "organizationProfiles", "relationshipLabels",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -136,6 +141,15 @@ function validateBundleModules(value: unknown): asserts value is BundleModules {
     if (value.exchanges !== undefined) parseExchangeStore(requireModuleEnvelope(value.exchanges, "往来账本"));
     if (value.aliases !== undefined) parsePersonAliasStore(requireModuleEnvelope(value.aliases, "人物别名"));
     if (value.orgMemberships !== undefined) normalizeOrgMembershipStoreForWrite(requireModuleEnvelope(value.orgMemberships, "组织成员"));
+    if (value.organizationProfiles !== undefined) {
+        const module = requireModuleEnvelope(value.organizationProfiles, "组织资料");
+        if (!isRecord(module.profiles)) throw new Error("组织资料模块字段损坏，拒绝导入");
+        for (const [docId, profile] of Object.entries(module.profiles)) {
+            if (!/^\d{14}-[0-9a-z]{7}$/.test(docId)) throw new Error("组织资料包含非法文档 ID，拒绝导入");
+            const checked = validateOrganizationProfile(profile as OrganizationProfileDraft);
+            if (!checked.valid) throw new Error(`组织资料 ${docId} 校验失败：${checked.errors.join("、")}`);
+        }
+    }
     if (value.relationshipLabels !== undefined) parsePersonRelationshipLabelStore(requireModuleEnvelope(value.relationshipLabels, "与我的关系"));
     if (value.selfIdentity !== undefined) {
         const module = requireModuleEnvelope(value.selfIdentity, "本人身份");
@@ -164,7 +178,7 @@ function parseBundle(text: string): MigrationBundle {
 }
 
 export async function exportMigrationBundle(plugin: Plugin): Promise<string> {
-    const [interactions, followUps, cadences, reminderDismissals, registry, templatesStore, exchanges, aliases, identity, orgMemberships, relationshipLabels] = await Promise.all([
+    const [interactions, followUps, cadences, reminderDismissals, registry, templatesStore, exchanges, aliases, identity, orgMemberships, organizationProfiles, relationshipLabels] = await Promise.all([
         JSON.parse(await exportInteractionJson(plugin)) as BundleModules["interactions"],
         JSON.parse(await exportFollowUpsJson(plugin)) as BundleModules["followUps"],
         loadCadenceMap(plugin),
@@ -175,6 +189,7 @@ export async function exportMigrationBundle(plugin: Plugin): Promise<string> {
         withStoreLock(PERSON_ALIAS_STORAGE_KEY, () => loadPersonAliasStore(plugin)),
         withStoreLock(SELF_IDENTITY_STORAGE_KEY, () => loadSelfIdentity(plugin)),
         withStoreLock(ORG_MEMBERSHIP_STORAGE_KEY, () => loadOrgMembershipStore(plugin)),
+        withStoreLock(ORGANIZATION_PROFILES_STORAGE_KEY, () => loadOrganizationProfiles(plugin)),
         withStoreLock(RELATIONSHIP_LABEL_STORAGE_KEY, () => loadRelationshipLabelStore(plugin)),
     ]);
     return JSON.stringify({
@@ -193,6 +208,7 @@ export async function exportMigrationBundle(plugin: Plugin): Promise<string> {
             aliases,
             selfIdentity: { schemaVersion: 1, identity },
             orgMemberships,
+            organizationProfiles: { schemaVersion: 1, profiles: organizationProfiles },
             relationshipLabels,
         },
     }, null, 2);
@@ -227,6 +243,7 @@ export function previewMigrationImport(text: string): MigrationModulePreview[] {
             previews.push({ key: "orgMemberships", label: "组织成员", count: store.memberships.length, tombstones: store.tombstones?.length ?? 0 });
         }
     }
+    if (modules.organizationProfiles) push("organizationProfiles", "组织资料", Object.keys(modules.organizationProfiles.profiles ?? {}).length);
     return previews;
 }
 
@@ -386,6 +403,25 @@ export async function importMigrationBundle(plugin: Plugin, text: string): Promi
             const organizationIds = new Set(organizations.map((organization) => organization.docId));
             const personIds = new Set([...people].filter((docId) => !organizationIds.has(docId)));
             addSummary("orgMemberships", "组织成员", await mergeOrgMembershipStore(plugin, incoming, personIds, organizationIds));
+        });
+    }
+    if (modules.organizationProfiles) {
+        await runModule("organizationProfiles", "组织资料", async () => {
+            if (Object.keys(modules.organizationProfiles!.profiles ?? {}).length === 0) {
+                result.modules.push({ key: "organizationProfiles", label: "组织资料", merged: 0 });
+                return;
+            }
+            const organizations = await scanOrganizations();
+            const reachable = new Set(organizations.map((organization) => organization.docId));
+            const current = await loadOrganizationProfiles(plugin);
+            let merged = 0;
+            let skipped = 0;
+            for (const [docId, profile] of Object.entries(modules.organizationProfiles!.profiles)) {
+                if (!reachable.has(docId) || current[docId]) { skipped += 1; continue; }
+                await saveOrganizationProfile(plugin, docId, profile);
+                merged += 1;
+            }
+            result.modules.push({ key: "organizationProfiles", label: "组织资料", merged, skipped });
         });
     }
     if (modules.relationshipLabels) {

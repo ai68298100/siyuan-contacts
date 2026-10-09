@@ -14,11 +14,15 @@
         revision = 0,
         i18n,
         onOpenOrgManager,
+        onCreateOrganization,
+        onEditOrganization,
     }: {
         facade: ContactsPluginFacade;
         revision?: number;
         i18n?: Readonly<Record<string, string>>;
         onOpenOrgManager: (docId?: string) => void;
+        onCreateOrganization?: () => void;
+        onEditOrganization?: (docId: string) => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -157,8 +161,9 @@
         <button type="button" class="b3-button b3-button--text" onclick={() => void refresh()} disabled={loading}>
             {text("graphReload", "重新加载")}</button>
         <button type="button" class="b3-button b3-button--text" onclick={() => onOpenOrgManager()}>
-            <Plus size={15} />{text("orgsManage", "组织管理")}
+            {text("orgsManage", "组织管理")}
         </button>
+        {#if onCreateOrganization}<button type="button" class="b3-button b3-button--primary" onclick={onCreateOrganization}><Plus size={15} />{text("orgsCreateFirst", "新建组织")}</button>{/if}
         {#if organizationLoadError}
             <button type="button" class="b3-button b3-button--text" onclick={retryRemainingOrganizations} disabled={organizationLoadingMore}>
                 继续读取
@@ -173,25 +178,38 @@
     {/if}
     {#if loading && orgs.length === 0 && !errorText}
         <ViewState loading title={text("orgsLoading", "正在加载组织…")} />
-    {:else if filteredOrgs.length === 0 && !errorText && !loading && organizationFilterActive}
+    {:else if filteredOrgs.length === 0 && !errorText && !loading && organizationLoadError}
+        <ViewState error title="组织列表读取未完成" description={`已读取 ${orgs.length} 个组织，后续读取失败：${organizationLoadError}`}>
+            <button type="button" class="b3-button b3-button--outline" disabled={organizationLoadingMore} onclick={retryRemainingOrganizations}>
+                {organizationLoadingMore ? "正在继续读取…" : "继续读取"}
+            </button>
+        </ViewState>
+    {:else if filteredOrgs.length === 0 && !errorText && !loading && !organizationLoadError && organizationFilterActive}
         <ViewState title={text("orgsNoMatchTitle", "没有匹配的组织")}
             description={text("orgsNoMatchDesc", "试试其他名称或清除筛选条件。")}>
             <button type="button" class="b3-button b3-button--outline" onclick={() => { organizationQuery = ""; organizationStatus = "all"; }}>{text("orgsClearFilters", "清除筛选")}</button>
         </ViewState>
-    {:else if filteredOrgs.length === 0 && !errorText && !loading}
+    {:else if filteredOrgs.length === 0 && !errorText && !loading && !organizationLoadError}
         <ViewState title={text("orgsEmptyTitle", "还没有组织")}
             description={text("orgsEmptyDesc", "在组织管理中新建组织（公司/学校等），再为联系人登记归属。")}>
-            <button type="button" class="b3-button b3-button--outline" onclick={() => onOpenOrgManager()}>{text("orgsCreateFirst", "新建组织")}</button>
+            <button type="button" class="b3-button b3-button--outline" onclick={() => onOpenOrgManager()}>{text("orgsManage", "打开组织管理")}</button>
+            {#if onCreateOrganization}<button type="button" class="b3-button b3-button--primary" onclick={onCreateOrganization}>{text("orgsCreateFirst", "新建组织")}</button>{/if}
         </ViewState>
     {:else if filteredOrgs.length > 0}
         <div class="lvct-orgs-view__grid">
             {#each filteredOrgs as org (org.docId)}
                 <div class="lvct-orgs-view__card" data-org-doc-id={org.docId} class:lvct-orgs-view__card--archived={org.archived}>
                     <div class="lvct-orgs-view__card-head">
-                        <span class="lvct-orgs-view__card-icon" aria-hidden="true"><Building2 size={16} /></span>
+                        {#if org.profile?.logoDataUrl || org.profile?.logoUrl}
+                            <img class="lvct-orgs-view__card-logo" src={org.profile.logoDataUrl || org.profile.logoUrl} alt="" />
+                        {:else}
+                            <span class="lvct-orgs-view__card-icon" aria-hidden="true"><Building2 size={16} /></span>
+                        {/if}
                         <b class="lvct-orgs-view__card-name">{org.name}</b>
+                        {#if org.profile?.shortName}<span class="lvct-chip lvct-chip--group">{org.profile.shortName}</span>{/if}
                         {#if org.archived}<span class="lvct-chip lvct-chip--group">{text("orgArchivedTag", "已归档")}</span>{/if}
                     </div>
+                    {#if org.profile?.description}<p class="lvct-orgs-view__card-description">{org.profile.description}</p>{/if}
                     <div class="ft__smaller ft__on-surface">
                         {text("orgsCardMembers", "{n} 名在职/在读成员", { n: activeCountOf(org) })}
                         {#if formerCountOf(org) > 0}<span class="lvct-orgs-view__card-history"> · {formerCountOf(org)} 条历史</span>{/if}
@@ -199,6 +217,8 @@
                     <div class="lvct-orgs-view__card-actions">
                         <button type="button" class="b3-button b3-button--text" disabled={loading || !!errorText} onclick={() => onOpenOrgManager(org.docId)}>
                             {text("orgsManageOrg", "管理")}</button>
+                        {#if onEditOrganization}<button type="button" class="b3-button b3-button--text" disabled={loading || !!errorText} onclick={() => onEditOrganization?.(org.docId)}>
+                            {text("orgsEditProfile", "编辑资料")}</button>{/if}
                     </div>
                 </div>
             {/each}

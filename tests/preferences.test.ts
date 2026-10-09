@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_VIEW_PREFERENCES, normalizeTableColumns, normalizeViewPreferences } from "../src/domain/preferences.ts";
+import { DEFAULT_VIEW_PREFERENCES, isValidPreferenceDays, normalizeTableColumns, normalizeViewPreferences } from "../src/domain/preferences.ts";
 import type { ViewPreferences } from "../src/domain/preferences.ts";
 import type { Plugin } from "siyuan";
 import { applyPreferencePatch, decodeViewPreferences, diffViewPreferences, rebasePreferenceDraft } from "../src/domain/preferences-concurrency.ts";
@@ -9,6 +9,13 @@ import { emitDataChanged, LVCT_DATA_CHANGED, subscribeDataChangedDebounced } fro
 
 test("视图偏好：空存储回退默认值", () => {
     assert.deepEqual(normalizeViewPreferences(null), DEFAULT_VIEW_PREFERENCES);
+});
+
+test("设置页提醒数字：保存前只接受 0–365 的整数", () => {
+    for (const value of [0, 1, 365]) assert.equal(isValidPreferenceDays(value), true);
+    for (const value of [undefined, null, "30", -1, 366, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+        assert.equal(isValidPreferenceDays(value), false);
+    }
 });
 
 test("视图偏好：非法枚举回退，数值限制在 0-365", () => {

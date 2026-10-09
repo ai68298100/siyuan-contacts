@@ -62,6 +62,10 @@
     let nativeScope: GraphScope = $state(preferences.nativeScope);
     // svelte-ignore state_referenced_locally
     let nativeCenterDocId = $state(preferences.nativeCenterDocId);
+    // 关系图的“组织中心”是当前会话范围，不写入偏好；只在偏好 revision
+    // 变化时同步持久化选项，避免本地临时范围被同一份旧 props 立即覆盖。
+    // svelte-ignore state_referenced_locally
+    let syncedPreferenceRevision = $state(preferences.revision);
     /* B14.6 组织增强：组织节点+成员边只叠加渲染，关系查询仍只按 related 边 */
     let showOrgs = $state(true);
     let relationScope: GraphScope = $state("global");
@@ -73,6 +77,12 @@
     let resultHeading: HTMLElement | undefined = $state();
     let canvasFocusId = $state("");
     let preferenceError = $state("");
+    type GraphPreferencePatch = Partial<Pick<ViewPreferences, "graphMode" | "nativeScope" | "nativeCenterDocId">>;
+    let pendingPreferencePatch: GraphPreferencePatch | null = $state(null);
+    let preferenceRetrying = $state(false);
+    function preferencePatchMatches(value: ViewPreferences, patch: GraphPreferencePatch): boolean {
+        return Object.entries(patch).every(([key, expected]) => value[key as keyof ViewPreferences] === expected);
+    }
     let alive = true;
     let returnObserver: MutationObserver | undefined;
     /* B14.8 按组织收窄（会话态：组织可能被归档/改名，不持久化） */
@@ -317,17 +327,64 @@
         }
     }
 
+    // 设置页、其它窗口或数据事件刷新偏好后，图谱页需要同步其持久化选项。
+    // 不监听每次 props 重渲染，而是以 revision 判断确实出现了外部保存结果，
+    // 这样 nativeScope="org" 这种不持久化的会话态不会被旧值冲掉。
+    $effect(() => {
+        const revision = preferences.revision;
+        const nextMode = preferences.graphMode;
+        const nextScope = preferences.nativeScope as GraphScope;
+        const nextCenter = preferences.nativeCenterDocId;
+        if (revision === syncedPreferenceRevision) return;
+        syncedPreferenceRevision = revision;
+        if (pendingPreferencePatch && preferencePatchMatches(preferences, pendingPreferencePatch)) {
+            pendingPreferencePatch = null;
+            preferenceError = "";
+        }
+        if (graphMode !== nextMode) {
+            graphMode = nextMode;
+            if (nextMode === "relations") {
+                nativeVersion += 1;
+                nativeLoading = false;
+            }
+        }
+        if (nativeScope !== nextScope) nativeScope = nextScope;
+        if (nativeCenterDocId !== nextCenter) nativeCenterDocId = nextCenter;
+    });
+
+    async function persistGraphPreferencePatch(patch: GraphPreferencePatch): Promise<void> {
+        pendingPreferencePatch = patch;
+        preferenceError = "";
+        try {
+            await onPreferencesChange({ ...preferences, ...patch });
+            pendingPreferencePatch = null;
+        } catch (error) {
+            if (alive) preferenceError = `图谱偏好保存失败：${error instanceof Error ? error.message : String(error)}`;
+            throw error;
+        }
+    }
+
+    async function retryGraphPreference(): Promise<void> {
+        const patch = pendingPreferencePatch;
+        if (!patch || preferenceRetrying) return;
+        preferenceRetrying = true;
+        try {
+            await persistGraphPreferencePatch(patch);
+        } catch {
+            // persistGraphPreference 已将可读错误反馈到界面。
+        } finally {
+            preferenceRetrying = false;
+        }
+    }
+
     /** B14.5：切换数据源模式并持久化偏好；保存失败不阻断本次切换（下次重开回落上次成功保存值） */
     async function switchGraphMode(mode: GraphViewMode) {
         if (graphMode === mode) return;
         graphMode = mode;
         if (mode === "relations") { nativeVersion += 1; nativeLoading = false; }
-        preferenceError = "";
         try {
-            await onPreferencesChange({ ...preferences, graphMode: mode });
-        } catch (error) {
-            if (alive) preferenceError = `图谱偏好保存失败：${error instanceof Error ? error.message : String(error)}`;
-        }
+            await persistGraphPreferencePatch({ graphMode: mode });
+        } catch { /* 错误已显示，可由用户重试 */ }
     }
 
     /** B14 原生模式加载：范围由 nativeScope 决定（B14.8），登记集合过滤（B14.3）。失败显式降级 */
@@ -368,19 +425,18 @@
         if (nativeScope === scope) return;
         nativeScope = scope;
         try {
-            if (scope !== "org") await onPreferencesChange({ ...preferences, nativeScope: scope, nativeCenterDocId });
-        } catch (error) {
-            if (alive) preferenceError = `引用图范围偏好保存失败：${error instanceof Error ? error.message : String(error)}`;
+            if (scope !== "org") await persistGraphPreferencePatch({ nativeScope: scope, nativeCenterDocId });
+            else { pendingPreferencePatch = null; preferenceError = ""; }
+        } catch {
+            // persistGraphPreference 已将可读错误反馈到界面。
         }
     }
 
     async function pickNativeCenter(docId: string) {
         nativeCenterDocId = docId;
         try {
-            await onPreferencesChange({ ...preferences, nativeScope: nativeScope === "org" ? "global" : nativeScope, nativeCenterDocId: docId });
-        } catch (error) {
-            if (alive) preferenceError = `引用图中心偏好保存失败：${error instanceof Error ? error.message : String(error)}`;
-        }
+            await persistGraphPreferencePatch({ nativeScope: nativeScope === "org" ? "global" : nativeScope, nativeCenterDocId: docId });
+        } catch { /* 错误已显示，可由用户重试 */ }
     }
 
     const nativeCenterItems = $derived(snapshot.people.map((person) => ({
@@ -617,6 +673,18 @@
         searchText = ""; groupFilter = ""; isolatedOnly = false; orgNarrowId = "";
         if (relationScope === "org") relationScope = "global";
         if (nativeScope === "org") nativeScope = "global";
+    }
+
+    /**
+     * 异常态的“切换全局范围”必须沿用范围选择器的持久化语义。
+     * 之前这里只改了当前组件的会话状态，刷新或重新打开图谱后会回到旧范围，
+     * 用户看到的“已切换全局”因此没有真正保存。
+     */
+    async function switchToGlobalScope() {
+        relationScope = "global";
+        orgNarrowId = "";
+        if (graphMode !== "native") return;
+        await switchNativeScope("global");
     }
 
     const nodeById = $derived(new Map(snapshot.graph.nodes.map((node) => [node.id, node])));
@@ -1109,7 +1177,16 @@
             <summary>{text("graphDiagnostics", "待核实与诊断")}（{snapshot.diagnostics.length}）</summary>
             <ul>{#each snapshot.diagnostics as diagnostic}<li>{diagnostic.message}</li>{/each}</ul>
         </details>{/if}
-        {#if preferenceError}<p role="alert">{preferenceError}</p>{/if}
+        {#if preferenceError}
+            <div class="lvct-form__error" role="alert">
+                <span>{preferenceError}</span>
+                {#if pendingPreferencePatch}
+                    <button type="button" class="b3-button b3-button--outline" disabled={preferenceRetrying} onclick={() => void retryGraphPreference()}>
+                        {preferenceRetrying ? "重试保存中…" : "重试保存"}
+                    </button>
+                {/if}
+            </div>
+        {/if}
     </section>
 
     {#if truncated}
@@ -1127,7 +1204,7 @@
     {:else if snapshot.state === "unknown" || snapshot.state === "center_missing"}
         <ViewState error title={text("graphSnapshotUnknown", "图查询范围尚未核实")} description={snapshot.diagnostics.map((entry) => entry.message).join("；")}>
             <button class="b3-button b3-button--outline" onclick={refresh}>{text("graphReverify", "重新核实来源")}</button>
-            <button class="b3-button b3-button--text" onclick={() => { relationScope = "global"; nativeScope = "global"; orgNarrowId = ""; }}>{text("graphUseGlobal", "切换全局范围")}</button>
+            <button class="b3-button b3-button--text" onclick={() => void switchToGlobalScope()}>{text("graphUseGlobal", "切换全局范围")}</button>
             {#if graphMode === "native"}<button class="b3-button b3-button--text" onclick={() => void switchGraphMode("relations")}>{text("graphUseRelations", "切换关系图")}</button>{/if}
         </ViewState>
     {:else if snapshot.graph.nodes.length === 0}

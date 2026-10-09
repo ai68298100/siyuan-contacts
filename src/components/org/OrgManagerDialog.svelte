@@ -23,15 +23,22 @@
         facade,
         i18n,
         onClose,
+        onCreated,
         initialOrgDocId = "",
         onOpenPerson,
+        onCreateOrganization,
+        onEditOrganization,
         hostCloseChannel,
     }: {
         facade: ContactsPluginFacade;
         i18n?: Readonly<Record<string, string>>;
         onClose: () => void;
+        /** 新建组织完成后通知宿主，供联系人表单刷新候选。 */
+        onCreated?: (docId: string) => void;
         initialOrgDocId?: string;
         onOpenPerson?: (docId: string, orgDocId: string) => void;
+        onCreateOrganization?: () => void;
+        onEditOrganization?: (docId: string) => void;
         /** D-40：宿主 X/Esc/遮罩关闭经同一守卫路由，避免绕过未保存提示。 */
         hostCloseChannel?: { request?: (close: () => void) => void };
     } = $props();
@@ -63,8 +70,12 @@
         alive = false;
         membersRequest += 1;
         organizationsRequest += 1;
+        rosterRequest += 1;
     });
     let roster: ContactSummary[] = $state([]);
+    let rosterError = $state("");
+    let rosterLoading = $state(false);
+    let rosterRequest = 0;
     let newOrgName = $state("");
     let addPersonId = $state("");
     let formBusy = $state(false);
@@ -328,16 +339,30 @@
         void loadOrgs(true).catch((error) => { if (alive) errorMessage = error instanceof Error ? error.message : String(error); });
     }
 
+    async function loadRoster(): Promise<void> {
+        const request = ++rosterRequest;
+        rosterLoading = true;
+        rosterError = "";
+        try {
+            const next = await facade.listContacts();
+            if (!alive || request !== rosterRequest) return;
+            roster = next;
+        } catch (error) {
+            if (alive && request === rosterRequest) rosterError = error instanceof Error ? error.message : String(error);
+        } finally {
+            if (alive && request === rosterRequest) rosterLoading = false;
+        }
+    }
+
     onMount(() => {
         void (async () => {
             loading = true;
             try {
                 if (initialOrgDocId && !/^\d{14}-[0-9a-z]{7}$/.test(initialOrgDocId)) throw new Error("组织导航 ID 非法");
                 currentOrgDocId = initialOrgDocId;
-                const next = await facade.listContacts();
-                if (!alive) return;
-                roster = next;
+                const rosterTask = loadRoster();
                 await loadOrgs(true);
+                await rosterTask;
             } catch (error) {
                 if (alive) errorMessage = error instanceof Error ? error.message : String(error);
             } finally {
@@ -347,7 +372,7 @@
     });
 
     async function run(task: () => Promise<void>): Promise<void> {
-        if (busy || loading || memberLoading || organizationsRefreshing || selectionGuardBusy || memberError || organizationMissing) return;
+        if (busy || loading || memberLoading || organizationsRefreshing || selectionGuardBusy || organizationMissing) return;
         formBusy = true;
         errorMessage = "";
         try {
@@ -411,6 +436,7 @@
             newOrgName = "";
             currentOrgDocId = created.docId;
             await loadOrgs(true);
+            onCreated?.(created.docId);
         });
     }
 
@@ -610,6 +636,10 @@
                 {/if}
             {/if}
             <div class="lvct-org-manager__create">
+                {#if onCreateOrganization}
+                    <button type="button" class="b3-button b3-button--primary" disabled={busy || loading || organizationsRefreshing || memberLoading || selectionGuardBusy} onclick={onCreateOrganization}>
+                        {text("orgCreateProfile", "新建组织资料")}</button>
+                {/if}
                 <input
                     class="b3-text-field fn__block"
                     placeholder={text("orgCreatePlaceholder", "组织名称…")}
@@ -637,6 +667,10 @@
                 {:else}
                     <div class="fn__flex" style="align-items: center; gap: 8px;">
                         <b class="fn__flex-1">{currentOrg.name}{currentOrg.archived ? text("orgArchivedTag", "（已归档）") : ""}</b>
+                        {#if onEditOrganization}
+                            <button type="button" class="b3-button b3-button--text" disabled={busy || organizationsRefreshing || memberLoading || hasDraft}
+                                onclick={() => onEditOrganization?.(currentOrg.docId)}>{text("orgEditProfile", "编辑资料")}</button>
+                        {/if}
                         <button type="button" class="b3-button b3-button--text" disabled={busy || organizationsRefreshing || memberLoading || hasDraft}
                             onclick={startRename}>{text("orgRename", "改名")}</button>
                         {#if currentOrg.archived}
@@ -690,7 +724,7 @@
                                                     searchText={text("orgPickerSearch", "输入姓名、电话、微信或文档 ID 筛选")}
                                                     ariaLabel={text("orgMemberReplacementPick", "接替联系人")}
                                                     i18n={i18n}
-                                                    disabled={busy}
+                                                    disabled={busy || rosterLoading || !!rosterError}
                                                     onSelect={(personDocId) => (replacementPersonId = personDocId)}
                                                 />
                                             </label>
@@ -796,6 +830,12 @@
                     {/if}
                     <div class="lvct-org-manager__add">
                         <p class="ft__smaller ft__on-surface">{text("orgMembershipAddImpact", "添加会登记新期间并更新双方当前双链；已离开的期间保留，重复添加当前成员不新增记录。")}</p>
+                        {#if rosterError}
+                            <p class="lvct-form__error" role="alert">联系人名册读取失败：{rosterError}</p>
+                            <button type="button" class="b3-button b3-button--outline" disabled={rosterLoading} onclick={() => void loadRoster()}>重新读取联系人名册</button>
+                        {:else if rosterLoading}
+                            <p class="ft__smaller ft__on-surface" role="status">正在读取联系人名册…</p>
+                        {/if}
                         <PersonPicker
                             items={addPickerItems}
                             value={addPersonId}
@@ -804,15 +844,15 @@
                             searchText={text("orgPickerSearch", "输入姓名、电话、微信或文档 ID 筛选")}
                             ariaLabel={text("orgAddMemberLabel", "选择要添加的联系人")}
                             i18n={i18n}
-                            disabled={busy || memberLoading || organizationsRefreshing || !!memberError || selectionGuardBusy || !!editingMemberId || !!replacingMemberId || !!removingMemberId || renaming}
+                            disabled={busy || memberLoading || organizationsRefreshing || !!memberError || !!rosterError || rosterLoading || selectionGuardBusy || !!editingMemberId || !!replacingMemberId || !!removingMemberId || renaming}
                             onSelect={(personDocId) => (addPersonId = personDocId)}
                         />
-                        <select class="b3-select fn__block" bind:value={addAffiliationKind} disabled={busy || memberLoading || organizationsRefreshing || !!memberError || selectionGuardBusy || !!editingMemberId || !!replacingMemberId || !!removingMemberId || renaming} aria-label={text("orgAffiliationKind", "归属分类")}>
+                        <select class="b3-select fn__block" bind:value={addAffiliationKind} disabled={busy || memberLoading || organizationsRefreshing || !!memberError || !!rosterError || rosterLoading || selectionGuardBusy || !!editingMemberId || !!replacingMemberId || !!removingMemberId || renaming} aria-label={text("orgAffiliationKind", "归属分类")}>
                             <option value="unspecified">{affiliationLabel("unspecified")}</option>
                             <option value="work">{affiliationLabel("work")}</option>
                             <option value="education">{affiliationLabel("education")}</option>
                         </select>
-                        <button class="b3-button b3-button--text" disabled={busy || memberLoading || organizationsRefreshing || !!memberError || selectionGuardBusy || !addPersonId} onclick={addMember}>
+                        <button class="b3-button b3-button--text" disabled={busy || memberLoading || organizationsRefreshing || !!memberError || !!rosterError || rosterLoading || selectionGuardBusy || !addPersonId} onclick={addMember}>
                             {text("orgMemberAdd", "添加成员")}</button>
                     </div>
                 </div>

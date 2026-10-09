@@ -7,6 +7,8 @@
     import ViewState from "../ViewState.svelte";
     import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
+    import { formatBirthdayDisplay } from "../../domain/occasions";
+    import { onDestroy } from "svelte";
 
     let {
         settings,
@@ -37,6 +39,12 @@
     let fileInput: HTMLInputElement | undefined = $state();
     let lastChosen: { planIndex: number; plan: VcfImportPlan }[] = $state([]);
     let pauseRequested = $state(false);
+    // 文件解析、队列写入和导出均可能跨越弹窗卸载；迟到结果不得回写已销毁实例。
+    let alive = true;
+    onDestroy(() => {
+        alive = false;
+        pauseRequested = true;
+    });
     const guardedClose = useCloseGuard({
         busy: () => importing || parsing || exporting || retrying,
         dirty: () => report ? pickRetryCount(report) > 0 : plans !== null && selectedCount > 0,
@@ -57,11 +65,22 @@
         if (!plans) return 0;
         return plans.filter((plan) => plan.duplicate).length;
     });
+    const previewStats = $derived.by(() => {
+        if (!plans) return { cards: 0, mapped: 0, ignored: 0, review: 0 };
+        return plans.reduce((stats, plan, index) => {
+            if (!selected[index]) return stats;
+            stats.cards += 1;
+            stats.mapped += (plan.mappings ?? []).filter((mapping) => mapping.state === "mapped").length;
+            stats.ignored += plan.contact.unsupportedProperties?.length ?? 0;
+            stats.review += plan.contact.needsReview?.length ?? 0;
+            return stats;
+        }, { cards: 0, mapped: 0, ignored: 0, review: 0 });
+    });
 
     async function onFileChange(event: Event) {
         const input = event.currentTarget as HTMLInputElement;
         const file = input.files?.[0];
-        if (!file) return;
+        if (!file || !alive) return;
         if (importing || exporting || parsing || retrying) return;
         parsing = true;
         plans = null;
@@ -72,6 +91,7 @@
         try {
             const text = await file.text();
             const result = await buildVcfImportPlan(settings, text);
+            if (!alive) return;
             plans = result;
             const next: Record<number, boolean> = {};
             result.forEach((plan, index) => (next[index] = !plan.duplicate && !(plan.unresolvedDocIds?.length)));
@@ -80,10 +100,12 @@
                 statusText = "没有解析到可导入的联系人（vCard 卡片需包含 FN 或 N 姓名属性）。";
             }
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            if (alive) errorText = error instanceof Error ? error.message : String(error);
         } finally {
-            parsing = false;
-            input.value = "";
+            if (alive) {
+                parsing = false;
+                input.value = "";
+            }
         }
     }
 
@@ -104,7 +126,7 @@
     }
 
     async function runImport() {
-        if (importing || parsing || exporting || errorText || report || !plans || selectedCount === 0) return;
+        if (!alive || importing || parsing || exporting || errorText || report || !plans || selectedCount === 0) return;
         importing = true;
         errorText = "";
         try {
@@ -118,8 +140,9 @@
             pauseRequested = false;
             const result = await runVcfImportQueue(settings, lastChosen, null, {
                 shouldPause: () => pauseRequested,
-                onProgress: (done, total) => { statusText = `已核实 ${done}/${total} 项…`; },
+                onProgress: (done, total) => { if (alive) statusText = `已核实 ${done}/${total} 项…`; },
             });
+            if (!alive) return;
             // 同名未勾选项不在服务入参内，在此补进逐项报告（planIndex 指回 plans）
             plans.forEach((plan, planIndex) => {
                 if (plan.duplicate && !selected[planIndex]) {
@@ -130,9 +153,9 @@
             statusText = "";
             if (report.imported > 0) onImported(report.imported);
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            if (alive) errorText = error instanceof Error ? error.message : String(error);
         } finally {
-            importing = false;
+            if (alive) importing = false;
         }
     }
 
@@ -146,32 +169,35 @@
     const retryable: boolean = $derived(pickRetryCount(report) > 0);
 
     async function runRetry(retryOnly = false) {
-        if (retrying || !plans || !report) return;
+        if (!alive || retrying || !plans || !report) return;
         retrying = true;
         pauseRequested = false;
         errorText = "";
         try {
             const before = report.imported;
-            report = await runVcfImportQueue(settings, lastChosen, report, {
+            const nextReport = await runVcfImportQueue(settings, lastChosen, report, {
                 retryOnly,
                 shouldPause: () => pauseRequested,
-                onProgress: (done, total) => { statusText = `已核实 ${done}/${total} 项…`; },
+                onProgress: (done, total) => { if (alive) statusText = `已核实 ${done}/${total} 项…`; },
             });
+            if (!alive) return;
+            report = nextReport;
             if (report.imported > before) onImported(report.imported - before);
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            if (alive) errorText = error instanceof Error ? error.message : String(error);
         } finally {
-            retrying = false;
+            if (alive) retrying = false;
         }
     }
 
     async function runExport() {
-        if (exporting) return;
+        if (!alive || exporting) return;
         exporting = true;
         errorText = "";
         statusText = "";
         try {
             const text = await exportVcfText(settings);
+            if (!alive) return;
             if (!text) {
                 statusText = "还没有可导出的联系人。";
                 return;
@@ -179,9 +205,9 @@
             downloadVcf(text);
             statusText = "已导出 vCard 文件（浏览器下载）。";
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            if (alive) errorText = error instanceof Error ? error.message : String(error);
         } finally {
-            exporting = false;
+            if (alive) exporting = false;
         }
     }
 
@@ -217,13 +243,34 @@
 </script>
 
 <div class="lvct-import lvct-vcard">
+    <details class="lvct-vcard__boundary" open>
+        <summary>通讯录交换边界</summary>
+        <div class="lvct-vcard__boundary-grid">
+            <div>
+                <b>当前支持</b>
+                <p>姓名、电话、邮箱、网站、公历生日、标签；本插件导出的农历生日可通过 <code>X-LVCT-BDAY-LUNAR</code> 回读。</p>
+            </div>
+            <div>
+                <b>不会写入 vCard</b>
+                <p>组织任职、关系图、互动、跟进、提醒、本人标记、AI 内容、思源文档 ID 和私密资料。</p>
+            </div>
+            <div>
+                <b>导入限制</b>
+                <p>当前联系人模型为单电话/邮箱/网站字段；多个电话会合并显示，多个邮箱和网站只取首项。ORG、ADR、NOTE、PHOTO、UID 等会标记为忽略或待核对。</p>
+            </div>
+            <div>
+                <b>在线同步状态</b>
+                <p>这里是本地 .vcf 文件交换，当前尚未连接 CardDAV 服务器；CardDAV 需要单独的地址簿、权限、冲突和删除确认流程。</p>
+            </div>
+        </div>
+    </details>
     <div class="lvct-vcard__export">
         <div class="lvct-vcard__section-title">{text("vcardExportTitle", "导出")}</div>
         <div class="fn__flex">
             <button class="b3-button b3-button--outline" onclick={runExport} disabled={exporting || parsing || importing || retrying}>
                 {exporting ? text("vcardExporting", "导出中…") : text("vcardExportAll", "导出全部联系人为 .vcf")}
             </button>
-            <span class="ft__smaller ft__on-surface lvct-vcard__note">{text("vcardExportNote", "含电话/邮箱/网站/生日/标签；微信不导出（无标准属性）")}</span>
+            <span class="ft__smaller ft__on-surface lvct-vcard__note">{text("vcardExportNote", "含电话/邮箱/网站/生日/标签；微信不导出（无标准属性）。当前多值电话会作为一个文本字段导出，请核对。")}</span>
         </div>
     </div>
 
@@ -240,7 +287,7 @@
             onchange={onFileChange}
         />
         <span class="ft__smaller ft__on-surface fn__flex-1 lvct-vcard__note">
-            {text("vcardFormatsNote", "支持通讯录应用导出的 vCard 2.1/3.0/4.0；只读 FN/N、TEL、EMAIL、URL、BDAY、CATEGORIES。")}
+            {text("vcardFormatsNote", "支持通讯录应用导出的 vCard 2.1/3.0/4.0；读取 FN/N、TEL、EMAIL、URL、BDAY、CATEGORIES，其他字段会在预览中标出。")}
         </span>
     </div>
 
@@ -319,6 +366,11 @@
         </div>
     {:else if plans}
         <p role="status">来源：vCard 文件；已选择 {selectedCount} 项，目标为逐卡独立请求文档。同名须按下列稳定 ID 核对，勾选同名项表示另建独立人物。</p>
+        <div class="lvct-vcard__preview-summary" role="status" aria-label="导入映射摘要">
+            <span>已选 {previewStats.cards} 张卡片 · 将写入字段 {previewStats.mapped} 项</span>
+            <span>将忽略属性 {previewStats.ignored} 项</span>
+            <span class:lvct-vcard__preview-summary--warn={previewStats.review > 0}>待人工核对 {previewStats.review} 项</span>
+        </div>
         <div class="lvct-import__list">
             <label class="lvct-import__row lvct-import__row--head">
                 <input
@@ -341,7 +393,7 @@
                     />
                     <span class="lvct-import__name">{index + 1} · <b>{plan.contact.name}</b></span>
                     <span class="ft__smaller ft__on-surface lvct-import__path">
-                        {plan.contact.phone || "—"}{plan.contact.birthday ? ` · ${plan.contact.birthday}${plan.contact.isLunar ? "（农历）" : ""}` : ""}
+                        {plan.contact.phone || "—"}{plan.contact.birthday ? ` · ${formatBirthdayDisplay(plan.contact.birthday, plan.contact.isLunar)}` : ""}
                     </span>
                     <span class="ft__smaller">{(plan.mappings ?? []).filter((mapping) => mapping.state === "mapped").map((mapping) => `${mapping.sourceField} → ${mapping.targetField}：${mapping.value}`).join("；")}</span>
                     {#if (plan.contact.unsupportedProperties?.length ?? 0) > 0}

@@ -9,13 +9,19 @@
     import { translateText } from "../../domain/translation";
     import QuickFillDialog from "./QuickFillDialog.svelte";
     import GroupField from "./GroupField.svelte";
+    import BirthdayField from "./BirthdayField.svelte";
     import { ClipboardPaste } from "@lucide/svelte";
+    import type { OrgAffiliationKind } from "../../domain/org-membership";
+    import type { ContactExtendedDraft } from "../../domain/contact-create";
 
     let {
         settings,
         i18n,
         initial,
         hostCloseChannel,
+        onLoadOrgCandidates,
+        onCreateOrganization,
+        onSaveExtended,
         onCreated,
         onClose,
     }: {
@@ -25,6 +31,11 @@
         initial?: ContactDraft;
         /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
         hostCloseChannel?: { request?: (close: () => void) => void };
+        /** 新建后可选的扩展资料保存回调（组织、与我的关系、人物备注）。 */
+        onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string }>>;
+        /** 当前没有合适组织时，跳转到统一的新建组织页面。 */
+        onCreateOrganization?: () => void | Promise<void>;
+        onSaveExtended?: (person: ContactSummary, details: ContactExtendedDraft) => Promise<void>;
         onCreated: (person: ContactSummary) => void;
         onClose: () => void;
     } = $props();
@@ -42,6 +53,22 @@
     let creationPreview = $state<ContactCreationPreview | null>(null);
     let creationChoice = $state("");
     let creationRequest = $state<ContactCreationRequest | undefined>();
+    /** 创建文档成功但补充资料保存失败时，重试只补写资料，避免再次创建同名联系人。 */
+    let createdPerson = $state<ContactSummary | null>(null);
+    let extraOpen = $state(false);
+    let extraLoading = $state(false);
+    let extraError = $state("");
+    let creatingOrganization = $state(false);
+    let orgCandidates = $state<ReadonlyArray<{ docId: string; name: string }>>([]);
+    let orgDocId = $state("");
+    let orgDepartment = $state("");
+    let orgTitle = $state("");
+    let orgJoinedOn = $state("");
+    let orgAffiliationKind = $state<OrgAffiliationKind>("unspecified");
+    let aliases = $state("");
+    let relationshipLabels = $state("");
+    let note = $state("");
+    const extendedSupported = $derived(Boolean(onSaveExtended));
     const currentPreview = $derived(creationPreview?.name === draft.name.trim() ? creationPreview : null);
     // FAST-01.1：粘贴并识别（识别结果经勾选后回填草稿，不直接写库）
     let quickFillOpen = $state(false);
@@ -56,7 +83,7 @@
         if (patch.wechat !== undefined) draft.wechat = patch.wechat;
         if (patch.website !== undefined) draft.website = patch.website;
         if (patch.birthday !== undefined) draft.birthday = patch.birthday;
-        if (patch.isLunar) draft.isLunar = true;
+        if (patch.isLunar !== undefined) draft.isLunar = patch.isLunar;
         if (patch.group !== undefined) draft.group = patch.group;
         if (patch.tagsAppend.length) {
             const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter(Boolean);
@@ -70,11 +97,19 @@
         const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
         running = true;
         try {
-            const person = await createContact(settings, { ...draft, tags }, {
+            const person = createdPerson ?? await createContact(settings, { ...draft, tags }, {
                 request: creationRequest,
                 allowSameName: currentPreview !== null && creationChoice === "new",
                 reuseDocId: currentPreview && creationChoice !== "new" ? creationChoice || undefined : undefined,
             });
+            createdPerson = person;
+            if (onSaveExtended) {
+                try {
+                    await onSaveExtended(person, { orgDocId, orgDepartment, orgTitle, orgJoinedOn, orgAffiliationKind, aliases, relationshipLabels, note });
+                } catch (error) {
+                    throw new Error(`联系人已创建，但补充资料保存失败：${error instanceof Error ? error.message : String(error)}`);
+                }
+            }
             saved = true;
             onCreated(person);
         } catch (error) {
@@ -85,6 +120,40 @@
             if (error instanceof ContactCreationError) creationRequest = error.request;
             throw error;
         } finally { running = false; }
+    }
+    async function openExtended(): Promise<void> {
+        extraOpen = true;
+        if (!onLoadOrgCandidates || extraLoading || orgCandidates.length > 0) return;
+        extraLoading = true;
+        extraError = "";
+        try { orgCandidates = await onLoadOrgCandidates(); }
+        catch (error) { extraError = error instanceof Error ? error.message : String(error); }
+        finally { extraLoading = false; }
+    }
+    function toggleExtended(): void {
+        if (extraOpen) {
+            extraOpen = false;
+            return;
+        }
+        void openExtended();
+    }
+    async function reloadOrgCandidates(): Promise<void> {
+        orgCandidates = [];
+        extraError = "";
+        await openExtended();
+    }
+    async function createOrganizationFromContact(): Promise<void> {
+        if (!onCreateOrganization || creatingOrganization || running) return;
+        creatingOrganization = true;
+        extraError = "";
+        try {
+            await onCreateOrganization();
+            await reloadOrgCandidates();
+        } catch (error) {
+            extraError = error instanceof Error ? error.message : String(error);
+        } finally {
+            creatingOrganization = false;
+        }
     }
     function draftChanges(): string[] {
         if (saved) return [];
@@ -103,11 +172,15 @@
         }
         if (draft.isLunar) changes.push(text("guardFieldChange", "{field}：{from} → {to}", { field: text("formLunar", "农历生日"), from: empty, to: "✓" }));
         if (tagsText.trim().length > 0) changes.push(text("guardTagsChange", "标签：{from} → {to}", { from: empty, to: tagsText }));
+        if (orgDocId || orgDepartment || orgTitle || orgJoinedOn) changes.push("组织归属补充资料已填写");
+        if (relationshipLabels.trim()) changes.push("与我的关系称谓已填写");
+        if (aliases.trim()) changes.push("别名/称呼已填写");
+        if (note.trim()) changes.push("人物备注已填写");
         return changes;
     }
     const guardedClose = useCloseGuard({
         busy: () => running,
-        dirty: () => !saved && (JSON.stringify(draft) !== JSON.stringify(emptyDraft()) || tagsText.trim().length > 0),
+        dirty: () => !saved && (JSON.stringify(draft) !== JSON.stringify(emptyDraft()) || tagsText.trim().length > 0 || Boolean(orgDocId || orgDepartment || orgTitle || orgJoinedOn || aliases.trim() || relationshipLabels.trim() || note.trim())),
         changes: () => [...draftChanges(), ...(creationRequest ? [text("contactCheckpointWarning", "原请求断点仅保留在当前窗口。关闭不会删除已保存文档；请核实后继续，不能凭同名重新建档。")] : [])],
         save: persist,
     });
@@ -165,14 +238,10 @@
             <span>{text("formWebsite", "网站")}</span>
             <input class="b3-text-field fn__block" type="url" bind:value={draft.website} placeholder="https://" />
         </label>
-        <label class="lvct-form__item">
+        <div class="lvct-form__item">
             <span>{text("formBirthday", "生日")}</span>
-            <input class="b3-text-field fn__block" type="date" bind:value={draft.birthday} />
-        </label>
-        <label class="lvct-form__item lvct-form__item--inline">
-            <span>{text("formLunar", "农历")}</span>
-            <input class="b3-switch" type="checkbox" bind:checked={draft.isLunar} />
-        </label>
+            <BirthdayField label={text("formBirthday", "生日")} value={draft.birthday} isLunar={draft.isLunar} onValueChange={(value) => (draft.birthday = value)} onModeChange={(isLunar) => (draft.isLunar = isLunar)} />
+        </div>
         <GroupField {i18n} value={draft.group} onValueChange={(value) => (draft.group = value)} onValidityChange={(valid) => (groupValid = valid)} label={text("formGroup", "分组")} ungroupedLabel={text("formUngrouped", "未分组")} disabled={running || !!creationRequest} />
         <label class="lvct-form__item">
             <span>{text("formTagsLabel", "标签（空格/逗号分隔）")}</span>
@@ -180,6 +249,46 @@
         </label>
     </div>
     </fieldset>
+
+    {#if extendedSupported}
+        <section class="lvct-form__optional" aria-labelledby="lvct-contact-extra-toggle">
+            <button id="lvct-contact-extra-toggle" type="button" class="b3-button b3-button--text lvct-form__optional-toggle" aria-expanded={extraOpen} aria-controls="lvct-contact-extra-body" onclick={toggleExtended} disabled={running || !!creationRequest}>
+                {extraOpen ? "收起补充资料" : "补充资料（可选）"}
+            </button>
+            {#if extraOpen}
+                <div id="lvct-contact-extra-body" class="lvct-form__optional-body">
+                    <p id="lvct-contact-extra-title" class="ft__smaller ft__on-surface">姓名是唯一必填项；组织、关系和备注可在创建后继续修改。</p>
+                    {#if onLoadOrgCandidates}
+                        <div class="lvct-form__grid">
+                            <label class="lvct-form__item">
+                                <span>组织</span>
+                                <select class="b3-select fn__block" bind:value={orgDocId} disabled={extraLoading || running || orgCandidates.length === 0}>
+                                    <option value="">{extraLoading ? "读取组织中…" : "暂不选择"}</option>
+                                    {#each orgCandidates as org (org.docId)}<option value={org.docId}>{org.name}</option>{/each}
+                                </select>
+                                {#if !extraLoading}
+                                    <span class="lvct-form__hint">{orgCandidates.length === 0 ? "暂无可选组织。" : "没有合适组织？"}{#if onCreateOrganization}<button type="button" class="b3-button b3-button--text lvct-form__inline-action" onclick={() => void createOrganizationFromContact()} disabled={running || creatingOrganization}>{creatingOrganization ? "组织创建中…" : "新建组织"}</button>{/if}<button type="button" class="b3-button b3-button--text lvct-form__inline-action" onclick={() => void reloadOrgCandidates()} disabled={running || creatingOrganization}>重新读取</button></span>
+                                {/if}
+                            </label>
+                            <label class="lvct-form__item">
+                                <span>归属分类</span>
+                                <select class="b3-select fn__block" bind:value={orgAffiliationKind} disabled={running || !orgDocId}>
+                                    <option value="unspecified">未分类</option><option value="work">工作单位</option><option value="education">学校</option>
+                                </select>
+                            </label>
+                            <label class="lvct-form__item"><span>部门</span><input class="b3-text-field fn__block" bind:value={orgDepartment} disabled={running || !orgDocId} placeholder="可选" /></label>
+                            <label class="lvct-form__item"><span>职位/身份</span><input class="b3-text-field fn__block" bind:value={orgTitle} disabled={running || !orgDocId} placeholder="可选" /></label>
+                            <label class="lvct-form__item"><span>加入日期</span><input class="b3-text-field fn__block" type="date" bind:value={orgJoinedOn} disabled={running || !orgDocId} /></label>
+                        </div>
+                        {#if extraError}<p class="lvct-form__error" role="alert">组织读取失败：{extraError} <button type="button" class="b3-button b3-button--text" onclick={() => void openExtended()}>重试</button></p>{/if}
+                    {/if}
+                    <label class="lvct-form__item"><span>别名 / 常用称呼</span><input class="b3-text-field fn__block" maxlength="80" bind:value={aliases} disabled={running} placeholder="例如：张老师、英文名；多个称呼用顿号分隔" /></label>
+                    <label class="lvct-form__item"><span>与我的关系称谓</span><input class="b3-text-field fn__block" maxlength="1600" bind:value={relationshipLabels} disabled={running} placeholder="例如：同事、朋友、校友；多个称谓用顿号分隔" /><small class="lvct-form__hint">需先在设置中指定“我”的档案；不填写无需设置。</small></label>
+                    <label class="lvct-form__item"><span>人物备注</span><textarea class="b3-text-field fn__block" rows="3" maxlength="5000" bind:value={note} disabled={running} placeholder="记录你希望长期保留的补充信息"></textarea></label>
+                </div>
+            {/if}
+        </section>
+    {/if}
 
     {#if currentPreview && !creationRequest}
         <fieldset class="lvct-form__fields" disabled={running}>
@@ -224,7 +333,7 @@
 {#if quickFillOpen}
     <QuickFillDialog
         {i18n}
-        existing={{ name: draft.name, phone: draft.phone, email: draft.email, wechat: draft.wechat, website: draft.website, birthday: draft.birthday, group: draft.group, tags: tagsText.split(/[，,、\s]+/).filter(Boolean) }}
+        existing={{ name: draft.name, phone: draft.phone, email: draft.email, wechat: draft.wechat, website: draft.website, birthday: draft.birthday, isLunar: draft.isLunar, group: draft.group, tags: tagsText.split(/[，,、\s]+/).filter(Boolean) }}
         onApply={applyQuickFill}
         onClose={() => (quickFillOpen = false)}
     />

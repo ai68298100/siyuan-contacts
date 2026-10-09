@@ -4,6 +4,7 @@
  * personDocId+source+externalRef 构成幂等身份。
  */
 import type { ContactSummary } from "./person";
+import { isValidDateKey } from "./date-key.ts";
 
 export type InteractionSource = "manual" | "diary" | "api";
 
@@ -35,7 +36,7 @@ function isInteractionEvent(raw: unknown): raw is InteractionEvent {
     return typeof event.id === "string" && event.id.length > 0 &&
         typeof event.personDocId === "string" && event.personDocId.length > 0 &&
         typeof event.occurredAt === "number" && Number.isFinite(event.occurredAt) &&
-        typeof event.localDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(event.localDate) &&
+        isValidDateKey(event.localDate) &&
         (event.source === "manual" || event.source === "diary" || event.source === "api") &&
         (event.externalRef === undefined || typeof event.externalRef === "string") &&
         (event.note === undefined || typeof event.note === "string");

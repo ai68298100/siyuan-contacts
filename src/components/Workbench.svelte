@@ -10,6 +10,7 @@
     import LvctDialog from "./LvctDialog.svelte";
     import OrgsView from "./org/OrgsView.svelte";
     import OrgManagerDialog from "./org/OrgManagerDialog.svelte";
+    import OrganizationProfileEditor from "./org/OrganizationProfileEditor.svelte";
     import { createCloseScope, anyDirtyChanges } from "./close-guard";
     import { House, UsersRound, Network, Settings, Building2, Sparkles, UserPlus } from "@lucide/svelte";
     import SettingsView from "./SettingsView.svelte";
@@ -119,6 +120,14 @@
     let detailReturn = $state<PersonReturnContext | null>(null);
     let organizationOpen = $state(false);
     let organizationDocId = $state("");
+    let organizationProfileOpen = $state(false);
+    let organizationProfileSaving = $state(false);
+    let organizationProfileError = $state("");
+    let organizationProfileReadOnly = $state(false);
+    let organizationProfileDocId = $state("");
+    let organizationProfileInitial = $state<Partial<import("../domain/organization-profile").OrganizationProfileDraft>>({});
+    let returnToContactAfterOrganizationProfile = $state(false);
+    let organizationProfileCompletion: ((created: boolean) => void) | null = $state(null);
     let workbenchElement: HTMLDivElement | undefined = $state();
     let navigationError = $state("");
     let navigationRequest = 0;
@@ -162,11 +171,116 @@
     async function openOrganization(docId = "") {
         if (docId && !isNavigationDocId(docId)) { navigationError = "组织导航 ID 非法"; return; }
         if (!(await canLeave.requestClose()) || !lifecycleToken.isAlive()) return;
+        navigationError = "";
         if (!organizationOpen) organizationDom = captureReturn();
         detailPerson = null;
         detailReturn = null;
         organizationDocId = docId;
         organizationOpen = true;
+    }
+
+    function showCreateOrganization(returnToContact = false): void {
+        if (!lifecycleToken.isAlive()) return;
+        navigationError = "";
+        returnToContactAfterOrganizationProfile = returnToContact;
+        organizationProfileError = "";
+        organizationProfileReadOnly = false;
+        organizationProfileDocId = "";
+        organizationProfileInitial = {};
+        organizationProfileOpen = true;
+    }
+
+    /** 在联系人编辑中创建组织时，等待资料弹窗完成后再刷新候选。 */
+    function openCreateOrganizationForContact(): Promise<void> {
+        if (!lifecycleToken.isAlive()) return Promise.resolve();
+        return new Promise((resolve) => {
+            organizationProfileCompletion = () => { organizationProfileCompletion = null; resolve(); };
+            showCreateOrganization(true);
+        });
+    }
+
+    async function openCreateOrganization() {
+        if (!(await canLeave.requestClose()) || !lifecycleToken.isAlive()) return;
+        showCreateOrganization();
+    }
+
+    async function openEditOrganizationProfile(docId: string) {
+        if (!(await canLeave.requestClose()) || !lifecycleToken.isAlive()) return;
+        navigationError = "";
+        organizationProfileError = "";
+        organizationProfileReadOnly = true;
+        organizationProfileDocId = docId;
+        organizationProfileInitial = {};
+        let profileError = "";
+        let profile: import("../domain/organization-profile").OrganizationProfileDraft | undefined;
+        let org: { name: string } | undefined;
+        try {
+            profile = (await facade.loadOrganizationProfile?.(docId)) ?? undefined;
+        } catch (error) {
+            profileError = error instanceof Error ? error.message : String(error);
+        }
+        try {
+            org = (await facade.listOrganizations()).find((item) => item.docId === docId);
+        } catch (error) {
+            profileError ||= error instanceof Error ? error.message : String(error);
+        }
+        if (!lifecycleToken.isAlive() || organizationProfileDocId !== docId) return;
+        organizationProfileInitial = profile ?? { name: org?.name ?? "" };
+        organizationProfileReadOnly = Boolean(profileError);
+        organizationProfileError = profileError ? `读取组织资料失败：${profileError}。可先核对内容后重试保存。` : "";
+        organizationProfileOpen = true;
+        if (profileError) {
+            queueMicrotask(() => document.querySelector<HTMLElement>(".lvct-org-profile-editor .lvct-form__error")?.focus());
+        }
+    }
+
+    async function retryOrganizationProfile(): Promise<void> {
+        const docId = organizationProfileDocId;
+        if (!docId || organizationProfileSaving) return;
+        organizationProfileOpen = false;
+        await tick();
+        if (lifecycleToken.isAlive()) await openEditOrganizationProfile(docId);
+    }
+
+    async function saveOrganizationProfile(draft: import("../domain/organization-profile").OrganizationProfileDraft) {
+        if (!lifecycleToken.isAlive()) return;
+        organizationProfileSaving = true;
+        organizationProfileError = "";
+        try {
+            let docId = organizationProfileDocId;
+            if (docId) {
+                if (!facade.saveOrganizationProfile) throw new Error("当前环境不支持编辑组织资料，请重新加载插件后重试");
+                const current = (await facade.listOrganizations()).find((org) => org.docId === docId);
+                if (!lifecycleToken.isAlive()) return;
+                if (current && current.name !== draft.name.trim()) await facade.renameOrganization?.(docId, draft.name.trim());
+                await facade.saveOrganizationProfile(docId, draft);
+                if (!lifecycleToken.isAlive()) return;
+            } else {
+                const created = await facade.createOrganization(draft.name, draft);
+                if (!lifecycleToken.isAlive()) return;
+                docId = created.docId;
+                if (created.profileSaved === false) {
+                    organizationProfileDocId = docId;
+                    organizationProfileInitial = draft;
+                    organizationProfileError = `组织已创建，但资料尚未保存：${created.profileError ?? "请重试"}`;
+                    return;
+                }
+            }
+            organizationProfileOpen = false;
+            organizationProfileDocId = "";
+            organizationProfileInitial = {};
+            organizationProfileReadOnly = false;
+            if (returnToContactAfterOrganizationProfile) {
+                returnToContactAfterOrganizationProfile = false;
+                organizationProfileCompletion?.(true);
+                return;
+            }
+            await openOrganization(docId);
+        } catch (error) {
+            if (lifecycleToken.isAlive()) organizationProfileError = error instanceof Error ? error.message : String(error);
+        } finally {
+            if (lifecycleToken.isAlive()) organizationProfileSaving = false;
+        }
     }
 
     async function closeOrganization() {
@@ -277,6 +391,21 @@
         };
         window.addEventListener("lvct-workbench-view", handleRequestedView);
         lifecycleToken.onDispose(() => window.removeEventListener("lvct-workbench-view", handleRequestedView));
+        const handleRequestedOrganizationCreate = (event: Event) => {
+            const detail = (event as CustomEvent<{ facade?: ContactsPluginFacade; returnToContact?: boolean; completion?: (created: boolean) => void }>).detail;
+            if (detail?.facade && detail.facade !== facade) return;
+            organizationProfileCompletion = detail?.completion ?? null;
+            showCreateOrganization(detail?.returnToContact === true);
+        };
+        window.addEventListener("lvct-workbench-create-organization", handleRequestedOrganizationCreate);
+        lifecycleToken.onDispose(() => window.removeEventListener("lvct-workbench-create-organization", handleRequestedOrganizationCreate));
+        // 外部联系人表单可能正在等待组织资料弹窗结束；工作台卸载时也要
+        // 收口该 Promise，避免宿主先卸载工作台后联系人一直停在“组织创建中”。
+        lifecycleToken.onDispose(() => {
+            organizationProfileCompletion?.(false);
+            organizationProfileCompletion = null;
+            returnToContactAfterOrganizationProfile = false;
+        });
         // B13.6a：组织管理弹窗成员「查看详情」跨弹窗导航（弹窗先关，Peek 由本层打开）
         const handleRequestedPerson = (event: Event) => {
             const person = (event as CustomEvent<{ person?: ContactSummary }>).detail?.person;
@@ -286,6 +415,7 @@
         return () => {
             lifecycleToken.invalidate();
             window.removeEventListener("lvct-workbench-view", handleRequestedView);
+            window.removeEventListener("lvct-workbench-create-organization", handleRequestedOrganizationCreate);
             window.removeEventListener("lvct-workbench-person", handleRequestedPerson);
         };
     });
@@ -397,6 +527,8 @@
                     focusIds={peopleFocusIds}
                     focusLabel={peopleFocusLabel}
                     externalSearch={globalSearch}
+                    onExternalSearchCleared={() => (globalSearch = "")}
+                    onExternalSearchChange={(value) => (globalSearch = value)}
                     {createRequested}
                     onClearFocus={clearPeopleFocus}
                     revision={dataRevision}
@@ -407,6 +539,46 @@
                     }}
                     onPreferencesChange={savePreferences}
                     {onOpenPersonDoc}
+                    onLoadOrgCandidates={async () => (await facade.listOrganizations()).filter((org) => !org.archived).map((org) => ({ docId: org.docId, name: org.name }))}
+                    onCreateOrganization={openCreateOrganizationForContact}
+                    onSaveExtended={async (person, details) => {
+                        if (details.orgDocId) {
+                            const memberships = await facade.listPersonOrgMemberships(person.docId);
+                            if (!memberships.some((membership) => membership.orgDocId === details.orgDocId && membership.status === "active")) {
+                                await facade.addOrganizationMember(details.orgDocId, person.docId, {
+                                    department: details.orgDepartment,
+                                    title: details.orgTitle,
+                                    joinedOn: details.orgJoinedOn,
+                                    affiliationKind: details.orgAffiliationKind,
+                                });
+                            }
+                        }
+                        if (details.relationshipLabels.trim()) {
+                            const identity = await facade.loadSelfIdentity();
+                            if (!identity) throw new Error("请先在设置中指定“我”的档案，再保存与我的关系称谓");
+                            const labels = details.relationshipLabels.split(/[、,，\n]/).map((label) => label.trim()).filter(Boolean);
+                            const current = await facade.loadPersonRelationshipLabels(person.docId);
+                            if (current.selfDocId !== identity.selfDocId || JSON.stringify(current.record?.labels ?? []) !== JSON.stringify(labels)) {
+                                await facade.savePersonRelationshipLabels(person.docId, identity.selfDocId, labels, current.record);
+                            }
+                        }
+                        if (details.aliases.trim()) {
+                            const existingAliases = await facade.listPersonAliases(person.docId);
+                            const existing = new Set(existingAliases.map((alias) => alias.alias.trim().toLocaleLowerCase()));
+                            const aliases = details.aliases.split(/[、,，\n]/).map((alias) => alias.trim()).filter(Boolean);
+                            for (const alias of aliases) {
+                                const key = alias.toLocaleLowerCase();
+                                if (!existing.has(key)) {
+                                    await facade.addPersonAlias(person.docId, alias);
+                                    existing.add(key);
+                                }
+                            }
+                        }
+                        if (details.note.trim()) {
+                            const currentNote = await facade.loadPersonNote(person.docId);
+                            if (currentNote !== details.note.trim()) await facade.savePersonNote(person.docId, details.note.trim(), currentNote);
+                        }
+                    }}
                 />
             {:else if current === "graph"}
                 <RelationGraph
@@ -425,6 +597,8 @@
                     revision={dataRevision}
                     i18n={facade.i18n}
                     onOpenOrgManager={(docId) => void openOrganization(docId)}
+                    onCreateOrganization={() => void openCreateOrganization()}
+                    onEditOrganization={(docId) => void openEditOrganizationProfile(docId)}
                 />
             {:else if current === "settings"}
                 <SettingsView
@@ -452,7 +626,25 @@
 {#if organizationOpen}
     <LvctDialog title={text("orgManagerTitle", "组织管理")} wide closeOnBackdrop={false} onClose={() => void closeOrganization()}>
         <OrgManagerDialog {facade} i18n={facade.i18n} initialOrgDocId={organizationDocId}
-            onOpenPerson={(docId, orgDocId) => void openPersonByDocId(docId, personReturnContext(current, { orgDocId }))} onClose={() => void closeOrganization()} />
+            onOpenPerson={(docId, orgDocId) => void openPersonByDocId(docId, personReturnContext(current, { orgDocId }))}
+            onCreateOrganization={() => void openCreateOrganization()}
+            onEditOrganization={(docId) => void openEditOrganizationProfile(docId)}
+            onClose={() => void closeOrganization()} />
+    </LvctDialog>
+{/if}
+
+{#if organizationProfileOpen}
+    <LvctDialog title={organizationProfileDocId ? text("orgEditTitle", "编辑组织资料") : text("orgCreateTitle", "新建组织")} wide closeOnBackdrop={false} onClose={() => { if (!organizationProfileSaving) { organizationProfileOpen = false; returnToContactAfterOrganizationProfile = false; organizationProfileCompletion?.(false); organizationProfileCompletion = null; } }}>
+        <OrganizationProfileEditor
+            mode={organizationProfileDocId ? "edit" : "create"}
+            initial={organizationProfileInitial}
+            saving={organizationProfileSaving}
+            error={organizationProfileError}
+            readOnly={organizationProfileReadOnly}
+            onRetry={() => void retryOrganizationProfile()}
+            onSave={saveOrganizationProfile}
+            onCancel={() => { if (!organizationProfileSaving) { organizationProfileOpen = false; returnToContactAfterOrganizationProfile = false; organizationProfileCompletion?.(false); organizationProfileCompletion = null; } }}
+        />
     </LvctDialog>
 {/if}
 
@@ -480,6 +672,7 @@
             onLoadOrgMemberships={(docId) => facade.listPersonOrgMemberships(docId)}
             onLoadCommonOrgs={(docId) => facade.listCommonOrgBackground(docId)}
             onOpenOrgManager={() => void openOrganization()}
+            onCreateOrganization={openCreateOrganizationForContact}
             onOpenOrganization={(docId) => void openOrganization(docId)}
             onLoadOrgCandidates={async () => (await facade.listOrganizations())
                 .filter((org) => !org.archived).map((org) => ({ docId: org.docId, name: org.name }))}

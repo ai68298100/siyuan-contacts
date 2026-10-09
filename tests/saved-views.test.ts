@@ -20,12 +20,14 @@ test("保存视图：正常条目保留，非法条目丢弃，坏日期容错�
         { id: "view-4", name: "缺 query" },
         { id: "view-5", name: "坏 query", query: { ...validView.query, tagMatch: "some" } },
         { id: "view-6", name: "坏日期", query: { ...validView.query, recentFrom: "2026/08/01" } },
+        { id: "view-7", name: "不存在日期", query: { ...validView.query, recentFrom: "2026-02-30" } },
         "垃圾项",
         null,
     ]);
-    assert.deepEqual(result.map((view) => view.id), ["view-1", "view-6"]);
+    assert.deepEqual(result.map((view) => view.id), ["view-1", "view-6", "view-7"]);
     assert.deepEqual(result[0].name, "球友圈");
     assert.equal(result[1].query.recentFrom, "");
+    assert.equal(result[2].query.recentFrom, "");
 });
 
 test("保存视图：name 去首尾空白，按 id 去重，截断到上限", () => {

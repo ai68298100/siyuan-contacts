@@ -384,7 +384,7 @@ export async function runSelfIdentityRegression({ test, assert, kernel, settings
         let submitted;
         let entered = false;
         const mounted = mount(InitWizard, { target: fixture, props: {
-            facade: { previewInitialize: async () => null, initialize: async (_name, progress, options) => {
+            facade: { previewInitialize: async () => ({ notebooks: [], notebook: null, hostDocId: null, dbBlockId: null, avId: null, existingFields: [] }), initialize: async (_name, progress, options) => {
                 submitted = options;
                 progress({ key: "wizardStepSelfPending", values: { message: "原本人结果未知" } });
                 return settings;
@@ -393,6 +393,7 @@ export async function runSelfIdentityRegression({ test, assert, kernel, settings
         try {
             const checkbox = fixture.querySelector('input[type="checkbox"]');
             checkbox.click();
+            await until(() => fixture.textContent.includes("开始初始化"), "初始化预检未完成");
             button("开始初始化").click();
             await until(() => fixture.textContent.includes("本人档案尚未确认"), "本人失败没有可见提示");
             assert(submitted.createSelf === false && !entered && fixture.textContent.includes("原本人结果未知"), "跳过选项未提交或失败被吞");

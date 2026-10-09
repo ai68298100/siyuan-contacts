@@ -49,6 +49,8 @@
     let queue = $state.raw<DocumentImportQueue | null>(null);
     let pauseRequested = $state(false);
     let progress = $state("");
+    // 扫描/批量收编可能跨越弹窗卸载；卸载后禁止异步结果回写状态或通知父层。
+    let alive = true;
     const guardedClose = useCloseGuard({
         busy: () => loading || importing,
         dirty: () => queue ? queue.items.some((item) => item.status !== "applied" && item.status !== "skipped")
@@ -63,6 +65,8 @@
     let searchTimer: ReturnType<typeof setTimeout> | undefined;
     let searchVersion = 0;
     onDestroy(() => {
+        alive = false;
+        pauseRequested = true;
         clearTimeout(searchTimer);
         searchVersion += 1;
     });
@@ -72,11 +76,14 @@
     const hiddenSelectedCount = $derived(selectedIds.filter((id) => !candidateIdSet.has(id)).length);
 
     async function loadNotebooks() {
+        if (!alive) return;
         loading = true;
         errorText = "";
         loaded = false;
         try {
-            notebooks = await listImportNotebooks(settings);
+            const result = await listImportNotebooks(settings);
+            if (!alive) return;
+            notebooks = result;
             if (notebooks.length > 0) {
                 notebookId = notebooks[0].id;
                 await search();
@@ -84,16 +91,17 @@
                 loaded = true;
             }
         } catch (error) {
+            if (!alive) return;
             errorText = error instanceof Error ? error.message : String(error);
             loaded = true;
         } finally {
-            loading = false;
+            if (alive) loading = false;
         }
     }
 
     async function search(continueScan = false) {
         clearTimeout(searchTimer);
-        if (!notebookId) return;
+        if (!alive || !notebookId) return;
         const version = ++searchVersion;
         loading = true;
         if (!continueScan) { candidates = []; scan = null; }
@@ -103,7 +111,7 @@
             const result = await scanImportCandidates(settings, notebookId, {
                 keyword, folderPrefix, previous: continueScan ? scan ?? undefined : undefined,
             });
-            if (version !== searchVersion) return;
+            if (!alive || version !== searchVersion) return;
             scan = result;
             candidates = result.candidates;
             for (const candidate of result.candidates) {
@@ -112,9 +120,9 @@
             errorText = result.state === "failed" ? result.error ?? "扫描读取失败，范围尚未核实" : "";
             loaded = true;
         } catch (error) {
-            if (version === searchVersion) errorText = error instanceof Error ? error.message : String(error);
+            if (alive && version === searchVersion) errorText = error instanceof Error ? error.message : String(error);
         } finally {
-            if (version === searchVersion) loading = false;
+            if (alive && version === searchVersion) loading = false;
         }
     }
 
@@ -139,7 +147,7 @@
     }
 
     async function runImport() {
-        if (importing || loading || errorText || importedCount !== null || selectedIds.length === 0) return;
+        if (!alive || importing || loading || errorText || importedCount !== null || selectedIds.length === 0) return;
         if (!groupValid) return;
         try {
             queue = snapshotImportQueue(importAnchor(settings), notebookId,
@@ -153,7 +161,7 @@
     }
 
     async function runQueue(retryOnly = false) {
-        if (importing || !queue) return;
+        if (!alive || importing || !queue) return;
         importing = true;
         pauseRequested = false;
         errorText = "";
@@ -163,16 +171,19 @@
             const result = await runDocumentImportQueue(settings, currentQueue, {
                 retryOnly,
                 shouldPause: () => pauseRequested,
-                onProgress: (done, total) => { progress = `已核实 ${done}/${total} 项`; },
+                onProgress: (done, total) => { if (alive) progress = `已核实 ${done}/${total} 项`; },
             });
+            if (!alive) return;
             queue = { ...result, items: result.items.map((item) => ({ ...item })) };
             const added = result.items.filter((item) => item.status === "applied").length - before;
-            if (added > 0) onImported(added);
+            if (alive && added > 0) onImported(added);
         } catch (error) {
-            queue = { ...currentQueue, items: currentQueue.items.map((item) => ({ ...item })) };
-            errorText = error instanceof Error ? error.message : String(error);
+            if (alive) {
+                queue = { ...currentQueue, items: currentQueue.items.map((item) => ({ ...item })) };
+                errorText = error instanceof Error ? error.message : String(error);
+            }
         } finally {
-            importing = false;
+            if (alive) importing = false;
         }
     }
 

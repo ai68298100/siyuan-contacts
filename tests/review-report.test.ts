@@ -81,3 +81,13 @@ test("零数据与工具：空区间一致，本月范围与上期推算", () =>
     assert.equal(activityKey({ id: "e9", source: "manual" }), "id:e9");
     assert.equal(activityKey({ eventId: "e9", source: "diary", externalRef: "note-1" }), "diary:note-1");
 });
+
+test("报表忽略非法互动日期，避免伪造统计和上一周期数量", () => {
+    const report = buildReviewReport({
+        events: [event({ id: "bad", personDocId: "doc-a", localDate: "2026-02-31" }), event({ id: "ok", personDocId: "doc-a", localDate: "2026-09-10" })],
+        roster,
+        range,
+    });
+    assert.equal(report.total, 1);
+    assert.deepEqual(report.entries.map((entry) => entry.eventId), ["ok"]);
+});

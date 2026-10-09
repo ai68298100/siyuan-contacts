@@ -154,10 +154,15 @@ export async function findCreationRequestDoc(notebookId: string, requestId: stri
 export async function findBlockIdByCustomAttr(rootId: string, attrName: string): Promise<string | undefined> {
     if (!/^\d{14}-[0-9a-z]{7}$/.test(rootId)) throw new Error("rootId 不是合法的思源 ID");
     if (!/^custom-[a-z0-9-]+$/.test(attrName)) throw new Error("attrName 必须是 custom- 前缀的小写属性名");
-    const rows = await querySql<{ id: string }>(
+    const rows = await querySql<unknown>(
         `SELECT id FROM blocks WHERE root_id = '${rootId}' AND ial LIKE '%${attrName}="%' LIMIT 1`,
     );
-    return rows[0]?.id;
+    if (rows.length === 0) return undefined;
+    const row = assertKernelRecord("/api/query/sql", rows[0]);
+    if (typeof row.id !== "string" || !/^\d{14}-[0-9a-z]{7}$/.test(row.id)) {
+        throw new KernelProtocolError("/api/query/sql", "属性标记查询返回非法块 ID");
+    }
+    return row.id;
 }
 
 export async function readMarkedBlocks(rootId: string, attrName: string): Promise<Array<{ id: string; markdown: string }>> {
@@ -186,10 +191,16 @@ export async function readMarkedBlocks(rootId: string, attrName: string): Promis
  */
 export async function findOutgoingLinkRoots(rootId: string): Promise<string[]> {
     if (!/^\d{14}-[0-9a-z]{7}$/.test(rootId)) throw new Error("rootId 不是合法的思源 ID");
-    const rows = await querySql<{ docId: string }>(
+    const rows = await querySql<unknown>(
         `SELECT DISTINCT def_block_root_id AS docId FROM refs WHERE root_id = '${rootId}' AND def_block_root_id != ''`,
     );
-    return rows.map((row) => row.docId).filter((id) => /^\d{14}-[0-9a-z]{7}$/.test(id));
+    return rows.map((raw) => {
+        const row = assertKernelRecord("/api/query/sql", raw);
+        if (typeof row.docId !== "string" || !/^\d{14}-[0-9a-z]{7}$/.test(row.docId)) {
+            throw new KernelProtocolError("/api/query/sql", "出链查询返回非法目标文档 ID");
+        }
+        return row.docId;
+    });
 }
 
 export const NOTEBOOK_DOC_PAGE_SIZE = 500;
@@ -244,8 +255,11 @@ export async function countNotebookDocs(notebookId: string): Promise<number> {
 export async function getBlockContent(blockId: string): Promise<string | undefined> {
     if (!/^\d{14}-[0-9a-z]{7}$/.test(blockId)) throw new Error("blockId 不是合法的思源 ID");
     await kernelPost("/api/sqlite/flushTransaction", {});
-    const rows = await querySql<{ content: string }>(`SELECT content FROM blocks WHERE id = '${blockId}' LIMIT 1`);
-    return rows[0]?.content;
+    const rows = await querySql<unknown>(`SELECT content FROM blocks WHERE id = '${blockId}' LIMIT 1`);
+    if (rows.length === 0) return undefined;
+    const row = assertKernelRecord("/api/query/sql", rows[0]);
+    if (typeof row.content !== "string") throw new KernelProtocolError("/api/query/sql", "块内容查询返回异常形状");
+    return row.content;
 }
 
 /** 导出文档全文 markdown（含子文档？不含，仅本文档内容；ID 严格校验） */
@@ -304,13 +318,18 @@ export async function findFollowUpTaskBlocks(
     rootId: string,
 ): Promise<Array<{ blockId: string; followUpId: string; markdown: string }>> {
     if (!/^\d{14}-[0-9a-z]{7}$/.test(rootId)) throw new Error("rootId 不是合法的思源 ID");
-    const rows = await querySql<{ id: string; ial: string; markdown: string }>(
+    const rows = await querySql<unknown>(
         `SELECT id, ial, markdown FROM blocks WHERE root_id = '${rootId}' AND type = 'i' AND subtype = 't' AND ial LIKE '%${FOLLOW_UP_ATTR}="%'`,
     );
     const result: Array<{ blockId: string; followUpId: string; markdown: string }> = [];
-    for (const row of rows) {
-        const match = String(row.ial ?? "").match(new RegExp(`${FOLLOW_UP_ATTR}="([^"]+)"`));
-        if (match) result.push({ blockId: row.id, followUpId: match[1], markdown: String(row.markdown ?? "") });
+    for (const raw of rows) {
+        const row = assertKernelRecord("/api/query/sql", raw);
+        if (typeof row.id !== "string" || !/^\d{14}-[0-9a-z]{7}$/.test(row.id)
+            || typeof row.ial !== "string" || typeof row.markdown !== "string") {
+            throw new KernelProtocolError("/api/query/sql", "跟进任务查询返回异常形状");
+        }
+        const match = row.ial.match(new RegExp(`${FOLLOW_UP_ATTR}="([^"]+)"`));
+        if (match?.[1]) result.push({ blockId: row.id, followUpId: match[1], markdown: row.markdown });
     }
     return result;
 }

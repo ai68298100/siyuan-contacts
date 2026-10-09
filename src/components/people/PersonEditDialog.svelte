@@ -12,6 +12,7 @@
     import { translateText } from "../../domain/translation";
     import QuickFillDialog from "./QuickFillDialog.svelte";
     import GroupField from "./GroupField.svelte";
+    import BirthdayField from "./BirthdayField.svelte";
     import { ClipboardPaste } from "@lucide/svelte";
     import { onDestroy, onMount, untrack } from "svelte";
 
@@ -23,6 +24,7 @@
         onSaveRelationshipLabels,
         onLoadOrgMemberships,
         onLoadOrgCandidates,
+        onCreateOrganization,
         onAddOrgMembership,
         hostCloseChannel,
         onSaved,
@@ -36,6 +38,7 @@
         onSaveRelationshipLabels?: (personDocId: string, selfDocId: string, labels: string[], expected: import("../../domain/person-relationship-labels").PersonRelationshipLabels | null) => Promise<import("../../domain/person-relationship-labels").PersonRelationshipLabels>;
         onLoadOrgMemberships?: (personDocId: string) => Promise<import("../../services/org").PersonOrgMembershipView[]>;
         onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string }>>;
+        onCreateOrganization?: () => void | Promise<void>;
         onAddOrgMembership?: (personDocId: string, orgDocId: string, extra?: { department?: string; title?: string; joinedOn?: string; affiliationKind?: OrgAffiliationKind }) => Promise<unknown>;
         /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
         hostCloseChannel?: { request?: (close: () => void) => void };
@@ -83,6 +86,21 @@
     let orgMemberships = $state<import("../../services/org").PersonOrgMembershipView[]>([]);
     let workOrgDocId = $state("");
     let educationOrgDocId = $state("");
+    let creatingOrganization = $state(false);
+    function validateEditDraft(value: ContactDraft): string[] {
+        const errors: string[] = [];
+        if (!value.name.trim()) errors.push("姓名不能为空");
+        if (value.email.trim() && !/^\S+@\S+\.\S+$/.test(value.email.trim())) errors.push("邮箱格式不正确");
+        if (value.birthday.trim()) {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(value.birthday.trim())) errors.push("生日日期格式不正确");
+            else {
+                const [year, month, day] = value.birthday.split("-").map(Number);
+                const date = new Date(year, month - 1, day);
+                if (!value.isLunar && (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day)) errors.push("生日不是有效日期");
+            }
+        }
+        return errors;
+    }
     // 使用 .by 形式与编辑器逻辑的无 Svelte 运行时测试夹具保持兼容；
     // 这里的派生值仍会由 Svelte 编译器按依赖追踪更新。
     const profileSupported = $derived.by(() => Boolean(onLoadRelationshipLabels || (onLoadOrgCandidates && onAddOrgMembership)));
@@ -109,6 +127,20 @@
         } catch (error) {
             profileError = error instanceof Error ? error.message : String(error);
         } finally { profileLoading = false; }
+    }
+    /** 新建组织后留在编辑页，并立即刷新候选，避免用户看到过期的“暂无组织”。 */
+    async function createOrganizationFromEditor(): Promise<void> {
+        if (!onCreateOrganization || creatingOrganization || profileBusy || profileLoading) return;
+        creatingOrganization = true;
+        profileError = "";
+        try {
+            await onCreateOrganization();
+            await loadProfileEditor();
+        } catch (error) {
+            profileError = error instanceof Error ? error.message : String(error);
+        } finally {
+            creatingOrganization = false;
+        }
     }
     // 运行时由 Svelte 注入 onMount；控制逻辑单测以无生命周期夹具执行，需安全跳过。
     if (typeof onMount === "function") onMount(() => { if (profileSupported) void loadProfileEditor(); });
@@ -154,7 +186,7 @@
         if (patch.wechat !== undefined) draft.wechat = patch.wechat;
         if (patch.website !== undefined) draft.website = patch.website;
         if (patch.birthday !== undefined) draft.birthday = patch.birthday;
-        if (patch.isLunar) draft.isLunar = true;
+        if (patch.isLunar !== undefined) draft.isLunar = patch.isLunar;
         if (patch.group !== undefined) draft.group = patch.group;
         if (patch.tagsAppend.length) {
             const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter(Boolean);
@@ -168,6 +200,8 @@
         if (!groupValid) throw new Error(text("groupCustomEmpty", "请输入分组名称。"));
         const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
         const next = { ...draft, tags };
+        const validationErrors = validateEditDraft(next);
+        if (validationErrors.length > 0) throw new Error(validationErrors.join("；"));
         const changed = pending ? changedContactWriteFields(pending.draft, next) : [];
         if (pending && changed.length > 0 && (retrying || pending.report.unknown.length > 0)) {
             throw new Error("草稿与原请求不同；未知字段请先恢复原输入并核实，明确失败后修改输入请使用保存");
@@ -237,7 +271,7 @@
         }
     }
     const guardedClose = useCloseGuard({
-        busy: () => running || profileBusy || profileLoading,
+        busy: () => running || profileBusy || profileLoading || creatingOrganization,
         dirty: () => baseDraftDirty() || profileDirty,
         changes: () => [...draftChanges(), ...profileChanges()],
         save: persistAll,
@@ -309,10 +343,16 @@
                         </label>
                     </div>
                     {#if availableOrgCandidates.length === 0}
-                        <p class="ft__smaller ft__on-surface">暂无可选择的活跃组织；可先在“组织管理”中新建组织，或编辑已有归属的分类。</p>
+                        <p class="ft__smaller ft__on-surface">暂无可选择的活跃组织；可先新建组织，或编辑已有归属的分类。</p>
+                        {#if onCreateOrganization}<button type="button" class="b3-button b3-button--outline" onclick={() => void createOrganizationFromEditor()} disabled={profileBusy || profileLoading || creatingOrganization}>{creatingOrganization ? "组织创建中…" : text("orgCreateFirst", "新建组织")}</button>{/if}
                     {/if}
                 {/if}
-                {#if profileError}<p class="lvct-form__error" role="alert">{profileError}</p>{/if}
+                {#if profileError}
+                    <p class="lvct-form__error" role="alert">{profileError}</p>
+                    <button type="button" class="b3-button b3-button--outline" onclick={() => void loadProfileEditor()} disabled={profileBusy || profileLoading}>
+                        {profileLoading ? "重新读取中…" : "重新读取资料"}
+                    </button>
+                {/if}
                 {#if profileMessage}<p role="status">{profileMessage}</p>{/if}
                 <button type="button" class="b3-button b3-button--outline" onclick={() => void saveProfileEditor()} disabled={profileBusy || !profileDirty}>
                     {profileBusy ? "保存资料中…" : "保存这些资料"}
@@ -337,14 +377,10 @@
             <span>{text("formWebsite", "网站")}</span>
             <input class="b3-text-field fn__block" type="url" bind:value={draft.website} disabled={running} />
         </label>
-        <label class="lvct-form__item">
+        <div class="lvct-form__item">
             <span>{text("formBirthday", "生日")}</span>
-            <input class="b3-text-field fn__block" type="date" bind:value={draft.birthday} disabled={running} />
-        </label>
-        <label class="lvct-form__item lvct-form__item--inline">
-            <span>{text("formLunar", "农历")}</span>
-            <input class="b3-switch" type="checkbox" bind:checked={draft.isLunar} disabled={running} />
-        </label>
+            <BirthdayField label={text("formBirthday", "生日")} value={draft.birthday} isLunar={draft.isLunar} disabled={running} onValueChange={(value) => (draft.birthday = value)} onModeChange={(isLunar) => (draft.isLunar = isLunar)} />
+        </div>
         <GroupField {i18n} value={draft.group} onValueChange={(value) => (draft.group = value)} onValidityChange={(valid) => (groupValid = valid)} label={text("formGroup", "分组")} ungroupedLabel={text("formUngrouped", "未分组")} disabled={running} />
         <label class="lvct-form__item">
             <span>{text("formTagsLabel", "标签（空格/逗号分隔）")}</span>
@@ -372,7 +408,7 @@
 {#if quickFillOpen}
     <QuickFillDialog
         {i18n}
-        existing={{ name: draft.name, phone: draft.phone, email: draft.email, wechat: draft.wechat, website: draft.website, birthday: draft.birthday, group: draft.group, tags: tagsText.split(/[，,、\s]+/).filter(Boolean) }}
+        existing={{ name: draft.name, phone: draft.phone, email: draft.email, wechat: draft.wechat, website: draft.website, birthday: draft.birthday, isLunar: draft.isLunar, group: draft.group, tags: tagsText.split(/[，,、\s]+/).filter(Boolean) }}
         onApply={applyQuickFill}
         onClose={() => (quickFillOpen = false)}
     />

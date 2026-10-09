@@ -5,14 +5,17 @@
  * 纯函数：无 DOM、无 IO，node --test 直接可测。
  */
 
+import { isValidDateKey } from "./date-key.ts";
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function isValidReviewDate(value: string): boolean {
-    return DATE_RE.test(value);
+    return DATE_RE.test(value) && isValidDateKey(value);
 }
 
 /** 闭区间日期范围过滤；非法/空端点视为不限制 */
 export function inDateRange(localDate: string, from: string, to: string): boolean {
+    if (!isValidReviewDate(localDate)) return false;
     const fromKey = isValidReviewDate(from) ? from : "";
     const toKey = isValidReviewDate(to) ? to : "";
     if (fromKey && localDate < fromKey) return false;
@@ -33,6 +36,7 @@ export function groupByMonth<T extends { localDate: string }>(items: readonly T[
     const groups: MonthGroup<T>[] = [];
     const byMonth = new Map<string, MonthGroup<T>>();
     for (const item of items) {
+        if (!isValidReviewDate(item.localDate)) continue;
         const month = item.localDate.slice(0, 7);
         let group = byMonth.get(month);
         if (!group) {
@@ -51,7 +55,7 @@ export function onThisDay<T extends { localDate: string }>(items: readonly T[], 
     if (!isValidReviewDate(today)) return [];
     const suffix = today.slice(5);
     return items
-        .filter((item) => item.localDate < today && item.localDate.slice(5) === suffix)
+        .filter((item) => isValidReviewDate(item.localDate) && item.localDate < today && item.localDate.slice(5) === suffix)
         .sort((a, b) => b.localDate.localeCompare(a.localDate));
 }
 

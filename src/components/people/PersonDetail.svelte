@@ -11,7 +11,7 @@ import ViewState from "../ViewState.svelte";
 import StatusNotice from "../StatusNotice.svelte";
     import type { ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
-    import { nextBirthday } from "../../domain/occasions";
+    import { formatBirthdayDisplay, nextBirthday } from "../../domain/occasions";
     import { createCloseScope, useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
     import PersonPicker from "./PersonPicker.svelte";
@@ -41,6 +41,7 @@ import StatusNotice from "../StatusNotice.svelte";
         revision = 0,
         onLoadOrgMemberships,
         onOpenOrgManager,
+        onCreateOrganization,
         onOpenOrganization,
         onLoadOrgCandidates,
         onAddOrgMembership,
@@ -92,6 +93,8 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadOrgMemberships?: (docId: string) => Promise<import("../../services/org").PersonOrgMembershipView[]>;
         /** B13.5 双向编辑（可选）：打开组织管理弹窗维护归属；未接线时隐藏按钮 */
         onOpenOrgManager?: () => void;
+        /** B13.5：组织候选为空时打开新建组织页。 */
+        onCreateOrganization?: () => void | Promise<void>;
         onOpenOrganization?: (docId: string) => void;
         /** B13.5 双向编辑完整版（可选）：归属候选（活跃组织）；未接线时隐藏添加表单 */
         onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string }>>;
@@ -350,16 +353,18 @@ import StatusNotice from "../StatusNotice.svelte";
     // ---- 互动备注模板（F09） ----
     const templatesSupported = $derived(Boolean(onListTemplates && onSaveTemplates));
     let templates: NoteTemplate[] = $state([]);
+    let templateLoadError = $state("");
     let templateChoice = $state("");
     let templateManagerOpen = $state(false);
 
     async function loadTemplates() {
         if (!onListTemplates) return;
+        templateLoadError = "";
         try {
             templates = await onListTemplates();
-        } catch {
-            // 模板为辅助功能，加载失败静默隐藏选项
+        } catch (error) {
             templates = [];
+            templateLoadError = error instanceof Error ? error.message : String(error);
         }
     }
     loadTemplates();
@@ -680,6 +685,16 @@ import StatusNotice from "../StatusNotice.svelte";
             if (detailAlive && request === orgCandidatesRequest) orgCandidatesError = error instanceof Error ? error.message : String(error);
         } finally { if (detailAlive && request === orgCandidatesRequest) orgCandidatesLoading = false; }
     }
+    async function createOrganizationFromDetail(): Promise<void> {
+        if (!onCreateOrganization || addOrgBusy || orgCandidatesLoading) return;
+        addOrgError = "";
+        try {
+            await onCreateOrganization();
+            await loadOrgCandidates();
+        } catch (error) {
+            if (detailAlive) addOrgError = error instanceof Error ? error.message : String(error);
+        }
+    }
     async function addOrgMembership(): Promise<void> {
         if (!onAddOrgMembership || addOrgBusy || orgLoading || orgReadError || orgCandidatesError || orgCandidatesLoading || addOrgDocId === "") return;
         addOrgBusy = true;
@@ -764,12 +779,15 @@ import StatusNotice from "../StatusNotice.svelte";
     /* ---- B13.6 共同背景投影（只读展示，零写入；失败降级隐藏） ---- */
     const commonOrgsSupported = $derived(Boolean(onLoadCommonOrgs));
     let commonOrgs: import("../../domain/org-membership").CommonOrgBackground[] = $state([]);
+    let commonOrgsLoading = $state(false);
     let commonOrgsFailed = $state(false);
     let commonOrgsRequest = 0;
     async function loadCommonOrgs(): Promise<void> {
         if (!onLoadCommonOrgs) return;
         const request = ++commonOrgsRequest;
         const docId = current.docId;
+        commonOrgsLoading = true;
+        commonOrgsFailed = false;
         try {
             const next = await onLoadCommonOrgs(docId);
             if (!detailAlive || request !== commonOrgsRequest || docId !== current.docId) return;
@@ -779,6 +797,8 @@ import StatusNotice from "../StatusNotice.svelte";
             if (!detailAlive || request !== commonOrgsRequest || docId !== current.docId) return;
             commonOrgs = [];
             commonOrgsFailed = true;
+        } finally {
+            if (detailAlive && request === commonOrgsRequest && docId === current.docId) commonOrgsLoading = false;
         }
     }
 
@@ -955,7 +975,7 @@ import StatusNotice from "../StatusNotice.svelte";
             <h3>{current.name}</h3>
             <div class="lvct-detail__meta">
                 {#if current.group}<span class="lvct-detail__group-chip">{current.group}</span>{/if}
-                {#if current.birthday}<span class="ft__smaller ft__on-surface">生日 {current.birthday}（{current.isLunar ? "农历" : "公历"}）</span>{/if}
+                {#if current.birthday}<span class="ft__smaller ft__on-surface">生日 {formatBirthdayDisplay(current.birthday, current.isLunar)}</span>{/if}
             </div>
         </div>
         <div class="lvct-detail__header-actions">
@@ -966,16 +986,57 @@ import StatusNotice from "../StatusNotice.svelte";
     </div>
 
     <div class="lvct-detail__tabs" role="tablist" tabindex="-1" aria-label="人物详情内容" onkeydown={handleTabKeydown}>
-        <button type="button" role="tab" aria-selected={activeTab === "overview"} tabindex={activeTab === "overview" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "overview"} onclick={() => void selectTab("overview")}>{text("detailOverview", "概览")}</button>
-        <button type="button" role="tab" aria-selected={activeTab === "activity"} tabindex={activeTab === "activity" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "activity"} onclick={() => void selectTab("activity")}>{text("detailActivity", "互动")}</button>
-        <button type="button" role="tab" aria-selected={activeTab === "relations"} tabindex={activeTab === "relations" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "relations"} onclick={() => void selectTab("relations")}>{text("detailRelations", "相关人")}</button>
+        <button id="lvct-detail-tab-overview" type="button" role="tab" aria-controls="lvct-detail-panel-overview" aria-selected={activeTab === "overview"} tabindex={activeTab === "overview" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "overview"} onclick={() => void selectTab("overview")}>{text("detailOverview", "概览")}</button>
+        <button id="lvct-detail-tab-activity" type="button" role="tab" aria-controls="lvct-detail-panel-activity" aria-selected={activeTab === "activity"} tabindex={activeTab === "activity" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "activity"} onclick={() => void selectTab("activity")}>{text("detailActivity", "互动")}</button>
+        <button id="lvct-detail-tab-relations" type="button" role="tab" aria-controls="lvct-detail-panel-relations" aria-selected={activeTab === "relations"} tabindex={activeTab === "relations" ? 0 : -1} class:lvct-detail__tab--active={activeTab === "relations"} onclick={() => void selectTab("relations")}>{text("detailRelations", "相关人")}</button>
     </div>
 
     {#if activeTab === "overview"}
+    <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
+    <section id="lvct-detail-panel-overview" role="tabpanel" aria-labelledby="lvct-detail-tab-overview" tabindex="0">
     <PersonProfileSummary profile={current.profile} />
     {#if onLoadRelationshipLabels && onSaveRelationshipLabels && !current.isSelf}
         <RelationshipLabels personDocId={current.docId} {revision} onLoad={onLoadRelationshipLabels} onSave={onSaveRelationshipLabels} {onChanged} />
     {/if}
+    <section class="lvct-detail__section lvct-detail__relationship-snapshot" aria-labelledby="lvct-relationship-snapshot-title">
+        <div class="lvct-detail__section-head">
+            <div>
+                <h4 id="lvct-relationship-snapshot-title">关系摘要</h4>
+                <p class="ft__smaller ft__on-surface">把联系背景集中在这里；互动记录会更新“久未联系”提醒，跟进完成不会自动记为互动。</p>
+            </div>
+            {#if insightsError}
+                <button type="button" class="b3-button b3-button--text" disabled={insightsLoading} onclick={loadInsights}>重试互动</button>
+            {:else}
+                <button type="button" class="b3-button b3-button--text" onclick={() => void selectTab("activity")}>查看互动</button>
+            {/if}
+        </div>
+        <dl class="lvct-detail__relationship-grid">
+            <div>
+                <dt>最近互动</dt>
+                <dd>{insightsLoading ? "读取中…" : insightsError ? "读取失败" : lastContactLabel || "尚无互动"}</dd>
+            </div>
+            <div>
+                <dt>待办跟进</dt>
+                <dd>
+                    {followUpsLoading ? "读取中…" : followUpError ? "读取失败" : openFollowUps.length > 0 ? `${openFollowUps.length} 条` : "暂无"}
+                    {#if followUpError}
+                        <button type="button" class="b3-button b3-button--text" disabled={followUpsLoading} onclick={loadFollowUps}>重试跟进</button>
+                    {/if}
+                </dd>
+            </div>
+            <div>
+                <dt>联系节奏</dt>
+                <dd>
+                    {cadenceSupported && !cadenceLoaded ? "读取中…" : cadenceLoadError ? "读取失败" : !cadenceSupported ? "未启用" : cadenceMode === "paused" ? "已暂停" : cadenceMode === "custom" ? `每 ${cadenceDays} 天` : "跟随全局阈值"}
+                    {#if cadenceLoadError}<button type="button" class="b3-button b3-button--text" onclick={loadCadence}>重试</button>{/if}
+                </dd>
+            </div>
+            <div>
+                <dt>相关人</dt>
+                <dd>{current.relatedItemIds.length > 0 ? `${current.relatedItemIds.length} 位` : "尚未建立"}</dd>
+            </div>
+        </dl>
+    </section>
     {#if !current.phone && !current.email && !current.wechat && !current.website && current.tags.length === 0}
         <ViewState compact title="联系资料还未填写" description="补充电话、邮箱或标签，方便下次查找。">
             <button class="b3-button b3-button--outline" onclick={() => (editing = true)}>编辑资料</button>
@@ -987,7 +1048,7 @@ import StatusNotice from "../StatusNotice.svelte";
         {#if current.wechat}<div><dt>微信</dt><dd>{current.wechat}</dd></div>{/if}
         {#if current.website}<div><dt>网站</dt><dd>{current.website}</dd></div>{/if}
         {#if current.tags.length > 0}<div><dt>标签</dt><dd>{current.tags.join(" · ")}</dd></div>{/if}
-        {#if birthday}<div><dt>下次生日</dt><dd>{birthday.date.toLocaleDateString("zh-CN")}（{current.isLunar ? "农历" : "公历"}） · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}</dd></div>{/if}
+        {#if birthday}<div><dt>下次生日</dt><dd>{birthday.date.toLocaleDateString("zh-CN")}（公历{current.isLunar ? `，对应${birthday.label}` : ""}） · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}</dd></div>{/if}
     </dl>
 
     {#if onLoadPersonNote && onSavePersonNote}
@@ -1038,6 +1099,12 @@ import StatusNotice from "../StatusNotice.svelte";
     <section class="lvct-detail__section">
         <h4>{text("detailRecordTitle", "记一笔互动")}</h4>
         {#if templatesSupported}
+            {#if templateLoadError}
+                <div class="lvct-form__error" role="alert">
+                    模板读取失败：{templateLoadError}
+                    <button type="button" class="b3-button b3-button--outline" onclick={loadTemplates}>重试模板</button>
+                </div>
+            {/if}
             <div class="lvct-detail__record fn__flex lvct-detail__template-row">
                 <select class="b3-select fn__flex-1" aria-label="选用备注模板" bind:value={templateChoice} onchange={applyTemplate} disabled={busy || templates.length === 0}>
                     <option value="">{templates.length === 0 ? text("tplEmptyHint", "暂无模板，点「管理模板」创建") : text("tplPick", "选用模板…")}</option>
@@ -1144,13 +1211,14 @@ import StatusNotice from "../StatusNotice.svelte";
                 <button class="b3-button b3-button--outline" disabled={addOrgBusy || orgCandidatesLoading} onclick={() => void loadOrgCandidates()}>{text("orgMembershipReloadCandidates", "重新读取组织候选")}</button>
             {/if}
             <div class="lvct-org-add">
-                <select class="b3-select" bind:value={addOrgDocId} disabled={addOrgBusy}
+                <select class="b3-select" bind:value={addOrgDocId} disabled={addOrgBusy || orgLoading || orgCandidatesLoading}
                     aria-label={text("orgAddOrgLabel", "选择要加入的组织")}>
                     <option value="">{text("orgAddOrgPick", "选择组织…")}</option>
                     {#each orgCandidateOptions as org (org.docId)}
                         <option value={org.docId}>{org.name} · {org.docId}</option>
                     {/each}
                 </select>
+                {#if orgCandidatesLoading}<span class="ft__smaller ft__on-surface" role="status">正在读取组织候选…</span>{/if}
                 <input class="b3-text-field" placeholder={text("orgMemberDeptLabel", "部门")} bind:value={addOrgDepartment}
                     disabled={addOrgBusy} aria-label={text("orgAddDeptLabel", "归属部门")} />
                 <input class="b3-text-field" placeholder={text("orgMemberTitleLabel", "职位")} bind:value={addOrgTitle}
@@ -1162,6 +1230,10 @@ import StatusNotice from "../StatusNotice.svelte";
                 </select>
                 <button type="button" class="b3-button b3-button--text" disabled={addOrgBusy || orgLoading || orgCandidatesLoading || !!orgReadError || !!orgCandidatesError || addOrgDocId === ""}
                     onclick={() => void addOrgMembership()}>{text("orgAddSubmit", "添加归属")}</button>
+                {#if onCreateOrganization && orgCandidateOptions.length === 0}
+                    <button type="button" class="b3-button b3-button--outline" disabled={addOrgBusy || orgLoading || orgCandidatesLoading}
+                        onclick={() => void createOrganizationFromDetail()}>{text("orgCreateFirst", "新建组织")}</button>
+                {/if}
             </div>
         {/if}
         <OrgMembershipResult report={orgMembershipReport} {i18n} />
@@ -1172,11 +1244,15 @@ import StatusNotice from "../StatusNotice.svelte";
     </section>
     {/if}
 
+    {#if commonOrgsSupported && commonOrgsLoading}
+    <p class="ft__smaller ft__on-surface" role="status">正在读取背景信息…</p>
+    {/if}
     {#if commonOrgsSupported && (commonOrgs.length > 0 || commonOrgsFailed)}
     <section class="lvct-detail__section">
         <h4>{text("orgCommonTitle", "共同背景")}</h4>
         {#if commonOrgsFailed}
-            <p class="ft__smaller ft__on-surface">{text("orgCommonFailed", "共同背景读取失败，可在数据刷新后重试。")}</p>
+            <p class="ft__smaller ft__on-surface" role="alert">{text("orgCommonFailed", "共同背景读取失败。")}</p>
+            <button type="button" class="b3-button b3-button--outline" onclick={loadCommonOrgs}>重新读取共同背景</button>
         {:else}
             {#each commonOrgs as entry (entry.orgDocId)}
                 <div class="lvct-org-common">
@@ -1252,7 +1328,7 @@ import StatusNotice from "../StatusNotice.svelte";
                         {/if}
                         <div class="lvct-detail__followup-actions">
                             <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => { snoozeForId = snoozeForId === item.id ? "" : item.id; snoozeCustomDate = ""; }} aria-expanded={snoozeForId === item.id}>{text("fuPostpone", "推迟")}</button>
-                            <button type="button" class="b3-button b3-button--text" disabled={followUpBusy} onclick={() => completeFollowUp(item)}>{text("fuComplete", "完成")}</button>
+                            <button type="button" class="b3-button b3-button--text" aria-label="完成跟进" title="完成跟进；不会自动记录互动" disabled={followUpBusy} onclick={() => completeFollowUp(item)}>{text("fuComplete", "完成")}</button>
                             <button type="button" class="b3-button b3-button--cancel" disabled={followUpBusy} onclick={() => cancelFollowUp(item)}>{text("fuCancelPlan", "取消计划")}</button>
                         </div>
                     {/each}
@@ -1274,7 +1350,7 @@ import StatusNotice from "../StatusNotice.svelte";
                     {followUpBusy ? text("fuAdding", "添加中…") : followUpRecorded ? text("fuAddAnother", "再加一条") : text("fuAddPlan", "添加计划")}
                 </button>
             </div>
-            <p class="ft__smaller ft__on-surface">到期的计划会出现在首页待办；完成计划不会自动记为互动。</p>
+            <p class="ft__smaller ft__on-surface">到期的计划会出现在首页待办；完成计划不会自动记为互动。需要更新最近联系日期时，请在上方“记一笔互动”中单独记录。</p>
         {/if}
     </section>
     {/if}
@@ -1340,7 +1416,11 @@ import StatusNotice from "../StatusNotice.svelte";
             {/if}
         </details>
     {/if}
+    </section>
     {:else if activeTab === "activity"}
+
+    <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
+    <section id="lvct-detail-panel-activity" role="tabpanel" aria-labelledby="lvct-detail-tab-activity" tabindex="0">
 
     <section class="lvct-detail__section">
         <h4>互动与共同出席{insights ? `（共 ${insights.totalEvents} 条）` : ""}</h4>
@@ -1420,9 +1500,11 @@ import StatusNotice from "../StatusNotice.svelte";
             </ViewState>
         {/if}
     </section>
+    </section>
     {:else}
 
-    <section class="lvct-detail__section">
+    <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
+    <section id="lvct-detail-panel-relations" role="tabpanel" aria-labelledby="lvct-detail-tab-relations" tabindex="0">
         <h4>相关人（{relatedPeople.length}）</h4>
         {#if othersLoading}
             <ViewState compact loading title="正在加载相关人" />
@@ -1501,6 +1583,7 @@ import StatusNotice from "../StatusNotice.svelte";
             onSaveRelationshipLabels={onSaveRelationshipLabels}
             onLoadOrgMemberships={onLoadOrgMemberships}
             onLoadOrgCandidates={onLoadOrgCandidates}
+            onCreateOrganization={onCreateOrganization}
             onAddOrgMembership={onAddOrgMembership}
             onSaved={refreshAfterEdit}
             onClose={() => (editing = false)}

@@ -4,7 +4,8 @@
  * 纯函数：无 DOM、无 IO，node --test 直接可测。
  */
 import type { PeopleSortMode } from "./preferences";
-import type { TagMatchMode } from "./people-filters";
+import type { ProfileGap, TagMatchMode } from "./people-filters";
+import { isValidDateKey } from "./date-key.ts";
 
 export interface SavedViewQuery {
     search: string;
@@ -15,6 +16,8 @@ export interface SavedViewQuery {
     recentFrom: string;
     recentTo: string;
     neverContacted: boolean;
+    /** 资料完整度筛选；旧视图缺失时按不限处理。 */
+    profileGap?: ProfileGap | "";
     sort: PeopleSortMode;
     workQuery?: string;
     educationQuery?: string;
@@ -29,8 +32,6 @@ export interface SavedView {
 
 /** 保存视图数量上限：防止偏好文件无界增长 */
 export const SAVED_VIEWS_LIMIT = 50;
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function isTagMatchMode(value: unknown): value is TagMatchMode {
     return value === "all" || value === "any";
@@ -53,9 +54,11 @@ function normalizeQuery(raw: unknown): SavedViewQuery | null {
         group: record.group,
         tags: [...record.tags],
         tagMatch: record.tagMatch,
-        recentFrom: typeof record.recentFrom === "string" && DATE_RE.test(record.recentFrom) ? record.recentFrom : "",
-        recentTo: typeof record.recentTo === "string" && DATE_RE.test(record.recentTo) ? record.recentTo : "",
+        recentFrom: isValidDateKey(record.recentFrom) ? record.recentFrom : "",
+        recentTo: isValidDateKey(record.recentTo) ? record.recentTo : "",
         neverContacted: record.neverContacted,
+        profileGap: record.profileGap === "phone" || record.profileGap === "birthday" || record.profileGap === "contact" || record.profileGap === "organize"
+            ? record.profileGap : "",
         sort: record.sort,
         ...(typeof record.workQuery === "string" && record.workQuery.trim() ? { workQuery: record.workQuery.trim().slice(0, 200) } : {}),
         ...(typeof record.educationQuery === "string" && record.educationQuery.trim() ? { educationQuery: record.educationQuery.trim().slice(0, 200) } : {}),

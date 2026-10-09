@@ -5,7 +5,7 @@
     import { profileText } from "../../domain/people-profiles";
     import { onDestroy, tick } from "svelte";
     import { exportVcfText } from "../../services/vcard";
-    import { nextBirthday } from "../../domain/occasions";
+    import { formatBirthdayDisplay, nextBirthday } from "../../domain/occasions";
     import GroupField from "./GroupField.svelte";
     import type { ContactSummary } from "../../domain/person";
     import type { WritableContactField } from "../../domain/contact-write.ts";
@@ -14,7 +14,7 @@
     import type { PeopleTableColumn, ViewPreferences } from "../../domain/preferences";
     import { applyPeopleFilters, EMPTY_PEOPLE_FILTER, isExtraFilterActive, matchTags } from "../../domain/people-filters";
     import type { PeopleFilterState } from "../../domain/people-filters";
-    import { findDuplicatePairs } from "../../domain/duplicate-check";
+    import { DUPLICATE_PAIRS_LIMIT, findDuplicatePairs } from "../../domain/duplicate-check";
     import type { DuplicatePair } from "../../domain/duplicate-check";
     import { findSavedViewByName, missingTags, normalizeSavedViews } from "../../domain/saved-views";
     import type { SavedView, SavedViewQuery } from "../../domain/saved-views";
@@ -31,6 +31,7 @@
     import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal, Bookmark, Pencil, Trash2 } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
     import { isAbortError } from "../../shared/async";
+    import type { ContactExtendedDraft } from "../../domain/contact-create";
 
     let {
         settings,
@@ -42,12 +43,17 @@
         focusIds = [],
         focusLabel = "",
         externalSearch = "",
+        onExternalSearchCleared,
+        onExternalSearchChange,
         createRequested = 0,
         onClearFocus,
         onOpenDetail,
         activePersonId = "",
         onOrderChange,
         onOpenPersonDoc,
+        onLoadOrgCandidates,
+        onCreateOrganization,
+        onSaveExtended,
         onPreferencesChange,
         isMobile = false,
     }: {
@@ -60,12 +66,19 @@
         focusIds?: readonly string[];
         focusLabel?: string;
         externalSearch?: string;
+        /** 首页搜索下推到联系人页后，清除条件时同步清空上游搜索框。 */
+        onExternalSearchCleared?: () => void;
+        /** 联系人页直接修改关键词时同步更新首页搜索框。 */
+        onExternalSearchChange?: (value: string) => void;
         createRequested?: number;
         onClearFocus?: () => void;
         onOpenDetail: (person: ContactSummary) => void;
         activePersonId?: string;
         onOrderChange?: (people: ContactSummary[]) => void;
         onOpenPersonDoc?: (docId: string) => void;
+        onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string }>>;
+        onCreateOrganization?: () => void;
+        onSaveExtended?: (person: ContactSummary, details: ContactExtendedDraft) => Promise<void>;
         onPreferencesChange: (preferences: ViewPreferences, baseline?: ViewPreferences) => Promise<ViewPreferences>;
         /** B09-1：移动端工具栏收纳（常驻搜索/视图切换/新建，其余收进底部弹层） */
         isMobile?: boolean;
@@ -76,6 +89,7 @@
     let loading: boolean = $state(true);
     let errorText: string = $state("");
     let searchText: string = $state("");
+    let selectedPeopleCache: Record<string, ContactSummary> = $state({});
     $effect(() => { searchText = externalSearch; });
     $effect(() => { if (createRequested > 0) adding = true; });
     let groupFilter: string = $state("");
@@ -97,6 +111,7 @@
     let viewHint = $state("");
     let dupOpen = $state(false);
     const duplicatePairs: DuplicatePair[] = $derived(findDuplicatePairs(people));
+    const duplicatePairsCapped = $derived(duplicatePairs.length >= DUPLICATE_PAIRS_LIMIT);
     // svelte-ignore state_referenced_locally
     let sortMode: "name" | "group" | "birthday" | "recent" = $state(initialSort);
     let recent: Record<string, { occurredAt: number; localDate: string }> = $state({});
@@ -132,17 +147,31 @@
         tableColumns = normalizeTableColumns(preferences.tableColumns);
     });
 
+    // svelte-ignore state_referenced_locally
+    let appliedInitialSort = $state(initialSort);
+    // 设置页修改“联系人默认排序”后，已打开的联系人页也应立即跟随。
+    // 已应用的保存视图或首页深链排序拥有更具体的意图，保留它们直到用户清除。
+    $effect(() => {
+        const nextSort = initialSort;
+        if (nextSort === appliedInitialSort) return;
+        appliedInitialSort = nextSort;
+        if (currentViewId || focusLabel) return;
+        sortMode = nextSort;
+    });
+
     function nextPreferenceIntent(patch: Partial<ViewPreferences>): { next: ViewPreferences; baseline: ViewPreferences } {
         const baseline = normalizeViewPreferences(preferenceIntent);
         preferenceIntent = { ...preferenceIntent, ...patch };
         return { next: preferenceIntent, baseline };
     }
 
-    async function persistPreferences(next: ViewPreferences, baseline: ViewPreferences = preferences) {
+    async function persistPreferences(next: ViewPreferences) {
         prefError = "";
         preferenceIntent = next;
         try {
-            await onPreferencesChange(next, baseline);
+            // 始终以父层已确认的偏好作为并发保存基线。preferenceIntent 保留本地完整意图，
+            // 这样某次自动保存失败后，下一次切换仍会把之前的改动一并重试，不会静默丢失。
+            await onPreferencesChange(next, normalizeViewPreferences(preferences));
         } catch (error) {
             prefError = error instanceof Error ? error.message : String(error);
         }
@@ -152,7 +181,7 @@
         if (viewMode === mode) return;
         viewMode = mode;
         const intent = nextPreferenceIntent({ peopleView: mode === "table" ? "table" : "card" });
-        void persistPreferences(intent.next, intent.baseline);
+        void persistPreferences(intent.next);
     }
 
     function toggleColumn(key: PeopleTableColumn, visible: boolean) {
@@ -161,7 +190,7 @@
             : tableColumns.filter((column) => column !== key);
         tableColumns = normalizeTableColumns(next);
         const intent = nextPreferenceIntent({ tableColumns: [...tableColumns] });
-        void persistPreferences(intent.next, intent.baseline);
+        void persistPreferences(intent.next);
     }
 
     function moveColumn(key: PeopleTableColumn, offset: -1 | 1) {
@@ -173,7 +202,7 @@
         next.splice(target, 0, key);
         tableColumns = next;
         const intent = nextPreferenceIntent({ tableColumns: [...tableColumns] });
-        void persistPreferences(intent.next, intent.baseline);
+        void persistPreferences(intent.next);
     }
 
     function resetDisplayPreferences() {
@@ -184,7 +213,7 @@
             peopleView: DEFAULT_VIEW_PREFERENCES.peopleView,
             tableColumns: [...DEFAULT_VIEW_PREFERENCES.tableColumns],
         });
-        void persistPreferences(intent.next, intent.baseline);
+        void persistPreferences(intent.next);
     }
 
     // 列设置浮层：fixed 定位原语（B02）——absolute 面板会被滚动祖先裁剪，宿主菜单同样用 fixed
@@ -305,7 +334,12 @@
         const result = filterContacts(people, searchText, groupFilter)
             .filter((person) => !focusLabel || focus.has(person.itemId))
             .filter((person) => matchTags(person, tagFilter, extraFilter.tagMatch));
-        const final = applyPeopleFilters(result, recent, extraFilter);
+        // 最近互动读取失败时，不能把空快照解释成“从未联系”；暂时暂停受影响条件，
+        // 保留联系人列表和其它筛选，待用户重试成功后再恢复条件。
+        const recentSafeFilter = recentError
+            ? { ...extraFilter, recentFrom: "", recentTo: "", neverContacted: false }
+            : extraFilter;
+        const final = applyPeopleFilters(result, recentError ? {} : recent, recentSafeFilter);
         const birthdayDays = new Map(final.map((person) => [person.itemId, nextBirthday(person.birthday, person.isLunar)?.daysUntil ?? Infinity]));
         final.sort((a, b) => {
             if (sortMode === "group") return a.group.localeCompare(b.group, "zh-CN") || a.name.localeCompare(b.name, "zh-CN");
@@ -342,7 +376,10 @@
             activeViewName = "";
             return;
         }
-        if (key === "search") searchText = "";
+        if (key === "search") {
+            searchText = "";
+            onExternalSearchCleared?.();
+        }
         else if (key === "group") groupFilter = "";
         else if (key === "tags") tagFilter = [];
         else if (key === "recentRange") extraFilter = { ...extraFilter, recentFrom: "", recentTo: "" };
@@ -354,6 +391,7 @@
 
     function clearAllConditions() {
         searchText = "";
+        onExternalSearchCleared?.();
         groupFilter = "";
         tagFilter = [];
         extraFilter = { ...EMPTY_PEOPLE_FILTER };
@@ -395,6 +433,7 @@
             recentFrom: extraFilter.recentFrom,
             recentTo: extraFilter.recentTo,
             neverContacted: extraFilter.neverContacted,
+            profileGap: extraFilter.profileGap,
             sort: sortMode,
             ...(extraFilter.workQuery?.trim() ? { workQuery: extraFilter.workQuery.trim() } : {}),
             ...(extraFilter.educationQuery?.trim() ? { educationQuery: extraFilter.educationQuery.trim() } : {}),
@@ -422,6 +461,7 @@
         groupFilter = query.group;
         tagFilter = [...query.tags];
         extraFilter = { ...extraFilter, tagMatch: query.tagMatch, recentFrom: query.recentFrom, recentTo: query.recentTo, neverContacted: query.neverContacted,
+            profileGap: query.profileGap ?? "",
             workQuery: query.workQuery ?? "", educationQuery: query.educationQuery ?? "", relationshipLabel: query.relationshipLabel ?? "" };
         sortMode = query.sort;
         visibleCount = PAGE_SIZE;
@@ -438,10 +478,10 @@
 
     async function persistViews(next: SavedView[]) {
         prefError = "";
-        const baseline = normalizeViewPreferences(preferenceIntent);
         preferenceIntent = { ...preferenceIntent, savedViews: next };
         try {
-            await onPreferencesChange(preferenceIntent, baseline);
+            // savedViews 同样以已确认的父层偏好为基线，避免前一次失败导致旧意图在后续操作中被省略。
+            await onPreferencesChange(preferenceIntent, normalizeViewPreferences(preferences));
             return true;
         } catch (error) {
             prefError = error instanceof Error ? error.message : String(error);
@@ -514,7 +554,7 @@
      */
     const selectedIdSet = $derived(new Set(selectedIds));
     const filteredIdSet = $derived(new Set(filtered.map((person) => person.itemId)));
-    const selectedPeople = $derived(people.filter((person) => selectedIdSet.has(person.itemId)));
+    const selectedPeople = $derived(selectedIds.map((itemId) => selectedPeopleCache[itemId]).filter((person): person is ContactSummary => Boolean(person)));
     const hiddenSelectionCount = $derived(selectedPeople.filter((person) => !filteredIdSet.has(person.itemId)).length);
     const allVisibleSelected = $derived(visible.length > 0 && visible.every((person) => selectedIdSet.has(person.itemId)));
     const someVisibleSelected = $derived(visible.some((person) => selectedIdSet.has(person.itemId)) && !allVisibleSelected);
@@ -546,11 +586,10 @@
             const next = await listContactPage(settings, 1, PAGE_SIZE, query, { signal: abortController.signal });
             if (request !== refreshGeneration) return; /* 旧响应不得覆盖新数据 */
             people = next.people;
+            selectedPeopleCache = { ...selectedPeopleCache, ...Object.fromEntries(next.people.map((person) => [person.itemId, person])) };
             rosterPage = next.page;
             rosterTotal = next.total;
             rosterHasMore = next.hasMore;
-            const available = new Set(people.map((person) => person.itemId));
-            selectedIds = selectedIds.filter((itemId) => available.has(itemId));
             loading = false;
             void loadRemainingRosterPages(request, pageGeneration, query, abortController);
         } catch (error) {
@@ -581,11 +620,15 @@
                 const duplicate = next.people.find((person) => known.has(person.itemId));
                 if (duplicate) throw new Error(`联系人分页出现重复行「${duplicate.name}」，已停止继续读取以避免重复展示`);
                 people = [...people, ...next.people];
+                selectedPeopleCache = { ...selectedPeopleCache, ...Object.fromEntries(next.people.map((person) => [person.itemId, person])) };
                 rosterPage = next.page;
                 rosterTotal = Math.max(rosterTotal, next.total);
                 rosterHasMore = next.hasMore;
-                const available = new Set(people.map((person) => person.itemId));
-                selectedIds = selectedIds.filter((itemId) => available.has(itemId));
+            }
+            if (!query && !rosterHasMore) {
+                const completeIds = new Set(people.map((person) => person.itemId));
+                selectedIds = selectedIds.filter((itemId) => completeIds.has(itemId));
+                selectedPeopleCache = Object.fromEntries(people.map((person) => [person.itemId, person]));
             }
         } catch (error) {
             if (request === refreshGeneration && expectedGeneration === rosterLoadGeneration && !isAbortError(error)) {
@@ -618,18 +661,23 @@
         return () => window.clearTimeout(timer);
     });
 
-    $effect(() => {
-        revision;
-        /* FUNC-01.7-a 请求代际：recent 读取无共享缓存去重，须自行挡乱序响应 */
+    async function reloadRecentInteractions(): Promise<void> {
         const request = ++recentGeneration;
-        void loadRecentInteractions().then((value) => {
+        try {
+            const value = await loadRecentInteractions();
             if (request !== recentGeneration) return;
             recent = value;
             recentError = "";
-        }).catch((error) => {
+        } catch (error) {
             if (request !== recentGeneration) return;
             recentError = error instanceof Error ? error.message : String(error);
-        });
+        }
+    }
+
+    $effect(() => {
+        revision;
+        /* FUNC-01.7-a 请求代际：recent 读取无共享缓存去重，须自行挡乱序响应 */
+        void reloadRecentInteractions();
     });
 
     function toggleTag(tag: string) {
@@ -639,6 +687,8 @@
 
     function toggleSelected(itemId: string, selected: boolean) {
         selectedScope = "manual";
+        const person = people.find((item) => item.itemId === itemId);
+        if (selected && person) selectedPeopleCache = { ...selectedPeopleCache, [itemId]: person };
         selectedIds = selected
             ? [...new Set([...selectedIds, itemId])]
             : selectedIds.filter((id) => id !== itemId);
@@ -646,6 +696,7 @@
 
     function toggleAllVisible(selected: boolean) {
         selectedScope = "manual";
+        if (selected) selectedPeopleCache = { ...selectedPeopleCache, ...Object.fromEntries(visible.map((person) => [person.itemId, person])) };
         const visibleIds = new Set(visible.map((person) => person.itemId));
         selectedIds = selected
             ? [...new Set([...selectedIds, ...visibleIds])]
@@ -658,12 +709,14 @@
 
     function selectAllFiltered(): void {
         if (batchBusy || exportingSelected) return;
+        selectedPeopleCache = { ...selectedPeopleCache, ...Object.fromEntries(filtered.map((person) => [person.itemId, person])) };
         selectedIds = filtered.map((person) => person.itemId);
         selectedScope = "filtered";
     }
 
     function selectVisibleScope(): void {
         if (batchBusy || exportingSelected) return;
+        selectedPeopleCache = { ...selectedPeopleCache, ...Object.fromEntries(visible.map((person) => [person.itemId, person])) };
         selectedIds = visible.map((person) => person.itemId);
         selectedScope = "page";
     }
@@ -852,13 +905,13 @@
                     <div class="lvct-form__item">
                         <span>最近互动日期</span>
                         <div style="display:flex; gap:6px; align-items:center">
-                            <input type="date" class="b3-text-field fn__block" bind:value={extraFilter.recentFrom} aria-label="最近互动起始日期" />
+                            <input type="date" class="b3-text-field fn__block" bind:value={extraFilter.recentFrom} disabled={!!recentError} aria-label="最近互动起始日期" />
                             <span>~</span>
-                            <input type="date" class="b3-text-field fn__block" bind:value={extraFilter.recentTo} aria-label="最近互动截止日期" />
+                            <input type="date" class="b3-text-field fn__block" bind:value={extraFilter.recentTo} disabled={!!recentError} aria-label="最近互动截止日期" />
                         </div>
                     </div>
                     <label class="lvct-people__moremenu-row">
-                        <input type="checkbox" bind:checked={extraFilter.neverContacted} />
+                        <input type="checkbox" bind:checked={extraFilter.neverContacted} disabled={!!recentError} />
                         <span>只看从未联系的人</span>
                     </label>
                     <label class="lvct-form__item">工作单位关键词<input class="b3-text-field" type="text" maxlength="200" value={extraFilter.workQuery ?? ""} oninput={(event) => { extraFilter = { ...extraFilter, workQuery: event.currentTarget.value }; visibleCount = PAGE_SIZE; }} /></label>
@@ -895,7 +948,7 @@
     {/snippet}
     {#snippet actionControls()}
         <button class="b3-button b3-button--outline" onclick={() => (dupOpen = true)}>
-            {text("peopleCleanup", "整理")}{duplicatePairs.length > 0 ? ` ·${duplicatePairs.length}` : ""}
+            {text("peopleCleanup", "整理")}{duplicatePairs.length > 0 ? ` ·${duplicatePairs.length}${duplicatePairsCapped ? "（上限）" : ""}` : ""}
         </button>
         <button class="b3-button b3-button--outline" onclick={() => (importing = true)}><FolderInput size={16}/>{text("peopleImportDocs", "导入已有文档")}</button>
         <button class="b3-button b3-button--outline" onclick={() => (vcarding = true)}><ContactRound size={16}/>{text("peopleVcard", "vCard 导入/导出")}</button>
@@ -907,7 +960,8 @@
                 type="text"
                 aria-label={text("peopleSearchPlaceholder", "搜索联系人")}
                 placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
-                bind:value={searchText}
+                value={searchText}
+                oninput={(event) => { searchText = (event.currentTarget as HTMLInputElement).value; onExternalSearchChange?.(searchText); }}
             />
         {/if}
         {#if !isMobile}
@@ -917,7 +971,8 @@
                 type="text"
                 aria-label={text("peopleSearchPlaceholder", "搜索联系人")}
                 placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
-                bind:value={searchText}
+                value={searchText}
+                oninput={(event) => { searchText = (event.currentTarget as HTMLInputElement).value; onExternalSearchChange?.(searchText); }}
             />
             {@render filterControls()}
         {/if}
@@ -1039,7 +1094,12 @@
             </div>
         </div>
     {/if}
-    {#if recentError}<div class="lvct-form__error" role="alert">最近互动读取失败：{recentError}</div>{/if}
+    {#if recentError}
+        <div class="lvct-form__error" role="alert">
+            最近互动读取失败：{recentError}；日期范围、从未联系和按最近互动排序暂时停用，联系人列表未按空数据误判。
+            <button type="button" class="b3-button b3-button--outline" disabled={loading} onclick={() => void reloadRecentInteractions()}>重试最近互动</button>
+        </div>
+    {/if}
     {#if people.some((person) => person.aliasProfile?.state === "unknown")}
         <p role="status">别名读取尚未核实，可按姓名查找；未把失败解释为无别名。</p>
         <button class="b3-button b3-button--text" disabled={loading} onclick={() => void refresh()}>重新读取别名</button>
@@ -1048,7 +1108,12 @@
         <p role="status">部分组织或称谓资料尚未核实。原有联系人仍可查看；相关筛选仅使用已核实的值。</p>
         <button class="b3-button b3-button--text" disabled={loading} onclick={() => void refresh()}>重新读取三项资料</button>
     {/if}
-    {#if prefError}<div class="lvct-form__error" role="alert">显示偏好保存失败：{prefError}</div>{/if}
+    {#if prefError}
+        <div class="lvct-form__error" role="alert">
+            显示偏好保存失败：{prefError}
+            <button type="button" class="b3-button b3-button--outline" onclick={() => void persistPreferences(preferenceIntent)}>重试保存显示偏好</button>
+        </div>
+    {/if}
 
     {#if viewHint}<div class="lvct-people__viewhint" role="status">{viewHint}</div>{/if}
 
@@ -1106,7 +1171,10 @@
     {/if}
 
     {#if errorText}
-        <div class="lvct-form__error" role="alert">加载失败：{errorText}</div>
+        <div class="lvct-form__error" role="alert">
+            <p>联系人加载失败：{errorText}</p>
+            <button type="button" class="b3-button b3-button--outline" disabled={loading} onclick={() => void refresh()}>重新加载</button>
+        </div>
     {:else if loading}
         <div class="lvct-people__skeleton" aria-busy="true" aria-label="联系人加载中">
             {#each Array(6) as _, index (index)}
@@ -1116,6 +1184,15 @@
                     <span class="lvct-skeleton lvct-skeleton--meta"></span>
                 </div>
             {/each}
+        </div>
+    {:else if rosterLoadError && filtered.length === 0}
+        <div class="lvct-empty" role="alert">
+            <div class="lvct-empty__icon" aria-hidden="true"><ContactRound size={24} strokeWidth={1.8}/></div>
+            <b>联系人读取未完成</b>
+            <p>已读取 {people.length} 人，后续联系人读取失败：{rosterLoadError}</p>
+            <div class="lvct-empty__actions">
+                <button type="button" class="b3-button b3-button--outline" disabled={rosterLoadingMore} onclick={resumeRosterLoading}>重试后续读取</button>
+            </div>
         </div>
     {:else if filtered.length === 0}
         <div class="lvct-empty">
@@ -1231,7 +1308,7 @@
                                     {#if column === "group"}{person.group || "—"}
                                     {:else if column === "phone"}{person.phone || "—"}
                                     {:else if column === "wechat"}{person.wechat || "—"}
-                                    {:else if column === "birthday"}{person.birthday ? `${person.birthday}（${person.isLunar ? "农历" : "公历"}）` : "—"}
+                                    {:else if column === "birthday"}{person.birthday ? formatBirthdayDisplay(person.birthday, person.isLunar) : "—"}
                                     {:else if column === "recent"}{recent[person.docId]?.localDate ?? "—"}
                                     {:else if column === "org"}{profileText(person.profile, "work")}
                                     {:else if column === "school"}{profileText(person.profile, "education")}
@@ -1258,6 +1335,9 @@
                 {settings}
                 {i18n}
                 onCreated={() => refresh()}
+                {onLoadOrgCandidates}
+                {onCreateOrganization}
+                {onSaveExtended}
                 onClose={() => (adding = false)}
             />
         </LvctDialog>
@@ -1322,6 +1402,9 @@
                     匹配规则：电话去格式后纯数字比较（不猜测补全国家码）、邮箱忽略大小写、姓名同名。
                     同名不等同同人；查看候选零写入，是否合并由你手动编辑决定。
                 </p>
+                {#if duplicatePairsCapped}
+                    <p class="ft__smaller lvct-text-danger" role="status">结果已达到 {DUPLICATE_PAIRS_LIMIT} 组展示上限，可能还有更多；请先用姓名、电话或邮箱搜索缩小名册范围，再重新打开整理。</p>
+                {/if}
                 {#if duplicatePairs.length === 0}
                     <ViewState compact icon="✓" title="没有发现疑似重复" description="当前名册没有按规则命中的候选组合。" />
                 {:else}

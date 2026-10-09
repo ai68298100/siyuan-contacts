@@ -17,6 +17,7 @@
     import LvctDialog from "../LvctDialog.svelte";
     import ReviewReportDialog from "./ReviewReportDialog.svelte";
     import { translateText } from "../../domain/translation";
+    import { useCloseGuard } from "../close-guard";
 
     let {
         facade,
@@ -64,6 +65,13 @@
     let quickDoneId = $state("");
     let quickError = $state("");
     let quickMessage = $state("");
+    // 首页快捷互动没有单独的保存按钮，切页/关闭时必须阻止带备注的草稿被静默丢弃。
+    // 空表单只是打开了输入区，不视为未保存修改；正在写入时仍独立阻断关闭。
+    useCloseGuard({
+        busy: () => quickBusy,
+        dirty: () => Boolean(quickNote.trim()),
+        changes: () => [text("guardQuickInteraction", "首页互动备注尚未保存")],
+    });
     let refreshVersion = 0;
     // 待办跟进（F05）
     let fuSnoozeForId = $state("");
@@ -126,21 +134,32 @@
     function isNeverCard(card: ActionCard): boolean {
         return card.reasons.some((reason) => reason.neverContacted);
     }
-    async function dismissBirthday(person: ContactSummary): Promise<void> {
-        const year = new Date().getFullYear();
-        const until = `${year}-12-31`;
+    async function dismissBirthdayUntil(person: ContactSummary, until: string, label: string): Promise<void> {
         /* C06：覆盖已有暂缓前先快照，撤销时精确恢复 */
         const previous = (await facade.loadReminderDismissals())
             .find((entry) => entry.personDocId === person.docId && entry.kind === "birthday");
         await facade.dismissReminder(person.docId, "birthday", until);
         setUndo(
-            `已跳过「${person.name}」本年生日提醒，跨年自动恢复`,
+            `已${label}「${person.name}」的生日提醒，可在设置-提醒中恢复`,
             previous
                 ? () => facade.dismissReminder(person.docId, "birthday", previous.until)
                 : () => facade.resumeReminder(person.docId, "birthday"),
         );
         rowMenuKey = "";
         await refresh();
+    }
+    async function dismissBirthday(person: ContactSummary): Promise<void> {
+        const year = new Date().getFullYear();
+        await dismissBirthdayUntil(person, `${year}-12-31`, "跳过本年");
+    }
+    async function dismissBirthdayToday(person: ContactSummary): Promise<void> {
+        await dismissBirthdayUntil(person, addDaysToToday(0), "今天先跳过");
+    }
+    async function dismissBirthdayWeek(person: ContactSummary): Promise<void> {
+        await dismissBirthdayUntil(person, addDaysToToday(7), "未来 7 天先跳过");
+    }
+    async function dismissBirthdayForever(person: ContactSummary): Promise<void> {
+        await dismissBirthdayUntil(person, "", "不再提醒");
     }
     async function dismissStaleReminder(person: ContactSummary): Promise<void> {
         const previous = (await facade.loadReminderDismissals())
@@ -390,15 +409,22 @@
 
     function openBirthdayPeople() {
         if (!data) return;
-        onOpenPeople({
-            itemIds: data.birthdays.filter((item) => item.bucket === "today" || item.bucket === "week").map((item) => item.person.itemId),
-            label: "本周生日",
-            sort: "birthday",
-        });
+        const itemIds = data.birthdays
+            .filter((item) => item.bucket === "today" || item.bucket === "week")
+            .map((item) => item.person.itemId);
+        if (itemIds.length === 0) {
+            onOpenPeople();
+            return;
+        }
+        onOpenPeople({ itemIds, label: "本周生日", sort: "birthday" });
     }
 
     function openNeverContactedPeople() {
         if (!data) return;
+        if (data.neverContactedItemIds.length === 0) {
+            onOpenPeople();
+            return;
+        }
         onOpenPeople({ itemIds: data.neverContactedItemIds, label: "从未互动" });
     }
 
@@ -414,11 +440,12 @@
             return;
         }
         showAllBirthdays = true;
-        onOpenPeople({
-            itemIds: data.birthdays.map((item) => item.person.itemId),
-            label: "近期生日",
-            sort: "birthday",
-        });
+        const itemIds = data.birthdays.map((item) => item.person.itemId);
+        if (itemIds.length === 0) {
+            onOpenPeople();
+            return;
+        }
+        onOpenPeople({ itemIds, label: "近期生日", sort: "birthday" });
     }
 
     function openAllStale(): void {
@@ -428,12 +455,12 @@
             return;
         }
         showAllStale = true;
-        onOpenPeople({
-            itemIds: data.stale.map((item) => item.person.itemId),
-            label: "久未联系",
-            // 联系人页的最近互动排序可稳定展示该集合，并兼容从未互动的人。
-            sort: "recent",
-        });
+        const itemIds = data.stale.map((item) => item.person.itemId);
+        if (itemIds.length === 0) {
+            onOpenPeople();
+            return;
+        }
+        onOpenPeople({ itemIds, label: "久未联系", sort: "recent" });
     }
 
     function openAllFollowUps(): void {
@@ -448,6 +475,10 @@
                 .filter((card) => card.reachable && card.person)
                 .map((card) => card.person!.itemId),
         )];
+        if (itemIds.length === 0) {
+            onOpenPeople();
+            return;
+        }
         onOpenPeople({ itemIds, label: "待办跟进", sort: "name" });
     }
 
@@ -771,7 +802,10 @@
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(card.person, 7))}>顺延 1 周</button>
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(card.person, 30))}>顺延 1 个月</button>
                                 {:else if card.reasons.some((reason) => reason.kind === "birthday")}
+                                    <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => dismissBirthdayToday(card.person))}>今天不再提醒</button>
+                                    <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => dismissBirthdayWeek(card.person))}>未来 7 天不再提醒</button>
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => dismissBirthday(card.person))}>跳过本年</button>
+                                    <button class="b3-button b3-button--cancel" disabled={alBusy} onclick={() => runRowAction(() => dismissBirthdayForever(card.person))}>不再提醒</button>
                                 {/if}
                                 <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => createFollowUpFor(card.person))}>建跟进（联系一下）</button>
                                 {#if card.bucket === "stale"}
@@ -837,7 +871,13 @@
                                 <button type="button" class="lvct-dash__row-main" onclick={() => onOpenDetail(item.person)}>
                                     <b>{item.person.name}</b>
                                     <PersonProfileSummary profile={item.person.profile} compact />
-                                    <span class="ft__smaller ft__on-surface">{item.projection.label}（{item.person.isLunar ? "农历" : "公历"}）</span>
+                                    <span class="ft__smaller ft__on-surface">
+                                        {#if item.person.isLunar}
+                                            {item.projection.label}（农历 · 对应公历 {item.projection.date.toLocaleDateString("zh-CN")}）
+                                        {:else}
+                                            {item.projection.label}（公历）
+                                        {/if}
+                                    </span>
                                     <span class="lvct-bucket {bucketStyles[item.bucket]}">
                                         {item.projection.daysUntil === 0 ? text("dashFuToday", "今天") : text("dashDaysUntilN", "{n}天", { n: item.projection.daysUntil })}
                                     </span>
@@ -848,7 +888,21 @@
                                     title={`跳过 ${item.person.name} 本年生日提醒`}
                                     onclick={(event) => { event.stopPropagation(); runRowAction(() => dismissBirthday(item.person)); }}
                                 >跳过本年</button>
+                                <button
+                                    type="button"
+                                    class="b3-button b3-button--outline lvct-dash__quick-button"
+                                    aria-label={`更多生日处置：${item.person.name}`}
+                                    aria-expanded={rowMenuKey === `birthday:${item.person.docId}`}
+                                    onclick={(event) => { event.stopPropagation(); toggleRowMenu(`birthday:${item.person.docId}`); }}
+                                >⋯</button>
                             </div>
+                            {#if rowMenuKey === `birthday:${item.person.docId}`}
+                                <div class="lvct-dash__quick-form lvct-dash__rowmenu">
+                                    <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => dismissBirthdayToday(item.person))}>今天不再提醒</button>
+                                    <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => dismissBirthdayWeek(item.person))}>未来 7 天不再提醒</button>
+                                    <button class="b3-button b3-button--cancel" disabled={alBusy} onclick={() => runRowAction(() => dismissBirthdayForever(item.person))}>不再提醒</button>
+                                </div>
+                            {/if}
                         {/each}
                     </div>
                     {#if data.birthdays.length > BIRTHDAY_PREVIEW_LIMIT}
@@ -953,11 +1007,11 @@
                                 {:else}
                                     <div class="lvct-dash__fu-actions">
                                         {#if card.reachable}
-                                            <button class="b3-button b3-button--text" disabled={fuBusy} onclick={() => card.person && onOpenDetail(card.person)}>{text("dashFuProcess", "处理")}</button>
+                                            <button class="b3-button b3-button--text" aria-label={`查看详情并处理跟进：${card.person?.name ?? "联系人"}`} title="查看详情并处理跟进" disabled={fuBusy} onclick={() => card.person && onOpenDetail(card.person)}>{text("dashFuProcess", "处理")}</button>
                                         {/if}
                                         <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => { fuSnoozeForId = fuSnoozeForId === card.item.id ? "" : card.item.id; fuCustomDate = ""; }} aria-expanded={fuSnoozeForId === card.item.id}>{text("dashFuPostpone", "推迟")}</button>
-                                        <button class="b3-button b3-button--outline" disabled={fuBusy} onclick={() => completeFollowUp(card.item.id, card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashFuComplete", "完成")}</button>
-                                        <button class="b3-button b3-button--cancel" disabled={fuBusy} onclick={() => skipFollowUp(card.item.id, card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashFuSkip", "跳过")}</button>
+                                        <button class="b3-button b3-button--outline" aria-label="完成跟进" title="完成跟进；不会自动记录互动" disabled={fuBusy} onclick={() => completeFollowUp(card.item.id, card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashFuComplete", "完成")}</button>
+                                        <button class="b3-button b3-button--cancel" aria-label="取消计划" title="取消本次跟进计划" disabled={fuBusy} onclick={() => skipFollowUp(card.item.id, card.item.title || text("dashKeepInTouch", "保持联系"))}>{text("dashFuSkip", "跳过")}</button>
                                     </div>
                                 {/if}
                             </div>
