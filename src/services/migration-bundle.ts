@@ -1,9 +1,9 @@
 import type { Plugin } from "siyuan";
 import { exportInteractionJson } from "./interaction-export";
 import { exportFollowUpsJson } from "./followups";
-import { loadCadenceMap, mergeCadenceMap } from "../data/cadences";
-import { loadReminderDismissals, mergeReminderDismissals } from "../data/reminder-dismissals";
-import { loadRegistry, mergeRegistryEntries } from "../data/registry";
+import { loadCadenceMapStrict, mergeCadenceMap } from "../data/cadences";
+import { loadReminderDismissalsStrict, mergeReminderDismissals } from "../data/reminder-dismissals";
+import { loadRegistryStrict, mergeRegistryEntries } from "../data/registry";
 import { loadTemplatesStore, mergeTemplatesStore } from "../data/templates";
 import { normalizeTemplates } from "../domain/interaction-templates";
 import { importInteractionJson } from "./interaction-import";
@@ -181,9 +181,9 @@ export async function exportMigrationBundle(plugin: Plugin): Promise<string> {
     const [interactions, followUps, cadences, reminderDismissals, registry, templatesStore, exchanges, aliases, identity, orgMemberships, organizationProfiles, relationshipLabels] = await Promise.all([
         JSON.parse(await exportInteractionJson(plugin)) as BundleModules["interactions"],
         JSON.parse(await exportFollowUpsJson(plugin)) as BundleModules["followUps"],
-        loadCadenceMap(plugin),
-        loadReminderDismissals(plugin),
-        loadRegistry(plugin),
+        loadCadenceMapStrict(plugin),
+        loadReminderDismissalsStrict(plugin),
+        loadRegistryStrict(plugin),
         loadTemplatesStore(plugin),
         withStoreLock(EXCHANGE_STORAGE_KEY, () => loadExchangeStore(plugin)),
         withStoreLock(PERSON_ALIAS_STORAGE_KEY, () => loadPersonAliasStore(plugin)),

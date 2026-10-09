@@ -18,6 +18,11 @@ import type { OrganizationFact } from "../domain/organization-operations.ts";
 
 export class OrganizationWriteNotSentError extends Error {}
 
+const NODE_ID = /^\d{14}-[0-9a-z]{7}$/;
+function assertNodeId(value: string, label = "块 ID"): void {
+    if (typeof value !== "string" || !NODE_ID.test(value)) throw new Error(`${label}不是合法的思源 ID`);
+}
+
 export async function readOrganizationFact(docId: string): Promise<OrganizationFact> {
     if (!/^\d{14}-[0-9a-z]{7}$/.test(docId)) throw new Error("组织文档 ID 非法");
     await flushBlockIndex();
@@ -79,6 +84,8 @@ export async function updateOrganizationMarker(expected: OrganizationFact, markd
 
 /** 在容器块（通常是文档根）末尾追加一个 markdown 块，返回新块 ID */
 export async function appendBlockMd(parentId: string, markdown: string): Promise<string> {
+    assertNodeId(parentId, "父块 ID");
+    if (typeof markdown !== "string") throw new Error("块内容必须是文本");
     const data = await kernelPost("/api/block/insertBlock", {
         dataType: "markdown",
         parentID: parentId,
@@ -91,10 +98,13 @@ export async function appendBlockMd(parentId: string, markdown: string): Promise
 
 /** 整块更新为新的 markdown（保留原块 ID） */
 export async function updateBlockMd(blockId: string, markdown: string): Promise<void> {
+    assertNodeId(blockId);
+    if (typeof markdown !== "string") throw new Error("块内容必须是文本");
     await kernelPost<unknown>("/api/block/updateBlock", { id: blockId, dataType: "markdown", data: markdown });
 }
 
 export async function deleteBlock(blockId: string): Promise<void> {
+    assertNodeId(blockId);
     await kernelPost<unknown>("/api/block/deleteBlock", { id: blockId });
 }
 

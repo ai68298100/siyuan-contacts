@@ -6,7 +6,7 @@ import type { Plugin } from "siyuan";
 import { buildReviewReport } from "../domain/review-report";
 import type { ReviewRange, ReviewReport } from "../domain/review-report";
 import type { ContactsSettings } from "../domain/model";
-import { loadInteractionStore } from "../data/interactions";
+import { loadInteractionStoreStrict } from "../data/interactions";
 import { getRoster } from "./roster";
 
 export async function buildReview(
@@ -14,6 +14,6 @@ export async function buildReview(
     settings: ContactsSettings,
     range: ReviewRange,
 ): Promise<ReviewReport> {
-    const [roster, store] = await Promise.all([getRoster(settings), loadInteractionStore(plugin)]);
+    const [roster, store] = await Promise.all([getRoster(settings), loadInteractionStoreStrict(plugin)]);
     return buildReviewReport({ events: store.events, roster, range });
 }
