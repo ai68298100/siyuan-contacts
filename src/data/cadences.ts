@@ -16,7 +16,7 @@ export async function loadCadenceMap(plugin: Plugin): Promise<Record<string, Per
 
 /** FUNC-01.12 严格展示读：键不存在返回空映射；读取失败/损坏抛错（首页据此显式降级提示） */
 export async function loadCadenceMapStrict(plugin: Plugin): Promise<Record<string, PersonCadence>> {
-    return normalizeCadenceMap(await loadJsonStrict(plugin, CADENCE_STORAGE_KEY));
+    return normalizeCadenceMapForWrite(await loadJsonStrict(plugin, CADENCE_STORAGE_KEY));
 }
 
 /**
@@ -43,7 +43,12 @@ export async function savePersonCadence(
             if (!(docId in store)) return;
             delete store[docId];
         } else {
-            store[docId] = { days: cadence.days, paused: cadence.paused };
+            /* 运行时调用方可能来自插件桥/旧版本 JS，不要把未归一化值直接落盘。 */
+            if (typeof cadence.days !== "number" || !Number.isFinite(cadence.days)
+                || typeof cadence.paused !== "boolean") throw new Error("联系节奏参数无效，未写入");
+            const normalized = normalizeCadenceMap({ schemaVersion: 1, cadences: { [docId]: cadence } })[docId];
+            if (!normalized) throw new Error("联系节奏参数无效，未写入");
+            store[docId] = normalized;
         }
         await saveJsonVerified(plugin, CADENCE_STORAGE_KEY, {
             schemaVersion: 1,
@@ -57,11 +62,18 @@ export async function mergeCadenceMap(
     plugin: Plugin,
     incoming: Record<string, { days: number; paused: boolean }>,
 ): Promise<number> {
+    for (const [docId, cadence] of Object.entries(incoming)) {
+        if (!isPersonDocId(docId) || cadence === null || typeof cadence !== "object"
+            || typeof cadence.days !== "number" || !Number.isFinite(cadence.days) || typeof cadence.paused !== "boolean") {
+            throw new Error("联系节奏导入内容损坏，拒绝写入");
+        }
+    }
+    const safeIncoming = normalizeCadenceMap({ schemaVersion: 1, cadences: incoming });
     return withStoreLock(CADENCE_STORAGE_KEY, async () => {
         const store = normalizeCadenceMapForWrite(await loadJsonStrict(plugin, CADENCE_STORAGE_KEY));
         let merged = 0;
-        for (const [docId, cadence] of Object.entries(incoming)) {
-            store[docId] = { days: cadence.days, paused: cadence.paused };
+        for (const [docId, cadence] of Object.entries(safeIncoming)) {
+            store[docId] = cadence;
             merged += 1;
         }
         await saveJsonVerified(plugin, CADENCE_STORAGE_KEY, {

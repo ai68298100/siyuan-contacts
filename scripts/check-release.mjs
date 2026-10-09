@@ -1,4 +1,5 @@
 /* 发布门禁：版本一致性 + dist 产物完整性 + package.zip 存在。任何一项不过即退出码 1。 */
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -26,6 +27,14 @@ check("dist/plugin.json 与源一致", JSON.stringify(distManifest) === JSON.str
 
 const zip = path.join(root, "package.zip");
 check("package.zip 存在且非空", fs.existsSync(zip) && fs.statSync(zip).size > 1024, fs.existsSync(zip) ? `${fs.statSync(zip).size}B` : "缺失");
+const checksumPath = path.join(root, "package.zip.sha256");
+if (fs.existsSync(zip) && fs.statSync(zip).size > 0 && fs.existsSync(checksumPath)) {
+    const expected = fs.readFileSync(checksumPath, "utf8").trim().split(/\s+/)[0].toLowerCase();
+    const actual = createHash("sha256").update(fs.readFileSync(zip)).digest("hex");
+    check("package.zip SHA-256 校验和", /^[0-9a-f]{64}$/.test(expected) && expected === actual, `${expected || "缺失"} / ${actual}`);
+} else {
+    check("package.zip SHA-256 校验和", false, "package.zip 或 package.zip.sha256 缺失");
+}
 check("icon.png ≤ 64KiB（集市限制）", fs.statSync(path.join(root, "icon.png")).size <= 64 * 1024, `${fs.statSync(path.join(root, "icon.png")).size}B`);
 check("preview.png ≤ 512KiB（集市限制）", fs.statSync(path.join(root, "preview.png")).size <= 512 * 1024, `${fs.statSync(path.join(root, "preview.png")).size}B`);
 

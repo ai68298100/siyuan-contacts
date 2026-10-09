@@ -33,6 +33,24 @@ export function normalizeRegistryStore(raw: unknown): RegistryStore {
     return { schemaVersion: REGISTRY_STORE_VERSION, registeredAt };
 }
 
+/** 严格展示/写入读取：现有库损坏时抛错，禁止把故障伪装为未登记。 */
+export function normalizeRegistryStoreForWrite(raw: unknown): RegistryStore {
+    if (raw == null || raw === "") return { schemaVersion: REGISTRY_STORE_VERSION, registeredAt: {} };
+    if (typeof raw !== "object" || (raw as Record<string, unknown>).schemaVersion !== REGISTRY_STORE_VERSION
+        || (raw as Record<string, unknown>).registeredAt === null
+        || typeof (raw as Record<string, unknown>).registeredAt !== "object"
+        || Array.isArray((raw as Record<string, unknown>).registeredAt)) {
+        throw new Error("收编时间索引存储格式或版本不兼容，操作已停止；请先备份并检查原文件");
+    }
+    const entries = (raw as { registeredAt: Record<string, unknown> }).registeredAt;
+    for (const [docId, date] of Object.entries(entries)) {
+        if (!DOC_ID_RE.test(docId) || !isValidDateKey(date)) {
+            throw new Error("收编时间索引存储内容损坏，操作已停止；请先备份并检查原文件");
+        }
+    }
+    return { schemaVersion: REGISTRY_STORE_VERSION, registeredAt: { ...entries } as Record<string, string> };
+}
+
 /**
  * 首次发现补记：返回"补记后的完整映射"与"本次新补记的 docId"（调用方决定是否落盘）。
  * 已登记的键不动；缺失键写 today。

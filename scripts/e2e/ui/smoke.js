@@ -1157,6 +1157,7 @@ await test("今日行动分组折叠：从未互动单独归组默认折叠，�
 
 await test("行内快捷处置：生日跳过本年、从未互动不再提醒，写入暂缓（B08）", async () => {
     const dismissals = [];
+    let cadenceWrites = 0;
     const personOf = (name) => ({
         docId: `20260927000000-${name}0000`, itemId: `row-${name}`, name,
         phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
@@ -1178,13 +1179,16 @@ await test("行内快捷处置：生日跳过本年、从未互动不再提醒�
                     { person: personOf("从未乙"), bucket: "stale", reasons: [
                         { kind: "stale", label: "从未互动", bucket: "stale", neverContacted: true },
                     ] },
+                    { person: personOf("久未丙"), bucket: "stale", reasons: [
+                        { kind: "stale", label: "45 天未联系（阈值 30 天）", bucket: "stale" },
+                    ] },
                 ],
             }),
             dismissReminder: async (docId, kind, until) => dismissals.push({ docId, kind, until }),
             resumeReminder: async () => {},
             loadReminderDismissals: async () => [],
             getPersonCadence: async () => null,
-            savePersonCadence: async () => {},
+            savePersonCadence: async () => { cadenceWrites += 1; },
         },
     } });
     await until(() => fixture.querySelector(".lvct-dash__row"), "行动未渲染");
@@ -1221,6 +1225,19 @@ await test("行内快捷处置：生日跳过本年、从未互动不再提醒�
     assert(neverHead, "从未互动组头未渲染");
     neverHead.click();
     await tick();
+    const staleMoreButton = [...fixture.querySelectorAll("button")]
+        .find((node) => (node.getAttribute("aria-label") ?? "").includes("更多处置") && (node.getAttribute("aria-label") ?? "").includes("久未丙"));
+    assert(staleMoreButton, "久未联系行动行缺更多处置按钮");
+    staleMoreButton.click();
+    await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent === "顺延 3 天"), "久未联系顺延菜单未展开");
+    [...fixture.querySelectorAll("button")].find((node) => node.textContent === "顺延 3 天").click();
+    await until(() => dismissals.some((entry) => entry.kind === "stale"), "久未联系顺延未写入暂缓");
+    const staleUntil = dismissals.find((entry) => entry.kind === "stale").until;
+    const staleTarget = new Date();
+    staleTarget.setDate(staleTarget.getDate() + 3);
+    const staleTargetKey = `${staleTarget.getFullYear()}-${pad(staleTarget.getMonth() + 1)}-${pad(staleTarget.getDate())}`;
+    assert(staleUntil === staleTargetKey, "久未联系顺延应写入一次性暂缓截止日");
+    assert(cadenceWrites === 0, "久未联系顺延不应永久改写联系节奏");
     const more = [...fixture.querySelectorAll("button")]
         .find((node) => (node.getAttribute("aria-label") ?? "").includes("更多处置") && (node.getAttribute("aria-label") ?? "").includes("从未乙"));
     assert(more, "行动行缺更多处置按钮");
