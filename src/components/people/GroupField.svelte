@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { untrack } from "svelte";
+    import { tick, untrack } from "svelte";
     import { PRESET_GROUPS } from "../../services/contacts";
     import {
         GROUP_CLEAR_OPTION,
@@ -55,6 +55,7 @@
     const initialCustomMode = !isListedOption(initialValue);
     let customMode = $state(initialCustomMode);
     let customText = $state(initialCustomMode ? initialValue : "");
+    let customInput: HTMLInputElement | undefined = $state();
     let observedValue = initialValue;
     const customValidation = $derived(normalizeCustomGroupName(customText));
     const customInputId = `lvct-group-custom-${Math.random().toString(36).slice(2, 10)}`;
@@ -84,7 +85,7 @@
         onValueChange(next);
     }
 
-    function selectGroup(event: Event): void {
+    async function selectGroup(event: Event): Promise<void> {
         const next = (event.currentTarget as HTMLSelectElement).value;
         if (next === GROUP_CUSTOM_OPTION) {
             customMode = true;
@@ -92,6 +93,8 @@
             const validation = normalizeCustomGroupName(customText);
             setValue(validation.ok ? validation.value : "");
             onValidityChange(validation.ok);
+            await tick();
+            if (!disabled) customInput?.focus();
             return;
         }
         customMode = false;
@@ -118,7 +121,7 @@
         {#each availableGroups.filter((group) => !PRESET_GROUPS.includes(group as typeof PRESET_GROUPS[number])) as group (group)}
             <option value={group}>{group}</option>
         {/each}
-        <option value={GROUP_CUSTOM_OPTION}>{text("groupCustom", "自定义…")}</option>
+        <option value={GROUP_CUSTOM_OPTION}>{text("groupCustom", "自定义…（随后输入）")}</option>
     </select>
 </label>
 {#if customMode}
@@ -133,6 +136,7 @@
             aria-invalid={!customValidation.ok}
             aria-describedby={customValidation.ok ? undefined : customErrorId}
             id={customInputId}
+            bind:this={customInput}
             {disabled}
             oninput={editCustomGroup}
         />

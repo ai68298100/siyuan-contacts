@@ -521,7 +521,7 @@ await test("首页零结果统计卡进入联系人全量列表", async () => {
     assert(!fixture.textContent.includes("来自首页：从未互动"), "零结果统计卡不应留下空筛选标签");
 });
 
-await test("首页搜索下推后清除条件同步清空首页搜索框", async () => {
+await test("首页搜索保持独立输入并通过 Enter 或按钮提交，清除后同步首页状态", async () => {
     mounted = mount(Workbench, { target: fixture, props: {
         settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
         onPreferencesUpdated() {}, onOpenPersonDoc() {},
@@ -533,12 +533,67 @@ await test("首页搜索下推后清除条件同步清空首页搜索框", async
     const homeSearch = () => fixture.querySelector('.lvct-workbench__header-actions input');
     await until(() => homeSearch(), "首页搜索框未渲染");
     input(homeSearch(), "不存在的人");
+    await tick();
+    assert(homeSearch() && !fixture.querySelector('.lvct-people__toolbar'), "首页输入时意外跳转到联系人页");
+    const homeSearchButton = () => [...fixture.querySelectorAll('.lvct-workbench__header-actions button')]
+        .find((node) => node.textContent.includes("搜索"));
+    assert(homeSearchButton() && !homeSearchButton().disabled, "首页搜索按钮未随关键词启用");
+    homeSearch().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await until(() => fixture.querySelector('.lvct-people__conditions')?.textContent.includes("不存在的人"), "首页搜索未下推到联系人页");
     [...fixture.querySelectorAll('.lvct-people__condition')].find((node) => node.textContent.includes("不存在的人")).click();
     await until(() => fixture.querySelector('.lvct-person-card'), "清除搜索条件未恢复联系人");
     navButton(["首页"]).click();
     await until(() => homeSearch(), "清除搜索后未返回首页");
     assert(homeSearch().value === "", "联系人页清除条件后首页搜索框仍保留旧值");
+    input(homeSearch(), "候选乙");
+    await tick();
+    homeSearchButton().click();
+    await until(() => fixture.querySelector('.lvct-people__conditions')?.textContent.includes("候选乙"), "点击首页搜索按钮后没有应用关键词");
+});
+
+await test("新用户首页显示快速开始入口，点击新建联系人直达表单", async () => {
+    const zeroDashboard = {
+        people: 0, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+        stale: [], staleTotal: 0, neverContacted: 0, neverContactedItemIds: [],
+        followUps: [], actions: [], neverOrder: {},
+    };
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: {
+            settings,
+            loadRecentInteractions: async () => ({}),
+            loadDashboard: async () => zeroDashboard,
+            listContacts: async () => [],
+        },
+    } });
+    const quickstart = () => fixture.querySelector('[data-testid="onboarding-quickstart"], [data-onboarding="quickstart"], .lvct-dash__quickstart');
+    const action = (name) => quickstart()?.querySelector(`[data-testid="onboarding-${name}"], [data-onboarding-action="${name}"]`);
+    await until(() => quickstart(), "空联系人首页未显示快速开始引导");
+    assert(quickstart().textContent.includes("联系人"), "快速开始引导缺少联系人入门说明");
+    assert(action("create") && action("import"), "快速开始引导缺少新建和导入入口");
+    action("create").click();
+    await until(() => fixture.querySelector(".lvct-people__toolbar"), "点击新建联系人后未进入联系人页");
+    await until(() => fixture.querySelector(".lvct-form input[type=text]"), "点击新建联系人后未打开联系人表单");
+});
+
+await test("已有联系人时不重复显示新用户快速开始引导", async () => {
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: {
+            settings,
+            loadRecentInteractions: async () => ({}),
+            loadDashboard: async () => ({
+                people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+                stale: [], staleTotal: 0, neverContacted: 1, neverContactedItemIds: [],
+                followUps: [], actions: [], neverOrder: {},
+            }),
+            listContacts: async () => [person],
+        },
+    } });
+    await until(() => fixture.querySelector(".lvct-dash__stats"), "已有联系人首页未加载");
+    assert(!fixture.querySelector('[data-testid="onboarding-quickstart"], [data-onboarding="quickstart"], .lvct-dash__quickstart'), "已有联系人仍显示新用户快速开始引导");
 });
 
 await test("工作台导航文字单行展示，不再被图标盒压成逐字竖排（UX-01.3）", async () => {
@@ -819,6 +874,11 @@ await test("资料完整度筛选与串行补录：缺电话列表、逐个保�
     await until(() => fixture.querySelector(".lvct-person-card"), "列表未渲染");
     const peopleSearch = fixture.querySelector('.lvct-people__toolbar input[placeholder*="搜索姓名"]');
     assert(peopleSearch?.getAttribute("aria-label") === "搜索联系人", "桌面联系人搜索缺少可访问名称");
+    assert(peopleSearch.getBoundingClientRect().width >= 260, `联系人搜索框宽度不足：${Math.round(peopleSearch.getBoundingClientRect().width)}px`);
+    fixture.style.width = "520px";
+    await tick();
+    assert(peopleSearch.getBoundingClientRect().width >= 300, `窄桌面下联系人搜索框被挤压：${Math.round(peopleSearch.getBoundingClientRect().width)}px`);
+    fixture.style.width = "min(1000px,100%)";
     const peopleGroupFilter = fixture.querySelector('.lvct-people__toolbar select');
     assert(peopleGroupFilter?.getAttribute("aria-label") === "分组筛选", "分组筛选缺少可访问名称");
     button("视图").click();
@@ -1708,7 +1768,7 @@ await test("B13.3 组织管理弹窗：新建组织、添加/移除成员经 fac
             const name = personDocId === "20260930000000-per0001" ? "张三" : "李四";
             memberOps.push({
                 id: `20260930000000-mem0${memberOps.length + 1}`,
-                orgDocId, personDocId, personName: name, title: extra?.title ?? "", status: "active",
+                orgDocId, personDocId, personName: name, department: extra?.department ?? "", title: extra?.title ?? "", status: "active",
             });
         },
         removeOrganizationMember: async (id) => {
@@ -1737,13 +1797,16 @@ await test("B13.3 组织管理弹窗：新建组织、添加/移除成员经 fac
     option.click();
     await tick();
     await tick();
+        input(fixture.querySelector('.lvct-org-manager__add input[aria-label="部门"]'), "研发部");
+        input(fixture.querySelector('.lvct-org-manager__add input[aria-label="职位"]'), "工程师");
     button("添加成员").click();
     await tick();
     await until(
         () => [...fixture.querySelectorAll(".lvct-org-manager__member")].some((node) => node.textContent.includes("张三")),
         "添加成员未生效",
     );
-    assert(memberOps.length === 1 && memberOps[0].personDocId === "20260930000000-per0001", "成员未写入");
+    assert(memberOps.length === 1 && memberOps[0].personDocId === "20260930000000-per0001"
+        && memberOps[0].department === "研发部" && memberOps[0].title === "工程师", "成员资料未完整写入");
     /* V-02：窄视口下组织弹窗双栏纵向堆叠，成员行不横向溢出。 */
     if (window.innerWidth <= 640) {
         const layout = fixture.querySelector(".lvct-org-manager__layout");
@@ -1798,18 +1861,19 @@ await test("B13.4/B13 组织成员字段编辑与归档恢复（facade 全链路
     await until(() => fixture.textContent.includes("曙光科技"), "组织列表未加载");
     /* 成员字段编辑：进入表单 → 填写 → 保存走 facade.updateOrganizationMember */
     button("编辑").click();
-    await until(() => fixture.querySelector('input[aria-label="部门"]'), "成员编辑表单未出现");
-    input(fixture.querySelector('input[aria-label="部门"]'), "研发部");
-    input(fixture.querySelector('input[aria-label="职位"]'), "工程师");
-    const statusSelect = fixture.querySelector('select[aria-label="状态"]');
+    await until(() => fixture.querySelector('.lvct-org-manager__member-edit input[aria-label="部门"]'), "成员编辑表单未出现");
+    input(fixture.querySelector('.lvct-org-manager__member-edit input[aria-label="部门"]'), "研发部");
+    input(fixture.querySelector('.lvct-org-manager__member-edit input[aria-label="职位"]'), "工程师");
+    const statusSelect = fixture.querySelector('.lvct-org-manager__member-edit select[aria-label="状态"]');
     statusSelect.value = "former";
     statusSelect.dispatchEvent(new Event("change", { bubbles: true }));
     await tick();
     button("保存").click();
     await until(() => updateCalls.length === 1, "成员更新未走 facade");
     assert(updateCalls[0].id === "20260930000000-mem0001", "更新 id 错误");
-    assert(updateCalls[0].patch.department === "研发部" && updateCalls[0].patch.title === "工程师" && updateCalls[0].patch.status === "former", "更新补丁字段错误");
-    await until(() => fixture.textContent.includes("研发部") && !fixture.querySelector('input[aria-label="部门"]')
+    assert(updateCalls[0].patch.department === "研发部" && updateCalls[0].patch.title === "工程师" && updateCalls[0].patch.status === "former",
+        `更新补丁字段错误：${JSON.stringify(updateCalls[0].patch)}`);
+    await until(() => fixture.textContent.includes("研发部") && !fixture.querySelector('.lvct-org-manager__member-edit input[aria-label="部门"]')
         && !button("归档组织").disabled, "保存后成员行未刷新");
     /* 归档：列表进归档分组，详情出现恢复按钮 */
     button("归档组织").click();
@@ -2709,11 +2773,13 @@ await test("B13.5 双向编辑完整版：人物详情内添加/移除组织归�
     orgSelect.dispatchEvent(new Event("change", { bubbles: true }));
     await tick();
     input(fixture.querySelector('input[aria-label="归属部门"]'), "市场部");
+    input(fixture.querySelector('input[aria-label="成员备注"]'), "负责华南客户交接");
     await tick();
     button("添加归属").click();
     await until(() => addCalls.length === 1, "添加归属未走 facade");
     assert(addCalls[0].docId === person.docId && addCalls[0].orgDocId === "20260930000000-org0002", "添加归属参数错误");
     assert(addCalls[0].extra.department === "市场部", "部门参数错误");
+    assert(addCalls[0].extra.note === "负责华南客户交接", "成员备注参数错误");
     await until(() => fixture.textContent.includes("新公司"), "添加后归属列表未刷新");
     assert(changedCount >= 1, "添加归属未触发 onChanged");
     /* 移除归属：按 membership id 走 facade（等添加流程的 busy 释放后再点） */

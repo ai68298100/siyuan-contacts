@@ -46,6 +46,8 @@
         onExternalSearchCleared,
         onExternalSearchChange,
         createRequested = 0,
+        importRequested = 0,
+        vcardRequested = 0,
         onClearFocus,
         onOpenDetail,
         activePersonId = "",
@@ -76,6 +78,10 @@
         /** 联系人页直接修改关键词时同步更新首页搜索框。 */
         onExternalSearchChange?: (value: string) => void;
         createRequested?: number;
+        /** 首页快速开始入口请求打开文档收编弹窗。 */
+        importRequested?: number;
+        /** 首页快速开始入口请求打开 vCard 弹窗。 */
+        vcardRequested?: number;
         onClearFocus?: () => void;
         onOpenDetail: (person: ContactSummary) => void;
         activePersonId?: string;
@@ -102,6 +108,8 @@
     let selectedPeopleCache: Record<string, ContactSummary> = $state({});
     $effect(() => { searchText = externalSearch; });
     $effect(() => { if (createRequested > 0) adding = true; });
+    $effect(() => { if (importRequested > 0) importing = true; });
+    $effect(() => { if (vcardRequested > 0) vcarding = true; });
     let groupFilter: string = $state("");
     let tagFilter: string[] = $state([]);
     // svelte-ignore state_referenced_locally
@@ -977,7 +985,7 @@
         {#if !isMobile}
             {@render viewMenuControl()}
             <input
-                class="b3-text-field fn__flex-1"
+                class="b3-text-field fn__flex-1 lvct-people__desktop-search"
                 type="text"
                 aria-label={text("peopleSearchPlaceholder", "搜索联系人")}
                 placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}

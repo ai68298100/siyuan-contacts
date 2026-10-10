@@ -1,7 +1,7 @@
 import type { Plugin } from "siyuan";
 import type { ContactsSettings } from "../domain/model";
 import type { OrgMembership, OrgMembershipPatch } from "../domain/org-membership";
-import { addOrgMembership, loadOrgMembershipStore, removeOrgMembership, replaceOrgMembership, updateOrgMembership } from "../data/org-membership";
+import { addOrgMembership, loadOrgMembershipStore, removeOrgMembership, replaceOrgMembership, updateOrgMembership, moveOrgMembership } from "../data/org-membership";
 import type { AddMembershipInput, ReplaceMembershipInput } from "../data/org-membership";
 import { previewOrganizationProjections, repairOrganizationProjection } from "./org-projections";
 import type { OrgProjectionRepairResult } from "./org-projections";
@@ -52,7 +52,18 @@ async function projectVerifiedMembership(
 }
 
 export async function saveOrganizationMember(plugin: Plugin, settings: ContactsSettings, input: AddMembershipInput): Promise<OrgMembershipWriteReport> {
-    await requireActiveTargets(settings, input.orgDocId, input.personDocId);
+    /* 当前归属必须落在活跃组织；历史记录也要求人物和组织仍可唯一核对，
+       但允许目标组织已归档，以便补录毕业/离职历史。 */
+    if ((input.status ?? "active") === "active") await requireActiveTargets(settings, input.orgDocId, input.personDocId);
+    else {
+        invalidateRoster();
+        const [organizations, people] = await Promise.all([scanOrganizations(), getRoster(settings)]);
+        if (!organizations.some((entry) => entry.docId === input.orgDocId)
+            || people.filter((person) => person.docId === input.personDocId).length !== 1
+            || organizations.some((entry) => entry.docId === input.personDocId)) {
+            throw new Error("历史组织归属的组织或人物无法唯一核实，未登记记录");
+        }
+    }
     const membership = await addOrgMembership(plugin, input);
     return projectVerifiedMembership(plugin, settings, membership);
 }
@@ -74,4 +85,24 @@ export async function replaceOrganizationMemberWithProjection(plugin: Plugin, se
     await requireActiveTargets(settings, former.orgDocId, input.personDocId);
     const membership = await replaceOrgMembership(plugin, input, expected ?? former);
     return projectVerifiedMembership(plugin, settings, membership, [former.personDocId]);
+}
+
+export async function moveOrganizationMemberWithProjection(
+    plugin: Plugin,
+    settings: ContactsSettings,
+    id: string,
+    targetOrgDocId: string,
+    expected?: OrgMembership,
+): Promise<OrgMembershipWriteReport> {
+    const current = await membershipById(plugin, id);
+    if (current.orgDocId === targetOrgDocId) throw new Error("目标组织与当前组织相同，无需移动");
+    invalidateRoster();
+    const [organizations, people] = await Promise.all([scanOrganizations(), getRoster(settings)]);
+    const target = organizations.find((entry) => entry.docId === targetOrgDocId);
+    if (!target) throw new Error("目标组织不可达，未移动成员");
+    if (current.status === "active" && target.archived) throw new Error("当前成员不能移动到已归档组织，请先标记为已离开或恢复目标组织");
+    if (people.filter((person) => person.docId === current.personDocId).length !== 1
+        || organizations.some((entry) => entry.docId === current.personDocId)) throw new Error("成员人物无法唯一核实，未移动记录");
+    const membership = await moveOrgMembership(plugin, id, targetOrgDocId, expected ?? current);
+    return projectVerifiedMembership(plugin, settings, membership, [current.orgDocId]);
 }

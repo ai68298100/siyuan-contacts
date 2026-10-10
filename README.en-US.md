@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.5** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.5) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.6** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.6) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -21,7 +21,24 @@ English | [简体中文](README.md)
 
 Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
 
-## What's new in v0.5.5
+## What's new in v0.5.6
+
+This release completes isolated-kernel and real browser-desktop acceptance, fixes the authentication cleanup boundary, and continues the contact and organization workflow refinements.
+
+Added: isolated-kernel real frontend acceptance
+
+- Added evidence for real browser-desktop dual-page, organization member/archive, birthday, ledger, alias, follow-up and cross-window flows.
+- All writes, restart reads, migration checks and release artifacts use an isolated workspace.
+
+Improved: E2E authentication and cleanup
+
+- Injects the isolated kernel `api.token` before first-page and second-page navigation to avoid anonymous requests triggering the kernel failed-authentication limiter.
+- Temporary notebooks are reliably cleaned after the real frontend run.
+
+Fixed: E2E authentication race
+
+- Fixed missing `Authorization` headers with kernels that store the token under `conf.api.token`.
+- Fixed the second isolated page navigating before authentication headers were installed.
 
 Added: contact creation prerequisites
 
@@ -86,7 +103,7 @@ The migration bundle is a JSON value snapshot with a preview and merge flow, not
 - The in-app English translation is incomplete, so some interface text may appear in Chinese.
 - CardDAV address-book sync and CalDAV calendar sync are not supported. Contacts can be exchanged using vCard files.
 
-See the [v0.5.5 release notes](docs/RELEASE-NOTES-v0.5.5.md) for validation scope.
+See the [v0.5.6 release notes](docs/RELEASE-NOTES-v0.5.6.md) for validation scope.
 
 ## Quick start
 

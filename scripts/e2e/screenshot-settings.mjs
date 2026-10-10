@@ -11,7 +11,7 @@ import { hostBaselinePlugin } from "./host-baseline.mjs";
 import { readBrowserDebuggingPort, removeIsolatedBrowserProfile, stopIsolatedBrowser } from "./browser-cleanup.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
-const workbenchViews = ["home", "people", "table", "peek", "graph", "orgs", "orgdetail", "quickfill", "viewsmenu", "morefilter", "colmenu"];
+const workbenchViews = ["home", "people", "table", "peek", "graph", "orgs", "orgdetail", "orgmgr", "quickfill", "viewsmenu", "morefilter", "colmenu"];
 const selectedView = process.env.LVCT_SHOT_VIEW?.trim();
 if (selectedView && !workbenchViews.includes(selectedView)) throw new Error(`截图视图未知：${selectedView}；可用 ${workbenchViews.join(", ")}`);
 const scaleValue = process.env.LVCT_SHOT_SCALE?.trim();

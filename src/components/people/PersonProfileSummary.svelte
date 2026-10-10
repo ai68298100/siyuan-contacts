@@ -7,12 +7,14 @@
 {#if profile}
     {#if compact}
         <span class="lvct-profile-summary lvct-profile-summary--compact" aria-label="组织成员与本人称谓资料">
+            <span>家庭：{profileText(profile, "family")}</span>
             <span>工作单位：{profileText(profile, "work")}</span>
             <span>学校：{profileText(profile, "education")}</span>
             <span>与我的关系：{profileText(profile, "relationship")}</span>
         </span>
     {:else}
     <dl class="lvct-profile-summary" aria-label="组织成员与本人称谓资料">
+        <div><dt>家庭</dt><dd>{profileText(profile, "family")}</dd></div>
         <div><dt>工作单位</dt><dd>{profileText(profile, "work")}</dd></div>
         <div><dt>学校</dt><dd>{profileText(profile, "education")}</dd></div>
         <div><dt>与我的关系</dt><dd>{profileText(profile, "relationship")}</dd></div>

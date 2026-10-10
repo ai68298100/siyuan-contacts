@@ -8,14 +8,17 @@ import {
     applyMembershipPatch,
     updateMembership,
     replaceMembership,
+    moveMembership,
     buildCommonOrgBackground,
     pageOrgMemberships,
     sortOrgMemberships,
     projectPersonAffiliations,
+    orgMembershipStatusLabel,
 } from "../src/domain/org-membership.ts";
 import type { OrgMembership } from "../src/domain/org-membership.ts";
 import { buildOrgProjectionTargets, orgProjectionSourceSnapshot, parseOrgProjectionOperationStore } from "../src/domain/org-projections.ts";
 import { mergeOrgMembershipBackup } from "../src/domain/migration-records.ts";
+import { validateContactExtendedDraft } from "../src/domain/contact-create.ts";
 
 const ID = /^\d{14}-[0-9a-z]{7}$/;
 
@@ -74,6 +77,42 @@ test("B13 成员期间：真实日历、先后顺序与当前状态一致，非�
     assert.ok(applyMembershipPatch(original, { status: "former", leftOn: "" }));
     assert.equal(original.status, "active");
     assert.throws(() => normalizeOrgMembershipStoreForWrite({ schemaVersion: 1, memberships: [{ ...original, joinedOn: "2026-02-29" }] }), /内容损坏/);
+});
+
+test("组织成员自定义状态：旧分类默认文案、状态校验与离职毕业历史兼容", () => {
+    const activeWork = membership({ id: "20261004000000-m000001", affiliationKind: "work" });
+    const activeSchool = membership({ id: "20261004000000-m000002", affiliationKind: "education" });
+    const formerSchool = membership({ id: "20261004000000-m000003", affiliationKind: "education", status: "former", leftOn: "2024-06-30" });
+    assert.equal(orgMembershipStatusLabel(activeWork), "在职");
+    assert.equal(orgMembershipStatusLabel(activeSchool), "就读");
+    assert.equal(orgMembershipStatusLabel(formerSchool), "已毕业/离校");
+    const custom = applyMembershipPatch(activeWork, { statusLabel: "实习" });
+    assert.equal(custom?.statusLabel, "实习");
+    assert.equal(orgMembershipStatusLabel(custom!), "实习");
+    assert.equal(applyMembershipPatch(custom!, { statusLabel: "x".repeat(41) }), null);
+    assert.equal(applyMembershipPatch(custom!, { statusLabel: "在职\n兼职" }), null);
+    assert.throws(() => normalizeOrgMembershipStoreForWrite({ schemaVersion: 1, memberships: [{ ...activeWork, statusLabel: "x".repeat(41) }] }), /内容损坏/);
+    const cleared = applyMembershipPatch(custom!, { statusLabel: "" });
+    assert.ok(cleared && !("statusLabel" in cleared));
+});
+
+test("新建联系人组织经历校验：支持多组织和同组织历史期间，拒绝重复当前经历", () => {
+    const draft = (over: Partial<import("../src/domain/contact-create.ts").ContactOrgAffiliationDraft>) => ({
+        orgDocId: "20261004000000-org0001", orgDepartment: "", orgTitle: "", orgJoinedOn: "", orgLeftOn: "",
+        orgStatus: "active" as const, orgStatusLabel: "", orgAffiliationKind: "unspecified" as const, ...over,
+    });
+    const base = { orgMemberships: [draft({ orgDocId: "20261004000000-org0001", orgAffiliationKind: "work" }),
+        draft({ orgDocId: "20261004000000-org0002", orgAffiliationKind: "education" })],
+        orgDocId: "", orgDepartment: "", orgTitle: "", orgJoinedOn: "", orgAffiliationKind: "unspecified" as const,
+        aliases: "", relationshipLabels: "", note: "" };
+    assert.deepEqual(validateContactExtendedDraft(base), []);
+    assert.deepEqual(validateContactExtendedDraft({ ...base, orgMemberships: [base.orgMemberships[0],
+        draft({ orgDocId: "20261004000000-org0001", orgStatus: "former", orgLeftOn: "2025-01-01" })] }), []);
+    assert.deepEqual(validateContactExtendedDraft({ ...base, orgMemberships: [draft({ orgNote: "毕业后仍保持联系" })] }), []);
+    assert.ok(validateContactExtendedDraft({ ...base, orgMemberships: [draft({ orgNote: "x".repeat(241) })] }).some((error) => error.includes("成员备注")));
+    assert.ok(validateContactExtendedDraft({ ...base, orgMemberships: [draft({ orgNote: "换行\n备注" })] }).some((error) => error.includes("成员备注")));
+    assert.ok(validateContactExtendedDraft({ ...base, orgMemberships: [base.orgMemberships[0], base.orgMemberships[0]] }).some((error) => error.includes("重复的当前归属")));
+    assert.ok(validateContactExtendedDraft({ ...base, orgMemberships: [draft({ orgStatus: "former", orgJoinedOn: "2025-01-02", orgLeftOn: "2025-01-01" })] }).some((error) => error.includes("起止日期")));
 });
 
 test("B13 成员恢复：不得与另一当前期间并存，重复编辑零变更，替补非法零半成品", () => {
@@ -259,6 +298,27 @@ test("B13.4 成员编辑：字段更新白名单与日期校验（写前拒绝�
     assert.equal(applyMembershipPatch(m, { leftOn: "昨天" }), null);
     assert.equal(applyMembershipPatch(m, { status: "paused" as never }), null);
     assert.deepEqual(m, membership({ id: "20260930000000-m000002" }), "原对象不被修改");
+});
+
+test("组织成员备注：单行长度校验、旧记录兼容和编辑清空", () => {
+    const m = membership({ id: "20260930000000-m000004", note: "  项目联系人  " });
+    const normalized = normalizeOrgMembershipStoreForWrite({ schemaVersion: 1, memberships: [m] });
+    assert.equal(normalized.memberships[0].note, "项目联系人");
+    assert.equal(applyMembershipPatch(m, { note: "新备注" })?.note, "新备注");
+    assert.equal(applyMembershipPatch(m, { note: "x".repeat(241) }), null);
+    assert.equal(applyMembershipPatch(m, { note: "多行\n备注" }), null);
+    assert.ok(applyMembershipPatch(m, { note: "" }) && !("note" in applyMembershipPatch(m, { note: "" })!));
+    assert.deepEqual(normalizeOrgMembershipStoreForWrite({ schemaVersion: 1, memberships: [{ ...m, note: undefined }] }).memberships[0].note, undefined);
+});
+
+test("组织成员移动：保留稳定 ID 与经历字段，阻止相同组织和 active 冲突", () => {
+    const source = membership({ id: "20260930000000-m000005", note: "历史备注", title: "顾问" });
+    const store = { schemaVersion: 1 as const, memberships: [source] };
+    const moved = moveMembership(store, source.id, "20260930000000-org0002");
+    assert.ok(moved);
+    assert.deepEqual(moved.memberships[0], { ...source, orgDocId: "20260930000000-org0002" });
+    assert.equal(moveMembership(store, source.id, source.orgDocId), null);
+    assert.equal(moveMembership({ schemaVersion: 1, memberships: [source, membership({ id: "20260930000000-m000006", orgDocId: "20260930000000-org0002" })] }, source.id, "20260930000000-org0002"), null);
 });
 
 test("B13.4 成员编辑：store 级更新与查无此 id", () => {

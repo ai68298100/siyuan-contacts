@@ -1,11 +1,35 @@
 import { mount, unmount, tick } from "svelte";
 import OrgManagerDialog from "../../../src/components/org/OrgManagerDialog.svelte";
 import OrgsView from "../../../src/components/org/OrgsView.svelte";
+import GroupFieldFixture from "./GroupFieldFixture.svelte";
+import { GROUP_CUSTOM_OPTION } from "../../../src/domain/contact-group";
 import { listOrganizationMembersPage } from "../../../src/services/org";
 import { listContacts } from "../../../src/services/contacts";
 import { invalidateRoster } from "../../../src/services/roster";
 
 export async function runOrganizationPageRegression({ test, assert, kernel, settings, fixture, until, button }) {
+    await test("分组自定义选项：选择后显示输入框并回填自定义文字", async () => {
+        const instance = mount(GroupFieldFixture, { target: fixture });
+        try {
+            const select = fixture.querySelector("select[aria-label='分组']");
+            assert(select, "分组选择器未渲染");
+            select.value = GROUP_CUSTOM_OPTION;
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+            await tick();
+            const input = fixture.querySelector("input[aria-label='自定义分组名称']");
+            assert(input, `选择自定义后没有显示文字输入框（选择值=${select.value}，选项=${[...select.options].map((option) => option.value).join("|")}）`);
+            await until(() => document.activeElement === input, "选择自定义后没有将焦点移到输入框");
+            assert(fixture.querySelector("[data-group-valid]")?.textContent === "false", "自定义分组空值没有进入待填写状态");
+            input.value = "校友会";
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            await tick();
+            assert(fixture.querySelector("[data-group-valid]")?.textContent === "true"
+                && fixture.querySelector("[data-group-value]")?.textContent === "校友会", "自定义分组文字没有回填到草稿");
+        } finally {
+            await unmount(instance);
+        }
+    });
+
     await test("组织卡片列表按稳定游标先展示首批，后台续读不重复", async () => {
         const org = (index, archived = false) => ({
             docId: `20261005000000-org${String(index).padStart(4, "0")}`,
@@ -41,6 +65,43 @@ export async function runOrganizationPageRegression({ test, assert, kernel, sett
             button("清除筛选").click();
             await until(() => fixture.querySelectorAll(".lvct-orgs-view__card").length === 2, "组织清除筛选未恢复卡片");
         } finally { await unmount(instance); }
+    });
+
+    await test("组织卡片 Logo 固定尺寸，不挤压名称和简称", async () => {
+        const facade = {
+            listOrganizations: async () => [{
+                docId: "20261005000000-logo001",
+                name: "厦门大学超长组织名称",
+                hpath: "/厦门大学超长组织名称",
+                notebookId: "20261005000000-book001",
+                archived: false,
+                memberships: [],
+                profile: {
+                    name: "厦门大学超长组织名称",
+                    shortName: "厦大",
+                    logoUrl: "https://example.com/large-logo.png",
+                    logoDataUrl: "",
+                    qccUrl: "",
+                    description: "",
+                    departments: [],
+                    customFields: [],
+                },
+            }],
+        };
+        const instance = mount(OrgsView, { target: fixture, props: { facade, onOpenOrgManager() {} } });
+        try {
+            await until(() => fixture.querySelector(".lvct-orgs-view__card-logo"), "组织 Logo 未渲染");
+            const logo = fixture.querySelector(".lvct-orgs-view__card-logo");
+            const cardHead = logo?.closest(".lvct-orgs-view__card-head");
+            const style = logo ? getComputedStyle(logo) : null;
+            const headStyle = cardHead ? getComputedStyle(cardHead) : null;
+            assert(style?.width === "40px" && style.height === "40px"
+                && style.objectFit === "contain", "组织 Logo 未限制为固定尺寸或未使用 contain");
+            assert((cardHead?.getBoundingClientRect().height ?? 0) <= 48
+                && (headStyle?.minWidth ?? "") === "0px", "组织 Logo 仍然挤压组织名称区域");
+        } finally {
+            await unmount(instance);
+        }
     });
 
     await test("组织成员实际服务和界面：1001 条稳定分页、状态搜索与完整候选身份", async () => {

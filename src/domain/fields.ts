@@ -57,6 +57,7 @@ export const FIELD_SPECS: readonly FieldSpec[] = [
 ] as const;
 
 export const PROFILE_FACT_SOURCES = {
+    family: { storageKey: "org-membership.json", classification: "family", reference: "membershipId" },
     work: { storageKey: "org-membership.json", classification: "work", reference: "membershipId" },
     education: { storageKey: "org-membership.json", classification: "education", reference: "membershipId" },
     relationshipLabels: { storageKey: "person-relationship-labels.json", reference: "selfDocId+personDocId" },

@@ -5,8 +5,8 @@
  */
 import type { Plugin } from "siyuan";
 import { loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage";
-import { normalizeOrgMembershipStoreForWrite, appendMembership, removeMembership, updateMembership, replaceMembership } from "../domain/org-membership";
-import type { OrgAffiliationKind, OrgMembership, OrgMembershipPatch, OrgMembershipStore } from "../domain/org-membership";
+import { normalizeOrgMembershipStoreForWrite, appendMembership, removeMembership, updateMembership, replaceMembership, moveMembership } from "../domain/org-membership";
+import type { OrgAffiliationKind, OrgMembership, OrgMembershipPatch, OrgMembershipStatus, OrgMembershipStore } from "../domain/org-membership";
 import { newNodeId } from "../api/client";
 import { mergeOrgMembershipBackup, MigrationWriteUnknownError } from "../domain/migration-records";
 import type { MigrationRecordSummary } from "../domain/migration-records";
@@ -48,7 +48,11 @@ export interface AddMembershipInput {
     department?: string;
     title?: string;
     joinedOn?: string;
+    leftOn?: string;
+    status?: OrgMembershipStatus;
+    statusLabel?: string;
     affiliationKind?: OrgAffiliationKind;
+    note?: string;
 }
 
 /** 新增成员记录：id 锁内生成；锁内严格读（损坏当前库拒绝覆盖）+ 写后回读 */
@@ -62,13 +66,19 @@ export async function addOrgMembership(plugin: Plugin, input: AddMembershipInput
             department: input.department?.trim() ?? "",
             title: input.title?.trim() ?? "",
             joinedOn: input.joinedOn ?? "",
-            leftOn: "",
-            status: "active",
+            leftOn: input.leftOn ?? "",
+            status: input.status ?? "active",
+            ...(input.statusLabel?.trim() ? { statusLabel: input.statusLabel.trim() } : {}),
             ...(input.affiliationKind === undefined ? {} : { affiliationKind: input.affiliationKind }),
+            ...(input.note?.trim() ? { note: input.note.trim() } : {}),
         };
         normalizeOrgMembershipStoreForWrite({ schemaVersion: 1, memberships: [membership] });
-        const existing = store.memberships.find((entry) => entry.orgDocId === membership.orgDocId
-            && entry.personDocId === membership.personDocId && entry.status === "active");
+        const existing = membership.status === "active" ? store.memberships.find((entry) => entry.orgDocId === membership.orgDocId
+            && entry.personDocId === membership.personDocId && entry.status === "active") : store.memberships.find((entry) => entry.orgDocId === membership.orgDocId
+            && entry.personDocId === membership.personDocId && entry.status === "former"
+            && entry.statusLabel === membership.statusLabel && entry.affiliationKind === membership.affiliationKind
+            && entry.department === membership.department && entry.title === membership.title
+            && entry.joinedOn === membership.joinedOn && entry.leftOn === membership.leftOn && entry.note === membership.note);
         if (existing) return existing;
         if (store.memberships.some((entry) => entry.id === membership.id) || store.tombstones?.includes(membership.id)) throw new Error("新成员 ID 已使用或已删除，未新增记录");
         const next = appendMembership(store, membership);
@@ -101,6 +111,18 @@ export async function updateOrgMembership(plugin: Plugin, id: string, patch: Org
         if (next !== store) {
             await saveJsonVerified(plugin, ORG_MEMBERSHIP_STORAGE_KEY, next);
         }
+        return next.memberships.find((membership) => membership.id === id)!;
+    });
+}
+
+/** 移动成员记录到另一个组织：身份之外的字段和记录 ID 保留；锁内严格读 + 写后回读。 */
+export async function moveOrgMembership(plugin: Plugin, id: string, targetOrgDocId: string, expected?: OrgMembership): Promise<OrgMembership> {
+    return withStoreLock(ORG_MEMBERSHIP_STORAGE_KEY, async () => {
+        const store = normalizeOrgMembershipStoreForWrite(await loadJsonStrict(plugin, ORG_MEMBERSHIP_STORAGE_KEY));
+        assertMembershipSnapshot(store.memberships.find((membership) => membership.id === id), expected);
+        const next = moveMembership(store, id, targetOrgDocId);
+        if (!next) throw new Error("成员记录不存在、目标组织无效、或目标组织已有同一人的当前记录");
+        await saveJsonVerified(plugin, ORG_MEMBERSHIP_STORAGE_KEY, next);
         return next.memberships.find((membership) => membership.id === id)!;
     });
 }

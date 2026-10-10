@@ -485,14 +485,17 @@ vCard 处理是**瞬态转换**（不落插件存储），但属性↔字段映�
   人物档案条一致：组织类型/部门数/成员数徽标 + 简要信息）。组织不进入联系人数据库——不与人员
   混行、不占用 fieldMap；组织列表 = 标记区块扫描（与 FUNC-01.8 锚点扫描同模式，支持续建找回）。
 - **成员关系** = 插件 JSON `org-membership.json`（新键，schemaVersion 1）：`{memberships:
-  [{id, orgDocId, personDocId, department?, title?, joinedOn?, leftOn?, status: active|former, affiliationKind?: work|education|unspecified}]}`——
+  [{id, orgDocId, personDocId, department?, title?, joinedOn?, leftOn?, status: active|former, statusLabel?, affiliationKind?: family|work|education|unspecified, note?}]}`——
   多人多组织多对多、同组织多段历史（以 membership id 区分）、离职/毕业置 former 不删除；
+  `status` 是当前性语义（active/former），`statusLabel` 是可选的用户自定义显示状态，例如“实习”“兼职”“休学”“肄业”；
+  未填写时按归属分类显示“在职/就读”或“离职/毕业”。`statusLabel` 限制为单行 1-40 个字符；`note` 是仅针对该组织经历的可选单行备注，限制为 1-240 个字符，不替代人物备注；缺失字段按空备注兼容读取。
   id/personDocId/orgDocId 均须通过 ID 校验。严格展示、写入与迁移读取遇到非法条目、重复记录 ID、未知分类整体报损坏，不丢项后覆盖；宽松归一仅用于显式诊断。
 - **B13.4 成员字段编辑（第 72 轮，2026-09-30）**：`updateOrgMembership(id, patch)` 锁内严格读 +
-  写后回读；patch 只含白名单字段（department/title/joinedOn/leftOn/status/affiliationKind），**身份字段
+  写后回读；patch 只含白名单字段（department/title/joinedOn/leftOn/status/statusLabel/affiliationKind/note），**身份字段
   （id/orgDocId/personDocId）不可变**；日期必须为空串或 YYYY-MM-DD，非法写前拒绝（绝不静默改写）。
 - **成员替换**：`replaceOrgMembership(formerId, successor)` 在同一次锁内把 active 旧成员写为
   `former + leftOn`，并追加同组织的 active 新成员；任一步校验失败都不写入，防止组织出现“旧人已离职但新人未登记”的中间状态。
+- **成员移动**：`moveOrgMembership(id, targetOrgDocId)` 在同一次成员存储锁内只修改所属组织，保留稳定成员 ID、人物、部门、职位、期间、状态、分类和备注；目标组织必须可达，active 记录不得移动到归档组织，且目标组织不能已有同一人物的 active 记录。移动后原组织、目标组织和人物的投影均重新核验；失败不按移动成功处理。
 - **B13 组织归档语义（第 72 轮，2026-09-30）**：标记区块值 `custom-lvct-org="archived"` 表示归档
   （活跃值为 `"1"`；AG-B13-001 收紧展示读取：其他值保留原文并报告未知，不再投影为活跃）。归档 = 重写标记块 IAL 值（文档与成员记录保留，
   可恢复）；归档组织不进关系图组织增强、不参与 B12 单位行投影，但成员记录仍可核对；
@@ -527,10 +530,13 @@ vCard 处理是**瞬态转换**（不落插件存储），但属性↔字段映�
 |---|---|---|
 | 工作单位 | `org-membership.json` 中 `affiliationKind=work` 的成员记录，组织标题来自组织文档 | 多条 active 均保留；former 与归档组织单列历史；改为 unspecified 只清分类，保留记录、日期和职位；不写人物 AV |
 | 学校 | 同一成员索引中 `affiliationKind=education` 的记录 | 毕业用 former，未知日期保留空；同一大学可分别是不同人的工作单位或学校；不由组织名推断 |
-| 未分类组织 | 缺 affiliationKind 或显式 unspecified 的成员记录 | schema 1 向后兼容，旧记录不猜成工作/学校；部门、职位、日期、历史照常保留；工作/学校查询不混入未分类记录 |
+| 家庭 | `affiliationKind=family`；旧的“家庭”组织名称在投影中兼容识别 | 可有多个家庭/家庭阶段；默认状态为“家庭成员”，结束后以 former 保留历史；不与工作单位、学校混合 |
+| 未分类组织 | 缺 affiliationKind 或显式 unspecified 的成员记录 | schema 1 向后兼容，旧记录不猜成工作/学校/家庭；部门、职位、日期、历史照常保留；工作/学校/家庭查询不混入未分类记录 |
 | 与我的关系 | 预留 `person-relationship-labels.json` schema 1：`{labels:[{id,selfDocId,personDocId,labels:string[],createdAt,updatedAt}]}` | 人工多值称谓，以本人文档 + 人物文档为唯一组合，不写 related、组织成员或别名；空数组表示显式清空，同一组合只一条；缺键为空，损坏/重复不当空 |
 
-组织文档不携带工作/学校分类：这是人与组织之间的归属事实。投影保留 membership ID、组织 ID、职位/部门/时间和分类，不能按姓名去重或只选一条覆盖其他任职。不可达组织保留原 ID 并标未知；完整组织扫描失败时调用方保持整项未知，不用空 map 宣称“未填写”。档案条是可重建投影，不是第二事实源。成员替换只继承部门/职位等显式选择，不自动将旧人的工作/学校分类赋给新的人。
+组织文档不携带工作/学校分类：这是人与组织之间的归属事实。投影保留 membership ID、组织 ID、职位/部门/时间、分类和自定义状态，不能按姓名去重或只选一条覆盖其他任职。不可达组织保留原 ID 并标未知；完整组织扫描失败时调用方保持整项未知，不用空 map 宣称“未填写”。档案条是可重建投影，不是第二事实源。成员替换只继承部门/职位等显式选择，不自动将旧人的工作/学校分类或自定义状态赋给新的人。
+
+**多组织资料编辑（AG-B13-010）**：联系人和本人资料编辑页展示同一人的全部组织归属，可重复添加不同家庭、不同公司、不同学校及同一组织的历史段落。新增记录填写归属分类、当前性状态、自定义状态、部门/职位和起止日期；编辑或删除只针对明确的 membership id。active 同一组织仍只允许一条，former 记录不会因再次加入而被覆盖；空状态标签使用分类默认文案，历史记录始终保留并在当前归属之外单列。归档组织只允许补录历史，恢复组织后才可新增当前归属。
 
 称谓解析严格验证三种稳定 ID、非负安全时间戳、updatedAt ≥ createdAt、非本人对自己的称谓、1–80 字符非空标签、最多 20 个去重标签。清空保留该组合的记录与时间戳，方便后续迁移比较。更换或清除本人后，旧称谓保留在原 selfDocId 下；新本人只看到其自身参照的称谓，不能自动搬移、颠倒或推断。未知本人身份时暂停相对称谓查询；已明确没有本人时显示“未指定本人”。共同组织背景与相关人均不能自动生成“同事/同学/朋友”等称谓。
 

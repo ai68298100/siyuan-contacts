@@ -6,7 +6,8 @@
     import type { ContactDraft } from "../../domain/person";
     import type { ContactSummary } from "../../domain/person";
     import type { ContactsSettings } from "../../domain/model";
-    import type { OrgAffiliationKind } from "../../domain/org-membership";
+    import { orgMembershipStatusLabel } from "../../domain/org-membership";
+    import type { OrgAffiliationKind, OrgMembership, OrgMembershipPatch, OrgMembershipStatus } from "../../domain/org-membership";
     import type { RelationshipLabelEditorState } from "../../services/people-profiles";
     import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
@@ -26,6 +27,8 @@
         onLoadOrgCandidates,
         onCreateOrganization,
         onAddOrgMembership,
+        onUpdateOrgMembership,
+        onRemoveOrgMembership,
         hostCloseChannel,
         onSaved,
         onClose,
@@ -37,9 +40,11 @@
         onLoadRelationshipLabels?: (personDocId: string) => Promise<RelationshipLabelEditorState>;
         onSaveRelationshipLabels?: (personDocId: string, selfDocId: string, labels: string[], expected: import("../../domain/person-relationship-labels").PersonRelationshipLabels | null) => Promise<import("../../domain/person-relationship-labels").PersonRelationshipLabels>;
         onLoadOrgMemberships?: (personDocId: string) => Promise<import("../../services/org").PersonOrgMembershipView[]>;
-        onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string }>>;
+        onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string; archived?: boolean }>>;
         onCreateOrganization?: () => void | Promise<void>;
-        onAddOrgMembership?: (personDocId: string, orgDocId: string, extra?: { department?: string; title?: string; joinedOn?: string; affiliationKind?: OrgAffiliationKind }) => Promise<unknown>;
+        onAddOrgMembership?: (personDocId: string, orgDocId: string, extra?: { department?: string; title?: string; joinedOn?: string; leftOn?: string; status?: OrgMembershipStatus; statusLabel?: string; affiliationKind?: OrgAffiliationKind; note?: string }) => Promise<unknown>;
+        onUpdateOrgMembership?: (membershipId: string, patch: OrgMembershipPatch, expected?: OrgMembership) => Promise<unknown>;
+        onRemoveOrgMembership?: (membershipId: string, expected?: OrgMembership) => Promise<unknown>;
         /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
         hostCloseChannel?: { request?: (close: () => void) => void };
         onSaved: () => void;
@@ -83,10 +88,31 @@
     let profileMessage = $state("");
     let relationshipSnapshot = $state<RelationshipLabelEditorState | null>(null);
     let relationshipDraft = $state("");
-    let orgCandidates = $state<ReadonlyArray<{ docId: string; name: string }>>([]);
+    let orgCandidates = $state<ReadonlyArray<{ docId: string; name: string; archived?: boolean }>>([]);
     let orgMemberships = $state<import("../../services/org").PersonOrgMembershipView[]>([]);
+    /* 常用入口保留两个轻量选择器；详细经历通过“添加其他组织经历”展开。 */
     let workOrgDocId = $state("");
     let educationOrgDocId = $state("");
+    let otherOrgOpen = $state(false);
+    let selectedOrgDocId = $state("");
+    let selectedOrgKind = $state<OrgAffiliationKind>("unspecified");
+    let selectedOrgStatus = $state<OrgMembershipStatus>("active");
+    let selectedOrgStatusLabel = $state("");
+    let selectedOrgDepartment = $state("");
+    let selectedOrgTitle = $state("");
+    let selectedOrgJoinedOn = $state("");
+    let selectedOrgLeftOn = $state("");
+    let selectedOrgNote = $state("");
+    let editingMembershipId = $state("");
+    let editingMembershipSnapshot = $state<OrgMembership | null>(null);
+    let editingOrgDepartment = $state("");
+    let editingOrgTitle = $state("");
+    let editingOrgJoinedOn = $state("");
+    let editingOrgLeftOn = $state("");
+    let editingOrgStatus = $state<OrgMembershipStatus>("active");
+    let editingOrgStatusLabel = $state("");
+    let editingOrgNote = $state("");
+    let editingOrgKind = $state<OrgAffiliationKind>("unspecified");
     let creatingOrganization = $state(false);
     function validateEditDraft(value: ContactDraft): string[] {
         const errors: string[] = [];
@@ -106,10 +132,33 @@
     // 这里的派生值仍会由 Svelte 编译器按依赖追踪更新。
     const profileSupported = $derived.by(() => Boolean(onLoadRelationshipLabels || (onLoadOrgCandidates && onAddOrgMembership)));
     const activeOrgIds = $derived.by(() => new Set(orgMemberships.filter((membership) => membership.status === "active").map((membership) => membership.orgDocId)));
+    /* 已有当前归属不再出现在快捷候选中，避免误建重复 current；历史记录仍可在已有经历中编辑。 */
     const availableOrgCandidates = $derived.by(() => orgCandidates.filter((org) => !activeOrgIds.has(org.docId)));
+    const quickOrgCandidates = $derived.by(() => availableOrgCandidates.filter((org) => !org.archived));
+    const selectedOrgCandidate = $derived.by(() => availableOrgCandidates.find((org) => org.docId === selectedOrgDocId));
+    function affiliationLabel(kind: OrgAffiliationKind | undefined): string {
+        return kind === "family" ? "家庭" : kind === "work" ? "工作单位" : kind === "education" ? "学校" : "其他组织";
+    }
+    function changeSelectedOrg(docId: string): void {
+        selectedOrgDocId = docId;
+        const candidate = availableOrgCandidates.find((org) => org.docId === docId);
+        if (candidate?.archived) {
+            selectedOrgStatus = "former";
+            selectedOrgLeftOn = "";
+        }
+        if (candidate?.name.trim() === "家庭") selectedOrgKind = "family";
+    }
+    function changeSelectedOrgStatus(status: OrgMembershipStatus): void {
+        selectedOrgStatus = status;
+        if (status === "active") selectedOrgLeftOn = "";
+    }
+    function changeEditingOrgStatus(status: OrgMembershipStatus): void {
+        editingOrgStatus = status;
+        if (status === "active") editingOrgLeftOn = "";
+    }
     const profileDirty = $derived.by(() =>
         Boolean(relationshipSnapshot && onSaveRelationshipLabels && relationshipDraft !== (relationshipSnapshot.record?.labels ?? []).join("、"))
-            || Boolean(workOrgDocId || educationOrgDocId),
+            || Boolean(workOrgDocId || educationOrgDocId || selectedOrgDocId || selectedOrgDepartment || selectedOrgTitle || selectedOrgJoinedOn || selectedOrgLeftOn || selectedOrgStatusLabel || selectedOrgNote || editingMembershipId),
     );
     async function loadProfileEditor(): Promise<void> {
         if (!profileSupported) return;
@@ -150,6 +199,44 @@
             creatingOrganization = false;
         }
     }
+    function membershipSnapshot(membership: import("../../services/org").PersonOrgMembershipView): OrgMembership {
+        return { id: membership.id, orgDocId: membership.orgDocId, personDocId: person.docId,
+            department: membership.department, title: membership.title, joinedOn: membership.joinedOn,
+            leftOn: membership.leftOn, status: membership.status, ...(membership.statusLabel ? { statusLabel: membership.statusLabel } : {}),
+            ...(membership.affiliationKind ? { affiliationKind: membership.affiliationKind } : {}),
+            ...(membership.note ? { note: membership.note } : {}) };
+    }
+    function startEditMembership(membership: import("../../services/org").PersonOrgMembershipView): void {
+        if (profileBusy || profileLoading) return;
+        editingMembershipId = membership.id;
+        editingMembershipSnapshot = membershipSnapshot(membership);
+        editingOrgDepartment = membership.department;
+        editingOrgTitle = membership.title;
+        editingOrgJoinedOn = membership.joinedOn;
+        editingOrgLeftOn = membership.leftOn;
+        editingOrgStatus = membership.archived ? "former" : membership.status;
+        editingOrgStatusLabel = membership.statusLabel ?? "";
+        editingOrgNote = membership.note ?? "";
+        editingOrgKind = membership.affiliationKind ?? "unspecified";
+    }
+    function cancelEditMembership(): void {
+        editingMembershipId = "";
+        editingMembershipSnapshot = null;
+    }
+    async function saveEditMembership(): Promise<void> { await saveProfileEditor(); }
+    async function removeMembership(membership: import("../../services/org").PersonOrgMembershipView): Promise<void> {
+        if (!onRemoveOrgMembership || profileBusy || profileLoading) return;
+        if (!window.confirm(`确定删除「${membership.orgName}」的这段组织经历吗？正常离职或毕业请编辑状态并保留历史。`)) return;
+        profileBusy = true;
+        profileError = "";
+        try {
+            await onRemoveOrgMembership(membership.id, membershipSnapshot(membership));
+            profileMessage = "组织归属已删除";
+            onSaved();
+            await loadProfileEditor();
+        } catch (error) { profileError = error instanceof Error ? error.message : String(error); }
+        finally { profileBusy = false; }
+    }
     // 运行时由 Svelte 注入 onMount；控制逻辑单测以无生命周期夹具执行，需安全跳过。
     if (typeof onMount === "function") onMount(() => { if (profileSupported) void loadProfileEditor(); });
     async function saveProfileEditor(): Promise<void> {
@@ -158,6 +245,33 @@
         profileError = "";
         profileMessage = "";
         try {
+            const quickSelections: Array<{ docId: string; kind: OrgAffiliationKind }> = [
+                { docId: workOrgDocId, kind: "work" as const },
+                { docId: educationOrgDocId, kind: "education" as const },
+            ].filter((item) => item.docId);
+            /* 所有本次新增的当前归属先统一做冲突核对，避免先写快捷入口
+               后才发现详细经历重复，留下部分保存。若正在把原经历改为
+               已离开/毕业，则释放该组织的当前名额，允许同次新增新期间。 */
+            const reservedActiveOrgIds = new Set(activeOrgIds);
+            if (editingMembershipSnapshot?.status === "active" && editingOrgStatus === "former") {
+                reservedActiveOrgIds.delete(editingMembershipSnapshot.orgDocId);
+            }
+            for (const selection of quickSelections) {
+                if (reservedActiveOrgIds.has(selection.docId)) throw new Error("该组织已有当前归属，请编辑已有经历；如需补录旧经历，请在已有经历中编辑并保留历史。");
+                reservedActiveOrgIds.add(selection.docId);
+            }
+            if (selectedOrgDocId && selectedOrgStatus === "active" && reservedActiveOrgIds.has(selectedOrgDocId)) {
+                throw new Error("该组织已有当前归属，请编辑已有经历；如需补录旧经历，请将状态设为已离开/毕业后添加。");
+            }
+            if (editingMembershipId && editingMembershipSnapshot && onUpdateOrgMembership) {
+                const patch = { department: editingOrgDepartment, title: editingOrgTitle,
+                    joinedOn: editingOrgJoinedOn, leftOn: editingOrgLeftOn, status: editingOrgStatus,
+                    statusLabel: editingOrgStatusLabel, affiliationKind: editingOrgKind,
+                    ...((editingOrgNote.trim() || editingMembershipSnapshot.note !== undefined) ? { note: editingOrgNote } : {}) };
+                await onUpdateOrgMembership(editingMembershipId, patch, editingMembershipSnapshot);
+                editingMembershipId = "";
+                editingMembershipSnapshot = null;
+            }
             if (relationshipSnapshot && onSaveRelationshipLabels && onLoadRelationshipLabels && relationshipSnapshot.selfDocId
                 && relationshipDraft !== (relationshipSnapshot.record?.labels ?? []).join("、")) {
                 const record = await onSaveRelationshipLabels(person.docId, relationshipSnapshot.selfDocId,
@@ -166,13 +280,33 @@
                 relationshipSnapshot = { selfDocId: record.selfDocId, record };
                 relationshipDraft = record.labels.join("、");
             }
-            for (const [kind, orgDocId] of [["work", workOrgDocId], ["education", educationOrgDocId]] as const) {
-                if (!orgDocId || !onAddOrgMembership) continue;
-                await onAddOrgMembership(person.docId, orgDocId, { affiliationKind: kind });
-                if (kind === "work") workOrgDocId = "";
-                else educationOrgDocId = "";
+            if (onAddOrgMembership) {
+                for (const selection of quickSelections) {
+                    await onAddOrgMembership(person.docId, selection.docId, { affiliationKind: selection.kind, status: "active" });
+                }
+                workOrgDocId = "";
+                educationOrgDocId = "";
             }
-            profileMessage = "工作单位、学校或关系称谓已保存";
+            if (selectedOrgDocId && onAddOrgMembership) {
+                await onAddOrgMembership(person.docId, selectedOrgDocId, {
+                    affiliationKind: selectedOrgKind,
+                    status: selectedOrgStatus,
+                    statusLabel: selectedOrgStatusLabel.trim(),
+                    department: selectedOrgDepartment.trim(), title: selectedOrgTitle.trim(),
+                    joinedOn: selectedOrgJoinedOn, leftOn: selectedOrgLeftOn,
+                    note: selectedOrgNote.trim(),
+                });
+                selectedOrgDocId = "";
+                selectedOrgKind = "unspecified";
+                selectedOrgStatus = "active";
+                selectedOrgStatusLabel = "";
+                selectedOrgDepartment = "";
+                selectedOrgTitle = "";
+                selectedOrgJoinedOn = "";
+                selectedOrgLeftOn = "";
+                selectedOrgNote = "";
+            }
+            profileMessage = "组织经历或关系称谓已保存";
             onSaved();
         } catch (error) {
             profileError = error instanceof Error ? error.message : String(error);
@@ -322,8 +456,8 @@
                 <div>
                     <h4 id="lvct-person-edit-profile-title">{person.isSelf ? "工作单位与学校" : "工作单位、学校与我的关系"}</h4>
                     <p class="ft__smaller ft__on-surface">{person.isSelf
-                        ? "可选择组织补充当前工作单位/学校。组织归属会保留历史，重复选择当前组织不会新增记录。"
-                        : "可直接填写关系称谓，或选择组织补充当前工作单位/学校。组织归属会保留历史，重复选择当前组织不会新增记录。"}</p>
+        ? "可添加多个家庭、工作单位、学校或其他组织；离职、毕业和自定义状态都会保留历史。"
+        : "可直接填写关系称谓，也可添加多个家庭、工作单位、学校或其他组织；每段经历独立保存。"}</p>
                 </div>
             </div>
             {#if profileLoading}
@@ -337,23 +471,61 @@
                 {/if}
                 {#if onLoadOrgCandidates && onAddOrgMembership}
                     <div class="lvct-form__grid">
-                        <label class="lvct-form__item">
-                            <span>工作单位</span>
-                            <select class="b3-select fn__block" bind:value={workOrgDocId} disabled={profileBusy || availableOrgCandidates.length === 0}>
-                                <option value="">选择组织…</option>
-                                {#each availableOrgCandidates as org (org.docId)}<option value={org.docId}>{org.name}</option>{/each}
-                            </select>
-                        </label>
-                        <label class="lvct-form__item">
-                            <span>学校</span>
-                            <select class="b3-select fn__block" bind:value={educationOrgDocId} disabled={profileBusy || availableOrgCandidates.length === 0}>
-                                <option value="">选择组织…</option>
-                                {#each availableOrgCandidates as org (org.docId)}<option value={org.docId}>{org.name}</option>{/each}
-                            </select>
-                        </label>
+                        <label class="lvct-form__item"><span>工作单位</span><select class="b3-select fn__block" bind:value={workOrgDocId} disabled={profileBusy || quickOrgCandidates.length === 0}><option value="">选择组织…</option>{#each quickOrgCandidates as org (org.docId)}<option value={org.docId}>{org.name}</option>{/each}</select></label>
+                        <label class="lvct-form__item"><span>学校</span><select class="b3-select fn__block" bind:value={educationOrgDocId} disabled={profileBusy || quickOrgCandidates.length === 0}><option value="">选择组织…</option>{#each quickOrgCandidates as org (org.docId)}<option value={org.docId}>{org.name}</option>{/each}</select></label>
                     </div>
+                    <button type="button" class="b3-button b3-button--text" aria-expanded={otherOrgOpen} onclick={() => (otherOrgOpen = !otherOrgOpen)} disabled={profileBusy}>{otherOrgOpen ? "收起详细组织经历" : "添加其他组织经历（可选）"}</button>
+                    {#if orgMemberships.length > 0}
+                        <div class="lvct-person-edit__org-list">
+                            <h5>已有组织经历</h5>
+                            {#each orgMemberships as membership (membership.id)}
+                                <div class="lvct-person-edit__org-item">
+                                    <div class="fn__flex-1">
+                                        <strong>{membership.orgName}</strong>
+                                        <span class="ft__smaller ft__on-surface"> · {affiliationLabel(membership.affiliationKind ?? (membership.orgName === "家庭" ? "family" : undefined))}</span>
+                                        <span class="lvct-chip {membership.status === "former" ? "lvct-bucket--stale" : "lvct-bucket--today"}">{orgMembershipStatusLabel({ ...membership, affiliationKind: membership.affiliationKind ?? (membership.orgName === "家庭" ? "family" : undefined) })}</span>
+                                        {#if membership.archived}<span class="lvct-chip lvct-bucket--stale">组织已归档</span>{/if}
+                                        {#if membership.reachable === false}<span class="lvct-chip lvct-bucket--stale">组织待核实</span>{/if}
+                                        {#if membership.department}<span class="ft__smaller"> · {membership.department}</span>{/if}
+                                        {#if membership.title}<span class="ft__smaller"> · {membership.title}</span>{/if}
+                                        {#if membership.joinedOn || membership.leftOn}<span class="ft__smaller ft__on-surface"> · {membership.joinedOn || "未知"} – {membership.leftOn || "至今"}</span>{/if}
+                                        {#if membership.note}<span class="ft__smaller ft__on-surface" title={membership.note}> · {membership.note}</span>{/if}
+                                    </div>
+                                    {#if onUpdateOrgMembership}<button type="button" class="b3-button b3-button--text" onclick={() => startEditMembership(membership)} disabled={profileBusy || profileLoading}>编辑</button>{/if}
+                                    {#if onRemoveOrgMembership}<button type="button" class="b3-button b3-button--cancel" onclick={() => void removeMembership(membership)} disabled={profileBusy || profileLoading}>删除</button>{/if}
+                                </div>
+                                {#if editingMembershipId === membership.id}
+                                    <div class="lvct-form__grid lvct-person-edit__org-edit">
+                                        <label class="lvct-form__item"><span>归属分类</span><select class="b3-select fn__block" bind:value={editingOrgKind} disabled={profileBusy}><option value="family">家庭</option><option value="unspecified">其他组织</option><option value="work">工作单位</option><option value="education">学校</option></select></label>
+                                        <label class="lvct-form__item"><span>当前状态</span><select class="b3-select fn__block" value={editingOrgStatus} onchange={(event) => changeEditingOrgStatus(event.currentTarget.value as OrgMembershipStatus)} disabled={profileBusy}><option value="active" disabled={membership.archived}>当前在职/就读</option><option value="former">已离开/毕业</option></select></label>
+                                        <label class="lvct-form__item"><span>自定义状态</span><input class="b3-text-field fn__block" maxlength="40" bind:value={editingOrgStatusLabel} disabled={profileBusy} placeholder="例如：实习、兼职、休学" /></label>
+                                        <label class="lvct-form__item"><span>{text("orgMemberNote", "成员备注")}</span><input class="b3-text-field fn__block" maxlength="240" bind:value={editingOrgNote} disabled={profileBusy} placeholder={text("orgMemberNotePlaceholder", "仅记录这段组织经历")} /></label>
+                                        <label class="lvct-form__item"><span>部门/院系</span><input class="b3-text-field fn__block" bind:value={editingOrgDepartment} disabled={profileBusy} /></label>
+                                        <label class="lvct-form__item"><span>职位/身份</span><input class="b3-text-field fn__block" bind:value={editingOrgTitle} disabled={profileBusy} /></label>
+                                        <label class="lvct-form__item"><span>开始日期</span><input class="b3-text-field fn__block" type="date" bind:value={editingOrgJoinedOn} disabled={profileBusy} /></label>
+                                        <label class="lvct-form__item"><span>结束日期</span><input class="b3-text-field fn__block" type="date" bind:value={editingOrgLeftOn} disabled={profileBusy || editingOrgStatus === "active"} /></label>
+                                        <div class="lvct-form__actions"><button type="button" class="b3-button b3-button--text" onclick={() => void saveEditMembership()} disabled={profileBusy}>保存</button><button type="button" class="b3-button b3-button--cancel" onclick={cancelEditMembership} disabled={profileBusy}>取消</button></div>
+                                    </div>
+                                {/if}
+                            {/each}
+                        </div>
+                    {/if}
+                    {#if otherOrgOpen}
+                    <div class="lvct-form__grid">
+                        <label class="lvct-form__item"><span>新增组织</span><select class="b3-select fn__block" value={selectedOrgDocId} onchange={(event) => changeSelectedOrg(event.currentTarget.value)} disabled={profileBusy || availableOrgCandidates.length === 0}><option value="">选择组织…</option>{#each availableOrgCandidates as org (org.docId)}<option value={org.docId}>{org.name}{org.archived ? "（已归档，仅补录历史）" : ""}</option>{/each}</select></label>
+                        <label class="lvct-form__item"><span>归属分类</span><select class="b3-select fn__block" bind:value={selectedOrgKind} disabled={profileBusy || !selectedOrgDocId}><option value="family">家庭</option><option value="unspecified">其他组织</option><option value="work">工作单位</option><option value="education">学校</option></select></label>
+                        <label class="lvct-form__item"><span>当前状态</span><select class="b3-select fn__block" value={selectedOrgStatus} onchange={(event) => changeSelectedOrgStatus(event.currentTarget.value as OrgMembershipStatus)} disabled={profileBusy || !selectedOrgDocId}><option value="active" disabled={Boolean(selectedOrgCandidate?.archived)}>当前在职/就读</option><option value="former">已离开/毕业</option></select></label>
+                        <label class="lvct-form__item"><span>自定义状态</span><input class="b3-text-field fn__block" maxlength="40" bind:value={selectedOrgStatusLabel} disabled={profileBusy || !selectedOrgDocId} placeholder="例如：实习、兼职、休学" /></label>
+                        <label class="lvct-form__item"><span>部门/院系</span><input class="b3-text-field fn__block" bind:value={selectedOrgDepartment} disabled={profileBusy || !selectedOrgDocId} /></label>
+                        <label class="lvct-form__item"><span>职位/身份</span><input class="b3-text-field fn__block" bind:value={selectedOrgTitle} disabled={profileBusy || !selectedOrgDocId} /></label>
+                        <label class="lvct-form__item"><span>开始日期</span><input class="b3-text-field fn__block" type="date" bind:value={selectedOrgJoinedOn} disabled={profileBusy || !selectedOrgDocId} /></label>
+                        <label class="lvct-form__item"><span>结束日期</span><input class="b3-text-field fn__block" type="date" bind:value={selectedOrgLeftOn} disabled={profileBusy || !selectedOrgDocId || selectedOrgStatus === "active"} /></label>
+                        <label class="lvct-form__item"><span>{text("orgMemberNote", "成员备注")}</span><input class="b3-text-field fn__block" maxlength="240" bind:value={selectedOrgNote} disabled={profileBusy || !selectedOrgDocId} placeholder={text("orgMemberNotePlaceholder", "仅记录这段组织经历")} /></label>
+                    </div>
+                    {#if selectedOrgCandidate?.archived}<p class="ft__smaller ft__on-surface">组织已归档，只能登记为历史经历；恢复组织后才可新增当前归属。</p>{/if}
+                    {/if}
                     {#if availableOrgCandidates.length === 0}
-                        <p class="ft__smaller ft__on-surface">暂无可选择的活跃组织；可先新建组织，或编辑已有归属的分类。</p>
+                        <p class="ft__smaller ft__on-surface">暂无可选择的活跃组织；可先新建组织。已有组织经历可逐条编辑，历史不会被覆盖。</p>
                         {#if onCreateOrganization}<button type="button" class="b3-button b3-button--outline" onclick={() => void createOrganizationFromEditor()} disabled={profileBusy || profileLoading || creatingOrganization}>{creatingOrganization ? "组织创建中…" : text("orgCreateFirst", "新建组织")}</button>{/if}
                     {/if}
                 {/if}

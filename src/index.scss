@@ -128,13 +128,17 @@
     align-items: center;
     gap: var(--lvct-sp-2);
     min-width: 0;
-    input { width: min(260px, 100%); }
+    input { width: min(260px, 100%); min-width: 0; }
     button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; }
 }
-@media (max-width: 640px) {
-    .lvct-workbench__header { flex-wrap: wrap; }
+@media (max-width: 960px) {
+    .lvct-workbench__header { align-items: flex-start; flex-wrap: wrap; }
     .lvct-workbench__header-actions { width: 100%; }
-    .lvct-workbench__header-actions input { flex: 1; }
+    .lvct-workbench__header-actions input { flex: 1 1 240px; width: auto; }
+}
+@media (max-width: 640px) {
+    .lvct-workbench__header-actions { flex-wrap: wrap; }
+    .lvct-workbench__header-actions input { flex: 1 1 100%; width: 100%; }
     /* B09-1：移动工具栏收纳——常驻搜索（整行）+ 视图切换/新建/筛选与整理，其余进底部弹层 */
     .lvct-people__toolbar { flex-wrap: wrap; row-gap: var(--lvct-sp-2); }
     .lvct-people__toolbar > .b3-text-field { flex-basis: 100%; }
@@ -401,6 +405,33 @@
     }
 }
 
+.lvct-wizard__features {
+    padding: var(--lvct-sp-3);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-md);
+    background: var(--lvct-bg-app);
+    text-align: left;
+
+    h3 {
+        margin: 0 0 var(--lvct-sp-2);
+        font-size: var(--lvct-fs-body);
+        color: var(--lvct-text-1);
+    }
+
+    ul {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--lvct-sp-2) var(--lvct-sp-4);
+        margin: 0;
+        padding-inline-start: 1.25rem;
+        color: var(--lvct-text-2);
+        font-size: var(--lvct-fs-caption);
+        line-height: 1.5;
+    }
+
+    li::marker { color: var(--lvct-accent); }
+}
+
 .lvct-wizard__logo {
     width: 64px;
     height: 64px;
@@ -587,6 +618,10 @@
         border-radius: var(--lvct-r-lg);
     }
 
+    .lvct-wizard__features ul {
+        grid-template-columns: 1fr;
+    }
+
     .lvct-wizard__header {
         gap: 12px;
 
@@ -619,6 +654,15 @@
 
     /* 拥挤时整钮换行而非汉字竖排（导航竖排 UX-01.3 同款教训，覆盖桌面+移动） */
     .b3-button { white-space: nowrap; flex-shrink: 0; }
+}
+
+/* 搜索是联系人页的主要入口；给它稳定的最小宽度，工具项再按可用空间换行。 */
+.lvct-people__desktop-search {
+    order: -1;
+    flex: 1 0 100%;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .lvct-people__mobile-search {
@@ -1486,6 +1530,127 @@
     margin-bottom: var(--lvct-sp-4);
 }
 
+.lvct-dash__quickstart {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-3);
+    padding: var(--lvct-sp-4);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-lg);
+    background: var(--lvct-bg-surface);
+    box-shadow: var(--lvct-shadow-1);
+}
+
+.lvct-dash__quickstart-head,
+.lvct-dash__quickstart-footer {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--lvct-sp-3);
+}
+
+.lvct-dash__quickstart-head > div,
+.lvct-dash__quickstart-footer > span:first-child {
+    min-width: 0;
+}
+
+.lvct-dash__quickstart-eyebrow {
+    margin: 0 0 var(--lvct-sp-1);
+    color: var(--lvct-accent);
+    font-size: var(--lvct-fs-caption);
+    font-weight: 600;
+}
+
+.lvct-dash__quickstart h2 {
+    margin: 0;
+    font-size: var(--lvct-fs-section-title);
+    line-height: 1.3;
+}
+
+.lvct-dash__quickstart-head p:last-child {
+    margin: var(--lvct-sp-1) 0 0;
+    color: var(--lvct-text-2);
+    font-size: var(--lvct-fs-caption);
+    line-height: 1.5;
+}
+
+.lvct-dash__quickstart-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--lvct-sp-2);
+}
+
+.lvct-dash__quickstart-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--lvct-sp-2);
+    min-width: 0;
+    min-height: 70px;
+    padding: var(--lvct-sp-3);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-md);
+    background: var(--lvct-bg-elevated);
+    color: var(--lvct-text-1);
+    text-align: left;
+    cursor: pointer;
+}
+
+.lvct-dash__quickstart-item:hover,
+.lvct-dash__quickstart-item:focus-visible {
+    border-color: var(--lvct-border-strong);
+}
+
+.lvct-dash__quickstart-item--primary {
+    border-color: var(--lvct-accent);
+    background: var(--lvct-accent-soft);
+}
+
+.lvct-dash__quickstart-item > span:nth-child(2) {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.lvct-dash__quickstart-item small {
+    color: var(--lvct-text-2);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.lvct-dash__quickstart-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    border-radius: var(--lvct-r-sm);
+    background: var(--lvct-bg-surface);
+    color: var(--lvct-accent);
+}
+
+.lvct-dash__quickstart-footer {
+    align-items: center;
+    color: var(--lvct-text-3);
+    font-size: var(--lvct-fs-caption);
+    line-height: 1.45;
+}
+
+.lvct-dash__quickstart-links {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--lvct-sp-1);
+    flex: 0 0 auto;
+}
+
+.lvct-dash__quickstart-links .b3-button {
+    min-width: 0;
+    white-space: nowrap;
+}
+
 .lvct-dash__greeting {
     margin: 0 0 var(--lvct-sp-1);
     font-size: var(--lvct-fs-page-title);
@@ -1523,6 +1688,20 @@
     .lvct-dash__birthday-banner {
         width: 100%;
         justify-content: space-between;
+    }
+
+    .lvct-dash__quickstart-head,
+    .lvct-dash__quickstart-footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .lvct-dash__quickstart-head > .b3-button {
+        align-self: flex-start;
+    }
+
+    .lvct-dash__quickstart-links {
+        justify-content: flex-start;
     }
 }
 
@@ -3377,6 +3556,8 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     justify-content: flex-end;
     gap: var(--lvct-sp-1);
     margin-left: auto;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 /* Peek 侧栏固定在较窄宽度，头像信息与导航按钮分行，避免生日和按钮互相挤压。 */
@@ -3390,6 +3571,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     grid-column: 1 / -1;
     width: 100%;
     margin-left: 0;
+    min-width: 0;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
 
@@ -3733,7 +3915,16 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     display: flex;
 }
 
+.lvct-picker__control {
+    display: flex;
+    align-items: stretch;
+    gap: var(--lvct-sp-1);
+    width: 100%;
+    min-width: 0;
+}
+
 .lvct-picker__trigger {
+    flex: 1 1 auto;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -3742,6 +3933,32 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     min-width: 0;
     text-align: left;
     cursor: pointer;
+}
+
+.lvct-picker__clear {
+    flex: 0 0 auto;
+    width: var(--lvct-touch-min);
+    min-height: var(--lvct-touch-min);
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-sm);
+    background: var(--lvct-bg-elevated);
+    color: var(--lvct-text-3);
+    cursor: pointer;
+}
+
+.lvct-picker__clear:hover,
+.lvct-picker__clear:focus-visible {
+    color: var(--lvct-text-1);
+    background: var(--lvct-bg-hover);
+}
+
+.lvct-picker__clear:disabled {
+    cursor: default;
+    opacity: .55;
 }
 
 .lvct-picker__value {
@@ -3840,6 +4057,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 
 @media (max-width: 640px) {
     .lvct-picker__option { min-height: var(--lvct-touch-min-mobile); }
+    .lvct-picker__clear { width: var(--lvct-touch-min-mobile); min-height: var(--lvct-touch-min-mobile); }
 }
 
 /* ---------- 仪表盘 ---------- */
@@ -4514,6 +4732,18 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         gap: var(--lvct-sp-3);
     }
 
+    .lvct-dash__quickstart {
+        padding: var(--lvct-sp-3);
+    }
+
+    .lvct-dash__quickstart-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .lvct-dash__quickstart-item {
+        min-height: 64px;
+    }
+
     .lvct-dash__stat {
         padding-block: var(--lvct-sp-3);
     }
@@ -5162,6 +5392,17 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     white-space: nowrap;
 }
 
+.lvct-org-manager__member-note {
+    display: inline-block;
+    max-width: min(36ch, 100%);
+    overflow: hidden;
+    color: var(--lvct-text-2);
+    font-size: var(--lvct-fs-micro);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
 .lvct-org-manager__detail > .fn__flex:first-child .b3-button--cancel {
     border-color: color-mix(in srgb, var(--lvct-danger) 28%, var(--lvct-border-subtle));
     background: var(--lvct-danger-soft);
@@ -5232,6 +5473,20 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         border-radius: var(--lvct-r-sm);
         background: var(--lvct-accent-soft);
         color: var(--lvct-accent);
+    }
+
+    /* Logo 来自用户上传或外部链接，不能让原始尺寸改变卡片标题区域。 */
+    &__card-logo {
+        display: block;
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+        max-width: 40px;
+        max-height: 40px;
+        border: 1px solid var(--lvct-border-subtle);
+        border-radius: var(--lvct-r-sm);
+        background: var(--lvct-accent-soft);
+        object-fit: contain;
     }
 
     &__card-name {
@@ -5355,6 +5610,9 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     gap: var(--lvct-sp-2);
     align-items: center;
     flex-wrap: wrap;
+
+    label { display: flex; flex: 1 1 180px; min-width: 160px; flex-direction: column; gap: 4px; font-size: var(--lvct-fs-caption); }
+    .lvct-org-manager__add-note { flex-basis: 100%; }
 }
 
 .lvct-org-manager__footer {

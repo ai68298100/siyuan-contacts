@@ -296,10 +296,10 @@ export function filterContacts(people: readonly ContactSummary[], query: string,
             person.wechat.toLowerCase().includes(keyword) ||
             person.email.toLowerCase().includes(keyword) ||
             person.tags.some((tag) => tag.toLowerCase().includes(keyword)) ||
-            person.profile && ["work", "education", "relationship"].some((field) =>
+            person.profile && ["family", "work", "education", "relationship"].some((field) =>
                 (field === "relationship" ? person.profile?.relationship.state === "known" && person.profile.relationship.labels.length > 0
-                    : person.profile?.affiliations.state === "known" && person.profile.affiliations.value[field as "work" | "education"].length > 0)
-                && profileText(person.profile, field as "work" | "education" | "relationship").toLowerCase().includes(keyword))
+                    : person.profile?.affiliations.state === "known" && person.profile.affiliations.value[field as "family" | "work" | "education"].length > 0)
+                && profileText(person.profile, field as "family" | "work" | "education" | "relationship").toLowerCase().includes(keyword))
         );
     });
 }

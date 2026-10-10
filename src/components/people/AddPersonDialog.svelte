@@ -11,8 +11,8 @@
     import GroupField from "./GroupField.svelte";
     import BirthdayField from "./BirthdayField.svelte";
     import { ClipboardPaste } from "@lucide/svelte";
-    import type { OrgAffiliationKind } from "../../domain/org-membership";
-    import type { ContactExtendedDraft } from "../../domain/contact-create";
+    import type { ContactExtendedDraft, ContactOrgAffiliationDraft } from "../../domain/contact-create";
+    import { validateContactExtendedDraft } from "../../domain/contact-create";
     import type { SelfIdentity, SelfIdentityChangePreview } from "../../domain/self-identity";
 
     let {
@@ -38,7 +38,7 @@
         /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
         hostCloseChannel?: { request?: (close: () => void) => void };
         /** 新建后可选的扩展资料保存回调（组织、与我的关系、人物备注）。 */
-        onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string }>>;
+        onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string; archived?: boolean }>>;
         /** 当前没有合适组织时，跳转到统一的新建组织页面。 */
         onCreateOrganization?: () => void | Promise<void>;
         /** 创建文档前核验已填写的补充资料是否满足前置条件。 */
@@ -72,12 +72,8 @@
     let extraLoading = $state(false);
     let extraError = $state("");
     let creatingOrganization = $state(false);
-    let orgCandidates = $state<ReadonlyArray<{ docId: string; name: string }>>([]);
-    let orgDocId = $state("");
-    let orgDepartment = $state("");
-    let orgTitle = $state("");
-    let orgJoinedOn = $state("");
-    let orgAffiliationKind = $state<OrgAffiliationKind>("unspecified");
+    let orgCandidates = $state<ReadonlyArray<{ docId: string; name: string; archived?: boolean }>>([]);
+    let orgAffiliations = $state<ContactOrgAffiliationDraft[]>([]);
     let aliases = $state("");
     let relationshipLabels = $state("");
     let note = $state("");
@@ -90,6 +86,24 @@
     let selfPreview = $state<SelfIdentityChangePreview | null>(null);
     const extendedSupported = $derived(Boolean(onSaveExtended));
     const currentPreview = $derived(creationPreview?.name === draft.name.trim() ? creationPreview : null);
+    function emptyOrgAffiliation(): ContactOrgAffiliationDraft {
+        return { orgDocId: "", orgDepartment: "", orgTitle: "", orgJoinedOn: "", orgLeftOn: "", orgStatus: "active", orgStatusLabel: "", orgAffiliationKind: "unspecified", orgNote: "" };
+    }
+    function patchOrgAffiliation(index: number, patch: Partial<ContactOrgAffiliationDraft>): void {
+        orgAffiliations = orgAffiliations.map((entry, current) => {
+            if (current !== index) return entry;
+            const updated = { ...entry, ...patch };
+            const organization = orgCandidates.find((org) => org.docId === updated.orgDocId);
+            if (organization?.archived) updated.orgStatus = "former";
+            if (organization?.name.trim() === "家庭") updated.orgAffiliationKind = "family";
+            if (updated.orgStatus === "active") updated.orgLeftOn = "";
+            return updated;
+        });
+    }
+    function changeOrgStatus(index: number, status: ContactOrgAffiliationDraft["orgStatus"]): void {
+        orgAffiliations = orgAffiliations.map((entry, current) => current === index
+            ? { ...entry, orgStatus: status, orgLeftOn: status === "active" ? "" : entry.orgLeftOn } : entry);
+    }
     // FAST-01.1：粘贴并识别（识别结果经勾选后回填草稿，不直接写库）
     let quickFillOpen = $state(false);
     function applyQuickFill(patch: {
@@ -117,7 +131,12 @@
         const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
         running = true;
         try {
-            const extendedDetails = { orgDocId, orgDepartment, orgTitle, orgJoinedOn, orgAffiliationKind, aliases, relationshipLabels, note };
+            const firstOrg = orgAffiliations.find((entry) => entry.orgDocId) ?? emptyOrgAffiliation();
+            const extendedDetails = { orgMemberships: orgAffiliations.filter((entry) => entry.orgDocId).map((entry) => ({ ...entry })),
+                orgDocId: firstOrg.orgDocId, orgDepartment: firstOrg.orgDepartment, orgTitle: firstOrg.orgTitle,
+                orgJoinedOn: firstOrg.orgJoinedOn, orgAffiliationKind: firstOrg.orgAffiliationKind, aliases, relationshipLabels, note };
+            const affiliationErrors = validateContactExtendedDraft(extendedDetails);
+            if (affiliationErrors.length) throw new Error(affiliationErrors.join("；"));
             if (!createdPerson && onValidateExtended) await onValidateExtended(extendedDetails);
             const person = createdPerson ?? await createContact(settings, { ...draft, tags }, {
                 request: creationRequest,
@@ -241,7 +260,7 @@
         }
         if (draft.isLunar) changes.push(text("guardFieldChange", "{field}：{from} → {to}", { field: text("formLunar", "农历生日"), from: empty, to: "✓" }));
         if (tagsText.trim().length > 0) changes.push(text("guardTagsChange", "标签：{from} → {to}", { from: empty, to: tagsText }));
-        if (orgDocId || orgDepartment || orgTitle || orgJoinedOn) changes.push("组织归属补充资料已填写");
+        if (orgAffiliations.some((entry) => entry.orgDocId || entry.orgDepartment || entry.orgTitle || entry.orgJoinedOn || entry.orgLeftOn || entry.orgStatusLabel.trim() || entry.orgNote?.trim())) changes.push("组织归属补充资料已填写");
         if (relationshipLabels.trim()) changes.push("与我的关系称谓已填写");
         if (aliases.trim()) changes.push("别名/称呼已填写");
         if (note.trim()) changes.push("人物备注已填写");
@@ -249,7 +268,7 @@
     }
     const guardedClose = useCloseGuard({
         busy: () => running,
-        dirty: () => !saved && (JSON.stringify(draft) !== JSON.stringify(emptyDraft()) || tagsText.trim().length > 0 || Boolean(orgDocId || orgDepartment || orgTitle || orgJoinedOn || aliases.trim() || relationshipLabels.trim() || note.trim())),
+        dirty: () => !saved && (JSON.stringify(draft) !== JSON.stringify(emptyDraft()) || tagsText.trim().length > 0 || orgAffiliations.some((entry) => Boolean(entry.orgDocId || entry.orgDepartment || entry.orgTitle || entry.orgJoinedOn || entry.orgLeftOn || entry.orgStatusLabel.trim() || entry.orgNote?.trim())) || Boolean(aliases.trim() || relationshipLabels.trim() || note.trim())),
         changes: () => [...draftChanges(), ...(creationRequest ? [text("contactCheckpointWarning", "原请求断点仅保留在当前窗口。关闭不会删除已保存文档；请核实后继续，不能凭同名重新建档。")] : [])],
         save: persist,
     });
@@ -329,27 +348,31 @@
                 <div id="lvct-contact-extra-body" class="lvct-form__optional-body">
                     <p id="lvct-contact-extra-title" class="ft__smaller ft__on-surface">姓名是唯一必填项；组织、关系和备注可在创建后继续修改。</p>
                     {#if onLoadOrgCandidates}
-                        <div class="lvct-form__grid">
-                            <label class="lvct-form__item">
-                                <span>组织</span>
-                                <select class="b3-select fn__block" bind:value={orgDocId} disabled={extraLoading || running || orgCandidates.length === 0}>
-                                    <option value="">{extraLoading ? "读取组织中…" : "暂不选择"}</option>
-                                    {#each orgCandidates as org (org.docId)}<option value={org.docId}>{org.name}</option>{/each}
-                                </select>
-                                {#if !extraLoading}
-                                    <span class="lvct-form__hint">{orgCandidates.length === 0 ? "暂无可选组织。" : "没有合适组织？"}{#if onCreateOrganization}<button type="button" class="b3-button b3-button--text lvct-form__inline-action" onclick={() => void createOrganizationFromContact()} disabled={running || creatingOrganization}>{creatingOrganization ? "组织创建中…" : "新建组织"}</button>{/if}<button type="button" class="b3-button b3-button--text lvct-form__inline-action" onclick={() => void reloadOrgCandidates()} disabled={running || creatingOrganization}>重新读取</button></span>
-                                {/if}
-                            </label>
-                            <label class="lvct-form__item">
-                                <span>归属分类</span>
-                                <select class="b3-select fn__block" bind:value={orgAffiliationKind} disabled={running || !orgDocId}>
-                                    <option value="unspecified">未分类</option><option value="work">工作单位</option><option value="education">学校</option>
-                                </select>
-                            </label>
-                            <label class="lvct-form__item"><span>部门</span><input class="b3-text-field fn__block" bind:value={orgDepartment} disabled={running || !orgDocId} placeholder="可选" /></label>
-                            <label class="lvct-form__item"><span>职位/身份</span><input class="b3-text-field fn__block" bind:value={orgTitle} disabled={running || !orgDocId} placeholder="可选" /></label>
-                            <label class="lvct-form__item"><span>加入日期</span><input class="b3-text-field fn__block" type="date" bind:value={orgJoinedOn} disabled={running || !orgDocId} /></label>
-                        </div>
+                        <div class="lvct-form__actions"><b>组织经历（可选，可添加多条）</b><button type="button" class="b3-button b3-button--outline" onclick={() => orgAffiliations = [...orgAffiliations, emptyOrgAffiliation()]} disabled={running || extraLoading}>添加组织经历</button></div>
+                        {#each orgAffiliations as affiliation, index (index)}
+                            <div class="lvct-form__grid lvct-person-edit__org-edit">
+                                <label class="lvct-form__item"><span>组织</span><select class="b3-select fn__block" value={affiliation.orgDocId} onchange={(event) => patchOrgAffiliation(index, { orgDocId: event.currentTarget.value })} disabled={extraLoading || running || orgCandidates.length === 0}>
+                                    <option value="">{extraLoading ? "读取组织中…" : "选择组织…"}</option>{#each orgCandidates as org (org.docId)}<option value={org.docId}>{org.name}{org.archived ? "（已归档，仅补录历史）" : ""}</option>{/each}
+                                </select></label>
+                                <label class="lvct-form__item"><span>归属分类</span><select class="b3-select fn__block" value={affiliation.orgAffiliationKind} onchange={(event) => patchOrgAffiliation(index, { orgAffiliationKind: event.currentTarget.value as ContactOrgAffiliationDraft["orgAffiliationKind"] })} disabled={running || !affiliation.orgDocId}>
+                                    <option value="family">家庭</option><option value="unspecified">其他组织</option><option value="work">工作单位</option><option value="education">学校</option>
+                                </select></label>
+                                <label class="lvct-form__item"><span>状态</span><select class="b3-select fn__block" value={affiliation.orgStatus} onchange={(event) => changeOrgStatus(index, event.currentTarget.value as ContactOrgAffiliationDraft["orgStatus"])} disabled={running || !affiliation.orgDocId}>
+                                    <option value="active" disabled={Boolean(orgCandidates.find((org) => org.docId === affiliation.orgDocId)?.archived)}>当前在职/就读</option><option value="former">已离开/毕业</option>
+                                </select></label>
+                                <label class="lvct-form__item"><span>自定义状态</span><input class="b3-text-field fn__block" maxlength="40" value={affiliation.orgStatusLabel} oninput={(event) => patchOrgAffiliation(index, { orgStatusLabel: event.currentTarget.value })} disabled={running || !affiliation.orgDocId} placeholder="例如：实习、兼职、休学" /></label>
+                                <label class="lvct-form__item"><span>部门/院系</span><input class="b3-text-field fn__block" value={affiliation.orgDepartment} oninput={(event) => patchOrgAffiliation(index, { orgDepartment: event.currentTarget.value })} disabled={running || !affiliation.orgDocId} /></label>
+                                <label class="lvct-form__item"><span>职位/身份</span><input class="b3-text-field fn__block" value={affiliation.orgTitle} oninput={(event) => patchOrgAffiliation(index, { orgTitle: event.currentTarget.value })} disabled={running || !affiliation.orgDocId} /></label>
+                                <label class="lvct-form__item"><span>开始日期</span><input class="b3-text-field fn__block" type="date" value={affiliation.orgJoinedOn} oninput={(event) => patchOrgAffiliation(index, { orgJoinedOn: event.currentTarget.value })} disabled={running || !affiliation.orgDocId} /></label>
+                                <label class="lvct-form__item"><span>结束日期</span><input class="b3-text-field fn__block" type="date" value={affiliation.orgLeftOn} oninput={(event) => patchOrgAffiliation(index, { orgLeftOn: event.currentTarget.value })} disabled={running || !affiliation.orgDocId || affiliation.orgStatus === "active"} /></label>
+                                <label class="lvct-form__item"><span>成员备注</span><input class="b3-text-field fn__block" maxlength="240" value={affiliation.orgNote ?? ""} oninput={(event) => patchOrgAffiliation(index, { orgNote: event.currentTarget.value })} disabled={running || !affiliation.orgDocId} placeholder="仅记录这段组织经历" /></label>
+                                <button type="button" class="b3-button b3-button--cancel" onclick={() => orgAffiliations = orgAffiliations.filter((_, row) => row !== index)} disabled={running}>移除这条</button>
+                                {#if orgCandidates.find((org) => org.docId === affiliation.orgDocId)?.archived}<p class="ft__smaller ft__on-surface">组织已归档，只能登记为离开或毕业的历史经历。</p>{/if}
+                            </div>
+                        {/each}
+                        {#if !extraLoading}
+                            <span class="lvct-form__hint">{orgCandidates.length === 0 ? "暂无可选组织。" : "没有合适组织？"}{#if onCreateOrganization}<button type="button" class="b3-button b3-button--text lvct-form__inline-action" onclick={() => void createOrganizationFromContact()} disabled={running || creatingOrganization}>{creatingOrganization ? "组织创建中…" : "新建组织"}</button>{/if}<button type="button" class="b3-button b3-button--text lvct-form__inline-action" onclick={() => void reloadOrgCandidates()} disabled={running || creatingOrganization}>重新读取</button></span>
+                        {/if}
                         {#if extraError}<p class="lvct-form__error" role="alert">组织读取失败：{extraError} <button type="button" class="b3-button b3-button--text" onclick={() => void openExtended()}>重试</button></p>{/if}
                     {/if}
                     <label class="lvct-form__item"><span>别名 / 常用称呼</span><input class="b3-text-field fn__block" maxlength="80" bind:value={aliases} disabled={running} placeholder="例如：张老师、英文名；多个称呼用顿号分隔" /></label>

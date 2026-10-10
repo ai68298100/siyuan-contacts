@@ -47,8 +47,16 @@
     let selectedPreset = $state("");
     let validationError = $state("");
     let logoError = $state("");
+    let logoPreviewError = $state("");
     let logoInput: HTMLInputElement | undefined = $state();
     let logoReadRequest = 0;
+
+    $effect(() => {
+        /* 输入新的 URL 或重新上传后，允许预览重新尝试加载。 */
+        draft.logoUrl;
+        draft.logoDataUrl;
+        logoPreviewError = "";
+    });
 
     function applyPreset(id: string): void {
         selectedPreset = id;
@@ -95,6 +103,9 @@
         draft.logoUrl = "";
         draft.logoDataUrl = "";
         if (logoInput) logoInput.value = "";
+    }
+    function handleLogoPreviewError(): void {
+        logoPreviewError = "Logo 暂时无法加载，保存后仍会保留链接。";
     }
     function logoPreview(): string { return draft.logoDataUrl || draft.logoUrl; }
     function validUrl(value: string): boolean {
@@ -167,13 +178,14 @@
     <section class="lvct-org-profile-editor__section" aria-labelledby="org-logo-title">
         <div class="lvct-org-profile-editor__section-head"><div><h4 id="org-logo-title">Logo</h4><span class="ft__smaller ft__on-surface">支持上传本地图片，或填写公开图片链接。</span></div></div>
         <div class="lvct-org-profile-editor__logo-row">
-            <div class="lvct-org-profile-editor__logo-preview">{#if logoPreview()}<img src={logoPreview()} alt="组织 Logo 预览" />{:else}<span aria-hidden="true">{draft.shortName?.slice(0, 2) || draft.name?.slice(0, 2) || "组"}</span>{/if}</div>
+            <div class="lvct-org-profile-editor__logo-preview">{#if logoPreview() && !logoPreviewError}<img src={logoPreview()} alt="组织 Logo 预览" onerror={handleLogoPreviewError} />{:else}<span aria-hidden="true">{draft.shortName?.slice(0, 2) || draft.name?.slice(0, 2) || "组"}</span>{/if}</div>
             <div class="lvct-org-profile-editor__logo-actions">
                 <input bind:this={logoInput} class="lvct-org-profile-editor__file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange={handleLogoFile} disabled={saving || readOnly} aria-label="上传组织 Logo" />
                 <button type="button" class="b3-button b3-button--outline" onclick={() => logoInput?.click()} disabled={saving || readOnly}><Upload size={15} />上传图片</button>
                 <label class="lvct-org-profile-editor__field">Logo 链接<input class="b3-text-field" type="url" bind:value={draft.logoUrl} placeholder="https://.../logo.png" aria-label="Logo 链接" disabled={saving || readOnly} /></label>
                 {#if logoPreview()}<button type="button" class="b3-button b3-button--text" onclick={clearLogo} disabled={saving || readOnly}>移除 Logo</button>{/if}
                 {#if logoError}<p class="lvct-form__error" role="alert">{logoError}</p>{/if}
+                {#if logoPreviewError}<p class="ft__smaller ft__on-surface" role="status">{logoPreviewError}</p>{/if}
             </div>
         </div>
     </section>

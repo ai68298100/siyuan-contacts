@@ -177,15 +177,15 @@
     });
     /* V-16：组织样例（活跃×2 + 归档×1）——组织视图卡片与组织管理弹窗景共用 */
     const orgShotList = [
-        { docId: "20260101000000-orgshot1", name: "曙光科技（原晨曦信息技术有限公司）", hpath: "/曙光科技", notebookId: settings.notebookId, archived: false, memberships: [
-            { id: "mem-1", orgDocId: "20260101000000-orgshot1", personDocId: people[0].docId, status: "active", joinedOn: "2021-03-01", department: "研发中心平台架构部", title: "高级工程师" },
-            { id: "mem-2", orgDocId: "20260101000000-orgshot1", personDocId: people[1].docId, status: "active", joinedOn: "2022-06-01", department: "数学组", title: "教师" },
-            { id: "mem-3", orgDocId: "20260101000000-orgshot1", personDocId: people[2].docId, status: "former", joinedOn: "2020-01-01", leftOn: "2023-06-30", department: "", title: "摄影指导" },
+        { docId: "20260101000000-orgsh01", name: "曙光科技（原晨曦信息技术有限公司）", hpath: "/曙光科技", notebookId: settings.notebookId, archived: false, memberships: [
+            { id: "mem-1", orgDocId: "20260101000000-orgsh01", personDocId: people[0].docId, status: "active", joinedOn: "2021-03-01", department: "研发中心平台架构部", title: "高级工程师" },
+            { id: "mem-2", orgDocId: "20260101000000-orgsh01", personDocId: people[1].docId, status: "active", joinedOn: "2022-06-01", department: "数学组", title: "教师" },
+            { id: "mem-3", orgDocId: "20260101000000-orgsh01", personDocId: people[2].docId, status: "former", joinedOn: "2020-01-01", leftOn: "2023-06-30", department: "", title: "摄影指导" },
         ] },
-        { docId: "20260101000000-orgshot2", name: "母校学院", hpath: "/母校学院", notebookId: settings.notebookId, archived: false, memberships: [
-            { id: "mem-4", orgDocId: "20260101000000-orgshot2", personDocId: people[0].docId, status: "active", joinedOn: "2015-09-01", department: "计算机系", title: "" },
+        { docId: "20260101000000-orgsh02", name: "母校学院", hpath: "/母校学院", notebookId: settings.notebookId, archived: false, memberships: [
+            { id: "mem-4", orgDocId: "20260101000000-orgsh02", personDocId: people[0].docId, status: "active", joinedOn: "2015-09-01", department: "计算机系", title: "" },
         ] },
-        { docId: "20260101000000-orgshot3", name: "已注销工作室", hpath: "/已注销工作室", notebookId: settings.notebookId, archived: true, memberships: [] },
+        { docId: "20260101000000-orgsh03", name: "已注销工作室", hpath: "/已注销工作室", notebookId: settings.notebookId, archived: true, memberships: [] },
     ];
     const facade = {
         listPersonOrgMemberships: async (docId) => organizations.flatMap((org) => org.memberships.filter((member) => member.personDocId === docId)
@@ -269,7 +269,7 @@
         },
         /* B13/V-05：Peek 组织区样例（长组织名/期间文本/同伴行，供布局矩阵核对） */
         listPersonOrgMemberships: async (docId) => docId === people[0].docId ? [{
-            id: "mem-shot-1", orgDocId: "20260101000000-orgshot1", orgName: "曙光科技（原晨曦信息技术有限公司）",
+            id: "mem-shot-1", orgDocId: "20260101000000-orgsh01", orgName: "曙光科技（原晨曦信息技术有限公司）",
             department: "研发中心平台架构部", title: "高级工程师", joinedOn: "2021-03-01", leftOn: "", status: "active",
         }] : [],
         /* V-16：组织视图样例——多组织（活跃+归档）+ 成员计数供组织卡片网格核对；
@@ -281,6 +281,20 @@
                 ...membership,
                 personName: byDoc.get(membership.personDocId) ?? "（已解绑）",
             }));
+        },
+        listOrganizationMembersPage: async (orgDocId, options = {}) => {
+            const all = await facade.listOrganizationMembers(orgDocId);
+            const query = options.query?.trim().toLocaleLowerCase() ?? "";
+            const status = options.status ?? "all";
+            const filtered = all.filter((member) => (status === "all" || member.status === status)
+                && (!query || [member.personName, member.department, member.title, member.note ?? ""]
+                    .some((value) => String(value ?? "").toLocaleLowerCase().includes(query))));
+            const page = pageOrgMemberships(filtered, options);
+            return {
+                ...page,
+                personDocIds: [...new Set(all.map((member) => member.personDocId))],
+                activePersonDocIds: [...new Set(all.filter((member) => member.status === "active").map((member) => member.personDocId))],
+            };
         },
         listContacts: async () => people.map(summary),
         createOrganization: async (name) => {
@@ -320,7 +334,7 @@
             });
         },
         listCommonOrgBackground: async (docId) => docId === people[0].docId ? [{
-            orgDocId: "20260101000000-orgshot1", orgName: "曙光科技（原晨曦信息技术有限公司）",
+            orgDocId: "20260101000000-orgsh01", orgName: "曙光科技（原晨曦信息技术有限公司）",
             peers: [
                 { docId: people[1].docId, name: people[1].name, overlapText: "2021-03-01 ~ 至今", samePeriod: true, contact: summary(people[1]) },
                 { docId: people[2].docId, name: people[2].name, overlapText: "? ~ 2022-06-30", samePeriod: false, contact: summary(people[2]) },
@@ -350,7 +364,7 @@
         facade, settings, preferences,
         /* V-26：settings 曾落入 people 兜底——断点矩阵 settings-* 与 people-* 字节相同；
            V-16 余项：orgmgr 先落组织视图再由触发器开组织管理弹窗 */
-        initialView: (view === "home" || view === "quickfill") ? "home" : view === "graph" ? "graph" : view === "orgs" || view === "orgmgr" ? "orgs" : view === "settings" ? "settings" : "people",
+        initialView: (view === "home" || view === "quickfill") ? "home" : view === "graph" ? "graph" : view === "orgs" || view === "orgdetail" || view === "orgmgr" ? "orgs" : view === "settings" ? "settings" : "people",
         isMobile: innerWidth <= 640, onPreferencesUpdated() {}, onOpenPersonDoc() {},
     } });
     async function waitFor(predicate, message) {
@@ -374,11 +388,20 @@
             document.querySelector(".lvct-person-card").click();
         }
         if (view === "orgdetail") {
-            const targetCard = () => document.querySelector(`.lvct-orgs-view__card[data-org-doc-id="${organizations[0].docId}"]`);
+            const targetCard = () => document.querySelector(`.lvct-orgs-view__card[data-org-doc-id="${orgShotList[0].docId}"]`);
             await waitFor(targetCard, "目标组织卡片未出现");
-            targetCard().querySelector("button").click();
-            await waitFor(() => document.querySelector(".lvct-org-manager")?.dataset.orgDocId === organizations[0].docId
-                && document.querySelectorAll(".lvct-org-manager__member").length === organizations[0].memberships.length, "组织详情未读取原组织及完整成员");
+            const targetButton = targetCard().querySelector("button");
+            if (!targetButton) throw new Error("组织卡片缺少管理按钮");
+            targetButton.click();
+            await new Promise((resolveWait) => setTimeout(resolveWait, 800));
+            if (!document.querySelector(".lvct-org-manager")) {
+                throw new Error(`组织详情弹窗未出现（按钮禁用=${targetButton.disabled}，按钮文本=${targetButton.textContent?.trim() ?? ""}，弹窗=${document.querySelectorAll(".b3-dialog").length}，主体=${document.body.innerText.slice(0, 240).replace(/\s+/g, " ")}）`);
+            }
+            const manager = document.querySelector(".lvct-org-manager");
+            const actualMemberCount = manager?.querySelectorAll(".lvct-org-manager__member").length ?? 0;
+            if (manager?.dataset.orgDocId !== orgShotList[0].docId || actualMemberCount !== orgShotList[0].memberships.length) {
+                throw new Error(`组织详情未读取原组织及完整成员（组织=${manager?.dataset.orgDocId ?? ""}，成员=${actualMemberCount}/${orgShotList[0].memberships.length}）`);
+            }
         }
         if (view === "viewsmenu") {
             if (innerWidth <= 640) {
@@ -398,8 +421,10 @@
             document.querySelector("#lvct-people-moremenu > button").click();
         }
         if (view === "quickfill") {
-            await waitFor(() => document.querySelector(".lvct-workbench__header-actions button"), "新建联系人入口未出现");
-            document.querySelector(".lvct-workbench__header-actions button").click();
+            const createButton = () => [...document.querySelectorAll(".lvct-workbench__header-actions button")]
+                .find((button) => button.textContent?.includes("新建联系人"));
+            await waitFor(createButton, "新建联系人入口未出现");
+            createButton().click();
             await waitFor(() => document.querySelector(".lvct-form__toolbar button"), "新建表单未出现");
             document.querySelector(".lvct-form__toolbar button").click();
         }
@@ -419,7 +444,7 @@
                 : view === "graph" ? innerWidth <= 640 ? ".lvct-graph-text" : ".lvct-graph-view__canvas"
                 : view === "orgs" ? ".lvct-orgs-view__card"
                 : view === "orgdetail" ? ".lvct-org-manager__member"
-                : view === "orgmgr" ? ".b3-dialog .lvct-org-manager"
+                : view === "orgmgr" ? ".lvct-dialog-panel .lvct-org-manager"
                 : view === "settings" ? ".lvct-settings"
                 : view === "table" ? ".lvct-people__table-wrap"
                 : view === "peek" ? ".lvct-detail"
@@ -429,7 +454,7 @@
                 : view === "colmenu" ? ".lvct-people__colmenu"
                 : ".lvct-person-card";
         if (view === "orgmgr") {
-            /* V-16 余项：点首个活跃组织卡片的「管理」→ facade.openOrgManagerDialog(orgDocId) */
+            /* V-16 余项：点首个活跃组织卡片的「管理」→ 工作台内嵌组织管理弹窗 */
             const manage = [...document.querySelectorAll(".lvct-orgs-view__card button")]
                 .find((node) => node.textContent.includes("管理"));
             if (!manage) { document.title = "ERROR no org manage button"; return; }

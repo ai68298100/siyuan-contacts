@@ -39,49 +39,49 @@
       "ok": true
     },
     {
-      "name": "真实内核重启后的原人物、双链、账本、别名和组织历史回读",
+      "name": "真实内核重启后的锚点核验与原人物数据回读",
       "ok": true
     }
   ],
-  "kernelVersion": "3.8.6",
+  "kernelVersion": "3.8.7-alpha.6",
   "emptyOptionShape": [
     {
-      "id": "20261005035220-6vjdpz4",
+      "id": "20261011025044-1yl73oc",
       "value": {
-        "id": "20261005035220-6vjdpz4",
-        "keyID": "20261005035220-cn5pkpm",
-        "blockID": "20261005035220-euwc79h",
+        "id": "20261011025044-1yl73oc",
+        "keyID": "20261011025043-cyaatx5",
+        "blockID": "20261011025044-q9a735f",
         "type": "select",
-        "createdAt": 1791143540000,
-        "updatedAt": 1791143540000
+        "createdAt": 1791658244000,
+        "updatedAt": 1791658244000
       },
       "valueType": "select",
       "color": "",
       "bgColor": ""
     },
     {
-      "id": "20261005035220-yipuzqs",
+      "id": "20261011025044-ens66e4",
       "value": {
-        "id": "20261005035220-yipuzqs",
-        "keyID": "20261005035220-uh4mqaj",
-        "blockID": "20261005035220-euwc79h",
+        "id": "20261011025044-ens66e4",
+        "keyID": "20261011025043-60d0400",
+        "blockID": "20261011025044-q9a735f",
         "type": "select",
-        "createdAt": 1791143540000,
-        "updatedAt": 1791143540000
+        "createdAt": 1791658244000,
+        "updatedAt": 1791658244000
       },
       "valueType": "select",
       "color": "",
       "bgColor": ""
     },
     {
-      "id": "20261005035220-i6euk18",
+      "id": "20261011025044-2vabnu7",
       "value": {
-        "id": "20261005035220-i6euk18",
-        "keyID": "20261005035220-tw5wly2",
-        "blockID": "20261005035220-euwc79h",
+        "id": "20261011025044-2vabnu7",
+        "keyID": "20261011025043-2skroir",
+        "blockID": "20261011025044-q9a735f",
         "type": "mSelect",
-        "createdAt": 1791143540000,
-        "updatedAt": 1791143540000
+        "createdAt": 1791658244000,
+        "updatedAt": 1791658244000
       },
       "valueType": "mSelect",
       "color": "",
@@ -106,12 +106,12 @@
     "msg": "",
     "data": {
       "value": {
-        "id": "20261005035221-xnodk3w",
-        "keyID": "20261005035220-kzlyp2q",
-        "blockID": "20261005035220-euwc79h",
+        "id": "20261011025045-egxe8yk",
+        "keyID": "20261011025043-xpbe0po",
+        "blockID": "20261011025044-q9a735f",
         "type": "date",
-        "createdAt": 1791143541569,
-        "updatedAt": 1791143542569,
+        "createdAt": 1791658245146,
+        "updatedAt": 1791658246146,
         "date": {
           "content": -631094400000,
           "isNotEmpty": true,
@@ -124,12 +124,12 @@
       }
     }
   },
-  "organizationProjection": "\n# 虚构公司\n**组织**：虚构公司\n**当前成员**：[虚构服务乙](siyuan://blocks/20261005035220-hac3iol) · 工作 · 新对接人 · 2026-10-04 ~ 至今",
+  "organizationProjection": "# 虚构公司\n**组织**：虚构公司\n\n**当前成员**：[虚构服务乙](siyuan://blocks/20261011025044-08nl7q2) · 工作 · 在职 · 新对接人 · 2026-10-04 ~ 至今",
   "frontend": {
     "ok": true,
     "isolated": true,
     "frontend": "browser-desktop",
-    "workspace": "C:\\Users\\sunku\\AppData\\Local\\Temp\\SiYuan-Lvct-Services-127c121c-3dcd-455d-9d85-25826e9359e8",
+    "workspace": "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Services-94948a5b-a031-43a1-8659-f8cdade50a82",
     "plugin": "siyuan-contacts",
     "pluginInstalled": true,
     "pluginLoaded": true,
@@ -159,13 +159,15 @@
     "organizationArchived": true,
     "organizationRestored": true,
     "organizationReloaded": true,
-    "captureSourceDocId": "20261005035221-0vcerwh",
-    "captureEditorOpen": false,
+    "captureSourceDocId": "20261011025045-r7xi0ke",
+    "captureOpenMode": "openFileByURL",
+    "captureEditorOpen": true,
     "captureContextMenu": false,
+    "captureCommandPanel": true,
     "captureDialog": false,
     "captureCompleted": false,
     "captureUiLimitations": [
-      "真实捕获 UI 未完成：Uncaught"
+      "真实捕获 UI 未完成：真实捕获弹窗超时"
     ],
     "uiReloaded": true,
     "multiWindowStable": true,
@@ -173,20 +175,23 @@
     "organizationCrossWindow": true,
     "organizationMemberCrossWindow": true,
     "organizationArchiveCrossWindow": true,
+    "hostReady": true,
     "screenshots": [
-      "D:\\AI\\思源笔记插件开发\\插件探索\\小驴人脉\\output\\playwright\\real-frontend-organization.png",
-      "D:\\AI\\思源笔记插件开发\\插件探索\\小驴人脉\\output\\playwright\\real-frontend-detail.png"
+      "D:\\思源插件\\小驴人脉\\siyuan-contacts\\output\\playwright\\real-frontend-organization.png",
+      "D:\\思源插件\\小驴人脉\\siyuan-contacts\\output\\playwright\\real-frontend-detail.png"
     ],
     "limitations": [],
     "failure": null,
-    "browserUrl": "http://127.0.0.1:5001/stage/build/desktop/",
+    "browserUrl": "http://127.0.0.1:10880/stage/build/desktop/",
     "consoleTail": [
+      "[lvct] storage data changed",
+      "[lvct] storage data changed",
       "[lvct] storage data changed"
     ],
     "ledgerBeforeSubmit": [
       {
         "type": "text",
-        "value": "Real UI ledger 3bd4fbcf"
+        "value": "Real UI ledger c9b36697"
       },
       {
         "type": "number",
@@ -210,7 +215,7 @@
       }
     ],
     "ledgerSubmitState": {
-      "text": "Exchange ledger（2） Record money, items and favors exchanged. Settling an entry preserves its history.  Type MoneyItemFavor Direction Owed to meI owe them Description  Amount  Currency  Date  Due date (optional)  Note (optional)  Record an exchange 2026-12-26 Real UI ledger 3bd4fbcf · 35 CNY 金钱 · 对方欠我  待处理 结清 取消2026-10-04 虚构借款 · 123 CNY 金钱 · 对方欠我  待处理 结清 取消",
+      "text": "Exchange ledger（2） Record money, items and favors exchanged. Settling an entry preserves its history.  Type MoneyItemFavor Direction Owed to meI owe them Description  Amount  Currency  Date  Due date (optional)  Note (optional)  Record an exchange 2026-12-26 Real UI ledger c9b36697 · 35 CNY 金钱 · 对方欠我  待处理 结清 取消2026-10-04 虚构借款 · 123 CNY 金钱 · 对方欠我  待处理 结清 取消",
       "inputs": [
         {
           "type": "text",
@@ -229,7 +234,7 @@
         },
         {
           "type": "date",
-          "value": "2026-10-05",
+          "value": "2026-10-11",
           "disabled": false
         },
         {
@@ -250,7 +255,7 @@
         {
           "placeholder": "What do you want to ask about? (optional)",
           "aria": null,
-          "value": "Real UI followup be09db17",
+          "value": "Real UI followup eb29c68a",
           "disabled": false
         },
         {

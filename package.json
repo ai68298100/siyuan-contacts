@@ -1,6 +1,6 @@
 {
   "name": "siyuan-contacts",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "type": "module",
   "description": "小驴人脉 (Lv Contacts)：在思源笔记里管理人脉与人际关系——一人一文档，数据库主干，关系图谱与农历生日提醒",
   "repository": "https://github.com/ai68298100/siyuan-contacts",
