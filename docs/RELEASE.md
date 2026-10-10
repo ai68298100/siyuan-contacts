@@ -1,6 +1,6 @@
 # 发布清单（RELEASE）
 
-> v0.5.6 发布准备中：本轮完整门禁和独立内核 E2E 已通过，待提交、annotated tag、GitHub Release 和 CI 产物校验完成。
+> v0.5.6 已发布：PR #27 已普通合并至 `main`，合并提交 `449f7722859c547aeb93f2048506ef5786c767fb`；annotated tag、GitHub Release 和附件下载校验均已完成。
 
 ## v0.5.6 本轮状态
 
@@ -9,7 +9,8 @@
 - [x] `pnpm check`、`pnpm test` 555/555、桌面 330/330、移动 331/331、宿主 330/330
 - [x] 独立内核加载、联系人 13/13、实际服务 9/9、真实 browser-desktop 与清理
 - [x] `pnpm build` 与 `pnpm check:release`
-- [ ] annotated tag `v0.5.6`、GitHub Latest Release 与附件下载校验
+- [x] PR #27 已通过 GitHub Actions build（runs [38078754990](https://github.com/ai68298100/siyuan-contacts/actions/runs/38078754990)、[38078780875](https://github.com/ai68298100/siyuan-contacts/actions/runs/38078780875)）并以普通合并方式进入 `main`
+- [x] annotated tag `v0.5.6`、[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.6) 与附件下载校验；`package.zip` 548327 bytes，SHA-256 `c655261c8e6588042f27445ce2e2c5ad678e9f239628bca14b98aefce725aa14`
 - [ ] 真实思源宿主、Android 真机、真实多窗口、原生图入口、任务管理器互读和集市客户端可见性仍需单独验收；CardDAV 在线同步未实现
 
 新增：真实前端独立内核验收
