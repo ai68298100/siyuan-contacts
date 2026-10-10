@@ -14,7 +14,7 @@ import type { PersonProfile } from "../src/domain/people-profiles.ts";
 import { mergeRelationshipLabelBackup, parsePersonRelationshipLabelStore } from "../src/domain/person-relationship-labels.ts";
 
 test("B12 三项资料：未知不当空，当前分类组合筛选不匹配历史与称谓提示", () => {
-    const profile: PersonProfile = { readAt: 1, affiliations: { state: "known", value: { work: [], education: [], unspecified: [], history: [], unresolved: [] } },
+    const profile: PersonProfile = { readAt: 1, affiliations: { state: "known", value: { family: [], work: [], education: [], unspecified: [], history: [], unresolved: [] } },
         relationship: { state: "known", labels: ["同学"], recordId: null, updatedAt: null } };
     assert.equal(profileText(profile, "work"), "未填写");
     assert.equal(matchesProfileFilters(profile, { relationshipLabel: "同学" }), true);

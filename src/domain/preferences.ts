@@ -46,6 +46,8 @@ export interface ViewPreferences {
     readonly summaryDismissedOn: string;
     /** C02 收编宽限期（天）：新收编联系人在此期限内不计入「从未互动」提醒；0 = 关闭 */
     readonly reminderGraceDays: number;
+    /** 新用户首页快速开始引导是否已关闭。 */
+    readonly onboardingDismissed: boolean;
 }
 
 export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
@@ -66,6 +68,7 @@ export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
     summaryEnabled: true,
     summaryDismissedOn: "",
     reminderGraceDays: 14,
+    onboardingDismissed: false,
 };
 
 /** 设置页数字输入的保存前校验：必须是 0–365 的整数。 */
@@ -137,6 +140,9 @@ export function normalizeViewPreferences(raw: unknown): ViewPreferences {
             ? record.summaryDismissedOn
             : "",
         reminderGraceDays: clampGraceDays(record.reminderGraceDays),
+        onboardingDismissed: typeof record.onboardingDismissed === "boolean"
+            ? record.onboardingDismissed
+            : DEFAULT_VIEW_PREFERENCES.onboardingDismissed,
     };
 }
 

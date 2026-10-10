@@ -69,6 +69,7 @@
     let selfDesignateTarget = $state("");
     let selfBusy = $state(false);
     let selfMessage = $state("");
+    let selfMessageError = $state(false);
     let selfReadError = $state("");
     let selfPreview: SelfIdentityChangePreview | null = $state(null);
     let selfAlive = true;
@@ -135,6 +136,7 @@
         if (selfBusy || identityLoading || selfReadError || typeof facade.createSelfProfile !== "function") return;
         selfBusy = true;
         selfMessage = "";
+        selfMessageError = false;
         try {
             const identity = await facade.createSelfProfile();
             if (!selfAlive) return;
@@ -142,9 +144,10 @@
             selfMessage = selfIdentity
                 ? text("selfCreated", "已创建本人档案「我自己」并标记身份")
                 : text("selfCreateFailed", "本人档案建立失败，请稍后重试");
+            selfMessageError = !selfIdentity;
             await refreshSelfSection();
         } catch (error) {
-            if (selfAlive) selfMessage = error instanceof Error ? error.message : String(error);
+            if (selfAlive) { selfMessage = error instanceof Error ? error.message : String(error); selfMessageError = true; }
         } finally {
             if (selfAlive) selfBusy = false;
         }
@@ -158,6 +161,7 @@
         }
         selfBusy = true;
         selfMessage = "";
+        selfMessageError = false;
         try {
             const preview = await facade.previewSelfIdentityChange(target);
             if (!selfAlive) return;
@@ -165,7 +169,7 @@
             await tick();
             selfPreviewElement?.focus();
         } catch (error) {
-            if (selfAlive) selfMessage = error instanceof Error ? error.message : String(error);
+            if (selfAlive) { selfMessage = error instanceof Error ? error.message : String(error); selfMessageError = true; }
         } finally {
             if (selfAlive) selfBusy = false;
         }
@@ -175,6 +179,7 @@
         if (selfBusy || !selfPreview) return;
         selfBusy = true;
         selfMessage = "";
+        selfMessageError = false;
         try {
             const identity = await facade.applySelfIdentityChange(selfPreview);
             if (!selfAlive) return;
@@ -185,7 +190,7 @@
                 : text("selfCleared", "已清除本人身份，人物档案与历史记录保留");
             await refreshSelfSection();
         } catch (error) {
-            if (selfAlive) selfMessage = error instanceof Error ? error.message : String(error);
+            if (selfAlive) { selfMessage = error instanceof Error ? error.message : String(error); selfMessageError = true; }
         } finally {
             if (selfAlive) selfBusy = false;
         }
@@ -472,6 +477,18 @@
         } finally {
             if (preferencesAlive && request === preferencesRequest) savingPreferences = false;
         }
+    }
+
+    async function reopenOnboarding(): Promise<void> {
+        if (savingPreferences || !draft.onboardingDismissed) return;
+        const previous = draft;
+        draft = { ...draft, onboardingDismissed: false };
+        await savePreferences();
+        if (errorText) {
+            draft = previous;
+            return;
+        }
+        preferencesMessage = text("onboardingReopened", "首页快速开始引导已重新开启");
     }
 
     async function runRebind() {
@@ -937,10 +954,10 @@
                             <p>{text("selfOrdinaryScope", "普通联系人统计范围")}: {selfPreview.ordinaryBefore} → {selfPreview.ordinaryAfter}</p>
                             <p>{text("selfChangeImpact", "生日、待联系和普通资料体检将排除新本人；图谱默认中心随本人变化，清除后需手动选择。原人物资料、互动、成员与历史称谓保留，不自动转移到新本人。")}</p>
                             <button class="b3-button" disabled={selfBusy} onclick={confirmSelfChange}>{selfBusy ? text("selfVerifying", "核实并保存中…") : text("selfConfirmChange", "确认本人身份变更")}</button>
-                            <button class="b3-button b3-button--text" disabled={selfBusy} onclick={() => { selfPreview = null; selfMessage = ""; }}>{text("selfCancelPreview", "取消本人预览")}</button>
+                            <button class="b3-button b3-button--text" disabled={selfBusy} onclick={() => { selfPreview = null; selfMessage = ""; selfMessageError = false; }}>{text("selfCancelPreview", "取消本人预览")}</button>
                         </section>
                     {/if}
-                    {#if selfMessage}<div class="lvct-form__error" role="status">{selfMessage}</div>{/if}
+                    <StatusNotice message={selfMessage} error={selfMessageError} onDismiss={() => { selfMessage = ""; selfMessageError = false; }} />
 
                     <div class="lvct-settings__form-grid">
                         <label class="lvct-form__item">
@@ -1002,6 +1019,13 @@
                         <div><b>启动时打开工作台</b><small>思源启动后自动展开人脉首页</small></div>
                         <span class="lvct-switch"><input type="checkbox" bind:checked={draft.openOnStartup} /><span class="lvct-switch__track"><span class="lvct-switch__thumb"></span></span></span>
                     </label>
+
+                    <div class="lvct-settings__row">
+                        <div><b>{text("onboardingSettingsTitle", "首页快速开始")}</b><small>{text("onboardingSettingsDesc", "联系人为空时，在首页显示新建、导入和组织整理入口")}</small></div>
+                        <button class="b3-button b3-button--outline" onclick={() => void reopenOnboarding()} disabled={savingPreferences || !draft.onboardingDismissed}>
+                            {draft.onboardingDismissed ? text("onboardingReopen", "重新显示引导") : text("onboardingAlreadyVisible", "当前已显示")}
+                        </button>
+                    </div>
 
                     <div class="lvct-settings__actions">
                         <button class="b3-button b3-button--outline" onclick={savePreferences} disabled={savingPreferences}>

@@ -31,7 +31,8 @@ import StatusNotice from "../StatusNotice.svelte";
     import { toLocalDateKey } from "../../domain/interactions";
     import OrgMembershipResult from "../org/OrgMembershipResult.svelte";
     import type { OrgMembershipWriteReport } from "../../services/org-member-writes";
-    import type { OrgAffiliationKind, OrgMembership, OrgMembershipPatch } from "../../domain/org-membership";
+    import { orgMembershipStatusLabel } from "../../domain/org-membership";
+    import type { OrgAffiliationKind, OrgMembership, OrgMembershipPatch, OrgMembershipStatus } from "../../domain/org-membership";
 
     let {
         settings,
@@ -97,9 +98,9 @@ import StatusNotice from "../StatusNotice.svelte";
         onCreateOrganization?: () => void | Promise<void>;
         onOpenOrganization?: (docId: string) => void;
         /** B13.5 双向编辑完整版（可选）：归属候选（活跃组织）；未接线时隐藏添加表单 */
-        onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string }>>;
+        onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string; archived?: boolean }>>;
         /** B13.5：为当前人物添加组织归属（orgDocId 单独传递，避免与 personDocId 混淆） */
-        onAddOrgMembership?: (personDocId: string, orgDocId: string, extra?: { department?: string; title?: string; joinedOn?: string; affiliationKind?: OrgAffiliationKind }) => Promise<OrgMembershipWriteReport | void>;
+        onAddOrgMembership?: (personDocId: string, orgDocId: string, extra?: { department?: string; title?: string; joinedOn?: string; leftOn?: string; status?: OrgMembershipStatus; statusLabel?: string; affiliationKind?: OrgAffiliationKind; note?: string }) => Promise<OrgMembershipWriteReport | void>;
         /** B13.5：移除一条组织归属（membership id） */
         onRemoveOrgMembership?: (membershipId: string, expected?: OrgMembership) => Promise<OrgMembershipWriteReport | void>;
         onUpdateOrgMembership?: (membershipId: string, patch: OrgMembershipPatch, expected?: OrgMembership) => Promise<OrgMembershipWriteReport | void>;
@@ -626,6 +627,8 @@ import StatusNotice from "../StatusNotice.svelte";
     let editOrgJoinedOn = $state("");
     let editOrgLeftOn = $state("");
     let editOrgStatus = $state<"active" | "former">("active");
+    let editOrgStatusLabel = $state("");
+    let editOrgNote = $state("");
     let editOrgAffiliationKind = $state<OrgAffiliationKind>("unspecified");
     let editingOrgSnapshot = $state<OrgMembership | null>(null);
     let removingOrgSnapshot = $state<OrgMembership | null>(null);
@@ -634,7 +637,9 @@ import StatusNotice from "../StatusNotice.svelte";
         return { id: membership.id, orgDocId: membership.orgDocId, personDocId: current.docId,
             department: membership.department, title: membership.title, joinedOn: membership.joinedOn,
             leftOn: membership.leftOn, status: membership.status,
-            ...(membership.affiliationKind === undefined ? {} : { affiliationKind: membership.affiliationKind }) };
+            ...(membership.statusLabel ? { statusLabel: membership.statusLabel } : {}),
+            ...(membership.affiliationKind === undefined ? {} : { affiliationKind: membership.affiliationKind }),
+            ...(membership.note ? { note: membership.note } : {}) };
     }
     async function loadOrgMemberships(): Promise<void> {
         if (!onLoadOrgMemberships) return;
@@ -655,21 +660,26 @@ import StatusNotice from "../StatusNotice.svelte";
     /* ---- B13.5 双向编辑完整版：人物详情内直接添加/移除组织归属 ---- */
     const orgAddSupported = $derived(Boolean(onLoadOrgCandidates && onAddOrgMembership));
     const orgRemoveSupported = $derived(Boolean(onRemoveOrgMembership));
-    let orgCandidates: ReadonlyArray<{ docId: string; name: string }> = $state([]);
+    let orgCandidates: ReadonlyArray<{ docId: string; name: string; archived?: boolean }> = $state([]);
     let addOrgDocId = $state("");
     let addOrgDepartment = $state("");
     let addOrgTitle = $state("");
     let addOrgJoinedOn = $state("");
     let addOrgAffiliationKind = $state<OrgAffiliationKind>("unspecified");
+    let addOrgStatus = $state<OrgMembershipStatus>("active");
+    let addOrgStatusLabel = $state("");
+    let addOrgNote = $state("");
+    let addOrgLeftOn = $state("");
+    const selectedAddOrg = $derived(orgCandidates.find((org) => org.docId === addOrgDocId));
     let addOrgBusy = $state(false);
     let addOrgError = $state("");
-    /* 候选 = 活跃组织 − 已加入（含历史 former 记录的组织也在已加入之列，避免重复建档） */
-    const orgCandidateOptions = $derived(
-        orgCandidates.filter((org) => !orgMemberships.some((membership) => membership.orgDocId === org.docId && membership.status === "active")),
-    );
+    /* 候选排除已有当前归属；历史 former 仍可重新登记新的当前期间。 */
+    const orgCandidateOptions = $derived(orgCandidates.filter((org) =>
+        !orgMemberships.some((membership) => membership.orgDocId === org.docId && membership.status === "active"),
+    ));
     useCloseGuard({
         busy: () => addOrgBusy || orgLoading || orgCandidatesLoading,
-        dirty: () => Boolean(addOrgDocId || addOrgDepartment.trim() || addOrgTitle.trim() || addOrgJoinedOn || addOrgAffiliationKind !== "unspecified"
+        dirty: () => Boolean(addOrgDocId || addOrgDepartment.trim() || addOrgTitle.trim() || addOrgJoinedOn || addOrgLeftOn || addOrgStatusLabel.trim() || addOrgNote.trim() || addOrgStatus !== "active" || addOrgAffiliationKind !== "unspecified"
             || editingOrgMembershipId || removingOrgMembershipId),
         changes: () => [text("orgUnsaved", "组织管理中的修改尚未完成")],
     });
@@ -697,6 +707,10 @@ import StatusNotice from "../StatusNotice.svelte";
     }
     async function addOrgMembership(): Promise<void> {
         if (!onAddOrgMembership || addOrgBusy || orgLoading || orgReadError || orgCandidatesError || orgCandidatesLoading || addOrgDocId === "") return;
+        if (addOrgStatus === "active" && orgMemberships.some((membership) => membership.orgDocId === addOrgDocId && membership.status === "active")) {
+            addOrgError = "该组织已有当前归属；请编辑已有记录，或将本次状态设为已离开/毕业以补录历史期间。";
+            return;
+        }
         addOrgBusy = true;
         addOrgError = "";
         try {
@@ -704,7 +718,11 @@ import StatusNotice from "../StatusNotice.svelte";
                 department: addOrgDepartment.trim(),
                 title: addOrgTitle.trim(),
                 joinedOn: addOrgJoinedOn,
+                leftOn: addOrgLeftOn,
+                status: addOrgStatus,
+                statusLabel: addOrgStatusLabel.trim(),
                 affiliationKind: addOrgAffiliationKind,
+                note: addOrgNote.trim(),
             });
             if (!detailAlive) return;
             orgMembershipReport = report ?? null;
@@ -713,6 +731,10 @@ import StatusNotice from "../StatusNotice.svelte";
             addOrgTitle = "";
             addOrgJoinedOn = "";
             addOrgAffiliationKind = "unspecified";
+            addOrgLeftOn = "";
+            addOrgStatus = "active";
+            addOrgStatusLabel = "";
+            addOrgNote = "";
             onChanged();
             await loadOrgMemberships();
             await loadOrgCandidates();
@@ -749,7 +771,9 @@ import StatusNotice from "../StatusNotice.svelte";
         editOrgTitle = membership.title;
         editOrgJoinedOn = membership.joinedOn;
         editOrgLeftOn = membership.leftOn;
-        editOrgStatus = membership.status;
+        editOrgStatus = membership.archived ? "former" : membership.status;
+        editOrgStatusLabel = membership.statusLabel ?? "";
+        editOrgNote = membership.note ?? "";
         editOrgAffiliationKind = membership.affiliationKind ?? "unspecified";
     }
 
@@ -758,8 +782,11 @@ import StatusNotice from "../StatusNotice.svelte";
         addOrgBusy = true;
         addOrgError = "";
         try {
-            const report = await onUpdateOrgMembership(editingOrgMembershipId, { department: editOrgDepartment, title: editOrgTitle,
-                joinedOn: editOrgJoinedOn, leftOn: editOrgLeftOn, status: editOrgStatus, affiliationKind: editOrgAffiliationKind }, editingOrgSnapshot ?? undefined);
+            const patch = { department: editOrgDepartment, title: editOrgTitle,
+                joinedOn: editOrgJoinedOn, leftOn: editOrgLeftOn, status: editOrgStatus, statusLabel: editOrgStatusLabel,
+                affiliationKind: editOrgAffiliationKind,
+                ...((editOrgNote.trim() || editingOrgSnapshot?.note !== undefined) ? { note: editOrgNote } : {}) };
+            const report = await onUpdateOrgMembership(editingOrgMembershipId, patch, editingOrgSnapshot ?? undefined);
             if (!detailAlive) return;
             orgMembershipReport = report ?? null;
             editingOrgMembershipId = "";
@@ -771,7 +798,27 @@ import StatusNotice from "../StatusNotice.svelte";
     }
 
     function affiliationLabel(kind: OrgAffiliationKind | undefined): string {
-        return kind === "work" ? text("orgAffiliationWork", "工作单位") : kind === "education" ? text("orgAffiliationEducation", "学校") : text("orgAffiliationUnspecified", "未分类");
+        return kind === "family" ? "家庭" : kind === "work" ? text("orgAffiliationWork", "工作单位") : kind === "education" ? text("orgAffiliationEducation", "学校") : text("orgAffiliationUnspecified", "未分类");
+    }
+
+    function changeAddOrgStatus(status: OrgMembershipStatus): void {
+        addOrgStatus = status;
+        if (status === "active") addOrgLeftOn = "";
+    }
+
+    function changeAddOrg(docId: string): void {
+        addOrgDocId = docId;
+        const org = orgCandidates.find((candidate) => candidate.docId === docId);
+        if (org?.archived) {
+            addOrgStatus = "former";
+            addOrgLeftOn = "";
+        }
+        if (org?.name.trim() === "家庭") addOrgAffiliationKind = "family";
+    }
+
+    function changeEditOrgStatus(status: OrgMembershipStatus): void {
+        editOrgStatus = status;
+        if (status === "active") editOrgLeftOn = "";
     }
 
     loadOrgCandidates();
@@ -1159,12 +1206,13 @@ import StatusNotice from "../StatusNotice.svelte";
                             {#if membership.department}<span class="ft__smaller"> · {membership.department}</span>{/if}
                             {#if membership.title}<span class="ft__smaller"> · {membership.title}</span>{/if}
                         </span>
-                        <span class="lvct-chip {membership.status === "former" ? "lvct-bucket--stale" : "lvct-bucket--today"}">
-                            {membership.reachable === false ? text("orgMembershipUnreachable", "组织待核实") : membership.archived ? text("orgMembershipArchived", "组织已归档") : membership.status === "former" ? text("orgMembershipFormer", "已离开") : text("orgMembershipActive", "在职/在学")}
-                        </span>
+                        <span class="lvct-chip {membership.status === "former" ? "lvct-bucket--stale" : "lvct-bucket--today"}">{orgMembershipStatusLabel(membership)}</span>
+                        {#if membership.archived}<span class="lvct-chip lvct-bucket--stale">{text("orgMembershipArchived", "组织已归档")}</span>{/if}
+                        {#if membership.reachable === false}<span class="lvct-chip lvct-bucket--stale">{text("orgMembershipUnreachable", "组织待核实")}</span>{/if}
                         {#if membership.joinedOn || membership.leftOn}
                             <span class="ft__on-surface">{membership.joinedOn || "?"}{membership.leftOn ? ` – ${membership.leftOn}` : " –"}</span>
                         {/if}
+                        {#if membership.note}<span class="ft__smaller ft__on-surface" title={membership.note}> · {membership.note}</span>{/if}
                         {#if orgRemoveSupported || onUpdateOrgMembership}
                             <span class="lvct-detail__org-actions">
                                 {#if orgRemoveSupported}
@@ -1182,12 +1230,14 @@ import StatusNotice from "../StatusNotice.svelte";
                                 <input class="b3-text-field" bind:value={editOrgDepartment} disabled={addOrgBusy} aria-label={text("orgMemberDeptLabel", "部门")} />
                                 <input class="b3-text-field" bind:value={editOrgTitle} disabled={addOrgBusy} aria-label={text("orgMemberTitleLabel", "职位")} />
                                 <input class="b3-text-field" type="date" bind:value={editOrgJoinedOn} disabled={addOrgBusy} aria-label={text("orgMemberJoinedLabel", "加入日期")} />
-                                <input class="b3-text-field" type="date" bind:value={editOrgLeftOn} disabled={addOrgBusy} aria-label={text("orgMemberLeftLabel", "离开日期")} />
-                                <select class="b3-select" bind:value={editOrgStatus} disabled={addOrgBusy} aria-label={text("orgMemberStatusLabel", "状态")}>
-                                    <option value="active">{text("orgStatusActive", "在职/在读")}</option><option value="former">{text("orgStatusFormer", "已离开")}</option>
+                                <input class="b3-text-field" type="date" bind:value={editOrgLeftOn} disabled={addOrgBusy || editOrgStatus === "active"} aria-label={text("orgMemberLeftLabel", "离开日期")} />
+                                <input class="b3-text-field" maxlength="40" bind:value={editOrgStatusLabel} disabled={addOrgBusy} aria-label="自定义状态" placeholder="自定义状态，如实习、休学" />
+                                <input class="b3-text-field" maxlength="240" bind:value={editOrgNote} disabled={addOrgBusy} aria-label={text("orgMemberNote", "成员备注")} placeholder={text("orgMemberNotePlaceholder", "仅记录这段组织经历")} />
+                                <select class="b3-select" value={editOrgStatus} onchange={(event) => changeEditOrgStatus(event.currentTarget.value as OrgMembershipStatus)} disabled={addOrgBusy} aria-label={text("orgMemberStatusLabel", "状态")}>
+                                    <option value="active" disabled={membership.archived}>{text("orgStatusActive", "当前在职/就读")}</option><option value="former">{text("orgStatusFormer", "已离开/毕业")}</option>
                                 </select>
                                 <select class="b3-select" bind:value={editOrgAffiliationKind} disabled={addOrgBusy} aria-label={text("orgAffiliationKind", "归属分类")}>
-                                    <option value="unspecified">{affiliationLabel("unspecified")}</option><option value="work">{affiliationLabel("work")}</option><option value="education">{affiliationLabel("education")}</option>
+                                    <option value="family">{affiliationLabel("family")}</option><option value="unspecified">{affiliationLabel("unspecified")}</option><option value="work">{affiliationLabel("work")}</option><option value="education">{affiliationLabel("education")}</option>
                                 </select>
                                 <p>{text("orgMembershipEditImpact", "保存会更新这段成员记录及双方当前双链；离开保留历史。恢复在职/在学须清空离开日期。")}</p>
                                 <button class="b3-button b3-button--text" disabled={addOrgBusy} onclick={() => void saveEditOrgMembership()}>{text("orgMemberSave", "保存")}</button>
@@ -1211,11 +1261,11 @@ import StatusNotice from "../StatusNotice.svelte";
                 <button class="b3-button b3-button--outline" disabled={addOrgBusy || orgCandidatesLoading} onclick={() => void loadOrgCandidates()}>{text("orgMembershipReloadCandidates", "重新读取组织候选")}</button>
             {/if}
             <div class="lvct-org-add">
-                <select class="b3-select" bind:value={addOrgDocId} disabled={addOrgBusy || orgLoading || orgCandidatesLoading}
+                <select class="b3-select" value={addOrgDocId} onchange={(event) => changeAddOrg(event.currentTarget.value)} disabled={addOrgBusy || orgLoading || orgCandidatesLoading}
                     aria-label={text("orgAddOrgLabel", "选择要加入的组织")}>
                     <option value="">{text("orgAddOrgPick", "选择组织…")}</option>
                     {#each orgCandidateOptions as org (org.docId)}
-                        <option value={org.docId}>{org.name} · {org.docId}</option>
+                        <option value={org.docId}>{org.name}{org.archived ? "（已归档，仅补录历史）" : ""} · {org.docId}</option>
                     {/each}
                 </select>
                 {#if orgCandidatesLoading}<span class="ft__smaller ft__on-surface" role="status">正在读取组织候选…</span>{/if}
@@ -1225,12 +1275,19 @@ import StatusNotice from "../StatusNotice.svelte";
                     disabled={addOrgBusy} aria-label={text("orgAddTitleLabel", "归属职位")} />
                 <input class="b3-text-field" type="date" bind:value={addOrgJoinedOn} disabled={addOrgBusy}
                     aria-label={text("orgAddJoinedLabel", "加入日期")} />
+                <input class="b3-text-field" type="date" bind:value={addOrgLeftOn} disabled={addOrgBusy || !addOrgDocId || addOrgStatus === "active"} aria-label="离开日期" />
                 <select class="b3-select" bind:value={addOrgAffiliationKind} disabled={addOrgBusy} aria-label={text("orgAffiliationKind", "归属分类")}>
-                    <option value="unspecified">{affiliationLabel("unspecified")}</option><option value="work">{affiliationLabel("work")}</option><option value="education">{affiliationLabel("education")}</option>
+                    <option value="family">{affiliationLabel("family")}</option><option value="unspecified">{affiliationLabel("unspecified")}</option><option value="work">{affiliationLabel("work")}</option><option value="education">{affiliationLabel("education")}</option>
                 </select>
+                <select class="b3-select" value={addOrgStatus} onchange={(event) => changeAddOrgStatus(event.currentTarget.value as OrgMembershipStatus)} disabled={addOrgBusy || !addOrgDocId} aria-label="当前状态">
+                    <option value="active" disabled={Boolean(selectedAddOrg?.archived)}>当前在职/就读</option><option value="former">已离开/毕业</option>
+                </select>
+                <input class="b3-text-field" maxlength="40" bind:value={addOrgStatusLabel} disabled={addOrgBusy || !addOrgDocId} aria-label="自定义状态" placeholder="自定义状态，如实习、休学" />
+                <input class="b3-text-field" maxlength="240" bind:value={addOrgNote} disabled={addOrgBusy || !addOrgDocId} aria-label={text("orgMemberNote", "成员备注")} placeholder={text("orgMemberNotePlaceholder", "仅记录这段组织经历")} />
                 <button type="button" class="b3-button b3-button--text" disabled={addOrgBusy || orgLoading || orgCandidatesLoading || !!orgReadError || !!orgCandidatesError || addOrgDocId === ""}
                     onclick={() => void addOrgMembership()}>{text("orgAddSubmit", "添加归属")}</button>
-                {#if onCreateOrganization && orgCandidateOptions.length === 0}
+                {#if selectedAddOrg?.archived}<p class="ft__smaller ft__on-surface">组织已归档，只能补录历史经历；恢复组织后才可添加当前归属。</p>{/if}
+                {#if onCreateOrganization && !orgCandidateOptions.some((org) => !org.archived)}
                     <button type="button" class="b3-button b3-button--outline" disabled={addOrgBusy || orgLoading || orgCandidatesLoading}
                         onclick={() => void createOrganizationFromDetail()}>{text("orgCreateFirst", "新建组织")}</button>
                 {/if}
@@ -1585,6 +1642,8 @@ import StatusNotice from "../StatusNotice.svelte";
             onLoadOrgCandidates={onLoadOrgCandidates}
             onCreateOrganization={onCreateOrganization}
             onAddOrgMembership={onAddOrgMembership}
+            onUpdateOrgMembership={onUpdateOrgMembership}
+            onRemoveOrgMembership={onRemoveOrgMembership}
             onSaved={refreshAfterEdit}
             onClose={() => (editing = false)}
         />

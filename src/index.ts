@@ -58,7 +58,7 @@ import {
 import { exportMigrationBundle, importMigrationBundle, previewMigrationImport } from "./services/migration-bundle";
 import { previewOrganizationProjections, repairOrganizationProjection } from "./services/org-projections";
 import { listPendingOrganizationOperations, inspectOrganizationOperation, resumeOrganizationOperation } from "./services/organization-writes";
-import { saveOrganizationMember, editOrganizationMember, deleteOrganizationMember, replaceOrganizationMemberWithProjection } from "./services/org-member-writes";
+import { saveOrganizationMember, editOrganizationMember, deleteOrganizationMember, replaceOrganizationMemberWithProjection, moveOrganizationMemberWithProjection } from "./services/org-member-writes";
 import { loadViewPreferences, saveViewPreferences, createPreferenceRequests } from "./services/preferences";
 import { exportInteractionJson } from "./services/interaction-export";
 import { loadExportSummary } from "./services/export-center";
@@ -585,7 +585,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
                 onSaveRelationshipLabels: (docId: string, selfDocId: string, labels: string[], expected: import("./domain/person-relationship-labels").PersonRelationshipLabels | null) =>
                     this.savePersonRelationshipLabels(docId, selfDocId, labels, expected),
                 onLoadOrgMemberships: (docId: string) => this.listPersonOrgMemberships(docId),
-                onLoadOrgCandidates: async () => (await this.listOrganizations()).filter((org) => !org.archived).map((org) => ({ docId: org.docId, name: org.name })),
+                onLoadOrgCandidates: async () => (await this.listOrganizations()).map((org) => ({ docId: org.docId, name: org.name, archived: org.archived })),
                 onCreateOrganization: () => {
                     if (document.querySelector(".lvct-workbench")) {
                         return new Promise<void>((resolve) => {
@@ -604,7 +604,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
                         this.openOrgManagerDialog(undefined, finish, finish);
                     });
                 },
-                onAddOrgMembership: (personDocId: string, orgDocId: string, extra?: { department?: string; title?: string; joinedOn?: string; affiliationKind?: import("./domain/org-membership").OrgAffiliationKind }) =>
+                onAddOrgMembership: (personDocId: string, orgDocId: string, extra?: { department?: string; title?: string; joinedOn?: string; leftOn?: string; status?: import("./domain/org-membership").OrgMembershipStatus; statusLabel?: string; affiliationKind?: import("./domain/org-membership").OrgAffiliationKind }) =>
                     this.addOrganizationMember(orgDocId, personDocId, extra),
                 onSaved: () => {
                     if (this.isLifecycleActive(lifecycleToken)) emitDataChanged({}, lifecycleToken);
@@ -636,7 +636,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
                 settings: this.settings,
                 i18n: this.i18n,
                 initial: draft,
-                onLoadOrgCandidates: async () => (await this.listOrganizations()).filter((org) => !org.archived).map((org) => ({ docId: org.docId, name: org.name })),
+                onLoadOrgCandidates: async () => (await this.listOrganizations()).map((org) => ({ docId: org.docId, name: org.name, archived: org.archived })),
                 onCreateOrganization: () => {
                     if (document.querySelector(".lvct-workbench")) {
                         return new Promise<void>((resolve) => {
@@ -656,16 +656,41 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
                         });
                     }
                 },
+                onValidateExtended: async (details: ContactExtendedDraft) => {
+                    if (details.orgMemberships.length) {
+                        const organizations = await this.listOrganizations();
+                        for (const affiliation of details.orgMemberships) {
+                            const organization = organizations.find((entry) => entry.docId === affiliation.orgDocId);
+                            if (!organization || (affiliation.orgStatus === "active" && organization.archived)) {
+                                throw new Error(`组织 ${affiliation.orgDocId} 不可用；当前归属不能加入已归档组织，请重新读取并选择`);
+                            }
+                        }
+                    }
+                    if (details.relationshipLabels.trim() && !await this.loadSelfIdentity()) {
+                        throw new Error("请先在设置中指定“我”的档案，再创建并填写与我的关系称谓");
+                    }
+                },
                 onSaveExtended: async (person: ContactSummary, details: ContactExtendedDraft) => {
-                    if (details.orgDocId) {
+                    if (details.orgMemberships.length) {
                         const memberships = await this.listPersonOrgMemberships(person.docId);
-                        if (!memberships.some((membership) => membership.orgDocId === details.orgDocId && membership.status === "active")) {
-                            await this.addOrganizationMember(details.orgDocId, person.docId, {
-                                department: details.orgDepartment,
-                                title: details.orgTitle,
-                                joinedOn: details.orgJoinedOn,
-                                affiliationKind: details.orgAffiliationKind,
+                        for (const affiliation of details.orgMemberships) {
+                            const same = (membership: typeof memberships[number]) => membership.orgDocId === affiliation.orgDocId
+                                && membership.status === affiliation.orgStatus && membership.statusLabel === (affiliation.orgStatusLabel.trim() || undefined)
+                                && membership.affiliationKind === affiliation.orgAffiliationKind && membership.department === affiliation.orgDepartment.trim()
+                                && membership.title === affiliation.orgTitle.trim() && membership.joinedOn === affiliation.orgJoinedOn && membership.leftOn === affiliation.orgLeftOn;
+                            if (memberships.some(same)) continue;
+                            if (affiliation.orgStatus === "active" && memberships.some((membership) => membership.orgDocId === affiliation.orgDocId && membership.status === "active")) {
+                                throw new Error(`组织 ${affiliation.orgDocId} 已有当前归属，请核对原记录；未覆盖它`);
+                            }
+                            await this.addOrganizationMember(affiliation.orgDocId, person.docId, {
+                                department: affiliation.orgDepartment, title: affiliation.orgTitle, joinedOn: affiliation.orgJoinedOn,
+                                leftOn: affiliation.orgLeftOn, status: affiliation.orgStatus,
+                                statusLabel: affiliation.orgStatusLabel.trim(), affiliationKind: affiliation.orgAffiliationKind,
                             });
+                            memberships.push({ id: "", orgDocId: affiliation.orgDocId, orgName: "", department: affiliation.orgDepartment.trim(),
+                                title: affiliation.orgTitle.trim(), joinedOn: affiliation.orgJoinedOn, leftOn: affiliation.orgLeftOn,
+                                status: affiliation.orgStatus, statusLabel: affiliation.orgStatusLabel.trim() || undefined,
+                                affiliationKind: affiliation.orgAffiliationKind, archived: false, reachable: true });
                         }
                     }
                     if (details.relationshipLabels.trim()) {
@@ -1009,7 +1034,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     /** B13.3：添加组织成员（active） */
-    async addOrganizationMember(orgDocId: string, personDocId: string, extra?: { department?: string; title?: string; joinedOn?: string; affiliationKind?: import("./domain/org-membership").OrgAffiliationKind }) {
+    async addOrganizationMember(orgDocId: string, personDocId: string, extra?: { department?: string; title?: string; joinedOn?: string; leftOn?: string; status?: import("./domain/org-membership").OrgMembershipStatus; statusLabel?: string; affiliationKind?: import("./domain/org-membership").OrgAffiliationKind; note?: string }) {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
         const token = this.lifecycleToken;
         const report = await saveOrganizationMember(this, this.settings, { ...extra, orgDocId, personDocId });
@@ -1031,6 +1056,14 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
         const token = this.lifecycleToken;
         const report = await editOrganizationMember(this, this.settings, id, patch, expected);
+        emitDataChanged({}, token);
+        return report;
+    }
+
+    async moveOrganizationMember(id: string, targetOrgDocId: string, expected?: import("./domain/org-membership").OrgMembership) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        const token = this.lifecycleToken;
+        const report = await moveOrganizationMemberWithProjection(this, this.settings, id, targetOrgDocId, expected);
         emitDataChanged({}, token);
         return report;
     }

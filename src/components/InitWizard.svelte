@@ -140,6 +140,16 @@
         </div>
     </header>
 
+    <section class="lvct-wizard__features" aria-labelledby="lvct-wizard-features-title">
+        <h3 id="lvct-wizard-features-title">{text("wizardFeaturesTitle", "初始化后，你可以")}</h3>
+        <ul>
+            <li>{text("wizardFeaturePeople", "管理联系人资料，支持手动新建、vCard 导入和已有笔记收编")}</li>
+            <li>{text("wizardFeatureInteractions", "记录互动、跟进计划和备注，首页集中显示需要关注的事项")}</li>
+            <li>{text("wizardFeatureOrganizations", "按家庭、公司、学校等组织整理成员，并保留历史经历")}</li>
+            <li>{text("wizardFeatureGraph", "用关系图谱查看有来源的连接，所有设置都可在工作台调整")}</li>
+        </ul>
+    </section>
+
     <label class="lvct-wizard__field">
         <span class="ft__on-surface">{text("wizardNotebookLabel", "人脉笔记本名称")}</span>
         <input class="b3-text-field" type="text" bind:value={notebookName} disabled={running} />

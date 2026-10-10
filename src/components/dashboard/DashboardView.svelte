@@ -16,6 +16,7 @@
     import PersonProfileSummary from "../people/PersonProfileSummary.svelte";
     import LvctDialog from "../LvctDialog.svelte";
     import ReviewReportDialog from "./ReviewReportDialog.svelte";
+    import QuickStartPanel from "./QuickStartPanel.svelte";
     import { translateText } from "../../domain/translation";
     import { useCloseGuard } from "../close-guard";
 
@@ -27,6 +28,11 @@
         onOpenDetail,
         onOpenPeople,
         onOpenGraph,
+        onCreate,
+        onImportVCard,
+        onImportDocuments,
+        onOpenOrganizations,
+        onOpenSettings,
         onPreferencesChange,
     }: {
         facade: ContactsPluginFacade;
@@ -36,6 +42,11 @@
         onOpenDetail: (person: ContactSummary) => void;
         onOpenPeople: (focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" | "recent" }) => void;
         onOpenGraph: () => void;
+        onCreate?: () => void;
+        onImportVCard?: () => void;
+        onImportDocuments?: () => void;
+        onOpenOrganizations?: () => void;
+        onOpenSettings?: () => void;
         /** 摘要忽略等偏好写入（F08）；未接线时「当日不再展示」退化为本次隐藏 */
         onPreferencesChange?: (preferences: ViewPreferences) => Promise<ViewPreferences>;
     } = $props();
@@ -630,6 +641,9 @@
     let summaryHiddenThisSession = $state(false);
     let summaryBusy = $state(false);
     let summaryError = $state("");
+    let onboardingHiddenThisSession = $state(false);
+    let onboardingSaving = $state(false);
+    let onboardingError = $state("");
     const localTodayKey = $derived.by(() => {
         const now = new Date();
         const pad = (value: number) => String(value).padStart(2, "0");
@@ -659,6 +673,22 @@
         }
     }
 
+    async function dismissOnboarding(): Promise<void> {
+        if (onboardingSaving) return;
+        onboardingSaving = true;
+        onboardingError = "";
+        try {
+            if (onPreferencesChange) {
+                await onPreferencesChange({ ...preferences, onboardingDismissed: true });
+            }
+            onboardingHiddenThisSession = true;
+        } catch (error) {
+            onboardingError = error instanceof Error ? error.message : String(error);
+        } finally {
+            onboardingSaving = false;
+        }
+    }
+
     const bucketStyles: Record<string, string> = {
         today: "lvct-bucket--today",
         week: "lvct-bucket--week",
@@ -679,6 +709,14 @@
             message={text("dashReadFailure", "部分数据读取失败，以下模块可能显示不完整：{modules}", { modules: data.readFailures.map((key) => moduleLabel(key)).join("、") })}
             actionLabel={text("dashReload", "重新加载")}
             onAction={refresh}
+        />
+    {/if}
+    {#if onboardingError}
+        <StatusNotice
+            error
+            message={text("onboardingSaveFailed", "快速开始状态保存失败：{msg}。请重试或稍后到设置中重新开启。", { msg: onboardingError })}
+            actionLabel={text("commonRetry", "重试")}
+            onAction={() => void dismissOnboarding()}
         />
     {/if}
     {#if data?.ordinaryScopeUnknown}
@@ -723,6 +761,19 @@
                 </button>
             {/if}
         </div>
+        {#if data.people === 0 && !data.ordinaryScopeUnknown && !(data.readFailures?.length) && !preferences.onboardingDismissed && !onboardingHiddenThisSession}
+            <QuickStartPanel
+                i18n={i18n}
+                saving={onboardingSaving}
+                onCreate={() => onCreate?.()}
+                onImportVCard={() => onImportVCard?.()}
+                onImportDocuments={() => onImportDocuments?.()}
+                onOpenOrganizations={() => onOpenOrganizations?.()}
+                onOpenGraph={() => onOpenGraph()}
+                onOpenSettings={() => onOpenSettings?.()}
+                onDismiss={() => void dismissOnboarding()}
+            />
+        {/if}
         <div class="lvct-dash__stats">
             <button class="lvct-dash__stat" onclick={() => onOpenPeople()}>
                 <span class="lvct-dash__stat-ic" aria-hidden="true"><Users size={14} /></span>

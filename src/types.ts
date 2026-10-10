@@ -139,11 +139,12 @@ export interface ContactsPluginFacade {
     /** B13.5b：组织成员稳定分页与筛选；旧宿主未提供时由 UI 回退全量列举 */
     listOrganizationMembersPage?(orgDocId: string, options?: { query?: string; status?: "all" | "active" | "former"; offset?: number; limit?: number }): Promise<import("./services/org").OrganizationMemberPage>;
     /** B13.3：添加组织成员（active） */
-    addOrganizationMember(orgDocId: string, personDocId: string, extra?: { department?: string; title?: string; joinedOn?: string; affiliationKind?: import("./domain/org-membership").OrgAffiliationKind }): Promise<import("./services/org-member-writes").OrgMembershipWriteReport | void>;
+    addOrganizationMember(orgDocId: string, personDocId: string, extra?: { department?: string; title?: string; joinedOn?: string; leftOn?: string; status?: import("./domain/org-membership").OrgMembershipStatus; statusLabel?: string; affiliationKind?: import("./domain/org-membership").OrgAffiliationKind; note?: string }): Promise<import("./services/org-member-writes").OrgMembershipWriteReport | void>;
     /** B13.3：移除组织成员记录 */
     removeOrganizationMember(id: string, expected?: import("./domain/org-membership").OrgMembership): Promise<import("./services/org-member-writes").OrgMembershipWriteReport | void>;
     /** B13.4：更新成员记录字段（部门/职位/入职/离职/状态；身份字段不可变） */
     updateOrganizationMember(id: string, patch: import("./domain/org-membership").OrgMembershipPatch, expected?: import("./domain/org-membership").OrgMembership): Promise<import("./services/org-member-writes").OrgMembershipWriteReport | void>;
+    moveOrganizationMember?(id: string, targetOrgDocId: string, expected?: import("./domain/org-membership").OrgMembership): Promise<import("./services/org-member-writes").OrgMembershipWriteReport | void>;
     replaceOrganizationMember(formerMembershipId: string, successorPersonDocId: string, extra: { department?: string; title?: string; joinedOn: string; leftOn: string; affiliationKind?: import("./domain/org-membership").OrgAffiliationKind }, expected?: import("./domain/org-membership").OrgMembership): Promise<import("./services/org-member-writes").OrgMembershipWriteReport | void>;
     /** B13：归档组织（标记区块值 archived；文档与成员记录保留可恢复） */
     archiveOrganization(orgDocId: string): Promise<void>;

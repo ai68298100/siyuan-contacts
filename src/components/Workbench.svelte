@@ -12,7 +12,7 @@
     import OrgManagerDialog from "./org/OrgManagerDialog.svelte";
     import OrganizationProfileEditor from "./org/OrganizationProfileEditor.svelte";
     import { createCloseScope, anyDirtyChanges } from "./close-guard";
-    import { House, UsersRound, Network, Settings, Building2, Sparkles, UserPlus } from "@lucide/svelte";
+    import { House, UsersRound, Network, Settings, Building2, Sparkles, UserPlus, Search } from "@lucide/svelte";
     import SettingsView from "./SettingsView.svelte";
     import { getContext, onDestroy, onMount, tick } from "svelte";
     import { translateText } from "../domain/translation";
@@ -318,6 +318,8 @@
     let peopleOrder: ContactSummary[] = $state([]);
     let globalSearch = $state("");
     let createRequested = $state(0);
+    let importRequested = $state(0);
+    let vcardRequested = $state(0);
     let dataRevision = $state(0);
     let peopleFocusIds: string[] = $state([]);
     let peopleFocusLabel = $state("");
@@ -347,17 +349,36 @@
         peopleFocusSort = undefined;
     }
 
-    async function selectView(view: ViewId) {
-        if (!lifecycleToken.isAlive()) return;
-        if ((view !== current || detailPerson || organizationOpen) && !(await canLeave.requestClose())) return;
-        if (!lifecycleToken.isAlive()) return;
+    async function selectView(view: ViewId): Promise<boolean> {
+        if (!lifecycleToken.isAlive()) return false;
+        if ((view !== current || detailPerson || organizationOpen) && !(await canLeave.requestClose())) return false;
+        if (!lifecycleToken.isAlive()) return false;
         current = view;
         detailPerson = null;
         detailReturn = null;
         organizationOpen = false;
         navigationRequest += 1;
-        if (view !== "people") createRequested = 0;
+        if (view !== "people") {
+            createRequested = 0;
+            importRequested = 0;
+            vcardRequested = 0;
+        }
         clearPeopleFocus();
+        return true;
+    }
+
+    async function requestPeopleAction(action: "create" | "import" | "vcard"): Promise<void> {
+        if (!(await selectView("people"))) return;
+        if (action === "create") createRequested += 1;
+        if (action === "import") importRequested += 1;
+        if (action === "vcard") vcardRequested += 1;
+    }
+
+    async function submitGlobalSearch() {
+        const query = globalSearch.trim();
+        if (!query) return;
+        globalSearch = query;
+        await selectView("people");
     }
 
     async function openPeople(focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" | "recent" }) {
@@ -502,9 +523,10 @@
                 <p>{currentMeta.subtitle}</p>
             </div>
             {#if current === "home"}<div class="lvct-workbench__header-actions">
-                <input class="b3-text-field" type="search" aria-label="搜索联系人" placeholder="搜索联系人" bind:value={globalSearch}
-                    oninput={() => { if (globalSearch.trim() && current !== "people") selectView("people"); }} />
-                <button type="button" class="b3-button" onclick={() => { selectView("people"); createRequested += 1; }}><UserPlus size={16}/>新建联系人</button>
+                <input class="b3-text-field" type="search" aria-label={text("homeSearchPlaceholder", "搜索联系人")} placeholder={text("homeSearchPlaceholder", "搜索联系人")} bind:value={globalSearch}
+                    onkeydown={(event) => { if (event.key === "Enter") { event.preventDefault(); void submitGlobalSearch(); } }} />
+                <button type="button" class="b3-button b3-button--outline" disabled={!globalSearch.trim()} onclick={() => void submitGlobalSearch()}><Search size={16}/>{text("homeSearchAction", "搜索")}</button>
+                <button type="button" class="b3-button" onclick={() => void requestPeopleAction("create")}><UserPlus size={16}/>新建联系人</button>
             </div>{/if}
         </header>
         <StatusNotice message={dataChangeNotice} onDismiss={() => (dataChangeNotice = "")} />
@@ -523,6 +545,11 @@
                     onOpenDetail={openDetail}
                     onOpenPeople={openPeople}
                     onOpenGraph={() => selectView("graph")}
+                    onCreate={() => void requestPeopleAction("create")}
+                    onImportVCard={() => void requestPeopleAction("vcard")}
+                    onImportDocuments={() => void requestPeopleAction("import")}
+                    onOpenOrganizations={() => void selectView("orgs")}
+                    onOpenSettings={() => void selectView("settings")}
                 />
             {:else if current === "people"}
                 <PeopleView
@@ -538,6 +565,8 @@
                     onExternalSearchCleared={() => (globalSearch = "")}
                     onExternalSearchChange={(value) => (globalSearch = value)}
                     {createRequested}
+                    {importRequested}
+                    {vcardRequested}
                     onClearFocus={clearPeopleFocus}
                     revision={dataRevision}
                     onOpenDetail={openDetail}
@@ -547,32 +576,46 @@
                     }}
                     onPreferencesChange={savePreferences}
                     {onOpenPersonDoc}
-                    onLoadOrgCandidates={async () => (await facade.listOrganizations()).filter((org) => !org.archived).map((org) => ({ docId: org.docId, name: org.name }))}
+                    onLoadOrgCandidates={async () => (await facade.listOrganizations()).map((org) => ({ docId: org.docId, name: org.name, archived: org.archived }))}
                     onCreateOrganization={openCreateOrganizationForContact}
                     onCreateSelfProfile={() => facade.createSelfProfile()}
                     onLoadSelfCandidates={() => facade.listContacts()}
                     onPreviewSelfIdentityChange={(personItemId) => facade.previewSelfIdentityChange(personItemId)}
                     onApplySelfIdentityChange={(preview) => facade.applySelfIdentityChange(preview)}
                     onValidateExtended={async (details) => {
-                        if (details.orgDocId) {
+                        if (details.orgMemberships.length) {
                             const organizations = await facade.listOrganizations();
-                            const selected = organizations.find((org) => org.docId === details.orgDocId);
-                            if (!selected || selected.archived) throw new Error("所选组织已不存在或已归档，请重新读取并选择可用组织");
+                            for (const membership of details.orgMemberships) {
+                                const selected = organizations.find((org) => org.docId === membership.orgDocId);
+                                if (!selected || (membership.orgStatus === "active" && selected.archived)) throw new Error(`组织 ${membership.orgDocId} 不可用；当前归属不能加入已归档组织，请重新读取并选择`);
+                            }
                         }
                         if (details.relationshipLabels.trim() && !await facade.loadSelfIdentity()) {
                             throw new Error("请先在设置中指定“我”的档案，再创建并填写与我的关系称谓");
                         }
                     }}
                     onSaveExtended={async (person, details) => {
-                        if (details.orgDocId) {
+                        if (details.orgMemberships.length) {
                             const memberships = await facade.listPersonOrgMemberships(person.docId);
-                            if (!memberships.some((membership) => membership.orgDocId === details.orgDocId && membership.status === "active")) {
-                                await facade.addOrganizationMember(details.orgDocId, person.docId, {
-                                    department: details.orgDepartment,
-                                    title: details.orgTitle,
-                                    joinedOn: details.orgJoinedOn,
-                                    affiliationKind: details.orgAffiliationKind,
+                            for (const affiliation of details.orgMemberships) {
+                                const same = (membership: typeof memberships[number]) => membership.orgDocId === affiliation.orgDocId
+                                    && membership.status === affiliation.orgStatus && membership.statusLabel === (affiliation.orgStatusLabel.trim() || undefined)
+                                    && membership.affiliationKind === affiliation.orgAffiliationKind && membership.department === affiliation.orgDepartment.trim()
+                                    && membership.title === affiliation.orgTitle.trim() && membership.joinedOn === affiliation.orgJoinedOn && membership.leftOn === affiliation.orgLeftOn
+                                    && (membership.note ?? "") === (affiliation.orgNote?.trim() ?? "");
+                                if (memberships.some(same)) continue;
+                                if (affiliation.orgStatus === "active" && memberships.some((membership) => membership.orgDocId === affiliation.orgDocId && membership.status === "active")) {
+                                    throw new Error(`组织 ${affiliation.orgDocId} 已有当前归属，请核对原记录；未覆盖它`);
+                                }
+                                await facade.addOrganizationMember(affiliation.orgDocId, person.docId, {
+                                    department: affiliation.orgDepartment, title: affiliation.orgTitle, joinedOn: affiliation.orgJoinedOn,
+                                    leftOn: affiliation.orgLeftOn, status: affiliation.orgStatus,
+                                    statusLabel: affiliation.orgStatusLabel.trim(), affiliationKind: affiliation.orgAffiliationKind, note: affiliation.orgNote?.trim() ?? "",
                                 });
+                                memberships.push({ id: "", orgDocId: affiliation.orgDocId, orgName: "", department: affiliation.orgDepartment.trim(),
+                                    title: affiliation.orgTitle.trim(), joinedOn: affiliation.orgJoinedOn, leftOn: affiliation.orgLeftOn,
+                                    status: affiliation.orgStatus, statusLabel: affiliation.orgStatusLabel.trim() || undefined,
+                                    affiliationKind: affiliation.orgAffiliationKind, note: affiliation.orgNote?.trim() || undefined, archived: false, reachable: true });
                             }
                         }
                         if (details.relationshipLabels.trim()) {
@@ -697,7 +740,7 @@
             onCreateOrganization={openCreateOrganizationForContact}
             onOpenOrganization={(docId) => void openOrganization(docId)}
             onLoadOrgCandidates={async () => (await facade.listOrganizations())
-                .filter((org) => !org.archived).map((org) => ({ docId: org.docId, name: org.name }))}
+                .map((org) => ({ docId: org.docId, name: org.name, archived: org.archived }))}
             onAddOrgMembership={(personDocId, orgDocId, extra) => facade.addOrganizationMember(orgDocId, personDocId, extra)}
             onRemoveOrgMembership={(id, expected) => facade.removeOrganizationMember(id, expected)}
             onUpdateOrgMembership={(id, patch, expected) => facade.updateOrganizationMember(id, patch, expected)}

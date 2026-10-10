@@ -6,6 +6,7 @@
     import { attachPopover } from "../../libs/popover";
     import { translateText } from "../../domain/translation";
     import { loadContactAliasIndex } from "../../services/contact-aliases";
+    import { X } from "@lucide/svelte";
 
     export interface PickerItem {
         id: string;
@@ -25,6 +26,8 @@
         emptyText = "没有匹配的联系人",
         searchText = "输入姓名、电话、微信筛选",
         ariaLabel = "选择联系人",
+        clearable = true,
+        clearLabel = "",
         disabled = false,
         i18n,
         onSelect,
@@ -36,6 +39,8 @@
         emptyText?: string;
         searchText?: string;
         ariaLabel?: string;
+        clearable?: boolean;
+        clearLabel?: string;
         disabled?: boolean;
         i18n?: Readonly<Record<string, string>>;
         onSelect: (id: string) => void;
@@ -124,6 +129,13 @@
         onSelect(item.id);
         void tick().then(() => triggerEl?.focus());
     }
+    function clearSelection(): void {
+        if (disabled || !selected) return;
+        open = false;
+        query = "";
+        onSelect("");
+        void tick().then(() => triggerEl?.focus());
+    }
     function onSearchKeydown(event: KeyboardEvent): void {
         if (event.key === "ArrowDown") {
             if (filtered.length === 0) return;
@@ -148,22 +160,29 @@
 </script>
 
 <div class="lvct-picker" bind:this={wrap}>
-    <button
-        type="button"
-        class="b3-select lvct-picker__trigger"
-        bind:this={triggerEl}
-        aria-haspopup="listbox"
-        aria-controls={open ? listboxId : undefined}
-        aria-expanded={open}
-        aria-label={ariaLabel}
-        disabled={disabled}
-        onclick={() => (open ? (open = false) : void show())}
-    >
-        <span class="lvct-picker__value" class:lvct-picker__placeholder={!selected}>
-            {selected ? `${selected.label}${ambiguousLabels.has(selected.label) ? ` · ${selected.docId ?? selected.id}` : ""}` : placeholder}
-        </span>
-        <span class="lvct-picker__caret" aria-hidden="true">▾</span>
-    </button>
+    <div class="lvct-picker__control">
+        <button
+            type="button"
+            class="b3-select lvct-picker__trigger"
+            bind:this={triggerEl}
+            aria-haspopup="listbox"
+            aria-controls={open ? listboxId : undefined}
+            aria-expanded={open}
+            aria-label={ariaLabel}
+            disabled={disabled}
+            onclick={() => (open ? (open = false) : void show())}
+        >
+            <span class="lvct-picker__value" class:lvct-picker__placeholder={!selected}>
+                {selected ? `${selected.label}${ambiguousLabels.has(selected.label) ? ` · ${selected.docId ?? selected.id}` : ""}` : placeholder}
+            </span>
+            <span class="lvct-picker__caret" aria-hidden="true">▾</span>
+        </button>
+        {#if selected && clearable}
+            <button type="button" class="lvct-picker__clear" aria-label={clearLabel || text("pickerClear", "清除选择")} title={clearLabel || text("pickerClear", "清除选择")} disabled={disabled} onclick={clearSelection}>
+                <X size={14} aria-hidden="true" />
+            </button>
+        {/if}
+    </div>
     {#if open}
         <div class="lvct-picker__panel" bind:this={panel}>
             {#if aliasError}

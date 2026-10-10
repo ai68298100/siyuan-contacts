@@ -7,7 +7,7 @@
 import { parseStoreRecords, StoreIntegrityError } from "./store-integrity.ts";
 
 export type OrgMembershipStatus = "active" | "former";
-export type OrgAffiliationKind = "work" | "education" | "unspecified";
+export type OrgAffiliationKind = "family" | "work" | "education" | "unspecified";
 
 export interface OrgMembership {
     /** 成员记录 ID（yyyyMMddHHmmss-xxxxxxx，与人物/组织文档 ID 相互独立） */
@@ -23,7 +23,11 @@ export interface OrgMembership {
     /** YYYY-MM-DD；空串表示在职/在学中 */
     leftOn: string;
     status: OrgMembershipStatus;
+    /** 用户自定义状态显示文案；空串表示使用分类和当前性推导的默认文案。 */
+    statusLabel?: string;
     affiliationKind?: OrgAffiliationKind;
+    /** 仅针对这段组织经历的备注；不替代人物备注。 */
+    note?: string;
 }
 
 export interface OrgMembershipStore {
@@ -77,13 +81,22 @@ function validMembershipDate(value: string): boolean {
     return year > 0 && month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1];
 }
 
-function validMembershipPeriod(joinedOn: string, leftOn: string, status: OrgMembershipStatus): boolean {
+export function isValidMembershipPeriod(joinedOn: string, leftOn: string, status: OrgMembershipStatus): boolean {
     return validMembershipDate(joinedOn) && validMembershipDate(leftOn)
         && !(joinedOn && leftOn && joinedOn > leftOn) && !(status === "active" && leftOn);
 }
 
 function isNonEmptyString(value: unknown): value is string {
     return typeof value === "string" && value.trim().length > 0;
+}
+
+export function isValidOrgStatusLabel(value: unknown): value is string {
+    return typeof value === "string" && value.length <= 40 && !/[\r\n]/.test(value);
+}
+
+/** 成员备注是单行短文本，避免把组织经历备注误当成人物长备注。 */
+export function isValidOrgMembershipNote(value: unknown): value is string {
+    return typeof value === "string" && value.length <= 240 && !/[\r\n]/.test(value);
 }
 
 function parseMembership(raw: unknown): OrgMembership | null {
@@ -99,10 +112,12 @@ function parseMembership(raw: unknown): OrgMembership | null {
     if (record.title !== undefined && typeof record.title !== "string") return null;
     if (record.joinedOn !== undefined && typeof record.joinedOn !== "string") return null;
     if (record.leftOn !== undefined && typeof record.leftOn !== "string") return null;
+    if (record.statusLabel !== undefined && !isValidOrgStatusLabel(record.statusLabel)) return null;
+    if (record.note !== undefined && !isValidOrgMembershipNote(record.note)) return null;
     const joinedOn = typeof record.joinedOn === "string" ? record.joinedOn : "";
     const leftOn = typeof record.leftOn === "string" ? record.leftOn : "";
     /* 日期字段存在但格式非法 → 视为坏条目过滤（不静默改写为空） */
-    if (!validMembershipPeriod(joinedOn, leftOn, status)) return null;
+    if (!isValidMembershipPeriod(joinedOn, leftOn, status)) return null;
     return {
         id: record.id,
         orgDocId: record.orgDocId,
@@ -112,7 +127,9 @@ function parseMembership(raw: unknown): OrgMembership | null {
         joinedOn,
         leftOn,
         status,
+        ...(record.statusLabel === undefined || record.statusLabel.trim() === "" ? {} : { statusLabel: record.statusLabel.trim() }),
         ...(record.affiliationKind === undefined ? {} : { affiliationKind: record.affiliationKind }),
+        ...(record.note === undefined || record.note.trim() === "" ? {} : { note: record.note.trim() }),
     };
 }
 
@@ -147,7 +164,16 @@ export function normalizeOrgMembershipStoreForWrite(raw: unknown): OrgMembership
 }
 
 export function isOrgAffiliationKind(value: unknown): value is OrgAffiliationKind {
-    return value === "work" || value === "education" || value === "unspecified";
+    return value === "family" || value === "work" || value === "education" || value === "unspecified";
+}
+
+/** 自定义状态为空时由界面按当前性和归属分类显示默认文案。 */
+export function orgMembershipStatusLabel(
+    membership: Pick<OrgMembership, "status" | "statusLabel" | "affiliationKind">,
+): string {
+    if (membership.statusLabel?.trim()) return membership.statusLabel.trim();
+    if (membership.status === "former") return membership.affiliationKind === "education" ? "已毕业/离校" : membership.affiliationKind === "family" ? "曾是家庭成员" : "已离开";
+    return membership.affiliationKind === "education" ? "就读" : membership.affiliationKind === "family" ? "家庭成员" : membership.affiliationKind === "work" ? "在职" : "在职/在学";
 }
 
 /** 追加成员记录（纯函数返回新 store）；同 id 视为重复静默跳过 */
@@ -171,7 +197,9 @@ export interface OrgMembershipPatch {
     joinedOn?: string;
     leftOn?: string;
     status?: OrgMembershipStatus;
+    statusLabel?: string;
     affiliationKind?: OrgAffiliationKind;
+    note?: string;
 }
 
 /**
@@ -180,17 +208,25 @@ export interface OrgMembershipPatch {
  */
 export function applyMembershipPatch(membership: OrgMembership, patch: OrgMembershipPatch): OrgMembership | null {
     if (patch.department !== undefined && typeof patch.department !== "string" || patch.title !== undefined && typeof patch.title !== "string") return null;
+    if (patch.statusLabel !== undefined && !isValidOrgStatusLabel(patch.statusLabel)) return null;
+    if (patch.note !== undefined && !isValidOrgMembershipNote(patch.note)) return null;
     const department = patch.department === undefined ? membership.department : patch.department.trim();
     const title = patch.title === undefined ? membership.title : patch.title.trim();
     const joinedOn = patch.joinedOn === undefined ? membership.joinedOn : patch.joinedOn;
-    const leftOn = patch.leftOn === undefined ? membership.leftOn : patch.leftOn;
     const status = patch.status === undefined ? membership.status : patch.status;
+    /* 恢复为当前归属时清理历史结束日期；避免 UI 禁用日期控件后把旧日期带回写入。 */
+    const leftOn = status === "active" && membership.status !== "active" ? "" : patch.leftOn === undefined ? membership.leftOn : patch.leftOn;
+    const statusLabel = patch.statusLabel === undefined ? membership.statusLabel : patch.statusLabel.trim();
+    const note = patch.note === undefined ? membership.note : patch.note.trim();
     if (status !== "active" && status !== "former") return null;
-    if (typeof joinedOn !== "string" || typeof leftOn !== "string" || !validMembershipPeriod(joinedOn, leftOn, status)) return null;
+    if (typeof joinedOn !== "string" || typeof leftOn !== "string" || !isValidMembershipPeriod(joinedOn, leftOn, status)) return null;
     if (patch.affiliationKind !== undefined && !isOrgAffiliationKind(patch.affiliationKind)) return null;
+    const { statusLabel: _currentStatusLabel, note: _currentNote, ...withoutOptionalFields } = membership;
     return {
-        ...membership, department, title, joinedOn, leftOn, status,
+        ...withoutOptionalFields, department, title, joinedOn, leftOn, status,
+        ...(statusLabel ? { statusLabel } : {}),
         ...(patch.affiliationKind === undefined ? {} : { affiliationKind: patch.affiliationKind }),
+        ...(note ? { note } : {}),
     };
 }
 
@@ -201,6 +237,7 @@ export interface PersonAffiliation extends OrgMembership {
 }
 
 export interface PersonAffiliationProjection {
+    family: PersonAffiliation[];
     work: PersonAffiliation[];
     education: PersonAffiliation[];
     unspecified: PersonAffiliation[];
@@ -213,12 +250,12 @@ export function projectPersonAffiliations(
     memberships: readonly OrgMembership[],
     organizations: ReadonlyMap<string, { name: string; archived: boolean }>,
 ): PersonAffiliationProjection {
-    const result: PersonAffiliationProjection = { work: [], education: [], unspecified: [], history: [], unresolved: [] };
+    const result: PersonAffiliationProjection = { family: [], work: [], education: [], unspecified: [], history: [], unresolved: [] };
     for (const membership of sortOrgMemberships(memberships.filter((item) => item.personDocId === personDocId))) {
         const organization = organizations.get(membership.orgDocId);
         const affiliation: PersonAffiliation = {
             ...membership,
-            affiliationKind: membership.affiliationKind ?? "unspecified",
+            affiliationKind: membership.affiliationKind ?? (organization?.name === "家庭" ? "family" : "unspecified"),
             orgName: organization?.name ?? null,
             scope: !organization ? "unreachable" : membership.status === "former" ? "former" : organization.archived ? "archived" : "current",
         };
@@ -240,6 +277,19 @@ export function updateMembership(store: OrgMembershipStore, id: string, patch: O
     if (JSON.stringify(updated) === JSON.stringify(store.memberships[index])) return store;
     const memberships = [...store.memberships];
     memberships[index] = updated;
+    return { ...store, memberships };
+}
+
+/** 把一段成员经历移动到另一个组织；只改变组织身份，其他字段和记录 ID 保留。 */
+export function moveMembership(store: OrgMembershipStore, id: string, targetOrgDocId: string): OrgMembershipStore | null {
+    const index = store.memberships.findIndex((existing) => existing.id === id);
+    if (index < 0 || !ID_PATTERN.test(targetOrgDocId)) return null;
+    const current = store.memberships[index];
+    if (current.orgDocId === targetOrgDocId) return null;
+    if (current.status === "active" && store.memberships.some((entry) => entry.id !== id
+        && entry.orgDocId === targetOrgDocId && entry.personDocId === current.personDocId && entry.status === "active")) return null;
+    const memberships = [...store.memberships];
+    memberships[index] = { ...current, orgDocId: targetOrgDocId };
     return { ...store, memberships };
 }
 
@@ -272,6 +322,8 @@ export interface OrgLinkEntry {
     orgName: string;
     department: string;
     title: string;
+    affiliationKind?: OrgAffiliationKind;
+    statusLabel?: string;
 }
 
 /**
@@ -282,9 +334,10 @@ export interface OrgLinkEntry {
 export function buildOrgLinksSection(entries: readonly OrgLinkEntry[]): string {
     if (entries.length === 0) return "";
     const links = entries.map((entry) => {
-        const suffix = entry.department && entry.title ? `（${entry.department} · ${entry.title}）`
-            : entry.department ? `（${entry.department}）`
-            : entry.title ? `（${entry.title}）`
+        const classification = entry.affiliationKind === "family" ? "家庭" : entry.affiliationKind === "work" ? "工作单位" : entry.affiliationKind === "education" ? "学校" : "其他组织";
+        const status = entry.statusLabel?.trim() || (entry.affiliationKind === "education" ? "就读" : entry.affiliationKind === "family" ? "家庭成员" : "在职");
+        const details = [classification, status, entry.department, entry.title].filter(Boolean);
+        const suffix = details.length ? `（${details.join(" · ")}）`
             : "";
         return `[${entry.orgName}](siyuan://blocks/${entry.orgDocId})${suffix}`;
     });

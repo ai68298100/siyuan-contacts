@@ -10,7 +10,7 @@
 import type { ContactSummary } from "./person";
 import type { FollowUpItem } from "./followups";
 import type { OrgMembership } from "./org-membership";
-import { findDanglingOrgLinks } from "./org-membership.ts";
+import { findDanglingOrgLinks, isOrgAffiliationKind, isValidOrgStatusLabel, isValidOrgMembershipNote } from "./org-membership.ts";
 import type { SelfIdentity } from "./self-identity";
 import { normalizeInteractionStoreForWrite } from "./interactions.ts";
 import type { InteractionStore } from "./interactions";
@@ -437,6 +437,9 @@ export function decodeAuditOrganizationMembers(raw: unknown): OrgMembership[] {
             || member.status !== "active" && member.status !== "former"
             || member.department !== undefined && typeof member.department !== "string"
             || member.title !== undefined && typeof member.title !== "string"
+            || member.statusLabel !== undefined && !isValidOrgStatusLabel(member.statusLabel)
+            || member.note !== undefined && !isValidOrgMembershipNote(member.note)
+            || member.affiliationKind !== undefined && !isOrgAffiliationKind(member.affiliationKind)
             || !validDate(member.joinedOn) || !validDate(member.leftOn)) throw new HealthAuditJsonError("organizationMembers");
         return { ...member, department: member.department ?? "", title: member.title ?? "", joinedOn: member.joinedOn ?? "", leftOn: member.leftOn ?? "" } as OrgMembership;
     });

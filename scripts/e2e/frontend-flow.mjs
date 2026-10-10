@@ -162,12 +162,19 @@ async function waitUntil(deadline, predicate, label) {
     throw new Error(`${label}超时`);
 }
 
-async function openCdpPage(browserSession, url, deadline) {
-    const response = await fetch(`http://127.0.0.1:${browserSession.debugPort}/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
+async function openCdpPage(browserSession, url, deadline, extraHeaders = {}) {
+    // Create a blank target first so authentication headers are installed
+    // before the page starts issuing API requests during navigation.
+    const response = await fetch(`http://127.0.0.1:${browserSession.debugPort}/json/new?${encodeURIComponent("about:blank")}`, { method: "PUT" });
     if (!response.ok) throw new Error(`第二隔离页面创建失败：HTTP ${response.status}`);
     const target = await response.json();
     const session = await connectCdpTarget(target);
+    if (Object.keys(extraHeaders).length > 0) {
+        await session.call("Network.enable");
+        await session.call("Network.setExtraHTTPHeaders", { headers: extraHeaders });
+    }
     await session.call("Page.enable");
+    await session.call("Page.navigate", { url });
     await waitUntil(deadline, async () => Boolean(await session.evaluate("document.readyState === 'complete'")), "第二隔离页面");
     return { ...session, targetId: target.id };
 }
@@ -270,6 +277,16 @@ export async function verifyRealFrontend({
 
         profile = fs.mkdtempSync(path.join(os.tmpdir(), "lvct-ui-"));
         browserSession = await connectBrowser(profile, deadline);
+        // The isolated kernel uses the modern api.token setting. browser-
+        // desktop does not render the legacy /check-auth page for that
+        // setting, so install the token at the transport boundary before
+        // loading the real frontend. This prevents anonymous requests from
+        // tripping the kernel's failed-authentication limiter.
+        const authHeaders = accessAuthCode ? { Authorization: `Token ${accessAuthCode}` } : {};
+        if (Object.keys(authHeaders).length > 0) {
+            await browserSession.call("Network.enable");
+            await browserSession.call("Network.setExtraHTTPHeaders", { headers: authHeaders });
+        }
         const targetURL = new URL("/stage/build/desktop/", baseURL).href;
         await browserSession.call("Page.navigate", { url: targetURL });
         await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.readyState === 'complete'")), "真实 Web desktop 页面");
@@ -756,7 +773,7 @@ export async function verifyRealFrontend({
         }
         let secondPage;
         try {
-            secondPage = await openCdpPage(browserSession, evidence.browserUrl, deadline);
+            secondPage = await openCdpPage(browserSession, evidence.browserUrl, deadline, authHeaders);
             await waitUntil(deadline, async () => Boolean(await secondPage.evaluate("window.LvContacts && window.LvContacts.protocol === 2")), "第二页面桥");
             await waitUntil(deadline, async () => Boolean(await secondPage.evaluate(`(()=>[...document.querySelectorAll('[title], [aria-label], button, .b3-tooltips')].some((item) => /小驴人脉|Lv Contacts/.test(item.getAttribute('title') || item.getAttribute('aria-label') || item.textContent || '')))()`)), "第二页面插件入口");
             if (!await secondPage.evaluate(`(()=>{const nodes=[...document.querySelectorAll('[title], [aria-label], button, .b3-tooltips')];const node=nodes.find(item=>/小驴人脉|Lv Contacts/.test(item.getAttribute('title')||item.getAttribute('aria-label')||item.textContent||''));if(!node)return false;node.click();return true})()`)) throw new Error("第二页面工作台入口不可定位");

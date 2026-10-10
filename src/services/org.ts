@@ -23,7 +23,7 @@ import {
     replaceOrgMembership,
 } from "../data/org-membership";
 import type { OrgMembership, OrgMembershipPatch, OrgMembershipStatusFilter } from "../domain/org-membership";
-import { buildCommonOrgBackground, pageOrgMemberships, sortOrgMemberships, buildOrgLinksSection } from "../domain/org-membership";
+import { buildCommonOrgBackground, orgMembershipStatusLabel, pageOrgMemberships, sortOrgMemberships, buildOrgLinksSection } from "../domain/org-membership";
 import type { CommonOrgBackground } from "../domain/org-membership";
 import type { ContactsSettings } from "../domain/model";
 import { getRoster } from "./roster";
@@ -84,6 +84,7 @@ export async function syncPersonOrgLinksSection(plugin: Plugin, personDocId: str
     const names = new Map((await scanOrganizations()).filter((org) => !org.archived).map((org) => [org.docId, org.name] as const));
     const entries = memberships.filter((m) => m.status === "active" && names.has(m.orgDocId)).map((m) => ({
         orgDocId: m.orgDocId, orgName: names.get(m.orgDocId) ?? "", department: m.department, title: m.title,
+        affiliationKind: m.affiliationKind, statusLabel: m.statusLabel,
     }));
     const existingId = await findBlockIdByCustomAttr(personDocId, ORG_LINKS_SECTION_ATTR);
     await upsertMarkedBlock(personDocId, ORG_LINKS_SECTION_ATTR, buildOrgLinksSection(entries), existingId);
@@ -118,11 +119,17 @@ export async function buildOrgDisplayByPerson(): Promise<Map<string, string>> {
     const display = new Map<string, string>();
     for (const [personDocId, list] of byPerson) {
         const eligible = sortOrgMemberships(list.filter((membership) => nameByDoc.has(membership.orgDocId)));
-        const active = eligible.find((membership) => membership.status === "active") ?? eligible[eligible.length - 1];
-        if (!active) continue;
-        const orgName = nameByDoc.get(active.orgDocId);
-        if (!orgName) continue;
-        display.set(personDocId, active.department ? `${orgName} · ${active.department}` : orgName);
+        const current = eligible.filter((membership) => membership.status === "active");
+        /* 多组织同时归属全部保留；只有没有当前归属时才回退到最近一段历史。 */
+        const visible = current.length > 0 ? current : eligible.slice(-1);
+        const labels = visible.flatMap((membership) => {
+            const orgName = nameByDoc.get(membership.orgDocId);
+            const affiliationKind = membership.affiliationKind ?? (orgName === "家庭" ? "family" : undefined);
+            /* 旧成员没有分类时保持旧的紧凑显示；新分类/自定义状态才补充状态文案。 */
+            const status = membership.statusLabel?.trim() || affiliationKind ? orgMembershipStatusLabel({ ...membership, affiliationKind }) : "";
+            return orgName ? [[orgName, status, membership.department].filter(Boolean).join(" · ")] : [];
+        });
+        if (labels.length) display.set(personDocId, labels.join("；"));
     }
     return display;
 }
@@ -194,8 +201,10 @@ export async function listOrganizationMembers(
     settings: ContactsSettings,
     orgDocId: string,
 ): Promise<OrganizationMember[]> {
-    const memberships = (await membershipsByOrganization(plugin)).get(orgDocId) ?? [];
-    const roster = await getRoster(settings);
+    const [membershipsByOrg, roster] = await Promise.all([
+        membershipsByOrganization(plugin), getRoster(settings),
+    ]);
+    const memberships = membershipsByOrg.get(orgDocId) ?? [];
     const byDoc = new Map(roster.map((person) => [person.docId, person.name]));
     return memberships.map((membership) => ({
         ...membership,
@@ -213,7 +222,7 @@ export async function listOrganizationMembersPage(
     const all = await listOrganizationMembers(plugin, settings, orgDocId);
     const query = options.query?.trim().toLocaleLowerCase() ?? "";
     const filtered = query
-        ? all.filter((member) => [member.personName, member.department, member.title]
+        ? all.filter((member) => [member.personName, member.department, member.title, member.statusLabel ?? "", member.note ?? ""]
             .some((value) => value.toLocaleLowerCase().includes(query)))
         : all;
     const page = pageOrgMemberships(filtered, options);
@@ -229,7 +238,7 @@ export async function addOrganizationMember(
     plugin: Plugin,
     orgDocId: string,
     personDocId: string,
-    extra: { department?: string; title?: string; joinedOn?: string } = {},
+    extra: { department?: string; title?: string; joinedOn?: string; leftOn?: string; status?: OrgMembership["status"]; statusLabel?: string; affiliationKind?: OrgMembership["affiliationKind"]; note?: string } = {},
 ): Promise<void> {
     await addOrgMembership(plugin, {
         orgDocId,
@@ -237,6 +246,11 @@ export async function addOrganizationMember(
         department: extra.department,
         title: extra.title,
         joinedOn: extra.joinedOn,
+        leftOn: extra.leftOn,
+        status: extra.status,
+        statusLabel: extra.statusLabel,
+        affiliationKind: extra.affiliationKind,
+        note: extra.note,
     });
 }
 
@@ -256,7 +270,9 @@ export interface PersonOrgMembershipView {
     joinedOn: string;
     leftOn: string;
     status: OrgMembership["status"];
+    statusLabel?: string;
     affiliationKind?: OrgMembership["affiliationKind"];
+    note?: string;
     archived: boolean;
     reachable: boolean;
 }
@@ -284,7 +300,9 @@ export async function listPersonOrgMemberships(
         joinedOn: membership.joinedOn,
         leftOn: membership.leftOn,
         status: membership.status,
-        affiliationKind: membership.affiliationKind,
+        statusLabel: membership.statusLabel,
+        affiliationKind: membership.affiliationKind ?? (byDoc.get(membership.orgDocId)?.name === "家庭" ? "family" : undefined),
+        note: membership.note,
         archived: byDoc.get(membership.orgDocId)?.archived ?? false,
         reachable: byDoc.has(membership.orgDocId),
     }));

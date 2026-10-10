@@ -11,6 +11,13 @@ test("视图偏好：空存储回退默认值", () => {
     assert.deepEqual(normalizeViewPreferences(null), DEFAULT_VIEW_PREFERENCES);
 });
 
+test("视图偏好：首页快速开始引导状态兼容旧数据", () => {
+    assert.equal(normalizeViewPreferences({}).onboardingDismissed, false);
+    assert.equal(normalizeViewPreferences({ onboardingDismissed: true }).onboardingDismissed, true);
+    assert.equal(normalizeViewPreferences({ onboardingDismissed: false }).onboardingDismissed, false);
+    assert.equal(normalizeViewPreferences({ onboardingDismissed: "true" }).onboardingDismissed, false);
+});
+
 test("设置页提醒数字：保存前只接受 0–365 的整数", () => {
     for (const value of [0, 1, 365]) assert.equal(isValidPreferenceDays(value), true);
     for (const value of [undefined, null, "30", -1, 366, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {

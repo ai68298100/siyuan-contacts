@@ -1,15 +1,25 @@
 # 发布清单（RELEASE）
 
-> v0.5.5 发布准备中：PR #25 已普通合并至 `main`（合并提交 `e33b653`），待本轮门禁、版本提交、annotated tag 和 GitHub Release 完成。
+> v0.5.6 发布准备中：本轮完整门禁和独立内核 E2E 已通过，待提交、annotated tag、GitHub Release 和 CI 产物校验完成。
 
-## v0.5.5 本轮状态
+## v0.5.6 本轮状态
 
-- [x] PR #25 已通过 GitHub CI 并以普通合并方式进入 `main`
-- [ ] `package.json` 与 `plugin.json` 版本统一为 0.5.5
-- [ ] README 中英文安装入口、CHANGELOG 与发布说明已切换到 v0.5.5
-- [ ] `pnpm check`、`pnpm test`、桌面/移动/宿主 UI、构建与发布门禁
-- [ ] annotated tag `v0.5.5`、GitHub Latest Release 与附件下载校验
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.6
+- [x] README 中英文安装入口、CHANGELOG 与发布说明已切换到 v0.5.6
+- [x] `pnpm check`、`pnpm test` 555/555、桌面 330/330、移动 331/331、宿主 330/330
+- [x] 独立内核加载、联系人 13/13、实际服务 9/9、真实 browser-desktop 与清理
+- [x] `pnpm build` 与 `pnpm check:release`
+- [ ] annotated tag `v0.5.6`、GitHub Latest Release 与附件下载校验
 - [ ] 真实思源宿主、Android 真机、真实多窗口、原生图入口、任务管理器互读和集市客户端可见性仍需单独验收；CardDAV 在线同步未实现
+
+新增：真实前端独立内核验收
+- 双页面、组织成员、生日、账本、别名、跟进和跨窗口操作均已通过。
+
+优化：E2E 认证与清理
+- 在两个浏览器页面导航前注入 `api.token`，临时库清理不再被认证限流阻断。
+
+修复：首屏认证竞态
+- 修复新版内核 `conf.api.token` 未进入真实 browser-desktop 请求头的问题。
 
 > v0.5.4 已于 2026-10-09 发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.4)，annotated tag 指向 PR #23 main 合并提交 `7fa442471901a53d8d32900d2aeac22463870468`。安装包来自该提交的 [main CI run 37898536920](https://github.com/ai68298100/siyuan-contacts/actions/runs/37898536920)，下载附件后再次核对校验和一致。
 

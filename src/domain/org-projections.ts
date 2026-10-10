@@ -1,6 +1,6 @@
 import { escapeMarkdown } from "./format.ts";
 import type { OrgMembership } from "./org-membership.ts";
-import { sortOrgMemberships } from "./org-membership.ts";
+import { orgMembershipStatusLabel, sortOrgMemberships } from "./org-membership.ts";
 import type { OrganizationSummary } from "./organization-scan.ts";
 import { parseStoreRecords, StoreIntegrityError } from "./store-integrity.ts";
 
@@ -69,8 +69,8 @@ export function orgProjectionSourceSnapshot(source: OrgProjectionSource): string
 }
 
 function affiliationText(membership: OrgMembership): string {
-    const classification = membership.affiliationKind === "work" ? "工作" : membership.affiliationKind === "education" ? "学校" : "未分类";
-    return [classification, membership.department, membership.title, `${membership.joinedOn || "?"} ~ ${membership.leftOn || "至今"}`]
+    const classification = membership.affiliationKind === "family" ? "家庭" : membership.affiliationKind === "work" ? "工作" : membership.affiliationKind === "education" ? "学校" : "未分类";
+    return [classification, orgMembershipStatusLabel(membership), membership.department, membership.title, `${membership.joinedOn || "?"} ~ ${membership.leftOn || "至今"}`]
         .filter(Boolean).map((value) => escapeMarkdown(value.replace(/[\r\n]+/g, " "))).join(" · ");
 }
 
