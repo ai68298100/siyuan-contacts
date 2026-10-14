@@ -235,12 +235,14 @@
     {:else}
         <div class="lvct-detail__timeline">
             {#each records as record (record.id)}
-                <div class="lvct-detail__timeline-row">
-                    <span class="ft__on-surface">{record.occurredOn}</span>
-                    <span class="lvct-detail__timeline-note">{recordLabel(record)}</span>
-                    <span class="lvct-chip">{kindLabel(record.kind)} · {directionLabel(record.direction)}</span>
+                <div class="lvct-detail__timeline-row lvct-exchange-row" data-direction={record.direction} data-status={record.status}>
+                    <span class="lvct-exchange-date ft__on-surface">{record.occurredOn}</span>
+                    <span class="lvct-detail__timeline-note lvct-exchange-desc">{recordLabel(record)}</span>
+                    <span class="lvct-chip lvct-exchange-chip" class:lvct-chip--receivable={record.direction === "receivable"} class:lvct-chip--payable={record.direction === "payable"}>
+                        {kindLabel(record.kind)} · {directionLabel(record.direction)}
+                    </span>
                     {#if record.dueOn}<span class="ft__smaller ft__on-surface">到期 {record.dueOn}</span>{/if}
-                    <span class="ft__smaller ft__on-surface">{record.status === "open" ? "待处理" : record.status === "settled" ? `已结清${record.settledOn ? ` · ${record.settledOn}` : ""}` : "已取消"}</span>
+                    <span class="lvct-exchange-status ft__smaller ft__on-surface">{record.status === "open" ? "待处理" : record.status === "settled" ? `已结清${record.settledOn ? ` · ${record.settledOn}` : ""}` : "已取消"}</span>
                     {#if record.status === "open"}
                         <button class="b3-button b3-button--text" disabled={formDisabled || loading || readFailed} onclick={() => changeStatus(record, "settled")}>结清</button>
                         <button class="b3-button b3-button--cancel" disabled={formDisabled || loading || readFailed} onclick={() => changeStatus(record, "cancelled")}>取消</button>

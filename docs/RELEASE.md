@@ -1,8 +1,15 @@
 # 发布清单（RELEASE）
 
-> v0.5.6 已发布：PR #27 已普通合并至 `main`，合并提交 `449f7722859c547aeb93f2048506ef5786c767fb`；annotated tag、GitHub Release 和附件下载校验均已完成。
+> v0.5.9 本轮发布：聚焦现代高级 UI 质感深度重塑，全面提升视觉深度、排版层次、触感动效与跨端一致性。 [GitHub Release v0.5.9](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.9)
 
-> v0.5.7 已发布：提交 f8d7c76 已推送至 dev/thispc-1010-org-affiliations，annotated tag、GitHub Release 与附件校验均已完成。 [GitHub Release v0.5.7](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.7)
+## v0.5.9 本轮状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.9
+- [x] README、README.en-US、CHANGELOG 与 v0.5.9 发布说明已更新
+- [x] `pnpm check`、`pnpm test` 594/594、桌面 UI 378/378、移动 UI 378/378 全部通过
+- [x] 复合微质感、Squircle 双色渐变、分段滑轨、磨砂玻璃与时间轴现代高级 UI 落地
+- [x] `pnpm build`、`pnpm check:release` 通过
+- [x] `package.zip` 579,325 B，SHA-256 `b515c522f703eb046ec1a2338097fe8f48be43d26bc407a4bc1f010c8b13aa94`
 
 > v0.5.8 已发布：提交 `7416531` 已推送至 `dev/thispc-1010-org-affiliations`，annotated tag、GitHub Release 与附件校验均已完成。 [GitHub Release v0.5.8](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.8)
 

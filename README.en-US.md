@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.8** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.8) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.9** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.9) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -20,6 +20,32 @@ English | [简体中文](README.md)
 ---
 
 Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
+
+## What's new in v0.5.9
+
+This release delivers an extensive modern design overhaul, restoring visual depth, typography hierarchy, micro-interactions, and refined physical feel across both desktop and mobile viewports.
+
+Added: modern design system and layered depth
+
+- Introduced Ambient Occlusion multi-layer soft shadows and 1px inner rim highlights, resolving pale card washout and harsh dark wireframe aesthetics.
+- Upgraded avatars, person details, wizard logos, and organization badges to smooth Squircle geometry with 135° dual-color gradients across five contact groups.
+- Dashboard stats now feature a radial ambient glow and 28px tabular-nums typography.
+
+Added: segmented sliding controls and frosted glass panels
+
+- Rebuilt card/table view toggles as iOS/Linear-grade inset sliding tracks with active floating pill indicators and micro-haptic press feedback.
+- Upgraded dialog backdrops with modern 10px frosted blur (`backdrop-filter: blur(10px)`) and a bold 22px / 700 header layout.
+- Graph controls now float as a frosted capsule island (`blur(16px)`), complemented by a central radial light field.
+- Organization cards feature 40px Squircle badge boxes and active member status breathing dots (Status Dot).
+
+Improved: sidebar, table view, timeline and details
+
+- Sidebar navigation items adopt modern floating pill selection and glowing brand iconography.
+- Contacts table introduces sticky frosted headers (`backdrop-filter: blur(8px)`) and active row accent highlights.
+- Person detail interaction history is restructured into a connected timeline track with stepped cards and dual-color exchange ledger badges.
+- Upgraded settings navigation, tactile iOS 18-grade switches, 18px Squircle welcome wizard, 6px slim frosted scrollbars, and mobile bottom bar blur.
+
+Validation: `pnpm check` (0 errors / 0 warnings), 594 unit tests (100% pass), desktop/mobile UI regression 378/378 each, and production release gates all pass.
 
 ## What's new in v0.5.8
 
@@ -114,7 +140,7 @@ Each plugin is maintained independently and can be used on its own or alongside 
 
 Manual installation from GitHub Releases is currently recommended. The Marketplace submission has been merged, but availability in the client has not been verified on a real device.
 
-1. Download package.zip from the [v0.5.5 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.5).
+1. Download package.zip from the [v0.5.9 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.9).
 2. Extract its contents into data/plugins/siyuan-contacts/ in your SiYuan workspace. plugin.json must be at that directory root.
 3. Restart SiYuan and enable **Lv Contacts** under **Settings → Marketplace → Installed**.
 
@@ -135,7 +161,7 @@ The migration bundle is a JSON value snapshot with a preview and merge flow, not
 - The in-app English translation is incomplete, so some interface text may appear in Chinese.
 - CardDAV address-book sync and CalDAV calendar sync are not supported. Contacts can be exchanged using vCard files.
 
-See the [v0.5.8 release notes](docs/RELEASE-NOTES-v0.5.8.md) for validation scope; previous release notes remain available for v0.5.7 and v0.5.6.
+See the [v0.5.9 release notes](docs/RELEASE-NOTES-v0.5.9.md) for validation scope; previous release notes remain available for v0.5.8, v0.5.7 and v0.5.6.
 
 ## Quick start
 

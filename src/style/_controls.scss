@@ -58,33 +58,35 @@
         cursor: not-allowed;
     }
 
-    /* 主按钮（无修饰类的填充按钮）：主题实色，渐变只用于品牌标识与特殊 CTA */
+    /* 主按钮（无修饰类的填充按钮）：现代微顶高光 + 自然投影 + 悬停微上浮 */
     .b3-button:not(.b3-button--outline):not(.b3-button--cancel):not(.b3-button--text) {
         background: var(--lvct-accent-fill);
         color: var(--lvct-on-accent);
         border: none;
+        box-shadow: 0 1px 2px rgba(18, 158, 154, 0.24), 0 2px 6px rgba(18, 158, 154, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.28);
 
         &:hover:not(:disabled) {
-            box-shadow: var(--lvct-shadow-2);
+            box-shadow: 0 4px 14px rgba(18, 158, 154, 0.35), 0 1px 3px rgba(18, 158, 154, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.35);
             background: var(--lvct-accent-hover);
+            transform: translateY(-1px);
             filter: none;
         }
 
         &:active:not(:disabled) {
-            box-shadow: none;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
             background: var(--lvct-accent-hover);
+            transform: scale(0.97) translateY(0);
             filter: none;
         }
     }
 
-    /* 次按钮：表面底 + 柔和描边（替换宿主描边观感） */
+    /* 次按钮：表面底 + 柔和描边 + 微内高光 */
     .b3-button--outline,
     .b3-button--cancel {
         background: var(--lvct-bg-surface);
         color: var(--lvct-text-1);
-        border: var(--lvct-control-border-width) solid var(--lvct-border-subtle);
-        /* 宿主 outline 以内阴影画主色描边；插件已使用语义边框，须在各状态清除旧描边。 */
-        box-shadow: none;
+        border: var(--lvct-control-border-width) solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.85);
 
         &:focus { box-shadow: none; }
 
@@ -92,10 +94,15 @@
             background: var(--lvct-bg-hover);
             border-color: var(--lvct-border-strong);
             color: var(--lvct-text-1);
-            box-shadow: none;
+            box-shadow: 0 2px 5px rgba(15, 23, 42, 0.06);
+            transform: translateY(-1px);
         }
 
-        &:active:not(:disabled) { background: var(--lvct-bg-active); box-shadow: none; }
+        &:active:not(:disabled) {
+            background: var(--lvct-bg-active);
+            box-shadow: none;
+            transform: scale(0.97) translateY(0);
+        }
     }
 
     /* 文字/幽灵按钮 */
@@ -160,34 +167,36 @@
         }
     }
 
-    /* ---------- 输入框 / 下拉：柔和描边 + 焦点环 ---------- */
+    /* ---------- 输入框 / 下拉：柔和描边 + 微凹槽内阴影 + 焦点呼吸环 ---------- */
     .b3-text-field,
     .b3-select {
         border-radius: var(--lvct-r-md);
-        border: var(--lvct-control-border-width) solid var(--lvct-border-subtle);
+        border: var(--lvct-control-border-width) solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
         background: var(--lvct-bg-surface);
         color: var(--lvct-text-1);
         min-height: var(--lvct-touch-min);
         box-sizing: border-box;
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
         transition:
             border-color var(--lvct-dur-fast) var(--lvct-ease),
-            box-shadow var(--lvct-dur-fast) var(--lvct-ease);
+            box-shadow var(--lvct-dur-fast) var(--lvct-ease),
+            background-color var(--lvct-dur-fast) var(--lvct-ease);
 
         &::placeholder { color: var(--lvct-text-3); }
 
         &:focus {
             border-color: var(--lvct-accent);
-            box-shadow: 0 0 0 var(--lvct-focus-ring-size) var(--lvct-accent-soft);
+            box-shadow: 0 0 0 var(--lvct-focus-ring-size) var(--lvct-accent-soft), inset 0 1px 1px rgba(0, 0, 0, 0.02);
             outline: none;
         }
 
         /* 控件在未聚焦时也给出边界反馈，避免浅色主题中与卡片表面融为一体。 */
         &:hover:not(:disabled):not(:focus) {
-            border-color: color-mix(in srgb, var(--lvct-accent) 32%, var(--lvct-border-subtle));
+            border-color: color-mix(in srgb, var(--lvct-accent) 36%, var(--lvct-border-subtle));
         }
 
         &:disabled {
-        opacity: var(--lvct-state-disabled-opacity);
+            opacity: var(--lvct-state-disabled-opacity);
             cursor: not-allowed;
         }
     }
