@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.7** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.7) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.8** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.8) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -20,6 +20,28 @@ English | [简体中文](README.md)
 ---
 
 Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
+
+## What's new in v0.5.8
+
+This patch release fixes large imports, contact view switching and organization management, and adds batch organization membership actions.
+
+Added: batch add contacts to an organization
+
+- Select multiple contacts and register them in one organization. The selected scope is frozen, archived organizations are disabled, and empty states offer a create-organization route.
+- Loading and saving lock duplicate actions, closing and scope changes.
+
+Improved: batch feedback
+
+- Partial failures show the affected contacts and readable errors; retry only sends failed contacts and never repeats successful writes.
+- Successful writes refresh the roster and expose a clear result.
+
+Fixed: large imports, view flicker and organization layout
+
+- Attribute-view binding and document mapping use verified batches of 50, preventing 400+ imports from stopping after the first 50 contacts.
+- Card/table switching keeps the local view intent, avoids skeleton flicker and restores detail focus after refresh.
+- Organization member controls no longer collapse; desktop dialogs use a wider workspace while mobile remains full screen.
+
+Validation: `pnpm check`, 594 unit tests, desktop/mobile UI regression 378/378 each, `pnpm build` and `pnpm check:release` pass.
 
 ## What's new in v0.5.7
 
@@ -113,7 +135,7 @@ The migration bundle is a JSON value snapshot with a preview and merge flow, not
 - The in-app English translation is incomplete, so some interface text may appear in Chinese.
 - CardDAV address-book sync and CalDAV calendar sync are not supported. Contacts can be exchanged using vCard files.
 
-See the [v0.5.7 release notes](docs/RELEASE-NOTES-v0.5.7.md) for validation scope; the previous release notes remain available for v0.5.6.
+See the [v0.5.8 release notes](docs/RELEASE-NOTES-v0.5.8.md) for validation scope; previous release notes remain available for v0.5.7 and v0.5.6.
 
 ## Quick start
 
