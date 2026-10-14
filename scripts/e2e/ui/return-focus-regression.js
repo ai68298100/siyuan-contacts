@@ -74,7 +74,7 @@ export async function runReturnFocusRegression({ test, assert, fixture, settings
             await until(() => target.querySelector(".lvct-detail"), "人物详情未打开");
             delayNext = true;
             emitDataChanged();
-            await until(() => refreshStarted && target.querySelector(".lvct-people__skeleton"), "数据变化没有触发受控慢刷新");
+            await until(() => refreshStarted && target.querySelector(".lvct-person-card") && !target.querySelector(".lvct-people__skeleton"), "数据变化没有触发受控慢刷新或列表出现闪烁骨架");
             button("返回联系人", target.querySelector(".lvct-dialog-panel")).click();
             await until(() => !target.querySelector(".lvct-dialog-panel"), "详情关闭未完成");
             await tick();
@@ -133,7 +133,7 @@ export async function runReturnFocusRegression({ test, assert, fixture, settings
             person.name = "Z原人物已改名";
             delayNext = true;
             emitDataChanged();
-            await until(() => refreshStarted && target.querySelector(".lvct-people__skeleton"), "改名没有触发受控名册刷新");
+            await until(() => refreshStarted && target.querySelector(".lvct-person-card") && !target.querySelector(".lvct-people__skeleton"), "改名没有触发受控名册刷新或列表出现闪烁骨架");
             button("返回联系人", target.querySelector(".lvct-dialog-panel")).click();
             await until(() => !target.querySelector(".lvct-dialog-panel"), "原人物详情未关闭");
             releaseRefresh();
@@ -182,7 +182,7 @@ export async function runReturnFocusRegression({ test, assert, fixture, settings
             await until(() => target.querySelector(".lvct-detail"), "旧人物详情未打开");
             delayNext = true;
             emitDataChanged();
-            await until(() => refreshStarted && target.querySelector(".lvct-people__skeleton"), "名册慢刷新未开始");
+            await until(() => refreshStarted && target.querySelector(".lvct-person-card") && !target.querySelector(".lvct-people__skeleton"), "名册慢刷新未开始或列表出现闪烁骨架");
             button("返回联系人", target.querySelector(".lvct-dialog-panel")).click();
             await until(() => !target.querySelector(".lvct-dialog-panel"), "旧详情未关闭");
             requestPersonNavigation(facade, { docId: people[1].docId, source: "document" });

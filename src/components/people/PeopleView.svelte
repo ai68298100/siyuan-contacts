@@ -377,6 +377,9 @@
     let rosterPage: number = $state(0);
     let rosterHasMore: boolean = $state(false);
     let rosterLoadingMore: boolean = $state(false);
+    // 首页数据到达后仍可能在后台读取后续页；返回详情焦点必须等待整轮刷新
+    // 完成，否则旧排序中的入口会过早被判定为已恢复，迟到的新排序无法再展开目标页。
+    let rosterRefreshing: boolean = $state(false);
     let rosterLoadError: string = $state("");
     let rosterLoadGeneration = 0;
 
@@ -662,7 +665,8 @@
 
     $effect(() => {
         const request = focusRequest;
-        if (!request || refreshQueued || loading || !peopleElement) return;
+        console.warn("[debug-return] focus-effect", Boolean(request), refreshQueued, loading, rosterRefreshing, people.length, visibleCount, filtered.length);
+        if (!request || refreshQueued || loading || rosterRefreshing || !peopleElement) return;
         // 这些依赖在名册、筛选或视图变化提交后重新查找当前入口。
         visible;
         viewMode;
@@ -921,9 +925,11 @@
     /* B12：人物 → 单位显示串（来自 org-membership 成员索引；加载失败降级为空） */
     async function refresh() {
         const request = ++refreshGeneration;
+        console.warn("[debug-return] refresh-start", request, rosterLoadGeneration, people.length);
         rosterAbortController?.abort();
         const abortController = new AbortController();
         rosterAbortController = abortController;
+        rosterRefreshing = true;
         rosterLoadGeneration += 1;
         const pageGeneration = rosterLoadGeneration;
         // 已有名册刷新时保留当前内容，避免视图偏好/跨窗口通知触发骨架屏闪烁。
@@ -938,6 +944,7 @@
         try {
             const query = searchText.trim();
             const next = await listContactPage(settings, 1, PAGE_SIZE, query, { signal: abortController.signal });
+            console.warn("[debug-return] refresh-page1", request, rosterLoadGeneration, next.people.length, next.total, next.hasMore);
             if (request !== refreshGeneration) return; /* 旧响应不得覆盖新数据 */
             people = next.people;
             selectedPeopleCache = { ...selectedPeopleCache, ...Object.fromEntries(next.people.map((person) => [person.itemId, person])) };
@@ -946,11 +953,13 @@
             rosterHasMore = next.hasMore;
             loading = false;
             void loadRemainingRosterPages(request, pageGeneration, query, abortController);
+            if (!next.hasMore) rosterRefreshing = false;
         } catch (error) {
             if (request !== refreshGeneration) return;
             /* 刷新失败保留旧列表内容，仅以横幅提示（可再次刷新重试） */
             if (!isAbortError(error)) errorText = requestErrorMessage(error);
             loading = false;
+            rosterRefreshing = false;
         } finally {
             if (rosterAbortController === abortController && !rosterLoadingMore) rosterAbortController = undefined;
         }
@@ -962,12 +971,14 @@
         query = searchText.trim(),
         abortController = rosterAbortController ?? new AbortController(),
     ) {
+        console.warn("[debug-return] remaining-start", request, expectedGeneration, rosterLoadGeneration, rosterHasMore, people.length);
         if (!rosterHasMore || expectedGeneration !== rosterLoadGeneration) return;
         rosterLoadingMore = true;
         rosterLoadError = "";
         try {
             while (rosterHasMore && request === refreshGeneration && expectedGeneration === rosterLoadGeneration && peopleAlive) {
                 const next = await listContactPage(settings, rosterPage + 1, PAGE_SIZE, query, { signal: abortController.signal });
+                console.warn("[debug-return] remaining-page", request, expectedGeneration, rosterLoadGeneration, rosterPage + 1, next.people.length, next.total, next.hasMore);
                 if (request !== refreshGeneration || expectedGeneration !== rosterLoadGeneration || !peopleAlive) return;
                 if (next.people.length === 0 && next.hasMore) throw new Error("联系人分页返回空页但仍有后续数据，已停止继续读取");
                 const known = new Set(people.map((person) => person.itemId));
@@ -989,7 +1000,11 @@
                 rosterLoadError = requestErrorMessage(error);
             }
         } finally {
-            if (expectedGeneration === rosterLoadGeneration) rosterLoadingMore = false;
+            if (expectedGeneration === rosterLoadGeneration) {
+                rosterLoadingMore = false;
+                rosterRefreshing = false;
+            }
+            console.warn("[debug-return] remaining-final", request, expectedGeneration, rosterLoadGeneration, rosterHasMore, people.length, rosterLoadingMore);
         }
     }
 
@@ -998,12 +1013,14 @@
         rosterAbortController?.abort();
         rosterAbortController = undefined;
         rosterLoadingMore = false;
+        rosterRefreshing = false;
     }
 
     function resumeRosterLoading() {
         if (!rosterHasMore || rosterLoadingMore) return;
         const abortController = new AbortController();
         rosterAbortController = abortController;
+        rosterRefreshing = true;
         void loadRemainingRosterPages(refreshGeneration, ++rosterLoadGeneration, searchText.trim(), abortController);
     }
 
