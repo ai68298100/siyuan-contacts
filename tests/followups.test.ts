@@ -12,6 +12,8 @@ import {
     nextMondayFrom,
     normalizeFollowUpStore,
     normalizeFollowUpStoreForWrite,
+    isFollowUpRequestId,
+    matchesFollowUpCreateRequest,
     projectOpenFollowUps,
     sameDayNextMonth,
     snoozedDueDate,
@@ -40,6 +42,19 @@ test("日期工具：加天、下周一、次月收敛与闰日校验", () => {
     assert.equal(isValidDateKey("2026-02-30"), false);
     assert.equal(isValidDateKey("2028-02-29"), true);
     assert.equal(daysBetween("2026-09-28", "2026-09-30"), 2);
+});
+
+test("跟进创建幂等：同一 requestId 只接受同一不可变输入，重试不生成第二条", () => {
+    const requestId = "20261014000000-req0001";
+    const current = item({ id: requestId, personDocId: "20261002000000-per0001", title: "回电", dueDate: "2026-10-20" });
+    assert.equal(isFollowUpRequestId(requestId), true);
+    assert.equal(isFollowUpRequestId("new-key"), false);
+    assert.equal(matchesFollowUpCreateRequest(current, {
+        requestId, personDocId: current.personDocId, title: "回电", dueDate: current.dueDate,
+    }), true);
+    assert.equal(matchesFollowUpCreateRequest(current, {
+        requestId, personDocId: current.personDocId, title: "其他", dueDate: current.dueDate,
+    }), false);
 });
 
 test("推迟语义：明天/三天/下周一/次月/指定日期；非法指定日期返回空串", () => {

@@ -140,7 +140,7 @@ export const GROUP_COLORS: Readonly<Record<string, string>> = {
     "家人": "#e05a5a",
     "朋友": "#4caf7d",
     "同事": "#4a8fe0",
-    "同学": "#e0a13a",
+    "同学": "#d95f78",
     "其他": "#9e9e9e",
 };
 
@@ -163,7 +163,7 @@ export interface GraphOrgAugmentation {
 }
 
 /** 组织节点固定色（数据编码固定色板，D-0002；与五个人群色相区分） */
-export const ORG_NODE_COLOR = "#8e5ad8";
+export const ORG_NODE_COLOR = "#2f8fa3";
 
 /**
  * 组织节点 + 成员边构建。与 related 边分源：产物只叠加到画布渲染，

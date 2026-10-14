@@ -34,6 +34,7 @@ import { createFollowUp, exportFollowUpsJson, importFollowUpsJson, previewFollow
 import { loadSelfIdentity } from "../../../src/data/self-identity";
 import { reconcileFollowUpTasksFromDoc, syncFollowUpTasksToDoc } from "../../../src/services/followup-sync";
 import { emitDataChanged } from "../../../src/libs/data-events";
+import { nativeRefsFixture, nativeRefsQueryCenter } from "./native-refs-fixture";
 import { loadFollowUpStore, createFollowUpRecord } from "../../../src/data/followups";
 import { loadTemplatesStore, saveTemplatesStore } from "../../../src/data/templates";
 import { exportMigrationBundle, previewMigrationImport, importMigrationBundle } from "../../../src/services/migration-bundle";
@@ -52,6 +53,8 @@ import "../../../src/index.scss";
 import englishMessages from "../../../public/i18n/en.json";
 import { runMigrationRegression } from "./migration-regression.js";
 import { runPeopleProfileRegression } from "./people-profile-regression.js";
+import { runProfileCardRegression } from "./profile-card-regression.js";
+import { runReturnFocusRegression } from "./return-focus-regression.js";
 import { runOrganizationOperationsRegression } from "./organization-operations-regression.js";
 import { runOperationResultRegression } from "./operation-result-regression.js";
 import { configureBridgeKernel, runExternalBridgeRegression } from "../external-bridge-regression.js";
@@ -66,6 +69,7 @@ import { runOrganizationHealthRegression } from "./organization-health-regressio
 import { runPersonIdentityRegression } from "./person-identity-regression.js";
 import { runOrganizationProjectionRegression } from "./organization-projection-regression.js";
 import { runGraphQueryRegression } from "./graph-query-regression.js";
+import { runGraphLayoutRegression } from "./graph-layout-regression.js";
 import { runAiPreflightRegression } from "./ai-preflight-regression.js";
 import { runImportRegression } from "./import-regression.js";
 
@@ -73,6 +77,7 @@ import { runAliasRegression } from "./alias-regression.js";
 import { runOrganizationContextRegression } from "./organization-context-regression.js";
 import { runSettingsRepairRegression } from "./settings-repair-regression.js";
 import { runDocumentNavigationRegression } from "./document-navigation-regression.js";
+import { runOpenDocumentRegression } from "./open-document-regression.js";
 import { runBatchSelectionRegression } from "./batch-selection-regression.js";
 import { buildAiPreflight } from "../../../src/domain/ai-preflight";
 import { buildAiCandidateDrafts } from "../../../src/domain/ai-candidates";
@@ -122,6 +127,10 @@ function input(node, value) {
 }
 /** B03 可搜索选人器驱动：按 aria-label 打开浮层，按候选名筛选后点选第一项 */
 async function pickOption(label, name) {
+    if (["关系中心", "对比人物"].includes(label)) {
+        const explore = fixture.querySelector(".lvct-graph-explore");
+        if (explore && !explore.open) { explore.querySelector("summary").click(); await tick(); }
+    }
     const findTrigger = () => [...fixture.querySelectorAll(".lvct-picker__trigger")]
         .find((node) => node.getAttribute("aria-label") === label);
     const trigger = findTrigger();
@@ -349,6 +358,10 @@ async function test(name, action) {
     } finally {
         if (mounted) await unmount(mounted);
         mounted = undefined;
+        const state = history.state && typeof history.state === "object"
+            ? Array.isArray(history.state) ? [...history.state] : { ...history.state } : {};
+        delete state.__lvctWorkbench;
+        history.replaceState(state, "", location.href);
         fixture.replaceChildren();
         document.querySelector("#results").textContent = JSON.stringify(results, null, 2);
     }
@@ -690,7 +703,7 @@ await test("数据刷新乱序防护：慢的旧互动响应不得覆盖新数�
     assert(!fixture.textContent.includes("60 天前互动"), "旧响应内容出现在列表中（乱序未挡）");
 });
 
-await test("数据刷新：已打开的 Peek 随数据变化原地重载洞察与跟进（FUNC-01.7-a）", async () => {
+await test("数据刷新：已打开的人物详情随数据变化原地重载洞察与跟进（FUNC-01.7-a）", async () => {
     let insightsCalls = 0;
     let followUpCalls = 0;
     let cadenceCalls = 0;
@@ -727,9 +740,9 @@ await test("数据刷新：已打开的 Peek 随数据变化原地重载洞察�
     detailNav.closest("button").click();
     await until(() => fixture.querySelector(".lvct-person-card"), "名册未渲染");
     fixture.querySelector(".lvct-person-card").dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await until(() => insightsCalls >= 1 && followUpCalls >= 1 && cadenceCalls >= 1, "Peek 未加载洞察、跟进与联系节奏");
+    await until(() => insightsCalls >= 1 && followUpCalls >= 1 && cadenceCalls >= 1, "人物详情未加载洞察、跟进与联系节奏");
     const cadenceMode = fixture.querySelector('select[aria-label="联系节奏模式"]');
-    assert(cadenceMode, "Peek 未渲染联系节奏控件");
+    assert(cadenceMode, "人物详情未渲染联系节奏控件");
     cadenceMode.value = "custom";
     cadenceMode.dispatchEvent(new Event("change", { bubbles: true }));
     await tick();
@@ -740,7 +753,7 @@ await test("数据刷新：已打开的 Peek 随数据变化原地重载洞察�
     const cadenceCallsBeforeRefresh = cadenceCalls;
     cadence = { days: 3, paused: false };
     emitDataChanged();
-    await until(() => insightsCalls >= 2 && followUpCalls >= 2, "Peek 未随数据变化原地重载");
+    await until(() => insightsCalls >= 2 && followUpCalls >= 2, "人物详情未随数据变化原地重载");
     assert(fixture.textContent.includes("跨窗口跟进"), "重载后跟进列表未渲染");
     assert(cadenceCalls === cadenceCallsBeforeRefresh && cadenceDays.value === "23", "跨窗口刷新覆盖了未保存的联系节奏草稿");
 });
@@ -881,13 +894,21 @@ await test("资料完整度筛选与串行补录：缺电话列表、逐个保�
     fixture.style.width = "min(1000px,100%)";
     const peopleGroupFilter = fixture.querySelector('.lvct-people__toolbar select');
     assert(peopleGroupFilter?.getAttribute("aria-label") === "分组筛选", "分组筛选缺少可访问名称");
-    button("视图").click();
+    const viewsTrigger = button("视图");
+    assert(viewsTrigger.getAttribute("aria-expanded") === "false" && viewsTrigger.getAttribute("aria-controls") === null, "视图面板关闭时不应保留悬空 aria-controls");
+    viewsTrigger.click();
     await until(() => fixture.querySelector("#lvct-people-viewsmenu-panel"), "视图面板未打开");
     const viewsPanel = fixture.querySelector("#lvct-people-viewsmenu-panel");
     assert(viewsPanel?.getAttribute("role") === "group" && !viewsPanel.querySelector('[role="menuitem"]'), "保存视图面板不应伪装为嵌套 ARIA 菜单项");
-    button("视图").click();
-    button("更多筛选").click();
+    assert(viewsTrigger.getAttribute("aria-expanded") === "true" && viewsTrigger.getAttribute("aria-controls") === viewsPanel.id, "打开视图面板后触发器未关联面板");
+    viewsTrigger.click();
+    await tick();
+    assert(viewsTrigger.getAttribute("aria-expanded") === "false" && viewsTrigger.getAttribute("aria-controls") === null, "关闭视图面板后仍保留悬空 aria-controls");
+    const moreTrigger = button("更多筛选");
+    assert(moreTrigger.getAttribute("aria-controls") === null, "更多筛选关闭时不应保留悬空 aria-controls");
+    moreTrigger.click();
     await until(() => fixture.querySelector('input[name="lvct-profile-gap"]'), "资料完整度筛选组未显示");
+    assert(moreTrigger.getAttribute("aria-expanded") === "true" && moreTrigger.getAttribute("aria-controls") === fixture.querySelector(".lvct-people__moremenu").id, "打开更多筛选后触发器未关联面板");
     [...fixture.querySelectorAll('input[name="lvct-profile-gap"]')][0].click();
     await until(() => fixture.textContent.includes("逐个补录（2）"), "缺口人数统计错误");
     assert(fixture.textContent.includes("资料：缺电话"), "生效条件 chips 未显示");
@@ -945,15 +966,44 @@ await test("移动端工具栏收纳：常驻搜索/视图切换/新建，其余
     const tools = [...fixture.querySelectorAll(".lvct-people__toolbar button")]
         .find((node) => node.textContent.includes("筛选与整理"));
     assert(tools, "收纳按钮未渲染");
+    assert(tools.getAttribute("aria-expanded") === "false" && tools.getAttribute("aria-controls") === null, "移动工具抽屉关闭时不应保留悬空 aria-controls");
     tools.click();
     await until(() => fixture.querySelector(".lvct-sheet"), "底部弹层未打开");
+    assert(tools.getAttribute("aria-expanded") === "true" && tools.getAttribute("aria-controls") === fixture.querySelector(".lvct-sheet").id, "移动工具抽屉打开后触发器未关联面板");
     assert(fixture.querySelectorAll(".lvct-sheet select").length >= 2, "弹层缺分组/排序控件");
     assert([...fixture.querySelectorAll(".lvct-sheet button")].some((node) => node.textContent.includes("导入已有文档")), "弹层缺导入入口");
+    const importFromSheet = [...fixture.querySelectorAll(".lvct-sheet button")]
+        .find((node) => node.textContent.includes("导入已有文档"));
+    importFromSheet.click();
+    await until(() => fixture.querySelector(".lvct-dialog-panel"), "移动弹层中的导入入口未打开对话框");
+    assert(!fixture.querySelector(".lvct-sheet"), "移动导入对话框打开后底部弹层仍遮挡内容");
+    fixture.querySelector(".lvct-dialog-panel__close").click();
+    await until(() => !fixture.querySelector(".lvct-dialog-panel"), "关闭移动导入对话框失败");
+    tools.click();
+    await until(() => fixture.querySelector(".lvct-sheet"), "关闭导入后无法重新打开移动工具弹层");
     const groupSelect = fixture.querySelectorAll(".lvct-sheet select")[0];
     groupSelect.value = "家人";
     groupSelect.dispatchEvent(new Event("change", { bubbles: true }));
     await tick();
     await until(() => fixture.textContent.includes("共 1 人"), "弹层内分组筛选未生效");
+
+    // 移动端筛选浮层包含文本/日期输入；软键盘引起的 viewport 变化不应销毁浮层或清空草稿。
+    const mobileMoreButton = [...fixture.querySelectorAll(".lvct-sheet button")]
+        .find((node) => node.textContent.includes("更多筛选"));
+    assert(mobileMoreButton, "移动筛选抽屉缺少更多筛选入口");
+    mobileMoreButton.click();
+    await until(() => fixture.querySelector(".lvct-sheet .lvct-people__moremenu"), "移动更多筛选浮层未打开");
+    const mobileWorkInput = fixture.querySelector('.lvct-sheet .lvct-people__moremenu input[type="text"]');
+    assert(mobileWorkInput, "移动更多筛选缺少文本输入");
+    input(mobileWorkInput, "示例单位");
+    window.dispatchEvent(new Event("resize"));
+    window.dispatchEvent(new Event("scroll"));
+    await tick();
+    assert(fixture.querySelector(".lvct-sheet .lvct-people__moremenu"), "移动输入法视口变化后更多筛选浮层被错误关闭");
+    assert(mobileWorkInput.value === "示例单位", "移动输入法视口变化后筛选草稿丢失");
+    mobileWorkInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    await until(() => !fixture.querySelector(".lvct-sheet .lvct-people__moremenu"), "Escape 未先关闭移动更多筛选浮层");
+    assert(fixture.querySelector(".lvct-sheet"), "一次 Escape 同时关闭了移动筛选浮层和底部工具弹层");
 
     const sheet = fixture.querySelector(".lvct-sheet");
     assert(sheet.getAttribute("aria-modal") === "true", "移动工具抽屉未声明模态语义");
@@ -977,6 +1027,7 @@ await test("移动端工具栏收纳：常驻搜索/视图切换/新建，其余
     await until(() => !fixture.querySelector(".lvct-sheet"), "Escape 未关闭移动工具抽屉");
     await until(() => document.activeElement === tools, "抽屉关闭后焦点未返回触发器");
     assert(tools.getAttribute("aria-expanded") === "false", "抽屉关闭后触发器展开状态未更新");
+    assert(tools.getAttribute("aria-controls") === null, "移动工具抽屉关闭后仍保留悬空 aria-controls");
 });
 
 await test("行动区一键建跟进与处置撤销（C07/C06）", async () => {
@@ -1049,7 +1100,7 @@ await test("完整迁移包：六模块导出→恢复预览→确认合并，�
     kernel.handler = async () => ({ code: 0 });
 
     await recordInteraction(plugin, { personDocId: "20260927000000-person1", localDate: "2026-09-28", source: "manual", note: "已有互动" });
-    await createFollowUpRecord(plugin, { id: "fu-exist", personDocId: "20260927000000-person1", title: "已有跟进", dueDate: "2026-10-01", status: "open" });
+    await createFollowUpRecord(plugin, { requestId: "20261014000000-fuexist", personDocId: "20260927000000-person1", title: "已有跟进", dueDate: "2026-10-01" });
     await saveTemplatesStore(plugin, [{ id: "tpl-exist", name: "已有模板", content: "x" }]);
 
     const bundleText = await exportMigrationBundle(plugin);
@@ -1493,7 +1544,20 @@ await test("新建联系人先核验组织和本人前置条件，不因补充�
     } });
     button("新建联系人").click();
     await until(() => fixture.querySelector(".lvct-form input[type=text]"), "新建弹窗未打开");
-    input(fixture.querySelector(".lvct-form input[type=text]"), "关系前置核验的人");
+    const extraToggle = button("补充资料（可选）");
+    assert(extraToggle.getAttribute("aria-expanded") === "false" && extraToggle.getAttribute("aria-controls") === null, "补充资料收起时不应保留悬空 aria-controls");
+    extraToggle.click();
+    await until(() => fixture.querySelector("#lvct-contact-extra-body"), "补充资料面板未打开");
+    assert(extraToggle.getAttribute("aria-expanded") === "true" && extraToggle.getAttribute("aria-controls") === "lvct-contact-extra-body", "补充资料展开后触发器未关联面板");
+    extraToggle.click();
+    await until(() => !fixture.querySelector("#lvct-contact-extra-body"), "补充资料面板未收起");
+    assert(extraToggle.getAttribute("aria-expanded") === "false" && extraToggle.getAttribute("aria-controls") === null, "补充资料收起后仍保留悬空 aria-controls");
+    const contactNameInput = fixture.querySelector(".lvct-form input[type=text]");
+    button("创建联系人").click();
+    await until(() => contactNameInput.getAttribute("aria-invalid") === "true", "缺少姓名时未关联字段错误");
+    assert(contactNameInput.getAttribute("aria-describedby") && fixture.querySelector(`#${contactNameInput.getAttribute("aria-describedby")}`)?.textContent.includes("请输入联系人姓名"), "姓名错误未通过 aria-describedby 关联到字段");
+    assert(document.activeElement === contactNameInput, "姓名缺失时焦点未定位到姓名字段");
+    input(contactNameInput, "关系前置核验的人");
     button("补充资料（可选）").click();
     await tick();
     const relationshipInput = fixture.querySelector('[placeholder^="例如：同事、朋友、校友"]');
@@ -2366,7 +2430,7 @@ await test("别名界面实际服务：重复添加已有别名只保留同一�
         "重复添加已有别名产生重复 ID 或重复写入");
 });
 
-await test("详情子面板：工作台 X 与 Esc 取消保留草稿，明确放弃切人只确认一次", async () => {
+await test("人物详情窗口：居中宽版、焦点循环和嵌套 Esc；X 与 Esc 取消保留草稿，明确放弃切人只确认一次", async () => {
     const second = { ...person, docId: "20260927000000-person2", itemId: "row-2", name: "回归测试乙" };
     let release;
     let writes = 0;
@@ -2384,6 +2448,7 @@ await test("详情子面板：工作台 X 与 Esc 取消保留草稿，明确放
         onPreferencesUpdated() {}, onOpenPersonDoc() {}, facade: {
             settings, viewPreferences: DEFAULT_VIEW_PREFERENCES, listContacts: () => getRoster(settings),
             loadRecentInteractions: async () => ({}), loadPersonInsights: async () => emptyInsights(),
+            loadPersonNote: async () => "", savePersonNote: async (_docId, note) => note,
             listPersonFollowUps: async () => [], getPersonCadence: async () => null, listTemplates: async () => [],
             listPersonAliases: async (docId) => aliases.filter((alias) => alias.personDocId === docId),
             addPersonAlias: async (docId, alias) => {
@@ -2396,8 +2461,94 @@ await test("详情子面板：工作台 X 与 Esc 取消保留草稿，明确放
         },
     } });
     await until(() => fixture.querySelector(".lvct-person-card"), "工作台联系人未加载");
-    fixture.querySelector(".lvct-person-card").click();
+    const trigger = fixture.querySelector(".lvct-person-card");
+    trigger.focus();
+    trigger.click();
     await until(() => fixture.querySelector('input[aria-label="新增别名"]') && fixture.textContent.includes("还没有设置别名"), "工作台详情别名未加载");
+    const panel = fixture.querySelector(".lvct-dialog-panel");
+    assert(panel.getAttribute("aria-modal") === "true", "人物详情没有声明模态窗口");
+    assert(panel.classList.contains("lvct-dialog-panel--wide") && !fixture.querySelector(".lvct-dialog-panel--peek"), "人物详情仍使用侧边抽屉");
+    await Promise.allSettled(panel.getAnimations().map((animation) => animation.finished));
+    if (window.innerWidth > 640) {
+        const box = panel.getBoundingClientRect();
+        // 完整回归的结果区会产生页面滚动条；fixed 遮罩在可用布局视口内居中。
+        const viewportWidth = document.documentElement.clientWidth;
+        const viewportHeight = document.documentElement.clientHeight;
+        assert(box.width >= Math.min(640, window.innerWidth * 0.94), "人物详情仍被压在窄侧栏内");
+        assert(Math.abs(box.left + box.width / 2 - viewportWidth / 2) < 2, "人物详情没有在视口水平居中");
+        assert(Math.abs(box.top + box.height / 2 - viewportHeight / 2) < 2, "人物详情没有在视口垂直居中");
+    }
+    const focusables = [...panel.querySelectorAll("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])")];
+    const first = focusables[0];
+    const last = focusables.at(-1);
+    last.focus();
+    last.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    assert(document.activeElement === first, "人物详情末项 Tab 没有回到窗口首项");
+    first.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
+    assert(document.activeElement === last, "人物详情首项 Shift+Tab 没有回到窗口末项");
+    const editTrigger = panel.querySelector(".lvct-detail__header-actions button");
+    editTrigger.focus();
+    editTrigger.click();
+    await until(() => fixture.querySelectorAll(".lvct-dialog-panel").length === 2, "人物详情内编辑窗口未打开");
+    const editorPanel = [...fixture.querySelectorAll(".lvct-dialog-panel")].at(-1);
+    await until(() => [...editorPanel.querySelectorAll("button")].some((node) => node.textContent.trim() === "新建组织" && !node.disabled), "人物编辑新建组织入口未启用");
+    const findCreateOrgTrigger = () => [...editorPanel.querySelectorAll("button")].find((node) => node.textContent.trim() === "新建组织");
+    let createOrgTrigger = button("新建组织", editorPanel);
+    createOrgTrigger.focus();
+    createOrgTrigger.click();
+    await until(() => fixture.querySelector(".lvct-org-profile-editor"), "人物编辑内新建组织窗口未打开");
+    const orgPanel = fixture.querySelector(".lvct-org-profile-editor").closest(".lvct-dialog-panel");
+    await Promise.allSettled(orgPanel.getAnimations().map((animation) => animation.finished));
+    const orgClose = orgPanel.querySelector(".lvct-dialog-panel__close");
+    const orgCloseBox = orgClose.getBoundingClientRect();
+    assert(document.elementFromPoint(orgCloseBox.left + orgCloseBox.width / 2, orgCloseBox.top + orgCloseBox.height / 2) === orgClose, "新建组织窗口被人物详情遮罩遮挡");
+    orgClose.focus();
+    orgClose.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await until(() => !fixture.querySelector(".lvct-org-profile-editor"), "新建组织 Esc 没有关闭资料窗口");
+    await until(() => findCreateOrgTrigger() && !findCreateOrgTrigger().disabled && document.activeElement === findCreateOrgTrigger(), "取消新建组织没有等待候选刷新后恢复入口焦点");
+    createOrgTrigger = findCreateOrgTrigger();
+    assert(panel.isConnected && editorPanel.isConnected && document.activeElement === createOrgTrigger, "取消新建组织没有返回人物编辑入口");
+    createOrgTrigger.click();
+    await until(() => fixture.querySelector(".lvct-org-profile-editor"), "再次新建组织窗口未打开");
+    const dirtyOrgPanel = fixture.querySelector(".lvct-org-profile-editor").closest(".lvct-dialog-panel");
+    const orgName = dirtyOrgPanel.querySelector('[aria-label="组织名称（必填）"]');
+    orgName.focus();
+    input(orgName, "尚未保存的新组织");
+    await tick();
+    dirtyOrgPanel.querySelector(".lvct-dialog-panel__close").click();
+    await until(() => document.querySelector(".lvct-closeguard"), "新建组织 X 没有保护自己的脏草稿");
+    assert(document.querySelector(".lvct-closeguard__list")?.textContent.includes("新建组织资料尚未保存"), "新建组织局部守卫缺少草稿明细");
+    document.querySelector('.lvct-closeguard button[data-choice="cancel"]').click();
+    await until(() => !document.querySelector(".lvct-closeguard") && document.activeElement === orgName, "新建组织取消关闭没有返回草稿焦点");
+    assert(orgName.value === "尚未保存的新组织" && panel.isConnected && editorPanel.isConnected, "取消关闭丢失组织或人物编辑草稿");
+    orgName.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    await until(() => document.querySelector(".lvct-closeguard"), "新建组织 Esc 没有保护自己的脏草稿");
+    document.querySelector('.lvct-closeguard button[data-choice="discard"]').click();
+    await until(() => !fixture.querySelector(".lvct-org-profile-editor") && findCreateOrgTrigger() && !findCreateOrgTrigger().disabled && document.activeElement === findCreateOrgTrigger(), "放弃组织草稿没有返回人物编辑入口");
+    editorPanel.querySelector(".lvct-dialog-panel__close").focus();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await until(() => fixture.querySelectorAll(".lvct-dialog-panel").length === 1, "嵌套编辑 Esc 没有只关闭一层");
+    assert(panel.isConnected && document.activeElement === editTrigger, "关闭编辑窗口丢失人物详情或没有恢复编辑入口焦点");
+    button("相关人").click();
+    await until(() => panel.querySelector('.lvct-picker__trigger[aria-label="选择要添加关系的联系人"]') && !panel.querySelector('.lvct-picker__trigger[aria-label="选择要添加关系的联系人"]').disabled, "人物详情相关人选择器未就绪");
+    const relationTrigger = panel.querySelector('.lvct-picker__trigger[aria-label="选择要添加关系的联系人"]');
+    relationTrigger.scrollIntoView({ block: "center", behavior: "instant" });
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    relationTrigger.click();
+    await until(() => panel.querySelector(".lvct-picker__panel"), "人物详情相关人浮层未打开");
+    const pickerPanel = panel.querySelector(".lvct-picker__panel");
+    const pickerBox = pickerPanel.getBoundingClientRect();
+    assert(Math.abs(pickerBox.left - Number.parseFloat(pickerPanel.style.left)) < 2
+        && Math.abs(pickerBox.top - Number.parseFloat(pickerPanel.style.top)) < 2, "人物详情容器使相关人浮层偏离视口定位");
+    assert(pickerBox.left >= 0 && pickerBox.right <= window.innerWidth + 1 && pickerBox.top >= 0 && pickerBox.bottom <= window.innerHeight + 1, "人物详情相关人浮层越过视口边界");
+    const search = pickerPanel.querySelector(".lvct-picker__search");
+    const searchBox = search.getBoundingClientRect();
+    assert(pickerPanel.contains(document.elementFromPoint(searchBox.left + searchBox.width / 2, searchBox.top + searchBox.height / 2)), "人物详情相关人搜索框被窗口裁切或遮挡");
+    search.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    await until(() => !panel.querySelector(".lvct-picker__panel"), "相关人 Esc 没有关闭选择浮层");
+    assert(panel.isConnected && document.activeElement === relationTrigger, "相关人 Esc 误关闭人物详情或丢失选择器焦点");
+    button("概览").click();
+    await until(() => fixture.querySelector('input[aria-label="新增别名"]') && fixture.textContent.includes("还没有设置别名"), "返回概览后别名编辑尚未就绪");
     const draft = fixture.querySelector('input[aria-label="新增别名"]');
     input(draft, "别名草稿");
     await tick();
@@ -2435,6 +2586,8 @@ await test("详情子面板：工作台 X 与 Esc 取消保留草稿，明确放
     await until(() => !secondDraft.disabled && secondDraft.value === "", "乙别名保存后未解除守卫");
     button("返回联系人").click();
     await until(() => !fixture.querySelector(".lvct-dialog-panel"), "子面板保存完成后仍无法返回联系人");
+    await until(() => document.activeElement?.dataset.personItemId === trigger.dataset.personItemId, "关闭人物详情没有恢复原联系人入口焦点");
+    assert(document.activeElement?.isConnected && document.activeElement === fixture.querySelector(`[data-person-item-id="${CSS.escape(trigger.dataset.personItemId)}"]`), "关闭人物详情没有恢复同一联系人当前入口的焦点");
 });
 
 await test("字段实际服务：接受但值未匹配只核实原请求，明确拒绝才补写未完成字段", async () => {
@@ -2543,6 +2696,39 @@ await test("字段编辑界面：未知结果保留生日草稿，核实已保�
     button("核实并重试未完成字段").click();
     await until(() => closed, "核实已保存生日后未完成");
     assert(saved === 1 && state.writes.length === before, "核实重试重复写入或重复回调");
+});
+
+await test("字段编辑界面：邮箱和生日校验关联到字段并聚焦，校验失败零写入", async () => {
+    const state = configureContactVerificationKernel();
+    let saved = 0;
+    let closed = false;
+    mounted = mount(PersonEditDialog, { target: fixture, props: {
+        settings, person, onSaved: () => { saved += 1; }, onClose: () => { closed = true; },
+    } });
+    const email = fixture.querySelector('input[type="email"]');
+    input(email, "not-an-email");
+    button("保存").click();
+    await until(() => email.getAttribute("aria-invalid") === "true", "非法邮箱没有标记具体字段");
+    const emailErrorId = email.getAttribute("aria-describedby");
+    assert(emailErrorId && fixture.querySelector(`#${emailErrorId}`)?.textContent.includes("邮箱格式不正确"), "邮箱错误没有通过 aria-describedby 关联到可读说明");
+    assert(document.activeElement === email && state.writes.length === 0 && saved === 0 && !closed, "邮箱校验未聚焦字段、仍写入或关闭编辑页");
+    await unmount(mounted);
+    mounted = undefined;
+    fixture.replaceChildren();
+
+    resetKernel();
+    const birthdayState = configureContactVerificationKernel();
+    mounted = mount(PersonEditDialog, { target: fixture, props: {
+        settings, person: { ...person, birthday: "2026-02-30" }, onSaved: () => { saved += 1; }, onClose: () => { closed = true; },
+    } });
+    /* 日期控件会拒绝显示非法日历值；修改其他字段触发整表保存前校验。 */
+    input(fixture.querySelector('input[type="email"]'), "valid@example.com");
+    button("保存").click();
+    const birthday = fixture.querySelector(".lvct-birthday-field input[type=\"date\"]");
+    await until(() => birthday?.getAttribute("aria-invalid") === "true", "非法生日没有标记具体字段");
+    const birthdayErrorId = birthday.getAttribute("aria-describedby");
+    assert(birthdayErrorId && fixture.querySelector(`#${birthdayErrorId}`)?.textContent.includes("生日不是有效日期"), "生日错误没有通过 aria-describedby 关联到可读说明");
+    assert(document.activeElement === birthday && birthdayState.writes.length === 0 && saved === 0 && !closed, "生日校验未聚焦字段、仍写入或关闭编辑页");
 });
 
 await test("B12 编辑界面：关系称谓可填写，工作单位与学校可选择并保存", async () => {
@@ -3011,6 +3197,85 @@ await test("工作台可通过入口请求切换到设置页", async () => {
     assert(fixture.querySelector(".lvct-settings"), "设置页内容未挂载");
 });
 
+await test("工作台浏览器历史：保留宿主状态、前进后退、重挂载恢复并阻断脏草稿离开", async () => {
+    const hostState = { hostMarker: "keep-me", hostPayload: { panel: "contacts", revision: 7 } };
+    const previousState = history.state;
+    history.replaceState(hostState, "", location.href);
+    const workbenchEntry = () => history.state?.__lvctWorkbench;
+    const assertHostState = () => {
+        assert(history.state?.hostMarker === hostState.hostMarker
+            && history.state?.hostPayload?.panel === "contacts"
+            && history.state?.hostPayload?.revision === 7,
+        `工作台覆盖了宿主 history.state 字段：${JSON.stringify(history.state)}`);
+    };
+    const mountWorkbench = () => mount(Workbench, { target: fixture, props: {
+        settings, preferences: { ...DEFAULT_VIEW_PREFERENCES, defaultView: "home" }, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadRecentInteractions: async () => ({}), loadDashboard: async () => ({
+            people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+            stale: [], neverContacted: 0, neverContactedItemIds: [],
+        }) },
+    } });
+    try {
+        mounted = mountWorkbench();
+        await until(() => fixture.querySelector("h1")?.textContent === "首页", "工作台首页未加载");
+        await until(() => workbenchEntry()?.view === "home", "首页没有写入当前 history entry");
+        const homeIndex = workbenchEntry().index;
+        assertHostState();
+
+        navButton(["联系人"]).click();
+        await until(() => fixture.querySelector("h1")?.textContent === "联系人", "联系人导航未切换");
+        await until(() => workbenchEntry()?.view === "people", "联系人导航没有建立历史项");
+        navButton(["关系图谱"]).click();
+        await until(() => fixture.querySelector("h1")?.textContent === "关系图谱", "图谱导航未切换");
+        await until(() => workbenchEntry()?.view === "graph", "图谱导航没有建立历史项");
+        navButton(["设置"]).click();
+        await until(() => fixture.querySelector("h1")?.textContent === "设置", "设置导航未切换");
+        await until(() => workbenchEntry()?.view === "settings", "设置导航没有建立历史项");
+        assert(workbenchEntry().index > homeIndex, "页面切换没有递增工作台历史索引");
+        assertHostState();
+
+        history.go(-2);
+        await until(() => fixture.querySelector("h1")?.textContent === "联系人" && workbenchEntry()?.view === "people",
+            "浏览器后退两步未恢复联系人页面");
+        history.go(2);
+        await until(() => fixture.querySelector("h1")?.textContent === "设置" && workbenchEntry()?.view === "settings",
+            "浏览器前进两步未恢复设置页面");
+        assertHostState();
+
+        // 全页重载会销毁组件实例；在 UI smoke 中用卸载并重挂载验证仅依赖 history.state 的恢复路径。
+        await unmount(mounted);
+        mounted = undefined;
+        mounted = mountWorkbench();
+        await until(() => fixture.querySelector("h1")?.textContent === "设置", "重挂载未从当前 history entry 恢复视图");
+        assert(workbenchEntry()?.view === "settings", "重挂载覆盖了已保存的工作台视图");
+        assertHostState();
+
+        navButton(["首页"]).click();
+        await until(() => fixture.querySelector("h1")?.textContent === "首页", "回到首页失败");
+        navButton(["联系人"]).click();
+        await until(() => fixture.querySelector("h1")?.textContent === "联系人", "再次进入联系人页失败");
+        button("新建联系人").click();
+        await until(() => fixture.querySelector('.lvct-form input[type="text"]'), "新建联系人表单未打开");
+        input(fixture.querySelector('.lvct-form input[type="text"]'), "历史守卫草稿");
+        await tick();
+        const currentIndex = workbenchEntry()?.index;
+        history.back();
+        await until(() => document.querySelector(".lvct-closeguard"), "浏览器后退未触发脏草稿关闭守卫");
+        document.querySelector('.lvct-closeguard [data-choice="cancel"]')?.click();
+        await until(() => !document.querySelector(".lvct-closeguard"), "关闭守卫取消后仍残留");
+        await until(() => fixture.querySelector("h1")?.textContent === "联系人" && workbenchEntry()?.view === "people",
+            "拒绝关闭后没有恢复原历史位置");
+        assert(workbenchEntry()?.index === currentIndex && fixture.querySelector('.lvct-form input[type="text"]')?.value === "历史守卫草稿",
+            "关闭守卫拒绝后页面、历史位置或草稿发生丢失");
+        assertHostState();
+    } finally {
+        if (mounted) await unmount(mounted);
+        mounted = undefined;
+        try { history.replaceState(previousState, "", location.href); } catch { /* 只恢复夹具当前项 */ }
+    }
+});
+
 await test("新工作台可按入口指定的初始视图打开", async () => {
     mounted = mount(Workbench, { target: fixture, props: {
         settings, preferences: DEFAULT_VIEW_PREFERENCES, initialView: "settings", isMobile: false,
@@ -3018,6 +3283,38 @@ await test("新工作台可按入口指定的初始视图打开", async () => {
     } });
     await until(() => fixture.querySelector("h1")?.textContent === "设置", "工作台没有使用入口指定的初始视图");
     assert(fixture.querySelector(".lvct-settings"), "初始设置页内容未挂载");
+});
+
+await test("R54 视觉基线：工作台尺度、白色内容面与设置页单一标题", async () => {
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: { settings, loadDashboard: async () => ({
+            people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+            stale: [], neverContacted: 0, neverContactedItemIds: [],
+        }) },
+    } });
+    await until(() => fixture.querySelector(".lvct-dash__actions"), "首页行动区未挂载");
+    const sidebar = fixture.querySelector(".lvct-workbench__sidebar");
+    const body = fixture.querySelector(".lvct-workbench__body");
+    const actionPanel = fixture.querySelector(".lvct-dash__actions");
+    if (window.innerWidth <= 640) {
+        const nav = sidebar.querySelector(".lvct-workbench__nav");
+        const sidebarStyle = getComputedStyle(sidebar);
+        assert(sidebarStyle.position === "fixed" && sidebarStyle.bottom === "0px", "移动端导航未固定在视口底部");
+        assert(nav.getBoundingClientRect().width > 0 && getComputedStyle(nav).display === "grid", "移动端底部导航结构未挂载");
+        assert(getComputedStyle(body).maxWidth === "none", "移动端工作区未铺满可用宽度");
+    } else {
+        assert(Math.round(sidebar.getBoundingClientRect().width) === 192, `桌面侧栏未对齐 R54 尺度：${sidebar.getBoundingClientRect().width}px`);
+        assert(getComputedStyle(body).maxWidth === "1240px", "工作区内容宽度未对齐原型基线");
+    }
+    assert(getComputedStyle(actionPanel).boxShadow === "none", "普通行动面板不应带浮层阴影");
+    button("设置").click();
+    await until(() => fixture.querySelector(".lvct-settings"), "设置页未挂载");
+    const headerTitle = fixture.querySelector(".lvct-workbench__header h1");
+    const settingsTitle = fixture.querySelector(".lvct-settings__heading");
+    assert(headerTitle?.textContent === "设置", "工作台没有提供唯一设置页标题");
+    assert(getComputedStyle(settingsTitle).display === "none", "设置页内容区仍重复渲染标题");
 });
 
 await test("B14.8 按组织收窄：关系图人物与组织节点收窄、文档引用图白名单收窄与范围说明", async () => {
@@ -3040,11 +3337,9 @@ await test("B14.8 按组织收窄：关系图人物与组织节点收窄、文�
                 { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
             ],
         })) } };
-        if (route === "/api/graph/getLocalGraph") {
-            assert(body.conf && typeof body.conf === "object", "引用图请求缺少实证 conf 对象");
-            localCalls.push(body.id);
-            return {
-                id: body.id,
+        if (route === "/api/query/sql") {
+            if (String(body.stmt).includes("FROM refs")) localCalls.push(nativeRefsQueryCenter(body.stmt));
+            return nativeRefsFixture(body.stmt, {
                 nodes: [
                     { id: selfDocId, label: "我自己", type: "NodeDocument", refs: 2, defs: 0 },
                     { id: memberA, label: "组织成员甲", type: "NodeDocument", refs: 0, defs: 1 },
@@ -3056,7 +3351,7 @@ await test("B14.8 按组织收窄：关系图人物与组织节点收窄、文�
                     { from: selfDocId, to: memberB, ref: true },
                     { from: selfDocId, to: outsider, ref: true },
                 ],
-            };
+            });
         }
         throw new Error(`回归测试不允许请求 ${route}`);
     };
@@ -3101,13 +3396,13 @@ await test("B14.8 按组织收窄：关系图人物与组织节点收窄、文�
     await until(() => localCalls.length === 1 && localCalls[0] === selfDocId, "局部图未使用保留的本人范围");
     const retainedNames = [{ id: selfDocId, name: "我自己" }, { id: orgDocId, name: "收窄科技" }]
         .sort((first, second) => first.id < second.id ? -1 : first.id > second.id ? 1 : 0).map((entry) => entry.name).join("、");
-    await until(() => fixture.querySelector(".lvct-graph-summary")?.textContent.includes(`范围外中心优先保留：${retainedNames}（不属于当前范围或组织成员集合，不新增关系事实）`), "范围外本人和补充组织的保留说明缺失或排序错误");
+    await until(() => fixture.querySelector(".lvct-graph-evidence")?.textContent.includes(`范围外中心优先保留：${retainedNames}（不属于当前范围或组织成员集合，不新增关系事实）`), "范围外本人和补充组织的保留说明缺失或排序错误");
     const nativeCanvasLive = () => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy;
     await until(() => (nativeCanvasLive()?.nodes().length ?? 0) === 4, "引用图收窄未保留本人、组织与两位成员");
     assert(nativeCanvasLive().getElementById(outsider).empty(), "引用图圈外人未被收窄过滤");
     assert(nativeCanvasLive().getElementById(orgDocId).nonempty() && nativeCanvasLive().edges().length === 2
         && nativeCanvasLive().edges().every((edge) => edge.data("kind") === "ref"), "组织聚焦将成员事实混入引用边");
-    assert(fixture.querySelector(".lvct-graph-summary")?.textContent.includes("登记 5")
+    assert(fixture.querySelector(".lvct-graph-evidence")?.textContent.includes("登记 5")
         && fixture.querySelector(".lvct-graph-summary")?.textContent.includes("展示 4 节点 / 2 边"), "聚焦范围与计数不可核对");
 });
 
@@ -3153,7 +3448,7 @@ await test("B13.5a 组织视图：侧栏入口、卡片渲染（活跃/归档/�
 });
 
 if (window.innerWidth <= 640) {
-    await test("移动视口显示底部导航，Peek 详情占满屏幕并保留安全区内距", async () => {
+    await test("移动视口显示底部导航，人物详情窗口占满屏幕并保留安全区内距", async () => {
         mounted = mount(Workbench, { target: fixture, props: {
             settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: true,
             onPreferencesUpdated() {}, onOpenPersonDoc() {},
@@ -3175,10 +3470,73 @@ if (window.innerWidth <= 640) {
         peopleNav.click();
         await until(() => fixture.querySelector("h1")?.textContent === "联系人", "底部导航未切换联系人");
         fixture.querySelector(".lvct-person-card")?.click();
-        await until(() => fixture.querySelector(".lvct-dialog-panel--peek"), "移动端详情 Peek 未打开");
-        const panel = fixture.querySelector(".lvct-dialog-panel--peek");
-        assert(panel.getBoundingClientRect().width >= window.innerWidth - 20, `移动端 Peek 没有占满视口：${getComputedStyle(panel).width} / ${window.innerWidth}px`);
-        assert(Number.parseFloat(getComputedStyle(panel).paddingBottom) > 0, "移动端 Peek 没有底部内距");
+        await until(() => fixture.querySelector(".lvct-dialog-panel--wide"), "移动端人物详情窗口未打开");
+        const panel = fixture.querySelector(".lvct-dialog-panel--wide");
+        await Promise.allSettled(panel.getAnimations().map((animation) => animation.finished));
+        assert(panel.getAttribute("aria-modal") === "true", "移动端人物详情没有声明模态窗口");
+        assert(panel.getBoundingClientRect().width >= window.innerWidth - 20, `移动端人物详情没有占满视口：${getComputedStyle(panel).width} / ${window.innerWidth}px`);
+        assert(Number.parseFloat(getComputedStyle(panel).paddingBottom) > 0, "移动端人物详情没有底部内距");
+
+        const closeButton = panel.querySelector(".lvct-dialog-panel__close");
+        assert(closeButton, "移动端人物详情没有可见的关闭按钮");
+        const longContent = document.createElement("div");
+        longContent.setAttribute("aria-hidden", "true");
+        longContent.style.height = "1200px";
+        panel.append(longContent);
+        panel.scrollTop = panel.scrollHeight;
+        await tick();
+        const closeBox = closeButton.getBoundingClientRect();
+        assert(panel.scrollTop > 0, "移动端详情测试没有实际滚动内容");
+        const header = panel.querySelector(".lvct-dialog-panel__header");
+        const headerStyle = getComputedStyle(header);
+        assert(headerStyle.position === "sticky", `移动端详情标题栏滚动时没有固定：position=${headerStyle.position}`);
+        assert(closeBox.top >= -1 && closeBox.bottom <= window.innerHeight + 1,
+            `移动端详情滚动后关闭按钮不在视口内：top=${closeBox.top}, bottom=${closeBox.bottom}, headerTop=${header.getBoundingClientRect().top}, scrollTop=${panel.scrollTop}, overflow=${getComputedStyle(panel).overflow}`);
+        closeButton.click();
+        await until(() => !fixture.querySelector(".lvct-dialog-panel"), "滚动后点击关闭按钮未关闭人物详情");
+    });
+}
+
+if (window.innerWidth > 640) {
+    await test("桌面人物详情滚动后标题栏与关闭按钮保持可达", async () => {
+        mounted = mount(Workbench, { target: fixture, props: {
+            settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
+            onPreferencesUpdated() {}, onOpenPersonDoc() {},
+            facade: {
+                settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+                loadDashboard: async () => ({ people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+                    stale: [{ person }], neverContacted: 1, neverContactedItemIds: [person.itemId] }),
+                loadPersonInsights: async () => emptyInsights(),
+                loadRecentInteractions: async () => ({}),
+                recordInteraction: async () => {},
+            },
+        } });
+        await until(() => fixture.querySelector(".lvct-workbench__sidebar"), "桌面工作台未加载");
+        const peopleNav = [...fixture.querySelectorAll(".lvct-workbench__nav-item")]
+            .find((node) => node.textContent.includes("联系人"));
+        assert(peopleNav, "未找到桌面联系人导航");
+        peopleNav.click();
+        await until(() => fixture.querySelector(".lvct-person-card"), "桌面名册未加载");
+        fixture.querySelector(".lvct-person-card").click();
+        await until(() => fixture.querySelector(".lvct-dialog-panel--wide"), "桌面人物详情未打开");
+        const panel = fixture.querySelector(".lvct-dialog-panel--wide");
+        await Promise.allSettled(panel.getAnimations().map((animation) => animation.finished));
+        const closeButton = panel.querySelector(".lvct-dialog-panel__close");
+        const longContent = document.createElement("div");
+        longContent.setAttribute("aria-hidden", "true");
+        longContent.style.height = "1200px";
+        panel.append(longContent);
+        panel.scrollTop = panel.scrollHeight;
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const panelBox = panel.getBoundingClientRect();
+        const closeBox = closeButton.getBoundingClientRect();
+        assert(panel.scrollTop > 0, "桌面详情测试没有实际滚动内容");
+        assert(getComputedStyle(panel.querySelector(".lvct-dialog-panel__header")).position === "sticky",
+            "桌面详情标题栏滚动时没有固定");
+        assert(closeBox.top >= panelBox.top && closeBox.bottom <= panelBox.bottom,
+            `桌面详情滚动后关闭按钮不在窗口内：top=${closeBox.top}, bottom=${closeBox.bottom}, panel=${panelBox.top}..${panelBox.bottom}`);
+        closeButton.click();
+        await until(() => !fixture.querySelector(".lvct-dialog-panel"), "滚动后点击关闭按钮未关闭桌面人物详情");
     });
 }
 
@@ -3229,18 +3587,7 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
     };
     /* B03：关系中心/对比人物改走可搜索选人器（打开 → 按名筛选 → 点选） */
     const pick = async (label, id) => {
-        const trigger = [...fixture.querySelectorAll(".lvct-picker__trigger")]
-            .find((node) => node.getAttribute("aria-label") === label);
-        assert(trigger, `未找到选人器：${label}`);
-        trigger.click();
-        await until(() => fixture.querySelector(".lvct-picker__panel"), `${label}浮层未打开`);
-        const name = entries.find((entry) => entry.id === id)?.name ?? id;
-        input(fixture.querySelector(".lvct-picker__search"), name);
-        await tick();
-        const option = [...fixture.querySelectorAll(".lvct-picker__option")][0];
-        assert(option, `${label} 未找到候选 ${id}`);
-        option.click();
-        await tick();
+        await pickOption(label, entries.find((entry) => entry.id === id)?.name ?? id);
     };
     await pick("关系中心", "a");
     await until(() => fixture.textContent.includes("直接关系：2 人"), "直接关系计数错误");
@@ -3295,7 +3642,7 @@ await test("图谱邻接、共同联系人与最短路径不重建画布，筛�
     const filteredCanvas = () => fixture.querySelector(".lvct-graph-view__canvas")?._cyreg?.cy;
     await until(() => filteredCanvas()?.nodes().length === 2, "搜索未保留中心和匹配人物");
     assert(filteredCanvas().getElementById("e").nonempty() && filteredCanvas().getElementById("c").nonempty()
-        && fixture.querySelector(".lvct-graph-summary")?.textContent.includes("中心优先保留：孤立人物"), "保中心例外缺少稳定目标或说明");
+        && fixture.querySelector(".lvct-graph-evidence")?.textContent.includes("中心优先保留：孤立人物"), "保中心例外缺少稳定目标或说明");
     const compareTrigger = [...fixture.querySelectorAll(".lvct-picker__trigger")]
         .find((node) => node.getAttribute("aria-label") === "对比人物");
     assert(compareTrigger && !compareTrigger.disabled, "有效中心保留后不应禁用对比");
@@ -3365,13 +3712,12 @@ await test("图谱文档引用模式：内核局部图按登记集合过滤，�
                 { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
             ],
         })) } };
-        if (route === "/api/graph/getLocalGraph") {
-            localRequests += 1;
-            assert(body && body.id === selfDocId, "局部图中心不是本人档案");
-            assert(body.conf && typeof body.conf === "object", "getLocalGraph 请求缺 conf 对象（内核必填）");
-            /* 字段形状按 spike:b14 实证：节点 id/label/refs/defs，边 from/to */
-            return {
-                id: body.id,
+        if (route === "/api/query/sql") {
+            if (String(body.stmt).includes("FROM refs")) {
+                localRequests += 1;
+                assert(nativeRefsQueryCenter(body.stmt) === selfDocId, "局部引用中心不是本人档案");
+            }
+            return nativeRefsFixture(body.stmt, {
                 nodes: [
                     { id: selfDocId, label: "我自己", type: "NodeDocument", refs: 2, defs: 0 },
                     { id: contactA, label: "引用甲", type: "NodeDocument", refs: 0, defs: 1 },
@@ -3383,7 +3729,7 @@ await test("图谱文档引用模式：内核局部图按登记集合过滤，�
                     { from: contactB, to: selfDocId, ref: true },
                     { from: selfDocId, to: stranger, ref: true },
                 ],
-            };
+            });
         }
         throw new Error(`回归测试不允许请求 ${route}`);
     };
@@ -3419,7 +3765,7 @@ await test("图谱文档引用模式：内核局部图按登记集合过滤，�
     await until(() => (nativeCanvas()?.nodes().length ?? 0) === 2, "引用图搜索未保留有效中心和匹配节点");
     assert(nativeCanvas().getElementById(selfDocId).nonempty() && nativeCanvas().getElementById(contactA).nonempty()
         && nativeCanvas().getElementById(contactB).empty() && nativeCanvas().edges().length === 1, "引用搜索结果/裁边错误");
-    assert(fixture.querySelector(".lvct-graph-summary")?.textContent.includes("中心优先保留：我自己") && localRequests === 1, "引用中心例外缺少说明或搜索重复查询内核");
+    assert(fixture.querySelector(".lvct-graph-evidence")?.textContent.includes("中心优先保留：我自己") && localRequests === 1, "引用中心例外缺少说明或搜索重复查询内核");
     input(fixture.querySelector('input[type="search"]'), "");
     await until(() => (nativeCanvas()?.nodes().length ?? 0) === 3, "引用图清空搜索未恢复");
     /* 切回关系图：不应重复请求局部图 */
@@ -3476,7 +3822,7 @@ await test("关系图组织增强：组织节点与成员边分源展示，开�
         .find((node) => node.textContent.includes("显示组织"));
     assert(orgToggle, "未找到组织开关");
     orgToggle.querySelector("input").click();
-    await until(() => fixture.querySelector(".lvct-graph-summary")?.textContent.includes("中心优先保留：曙光科技"), "组织中心不满足显示开关时缺少保留说明");
+    await until(() => fixture.querySelector(".lvct-graph-evidence")?.textContent.includes("中心优先保留：曙光科技"), "组织中心不满足显示开关时缺少保留说明");
     assert(canvas().getElementById(orgDocId).nonempty(), "有效组织中心被显示开关静默隐藏");
     const relationScope = fixture.querySelector('select[aria-label="关系图范围"]');
     relationScope.value = "global";
@@ -3517,32 +3863,19 @@ await test("引用图范围切换：联系为中心一度、全部登记文档�
                 { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: [] } } },
             ],
         })) } };
-        if (route === "/api/graph/getLocalGraph") {
-            localCalls.push(body.id);
-            assert([selfDocId, contactA, contactB].includes(body.id), "失效中心仍发送局部图请求");
-            const around = body.id === contactA
-                ? { nodes: [{ id: contactA, label: "中心人物甲" }, { id: contactB, label: "联系人乙" }], links: [{ from: contactA, to: contactB, ref: true }] }
-                : { nodes: [{ id: body.id, label: nameRows.find((row) => row.id === body.id).name }], links: [] };
-            return {
-                id: body.id,
-                nodes: around.nodes.map((node) => ({ ...node, type: "NodeDocument", refs: 0, defs: 0 })),
-                links: around.links,
-            };
-        }
-        if (route === "/api/graph/getGraph") {
-            globalCalls += 1;
-            return {
-                nodes: [
-                    { id: selfDocId, label: "我自己", type: "NodeDocument", refs: 0, defs: 0 },
-                    { id: contactA, label: "中心人物甲", type: "NodeDocument", refs: 0, defs: 0 },
-                    { id: contactB, label: "联系人乙", type: "NodeDocument", refs: 0, defs: 0 },
-                    { id: stranger, label: "无关笔记", type: "NodeDocument", refs: 9, defs: 9 },
-                ],
-                links: [
-                    { from: selfDocId, to: contactA, ref: true },
-                    { from: selfDocId, to: stranger, ref: true },
-                ],
-            };
+        if (route === "/api/query/sql") {
+            const center = nativeRefsQueryCenter(body.stmt);
+            if (String(body.stmt).includes("FROM refs")) {
+                if (center) {
+                    localCalls.push(center);
+                    assert([selfDocId, contactA, contactB].includes(center), "失效中心仍发送局部引用请求");
+                } else globalCalls += 1;
+            }
+            return nativeRefsFixture(body.stmt, {
+                nodes: [...nameRows.map((row) => ({ id: row.id, label: row.name })), { id: stranger, label: "无关笔记" }],
+                links: center ? center === contactA ? [{ from: contactA, to: contactB, ref: true }] : []
+                    : [{ from: selfDocId, to: contactA, ref: true }, { from: selfDocId, to: stranger, ref: true }],
+            });
         }
         throw new Error(`回归测试不允许请求 ${route}`);
     };
@@ -3578,15 +3911,15 @@ await test("引用图范围切换：联系为中心一度、全部登记文档�
     await until(() => fixture.querySelector(".lvct-graph-summary")?.textContent.includes(`人物中心 · 联系人乙 · ${contactB}`)
         && nativeCanvas()?.nodes().length === 1 && nativeCanvas().nodes()[0].id() === contactB, "person 范围说明或局部结果缺少实际中心");
     assert(savedCenter === contactB, "中心人物偏好未持久化");
-    /* 全部登记文档：getGraph + 登记集合过滤 */
+    /* 全部登记文档：只读 refs + 登记集合过滤 */
     scopeSelect.value = "global";
     scopeSelect.dispatchEvent(new Event("change", { bubbles: true }));
     await until(() => globalCalls === 1, "全局图请求未发出");
     await until(() => fixture.textContent.includes("不是整库图"), "global 范围说明缺失");
     await until(() => (nativeCanvas()?.nodes().length ?? 0) === 3, "无关笔记未被登记集合过滤");
     assert(nativeCanvas().edges().length === 1, "被过滤节点的边未丢弃");
-    await until(() => fixture.querySelector(".lvct-graph-summary")?.textContent.includes("登记 3 · 来源节点 3 / 边 1"), "来源登记数或边数说明错误");
-    assert(fixture.querySelector(".lvct-graph-summary")?.textContent.includes("范围排除 0")
+    await until(() => fixture.querySelector(".lvct-graph-evidence")?.textContent.includes("登记 3 · 来源节点 3 / 边 1"), "来源登记数或边数说明错误");
+    assert(fixture.querySelector(".lvct-graph-evidence")?.textContent.includes("范围排除 0")
         && fixture.querySelector(".lvct-graph-summary")?.textContent.includes("展示 3 节点 / 1 边")
         && savedNativeScope === "global", "全局范围实际计数或偏好不可核对");
     assert(!fixture.textContent.includes("暂无引用"), "范围外对象被误称暂无引用");
@@ -3822,14 +4155,19 @@ await test("设置页可按列类型手动恢复字段映射并拒绝空提交",
     graphModeSelect.dispatchEvent(new Event("change", { bubbles: true }));
     graphScopeSelect.value = "global";
     graphScopeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await until(() => !button("保存偏好").disabled, "图谱默认项修改后保存入口仍被禁用");
     button("保存偏好").click();
     await until(() => savedPreference?.graphMode === "native" && savedPreference?.nativeScope === "global", "图谱默认项未保存");
     if (window.innerWidth <= 640) {
         const layoutEl = fixture.querySelector(".lvct-settings__layout");
         const navEl = fixture.querySelector(".lvct-settings__nav");
         assert(getComputedStyle(layoutEl).flexDirection === "column", "移动端设置页应为纵向布局");
-        assert(getComputedStyle(navEl).display === "grid", "移动端设置导航应为网格");
-        assert([...navEl.querySelectorAll("button")].every((item) => item.getBoundingClientRect().right <= window.innerWidth + 1), "移动端设置分区按钮被裁切");
+        const navStyle = getComputedStyle(navEl);
+        assert(navStyle.display === "flex" && navStyle.flexDirection === "row", "移动端设置导航应为单行横向滚动");
+        assert(navStyle.flexWrap !== "wrap" && navStyle.overflowX === "auto", "移动端设置导航应保留横向滚动出口");
+        const navRect = navEl.getBoundingClientRect();
+        assert(navRect.left >= -1 && navRect.right <= window.innerWidth + 1, "移动端设置导航容器被裁切");
+        assert([...navEl.querySelectorAll("button")].every((item) => item.getBoundingClientRect().height >= 40), "移动端设置分区触控目标不足 40px");
     }
     const dataNav = [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes("数据与字段"));
     assert(dataNav, "未找到数据与字段导航");
@@ -3862,8 +4200,11 @@ await test("表格列显隐与顺序偏好持久化，姓名列固定，恢复�
     await until(() => fixture.querySelector("table"), "表格未渲染");
     sameList(headers(), ["", "姓名", "电话", "分组"], "列顺序未按偏好渲染");
 
-    button("列设置").click();
+    const columnTrigger = button("列设置");
+    assert(columnTrigger.getAttribute("aria-expanded") === "false" && columnTrigger.getAttribute("aria-controls") === null, "列设置关闭时不应保留悬空 aria-controls");
+    columnTrigger.click();
     await tick();
+    assert(columnTrigger.getAttribute("aria-expanded") === "true" && columnTrigger.getAttribute("aria-controls") === fixture.querySelector("#lvct-people-colmenu-panel")?.id, "列设置打开后触发器未关联面板");
     const nameRow = fixture.querySelector(".lvct-people__colmenu-row input");
     assert(nameRow.disabled && nameRow.checked, "姓名列应固定且不可取消");
     fixture.querySelector('input[aria-label="显示微信列"]').click();
@@ -4446,7 +4787,7 @@ await test("今日行动清单：多原因单卡徽标，逾期跟进批量顺�
     assert(cardA.textContent.includes("行动乙") === false, "不同人物不应合并卡片");
 
     // 批量顺延：把逾期跟进顺延到今天
-    [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("2 条逾期跟进顺延到今天")).click();
+    [...fixture.querySelectorAll("button")].find((node) => node.getAttribute("aria-label")?.includes("2 条逾期跟进顺延到今天")).click();
     await until(() => snoozeCalls.length === 2, "批量顺延未触发");
     assert(snoozeCalls[0][0] === "fu-1" && snoozeCalls[0][1] === "custom" && snoozeCalls[0][2] === todayKey, "顺延参数错误");
     assert(snoozeCalls[1][0] === "fu-2", "失败项未继续执行");
@@ -5017,7 +5358,7 @@ await test("关系结果导出：路径链 Markdown、无路径兜底与图规�
         assert(text.includes("展示节点 3 / 边 1") && text.includes("来源节点 3 / 边 1"), "快照展示与来源规模缺失");
         assert(text.includes("不代表现实社交关系、引荐意愿或关系强弱"), "范围免责缺失");
         input(fixture.querySelector('input[type="search"]'), "没有匹配");
-        await until(() => fixture.querySelector(".lvct-graph-summary")?.textContent.includes("当前筛选或裁剪后的 related 图中未找到路径"), "筛选后的无路径未区分原因");
+        await until(() => fixture.querySelector(".lvct-graph-evidence")?.textContent.includes("当前筛选或裁剪后的 related 图中未找到路径"), "筛选后的无路径未区分原因");
         button("导出结果说明").click();
         await until(() => downloads === 2, "筛选快照导出未触发");
         const filteredText = await blob.text();
@@ -5531,6 +5872,87 @@ await test("互动导出保留原始损坏项与未知版本，读取失败不�
     try { await exportInteractionJson(plugin); } catch (error) { message = error.message; }
     assert(message.includes("存储读取失败"), "读取失败仍生成备份");
     assert(writes === 0, "导出修改了原存储");
+});
+
+await test("设置页无变化禁用保存，修改后只提交一次并显示结果", async () => {
+    let calls = 0;
+    let finishSave;
+    mounted = mount(SettingsView, { target: fixture, props: {
+        facade: {
+            saveViewPreferences: async (value) => {
+                calls += 1;
+                await new Promise((resolve) => { finishSave = resolve; });
+                return { ...value, revision: DEFAULT_VIEW_PREFERENCES.revision + 1 };
+            },
+        },
+        settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {},
+    } });
+    for (const section of ["通用", "数据与字段", "AI 与隐私"]) {
+        const nav = [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes(section));
+        assert(nav, `未找到设置分区：${section}`);
+        await until(() => !nav.disabled, `${section}分区仍被其他初始化任务锁定`);
+        nav.click();
+        await until(() => fixture.querySelector(".lvct-settings__actions button"), `${section}分区没有呈现偏好保存入口`);
+        assert(fixture.querySelector(".lvct-settings__actions button").disabled, `${section}分区在无修改时仍可保存`);
+    }
+    const general = [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes("通用"));
+    await until(() => !general.disabled, "通用分区仍被其他初始化任务锁定");
+    general.click();
+    await until(() => fixture.querySelector(".lvct-settings__actions button"), "通用分区没有呈现偏好保存入口");
+    const save = button("保存偏好");
+    assert(save.disabled, "没有修改时仍可提交保存");
+    save.click();
+    await tick();
+    assert(calls === 0, "没有修改时仍调用保存服务");
+
+    const startup = fixture.querySelector(".lvct-settings__switch-row input");
+    startup.checked = !startup.checked;
+    startup.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    assert(!save.disabled, "有未保存修改时保存按钮仍禁用");
+    save.click();
+    await tick();
+    assert(save.disabled && calls === 1, "提交期间未锁定按钮或没有开始保存");
+    save.click();
+    await tick();
+    assert(calls === 1, "重复点击产生了第二次保存");
+    finishSave();
+    await until(() => fixture.textContent.includes("偏好已保存"), "保存成功没有明确反馈");
+    assert(save.disabled, "保存成功后未恢复为无待保存状态");
+});
+
+await test("设置页数值校验：三个提醒天数分别关联错误并聚焦，非法值不保存", async () => {
+    let saveCalls = 0;
+    mounted = mount(SettingsView, { target: fixture, props: {
+        facade: { saveViewPreferences: async (value) => { saveCalls += 1; return value; } },
+        settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {},
+    } });
+    const reminderNav = [...fixture.querySelectorAll(".lvct-settings__nav-item")].find((node) => node.textContent.includes("提醒"));
+    assert(reminderNav, "未找到提醒设置分区");
+    reminderNav.click();
+    const fields = [
+        ["birthdayWindowDays", "生日提醒窗口", "lvct-pref-birthday-window-error"],
+        ["staleThresholdDays", "久未联系阈值", "lvct-pref-stale-threshold-error"],
+        ["reminderGraceDays", "收编宽限期", "lvct-pref-reminder-grace-error"],
+    ];
+    await until(() => fixture.querySelectorAll('.lvct-settings__form-grid input[type="number"]').length === 3, "提醒数字设置未加载");
+    const inputs = [...fixture.querySelectorAll('.lvct-settings__form-grid input[type="number"]')];
+    const save = button("保存偏好");
+    for (const [index, [field, label, errorId]] of fields.entries()) {
+        const target = inputs[index];
+        input(target, "-1");
+        await tick();
+        save.click();
+        await until(() => target.getAttribute("aria-invalid") === "true", `${label}非法值没有标记字段错误`);
+        assert(target.getAttribute("aria-describedby") === errorId && fixture.querySelector(`#${errorId}`)?.textContent.includes("0–365 的整数"), `${label}错误未与输入字段建立可访问关联`);
+        assert(document.activeElement === target, `${label}校验没有将焦点移动到具体输入框`);
+        assert(saveCalls === 0, `${label}非法值触发了偏好保存`);
+        input(target, String(DEFAULT_VIEW_PREFERENCES[field]));
+        await tick();
+        assert(target.getAttribute("aria-invalid") !== "true", `${label}修正后仍保留错误状态`);
+    }
 });
 
 await test("设置页备份读取失败不下载，重试后下载完整快照", async () => {
@@ -6285,23 +6707,31 @@ await test("向导：预检提示将复用的内容，失败后可继续并在�
 
 await test("读取故障显式化：首页模块读取失败显示降级横幅（指名模块），重试成功后消失（FUNC-01.12）", async () => {
     let calls = 0;
+    let resolveReload;
+    const reloadPending = new Promise((resolve) => { resolveReload = resolve; });
+    const base = {
+        people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+        stale: [], staleTotal: 0, neverContacted: 0, neverContactedItemIds: [],
+        followUps: [], actions: [], neverOrder: {},
+    };
     mounted = mount(Workbench, { target: fixture, props: {
         settings, preferences: DEFAULT_VIEW_PREFERENCES, isMobile: false,
         onPreferencesUpdated() {}, onOpenPersonDoc() {},
         facade: { settings, loadRecentInteractions: async () => ({}), loadDashboard: async () => {
             calls += 1;
-            const base = {
-                people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
-                stale: [], staleTotal: 0, neverContacted: 0, neverContactedItemIds: [],
-                followUps: [], actions: [], neverOrder: {},
-            };
-            return calls === 1 ? { ...base, readFailures: ["interactions", "followUps"] } : base;
+            if (calls === 1) return { ...base, readFailures: ["interactions", "followUps"] };
+            return reloadPending;
         } },
     } });
     await until(() => fixture.querySelector(".lvct-notice--error"), "读取失败横幅未显示");
     assert(fixture.textContent.includes("互动记录") && fixture.textContent.includes("跟进计划"),
         "横幅未指名受影响模块（互动记录/跟进计划）");
-    fixture.querySelector(".lvct-notice__action").click();
+    const retry = fixture.querySelector(".lvct-notice__action");
+    retry.click();
+    await until(() => calls === 2 && retry.disabled && retry.textContent.includes("正在重新加载"), "重试加载中未显示反馈或未锁定按钮");
+    retry.click();
+    assert(calls === 2, "加载期间重复点击触发了重复请求");
+    resolveReload(base);
     await until(() => calls >= 2 && !fixture.querySelector(".lvct-notice--error"), "重试后横幅未消失");
     assert(calls === 2, "重试未按一次计");
 });
@@ -6333,6 +6763,8 @@ await test("读取故障显式化：跟进计划读取失败显示错误态与�
 
 await runMigrationRegression({ test, assert, person, settings, kernel, fixture, until, button });
 await runPeopleProfileRegression({ test, assert, kernel, settings, fixture, until, button });
+await runProfileCardRegression({ test, assert, fixture });
+await runReturnFocusRegression({ test, assert, fixture, settings, kernel, until, button });
 await runOperationResultRegression({ test, assert, kernel, settings, fixture, until, button });
 await runExternalBridgeRegression({ test, assert, kernel, settings });
 await runRelationRegression({ test, assert, kernel, settings });
@@ -6347,12 +6779,14 @@ await runPersonIdentityRegression({ test, assert, kernel, settings, fixture, unt
 await runOrganizationProjectionRegression({ test, assert, kernel, settings, fixture, until, button });
 await runOrganizationOperationsRegression({ test, assert, fixture, until, button });
 await runGraphQueryRegression({ test, assert, kernel, settings, fixture, until, button });
+await runGraphLayoutRegression({ test, assert, kernel, settings, fixture, until, button });
 await runAiPreflightRegression({ test, assert, kernel, settings, fixture });
 await runImportRegression({ test, assert, kernel, settings, fixture, until, button });
 await runAliasRegression({ test, assert, kernel, settings, fixture, until });
 await runOrganizationContextRegression({ test, assert, kernel, settings, fixture, until, button });
 await runSettingsRepairRegression({ test, assert, kernel, settings, fixture, until, button });
 await runDocumentNavigationRegression({ test, assert, kernel, settings, fixture, until, button });
+await runOpenDocumentRegression({ test, assert });
 await runBatchSelectionRegression({ test, assert, kernel, settings, fixture, until, button });
 
 await pause(100);

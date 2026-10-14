@@ -1,11 +1,11 @@
 /**
  * 内核 HTTP 传输层：api/ 目录是唯一允许发内核请求的地方。
  * 全部端点形状经 M0 spike 在 v3.8.5 真内核实证（scripts/spike/）。
- * CODE-02.6 API 边界：请求有界（超时拒绝，不自动重试——写入重试会产生重复块），
- * 协议异常形状上抛，不得归一为空结果（读故障显式化）。
+ * CODE-02.6 API 边界：统一超时/取消与错误解码；仅登记的只读端点允许并发去重，
+ * 仅传输失败可限次重试。写入不自动去重或重试，避免把未知结果变成重复数据。
  */
 import { fetchPost } from "siyuan";
-import { withTimeout } from "../shared/async";
+import { AsyncAbortError, AsyncTimeoutError, withTimeout } from "../shared/async";
 import { validateDocumentTitle } from "../domain/format";
 import {
     assertKernelArray,
@@ -36,9 +36,62 @@ export {
 /** 内核请求等待上限；宿主卡顿时以超时拒绝，用户可在界面重试（写入严禁自动重试） */
 export const kernelConfig = { timeoutMs: 15_000 };
 
+/** 只允许明确的读取端点共享并发请求/进行一次传输失败重试。 */
+const SAFE_READ_ROUTES = new Set([
+    "/api/notebook/lsNotebooks",
+    "/api/query/sql",
+    "/api/av/renderAttributeView",
+    "/api/av/getAttributeView",
+    "/api/av/getAttributeViewItemIDsByBoundIDs",
+]);
+const MAX_READ_TRANSPORT_RETRIES = 1;
+const READ_RETRY_DELAY_MS = 80;
+const inFlightReads = new Map<string, Promise<unknown>>();
+
+function canonicalJson(value: unknown): string {
+    if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+    if (typeof value === "object" && value !== null) {
+        const record = value as Record<string, unknown>;
+        return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(",")}}`;
+    }
+    const encoded = JSON.stringify(value);
+    if (encoded === undefined) throw new TypeError("内核请求体包含不可序列化的值");
+    return encoded;
+}
+
+function isSafeRead(route: string, body: Record<string, unknown>): boolean {
+    if (!SAFE_READ_ROUTES.has(route)) return false;
+    // querySql is a general SQL transport. Only a single SELECT statement is
+    // provably read-only here; callers using UPDATE/INSERT/CTE or multiple
+    // statements get ordinary no-retry, no-dedupe semantics.
+    if (route === "/api/query/sql") {
+        const statement = body.stmt;
+        return typeof statement === "string" && /^\s*SELECT\b/i.test(statement) && !statement.includes(";");
+    }
+    return true;
+}
+
+function waitBeforeRetry(route: string, delayMs: number, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) return Promise.reject(new AsyncAbortError(route));
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            signal?.removeEventListener("abort", abort);
+            resolve();
+        }, delayMs);
+        const abort = () => {
+            clearTimeout(timer);
+            signal?.removeEventListener("abort", abort);
+            reject(new AsyncAbortError(route));
+        };
+        signal?.addEventListener("abort", abort, { once: true });
+    });
+}
+
 export interface KernelPostOptions<T> {
     timeoutMs?: number;
     signal?: AbortSignal;
+    /** Freshness-sensitive callers can bypass in-flight sharing while keeping retry/timeout policy. */
+    dedupe?: boolean;
     decode?: (data: unknown) => T;
 }
 
@@ -47,15 +100,15 @@ function kernelPost<T>(
     body: Record<string, unknown> = {},
     options: KernelPostOptions<T> = {},
 ): Promise<T> {
-    return withTimeout(
-        () => new Promise<T>((resolve, reject) => {
+    if (options.signal?.aborted) return Promise.reject(new AsyncAbortError(route));
+    const timeoutMs = options.timeoutMs ?? kernelConfig.timeoutMs;
+    const safeRead = isSafeRead(route, body);
+    // A caller-supplied signal belongs to that consumer. It cannot safely control a
+    // request shared with other readers, so signalled reads stay independent.
+    const canShareRead = safeRead && options.dedupe !== false && !options.signal;
+    const sendOnce = () => new Promise<unknown>((resolve, reject) => {
             const handleResponse = (response: unknown) => {
-                try {
-                    const envelope = decodeKernelResponse<T>(route, response);
-                    resolve(options.decode ? options.decode(envelope.data) : envelope.data);
-                } catch (error) {
-                    reject(error);
-                }
+                resolve(response);
             };
 
             const handleFailure = (response: unknown) => {
@@ -78,11 +131,50 @@ function kernelPost<T>(
             } catch (error) {
                 reject(new KernelTransportError(route, error));
             }
-        }),
-        options.timeoutMs ?? kernelConfig.timeoutMs,
-        route,
-        { signal: options.signal },
-    );
+        });
+
+    const sendWithPolicy = async (): Promise<unknown> => {
+        const deadline = Date.now() + timeoutMs;
+        let attempt = 0;
+        while (true) {
+            const remainingMs = deadline - Date.now();
+            if (remainingMs <= 0) throw new AsyncTimeoutError(route, timeoutMs);
+            try {
+                return await withTimeout(sendOnce, remainingMs, route, { signal: options.signal });
+            } catch (error) {
+                if (!safeRead || !(error instanceof KernelTransportError) || attempt >= MAX_READ_TRANSPORT_RETRIES) throw error;
+                attempt += 1;
+                const delay = Math.min(READ_RETRY_DELAY_MS, Math.max(0, deadline - Date.now()));
+                if (delay <= 0) throw error;
+                await waitBeforeRetry(route, delay, options.signal);
+            }
+        }
+    };
+
+    let rawRequest: Promise<unknown>;
+    let key: string | undefined;
+    if (canShareRead) {
+        key = `${route}\n${timeoutMs}\n${canonicalJson(body)}`;
+        const existing = inFlightReads.get(key);
+        if (existing) rawRequest = existing;
+        else {
+            rawRequest = sendWithPolicy();
+            inFlightReads.set(key, rawRequest);
+            void rawRequest.finally(() => {
+                if (inFlightReads.get(key!) === rawRequest) inFlightReads.delete(key!);
+            }).catch(() => undefined);
+        }
+    } else {
+        rawRequest = sendWithPolicy();
+    }
+
+    // Each caller owns its cancellation; aborting one consumer must not cancel a read
+    // shared with another consumer. fetchPost itself has no cancellation API, so a
+    // timeout/abort only ends this caller's wait; the host operation may still finish.
+    return withTimeout(() => rawRequest, timeoutMs, route, { signal: options.signal }).then((response) => {
+        const envelope = decodeKernelResponse<T>(route, response);
+        return options.decode ? options.decode(envelope.data) : envelope.data;
+    });
 }
 
 function decodeNotebookList(route: string, data: unknown): NotebookMeta[] {
@@ -227,8 +319,14 @@ export interface DocRow {
 }
 
 /** 跑一条只读 SQL；思源索引异步刷新，写后立刻查可能短暂滞后 */
-export async function querySql<T = Record<string, unknown>>(stmt: string): Promise<T[]> {
-    return kernelPost("/api/query/sql", { stmt }, { decode: (data) => decodeArray<T>("/api/query/sql", data) });
+export async function querySql<T = Record<string, unknown>>(
+    stmt: string,
+    options: Pick<KernelPostOptions<T[]>, "dedupe" | "signal" | "timeoutMs"> = {},
+): Promise<T[]> {
+    return kernelPost("/api/query/sql", { stmt }, {
+        ...options,
+        decode: (data) => decodeArray<T>("/api/query/sql", data),
+    });
 }
 
 /* ---------- block ---------- */

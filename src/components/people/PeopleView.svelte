@@ -31,7 +31,9 @@
     import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal, Bookmark, Pencil, Trash2 } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
     import { isAbortError } from "../../shared/async";
+    import { requestErrorMessage } from "../../shared/error-presenter";
     import type { ContactExtendedDraft } from "../../domain/contact-create";
+    import { buildVirtualRows, estimateVirtualHeight, virtualRowAtOffset, virtualRowRange } from "../../domain/virtual-list";
 
     let {
         settings,
@@ -103,6 +105,22 @@
 
     let people: ContactSummary[] = $state([]);
     let loading: boolean = $state(true);
+    let refreshQueued = $state(false);
+    let peopleElement: HTMLDivElement | undefined = $state();
+    type ContactFocusResult = "restored" | "cancelled" | "missing";
+    let focusRequest: { itemId: string; previousActive: Element | null; resolve: (result: ContactFocusResult) => void } | null = $state(null);
+
+    export function cancelContactFocus(): void {
+        focusRequest?.resolve("cancelled");
+        focusRequest = null;
+    }
+
+    /** 详情关闭时按稳定行 ID 返回；刷新或渐进读取期间保留请求，避免聚焦已卸载的旧卡片。 */
+    export function focusContact(itemId: string): Promise<ContactFocusResult> {
+        cancelContactFocus();
+        if (!peopleAlive) return Promise.resolve("cancelled");
+        return new Promise((resolve) => { focusRequest = { itemId, previousActive: document.activeElement, resolve }; });
+    }
     let errorText: string = $state("");
     let searchText: string = $state("");
     let selectedPeopleCache: Record<string, ContactSummary> = $state({});
@@ -191,13 +209,15 @@
             // 这样某次自动保存失败后，下一次切换仍会把之前的改动一并重试，不会静默丢失。
             await onPreferencesChange(next, normalizeViewPreferences(preferences));
         } catch (error) {
-            prefError = error instanceof Error ? error.message : String(error);
+            prefError = requestErrorMessage(error);
         }
     }
 
     function setViewMode(mode: "cards" | "table") {
         if (viewMode === mode) return;
         viewMode = mode;
+        virtualScrollTop = 0;
+        if (peopleListElement) peopleListElement.scrollTop = 0;
         const intent = nextPreferenceIntent({ peopleView: mode === "table" ? "table" : "card" });
         void persistPreferences(intent.next);
     }
@@ -239,7 +259,12 @@
         const wrap = colMenuWrap;
         const panel = colMenuPanel;
         if (!colMenuOpen || !wrap || !panel) return;
-        return attachPopover(panel, wrap, () => (colMenuOpen = false));
+        // 移动端软键盘会触发 resize/scroll；列设置内虽然没有文本框，
+        // 但它可能与筛选抽屉共存，统一保持浮层并重新定位，避免视口变化误关闭。
+        return attachPopover(panel, wrap, () => (colMenuOpen = false), isMobile ? {
+            closeOnScroll: false,
+            closeOnResize: false,
+        } : undefined);
     });
     let adding: boolean = $state(false);
     let importing: boolean = $state(false);
@@ -273,6 +298,9 @@
 
     function handleMobileSheetKeydown(event: KeyboardEvent) {
         if (event.key === "Escape") {
+            // 更多筛选、视图和列设置是挂在底部弹层里的独立浮层。
+            // 先让最内层浮层的全局处理器收起自身，避免一次 Esc 把外层也带走。
+            if (document.querySelector(".lvct-people__moremenu, .lvct-people__viewsmenu, .lvct-people__colmenu")) return;
             event.preventDefault();
             closeMobileSheet();
             return;
@@ -312,11 +340,15 @@
     let rosterAbortController: AbortController | undefined;
     onDestroy(() => {
         peopleAlive = false;
+        cancelContactFocus();
         refreshGeneration += 1;
         recentGeneration += 1;
         rosterLoadGeneration += 1;
         rosterAbortController?.abort();
         rosterAbortController = undefined;
+        cardResizeObserver?.disconnect();
+        cardResizeObserver = undefined;
+        observedCards.clear();
     });
     const guardedClose = useCloseGuard({
         busy: () => batchBusy || exportingSelected,
@@ -337,6 +369,71 @@
     let rosterLoadingMore: boolean = $state(false);
     let rosterLoadError: string = $state("");
     let rosterLoadGeneration = 0;
+
+    /**
+     * 长联系人列表只保留视口附近的 DOM。600 条以内继续使用原有完整渲染，
+     * 避免小列表引入滚动估算；超过阈值后，数据仍完整保留在内存中，选择、
+     * 筛选和批量操作的语义不变，只减少离屏卡片/行的挂载数量。
+     */
+    const VIRTUAL_LIST_THRESHOLD = 600;
+    const VIRTUAL_OVERSCAN_ROWS = 3;
+    const CARD_ROW_ESTIMATE = 202;
+    const TABLE_ROW_ESTIMATE = 48;
+    const VIRTUAL_ROW_GAP = 16;
+    let peopleListElement: HTMLDivElement | null = $state(null);
+    let virtualScrollTop = $state(0);
+    let virtualViewportHeight = $state(0);
+    let virtualViewportWidth = $state(0);
+    let virtualFrame: number | undefined;
+    let cardMeasureRevision = $state(0);
+    const cardMeasurements = new Map<string, { width: number; height: number }>();
+    let cardResizeObserver: ResizeObserver | undefined;
+    const observedCards = new Set<HTMLElement>();
+
+    function updateVirtualViewport(): void {
+        if (!peopleListElement) return;
+        const element = peopleListElement;
+        if (virtualFrame !== undefined) return;
+        virtualFrame = requestAnimationFrame(() => {
+            virtualFrame = undefined;
+            if (!element.isConnected) return;
+            if (element !== peopleListElement) return;
+            const active = document.activeElement;
+            const focusedItem = active instanceof HTMLElement ? active.closest<HTMLElement>("[data-person-item-id]") : null;
+            if (focusedItem && element.contains(focusedItem) && visible.length > VIRTUAL_LIST_THRESHOLD) {
+                const index = filtered.findIndex((person) => person.itemId === focusedItem.dataset.personItemId);
+                const height = element.clientHeight;
+                const range = currentVirtualRange(element.scrollTop, height);
+                const start = range.start * virtualColumnCount;
+                const end = Math.min(visible.length, range.end * virtualColumnCount);
+                if (index >= 0 && (index < start || index >= end)) element.focus({ preventScroll: true });
+            }
+            virtualScrollTop = element.scrollTop;
+            virtualViewportHeight = element.clientHeight;
+            virtualViewportWidth = element.clientWidth;
+        });
+    }
+
+    function handlePeopleListScroll(): void {
+        updateVirtualViewport();
+    }
+
+    $effect(() => {
+        const element = peopleListElement;
+        if (!element) return;
+        updateVirtualViewport();
+        element.addEventListener("scroll", handlePeopleListScroll, { passive: true });
+        const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(updateVirtualViewport);
+        observer?.observe(element);
+        return () => {
+            element.removeEventListener("scroll", handlePeopleListScroll);
+            observer?.disconnect();
+            if (virtualFrame !== undefined) {
+                cancelAnimationFrame(virtualFrame);
+                virtualFrame = undefined;
+            }
+        };
+    });
 
     const groups = $derived.by(() => {
         const set = new Set<string>();
@@ -359,16 +456,235 @@
             : extraFilter;
         const final = applyPeopleFilters(result, recentError ? {} : recent, recentSafeFilter);
         const birthdayDays = new Map(final.map((person) => [person.itemId, nextBirthday(person.birthday, person.isLunar)?.daysUntil ?? Infinity]));
+        const effectiveSortMode = recentError && sortMode === "recent" ? "name" : sortMode;
         final.sort((a, b) => {
-            if (sortMode === "group") return a.group.localeCompare(b.group, "zh-CN") || a.name.localeCompare(b.name, "zh-CN");
-            if (sortMode === "birthday") return (birthdayDays.get(a.itemId) ?? Infinity) - (birthdayDays.get(b.itemId) ?? Infinity) || a.name.localeCompare(b.name, "zh-CN");
-            if (sortMode === "recent") return (recent[b.docId]?.occurredAt ?? -Infinity) - (recent[a.docId]?.occurredAt ?? -Infinity) || a.name.localeCompare(b.name, "zh-CN");
+            if (effectiveSortMode === "group") return a.group.localeCompare(b.group, "zh-CN") || a.name.localeCompare(b.name, "zh-CN");
+            if (effectiveSortMode === "birthday") return (birthdayDays.get(a.itemId) ?? Infinity) - (birthdayDays.get(b.itemId) ?? Infinity) || a.name.localeCompare(b.name, "zh-CN");
+            if (effectiveSortMode === "recent") return (recent[b.docId]?.occurredAt ?? -Infinity) - (recent[a.docId]?.occurredAt ?? -Infinity) || a.name.localeCompare(b.name, "zh-CN");
             return a.name.localeCompare(b.name, "zh-CN");
         });
         return final;
     });
     const visible = $derived(filtered.slice(0, visibleCount));
+    const virtualized = $derived(visible.length > VIRTUAL_LIST_THRESHOLD);
+    const virtualRowSize = $derived(viewMode === "table" ? TABLE_ROW_ESTIMATE : CARD_ROW_ESTIMATE);
+    const virtualColumnCount = $derived(viewMode === "table"
+        ? 1
+        : Math.max(1, Math.floor((virtualViewportWidth + 16) / (285 + 16))));
+    const virtualCardWidth = $derived(virtualColumnCount > 0
+        ? Math.max(0, (virtualViewportWidth - VIRTUAL_ROW_GAP * (virtualColumnCount - 1)) / virtualColumnCount)
+        : 0);
+    const virtualCardEstimate = $derived.by(() => {
+        cardMeasureRevision;
+        const measuredRows: number[] = [];
+        if (virtualCardWidth > 0) {
+            for (let start = 0; start < visible.length; start += virtualColumnCount) {
+                let rowHeight = 0;
+                let complete = true;
+                for (const person of visible.slice(start, start + virtualColumnCount)) {
+                    const measurement = cardMeasurements.get(person.itemId);
+                    if (!measurement || Math.abs(measurement.width - virtualCardWidth) >= 2) {
+                        complete = false;
+                        break;
+                    }
+                    rowHeight = Math.max(rowHeight, measurement.height);
+                }
+                if (complete) measuredRows.push(rowHeight);
+            }
+        }
+        // Estimate with complete row maxima, so desktop multi-column rows and the
+        // mobile single-column layout both track their own measured content density.
+        return Math.max(120, Math.min(420, estimateVirtualHeight(measuredRows, CARD_ROW_ESTIMATE)));
+    });
+    const cardVirtualRows = $derived.by(() => {
+        cardMeasureRevision;
+        return buildVirtualRows(visible, virtualColumnCount, (person) => person.itemId,
+            (itemId) => {
+                const measurement = cardMeasurements.get(itemId);
+                return measurement && virtualCardWidth > 0 && Math.abs(measurement.width - virtualCardWidth) < 2
+                    ? measurement.height : undefined;
+            }, virtualCardEstimate, VIRTUAL_ROW_GAP);
+    });
+    const tableVirtualRows = $derived.by(() => buildVirtualRows(visible, 1, (person) => person.itemId,
+        () => TABLE_ROW_ESTIMATE, TABLE_ROW_ESTIMATE, 0));
+    const virtualRows = $derived(viewMode === "cards" ? cardVirtualRows : tableVirtualRows);
+    const currentVirtualRange = (scrollTop: number, viewportHeight: number) => virtualized
+        ? virtualRowRange(virtualRows.offsets, scrollTop, viewportHeight, VIRTUAL_OVERSCAN_ROWS, virtualRowSize * 4)
+        : { start: 0, end: virtualRows.rows.length };
+    const virtualStartRow = $derived(virtualized ? currentVirtualRange(virtualScrollTop, virtualViewportHeight).start : 0);
+    const virtualEndRow = $derived(virtualized ? currentVirtualRange(virtualScrollTop, virtualViewportHeight).end : 0);
+    const virtualStartIndex = $derived(virtualized ? virtualStartRow * virtualColumnCount : 0);
+    const virtualEndIndex = $derived(virtualized ? Math.min(visible.length, virtualEndRow * virtualColumnCount) : visible.length);
+    const renderedVisible = $derived(virtualized ? visible.slice(virtualStartIndex, virtualEndIndex) : visible);
+    const virtualTopSpacer = $derived(virtualized
+        ? Math.max(0, (virtualRows.offsets[virtualStartRow] ?? 0) - (viewMode === "cards" && virtualStartRow > 0 ? VIRTUAL_ROW_GAP : 0))
+        : 0);
+    const virtualBottomSpacer = $derived(virtualized
+        ? Math.max(0, virtualRows.totalHeight - (virtualRows.offsets[virtualEndRow] ?? virtualRows.totalHeight)
+            - (viewMode === "cards" && virtualEndRow < virtualRows.rows.length ? VIRTUAL_ROW_GAP : 0))
+        : 0);
+
+    function readCardMeasurement(element: Element): { id: string; width: number; height: number } | null {
+        if (!(element instanceof HTMLElement)) return null;
+        const id = element.dataset.personItemId;
+        if (!id || !element.isConnected) return null;
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 ? { id, width: rect.width, height: rect.height } : null;
+    }
+
+    function applyCardMeasurements(entries: readonly Pick<ResizeObserverEntry, "target">[]): void {
+        const element = peopleListElement;
+        if (!element || viewMode !== "cards" || !virtualized) return;
+        const prior = cardVirtualRows;
+        const anchorScrollTop = element.scrollTop;
+        const wasAtBottom = element.scrollTop + element.clientHeight >= element.scrollHeight - 2;
+        const priorAnchorRow = virtualRowAtOffset(prior.offsets, element.scrollTop);
+        const anchorId = prior.rows[priorAnchorRow]?.items[0]?.itemId;
+        const offsetInAnchor = element.scrollTop - (prior.offsets[priorAnchorRow] ?? 0);
+        let changed = false;
+        for (const entry of entries) {
+            const measurement = readCardMeasurement(entry.target);
+            if (!measurement) continue;
+            const old = cardMeasurements.get(measurement.id);
+            if (!old || Math.abs(old.width - measurement.width) >= 1 || Math.abs(old.height - measurement.height) >= 1) {
+                cardMeasurements.set(measurement.id, { width: measurement.width, height: measurement.height });
+                changed = true;
+            }
+        }
+        if (!changed) return;
+        cardMeasureRevision += 1;
+        // Keep the same stable row at the same intra-row offset when measured rows above
+        // the viewport change the spacer height (long wrapped profile text is common here).
+        if (anchorId) {
+            void tick().then(() => requestAnimationFrame(() => {
+                if (element !== peopleListElement || !element.isConnected) return;
+                // A user may scroll before this measurement batch reaches the next frame.
+                // Never let a stale anchor move their newer position.
+                if (Math.abs(element.scrollTop - anchorScrollTop) > 1) return;
+                if (wasAtBottom) {
+                    // Measurements of the final rows can grow the scroll height. Preserve
+                    // the user's intent to stay at the end instead of leaving the viewport
+                    // stranded above the last contacts.
+                    element.scrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+                    updateVirtualViewport();
+                    return;
+                }
+                const row = cardVirtualRows.rows.findIndex((candidate) => candidate.items.some((person) => person.itemId === anchorId));
+                if (row < 0) return;
+                element.scrollTop = Math.max(0, (cardVirtualRows.offsets[row] ?? 0) + offsetInAnchor);
+                updateVirtualViewport();
+            }));
+        }
+    }
+
+    // Observe only the rendered cards. The observer follows the list container lifetime;
+    // the diff below avoids recreating it on every scroll-window update.
+    $effect(() => {
+        const element = peopleListElement;
+        if (!element || typeof ResizeObserver === "undefined") return;
+        const observer = new ResizeObserver((entries) => applyCardMeasurements(entries));
+        cardResizeObserver = observer;
+        return () => {
+            observer.disconnect();
+            if (cardResizeObserver === observer) cardResizeObserver = undefined;
+            observedCards.clear();
+        };
+    });
+
+    $effect(() => {
+        renderedVisible;
+        const element = peopleListElement;
+        const observer = cardResizeObserver;
+        if (!element || !observer) return;
+        const cards = viewMode === "cards" && virtualized
+            ? [...element.querySelectorAll<HTMLElement>(".lvct-person-card[data-person-item-id]")]
+            : [];
+        const current = new Set(cards);
+        for (const previous of observedCards) {
+            if (!current.has(previous)) {
+                observer.unobserve(previous);
+                observedCards.delete(previous);
+            }
+        }
+        const initialMeasurements: Array<Pick<ResizeObserverEntry, "target">> = [];
+        for (const card of cards) {
+            if (observedCards.has(card)) continue;
+            observedCards.add(card);
+            observer.observe(card);
+            const measurement = readCardMeasurement(card);
+            if (measurement) initialMeasurements.push({ target: card });
+        }
+        if (initialMeasurements.length) applyCardMeasurements(initialMeasurements);
+    });
+
+    $effect(() => {
+        const currentIds = new Set(people.map((person) => person.itemId));
+        let changed = false;
+        for (const id of cardMeasurements.keys()) {
+            if (!currentIds.has(id)) {
+                cardMeasurements.delete(id);
+                changed = true;
+            }
+        }
+        if (changed) cardMeasureRevision += 1;
+    });
+
+    let previousFilterSignature = "";
+    $effect(() => {
+        const signature = JSON.stringify([searchText, groupFilter, tagFilter, extraFilter, focusIds, focusLabel, sortMode, currentViewId]);
+        if (previousFilterSignature && signature !== previousFilterSignature) {
+            if (peopleListElement) peopleListElement.scrollTop = 0;
+            virtualScrollTop = 0;
+        }
+        previousFilterSignature = signature;
+    });
+
+    let previousColumnCount = 0;
+    $effect(() => {
+        const columns = virtualColumnCount;
+        if (previousColumnCount > 0 && columns !== previousColumnCount) {
+            if (peopleListElement) peopleListElement.scrollTop = 0;
+            virtualScrollTop = 0;
+        }
+        previousColumnCount = columns;
+    });
     $effect(() => { onOrderChange?.(filtered); });
+
+    $effect(() => {
+        const request = focusRequest;
+        if (!request || refreshQueued || loading || !peopleElement) return;
+        // 这些依赖在名册、筛选或视图变化提交后重新查找当前入口。
+        visible;
+        viewMode;
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && active.isConnected && active !== document.body && active !== request.previousActive) {
+            // 等待读取时用户已聚焦其他控件或新窗口，保留其新的操作位置。
+            focusRequest = null;
+            request.resolve("cancelled");
+            return;
+        }
+        const index = filtered.findIndex((person) => person.itemId === request.itemId);
+        if (index >= visibleCount) {
+            // 编辑或互动可能改变排序位置，先展示新的所在页，再恢复该入口。
+            visibleCount = index + 1;
+            return;
+        }
+        if (virtualized && (index < virtualStartIndex || index >= virtualEndIndex)) {
+            const targetRow = Math.floor(index / virtualColumnCount);
+            if (peopleListElement) {
+                peopleListElement.scrollTop = viewMode === "cards"
+                    ? cardVirtualRows.offsets[targetRow] ?? 0
+                    : targetRow * virtualRowSize;
+                virtualScrollTop = peopleListElement.scrollTop;
+            }
+            return;
+        }
+        const target = peopleElement.querySelector<HTMLElement>(`[data-person-item-id="${CSS.escape(request.itemId)}"]`);
+        if (!target && rosterLoadingMore) return;
+        focusRequest = null;
+        target?.focus({ preventScroll: true });
+        request.resolve(target && document.activeElement === target ? "restored" : "missing");
+    });
 
     // 生效条件行（F03）：搜索/分组/标签与更多筛选的可视化，可单项清除
     type ConditionChip = { key: string; label: string };
@@ -426,7 +742,11 @@
         const wrap = moreMenuWrap;
         const panel = moreMenuPanel;
         if (!moreOpen || !wrap || !panel) return;
-        return attachPopover(panel, wrap, () => (moreOpen = false));
+        // 更多筛选包含文本和日期输入，移动端输入法打开时不能销毁当前草稿。
+        return attachPopover(panel, wrap, () => (moreOpen = false), isMobile ? {
+            closeOnScroll: false,
+            closeOnResize: false,
+        } : undefined);
     });
 
     // 视图浮层：fixed 定位原语（B02）——absolute 面板会被滚动祖先裁剪，宿主菜单同样用 fixed
@@ -434,7 +754,11 @@
         const wrap = viewsMenuWrap;
         const panel = viewsMenuPanel;
         if (!viewsOpen || !wrap || !panel) return;
-        return attachPopover(panel, wrap, () => (viewsOpen = false));
+        // 视图菜单在移动筛选抽屉内复用，和其它移动浮层保持一致的视口变化行为。
+        return attachPopover(panel, wrap, () => (viewsOpen = false), isMobile ? {
+            closeOnScroll: false,
+            closeOnResize: false,
+        } : undefined);
     });
 
     // 外部偏好更新时同步本地视图列表
@@ -502,7 +826,7 @@
             await onPreferencesChange(preferenceIntent, normalizeViewPreferences(preferences));
             return true;
         } catch (error) {
-            prefError = error instanceof Error ? error.message : String(error);
+            prefError = requestErrorMessage(error);
             return false;
         }
     }
@@ -613,7 +937,7 @@
         } catch (error) {
             if (request !== refreshGeneration) return;
             /* 刷新失败保留旧列表内容，仅以横幅提示（可再次刷新重试） */
-            if (!isAbortError(error)) errorText = error instanceof Error ? error.message : String(error);
+            if (!isAbortError(error)) errorText = requestErrorMessage(error);
             loading = false;
         } finally {
             if (rosterAbortController === abortController && !rosterLoadingMore) rosterAbortController = undefined;
@@ -650,7 +974,7 @@
             }
         } catch (error) {
             if (request === refreshGeneration && expectedGeneration === rosterLoadGeneration && !isAbortError(error)) {
-                rosterLoadError = error instanceof Error ? error.message : String(error);
+                rosterLoadError = requestErrorMessage(error);
             }
         } finally {
             if (expectedGeneration === rosterLoadGeneration) rosterLoadingMore = false;
@@ -675,7 +999,8 @@
         revision;
         const query = searchText.trim();
         stopRosterLoading();
-        const timer = window.setTimeout(() => void refresh(), query ? 250 : 0);
+        refreshQueued = true;
+        const timer = window.setTimeout(() => { refreshQueued = false; void refresh(); }, query ? 250 : 0);
         return () => window.clearTimeout(timer);
     });
 
@@ -688,7 +1013,8 @@
             recentError = "";
         } catch (error) {
             if (request !== recentGeneration) return;
-            recentError = error instanceof Error ? error.message : String(error);
+            recentError = requestErrorMessage(error);
+            if (sortMode === "recent") sortMode = "name";
         }
     }
 
@@ -808,7 +1134,7 @@
             if (peopleAlive) batchResultElement?.focus();
         } catch (error) {
             if (!peopleAlive) return;
-            batchError = error instanceof Error ? error.message : String(error);
+            batchError = requestErrorMessage(error);
             await tick();
             if (peopleAlive) batchResultElement?.focus();
         } finally {
@@ -832,7 +1158,7 @@
             anchor.click();
             URL.revokeObjectURL(url);
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             exportingSelected = false;
         }
@@ -850,18 +1176,18 @@
             selectedIds = [];
             await refresh();
         } catch (error) {
-            batchError = error instanceof Error ? error.message : String(error);
+            batchError = requestErrorMessage(error);
         } finally {
             batchBusy = false;
         }
     }
 </script>
 
-<div class="lvct-people">
+<div class="lvct-people" bind:this={peopleElement}>
     <!-- B09-1：工具栏控件 snippet 化——桌面原位渲染；移动端收进「筛选与整理」底部弹层（互斥渲染，popover 单挂载） -->
     {#snippet viewMenuControl()}
         <span id="lvct-people-viewsmenu" bind:this={viewsMenuWrap} style="position:relative; display:inline-flex">
-            <button class="b3-button b3-button--outline" aria-label={text("peopleViews", "视图")} aria-expanded={viewsOpen} aria-controls="lvct-people-viewsmenu-panel" onclick={() => (viewsOpen = !viewsOpen)}>
+            <button class="b3-button b3-button--outline" aria-label={text("peopleViews", "视图")} aria-expanded={viewsOpen} aria-controls={viewsOpen ? "lvct-people-viewsmenu-panel" : undefined} onclick={() => (viewsOpen = !viewsOpen)}>
                 <Bookmark size={16}/>{activeViewName ? `${text("peopleViews", "视图")}：${activeViewName}` : text("peopleViews", "视图")}
             </button>
             {#if viewsOpen}
@@ -898,13 +1224,13 @@
             <option value="name">{text("peopleSortName", "按姓名")}</option>
             <option value="group">{text("peopleSortGroup", "按分组")}</option>
             <option value="birthday">{text("peopleSortBirthday", "按生日临近")}</option>
-            <option value="recent">{text("peopleSortRecent", "按最近互动")}</option>
+            <option value="recent" disabled={!!recentError}>{recentError ? "按最近互动（读取失败）" : text("peopleSortRecent", "按最近互动")}</option>
         </select>
         <span id="lvct-people-moremenu" bind:this={moreMenuWrap} style="position:relative; display:inline-flex">
             <button
                 class="b3-button b3-button--outline"
                 aria-expanded={moreOpen}
-                aria-controls="lvct-people-moremenu-panel"
+                aria-controls={moreOpen ? "lvct-people-moremenu-panel" : undefined}
                 onclick={() => (moreOpen = !moreOpen)}
             >
                 <SlidersHorizontal size={16}/>{text("peopleMoreFilters", "更多筛选")}{isExtraFilterActive(extraFilter) ? " ·" : ""}
@@ -923,13 +1249,13 @@
                     <div class="lvct-form__item">
                         <span>最近互动日期</span>
                         <div style="display:flex; gap:6px; align-items:center">
-                            <input type="date" class="b3-text-field fn__block" bind:value={extraFilter.recentFrom} disabled={!!recentError} aria-label="最近互动起始日期" />
+                            <input type="date" class="b3-text-field fn__block" bind:value={extraFilter.recentFrom} disabled={!!recentError} title={recentError ? "最近互动读取失败，恢复后才能按日期筛选" : undefined} aria-label="最近互动起始日期" />
                             <span>~</span>
-                            <input type="date" class="b3-text-field fn__block" bind:value={extraFilter.recentTo} disabled={!!recentError} aria-label="最近互动截止日期" />
+                            <input type="date" class="b3-text-field fn__block" bind:value={extraFilter.recentTo} disabled={!!recentError} title={recentError ? "最近互动读取失败，恢复后才能按日期筛选" : undefined} aria-label="最近互动截止日期" />
                         </div>
                     </div>
                     <label class="lvct-people__moremenu-row">
-                        <input type="checkbox" bind:checked={extraFilter.neverContacted} disabled={!!recentError} />
+                        <input type="checkbox" bind:checked={extraFilter.neverContacted} disabled={!!recentError} title={recentError ? "最近互动读取失败，恢复后才能筛选从未联系" : undefined} />
                         <span>只看从未联系的人</span>
                     </label>
                     <label class="lvct-form__item">工作单位关键词<input class="b3-text-field" type="text" maxlength="200" value={extraFilter.workQuery ?? ""} oninput={(event) => { extraFilter = { ...extraFilter, workQuery: event.currentTarget.value }; visibleCount = PAGE_SIZE; }} /></label>
@@ -956,7 +1282,8 @@
                                 class="b3-button b3-button--outline"
                                 style="margin-top:6px"
                                 disabled={filtered.length === 0}
-                                onclick={() => { completionPeople = filtered.map((person) => ({ ...person, tags: [...person.tags] })); completing = true; }}
+                                title={filtered.length === 0 ? "当前筛选没有可补录的联系人" : undefined}
+                                onclick={() => { if (isMobile) closeMobileSheet(false); completionPeople = filtered.map((person) => ({ ...person, tags: [...person.tags] })); completing = true; }}
                             >逐个补录（{filtered.length}）</button>
                         {/if}
                     </div>
@@ -965,11 +1292,11 @@
         </span>
     {/snippet}
     {#snippet actionControls()}
-        <button class="b3-button b3-button--outline" onclick={() => (dupOpen = true)}>
+        <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); dupOpen = true; }}>
             {text("peopleCleanup", "整理")}{duplicatePairs.length > 0 ? ` ·${duplicatePairs.length}${duplicatePairsCapped ? "（上限）" : ""}` : ""}
         </button>
-        <button class="b3-button b3-button--outline" onclick={() => (importing = true)}><FolderInput size={16}/>{text("peopleImportDocs", "导入已有文档")}</button>
-        <button class="b3-button b3-button--outline" onclick={() => (vcarding = true)}><ContactRound size={16}/>{text("peopleVcard", "vCard 导入/导出")}</button>
+        <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); importing = true; }}><FolderInput size={16}/>{text("peopleImportDocs", "导入已有文档")}</button>
+        <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); vcarding = true; }}><ContactRound size={16}/>{text("peopleVcard", "vCard 导入/导出")}</button>
     {/snippet}
     <div class="lvct-people__toolbar lvct-people__control-surface fn__flex">
         {#if isMobile}
@@ -1016,7 +1343,7 @@
                     <button
                         class="b3-button b3-button--outline"
                         aria-expanded={colMenuOpen}
-                        aria-controls="lvct-people-colmenu-panel"
+                        aria-controls={colMenuOpen ? "lvct-people-colmenu-panel" : undefined}
                         aria-label="表格列设置"
                         title="表格列设置"
                         onclick={() => (colMenuOpen = !colMenuOpen)}
@@ -1040,8 +1367,8 @@
                                     />
                                     <span>{columnLabel(key)}</span>
                                     <span class="lvct-people__colmenu-actions">
-                                        <button type="button" aria-label={`上移${columnLabel(key)}列`} disabled={tableColumns.indexOf(key) <= 0} onclick={() => moveColumn(key, -1)}>↑</button>
-                                        <button type="button" aria-label={`下移${columnLabel(key)}列`} disabled={tableColumns.indexOf(key) < 0 || tableColumns.indexOf(key) >= tableColumns.length - 1} onclick={() => moveColumn(key, 1)}>↓</button>
+                                        <button type="button" aria-label={`上移${columnLabel(key)}列`} title={tableColumns.indexOf(key) <= 0 ? "已经是第一列" : undefined} disabled={tableColumns.indexOf(key) <= 0} onclick={() => moveColumn(key, -1)}>↑</button>
+                                        <button type="button" aria-label={`下移${columnLabel(key)}列`} title={tableColumns.indexOf(key) < 0 || tableColumns.indexOf(key) >= tableColumns.length - 1 ? "已经是最后一列" : undefined} disabled={tableColumns.indexOf(key) < 0 || tableColumns.indexOf(key) >= tableColumns.length - 1} onclick={() => moveColumn(key, 1)}>↓</button>
                                     </span>
                                 </div>
                             {/each}
@@ -1064,7 +1391,7 @@
                 class="b3-button b3-button--outline"
                 aria-label={text("peopleMobileTools", "筛选与整理")}
                 aria-expanded={mobileSheetOpen}
-                aria-controls="lvct-people-mobile-tools-sheet"
+                aria-controls={mobileSheetOpen ? "lvct-people-mobile-tools-sheet" : undefined}
                 bind:this={mobileSheetTrigger}
                 onclick={openMobileSheet}
             ><SlidersHorizontal size={16}/>{text("peopleMobileTools", "筛选与整理")}{isExtraFilterActive(extraFilter) || duplicatePairs.length > 0 ? " ·" : ""}</button>
@@ -1114,17 +1441,17 @@
     {/if}
     {#if recentError}
         <div class="lvct-form__error" role="alert">
-            最近互动读取失败：{recentError}；日期范围、从未联系和按最近互动排序暂时停用，联系人列表未按空数据误判。
-            <button type="button" class="b3-button b3-button--outline" disabled={loading} onclick={() => void reloadRecentInteractions()}>重试最近互动</button>
+            最近互动读取失败：{recentError}；日期范围、从未联系和按最近互动排序暂时不可用。若此前使用该排序，当前已切回按姓名排序；读取恢复后可重新选择。联系人列表未按空数据误判。
+            <button type="button" class="b3-button b3-button--outline" disabled={loading} title={loading ? "联系人仍在读取中" : undefined} onclick={() => void reloadRecentInteractions()}>重试最近互动</button>
         </div>
     {/if}
     {#if people.some((person) => person.aliasProfile?.state === "unknown")}
         <p role="status">别名读取尚未核实，可按姓名查找；未把失败解释为无别名。</p>
-        <button class="b3-button b3-button--text" disabled={loading} onclick={() => void refresh()}>重新读取别名</button>
+        <button class="b3-button b3-button--text" disabled={loading} title={loading ? "联系人仍在读取中" : undefined} onclick={() => void refresh()}>重新读取别名</button>
     {/if}
     {#if people.some((person) => person.profile?.affiliations.state === "unknown" || person.profile?.relationship.state === "unknown")}
         <p role="status">部分组织或称谓资料尚未核实。原有联系人仍可查看；相关筛选仅使用已核实的值。</p>
-        <button class="b3-button b3-button--text" disabled={loading} onclick={() => void refresh()}>重新读取三项资料</button>
+        <button class="b3-button b3-button--text" disabled={loading} title={loading ? "联系人仍在读取中" : undefined} onclick={() => void refresh()}>重新读取三项资料</button>
     {/if}
     {#if prefError}
         <div class="lvct-form__error" role="alert">
@@ -1165,16 +1492,36 @@
         <div class="lvct-people__batchbar" role="toolbar" aria-label="批量操作">
             <b>已选 {selectedIds.length} 人</b>
             <span>{selectionScopeLabel}；筛选外 {hiddenSelectionCount} 人</span>
-            <button class="b3-button b3-button--outline" onclick={openBatch} disabled={batchBusy || exportingSelected}>批量编辑</button>
-            <button class="b3-button b3-button--outline" onclick={exportSelected} disabled={batchBusy || exportingSelected}>导出 vCard</button>
-            <button class="b3-button b3-button--cancel lvct-people__remove" onclick={removeSelected} disabled={batchBusy || exportingSelected}>从人脉移除</button>
-            <button class="b3-button b3-button--text" onclick={() => (selectedIds = [])} disabled={batchBusy || exportingSelected}>取消选择</button>
+            <button class="b3-button b3-button--outline" onclick={openBatch} disabled={batchBusy || exportingSelected} title={batchBusy || exportingSelected ? "批量操作进行中，请稍候" : undefined}>批量编辑</button>
+            <button class="b3-button b3-button--outline" onclick={exportSelected} disabled={batchBusy || exportingSelected} title={batchBusy || exportingSelected ? "批量操作进行中，请稍候" : undefined}>导出 vCard</button>
+            <button class="b3-button b3-button--cancel lvct-people__remove" onclick={removeSelected} disabled={batchBusy || exportingSelected} title={batchBusy || exportingSelected ? "批量操作进行中，请稍候" : undefined}>从人脉移除</button>
+            <button class="b3-button b3-button--text" onclick={() => (selectedIds = [])} disabled={batchBusy || exportingSelected} title={batchBusy || exportingSelected ? "批量操作进行中，请稍候" : undefined}>取消选择</button>
         </div>
     {/if}
 
-    <div class="lvct-people__actions" role="group" aria-label="选择联系人范围">
-        <button class="b3-button b3-button--text" disabled={batchBusy || exportingSelected || visible.length === 0} onclick={selectVisibleScope}>选择当前页（{visible.length} 人）</button>
-        <button class="b3-button b3-button--text" disabled={batchBusy || exportingSelected || rosterHasMore || rosterLoadError !== "" || filtered.length === 0} title={rosterHasMore || rosterLoadError ? "名册尚未完整读取，完成读取后再选择全部筛选" : undefined} onclick={selectAllFiltered}>选择全部筛选（{filtered.length} 人）</button>
+    {#snippet rosterProgress()}
+        <div class="lvct-people__progress" role="status" aria-live="polite">
+            已加载 {people.length} / {rosterTotal} 人
+            {#if rosterLoadingMore}
+                · 正在读取后续联系人
+                <button type="button" class="b3-button b3-button--text" onclick={stopRosterLoading}>停止继续读取</button>
+            {:else if rosterLoadError}
+                · 后续读取失败：{rosterLoadError}
+                <button type="button" class="b3-button b3-button--text" onclick={resumeRosterLoading}>重试后续读取</button>
+            {:else if rosterHasMore}
+                · 尚未读取完
+                <button type="button" class="b3-button b3-button--text" onclick={resumeRosterLoading}>继续读取</button>
+            {:else}
+                · 已读取完整名册
+            {/if}
+        </div>
+    {/snippet}
+    <div class="lvct-people__list-context">
+        <div class="lvct-people__actions" role="group" aria-label="选择联系人范围">
+            <button class="b3-button b3-button--text" disabled={batchBusy || exportingSelected || visible.length === 0} title={batchBusy || exportingSelected ? "批量操作进行中，请稍候" : visible.length === 0 ? "当前页没有可选择的联系人" : undefined} onclick={selectVisibleScope}>选择当前页（{visible.length} 人）</button>
+            <button class="b3-button b3-button--text" disabled={batchBusy || exportingSelected || rosterHasMore || rosterLoadError !== "" || filtered.length === 0} title={batchBusy || exportingSelected ? "批量操作进行中，请稍候" : rosterHasMore || rosterLoadError ? "名册尚未完整读取，完成读取后再选择全部筛选" : filtered.length === 0 ? "当前筛选没有联系人" : undefined} onclick={selectAllFiltered}>选择全部筛选（{filtered.length} 人）</button>
+        </div>
+        {#if !loading && !errorText && filtered.length > 0}{@render rosterProgress()}{/if}
     </div>
     {#if batchResult}<p role="status" tabindex="-1" bind:this={batchResultElement}>{batchResult}</p>{/if}
     {#if batchError && !batchOpen}
@@ -1238,23 +1585,9 @@
             {/if}
         </div>
     {:else if viewMode === "cards"}
-        <div class="lvct-people__progress" role="status" aria-live="polite">
-            已加载 {people.length} / {rosterTotal} 人
-            {#if rosterLoadingMore}
-                · 正在读取后续联系人
-                <button type="button" class="b3-button b3-button--text" onclick={stopRosterLoading}>停止继续读取</button>
-            {:else if rosterLoadError}
-                · 后续读取失败：{rosterLoadError}
-                <button type="button" class="b3-button b3-button--text" onclick={resumeRosterLoading}>重试后续读取</button>
-            {:else if rosterHasMore}
-                · 尚未读取完
-                <button type="button" class="b3-button b3-button--text" onclick={resumeRosterLoading}>继续读取</button>
-            {:else}
-                · 已读取完整名册
-            {/if}
-        </div>
-        <div class="lvct-people__cards">
-            {#each visible as person (person.itemId)}
+        <div class="lvct-people__cards" bind:this={peopleListElement} tabindex="-1" aria-label="联系人列表">
+            {#if virtualized}<div class="lvct-people__virtual-spacer" style={`height:${virtualTopSpacer}px`} aria-hidden="true"></div>{/if}
+            {#each renderedVisible as person (person.itemId)}
                 <PersonCard
                     {person}
                     selected={selectedIdSet.has(person.itemId)}
@@ -1265,26 +1598,12 @@
                     onOpen={onOpenDetail}
                 />
             {/each}
+            {#if virtualized}<div class="lvct-people__virtual-spacer" style={`height:${virtualBottomSpacer}px`} aria-hidden="true"></div>{/if}
         </div>
     {:else}
-        <div class="lvct-people__progress" role="status" aria-live="polite">
-            已加载 {people.length} / {rosterTotal} 人
-            {#if rosterLoadingMore}
-                · 正在读取后续联系人
-                <button type="button" class="b3-button b3-button--text" onclick={stopRosterLoading}>停止继续读取</button>
-            {:else if rosterLoadError}
-                · 后续读取失败：{rosterLoadError}
-                <button type="button" class="b3-button b3-button--text" onclick={resumeRosterLoading}>重试后续读取</button>
-            {:else if rosterHasMore}
-                · 尚未读取完
-                <button type="button" class="b3-button b3-button--text" onclick={resumeRosterLoading}>继续读取</button>
-            {:else}
-                · 已读取完整名册
-            {/if}
-        </div>
         {#if isMobile}<p class="lvct-people__scroll-hint">左右滑动查看更多字段</p>{/if}
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -- keyboard users need to focus the horizontal scroll region -->
-        <div class="lvct-people__table-wrap" role="region" tabindex="0" aria-label="联系人表格，可左右滚动查看更多字段">
+        <div class="lvct-people__table-wrap" bind:this={peopleListElement} role="region" tabindex="0" aria-label="联系人表格，可左右滚动查看更多字段">
             <table class="b3-table">
                 <thead>
                     <tr>
@@ -1303,9 +1622,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {#each visible as person (person.itemId)}
-                        <tr tabindex="0" aria-label={`查看 ${person.name} 的详情`} class:lvct-people__row--active={activePersonId === person.itemId}
-                            onclick={() => onOpenDetail(person)}
+                    {#if virtualized}<tr class="lvct-people__virtual-row" aria-hidden="true"><td colspan={tableColumns.length + 2} style={`height:${virtualTopSpacer}px`}></td></tr>{/if}
+                    {#each renderedVisible as person (person.itemId)}
+                        <tr tabindex="0" aria-label={`查看 ${person.name} 的详情`} class:lvct-people__row--active={activePersonId === person.itemId} data-person-item-id={person.itemId}
+                            onclick={(event) => { event.currentTarget.focus({ preventScroll: true }); onOpenDetail(person); }}
                             onkeydown={(event) => {
                                 if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
                                 event.preventDefault();
@@ -1336,6 +1656,7 @@
                             {/each}
                         </tr>
                     {/each}
+                    {#if virtualized}<tr class="lvct-people__virtual-row" aria-hidden="true"><td colspan={tableColumns.length + 2} style={`height:${virtualBottomSpacer}px`}></td></tr>{/if}
                 </tbody>
             </table>
         </div>
@@ -1403,6 +1724,11 @@
                     <span>追加标签（空格/逗号分隔）</span>
                     <input class="b3-text-field fn__block" type="text" bind:value={batchTagsText} placeholder="重点 客户" disabled={batchBusy} />
                 </label>
+                {#if !batchBusy && !batchGroupValid}
+                    <p class="lvct-people__batch-hint" role="status">请选择有效的分组，或修正自定义分组名称后再应用。</p>
+                {:else if !batchBusy && batchHiddenCount > 0 && !includeHidden}
+                    <p class="lvct-people__batch-hint" role="status">本次选择包含筛选外联系人；勾选上方确认后才能应用批量修改。</p>
+                {/if}
                 {#if batchError}<div class="lvct-form__error" role="alert" tabindex="-1" bind:this={batchResultElement}>{batchError}</div>{/if}
                 {#if Object.keys(batchFailedFieldsByItem).length > 0}
                     <div class="ft__smaller ft__on-surface">已有 {Object.keys(batchFailedFieldsByItem).length} 人存在失败字段，可只重试这些字段。</div>
@@ -1410,9 +1736,9 @@
                 <div class="lvct-form__actions">
                     <button class="b3-button b3-button--cancel" onclick={closeBatch} disabled={batchBusy}>取消</button>
                     {#if Object.keys(batchFailedFieldsByItem).length > 0}
-                        <button class="b3-button b3-button--outline" onclick={() => runBatchUpdate(true)} disabled={batchBusy || !batchGroupValid}>{batchBusy ? "重试中…" : text("formRetryFailed", "核实并重试未完成字段")}</button>
+                        <button class="b3-button b3-button--outline" onclick={() => runBatchUpdate(true)} disabled={batchBusy || !batchGroupValid} title={!batchGroupValid ? "请选择有效的分组后再重试" : undefined}>{batchBusy ? "重试中…" : text("formRetryFailed", "核实并重试未完成字段")}</button>
                     {/if}
-                    <button class="b3-button b3-button--text" onclick={() => runBatchUpdate()} disabled={batchBusy || !batchGroupValid || batchHiddenCount > 0 && !includeHidden}>{batchBusy ? "保存中…" : "应用到所选联系人"}</button>
+                    <button class="b3-button b3-button--text" onclick={() => runBatchUpdate()} disabled={batchBusy || !batchGroupValid || batchHiddenCount > 0 && !includeHidden} title={batchBusy ? "批量修改保存中" : !batchGroupValid ? "请选择有效的分组后再应用" : batchHiddenCount > 0 && !includeHidden ? "请先确认包含筛选外联系人" : undefined}>{batchBusy ? "保存中…" : "应用到所选联系人"}</button>
                 </div>
             </div>
         </LvctDialog>

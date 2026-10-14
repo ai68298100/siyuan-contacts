@@ -2,6 +2,7 @@ import type { Plugin } from "siyuan";
 import {
     appendExchange,
     emptyExchangeStore,
+    ExchangeConflictError,
     ExchangeWriteUnknownError,
     listExchangesForPerson,
     matchesExchangeRequest,
@@ -87,11 +88,19 @@ export async function listPersonExchangeRecords(plugin: Plugin, personDocId: str
     return listExchangesForPerson(await loadExchangeStore(plugin), personDocId);
 }
 
-export async function updateExchangeRecord(plugin: Plugin, id: string, patch: ExchangePatch): Promise<ExchangeRecord> {
+export async function updateExchangeRecord(
+    plugin: Plugin,
+    id: string,
+    patch: ExchangePatch,
+    expected?: Pick<ExchangeRecord, "updatedAt">,
+): Promise<ExchangeRecord> {
     return withStoreLock(EXCHANGE_STORAGE_KEY, async () => {
         const store = normalizeExchangeStoreForWrite(await loadJsonStrict(plugin, EXCHANGE_STORAGE_KEY));
         const current = store.records.find((record) => record.id === id);
         if (!current) throw new Error("往来记录不存在");
+        if (expected && current.updatedAt !== expected.updatedAt) {
+            throw new ExchangeConflictError(id, expected.updatedAt, current.updatedAt);
+        }
         const next = updateExchange(store, id, patch, Date.now());
         if (!next) throw new Error("往来记录更新内容无效");
         await saveJsonVerified(plugin, EXCHANGE_STORAGE_KEY, next);
@@ -99,11 +108,11 @@ export async function updateExchangeRecord(plugin: Plugin, id: string, patch: Ex
     });
 }
 
-export async function setExchangeStatus(plugin: Plugin, id: string, status: ExchangeStatus, settledOn: string = ""): Promise<ExchangeRecord> {
+export async function setExchangeStatus(plugin: Plugin, id: string, status: ExchangeStatus, settledOn: string = "", expected?: Pick<ExchangeRecord, "updatedAt">): Promise<ExchangeRecord> {
     return updateExchangeRecord(plugin, id, {
         status,
         settledOn: status === "settled" ? settledOn : "",
-    });
+    }, expected);
 }
 
 export { emptyExchangeStore };

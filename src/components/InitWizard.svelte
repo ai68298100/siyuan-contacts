@@ -10,6 +10,7 @@
     import type { InitProgressStep, WorkspaceSnapshot } from "../services/init";
     import { translateText } from "../domain/translation";
     import { useCloseGuard } from "./close-guard";
+    import { requestErrorMessage } from "../shared/error-presenter";
 
     let {
         facade,
@@ -80,7 +81,7 @@
         } catch (error) {
             if (token === previewToken) {
                 snapshot = null;
-                previewError = error instanceof Error ? error.message : String(error);
+                previewError = requestErrorMessage(error);
             }
         } finally {
             if (token === previewToken) previewLoading = false;
@@ -115,7 +116,7 @@
             if (selfPending) completedSettings = settings;
             else onInitialized(settings);
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
+            const message = requestErrorMessage(error);
             errorText = message;
             failed = true;
             logLines = [...logLines, `✕ ${message}`];

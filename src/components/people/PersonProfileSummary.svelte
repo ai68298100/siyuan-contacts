@@ -1,16 +1,35 @@
 <script lang="ts">
     import type { PersonProfile } from "../../domain/people-profiles";
     import { profileText } from "../../domain/people-profiles";
-    let { profile, compact = false }: { profile?: PersonProfile; compact?: boolean } = $props();
+    let { profile, compact = false, hideEmpty = false }: { profile?: PersonProfile; compact?: boolean; hideEmpty?: boolean } = $props();
+    const compactRows = $derived.by(() => {
+        if (!profile) return [];
+        const fields = [
+            { key: "family", label: "家庭" }, { key: "work", label: "工作单位" },
+            { key: "education", label: "学校" }, { key: "relationship", label: "与我的关系" },
+            ...(hideEmpty ? [{ key: "unspecified" as const, label: "其他组织" }] : []),
+        ] as const;
+        const rows = fields.flatMap(({ key, label }) => {
+            if (hideEmpty && profile.affiliations.state === "unknown" && key !== "relationship") {
+                return key === "family" ? [{ label: "组织归属", value: profileText(profile, key) }] : [];
+            }
+            const value = profileText(profile, key);
+            return hideEmpty && value === "未填写" ? [] : [{ label, value }];
+        });
+        if (hideEmpty && profile.affiliations.state === "known") {
+            const { history, unresolved } = profile.affiliations.value;
+            if (history.length) rows.push({ label: "历史组织", value: `${history.length} 条经历，详情可查看` });
+            if (unresolved.length) rows.push({ label: "待核对组织", value: `${unresolved.length} 条，详情可核对` });
+        }
+        return rows;
+    });
 </script>
 
 {#if profile}
     {#if compact}
         <span class="lvct-profile-summary lvct-profile-summary--compact" aria-label="组织成员与本人称谓资料">
-            <span>家庭：{profileText(profile, "family")}</span>
-            <span>工作单位：{profileText(profile, "work")}</span>
-            <span>学校：{profileText(profile, "education")}</span>
-            <span>与我的关系：{profileText(profile, "relationship")}</span>
+            {#each compactRows as row (row.label)}<span>{row.label}：{row.value}</span>{/each}
+            {#if hideEmpty && compactRows.length === 0}<span>资料待补充</span>{/if}
         </span>
     {:else}
     <dl class="lvct-profile-summary" aria-label="组织成员与本人称谓资料">
@@ -29,7 +48,7 @@
 <style>
     .lvct-profile-summary { margin: var(--lvct-sp-2) 0; color: var(--lvct-text-2); font-size: var(--lvct-fs-caption); }
     .lvct-profile-summary div { display: flex; gap: 8px; margin: 4px 0; }
-    .lvct-profile-summary dt { flex: 0 0 72px; }
+    .lvct-profile-summary dt { flex: 0 0 84px; color: var(--lvct-text-3); }
     .lvct-profile-summary dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
     .lvct-profile-summary--compact { display: block; margin: 4px 0; }
     .lvct-profile-summary--compact > span { display: block; overflow-wrap: anywhere; }

@@ -175,6 +175,7 @@
             </p>
             <textarea class="b3-text-field fn__block lvct-qf__input" rows="7"
                 placeholder={text("qfPlaceholder", "张三\n手机：13800138000\n微信：zhang_san\n邮箱：a@example.com")}
+                aria-label={text("qfInputLabel", "待识别的联系人内容")}
                 bind:value={pasteText}></textarea>
             <div class="lvct-form__actions">
                 <button class="b3-button b3-button--cancel" onclick={requestClose}>{text("formCancel", "取消")}</button>

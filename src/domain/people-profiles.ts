@@ -10,7 +10,7 @@ export interface PersonProfile {
     selfDocId?: string | null;
 }
 
-export function profileText(profile: PersonProfile | undefined, field: "family" | "work" | "education" | "relationship" | "org"): string {
+export function profileText(profile: PersonProfile | undefined, field: "family" | "work" | "education" | "unspecified" | "relationship" | "org"): string {
     if (!profile) return "尚未核实";
     if (field === "relationship") {
         if (profile.relationship.state === "unknown") return "称谓尚未核实";

@@ -2,6 +2,7 @@
     import { onDestroy } from "svelte";
     import type { ContactsPluginFacade } from "../../types";
     import type { OrganizationOperationReport } from "../../domain/organization-operations";
+    import { requestErrorMessage } from "../../shared/error-presenter";
 
     let { facade, refreshKey = 0, disabled = false, onRecovered, onBusyChange }: {
         facade: ContactsPluginFacade;
@@ -28,7 +29,7 @@
             reports = next;
             errorMessage = "";
         } catch (error) {
-            if (alive && currentRequest === request) errorMessage = error instanceof Error ? error.message : String(error);
+            if (alive && currentRequest === request) errorMessage = requestErrorMessage(error);
         } finally {
             if (alive && currentRequest === request) busy = false;
         }
@@ -49,7 +50,7 @@
             reports = reports.map((entry) => entry.operation.requestId === requestId ? result : entry);
             if (result.status === "complete" && result.docId) await onRecovered?.(result.docId);
         } catch (error) {
-            if (alive && currentRequest === request) errorMessage = error instanceof Error ? error.message : String(error);
+            if (alive && currentRequest === request) errorMessage = requestErrorMessage(error);
         } finally {
             if (alive && currentRequest === request) busy = false;
         }

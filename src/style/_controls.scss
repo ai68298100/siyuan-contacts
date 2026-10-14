@@ -22,11 +22,17 @@
 .lvct-dialog-root,
 .lvct-doc-strip {
 
+    font-family: var(--lvct-font-family);
+    color: var(--lvct-text-1);
+
+    /* Lucide 是描边图标；宿主 svg 的 fill:currentColor 会把钟表、搜索等填成实心。 */
+    svg.lucide-icon { fill: none; }
+
     /* ---------- 按钮：公共基线（尺寸/圆角/状态过渡/焦点环） ---------- */
     .b3-button {
-            border-radius: var(--lvct-r-control);
+        border-radius: var(--lvct-r-control);
         font-size: var(--lvct-fs-body);
-        min-height: var(--lvct-touch-min);
+        min-height: var(--lvct-control-h);
         box-sizing: border-box;
         transition:
             background var(--lvct-dur-fast) var(--lvct-ease),
@@ -43,29 +49,31 @@
     }
 
     .b3-button:focus-visible {
-        outline: 2px solid var(--lvct-accent);
-        outline-offset: 2px;
+        outline: var(--lvct-focus-ring-width) solid var(--lvct-focus-ring-color);
+        outline-offset: var(--lvct-focus-ring-offset);
     }
 
     .b3-button:disabled {
-        opacity: 0.5;
+        opacity: var(--lvct-state-disabled-opacity);
         cursor: not-allowed;
     }
 
-    /* 主按钮（无修饰类的填充按钮）：品牌渐变 + 悬停提升 */
+    /* 主按钮（无修饰类的填充按钮）：主题实色，渐变只用于品牌标识与特殊 CTA */
     .b3-button:not(.b3-button--outline):not(.b3-button--cancel):not(.b3-button--text) {
-        background: var(--lvct-brand-gradient);
+        background: var(--lvct-accent-fill);
         color: var(--lvct-on-accent);
         border: none;
 
         &:hover:not(:disabled) {
             box-shadow: var(--lvct-shadow-2);
-            filter: brightness(1.05);
+            background: var(--lvct-accent-hover);
+            filter: none;
         }
 
         &:active:not(:disabled) {
             box-shadow: none;
-            filter: brightness(0.97);
+            background: var(--lvct-accent-hover);
+            filter: none;
         }
     }
 
@@ -74,15 +82,20 @@
     .b3-button--cancel {
         background: var(--lvct-bg-surface);
         color: var(--lvct-text-1);
-        border: 1px solid var(--lvct-border-subtle);
+        border: var(--lvct-control-border-width) solid var(--lvct-border-subtle);
+        /* 宿主 outline 以内阴影画主色描边；插件已使用语义边框，须在各状态清除旧描边。 */
+        box-shadow: none;
+
+        &:focus { box-shadow: none; }
 
         &:hover:not(:disabled) {
             background: var(--lvct-bg-hover);
             border-color: var(--lvct-border-strong);
             color: var(--lvct-text-1);
+            box-shadow: none;
         }
 
-        &:active:not(:disabled) { background: var(--lvct-bg-active); }
+        &:active:not(:disabled) { background: var(--lvct-bg-active); box-shadow: none; }
     }
 
     /* 文字/幽灵按钮 */
@@ -119,17 +132,17 @@
             position: absolute;
             inset: 0;
             margin: auto;
-            width: 14px;
-            height: 14px;
+            width: var(--lvct-spinner-size);
+            height: var(--lvct-spinner-size);
             border-radius: 50%;
-            border: 2px solid color-mix(in srgb, var(--lvct-on-accent, #fff) 40%, transparent);
-            border-top-color: var(--lvct-on-accent, #fff);
-            animation: lvct-spin 0.7s linear infinite;
+            border: var(--lvct-spinner-border) solid color-mix(in srgb, var(--lvct-on-accent) 40%, transparent);
+            border-top-color: var(--lvct-on-accent);
+            animation: lvct-spin var(--lvct-dur-loading) linear infinite;
         }
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .lvct-btn--loading::after { animation-duration: 1.6s; }
+        .lvct-btn--loading::after { animation-duration: var(--lvct-dur-reduced); }
 
         /* UX-02.1 动效降级：位移动效只保留透明度，pop-in 直出 */
         .b3-button:not(:disabled):active { transform: none; }
@@ -142,7 +155,7 @@
         .lvct-graph-view__hover-card,
         .lvct-dialog-mask,
         .lvct-dialog-panel {
-            transition-duration: 0.01ms !important;
+            transition-duration: var(--lvct-dur-none) !important;
             animation: none !important;
         }
     }
@@ -151,7 +164,7 @@
     .b3-text-field,
     .b3-select {
         border-radius: var(--lvct-r-md);
-        border: 1px solid var(--lvct-border-subtle);
+        border: var(--lvct-control-border-width) solid var(--lvct-border-subtle);
         background: var(--lvct-bg-surface);
         color: var(--lvct-text-1);
         min-height: var(--lvct-touch-min);
@@ -164,12 +177,17 @@
 
         &:focus {
             border-color: var(--lvct-accent);
-            box-shadow: 0 0 0 3px var(--lvct-accent-soft);
+            box-shadow: 0 0 0 var(--lvct-focus-ring-size) var(--lvct-accent-soft);
             outline: none;
         }
 
+        /* 控件在未聚焦时也给出边界反馈，避免浅色主题中与卡片表面融为一体。 */
+        &:hover:not(:disabled):not(:focus) {
+            border-color: color-mix(in srgb, var(--lvct-accent) 32%, var(--lvct-border-subtle));
+        }
+
         &:disabled {
-            opacity: 0.5;
+        opacity: var(--lvct-state-disabled-opacity);
             cursor: not-allowed;
         }
     }
@@ -178,13 +196,13 @@
     input[type="checkbox"]:not(.b3-switch):not(.lvct-switch input),
     input[type="radio"]:not(.b3-switch):not(.lvct-switch input) {
         appearance: none;
-        flex: 0 0 16px;
-        width: 16px;
-        height: 16px;
+        flex: 0 0 var(--lvct-check-size);
+        width: var(--lvct-check-size);
+        height: var(--lvct-check-size);
         margin: 0;
         display: inline-grid;
         place-content: center;
-        border: 1px solid var(--lvct-border-strong);
+        border: var(--lvct-control-border-width) solid var(--lvct-border-strong);
         border-radius: var(--lvct-r-sm);
         background: var(--lvct-bg-surface);
         color: var(--lvct-on-accent);
@@ -196,11 +214,11 @@
 
         &::before {
             content: "";
-            width: 7px;
-            height: 4px;
+            width: var(--lvct-check-mark-w);
+            height: var(--lvct-check-mark-h);
             border: 0 solid currentColor;
-            border-left-width: 2px;
-            border-bottom-width: 2px;
+            border-left-width: var(--lvct-check-mark-stroke);
+            border-bottom-width: var(--lvct-check-mark-stroke);
             transform: rotate(-45deg) scale(0);
             transition: transform var(--lvct-dur-fast) var(--lvct-ease);
         }
@@ -210,8 +228,8 @@
         &:checked::before { transform: rotate(-45deg) scale(1); }
         &:indeterminate { border-color: var(--lvct-accent); background: var(--lvct-accent); }
         &:indeterminate::before {
-            width: 8px;
-            height: 2px;
+            width: var(--lvct-check-indeterminate-w);
+            height: var(--lvct-check-indeterminate-h);
             border: 0;
             background: currentColor;
             transform: none;
@@ -220,12 +238,12 @@
             background: var(--lvct-bg-app);
             border-color: var(--lvct-border-subtle);
             cursor: not-allowed;
-            opacity: 0.5;
+            opacity: var(--lvct-state-disabled-opacity);
         }
         &:focus-visible {
-            outline: 2px solid var(--lvct-accent);
-            outline-offset: 2px;
-            box-shadow: 0 0 0 3px var(--lvct-accent-soft);
+            outline: var(--lvct-focus-ring-width) solid var(--lvct-focus-ring-color);
+            outline-offset: var(--lvct-focus-ring-offset);
+            box-shadow: 0 0 0 var(--lvct-focus-ring-size) var(--lvct-accent-soft);
         }
 
         &[type="checkbox"] { border-radius: var(--lvct-r-control); }
@@ -233,8 +251,8 @@
             border-radius: var(--lvct-r-pill);
 
             &::before {
-                width: 6px;
-                height: 6px;
+                width: var(--lvct-radio-dot-size);
+                height: var(--lvct-radio-dot-size);
                 border: 0;
                 border-radius: var(--lvct-r-pill);
                 background: currentColor;

@@ -7,12 +7,14 @@ import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./sto
 import {
     appendFollowUp,
     emptyFollowUpStore,
+    FollowUpWriteUnknownError,
+    isFollowUpRequestId,
+    matchesFollowUpCreateRequest,
     normalizeFollowUpStore,
     normalizeFollowUpStoreForWrite,
     updateFollowUp,
 } from "../domain/followups";
 import type { FollowUpItem, FollowUpStore } from "../domain/followups";
-import { newNodeId } from "../api/client";
 import { isValidDateKey } from "../domain/date-key";
 import { isPersonDocId } from "../domain/cadence";
 
@@ -30,6 +32,8 @@ export async function loadFollowUpStoreStrict(plugin: Plugin): Promise<FollowUpS
 
 export interface CreateFollowUpInput {
     personDocId: string;
+    /** 稳定幂等键；未知结果重试时必须复用，不能自动换新 ID。 */
+    requestId: string;
     title?: string;
     /** YYYY-MM-DD，已由服务层严格校验 */
     dueDate: string;
@@ -40,10 +44,12 @@ export async function createFollowUpRecord(plugin: Plugin, input: CreateFollowUp
     if (!isPersonDocId(input.personDocId)) throw new Error("人物文档 ID 无效，未创建跟进事项");
     if (!isValidDateKey(input.dueDate)) throw new Error("跟进到期日期无效，未创建跟进事项");
     if (input.title !== undefined && typeof input.title !== "string") throw new Error("跟进标题无效，未创建跟进事项");
+    const requestId = input.requestId;
+    if (!isFollowUpRequestId(requestId)) throw new Error("跟进保存请求 ID 无效，未创建跟进事项");
     return withStoreLock(FOLLOW_UP_STORAGE_KEY, async () => {
         const now = Date.now();
         const item: FollowUpItem = {
-            id: newNodeId(),
+            id: requestId,
             personDocId: input.personDocId,
             title: input.title?.trim() ?? "",
             dueDate: input.dueDate,
@@ -53,9 +59,19 @@ export async function createFollowUpRecord(plugin: Plugin, input: CreateFollowUp
             docSyncPending: true,
         };
         const store = normalizeFollowUpStoreForWrite(await loadJsonStrict(plugin, FOLLOW_UP_STORAGE_KEY));
-        /* 极低概率的随机 ID 碰撞也不能返回一个实际未落盘的“成功”事项。 */
-        if (store.items.some((existing) => existing.id === item.id)) throw new Error("跟进事项 ID 冲突，未创建；请重试");
-        await saveJsonVerified(plugin, FOLLOW_UP_STORAGE_KEY, appendFollowUp(store, item));
+        const existing = store.items.find((candidate) => candidate.id === requestId);
+        if (existing) {
+            if (!matchesFollowUpCreateRequest(existing, { requestId, personDocId: input.personDocId, title: input.title, dueDate: input.dueDate })) {
+                throw new Error("同一跟进保存请求已存在不同内容，请核对已有事项；未修改原事实");
+            }
+            return existing;
+        }
+        try {
+            await saveJsonVerified(plugin, FOLLOW_UP_STORAGE_KEY, appendFollowUp(store, item));
+        } catch (error) {
+            // saveJsonVerified 可能已落盘但回读失败；保留 key，禁止调用方盲目换 key 重建。
+            throw new FollowUpWriteUnknownError(requestId, error);
+        }
         return item;
     });
 }

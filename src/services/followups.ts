@@ -4,6 +4,7 @@
  * 导出与恢复纪律对齐互动备份（docs/DATA-CONTRACT.md §3）。
  */
 import type { Plugin } from "siyuan";
+import { newNodeId } from "../api/client";
 import { isValidDateKey, snoozedDueDate } from "../domain/followups";
 import type { FollowUpItem, FollowUpStore, SnoozeOption } from "../domain/followups";
 import { toLocalDateKey } from "../domain/interactions";
@@ -16,10 +17,25 @@ import {
     readFollowUpStoreStrictInLock,
     updateFollowUpRecord,
 } from "../data/followups";
+import { checkpointFollowUpCreate, clearPendingFollowUpCreate } from "../data/follow-up-requests";
 import { syncFollowUpTasksToDoc } from "./followup-sync";
 import type { FollowUpSyncReport } from "./followup-sync";
 
 export type { FollowUpItem, FollowUpStatus, SnoozeOption } from "../domain/followups";
+
+export function newFollowUpRequestId(): string {
+    return newNodeId();
+}
+
+export class FollowUpSyncError extends Error {
+    readonly requestId: string;
+
+    constructor(requestId: string, cause: unknown) {
+        super(`跟进已保存，但原生待办同步未完成（请求 ${requestId}）；可使用原请求重试`, { cause });
+        this.name = "FollowUpSyncError";
+        this.requestId = requestId;
+    }
+}
 
 function assertDateKey(dueDate: string, label: string): void {
     if (!isValidDateKey(dueDate)) throw new Error(`${label}日期无效：需要真实存在的公历日期（YYYY-MM-DD）`);
@@ -37,27 +53,40 @@ function assertSyncReported(report: FollowUpSyncReport): void {
 
 export async function createFollowUp(
     plugin: Plugin,
-    input: { personDocId: string; title?: string; dueDate: string },
+    input: { requestId: string; personDocId: string; title?: string; dueDate: string },
 ): Promise<FollowUpItem> {
     if (!input.personDocId) throw new Error("缺少人物文档 ID");
     assertDateKey(input.dueDate, "计划");
-    const item = await createFollowUpRecord(plugin, { personDocId: input.personDocId, title: input.title, dueDate: input.dueDate });
+    const request = { requestId: input.requestId, personDocId: input.personDocId, title: input.title?.trim() ?? "", dueDate: input.dueDate };
+    await checkpointFollowUpCreate(plugin, request);
+    const item = await createFollowUpRecord(plugin, request);
     /* B07：文档任务块为事实源——插件库变更后同步到人物文档；同步失败不回退创建，按复合错误上浮 */
-    assertSyncReported(await syncFollowUpTasksToDoc(plugin, input.personDocId));
+    try {
+        assertSyncReported(await syncFollowUpTasksToDoc(plugin, input.personDocId));
+    } catch (error) {
+        // The item id currently equals the idempotency key, but keep the
+        // original request field here as the recovery contract. If the
+        // storage representation changes later, retries must still use the
+        // caller's key rather than a generated/derived value.
+        throw new FollowUpSyncError(request.requestId, error);
+    }
+    await clearPendingFollowUpCreate(plugin, item.id, request);
     return item;
 }
 
-export async function setFollowUpStatus(plugin: Plugin, id: string, status: FollowUpItem["status"]): Promise<void> {
-    await updateFollowUpRecord(plugin, id, { status });
+export async function setFollowUpStatus(plugin: Plugin, id: string, status: FollowUpItem["status"]): Promise<FollowUpItem> {
+    const item = await updateFollowUpRecord(plugin, id, { status });
     await syncAfterIdChange(plugin, id);
+    return item;
 }
 
 /** 语义化推迟：日期以本地今天为基准计算；custom 需合法日期，否则拒绝 */
-export async function snoozeFollowUp(plugin: Plugin, id: string, option: SnoozeOption, customDate?: string): Promise<void> {
+export async function snoozeFollowUp(plugin: Plugin, id: string, option: SnoozeOption, customDate?: string): Promise<FollowUpItem> {
     const due = snoozedDueDate(option, toLocalDateKey(new Date()), customDate);
     if (!due) throw new Error("指定日期无效：需要真实存在的公历日期（YYYY-MM-DD）");
-    await updateFollowUpRecord(plugin, id, { dueDate: due });
+    const item = await updateFollowUpRecord(plugin, id, { dueDate: due });
     await syncAfterIdChange(plugin, id);
+    return item;
 }
 
 /** 由跟进 id 反查人物文档后同步任务块（状态/改期变更共用） */

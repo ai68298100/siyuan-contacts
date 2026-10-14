@@ -16,7 +16,19 @@
 const VIEWPORT_MARGIN = 8;
 const ANCHOR_GAP = 4;
 
-export function attachPopover(panel: HTMLElement, wrap: HTMLElement, onClose: () => void): () => void {
+export interface PopoverOptions {
+    /** 默认滚动时关闭；输入法引起的 viewport 变化可改为重新定位。 */
+    closeOnScroll?: boolean;
+    /** 默认窗口尺寸变化时关闭；移动端软键盘打开会触发 resize。 */
+    closeOnResize?: boolean;
+}
+
+export function attachPopover(
+    panel: HTMLElement,
+    wrap: HTMLElement,
+    onClose: () => void,
+    options: PopoverOptions = {},
+): () => void {
     const place = () => {
         const anchorRect = wrap.getBoundingClientRect();
         // 先定到左上角测量自然尺寸，避免旧位置影响测量
@@ -44,11 +56,19 @@ export function attachPopover(panel: HTMLElement, wrap: HTMLElement, onClose: ()
     const onScroll = (event: Event) => {
         // 面板内部的滚动（长列表）不关闭
         if (event.target instanceof Node && panel.contains(event.target)) return;
-        onClose();
+        if (options.closeOnScroll === false) place();
+        else onClose();
     };
-    const onResize = () => onClose();
+    const onResize = () => {
+        if (options.closeOnResize === false) place();
+        else onClose();
+    };
     const onKeyDown = (event: KeyboardEvent) => {
-        if (event.key === "Escape") onClose();
+        const target = event.target as Node | null;
+        if (event.key === "Escape" && !event.defaultPrevented && target && (panel.contains(target) || wrap.contains(target))) {
+            event.preventDefault();
+            onClose();
+        }
     };
     const outside = (event: Event) => {
         const target = event.target as Node;

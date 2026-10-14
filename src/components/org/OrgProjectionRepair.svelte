@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { requestErrorMessage } from "../../shared/error-presenter";
     import { onDestroy, tick } from "svelte";
     import type { ContactsPluginFacade } from "../../types";
     import type { OrgProjectionPreview, OrgProjectionRepairResult } from "../../services/org-projections";
@@ -42,7 +43,7 @@
             await tick();
             if (alive && request === generation) summaryElement?.focus();
         } catch (error) {
-            if (alive && request === generation) { errorText = error instanceof Error ? error.message : String(error); stale = true; }
+            if (alive && request === generation) { errorText = requestErrorMessage(error); stale = true; }
         } finally { if (alive && request === generation) busy = false; }
     }
 
@@ -57,7 +58,7 @@
             results = { ...results, [retryKey]: result };
             if (result.status === "failed" || result.status === "unknown") stale = true;
         } catch (error) {
-            if (alive && request === generation) { errorText = error instanceof Error ? error.message : String(error); stale = true; }
+            if (alive && request === generation) { errorText = requestErrorMessage(error); stale = true; }
         } finally {
             if (alive && request === generation) {
                 busy = false;

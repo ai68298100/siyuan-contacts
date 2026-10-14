@@ -7,18 +7,19 @@
         title,
         closeLabel = "关闭",
         wide = false,
-        peek = false,
-        modal = !peek,
+        modal = true,
         closeOnBackdrop = true,
+        beforeClose,
         onClose,
         children,
     }: {
         title: string;
         closeLabel?: string;
         wide?: boolean;
-        peek?: boolean;
         modal?: boolean;
         closeOnBackdrop?: boolean;
+        /** 子窗口可使用自身编辑器的守卫，避免被等待其结果的父窗口 busy 阻断。 */
+        beforeClose?: () => Promise<boolean>;
         onClose: () => void;
         children: Snippet;
     } = $props();
@@ -55,7 +56,7 @@
         closing = true;
         try {
             // B06：聚合作用域内全部脏项，弹一次三选一（保存并离开/放弃/取消）
-            const allowed = await canClose.requestClose();
+            const allowed = await (beforeClose ? beforeClose() : canClose.requestClose());
             if (!allowed) {
                 await tick();
                 if (restoreTarget?.isConnected) {
@@ -78,7 +79,9 @@
     }
 
     function handleKeydown(event: KeyboardEvent) {
-        // Nested dialogs (例如 Peek 内的编辑窗口) 各自处理键盘焦点与 Esc。
+        // 选人器等子浮层已处理 Esc 时，只收起该浮层。
+        if (event.defaultPrevented) return;
+        // 嵌套编辑窗口各自处理键盘焦点与 Esc。
         // 外层弹层不能抢走内层的按键，否则 Esc 会连关两层窗口。
         const activePanel = document.activeElement instanceof HTMLElement
             ? document.activeElement.closest(".lvct-dialog-panel")
@@ -113,7 +116,6 @@
 
 <div
     class="lvct-dialog-mask"
-    class:lvct-dialog-mask--peek={peek}
     role="presentation"
     onclick={(event) => {
         if (closeOnBackdrop && event.target === event.currentTarget) void requestClose();
@@ -121,7 +123,6 @@
 >
     <div
         class:lvct-dialog-panel--wide={wide}
-        class:lvct-dialog-panel--peek={peek}
         class="lvct-dialog-panel"
         role="dialog"
         aria-modal={modal ? "true" : undefined}
@@ -136,7 +137,7 @@
     >
         <div class="lvct-dialog-panel__header">
             <h2 id={titleId} class="lvct-dialog-panel__title">{title}</h2>
-            <button class="lvct-dialog-panel__close" type="button" aria-label={closeLabel}
+            <button class="lvct-dialog-panel__close" type="button" aria-label={closeLabel} title={closeLabel}
                 onmousedown={(event) => {
                     const active = document.activeElement;
                     if (active instanceof HTMLElement && panel?.contains(active) && !active.classList.contains("lvct-dialog-panel__close")) lastContentFocus = active;

@@ -2,6 +2,7 @@ import { listContacts } from "./contacts";
 import { fetchGlobalGraph, fetchLocalGraph } from "../api/graph";
 import { graphRegistry, resolveGraphCenter } from "../domain/graph-query";
 import { mapNativeGraph } from "../domain/native-graph";
+import { requestErrorMessage } from "../shared/error-presenter";
 import type { ContactsSettings } from "../domain/model";
 import type { GraphOrganization, GraphQuery, GraphReferenceSource, GraphSources } from "../domain/graph-query";
 
@@ -23,7 +24,7 @@ export async function loadGraphSources(settings: ContactsSettings, reads: {
         errors: {}, revision,
     };
     for (const [key, result] of [["roster", roster], ["organizations", organizations], ["self", self]] as const) {
-        if (result.status === "rejected") sources.errors[key] = result.reason instanceof Error ? result.reason.message : String(result.reason);
+        if (result.status === "rejected") sources.errors[key] = requestErrorMessage(result.reason);
     }
     return sources;
 }
@@ -35,12 +36,14 @@ export async function loadGraphReferences(sources: GraphSources, query: GraphQue
             return { status: "unknown", graph: { nodes: [], edges: [] }, error: "登记集合或指定中心尚未核实，未请求内核图。" };
         }
         const registry = graphRegistry(sources);
-        const native = center.status === "none" ? await fetchGlobalGraph() : await fetchLocalGraph(center.id);
         const nodes = registry.graph.nodes;
-        const graph = mapNativeGraph(native, { allowedDocIds: new Set(nodes.map((node) => node.id)),
+        if (nodes.length === 0) return { status: "verified", graph: { nodes: [], edges: [] } };
+        const allowedDocIds = new Set(nodes.map((node) => node.id));
+        const native = center.status === "none" ? await fetchGlobalGraph(allowedDocIds) : await fetchLocalGraph(center.id, allowedDocIds);
+        const graph = mapNativeGraph(native, { allowedDocIds,
             docGroups: new Map(nodes.map((node) => [node.id, node.group])), docKinds: new Map(nodes.map((node) => [node.id, node.kind ?? "person"])) });
         return { status: "verified", graph };
     } catch (error) {
-        return { status: "unknown", graph: { nodes: [], edges: [] }, error: error instanceof Error ? error.message : String(error) };
+        return { status: "unknown", graph: { nodes: [], edges: [] }, error: requestErrorMessage(error) };
     }
 }

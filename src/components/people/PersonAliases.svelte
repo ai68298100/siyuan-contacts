@@ -3,6 +3,7 @@
     import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
     import type { PersonAlias } from "../../domain/person-aliases";
+    import { requestErrorMessage } from "../../shared/error-presenter";
 
     let {
         personDocId,
@@ -26,6 +27,7 @@
     let aliasDraft = $state("");
     let loading = $state(true);
     let busy = $state(false);
+    let pendingRemoveId = $state("");
     let errorText = $state("");
     let readFailed = $state(false);
     let loadGeneration = 0;
@@ -51,7 +53,7 @@
         } catch (error) {
             if (!alive || generation !== loadGeneration || docId !== personDocId) return;
             readFailed = true;
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             if (alive && generation === loadGeneration && docId === personDocId) loading = false;
         }
@@ -63,6 +65,7 @@
             personGeneration += 1;
             aliases = [];
             aliasDraft = "";
+            pendingRemoveId = "";
             busy = false;
             void load(docId);
         });
@@ -70,7 +73,7 @@
 
     async function add(): Promise<void> {
         const alias = aliasDraft.trim();
-        if (!alias || busy || loading || readFailed) return;
+        if (!alias || busy || pendingRemoveId || loading || readFailed) return;
         busy = true;
         errorText = "";
         const docId = personDocId;
@@ -84,14 +87,28 @@
             onChanged();
         } catch (error) {
             if (!alive || generation !== personGeneration || docId !== personDocId) return;
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             if (alive && generation === personGeneration && docId === personDocId) busy = false;
         }
     }
 
-    async function remove(id: string): Promise<void> {
-        if (busy || loading || readFailed) return;
+    function requestRemove(id: string): void {
+        if (busy || loading || readFailed || pendingRemoveId) return;
+        if (!aliases.some((item) => item.id === id)) return;
+        errorText = "";
+        pendingRemoveId = id;
+    }
+
+    function cancelRemove(): void {
+        if (busy) return;
+        pendingRemoveId = "";
+        errorText = "";
+    }
+
+    async function confirmRemove(): Promise<void> {
+        const id = pendingRemoveId;
+        if (!id || busy || loading || readFailed || !aliases.some((item) => item.id === id)) return;
         busy = true;
         errorText = "";
         const docId = personDocId;
@@ -100,10 +117,11 @@
             await onRemove(id);
             if (!alive || generation !== personGeneration || docId !== personDocId) return;
             aliases = aliases.filter((item) => item.id !== id);
+            pendingRemoveId = "";
             onChanged();
         } catch (error) {
             if (!alive || generation !== personGeneration || docId !== personDocId) return;
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             if (alive && generation === personGeneration && docId === personDocId) busy = false;
         }
@@ -123,10 +141,23 @@
             {#each aliases as item (item.id)}
                 <span class="lvct-person-aliases__item">
                     <span>{item.alias}</span>
-                    <button type="button" class="b3-button b3-button--text" disabled={busy} onclick={() => void remove(item.id)}>
+                    <button type="button" class="b3-button b3-button--text" disabled={busy || !!pendingRemoveId} onclick={() => requestRemove(item.id)}>
                         {text("personAliasesRemove", "删除")}
                     </button>
                 </span>
+                {#if pendingRemoveId === item.id}
+                    <div class="lvct-person-aliases__confirm" role="group" aria-label={text("personAliasesRemoveConfirm", "确认删除别名")}>
+                        <p>{text("personAliasesRemoveImpact", "将从此人物的别名列表中删除“{alias}”。此操作不可撤销。", { alias: item.alias })}</p>
+                        <div class="lvct-person-aliases__confirm-actions">
+                            <button type="button" class="b3-button b3-button--cancel" disabled={busy} onclick={() => void confirmRemove()}>
+                                {busy ? text("personAliasesRemoving", "删除中…") : text("personAliasesConfirmRemove", "确认删除")}
+                            </button>
+                            <button type="button" class="b3-button b3-button--outline" disabled={busy} onclick={cancelRemove}>
+                                {text("personAliasesCancelRemove", "取消")}
+                            </button>
+                        </div>
+                    </div>
+                {/if}
             {/each}
         </div>
     {:else}
@@ -139,10 +170,10 @@
             bind:value={aliasDraft}
             placeholder={text("personAliasesPlaceholder", "例如：老张、英文名")}
             aria-label={text("personAliasesInputLabel", "新增别名")}
-            disabled={busy}
+            disabled={busy || !!pendingRemoveId}
             onkeydown={(event) => { if (event.key === "Enter") void add(); }}
         />
-        <button type="button" class="b3-button b3-button--text" disabled={busy || loading || readFailed || !aliasDraft.trim()} onclick={() => void add()}>
+        <button type="button" class="b3-button b3-button--text" disabled={busy || !!pendingRemoveId || loading || readFailed || !aliasDraft.trim()} onclick={() => void add()}>
             {busy ? text("personAliasesSaving", "保存中…") : text("personAliasesAdd", "添加")}
         </button>
     </div>

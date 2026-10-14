@@ -17,11 +17,13 @@ const browserPath = [
     "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
 ].find((candidate) => candidate && existsSync(candidate));
 if (!browserPath) throw new Error("未找到测试浏览器，请用 LVCT_TEST_BROWSER 指定 Chromium 可执行文件");
+const profile = mkdtempSync(join(tmpdir(), "lvct-ui-"));
 
 let resolveReport;
 const report = new Promise((resolve) => { resolveReport = resolve; });
 const server = await createServer({
     configFile: false, root, publicDir: false,
+    cacheDir: join(profile, "vite-cache"),
     resolve: { alias: { siyuan: resolve(root, "scripts/e2e/ui/siyuan-mock.js") } },
     plugins: [svelte(), hostBaselinePlugin(), {
         name: "isolated-ui-report",
@@ -46,13 +48,11 @@ const server = await createServer({
 });
 let browser;
 let debuggerSocket;
-let profile;
 let timeout;
 let requestBrowserClose;
 try {
     await server.listen();
     const address = server.httpServer.address();
-    profile = mkdtempSync(join(tmpdir(), "lvct-ui-"));
     console.log(`隔离浏览器临时目录：${profile}`);
     browser = spawn(browserPath, [
         "--headless=new", "--no-first-run", "--no-default-browser-check", "--disable-gpu", "--disable-extensions",

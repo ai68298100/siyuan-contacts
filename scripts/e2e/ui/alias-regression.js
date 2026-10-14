@@ -137,4 +137,59 @@ export async function runAliasRegression({ test, assert, kernel, settings, fixtu
                 "重复保存产生重复 UI 或存储写入");
         } finally { if (component) await unmount(component); detach(); }
     });
+
+    await test("AG-ALIAS-002 删除别名须确认，可取消且确认仅删除选中项", async () => {
+        const aliases = [
+            { id: "alias-keep", personDocId: person.docId, alias: "老张", createdAt: 1, updatedAt: 1 },
+            { id: "alias-remove", personDocId: person.docId, alias: "英文名", createdAt: 2, updatedAt: 2 },
+        ];
+        const removeCalls = [];
+        let releaseRemove;
+        let changed = 0;
+        let component;
+        try {
+            component = mount(PersonAliases, { target: fixture, props: {
+                personDocId: person.docId,
+                onLoad: async () => aliases,
+                onAdd: async () => { throw new Error("用例不涉及新增"); },
+                onRemove: (id) => {
+                    removeCalls.push(id);
+                    return new Promise((resolve) => { releaseRemove = resolve; });
+                },
+                onChanged: () => { changed += 1; },
+            } });
+            await until(() => fixture.querySelectorAll(".lvct-person-aliases__item").length === 2, "别名列表未加载");
+
+            const rowFor = (alias) => [...fixture.querySelectorAll(".lvct-person-aliases__item")]
+                .find((row) => row.textContent.includes(alias));
+            rowFor("老张").querySelector("button").click();
+            await tick();
+            const firstConfirm = fixture.querySelector(".lvct-person-aliases__confirm");
+            assert(firstConfirm?.textContent.includes("老张") && firstConfirm.textContent.includes("不可撤销"),
+                "删除确认没有说明目标别名和删除后果");
+            assert(removeCalls.length === 0, "确认前已执行删除回调");
+            [...firstConfirm.querySelectorAll("button")].find((button) => button.textContent.trim() === "取消").click();
+            await tick();
+            assert(removeCalls.length === 0 && fixture.querySelectorAll(".lvct-person-aliases__item").length === 2,
+                "取消确认仍执行删除或改变列表");
+
+            rowFor("英文名").querySelector("button").click();
+            await tick();
+            const confirm = fixture.querySelector(".lvct-person-aliases__confirm");
+            [...confirm.querySelectorAll("button")].find((button) => button.textContent.trim() === "确认删除").click();
+            await until(() => removeCalls.length === 1, "确认后未调用删除回调");
+            await tick();
+            assert(removeCalls.length === 1 && removeCalls[0] === "alias-remove", "删除回调目标不是选中的别名");
+            const lockedConfirm = fixture.querySelector(".lvct-person-aliases__confirm");
+            const confirmButton = [...lockedConfirm.querySelectorAll("button")]
+                .find((button) => button.textContent.includes("删除中"));
+            assert(confirmButton?.disabled && [...lockedConfirm.querySelectorAll("button")].every((button) => button.disabled),
+                "删除请求期间确认和取消没有锁定");
+            confirmButton.click();
+            assert(removeCalls.length === 1, "重复点击提交了第二次删除");
+            releaseRemove();
+            await until(() => fixture.querySelectorAll(".lvct-person-aliases__item").length === 1, "确认删除后列表未刷新");
+            assert(rowFor("老张") && !rowFor("英文名") && changed === 1, "确认删除影响了错误别名或未通知刷新");
+        } finally { if (component) await unmount(component); }
+    });
 }

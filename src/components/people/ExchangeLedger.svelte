@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { requestErrorMessage } from "../../shared/error-presenter";
     import { onDestroy, untrack } from "svelte";
     import { newExchangeRequestId } from "../../services/exchanges";
     import { useCloseGuard } from "../close-guard";
@@ -30,7 +31,7 @@
             dueOn?: string;
             note?: string;
         }) => Promise<ExchangeRecord>;
-        onChangeStatus: (id: string, status: ExchangeStatus, settledOn?: string) => Promise<ExchangeRecord>;
+        onChangeStatus: (id: string, status: ExchangeStatus, settledOn?: string, expected?: { updatedAt: number }) => Promise<ExchangeRecord>;
         onChanged?: () => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
@@ -82,7 +83,7 @@
         } catch (error) {
             if (!alive || generation !== loadGeneration || docId !== personDocId) return;
             readFailed = true;
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             if (alive && generation === loadGeneration && docId === personDocId) loading = false;
         }
@@ -139,7 +140,7 @@
         } catch (error) {
             if (!alive || generation !== personGeneration || docId !== personDocId || activeRequestId !== requestId) return;
             saveUnknown = saveUnknown || error instanceof ExchangeWriteUnknownError;
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             if (alive && generation === personGeneration && docId === personDocId) busy = false;
         }
@@ -147,19 +148,20 @@
 
     async function changeStatus(record: ExchangeRecord, status: ExchangeStatus): Promise<void> {
         if (busy || loading || readFailed || saveUnknown) return;
+        if (status === "cancelled" && !window.confirm(`确定取消「${recordLabel(record)}」吗？取消后仍保留历史记录。`)) return;
         busy = true;
         errorText = "";
         const docId = personDocId;
         const generation = personGeneration;
         try {
-            await onChangeStatus(record.id, status, status === "settled" ? toLocalDateKey(new Date()) : undefined);
+            await onChangeStatus(record.id, status, status === "settled" ? toLocalDateKey(new Date()) : undefined, { updatedAt: record.updatedAt });
             if (!alive || docId !== personDocId || generation !== personGeneration) return;
             await load(docId);
             if (!alive || docId !== personDocId || generation !== personGeneration) return;
             onChanged?.();
         } catch (error) {
             if (!alive || docId !== personDocId || generation !== personGeneration) return;
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             if (alive && docId === personDocId && generation === personGeneration) busy = false;
         }

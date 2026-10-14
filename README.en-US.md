@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.6** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.6) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.7** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.7) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -21,7 +21,17 @@ English | [简体中文](README.md)
 
 Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
 
-## What's new in v0.5.6
+## What's new in v0.5.7
+
+### Design tokens and component consistency
+
+- Added a three-layer Primitive → Semantic → Component token system for color, spacing, typography, radii, shadows, z-index, motion and control sizes. Light and dark themes now share the same semantic contract.
+- Unified button, field, checkbox, radio, loading and focus-ring variants so new screens can reuse the same components.
+
+### Measured consolidation
+
+- Token coverage: 38.86% → 41.19%; color literals: 202 → 196; length literals: 2,057 → 1,936; non-4px-grid lengths: 1,159 → 1,071; font-size variants: 29 → 28.
+- Reproduce the audit with pnpm audit:tokens; see [token consolidation report](docs/TOKEN-CONSOLIDATION-2026-10-14.md).
 
 This release completes isolated-kernel and real browser-desktop acceptance, fixes the authentication cleanup boundary, and continues the contact and organization workflow refinements.
 
@@ -103,7 +113,7 @@ The migration bundle is a JSON value snapshot with a preview and merge flow, not
 - The in-app English translation is incomplete, so some interface text may appear in Chinese.
 - CardDAV address-book sync and CalDAV calendar sync are not supported. Contacts can be exchanged using vCard files.
 
-See the [v0.5.6 release notes](docs/RELEASE-NOTES-v0.5.6.md) for validation scope.
+See the [v0.5.7 release notes](docs/RELEASE-NOTES-v0.5.7.md) for validation scope; the previous release notes remain available for v0.5.6.
 
 ## Quick start
 

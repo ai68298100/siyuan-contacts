@@ -41,7 +41,10 @@ export async function getRoster(settings: ContactsSettings): Promise<ContactSumm
     const request = { key, generation, promise: Promise.resolve([] as ContactSummary[]) };
     request.promise = (async () => {
         try {
-            const rendered = await renderView(settings.avId, settings.dbBlockId);
+            /* 名册服务已有自己的 generation/pending 合并。generation 失效后，
+             * 必须绕过 API 层同键共享，否则旧 renderAttributeView 请求仍会
+             * 占住新读取，导致失效后的最新结果无法及时取得。 */
+            const rendered = await renderView(settings.avId, settings.dbBlockId, "", false, { dedupe: generation === 0 });
             const people = rosterFromRender(rendered, fieldMap);
             /* B11.4：名册保留并标识本人——isSelf 供卡片徽标/选人器排除等投影使用；
                身份读取失败或未装配按无标记降级（roster 不因身份层故障而失败） */

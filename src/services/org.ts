@@ -37,19 +37,43 @@ export const ORG_SECTION_ATTR = "custom-lvct-org";
 export const ORG_ARCHIVED_VALUE = "archived";
 export const ORG_LINKS_SECTION_ATTR = "custom-lvct-org-links";
 
+/*
+ * 组织扫描是多个页面共享的只读数据源。人物档案、图谱和组织管理经常
+ * 在同一轮刷新中同时请求它；合并同一时刻的扫描可以避免重复执行两次
+ * SQL，同时保留“写入后立即失效”的事实源语义。这里不做长期缓存，
+ * 因而外部编辑仍会在下一次没有并发请求时被重新读取。
+ */
+let pendingOrganizationScan: Promise<OrganizationSummary[]> | null = null;
+
+/** 组织标记或文档标题发生写入后调用，丢弃当前共享读取引用。 */
+export function invalidateOrganizationScan(): void {
+    pendingOrganizationScan = null;
+}
+
 /** 全库组织文档列举（单 SQL 找标记含归档值 + 单 SQL 取文档名，性能预算见 §4；零写入） */
 export async function scanOrganizations(): Promise<OrganizationSummary[]> {
-    const roots = await querySql<unknown>(
-        `SELECT root_id, ial, COUNT(*) AS markerCount FROM blocks WHERE ial LIKE '%${ORG_SECTION_ATTR}="%' GROUP BY root_id, ial ORDER BY root_id, ial`,
-    );
-    const states = organizationMarkerStates(roots);
-    const ids = [...states.keys()];
-    if (ids.length === 0) return [];
-    const idList = ids.map((id) => `'${id}'`).join(",");
-    const docs = await querySql<unknown>(
-        `SELECT id, content, hpath, box FROM blocks WHERE type='d' AND id IN (${idList})`,
-    );
-    return organizationsFromDocs(states, docs);
+    if (pendingOrganizationScan) return pendingOrganizationScan;
+    const request = (async () => {
+        const roots = await querySql<unknown>(
+            `SELECT root_id, ial, COUNT(*) AS markerCount FROM blocks WHERE ial LIKE '%${ORG_SECTION_ATTR}="%' GROUP BY root_id, ial ORDER BY root_id, ial`,
+            { dedupe: false },
+        );
+        const states = organizationMarkerStates(roots);
+        const ids = [...states.keys()];
+        if (ids.length === 0) return [];
+        const idList = ids.map((id) => `'${id}'`).join(",");
+        const docs = await querySql<unknown>(
+            `SELECT id, content, hpath, box FROM blocks WHERE type='d' AND id IN (${idList})`,
+            { dedupe: false },
+        );
+        return organizationsFromDocs(states, docs);
+    })();
+    pendingOrganizationScan = request;
+    try {
+        return await request;
+    } finally {
+        if (pendingOrganizationScan === request) pendingOrganizationScan = null;
+    }
 }
 
 /** B13.9：组织标记冲突体检数据源。 */
@@ -348,6 +372,7 @@ export async function createOrganization(
     if (titleError) throw new Error(titleError);
     const result = await startOrganizationCreate(plugin ?? plugin0(), settings, name);
     if (result.status !== "complete") throw new Error(`${result.message}（请求 ${result.operation.requestId}）`);
+    invalidateOrganizationScan();
     if (!profile) return { docId: result.docId };
     try {
         await saveOrganizationProfile(plugin ?? plugin0(), result.docId, { ...profile, name });
@@ -361,11 +386,16 @@ export async function getOrganizationProfile(plugin: Plugin, docId: string): Pro
     return loadOrganizationProfile(plugin, docId);
 }
 
-export async function updateOrganizationProfile(plugin: Plugin, docId: string, profile: OrganizationProfileDraft): Promise<OrganizationProfileDraft> {
+export async function updateOrganizationProfile(
+    plugin: Plugin,
+    docId: string,
+    profile: OrganizationProfileDraft,
+    expected?: OrganizationProfileDraft | null,
+): Promise<OrganizationProfileDraft> {
     const organization = (await scanOrganizations()).find((item) => item.docId === docId);
     if (!organization) throw new Error("组织不存在，资料未保存");
     if (organization.name.trim() !== profile.name.trim()) throw new Error("组织名称已变化，请先完成组织改名后再保存资料");
-    return saveOrganizationProfile(plugin, docId, profile);
+    return saveOrganizationProfile(plugin, docId, profile, expected);
 }
 
 /** 初始化时保证内置“家庭”组织存在；重复运行只读检查，不会重复建档。 */
@@ -399,10 +429,14 @@ async function setOrganizationArchived(orgDocId: string, archived: boolean): Pro
         if (fact.name !== org.name || (fact.marker.value === ORG_ARCHIVED_VALUE) !== org.archived) throw new Error("组织事实在归档前变化，未写入");
         const ial = fact.marker.ial.replace(/custom-lvct-org="(?:1|archived)"/, `${ORG_SECTION_ATTR}="${archived ? ORG_ARCHIVED_VALUE : "1"}"`);
         let writeError: unknown;
+        invalidateOrganizationScan();
         try {
             await updateBlockMd(fact.marker.id, `**组织**：${escapeMarkdown(org.name)}\n${ial}`);
         } catch (error) {
             writeError = error;
+        } finally {
+            /* 响应可能丢失但写入已生效；核验必须重新扫描，不能复用写前 pending。 */
+            invalidateOrganizationScan();
         }
         try {
             await flushBlockIndex();
@@ -476,6 +510,7 @@ export async function renameOrganization(orgDocId: string, name: string, plugin?
     }
     const result = await startOrganizationRename(plugin ?? plugin0(), orgDocId, name);
     if (result.status !== "complete") throw new Error(`${result.message}（请求 ${result.operation.requestId}）`);
+    invalidateOrganizationScan();
 }
 
 /** 供设置页/向导显示的组织锚点状态（只读） */

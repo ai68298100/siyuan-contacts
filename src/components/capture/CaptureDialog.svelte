@@ -8,6 +8,7 @@
     import { CheckCircle2, Sparkles } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
     import { onDestroy } from "svelte";
+    import { requestErrorMessage } from "../../shared/error-presenter";
     import { AI_CANDIDATE_FIELDS } from "../../domain/ai-extract";
     import type { AiCandidateField } from "../../domain/ai-extract";
     import { AiExtractionError } from "../../domain/ai-preflight";
@@ -147,7 +148,7 @@
             /* V-19：初始勾选不算草稿——基线在此刻落定（重试重载同样复基线） */
             markClean();
         } catch (error) {
-            loadError = error instanceof Error ? error.message : String(error);
+            loadError = requestErrorMessage(error);
         } finally {
             loading = false;
         }
@@ -333,7 +334,7 @@
             }
             step = 3;
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             running = false;
         }
@@ -351,7 +352,7 @@
                 aiExtrasApplied = !extrasError;
             }
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             running = false;
         }
@@ -383,7 +384,7 @@
             // must stay visible as a recoverable AI-extra error instead of
             // becoming an unhandled promise rejection with no feedback.
             aiExtrasApplied = false;
-            extrasError = error instanceof Error ? error.message : String(error);
+            extrasError = requestErrorMessage(error);
         } finally {
             running = false;
         }

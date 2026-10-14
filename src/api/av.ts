@@ -179,6 +179,7 @@ export async function renderView(
     dbBlockId: string,
     query: string = "",
     createIfNotExist: boolean = false,
+    options: Pick<RenderPageOptions, "signal" | "dedupe"> = {},
 ): Promise<AvRenderResult> {
     try {
         return await kernelPost("/api/av/renderAttributeView", {
@@ -187,7 +188,11 @@ export async function renderView(
             query,
             pageSize: -1,
             createIfNotExist,
-        }, { decode: (data) => decodeAvRenderResult("/api/av/renderAttributeView", data) });
+        }, {
+            signal: options.signal,
+            dedupe: options.dedupe,
+            decode: (data) => decodeAvRenderResult("/api/av/renderAttributeView", data),
+        });
     } catch (error) {
         rethrowAttributeViewCarrierMissing(error, avId, dbBlockId);
     }
@@ -235,6 +240,8 @@ export interface RenderPageOptions {
     pageSize?: number;
     /** 读取分页可由视图切换/用户停止操作取消；取消只终止本次等待，不重试请求。 */
     signal?: AbortSignal;
+    /** 服务层已完成代际合并时可关闭底层同键请求共享，避免旧请求占住新读取。 */
+    dedupe?: boolean;
 }
 
 export async function renderViewPage(avId: string, dbBlockId: string, options: RenderPageOptions = {}): Promise<AvRenderResult> {
@@ -252,6 +259,7 @@ export async function renderViewPage(avId: string, dbBlockId: string, options: R
             createIfNotExist: false,
         }, {
             signal: options.signal,
+            dedupe: options.dedupe,
             decode: (data) => decodeAvRenderResult("/api/av/renderAttributeView", data),
         });
     } catch (error) {

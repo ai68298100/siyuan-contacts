@@ -1,11 +1,12 @@
 <script lang="ts">
+    import { requestErrorMessage } from "../shared/error-presenter";
     /**
      * 主工作台：首页(仪表盘) + 联系人(卡片/表格) + 关系图谱。
      * 人物详情弹窗在此层统一承载，各视图共用。
      */
     import PeopleView from "./people/PeopleView.svelte";
     import PersonDetail from "./people/PersonDetail.svelte";
-    import RelationGraph from "./graph/RelationGraph.svelte";
+    import RelationGraphLoader from "./graph/RelationGraphLoader.svelte";
     import DashboardView from "./dashboard/DashboardView.svelte";
     import LvctDialog from "./LvctDialog.svelte";
     import OrgsView from "./org/OrgsView.svelte";
@@ -28,6 +29,7 @@
     import { createLifecycleToken, LIFECYCLE_CONTEXT, type LifecycleToken } from "../domain/lifecycle";
     import type { ContactSummary } from "../domain/person";
     import type { ContactsPluginFacade, WorkbenchView } from "../types";
+    import { OrganizationProfileConflictError } from "../data/organization-profiles";
 
     let {
         facade,
@@ -48,6 +50,33 @@
     } = $props();
 
     type ViewId = WorkbenchView;
+    const validViewIds: readonly ViewId[] = ["home", "people", "graph", "orgs", "settings"];
+    const WORKBENCH_HISTORY_KEY = "__lvctWorkbench";
+    type WorkbenchHistoryEntry = { view: ViewId; index: number };
+    function historyEntry(state: unknown = window.history.state): WorkbenchHistoryEntry | undefined {
+        if (!state || typeof state !== "object") return undefined;
+        const entry = (state as Record<string, unknown>)[WORKBENCH_HISTORY_KEY];
+        if (!entry || typeof entry !== "object") return undefined;
+        const { view, index } = entry as Partial<WorkbenchHistoryEntry>;
+        return validViewIds.includes(view as ViewId) && Number.isSafeInteger(index) && (index as number) >= 0
+            ? { view: view as ViewId, index: index as number }
+            : undefined;
+    }
+    let historyIndex = historyEntry()?.index ?? 0;
+    let historyNavigationRequest = 0;
+    function syncViewHistory(view: ViewId, mode: "push" | "replace"): void {
+        if (typeof window === "undefined" || !window.history?.pushState) return;
+        const previous = window.history.state;
+        // History state is structured-cloneable by definition; retain the host's object fields.
+        const state = previous && typeof previous === "object" && !Array.isArray(previous) ? { ...previous } : {};
+        if (mode === "push") historyIndex += 1;
+        state[WORKBENCH_HISTORY_KEY] = { view, index: historyIndex } satisfies WorkbenchHistoryEntry;
+        try {
+            window.history[mode === "push" ? "pushState" : "replaceState"](state, "", window.location.href);
+        } catch {
+            // Some embedded hosts restrict History API writes; navigation still works in-place.
+        }
+    }
     // Keep the message object as an explicit reactive dependency.  Returning a
     // function from `$derived` hid the actual `facade.i18n` read from derived
     // values such as `viewMeta`, so their first render could retain Chinese
@@ -85,7 +114,7 @@
     });
 
     // svelte-ignore state_referenced_locally
-    let current: ViewId = $state(initialView ?? preferences.defaultView);
+    let current: ViewId = $state(initialView ?? historyEntry()?.view ?? preferences.defaultView);
     // svelte-ignore state_referenced_locally
     let currentSettings: ContactsSettings = $state(settings);
     // svelte-ignore state_referenced_locally
@@ -99,7 +128,7 @@
         apply: applyPreferences,
         fail: (error) => {
             if (!lifecycleToken.isAlive()) return;
-            preferencesNotice = `偏好读取或保存失败，当前结果尚未核实：${error instanceof Error ? error.message : String(error)}`;
+            preferencesNotice = `偏好读取或保存失败，当前结果尚未核实：${requestErrorMessage(error)}`;
         },
     });
     lifecycleToken.onDispose(preferenceRequests.dispose);
@@ -126,12 +155,19 @@
     let organizationProfileReadOnly = $state(false);
     let organizationProfileDocId = $state("");
     let organizationProfileInitial = $state<Partial<import("../domain/organization-profile").OrganizationProfileDraft>>({});
+    // 编辑组织资料时保留打开瞬间的基线；保存前由数据层拒绝覆盖其他窗口的新版本。
+    let organizationProfileExpected = $state<import("../domain/organization-profile").OrganizationProfileDraft | null | undefined>(undefined);
+    let organizationProfileEditor: { requestClose: () => Promise<boolean> } | undefined = $state();
     let returnToContactAfterOrganizationProfile = $state(false);
     let organizationProfileCompletion: ((created: boolean) => void) | null = $state(null);
     let workbenchElement: HTMLDivElement | undefined = $state();
+    let peopleView: {
+        focusContact: (itemId: string) => Promise<"restored" | "cancelled" | "missing">;
+        cancelContactFocus: () => void;
+    } | undefined = $state();
     let navigationError = $state("");
     let navigationRequest = 0;
-    type ReturnDom = { trigger: HTMLElement | null; scrolls: Array<{ element: HTMLElement; top: number; left: number }> };
+    type ReturnDom = { trigger: HTMLElement | null; personItemId: string | null; scrolls: Array<{ element: HTMLElement; top: number; left: number }> };
     let detailDom: ReturnDom | null = null;
     let organizationDom: ReturnDom | null = null;
 
@@ -141,15 +177,21 @@
         while (ancestor) { elements.add(ancestor); ancestor = ancestor.parentElement; }
         const body = workbenchElement?.querySelector<HTMLElement>(".lvct-workbench__body");
         if (body) elements.add(body);
-        return { trigger, scrolls: [...elements].map((element) => ({ element, top: element.scrollTop, left: element.scrollLeft })) };
+        return { trigger, personItemId: trigger?.closest<HTMLElement>("[data-person-item-id]")?.dataset.personItemId ?? null,
+            scrolls: [...elements].map((element) => ({ element, top: element.scrollTop, left: element.scrollLeft })) };
     }
 
     async function restoreReturn(snapshot: ReturnDom | null, context?: PersonReturnContext | null) {
+        const request = navigationRequest;
         await tick();
-        if (!lifecycleToken.isAlive()) return;
+        if (!lifecycleToken.isAlive() || request !== navigationRequest || detailPerson) return;
+        const contactFocus = snapshot?.personItemId && current === "people" && peopleView
+            ? await peopleView.focusContact(snapshot.personItemId) : "missing";
+        if (!lifecycleToken.isAlive() || request !== navigationRequest || detailPerson || contactFocus === "cancelled") return;
         for (const position of snapshot?.scrolls ?? []) {
             if (position.element.isConnected) { position.element.scrollTop = position.top; position.element.scrollLeft = position.left; }
         }
+        if (contactFocus === "restored") return;
         const documentTrigger = context?.kind === "document"
             ? document.querySelector<HTMLElement>(`.lvct-doc-strip[data-person-doc-id="${context.docId}"] [data-lvct-person-entry]`) : null;
         const fallback = organizationOpen ? document.querySelector<HTMLElement>(".lvct-org-manager__members input")
@@ -187,6 +229,7 @@
         organizationProfileReadOnly = false;
         organizationProfileDocId = "";
         organizationProfileInitial = {};
+        organizationProfileExpected = undefined;
         organizationProfileOpen = true;
     }
 
@@ -211,21 +254,23 @@
         organizationProfileReadOnly = true;
         organizationProfileDocId = docId;
         organizationProfileInitial = {};
+        organizationProfileExpected = undefined;
         let profileError = "";
         let profile: import("../domain/organization-profile").OrganizationProfileDraft | undefined;
         let org: { name: string } | undefined;
         try {
             profile = (await facade.loadOrganizationProfile?.(docId)) ?? undefined;
         } catch (error) {
-            profileError = error instanceof Error ? error.message : String(error);
+            profileError = requestErrorMessage(error);
         }
         try {
             org = (await facade.listOrganizations()).find((item) => item.docId === docId);
         } catch (error) {
-            profileError ||= error instanceof Error ? error.message : String(error);
+            profileError ||= requestErrorMessage(error);
         }
         if (!lifecycleToken.isAlive() || organizationProfileDocId !== docId) return;
         organizationProfileInitial = profile ?? { name: org?.name ?? "" };
+        organizationProfileExpected = profile ?? null;
         organizationProfileReadOnly = Boolean(profileError);
         organizationProfileError = profileError ? `读取组织资料失败：${profileError}。可先核对内容后重试保存。` : "";
         organizationProfileOpen = true;
@@ -253,7 +298,7 @@
                 const current = (await facade.listOrganizations()).find((org) => org.docId === docId);
                 if (!lifecycleToken.isAlive()) return;
                 if (current && current.name !== draft.name.trim()) await facade.renameOrganization?.(docId, draft.name.trim());
-                await facade.saveOrganizationProfile(docId, draft);
+                await facade.saveOrganizationProfile(docId, draft, organizationProfileExpected);
                 if (!lifecycleToken.isAlive()) return;
             } else {
                 const created = await facade.createOrganization(draft.name, draft);
@@ -262,6 +307,7 @@
                 if (created.profileSaved === false) {
                     organizationProfileDocId = docId;
                     organizationProfileInitial = draft;
+                    organizationProfileExpected = null;
                     organizationProfileError = `组织已创建，但资料尚未保存：${created.profileError ?? "请重试"}`;
                     return;
                 }
@@ -269,6 +315,7 @@
             organizationProfileOpen = false;
             organizationProfileDocId = "";
             organizationProfileInitial = {};
+            organizationProfileExpected = undefined;
             organizationProfileReadOnly = false;
             if (returnToContactAfterOrganizationProfile) {
                 returnToContactAfterOrganizationProfile = false;
@@ -277,7 +324,10 @@
             }
             await openOrganization(docId);
         } catch (error) {
-            if (lifecycleToken.isAlive()) organizationProfileError = error instanceof Error ? error.message : String(error);
+            if (lifecycleToken.isAlive()) {
+                if (error instanceof OrganizationProfileConflictError) organizationProfileReadOnly = true;
+                organizationProfileError = requestErrorMessage(error);
+            }
         } finally {
             if (lifecycleToken.isAlive()) organizationProfileSaving = false;
         }
@@ -308,7 +358,7 @@
             navigationError = "";
             showDetail(person);
         } catch (error) {
-            if (lifecycleToken.isAlive() && request === navigationRequest) navigationError = error instanceof Error ? error.message : String(error);
+            if (lifecycleToken.isAlive() && request === navigationRequest) navigationError = requestErrorMessage(error);
         }
     }
     const detailCloseLabel = $derived(detailReturn?.kind === "organization" ? text("routeReturnOrganization", "返回原组织")
@@ -335,6 +385,8 @@
 
     function showDetail(person: ContactSummary) {
         if (!lifecycleToken.isAlive()) return;
+        navigationRequest += 1;
+        peopleView?.cancelContactFocus();
         if (!detailReturn) {
             detailReturn = personReturnContext(current);
             detailDom = captureReturn();
@@ -349,11 +401,14 @@
         peopleFocusSort = undefined;
     }
 
-    async function selectView(view: ViewId): Promise<boolean> {
+    async function selectView(view: ViewId, options: { history?: "push" | "replace" | "none" } = {}): Promise<boolean> {
+        if (options.history !== "none") historyNavigationRequest += 1;
         if (!lifecycleToken.isAlive()) return false;
+        const previousView = current;
         if ((view !== current || detailPerson || organizationOpen) && !(await canLeave.requestClose())) return false;
         if (!lifecycleToken.isAlive()) return false;
         current = view;
+        if (options.history !== "none" && (view !== previousView || detailPerson || organizationOpen)) syncViewHistory(view, options.history ?? "push");
         detailPerson = null;
         detailReturn = null;
         organizationOpen = false;
@@ -385,13 +440,33 @@
         if (!lifecycleToken.isAlive()) return;
         if (current !== "people" && !(await canLeave.requestClose())) return;
         if (!lifecycleToken.isAlive()) return;
+        const previousView = current;
         current = "people";
+        if (previousView !== "people") syncViewHistory("people", "push");
         peopleFocusIds = focus?.itemIds ? [...focus.itemIds] : [];
         peopleFocusLabel = focus?.label ?? "";
         peopleFocusSort = focus?.sort;
     }
 
     onMount(() => {
+        // Store the selected in-plugin view in the current history entry without changing
+        // the host URL; this preserves browser Back/Forward and refresh restoration safely.
+        const restored = historyEntry();
+        if (!initialView && restored) current = restored.view;
+        else syncViewHistory(current, "replace");
+        const handlePopState = (event: PopStateEvent) => {
+            const target = historyEntry(event.state);
+            if (!target || target.index === historyIndex && target.view === current) return;
+            const previousIndex = historyIndex;
+            const request = ++historyNavigationRequest;
+            void selectView(target.view, { history: "none" }).then((accepted) => {
+                if (request !== historyNavigationRequest) return;
+                if (accepted) historyIndex = target.index;
+                else if (target.index !== previousIndex) window.history.go(previousIndex - target.index);
+            });
+        };
+        window.addEventListener("popstate", handlePopState);
+        lifecycleToken.onDispose(() => window.removeEventListener("popstate", handlePopState));
         const unsubscribePerson = subscribePersonNavigation(facade, (request) => {
             void (async () => {
                 if (!lifecycleToken.isAlive()) return;
@@ -427,7 +502,7 @@
             organizationProfileCompletion = null;
             returnToContactAfterOrganizationProfile = false;
         });
-        // B13.6a：组织管理弹窗成员「查看详情」跨弹窗导航（弹窗先关，Peek 由本层打开）
+        // B13.6a：组织管理弹窗成员「查看详情」跨弹窗导航（弹窗先关，人物详情由本层打开）
         const handleRequestedPerson = (event: Event) => {
             const person = (event as CustomEvent<{ person?: ContactSummary }>).detail?.person;
             if (person?.docId) void openDetail(person);
@@ -441,7 +516,7 @@
         };
     });
 
-    // FUNC-01.7：跨窗口/宿主数据变化 → 防抖合并后 bump revision 原地刷新（筛选与 Peek 上下文保留）；
+    // FUNC-01.7：跨窗口/宿主数据变化 → 防抖合并后 bump revision 原地刷新（筛选与人物详情上下文保留）；
     // 有未保存草稿时不静默：追加一条可见提示（草稿在弹窗本地状态中，列表刷新不覆盖草稿）。
     let dataChangeNotice = $state("");
     onMount(() => {
@@ -469,7 +544,13 @@
 <div class="lvct-workbench" bind:this={workbenchElement}>
     <aside class="lvct-workbench__sidebar" aria-label={text("navigationLabel", "小驴人脉导航")}>
         <div class="lvct-workbench__brand">
-            <span class="lvct-workbench__brand-mark">驴</span>
+            <span class="lvct-workbench__brand-mark">
+                {#if currentPreferences.brandAvatarImage}
+                    <img src={currentPreferences.brandAvatarImage} alt="" width="40" height="40" decoding="async" />
+                {:else}
+                    {currentPreferences.brandAvatar || "驴"}
+                {/if}
+            </span>
             <span>
                 <b>{text("tabTitle", "小驴人脉")}</b>
                 <small>Lv Contacts</small>
@@ -517,7 +598,7 @@
     </aside>
 
     <main class="lvct-workbench__main">
-        <header class="lvct-workbench__header">
+        <header class="lvct-workbench__header" class:lvct-workbench__header--settings={current === "settings"}>
             <div>
                 <h1 tabindex="-1">{currentMeta.title}</h1>
                 <p>{currentMeta.subtitle}</p>
@@ -525,7 +606,7 @@
             {#if current === "home"}<div class="lvct-workbench__header-actions">
                 <input class="b3-text-field" type="search" aria-label={text("homeSearchPlaceholder", "搜索联系人")} placeholder={text("homeSearchPlaceholder", "搜索联系人")} bind:value={globalSearch}
                     onkeydown={(event) => { if (event.key === "Enter") { event.preventDefault(); void submitGlobalSearch(); } }} />
-                <button type="button" class="b3-button b3-button--outline" disabled={!globalSearch.trim()} onclick={() => void submitGlobalSearch()}><Search size={16}/>{text("homeSearchAction", "搜索")}</button>
+                <button type="button" class="b3-button b3-button--outline" disabled={!globalSearch.trim()} title={!globalSearch.trim() ? text("homeSearchDisabled", "请输入联系人姓名或其他关键词") : undefined} onclick={() => void submitGlobalSearch()}><Search size={16}/>{text("homeSearchAction", "搜索")}</button>
                 <button type="button" class="b3-button" onclick={() => void requestPeopleAction("create")}><UserPlus size={16}/>新建联系人</button>
             </div>{/if}
         </header>
@@ -553,6 +634,7 @@
                 />
             {:else if current === "people"}
                 <PeopleView
+                    bind:this={peopleView}
                     settings={currentSettings}
                     i18n={facade.i18n}
                     isMobile={isMobile}
@@ -646,7 +728,7 @@
                     }}
                 />
             {:else if current === "graph"}
-                <RelationGraph
+                <RelationGraphLoader
                     settings={currentSettings}
                     {facade}
                     revision={dataRevision}
@@ -654,7 +736,8 @@
                     onPreferencesChange={savePreferences}
                     onOpenDetail={openDetail}
                     onOpenPeople={() => selectView("people")}
-                    onOpenOrgs={() => selectView("orgs")}
+                    onOpenCreatePerson={() => void requestPeopleAction("create")}
+                    onOpenOrgs={(docId) => docId ? void openOrganization(docId) : selectView("orgs")}
                 />
             {:else if current === "orgs"}
                 <OrgsView
@@ -698,23 +781,8 @@
     </LvctDialog>
 {/if}
 
-{#if organizationProfileOpen}
-    <LvctDialog title={organizationProfileDocId ? text("orgEditTitle", "编辑组织资料") : text("orgCreateTitle", "新建组织")} wide closeOnBackdrop={false} onClose={() => { if (!organizationProfileSaving) { organizationProfileOpen = false; returnToContactAfterOrganizationProfile = false; organizationProfileCompletion?.(false); organizationProfileCompletion = null; } }}>
-        <OrganizationProfileEditor
-            mode={organizationProfileDocId ? "edit" : "create"}
-            initial={organizationProfileInitial}
-            saving={organizationProfileSaving}
-            error={organizationProfileError}
-            readOnly={organizationProfileReadOnly}
-            onRetry={() => void retryOrganizationProfile()}
-            onSave={saveOrganizationProfile}
-            onCancel={() => { if (!organizationProfileSaving) { organizationProfileOpen = false; returnToContactAfterOrganizationProfile = false; organizationProfileCompletion?.(false); organizationProfileCompletion = null; } }}
-        />
-    </LvctDialog>
-{/if}
-
 {#if detailPerson}
-    <LvctDialog title={text("personDetailTitle", "人物详情 · {name}", { name: detailPerson.name })} closeLabel={detailCloseLabel} peek modal={isMobile} closeOnBackdrop={false} onClose={() => void closeDetail()}>
+    <LvctDialog title={text("personDetailTitle", "人物详情 · {name}", { name: detailPerson.name })} closeLabel={detailCloseLabel} wide closeOnBackdrop={false} onClose={() => void closeDetail()}>
         {#key detailKey}
         <PersonDetail
             settings={currentSettings}
@@ -728,7 +796,7 @@
             onSavePersonNote={(docId, note, expected) => facade.savePersonNote(docId, note, expected)}
             onLoadExchanges={(docId) => facade.listPersonExchanges(docId)}
             onCreateExchange={(input) => facade.createPersonExchange(input)}
-            onChangeExchangeStatus={(id, status, settledOn) => facade.changePersonExchangeStatus(id, status, settledOn)}
+            onChangeExchangeStatus={(id, status, settledOn, expected) => facade.changePersonExchangeStatus(id, status, settledOn, expected)}
             onLoadAliases={(docId) => facade.listPersonAliases(docId)}
             onAddAlias={(docId, alias) => facade.addPersonAlias(docId, alias)}
             onRemoveAlias={(id) => facade.removePersonAlias(id)}
@@ -745,7 +813,7 @@
             onRemoveOrgMembership={(id, expected) => facade.removeOrganizationMember(id, expected)}
             onUpdateOrgMembership={(id, patch, expected) => facade.updateOrganizationMember(id, patch, expected)}
             onListFollowUps={(docId) => facade.listPersonFollowUps(docId)}
-            onCreateFollowUp={(docId, title, dueDate) => facade.createFollowUp(docId, title, dueDate)}
+            onCreateFollowUp={(docId, title, dueDate, requestId) => facade.createFollowUp(docId, title, dueDate, requestId)}
             onSetFollowUpStatus={(id, status) => facade.setFollowUpStatus(id, status)}
             onSnoozeFollowUp={(id, option, customDate) => facade.snoozeFollowUp(id, option, customDate)}
             onGetCadence={(docId) => facade.getPersonCadence(docId)}
@@ -765,5 +833,22 @@
             onClose={() => void closeDetail()}
         />
         {/key}
+    </LvctDialog>
+{/if}
+
+<!-- 详情或编辑窗口内新建组织时，资料窗口必须在已有模态之上。 -->
+{#if organizationProfileOpen}
+    <LvctDialog title={organizationProfileDocId ? text("orgEditTitle", "编辑组织资料") : text("orgCreateTitle", "新建组织")} wide closeOnBackdrop={false} beforeClose={() => organizationProfileEditor?.requestClose() ?? Promise.resolve(false)} onClose={() => { if (!organizationProfileSaving) { organizationProfileOpen = false; returnToContactAfterOrganizationProfile = false; organizationProfileCompletion?.(false); organizationProfileCompletion = null; } }}>
+        <OrganizationProfileEditor
+            bind:this={organizationProfileEditor}
+            mode={organizationProfileDocId ? "edit" : "create"}
+            initial={organizationProfileInitial}
+            saving={organizationProfileSaving}
+            error={organizationProfileError}
+            readOnly={organizationProfileReadOnly}
+            onRetry={() => void retryOrganizationProfile()}
+            onSave={saveOrganizationProfile}
+            onCancel={() => { if (!organizationProfileSaving) { organizationProfileOpen = false; returnToContactAfterOrganizationProfile = false; organizationProfileCompletion?.(false); organizationProfileCompletion = null; } }}
+        />
     </LvctDialog>
 {/if}

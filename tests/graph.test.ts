@@ -205,7 +205,9 @@ test("图快照：筛选保中心，重复身份排除，已删除查询端点�
     assert(!snapshot.graph.nodes.some((node) => node.id === "a"));
     const tooSmall = buildGraphQuerySnapshot(sources, { ...query, orgDocId: "org", maxNodes: 1 });
     assert.equal(tooSmall.state, "unknown");
-    assert(tooSmall.diagnostics.some((entry) => entry.code === "budget_unknown"));
+    const budgetDiagnostic = tooSmall.diagnostics.find((entry) => entry.code === "budget_unknown");
+    assert(budgetDiagnostic);
+    assert.match(budgetDiagnostic.message, /节点预算不足以保留查询中心/);
 });
 
 test("图快照：引用按登记人物与组织收窄，只有 ref；未知引用明确停止", () => {

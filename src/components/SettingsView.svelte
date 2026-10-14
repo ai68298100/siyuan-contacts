@@ -1,13 +1,14 @@
 <script lang="ts">
+    import { requestErrorMessage } from "../shared/error-presenter";
     import type { ContactsPluginFacade } from "../types";
     import type { ContactsSettings } from "../domain/model";
-    import type { ViewPreferences } from "../domain/preferences";
+import type { ViewPreferences } from "../domain/preferences";
     import type { InteractionImportSummary } from "../domain/interaction-backup";
     import { useCloseGuard } from "./close-guard";
     import StatusNotice from "./StatusNotice.svelte";
     import { SlidersHorizontal, Database, Bell, Sparkles, Plug, Info } from "@lucide/svelte";
     import { translateText } from "../domain/translation";
-    import { DEFAULT_VIEW_PREFERENCES, isValidPreferenceDays, normalizeViewPreferences } from "../domain/preferences";
+    import { BRAND_AVATAR_IMAGE_MAX_LENGTH, DEFAULT_VIEW_PREFERENCES, isValidBrandAvatarImage, isValidPreferenceDays, normalizeViewPreferences } from "../domain/preferences";
     import { rebasePreferenceDraft } from "../domain/preferences-concurrency";
     import { savePreferenceChanges } from "../services/preferences";
     import { onDestroy, untrack, tick } from "svelte";
@@ -120,7 +121,7 @@
             }
             selfReadError = "";
         } catch (error) {
-            if (selfAlive && request === selfReadRequest) selfReadError = error instanceof Error ? error.message : String(error);
+            if (selfAlive && request === selfReadRequest) selfReadError = requestErrorMessage(error);
         } finally {
             if (selfAlive && request === selfReadRequest) identityLoading = false;
         }
@@ -147,7 +148,7 @@
             selfMessageError = !selfIdentity;
             await refreshSelfSection();
         } catch (error) {
-            if (selfAlive) { selfMessage = error instanceof Error ? error.message : String(error); selfMessageError = true; }
+            if (selfAlive) { selfMessage = requestErrorMessage(error); selfMessageError = true; }
         } finally {
             if (selfAlive) selfBusy = false;
         }
@@ -169,7 +170,7 @@
             await tick();
             selfPreviewElement?.focus();
         } catch (error) {
-            if (selfAlive) { selfMessage = error instanceof Error ? error.message : String(error); selfMessageError = true; }
+            if (selfAlive) { selfMessage = requestErrorMessage(error); selfMessageError = true; }
         } finally {
             if (selfAlive) selfBusy = false;
         }
@@ -190,7 +191,7 @@
                 : text("selfCleared", "已清除本人身份，人物档案与历史记录保留");
             await refreshSelfSection();
         } catch (error) {
-            if (selfAlive) { selfMessage = error instanceof Error ? error.message : String(error); selfMessageError = true; }
+            if (selfAlive) { selfMessage = requestErrorMessage(error); selfMessageError = true; }
         } finally {
             if (selfAlive) selfBusy = false;
         }
@@ -220,7 +221,7 @@
             if (!selfAlive || request !== dismissalsRequest) return;
             dismissedReminders = result;
         } catch (error) {
-            if (selfAlive && request === dismissalsRequest) dismissalsError = error instanceof Error ? error.message : String(error);
+            if (selfAlive && request === dismissalsRequest) dismissalsError = requestErrorMessage(error);
         } finally {
             // A resume action can supersede this read so its stale result is
             // ignored, but the read's own loading indicator must still end.
@@ -238,7 +239,7 @@
             if (!selfAlive || request !== dismissalsRequest) return;
             dismissedReminders = result;
         } catch (error) {
-            if (selfAlive && request === dismissalsRequest) dismissalsError = error instanceof Error ? error.message : String(error);
+            if (selfAlive && request === dismissalsRequest) dismissalsError = requestErrorMessage(error);
         } finally {
             // A concurrent refresh may advance dismissalsRequest while this
             // write is in flight. The busy guard still belongs to this
@@ -254,6 +255,11 @@
     let rebindPreviewElement: HTMLElement | undefined = $state();
     let savingPreferences = $state(false);
     let preferencesMessage = $state("");
+    type PreferenceDayField = "birthdayWindowDays" | "staleThresholdDays" | "reminderGraceDays";
+    let preferenceDayErrors: Partial<Record<PreferenceDayField, string>> = $state({});
+    let birthdayWindowInput: HTMLInputElement | undefined = $state();
+    let staleThresholdInput: HTMLInputElement | undefined = $state();
+    let reminderGraceInput: HTMLInputElement | undefined = $state();
     let rebinding = $state(false);
     let rebindOpen = $state(false);
     // FUNC-01.8 锚点找回：全库只读扫描候选，选中后填入手填框，提交仍走既有验证路径
@@ -282,7 +288,7 @@
             anchorCandidates = mergeAnchorCandidates(resume ? (anchorCandidates ?? []) : [], result.candidates);
             if (!resume) selectedCandidateKey = "";
         } catch (error) {
-            if (selfAlive) errorText = error instanceof Error ? error.message : String(error);
+            if (selfAlive) errorText = requestErrorMessage(error);
         } finally {
             if (selfAlive) scanningAnchors = false;
         }
@@ -326,10 +332,17 @@
     let importFileInput = $state<HTMLInputElement>();
     let mappingDraft: Record<string, string> = $state({});
     let mappingBusy = $state(false);
+    let brandAvatarFileInput = $state<HTMLInputElement>();
+    let brandAvatarMessage = $state("");
+    let brandAvatarMessageError = $state(false);
+    let brandAvatarReadRequest = 0;
     // svelte-ignore state_referenced_locally
     let draft: ViewPreferences = $state({ ...preferences });
     // svelte-ignore state_referenced_locally
     let savedDraft: ViewPreferences = $state({ ...preferences });
+    // 统一驱动三个偏好保存入口，避免没有修改时仍触发一次写入请求。
+    // 这里比较的是归一化前的草稿，保存成功后会由 savePreferences 重建基线。
+    let preferencesDirty = $derived(JSON.stringify(draft) !== JSON.stringify(savedDraft));
     let preferencesAlive = true;
     let preferencesRequest = 0;
     $effect(() => {
@@ -343,6 +356,7 @@
     onDestroy(() => {
         preferencesAlive = false;
         preferencesRequest += 1;
+        brandAvatarReadRequest += 1;
     });
     // svelte-ignore state_referenced_locally
     let anchorDraft: SettingsAnchorPatch = $state({
@@ -352,6 +366,69 @@
         avId: settings.avId,
     });
     let errorText = $state("");
+
+    function setBrandAvatarPreset(value: string): void {
+        if (savingPreferences) return;
+        // 图片优先显示；切换文字不会悄悄删除已上传的图片，需显式点击“移除图片”。
+        draft = { ...draft, brandAvatar: value };
+        brandAvatarMessage = "";
+        brandAvatarMessageError = false;
+    }
+
+    function removeBrandAvatarImage(): void {
+        if (savingPreferences) return;
+        brandAvatarReadRequest += 1;
+        draft = { ...draft, brandAvatarImage: "" };
+        if (brandAvatarFileInput) brandAvatarFileInput.value = "";
+        brandAvatarMessage = "已移除图片，将使用文字头像";
+        brandAvatarMessageError = false;
+    }
+
+    function selectBrandAvatarImage(event: Event): void {
+        const input = event.currentTarget as HTMLInputElement;
+        const file = input.files?.[0];
+        if (!file) return;
+        if (!/^image\/(png|jpeg|webp|gif)$/i.test(file.type)) {
+            brandAvatarMessage = "仅支持 PNG、JPG、WebP 或 GIF 图片，请重新选择";
+            brandAvatarMessageError = true;
+            input.value = "";
+            return;
+        }
+        // 先按原始文件大小挡住明显过大的文件，再生成 data URL，避免一次性读取超大图片。
+        if (file.size > 1_000_000) {
+            brandAvatarMessage = "图片过大，请选择 1 MB 以内的 PNG、JPG、WebP 或 GIF";
+            brandAvatarMessageError = true;
+            input.value = "";
+            return;
+        }
+        const request = ++brandAvatarReadRequest;
+        brandAvatarMessage = "";
+        brandAvatarMessageError = false;
+        const reader = new FileReader();
+        reader.onload = () => {
+            if (!preferencesAlive || request !== brandAvatarReadRequest) return;
+            const value = typeof reader.result === "string" ? reader.result : "";
+            if (!isValidBrandAvatarImage(value)) {
+                const rawLength = typeof reader.result === "string" ? reader.result.length : 0;
+                brandAvatarMessage = rawLength > BRAND_AVATAR_IMAGE_MAX_LENGTH
+                    ? "图片过大，请选择 1 MB 以内的 PNG、JPG、WebP 或 GIF"
+                    : "仅支持 PNG、JPG、WebP 或 GIF 图片，请重新选择";
+                brandAvatarMessageError = true;
+                input.value = "";
+                return;
+            }
+            draft = { ...draft, brandAvatarImage: value };
+            brandAvatarMessage = "图片已载入，点击“保存偏好”后生效";
+            brandAvatarMessageError = false;
+        };
+        reader.onerror = () => {
+            if (!preferencesAlive || request !== brandAvatarReadRequest) return;
+            brandAvatarMessage = "图片读取失败，请重新选择";
+            brandAvatarMessageError = true;
+            input.value = "";
+        };
+        reader.readAsDataURL(file);
+    }
     const guardedClose = useCloseGuard({
         /* CODE-02.1：全部挂起类操作（偏好/重绑/映射/互动与迁移导入导出/扫描/字段重建/体检/提醒恢复）期间不关 */
         busy: () => identityLoading || selfBusy || checking || auditBusy || orgProjectionBusy || dismissalsLoading || dismissalsBusy
@@ -386,7 +463,7 @@
             const next = await facade.checkSettingsHealth();
             if (selfAlive) setHealth(next);
         } catch (error) {
-            if (selfAlive) { health = null; errorText = error instanceof Error ? error.message : String(error); }
+            if (selfAlive) { health = null; errorText = requestErrorMessage(error); }
         } finally {
             if (selfAlive) checking = false;
         }
@@ -421,7 +498,7 @@
             await tick();
             if (selfAlive) rebuildPreviewElement?.focus();
         } catch (error) {
-            if (selfAlive) errorText = error instanceof Error ? error.message : String(error);
+            if (selfAlive) errorText = requestErrorMessage(error);
         } finally {
             if (selfAlive) rebuilding = false;
         }
@@ -439,23 +516,31 @@
             const next = await facade.checkSettingsHealth();
             if (selfAlive) setHealth(next);
         } catch (error) {
-            if (selfAlive) errorText = error instanceof Error ? error.message : String(error);
+            if (selfAlive) errorText = requestErrorMessage(error);
         } finally {
             if (selfAlive) rebuilding = false;
         }
     }
 
     async function savePreferences() {
-        if (savingPreferences) return;
+        if (savingPreferences || !preferencesDirty) return;
+        preferenceDayErrors = {};
         const invalidDays = [
-            [draft.birthdayWindowDays, "生日提醒窗口"],
-            [draft.staleThresholdDays, "久未联系阈值"],
-            [draft.reminderGraceDays, "收编宽限期"],
-        ] as const;
-        const invalid = invalidDays.find(([value]) => !isValidPreferenceDays(value));
+            ["birthdayWindowDays", draft.birthdayWindowDays, "生日提醒窗口"],
+            ["staleThresholdDays", draft.staleThresholdDays, "久未联系阈值"],
+            ["reminderGraceDays", draft.reminderGraceDays, "收编宽限期"],
+        ] as const satisfies readonly (readonly [PreferenceDayField, number, string])[];
+        const invalid = invalidDays.find(([, value]) => !isValidPreferenceDays(value));
         if (invalid) {
-            errorText = `${invalid[1]}必须是 0–365 的整数`;
+            const [field, , label] = invalid;
+            const message = `${label}必须是 0–365 的整数`;
+            preferenceDayErrors = { [field]: message };
+            errorText = "";
             preferencesMessage = "";
+            await tick();
+            const target = field === "birthdayWindowDays" ? birthdayWindowInput
+                : field === "staleThresholdDays" ? staleThresholdInput : reminderGraceInput;
+            target?.focus();
             return;
         }
         const request = ++preferencesRequest;
@@ -473,10 +558,22 @@
             onPreferencesUpdated(latest);
             preferencesMessage = JSON.stringify(draft) === JSON.stringify(savedDraft) ? "偏好已保存" : "本次偏好已保存，后续修改仍未保存";
         } catch (error) {
-            if (preferencesAlive && request === preferencesRequest) errorText = error instanceof Error ? error.message : String(error);
+            if (preferencesAlive && request === preferencesRequest) errorText = requestErrorMessage(error);
         } finally {
             if (preferencesAlive && request === preferencesRequest) savingPreferences = false;
         }
+    }
+
+    function updateGraphPreference(key: "graphMode" | "nativeScope", event: Event): void {
+        const value = (event.currentTarget as HTMLSelectElement).value as ViewPreferences[typeof key];
+        draft = { ...draft, [key]: value };
+    }
+
+    function clearPreferenceDayError(field: PreferenceDayField): void {
+        if (!(field in preferenceDayErrors)) return;
+        const next = { ...preferenceDayErrors };
+        delete next[field];
+        preferenceDayErrors = next;
     }
 
     async function reopenOnboarding(): Promise<void> {
@@ -503,7 +600,7 @@
             await tick();
             if (selfAlive) rebindPreviewElement?.focus();
         } catch (error) {
-            if (selfAlive) errorText = error instanceof Error ? error.message : String(error);
+            if (selfAlive) errorText = requestErrorMessage(error);
         } finally {
             if (selfAlive) rebinding = false;
         }
@@ -529,7 +626,7 @@
             setHealth(next);
             rebindMessage = "锚点已更新，已重新检查字段健康状态";
         } catch (error) {
-            if (selfAlive) errorText = error instanceof Error ? error.message : String(error);
+            if (selfAlive) errorText = requestErrorMessage(error);
         } finally {
             if (selfAlive) rebinding = false;
         }
@@ -569,7 +666,7 @@
             URL.revokeObjectURL(url);
             exportMessage = "互动事件与原始数据快照已导出";
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             exportingInteractions = false;
         }
@@ -601,7 +698,7 @@
             URL.revokeObjectURL(url);
             bundleMessage = "插件数据迁移包已导出（含账本、别名、本人身份、组织成员和关系称谓；思源原生文档需另行备份）";
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             exportingBundle = false;
         }
@@ -625,7 +722,7 @@
                 bundlePreview = preview;
             } catch (error) {
                 if (!selfAlive || request !== bundleRequest) return;
-                bundleMessage = error instanceof Error ? error.message : String(error);
+                bundleMessage = requestErrorMessage(error);
                 bundlePreview = [];
             } finally {
                 if (selfAlive && request === bundleRequest) previewingBundle = false;
@@ -669,7 +766,7 @@
             onInteractionsUpdated();
         } catch (error) {
             if (!selfAlive || request !== bundleRequest) return;
-            bundleMessage = error instanceof Error ? error.message : String(error);
+            bundleMessage = requestErrorMessage(error);
         } finally {
             if (selfAlive && request === bundleRequest) {
                 importingBundle = false;
@@ -695,7 +792,7 @@
             URL.revokeObjectURL(url);
             rosterExportMessage = "全量名册已导出为 vCard 3.0";
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             exportingRoster = false;
         }
@@ -717,7 +814,7 @@
             URL.revokeObjectURL(url);
             followUpsExportMessage = "跟进事项与原始数据快照已导出";
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             exportingFollowUps = false;
         }
@@ -741,7 +838,7 @@
             fuImportText = text;
             fuImportPreview = preview;
         } catch (error) {
-            if (request === fuImportRequest) errorText = error instanceof Error ? error.message : String(error);
+            if (request === fuImportRequest) errorText = requestErrorMessage(error);
         } finally {
             if (request === fuImportRequest) fuPreviewing = false;
         }
@@ -760,7 +857,7 @@
             fuImportText = "";
             if (fuFileInput) fuFileInput.value = "";
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             fuImporting = false;
         }
@@ -776,7 +873,7 @@
         } catch (error) {
             if (request !== importRequest) return;
             importDiff = null;
-            importDiffError = error instanceof Error ? error.message : String(error);
+            importDiffError = requestErrorMessage(error);
         }
     }
 
@@ -800,7 +897,7 @@
             importPreview = preview;
             await loadInteractionDiff(request);
         } catch (error) {
-            if (request === importRequest) errorText = error instanceof Error ? error.message : String(error);
+            if (request === importRequest) errorText = requestErrorMessage(error);
         } finally {
             if (request === importRequest) previewingImport = false;
         }
@@ -823,7 +920,7 @@
             if (importFileInput) importFileInput.value = "";
             onInteractionsUpdated();
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             importingInteractions = false;
         }
@@ -847,7 +944,7 @@
             onSettingsUpdated(updated);
             setHealth(await facade.checkSettingsHealth());
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             mappingBusy = false;
         }
@@ -870,6 +967,7 @@
                     class="lvct-settings__nav-item"
                     class:lvct-settings__nav-item--active={activeSection === section.id}
                     aria-current={activeSection === section.id ? "page" : undefined}
+                    aria-describedby={auditBusy || orgProjectionBusy ? "lvct-settings-nav-status" : undefined}
                     title={auditBusy ? "资料体检进行中，完成后可切换设置分区" : orgProjectionBusy ? "组织双链核对进行中，完成后可切换设置分区" : undefined}
                     disabled={auditBusy || orgProjectionBusy}
                     onclick={() => { if (!auditBusy && !orgProjectionBusy) activeSection = section.id; }}
@@ -884,6 +982,17 @@
                     </span>{section.label}
                 </button>
             {/each}
+            {#if auditBusy || orgProjectionBusy}
+                <p id="lvct-settings-nav-status" class="lvct-settings__nav-status" role="status">
+                    {#if auditBusy && orgProjectionBusy}
+                        资料体检和组织双链核对进行中，完成后可切换设置分区。
+                    {:else if auditBusy}
+                        资料体检进行中，完成后可切换设置分区。
+                    {:else}
+                        组织双链核对进行中，完成后可切换设置分区。
+                    {/if}
+                </p>
+            {/if}
         </nav>
 
         <div class="lvct-settings__body">
@@ -893,6 +1002,48 @@
                 <section class="lvct-settings__panel">
                     <h2>{text("settingsGeneral", "通用")}</h2>
                     <p class="lvct-settings__desc">界面与默认行为偏好，仅存于插件本地 JSON，不影响数据库内容。</p>
+                    {#if preferencesDirty}
+                        <p class="lvct-settings__draft-status" role="status">有未保存修改；切换设置分区会保留草稿，返回工作台时会提示你。</p>
+                    {/if}
+
+                    <div class="lvct-settings__row lvct-settings__brand-avatar-row">
+                        <div>
+                            <b>工作台头像</b>
+                            <small>仅用于左上角“小驴人脉”品牌标记；联系人头像不受影响。</small>
+                        </div>
+                        <div class="lvct-settings__brand-avatar-controls">
+                            <span class="lvct-settings__brand-avatar-preview" aria-label="工作台头像预览">
+                                {#if draft.brandAvatarImage}
+                                    <img src={draft.brandAvatarImage} alt="" width="48" height="48" decoding="async" />
+                                {:else}
+                                    {draft.brandAvatar || DEFAULT_VIEW_PREFERENCES.brandAvatar}
+                                {/if}
+                            </span>
+                            <div class="lvct-settings__brand-avatar-actions">
+                                <div class="lvct-settings__brand-avatar-presets" role="group" aria-label="头像文字预设">
+                                    {#each ["驴", "我", "人"] as preset}
+                                        <button type="button" class="b3-button b3-button--text" class:lvct-settings__brand-avatar-preset-active={!draft.brandAvatarImage && draft.brandAvatar === preset}
+                                            onclick={() => setBrandAvatarPreset(preset)} disabled={savingPreferences}>{preset}</button>
+                                    {/each}
+                                    <input class="b3-text-field lvct-settings__brand-avatar-text" value={draft.brandAvatar} maxlength="4" placeholder="自定义" aria-label="自定义头像文字"
+                                        oninput={(event) => {
+                                            draft = { ...draft, brandAvatar: (event.currentTarget as HTMLInputElement).value };
+                                            brandAvatarMessage = "";
+                                            brandAvatarMessageError = false;
+                                        }} disabled={savingPreferences} />
+                                </div>
+                                <input bind:this={brandAvatarFileInput} class="lvct-settings__brand-avatar-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange={selectBrandAvatarImage} disabled={savingPreferences} aria-label="上传工作台头像" />
+                                <div class="lvct-settings__brand-avatar-buttons">
+                                    <button type="button" class="b3-button b3-button--outline" onclick={() => brandAvatarFileInput?.click()} disabled={savingPreferences}>上传图片</button>
+                                    {#if draft.brandAvatarImage}<button type="button" class="b3-button b3-button--text" onclick={removeBrandAvatarImage} disabled={savingPreferences}>移除图片</button>{/if}
+                                </div>
+                                <small class="lvct-settings__brand-avatar-hint">{draft.brandAvatarImage ? "当前优先显示图片；移除后使用文字头像" : "可使用预设、最多 4 个字符，或上传本地图片"}</small>
+                            </div>
+                        </div>
+                    </div>
+                    {#if brandAvatarMessage}
+                        <div class:lvct-form__error={brandAvatarMessageError} class="lvct-settings__inline-hint" role={brandAvatarMessageError ? "alert" : "status"}>{brandAvatarMessage}</div>
+                    {/if}
 
                     <div class="lvct-settings__row">
                         <div><b>联系人笔记本</b><small>工作空间的固定数据锚点</small></div>
@@ -987,7 +1138,7 @@
                         </label>
                         <label class="lvct-form__item">
                             <span>图谱默认数据源</span>
-                            <select class="b3-select fn__block" bind:value={draft.graphMode}>
+                            <select class="b3-select fn__block" value={draft.graphMode} onchange={(event) => updateGraphPreference("graphMode", event)}>
                                 <option value="relations">关系图（联系人关系）</option>
                                 <option value="native">文档引用图（思源引用）</option>
                             </select>
@@ -995,7 +1146,7 @@
                         </label>
                         <label class="lvct-form__item">
                             <span>文档引用图默认范围</span>
-                            <select class="b3-select fn__block" bind:value={draft.nativeScope}>
+                            <select class="b3-select fn__block" value={draft.nativeScope} onchange={(event) => updateGraphPreference("nativeScope", event)}>
                                 <option value="self">以本人为中心</option>
                                 <option value="person">以联系人为中心</option>
                                 <option value="global">全部登记文档</option>
@@ -1028,7 +1179,7 @@
                     </div>
 
                     <div class="lvct-settings__actions">
-                        <button class="b3-button b3-button--outline" onclick={savePreferences} disabled={savingPreferences}>
+                        <button class="b3-button b3-button--outline" onclick={savePreferences} disabled={savingPreferences || !preferencesDirty} title={!preferencesDirty ? "当前没有待保存的偏好修改" : undefined}>
                             {savingPreferences ? "保存中…" : "保存偏好"}
                         </button>
                         <StatusNotice message={preferencesMessage} onDismiss={() => (preferencesMessage = "")} />
@@ -1097,7 +1248,9 @@
                                             {/each}
                                         </ul>
                                         <div class="lvct-settings__actions">
-                                            <button class="b3-button b3-button--outline" disabled={!selectedCandidateKey} onclick={applySelectedCandidate}>填入所选候选</button>
+                                            <button class="b3-button b3-button--outline" disabled={!selectedCandidateKey}
+                                                title={!selectedCandidateKey ? "请先选择一个候选数据库" : undefined}
+                                                onclick={applySelectedCandidate}>填入所选候选</button>
                                         </div>
                                     {/if}
                                 {/if}
@@ -1297,7 +1450,8 @@
                         {/if}
                     {/if}
                     <div class="lvct-settings__actions">
-                        <button class="b3-button b3-button--outline" onclick={runImportInteractions} disabled={!importPreview || previewingImport || importingInteractions}>
+                        <button class="b3-button b3-button--outline" onclick={runImportInteractions} disabled={!importPreview || previewingImport || importingInteractions}
+                            title={!importPreview && !previewingImport && !importingInteractions ? "请先读取并确认互动备份预览" : undefined}>
                             {importingInteractions ? "合并中…" : "确认合并备份"}
                         </button>
                         <StatusNotice message={importMessage} onDismiss={() => (importMessage = "")} />
@@ -1313,7 +1467,8 @@
                         <p class="lvct-settings__inline-hint">预计新增 {fuImportPreview.added} 条，跳过 {fuImportPreview.skipped} 条</p>
                     {/if}
                     <div class="lvct-settings__actions">
-                        <button class="b3-button b3-button--outline" onclick={runImportFollowUps} disabled={!fuImportPreview || fuPreviewing || fuImporting}>
+                        <button class="b3-button b3-button--outline" onclick={runImportFollowUps} disabled={!fuImportPreview || fuPreviewing || fuImporting}
+                            title={!fuImportPreview && !fuPreviewing && !fuImporting ? "请先读取并确认跟进备份预览" : undefined}>
                             {fuImporting ? "合并中…" : "确认合并备份"}
                         </button>
                         <StatusNotice message={fuImportMessage} onDismiss={() => (fuImportMessage = "")} />
@@ -1433,18 +1588,21 @@
                     <div class="lvct-settings__form-grid">
                         <label class="lvct-form__item">
                             <span>生日提醒窗口（天）</span>
-                            <input class="b3-text-field fn__block" type="number" min="0" max="365" step="1" bind:value={draft.birthdayWindowDays} />
+                            <input class="b3-text-field fn__block" type="number" min="0" max="365" step="1" bind:this={birthdayWindowInput} bind:value={draft.birthdayWindowDays} aria-invalid={Boolean(preferenceDayErrors.birthdayWindowDays)} aria-describedby={preferenceDayErrors.birthdayWindowDays ? "lvct-pref-birthday-window-error" : undefined} oninput={() => clearPreferenceDayError("birthdayWindowDays")} />
                             <small>请输入 0–365 的整数</small>
+                            {#if preferenceDayErrors.birthdayWindowDays}<small id="lvct-pref-birthday-window-error" class="lvct-form__error" role="alert">{preferenceDayErrors.birthdayWindowDays}</small>{/if}
                         </label>
                         <label class="lvct-form__item">
                             <span>久未联系阈值（天）</span>
-                            <input class="b3-text-field fn__block" type="number" min="0" max="365" step="1" bind:value={draft.staleThresholdDays} />
+                            <input class="b3-text-field fn__block" type="number" min="0" max="365" step="1" bind:this={staleThresholdInput} bind:value={draft.staleThresholdDays} aria-invalid={Boolean(preferenceDayErrors.staleThresholdDays)} aria-describedby={preferenceDayErrors.staleThresholdDays ? "lvct-pref-stale-threshold-error" : undefined} oninput={() => clearPreferenceDayError("staleThresholdDays")} />
                             <small>请输入 0–365 的整数</small>
+                            {#if preferenceDayErrors.staleThresholdDays}<small id="lvct-pref-stale-threshold-error" class="lvct-form__error" role="alert">{preferenceDayErrors.staleThresholdDays}</small>{/if}
                         </label>
                         <label class="lvct-form__item">
                             <span>收编宽限期（天）</span>
-                            <input class="b3-text-field fn__block" type="number" min="0" max="365" step="1" bind:value={draft.reminderGraceDays} />
+                            <input class="b3-text-field fn__block" type="number" min="0" max="365" step="1" bind:this={reminderGraceInput} bind:value={draft.reminderGraceDays} aria-invalid={Boolean(preferenceDayErrors.reminderGraceDays)} aria-describedby={preferenceDayErrors.reminderGraceDays ? "lvct-pref-reminder-grace-error" : undefined} oninput={() => clearPreferenceDayError("reminderGraceDays")} />
                             <small>新收编的联系人在此期限内不计入「从未互动」提醒；0 为关闭（C02）</small>
+                            {#if preferenceDayErrors.reminderGraceDays}<small id="lvct-pref-reminder-grace-error" class="lvct-form__error" role="alert">{preferenceDayErrors.reminderGraceDays}</small>{/if}
                         </label>
                     </div>
 
@@ -1454,7 +1612,7 @@
                     </label>
 
                     <div class="lvct-settings__actions">
-                        <button class="b3-button b3-button--outline" onclick={savePreferences} disabled={savingPreferences}>
+                        <button class="b3-button b3-button--outline" onclick={savePreferences} disabled={savingPreferences || !preferencesDirty} title={!preferencesDirty ? "当前没有待保存的偏好修改" : undefined}>
                             {savingPreferences ? "保存中…" : "保存偏好"}
                         </button>
                         <StatusNotice message={preferencesMessage} onDismiss={() => (preferencesMessage = "")} />
@@ -1476,7 +1634,7 @@
                     <p class="lvct-settings__inline-hint">只有开启入口并点击「AI 分析本页」时，才会调用你自己在思源中配置的 AI 端点；笔记内容不会由插件后台扫描，也不会上传到插件维护的服务。</p>
 
                     <div class="lvct-settings__actions">
-                        <button class="b3-button b3-button--outline" onclick={savePreferences} disabled={savingPreferences}>
+                        <button class="b3-button b3-button--outline" onclick={savePreferences} disabled={savingPreferences || !preferencesDirty} title={!preferencesDirty ? "当前没有待保存的偏好修改" : undefined}>
                             {savingPreferences ? "保存中…" : "保存偏好"}
                         </button>
                         <StatusNotice message={preferencesMessage} onDismiss={() => (preferencesMessage = "")} />

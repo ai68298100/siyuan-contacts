@@ -9,6 +9,7 @@
     import { translateText } from "../../domain/translation";
     import { formatBirthdayDisplay } from "../../domain/occasions";
     import { onDestroy } from "svelte";
+    import { requestErrorMessage } from "../../shared/error-presenter";
 
     let {
         settings,
@@ -100,7 +101,7 @@
                 statusText = "没有解析到可导入的联系人（vCard 卡片需包含 FN 或 N 姓名属性）。";
             }
         } catch (error) {
-            if (alive) errorText = error instanceof Error ? error.message : String(error);
+            if (alive) errorText = requestErrorMessage(error);
         } finally {
             if (alive) {
                 parsing = false;
@@ -153,7 +154,7 @@
             statusText = "";
             if (report.imported > 0) onImported(report.imported);
         } catch (error) {
-            if (alive) errorText = error instanceof Error ? error.message : String(error);
+            if (alive) errorText = requestErrorMessage(error);
         } finally {
             if (alive) importing = false;
         }
@@ -185,7 +186,7 @@
             report = nextReport;
             if (report.imported > before) onImported(report.imported - before);
         } catch (error) {
-            if (alive) errorText = error instanceof Error ? error.message : String(error);
+            if (alive) errorText = requestErrorMessage(error);
         } finally {
             if (alive) retrying = false;
         }
@@ -206,7 +207,7 @@
             downloadVcf(text);
             statusText = "已导出 vCard 文件（浏览器下载）。";
         } catch (error) {
-            if (alive) errorText = error instanceof Error ? error.message : String(error);
+            if (alive) errorText = requestErrorMessage(error);
         } finally {
             if (alive) exporting = false;
         }

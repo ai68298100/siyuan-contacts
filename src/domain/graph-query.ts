@@ -233,7 +233,13 @@ export function buildGraphQuerySnapshot(sources: GraphSources, query: GraphQuery
     let budgetUnknown = false;
     if (!criticalUnknown && center.status !== "missing") {
         try { capped = capGraph(filtered, query.maxNodes ?? GRAPH_MAX_NODES, [...pins]); }
-        catch (error) { budgetUnknown = true; diagnostics.push({ code: "budget_unknown", message: error instanceof Error ? error.message : String(error) }); }
+        catch (error) {
+            budgetUnknown = true;
+            diagnostics.push({
+                code: "budget_unknown",
+                message: error instanceof Error ? error.message : "图谱规模尚未核实，请调整范围或提高节点预算后重试。",
+            });
+        }
     }
     const graph = capped.graph;
     const relationGraph = orderGraph({ nodes: graph.nodes.filter((node) => node.kind !== "org"), edges: graph.edges.filter((edge) => edge.kind === "related") });

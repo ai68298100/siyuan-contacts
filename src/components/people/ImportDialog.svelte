@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { requestErrorMessage } from "../../shared/error-presenter";
     /** 存量文档收编：选笔记本 → 勾选"人名"文档 → 批量绑定为联系人 */
     import { listImportNotebooks } from "../../services/contacts";
     import { scanImportCandidates } from "../../services/import-scan";
@@ -92,7 +93,7 @@
             }
         } catch (error) {
             if (!alive) return;
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
             loaded = true;
         } finally {
             if (alive) loading = false;
@@ -120,7 +121,7 @@
             errorText = result.state === "failed" ? result.error ?? "扫描读取失败，范围尚未核实" : "";
             loaded = true;
         } catch (error) {
-            if (alive && version === searchVersion) errorText = error instanceof Error ? error.message : String(error);
+            if (alive && version === searchVersion) errorText = requestErrorMessage(error);
         } finally {
             if (alive && version === searchVersion) loading = false;
         }
@@ -154,7 +155,7 @@
                 selectedIds.map((docId) => selectionPool[docId]),
                 { group: importGroup, tags: normalizeImportTags(importTagsText) });
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
             return;
         }
         await runQueue();
@@ -180,7 +181,7 @@
         } catch (error) {
             if (alive) {
                 queue = { ...currentQueue, items: currentQueue.items.map((item) => ({ ...item })) };
-                errorText = error instanceof Error ? error.message : String(error);
+                errorText = requestErrorMessage(error);
             }
         } finally {
             if (alive) importing = false;

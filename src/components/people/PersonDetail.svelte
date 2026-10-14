@@ -1,6 +1,8 @@
 <script lang="ts">
-    /** 人物详情 Peek：档案字段、互动与关系列表（增删，内核自动维护双向回链） */
-    import { onDestroy, untrack } from "svelte";
+    import { requestErrorMessage } from "../../shared/error-presenter";
+    /** 人物详情窗口：档案字段、互动与关系列表（增删，内核自动维护双向回链） */
+    import { onDestroy, tick, untrack } from "svelte";
+    import { CalendarDays } from "@lucide/svelte";
     import { listContacts, removeContact } from "../../services/contacts";
     import { addRelation, removeRelation, refreshPerson, retryRelationProjections } from "../../services/relations";
     import { resolveRelated } from "../../services/doc-section";
@@ -18,6 +20,7 @@ import StatusNotice from "../StatusNotice.svelte";
     import type { PickerItem } from "./PersonPicker.svelte";
     import { dueLabel, hasFollowUpDraft } from "../../domain/followups";
     import type { FollowUpItem, SnoozeOption } from "../../domain/followups";
+    import { newFollowUpRequestId } from "../../services/followups";
     import type { PersonCadence } from "../../domain/cadence";
     import { renderTemplate } from "../../domain/interaction-templates";
     import type { NoteTemplate } from "../../domain/interaction-templates";
@@ -116,7 +119,7 @@ import StatusNotice from "../StatusNotice.svelte";
         onClose: () => void;
         /** 跟进计划（F05，可选：未接线时隐藏该区） */
         onListFollowUps?: (personDocId: string) => Promise<FollowUpItem[]>;
-        onCreateFollowUp?: (personDocId: string, title: string, dueDate: string) => Promise<FollowUpItem>;
+        onCreateFollowUp?: (personDocId: string, title: string, dueDate: string, requestId?: string) => Promise<FollowUpItem>;
         onSetFollowUpStatus?: (id: string, status: "open" | "done" | "cancelled") => Promise<void>;
         onSnoozeFollowUp?: (id: string, option: SnoozeOption, customDate?: string) => Promise<void>;
         /** 联系节奏（F06，可选：未接线时隐藏该区） */
@@ -127,7 +130,7 @@ import StatusNotice from "../StatusNotice.svelte";
         onSaveTemplates?: (templates: NoteTemplate[]) => Promise<NoteTemplate[]>;
         onLoadExchanges?: (personDocId: string) => Promise<import("../../domain/exchanges").ExchangeRecord[]>;
         onCreateExchange?: (input: import("../../services/exchanges").CreatePersonExchangeInput) => Promise<import("../../domain/exchanges").ExchangeRecord>;
-        onChangeExchangeStatus?: (id: string, status: import("../../domain/exchanges").ExchangeStatus, settledOn?: string) => Promise<import("../../domain/exchanges").ExchangeRecord>;
+        onChangeExchangeStatus?: (id: string, status: import("../../domain/exchanges").ExchangeStatus, settledOn?: string, expected?: { updatedAt: number }) => Promise<import("../../domain/exchanges").ExchangeRecord>;
         onLoadAliases?: (personDocId: string) => Promise<import("../../domain/person-aliases").PersonAlias[]>;
         onAddAlias?: (personDocId: string, alias: string) => Promise<import("../../domain/person-aliases").PersonAlias>;
         onRemoveAlias?: (id: string) => Promise<void>;
@@ -145,6 +148,7 @@ import StatusNotice from "../StatusNotice.svelte";
     let othersRequest = 0;
     let relationProjections: RelationProjectionResult[] = $state([]);
     const pendingRelationProjections = $derived(relationProjections.filter((item) => item.status !== "applied"));
+    let pendingRelationMutation = $state<{ operation: "add" | "remove"; other: ContactSummary } | null>(null);
     onDestroy(() => {
         detailAlive = false;
         othersRequest += 1;
@@ -215,7 +219,7 @@ import StatusNotice from "../StatusNotice.svelte";
             if (!preserveSaved) personNoteSaved = false;
         } catch (error) {
             if (detailAlive && request === personNoteRequest && current.docId === targetDocId && current.itemId === targetItemId && personNoteDraftRevision === draftRevision) {
-                personNoteError = error instanceof Error ? error.message : String(error);
+                personNoteError = requestErrorMessage(error);
                 personNoteErrorKind = "load";
             }
         } finally {
@@ -236,7 +240,7 @@ import StatusNotice from "../StatusNotice.svelte";
             personNoteSaved = true;
             onChanged();
         } catch (error) {
-            personNoteError = error instanceof Error ? error.message : String(error);
+            personNoteError = requestErrorMessage(error);
             personNoteErrorKind = "save";
             if (rethrowOnFailure) throw error;
         } finally {
@@ -330,7 +334,7 @@ import StatusNotice from "../StatusNotice.svelte";
             onChanged();
             await loadInsights();
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally { busy = false; }
     }
 
@@ -342,7 +346,7 @@ import StatusNotice from "../StatusNotice.svelte";
             const result = await onLoadInsights(current.docId);
             if (request === insightsRequest) insights = result;
         } catch (error) {
-            if (request === insightsRequest) insightsError = error instanceof Error ? error.message : String(error);
+            if (request === insightsRequest) insightsError = requestErrorMessage(error);
         } finally {
             if (request === insightsRequest) insightsLoading = false;
         }
@@ -365,7 +369,7 @@ import StatusNotice from "../StatusNotice.svelte";
             templates = await onListTemplates();
         } catch (error) {
             templates = [];
-            templateLoadError = error instanceof Error ? error.message : String(error);
+            templateLoadError = requestErrorMessage(error);
         }
     }
     loadTemplates();
@@ -420,7 +424,7 @@ import StatusNotice from "../StatusNotice.svelte";
             else othersError = "原人物的文档与行绑定已变化或不唯一，当前详情保留；请重新核对稳定文档 ID";
         } catch (error) {
             if (detailAlive && request === othersRequest && current.docId === target.docId && current.itemId === target.itemId) {
-                othersError = error instanceof Error ? error.message : String(error);
+                othersError = requestErrorMessage(error);
             }
         } finally {
             if (detailAlive && request === othersRequest) othersLoading = false;
@@ -450,13 +454,13 @@ import StatusNotice from "../StatusNotice.svelte";
             onChanged();
             await loadOthers();
         } catch (error) {
-            if (detailAlive) errorText = error instanceof Error ? error.message : String(error);
+            if (detailAlive) errorText = requestErrorMessage(error);
         } finally {
             if (detailAlive) busy = false;
         }
     }
 
-    async function mutate(action: () => Promise<unknown>) {
+    async function mutate(action: () => Promise<unknown>, onFailure?: () => void) {
         if (busy) return;
         busy = true;
         errorText = "";
@@ -472,10 +476,28 @@ import StatusNotice from "../StatusNotice.svelte";
                 await loadOthers();
             }
         } catch (error) {
-            if (detailAlive) errorText = error instanceof Error ? error.message : String(error);
+            if (detailAlive) {
+                errorText = requestErrorMessage(error);
+                onFailure?.();
+            }
         } finally {
             if (detailAlive) busy = false;
         }
+    }
+
+    function mutateRelationAction(operation: "add" | "remove", other: ContactSummary): void {
+        void mutate(async () => {
+            const result = operation === "add"
+                ? await addRelation(settings, current, other)
+                : await removeRelation(settings, current, other);
+            pendingRelationMutation = null;
+            return result;
+        }, () => { pendingRelationMutation = { operation, other }; });
+    }
+
+    function retryRelationMutation(): void {
+        const pending = pendingRelationMutation;
+        if (pending) mutateRelationAction(pending.operation, pending.other);
     }
 
     async function refreshAfterEdit() {
@@ -526,7 +548,7 @@ import StatusNotice from "../StatusNotice.svelte";
             await removeContact(settings, current);
             onDeleted();
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             deleting = false;
         }
@@ -548,8 +570,11 @@ import StatusNotice from "../StatusNotice.svelte";
     let followUpError = $state("");
     /* 写入已经成功但随后列表回读失败时，不能把成功误报为写入失败。 */
     let followUpActionError = $state("");
+    /** 写后回读/同步失败时保留原请求和输入；编辑任一字段后必须放弃该 key。 */
+    let followUpFailedRequest = $state<{ requestId: string; title: string; dueDate: string } | null>(null);
     let followUpRefreshWarning = $state("");
     let followUpRequest = 0;
+    let followUpRequestId = $state("");
     let snoozeForId = $state("");
     let snoozeCustomDate = $state("");
     const todayKey = $derived(toLocalDateKey(new Date()));
@@ -590,7 +615,7 @@ import StatusNotice from "../StatusNotice.svelte";
             return true;
         } catch (error) {
             if (detailAlive && request === followUpRequest && current.docId === targetDocId) {
-                followUpError = error instanceof Error ? error.message : String(error);
+                followUpError = requestErrorMessage(error);
                 return false;
             }
             return true;
@@ -618,6 +643,8 @@ import StatusNotice from "../StatusNotice.svelte";
     let orgReadRequest = 0;
     let orgCandidatesRequest = 0;
     let orgCandidatesLoading = $state(false);
+    let createOrganizationTrigger: HTMLButtonElement | undefined = $state();
+    let addOrganizationSelect: HTMLSelectElement | undefined = $state();
     let orgCandidatesError = $state("");
     let orgMembershipReport = $state<OrgMembershipWriteReport | null>(null);
     let removingOrgMembershipId = $state("");
@@ -651,7 +678,7 @@ import StatusNotice from "../StatusNotice.svelte";
             const next = await onLoadOrgMemberships(docId);
             if (detailAlive && request === orgReadRequest && docId === current.docId) orgMemberships = next;
         } catch (error) {
-            if (detailAlive && request === orgReadRequest && docId === current.docId) orgReadError = error instanceof Error ? error.message : String(error);
+            if (detailAlive && request === orgReadRequest && docId === current.docId) orgReadError = requestErrorMessage(error);
         } finally { if (detailAlive && request === orgReadRequest && docId === current.docId) orgLoading = false; }
     }
 
@@ -672,6 +699,7 @@ import StatusNotice from "../StatusNotice.svelte";
     let addOrgLeftOn = $state("");
     const selectedAddOrg = $derived(orgCandidates.find((org) => org.docId === addOrgDocId));
     let addOrgBusy = $state(false);
+    let orgAction = $state<"create" | "add" | "edit" | "remove" | "">("");
     let addOrgError = $state("");
     /* 候选排除已有当前归属；历史 former 仍可重新登记新的当前期间。 */
     const orgCandidateOptions = $derived(orgCandidates.filter((org) =>
@@ -692,17 +720,24 @@ import StatusNotice from "../StatusNotice.svelte";
             const next = await onLoadOrgCandidates();
             if (detailAlive && request === orgCandidatesRequest) orgCandidates = next;
         } catch (error) {
-            if (detailAlive && request === orgCandidatesRequest) orgCandidatesError = error instanceof Error ? error.message : String(error);
+            if (detailAlive && request === orgCandidatesRequest) orgCandidatesError = requestErrorMessage(error);
         } finally { if (detailAlive && request === orgCandidatesRequest) orgCandidatesLoading = false; }
     }
     async function createOrganizationFromDetail(): Promise<void> {
         if (!onCreateOrganization || addOrgBusy || orgCandidatesLoading) return;
+        addOrgBusy = true;
+        orgAction = "create";
         addOrgError = "";
         try {
             await onCreateOrganization();
             await loadOrgCandidates();
         } catch (error) {
-            if (detailAlive) addOrgError = error instanceof Error ? error.message : String(error);
+            if (detailAlive) addOrgError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive) { addOrgBusy = false; orgAction = ""; }
+            await tick();
+            const target = createOrganizationTrigger ?? addOrganizationSelect;
+            if (detailAlive && target?.isConnected && !target.disabled) target.focus({ preventScroll: true });
         }
     }
     async function addOrgMembership(): Promise<void> {
@@ -712,6 +747,7 @@ import StatusNotice from "../StatusNotice.svelte";
             return;
         }
         addOrgBusy = true;
+        orgAction = "add";
         addOrgError = "";
         try {
             const report = await onAddOrgMembership(current.docId, addOrgDocId, {
@@ -739,14 +775,15 @@ import StatusNotice from "../StatusNotice.svelte";
             await loadOrgMemberships();
             await loadOrgCandidates();
         } catch (error) {
-            if (detailAlive) addOrgError = error instanceof Error ? error.message : String(error);
+            if (detailAlive) addOrgError = requestErrorMessage(error);
         } finally {
-            if (detailAlive) addOrgBusy = false;
+            if (detailAlive) { addOrgBusy = false; orgAction = ""; }
         }
     }
     async function removeOrgMembership(membershipId: string): Promise<void> {
         if (!onRemoveOrgMembership || addOrgBusy || orgLoading || orgReadError || removingOrgMembershipId !== membershipId) return;
         addOrgBusy = true;
+        orgAction = "remove";
         addOrgError = "";
         try {
             const report = await onRemoveOrgMembership(membershipId, removingOrgSnapshot ?? undefined);
@@ -757,9 +794,9 @@ import StatusNotice from "../StatusNotice.svelte";
             await loadOrgMemberships();
             await loadOrgCandidates();
         } catch (error) {
-            if (detailAlive) addOrgError = error instanceof Error ? error.message : String(error);
+            if (detailAlive) addOrgError = requestErrorMessage(error);
         } finally {
-            if (detailAlive) addOrgBusy = false;
+            if (detailAlive) { addOrgBusy = false; orgAction = ""; }
         }
     }
 
@@ -780,6 +817,7 @@ import StatusNotice from "../StatusNotice.svelte";
     async function saveEditOrgMembership(): Promise<void> {
         if (!onUpdateOrgMembership || addOrgBusy || !editingOrgMembershipId || orgLoading || orgReadError) return;
         addOrgBusy = true;
+        orgAction = "edit";
         addOrgError = "";
         try {
             const patch = { department: editOrgDepartment, title: editOrgTitle,
@@ -793,8 +831,8 @@ import StatusNotice from "../StatusNotice.svelte";
             onChanged();
             await loadOrgMemberships();
             await loadOrgCandidates();
-        } catch (error) { if (detailAlive) addOrgError = error instanceof Error ? error.message : String(error); }
-        finally { if (detailAlive) addOrgBusy = false; }
+        } catch (error) { if (detailAlive) addOrgError = requestErrorMessage(error); }
+        finally { if (detailAlive) { addOrgBusy = false; orgAction = ""; } }
     }
 
     function affiliationLabel(kind: OrgAffiliationKind | undefined): string {
@@ -885,19 +923,44 @@ import StatusNotice from "../StatusNotice.svelte";
         followUpError = "";
         followUpActionError = "";
         followUpRefreshWarning = "";
+        const title = followUpTitle.trim();
+        const dueDate = followUpDate;
+        const requestId = followUpRequestId || newFollowUpRequestId();
+        followUpRequestId = requestId;
         try {
-            await onCreateFollowUp(current.docId, followUpTitle.trim(), followUpDate);
+            await onCreateFollowUp(current.docId, title, dueDate, requestId);
             followUpTitle = "";
             followUpSavedTitle = "";
             followUpSavedDate = followUpDate;
             followUpRecorded = true;
+            followUpRequestId = "";
+            followUpFailedRequest = null;
             onChanged();
             await refreshFollowUpsAfterMutation();
         } catch (error) {
-            followUpActionError = error instanceof Error ? error.message : String(error);
+            followUpActionError = requestErrorMessage(error);
+            const failedRequestId = (error as { requestId?: unknown })?.requestId;
+            followUpFailedRequest = typeof failedRequestId === "string" && failedRequestId === requestId
+                ? { requestId, title, dueDate }
+                : null;
         } finally {
             followUpBusy = false;
         }
+    }
+
+    function clearFailedFollowUpRequest(): void {
+        const failed = followUpFailedRequest;
+        if (!failed) return;
+        if (failed.title !== followUpTitle.trim() || failed.dueDate !== followUpDate) {
+            followUpFailedRequest = null;
+            followUpRequestId = "";
+        }
+    }
+
+    function retryFailedFollowUp(): void {
+        const failed = followUpFailedRequest;
+        if (!failed || failed.title !== followUpTitle.trim() || failed.dueDate !== followUpDate) return;
+        void createFollowUp();
     }
 
     async function completeFollowUp(item: FollowUpItem) {
@@ -911,7 +974,7 @@ import StatusNotice from "../StatusNotice.svelte";
             await refreshFollowUpsAfterMutation();
             onChanged();
         } catch (error) {
-            followUpActionError = error instanceof Error ? error.message : String(error);
+            followUpActionError = requestErrorMessage(error);
         } finally {
             followUpBusy = false;
         }
@@ -929,7 +992,7 @@ import StatusNotice from "../StatusNotice.svelte";
             await refreshFollowUpsAfterMutation();
             onChanged();
         } catch (error) {
-            followUpActionError = error instanceof Error ? error.message : String(error);
+            followUpActionError = requestErrorMessage(error);
         } finally {
             followUpBusy = false;
         }
@@ -949,7 +1012,7 @@ import StatusNotice from "../StatusNotice.svelte";
             await refreshFollowUpsAfterMutation();
             onChanged();
         } catch (error) {
-            followUpActionError = error instanceof Error ? error.message : String(error);
+            followUpActionError = requestErrorMessage(error);
         } finally {
             followUpBusy = false;
         }
@@ -981,7 +1044,7 @@ import StatusNotice from "../StatusNotice.svelte";
             cadenceLoaded = true;
         } catch (error) {
             if (detailAlive && request === cadenceRequest && current.docId === targetDocId) {
-                cadenceLoadError = error instanceof Error ? error.message : String(error);
+                cadenceLoadError = requestErrorMessage(error);
                 cadenceLoaded = true;
             }
         }
@@ -1007,7 +1070,7 @@ import StatusNotice from "../StatusNotice.svelte";
                     : `已设为每 ${days} 天联系一次`;
             onChanged();
         } catch (error) {
-            cadenceError = error instanceof Error ? error.message : String(error);
+            cadenceError = requestErrorMessage(error);
             if (rethrowOnFailure) throw error;
         } finally {
             cadenceSaving = false;
@@ -1165,6 +1228,7 @@ import StatusNotice from "../StatusNotice.svelte";
                 class="b3-text-field fn__flex-1"
                 type="text"
                 placeholder={text("detailRecordPlaceholder", "做了什么、聊了什么（可留空）")}
+                aria-label={text("detailRecordLabel", "互动备注")}
                 bind:value={noteText}
                 oninput={() => (recorded = false)}
                 disabled={busy}
@@ -1180,7 +1244,7 @@ import StatusNotice from "../StatusNotice.svelte";
     </section>
 
     {#if orgSectionSupported}
-    <section class="lvct-detail__section">
+    <section class="lvct-detail__section" aria-busy={addOrgBusy}>
         <div class="fn__flex" style="align-items: center; gap: 8px;">
             <h4 class="fn__flex-1">{text("orgSectionTitle", "组织归属")}</h4>
             <!-- B13.5 双向编辑最小版：跳转组织管理弹窗维护归属（弹窗内可添加/编辑/移除） -->
@@ -1189,6 +1253,11 @@ import StatusNotice from "../StatusNotice.svelte";
                     {text("orgSectionManage", "管理归属")}</button>
             {/if}
         </div>
+        {#if addOrgBusy}
+            <p class="ft__smaller ft__on-surface" role="status" aria-live="polite">
+                {orgAction === "create" ? "正在创建组织…" : orgAction === "add" ? "正在添加组织归属…" : orgAction === "edit" ? "正在保存组织归属…" : orgAction === "remove" ? "正在移除组织归属…" : "正在处理组织归属…"}
+            </p>
+        {/if}
         {#if orgReadError}
             <p class="lvct-form__error" role="alert">{text("orgMembershipReadUnknown", "组织归属读取失败，结果尚未核实。")}{orgReadError}</p>
             <button class="b3-button b3-button--outline" disabled={addOrgBusy || orgLoading} onclick={() => void loadOrgMemberships()}>{text("orgMembershipReload", "重新读取归属")}</button>
@@ -1240,14 +1309,14 @@ import StatusNotice from "../StatusNotice.svelte";
                                     <option value="family">{affiliationLabel("family")}</option><option value="unspecified">{affiliationLabel("unspecified")}</option><option value="work">{affiliationLabel("work")}</option><option value="education">{affiliationLabel("education")}</option>
                                 </select>
                                 <p>{text("orgMembershipEditImpact", "保存会更新这段成员记录及双方当前双链；离开保留历史。恢复在职/在学须清空离开日期。")}</p>
-                                <button class="b3-button b3-button--text" disabled={addOrgBusy} onclick={() => void saveEditOrgMembership()}>{text("orgMemberSave", "保存")}</button>
+                                <button class="b3-button b3-button--text" disabled={addOrgBusy} onclick={() => void saveEditOrgMembership()}>{addOrgBusy && orgAction === "edit" ? "保存中…" : text("orgMemberSave", "保存")}</button>
                                 <button class="b3-button b3-button--cancel" disabled={addOrgBusy} onclick={() => (editingOrgMembershipId = "")}>{text("orgMemberCancel", "取消")}</button>
                             </div>
                         {/if}
                         {#if removingOrgMembershipId === membership.id}
                             <div role="group" aria-label={text("orgMembershipRemoveConfirm", "确认移除这段成员历史")}>
                                 <p>{text("orgMembershipRemoveImpact", "将删除这段成员历史并重建双方当前双链。普通离职请编辑为已离开；人物和组织文档保留。")}</p>
-                                <button class="b3-button b3-button--cancel" disabled={addOrgBusy} onclick={() => void removeOrgMembership(membership.id)}>{text("orgMembershipRemoveConfirm", "确认移除这段成员历史")}</button>
+                                <button class="b3-button b3-button--cancel" disabled={addOrgBusy} onclick={() => void removeOrgMembership(membership.id)}>{addOrgBusy && orgAction === "remove" ? "移除中…" : text("orgMembershipRemoveConfirm", "确认移除这段成员历史")}</button>
                                 <button class="b3-button b3-button--outline" disabled={addOrgBusy} onclick={() => (removingOrgMembershipId = "")}>{text("orgMemberCancel", "取消")}</button>
                             </div>
                         {/if}
@@ -1261,7 +1330,7 @@ import StatusNotice from "../StatusNotice.svelte";
                 <button class="b3-button b3-button--outline" disabled={addOrgBusy || orgCandidatesLoading} onclick={() => void loadOrgCandidates()}>{text("orgMembershipReloadCandidates", "重新读取组织候选")}</button>
             {/if}
             <div class="lvct-org-add">
-                <select class="b3-select" value={addOrgDocId} onchange={(event) => changeAddOrg(event.currentTarget.value)} disabled={addOrgBusy || orgLoading || orgCandidatesLoading}
+                <select class="b3-select" value={addOrgDocId} onchange={(event) => changeAddOrg(event.currentTarget.value)} disabled={addOrgBusy || orgLoading || orgCandidatesLoading} bind:this={addOrganizationSelect}
                     aria-label={text("orgAddOrgLabel", "选择要加入的组织")}>
                     <option value="">{text("orgAddOrgPick", "选择组织…")}</option>
                     {#each orgCandidateOptions as org (org.docId)}
@@ -1285,11 +1354,11 @@ import StatusNotice from "../StatusNotice.svelte";
                 <input class="b3-text-field" maxlength="40" bind:value={addOrgStatusLabel} disabled={addOrgBusy || !addOrgDocId} aria-label="自定义状态" placeholder="自定义状态，如实习、休学" />
                 <input class="b3-text-field" maxlength="240" bind:value={addOrgNote} disabled={addOrgBusy || !addOrgDocId} aria-label={text("orgMemberNote", "成员备注")} placeholder={text("orgMemberNotePlaceholder", "仅记录这段组织经历")} />
                 <button type="button" class="b3-button b3-button--text" disabled={addOrgBusy || orgLoading || orgCandidatesLoading || !!orgReadError || !!orgCandidatesError || addOrgDocId === ""}
-                    onclick={() => void addOrgMembership()}>{text("orgAddSubmit", "添加归属")}</button>
+                    onclick={() => void addOrgMembership()}>{addOrgBusy && orgAction === "add" ? "添加中…" : text("orgAddSubmit", "添加归属")}</button>
                 {#if selectedAddOrg?.archived}<p class="ft__smaller ft__on-surface">组织已归档，只能补录历史经历；恢复组织后才可添加当前归属。</p>{/if}
                 {#if onCreateOrganization && !orgCandidateOptions.some((org) => !org.archived)}
-                    <button type="button" class="b3-button b3-button--outline" disabled={addOrgBusy || orgLoading || orgCandidatesLoading}
-                        onclick={() => void createOrganizationFromDetail()}>{text("orgCreateFirst", "新建组织")}</button>
+                    <button type="button" class="b3-button b3-button--outline" disabled={addOrgBusy || orgLoading || orgCandidatesLoading} bind:this={createOrganizationTrigger}
+                        onclick={() => void createOrganizationFromDetail()}>{addOrgBusy && orgAction === "create" ? "创建中…" : text("orgCreateFirst", "新建组织")}</button>
                 {/if}
             </div>
         {/if}
@@ -1348,6 +1417,11 @@ import StatusNotice from "../StatusNotice.svelte";
         <h4>{text("fuSectionTitle", "跟进计划")}</h4>
         {#if followUpActionError}
             <div class="lvct-form__error" role="alert">{text("fuActionFail", "跟进操作失败：{msg}", { msg: followUpActionError })}</div>
+            {#if followUpFailedRequest}
+                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={retryFailedFollowUp}>
+                    使用原请求重试
+                </button>
+            {/if}
         {/if}
         {#if followUpRefreshWarning}
             <StatusNotice error message={followUpRefreshWarning} actionLabel={text("commonRetry", "重试")} onAction={() => void loadFollowUps()} />
@@ -1399,14 +1473,19 @@ import StatusNotice from "../StatusNotice.svelte";
                     class="b3-text-field fn__flex-1"
                     type="text"
                     placeholder={text("fuTitlePlaceholder", "这次想联系什么？（可选，如：问问面试结果）")}
+                    aria-label={text("fuTitleLabel", "跟进标题")}
                     bind:value={followUpTitle}
+                    oninput={clearFailedFollowUpRequest}
                     disabled={followUpBusy}
                 />
-                <input type="date" class="b3-text-field" aria-label={text("fuDateLabel", "计划日期")} bind:value={followUpDate} disabled={followUpBusy} />
+                <input type="date" class="b3-text-field" aria-label={text("fuDateLabel", "计划日期")} bind:value={followUpDate} onchange={clearFailedFollowUpRequest} disabled={followUpBusy} />
                 <button class="b3-button b3-button--text" disabled={followUpBusy} onclick={createFollowUp}>
                     {followUpBusy ? text("fuAdding", "添加中…") : followUpRecorded ? text("fuAddAnother", "再加一条") : text("fuAddPlan", "添加计划")}
                 </button>
             </div>
+            {#if followUpFailedRequest && followUpFailedRequest.title === followUpTitle.trim() && followUpFailedRequest.dueDate === followUpDate}
+                <StatusNotice error message="该跟进请求尚未完全核实。使用原请求重试会先核对已有记录，避免重复创建。" actionLabel="用原请求重试" onAction={retryFailedFollowUp} actionDisabled={followUpBusy} />
+            {/if}
             <p class="ft__smaller ft__on-surface">到期的计划会出现在首页待办；完成计划不会自动记为互动。需要更新最近联系日期时，请在上方“记一笔互动”中单独记录。</p>
         {/if}
     </section>
@@ -1483,7 +1562,7 @@ import StatusNotice from "../StatusNotice.svelte";
         <h4>互动与共同出席{insights ? `（共 ${insights.totalEvents} 条）` : ""}</h4>
         {#if historyToday.length > 0}
             <div class="lvct-detail__history" role="region" aria-label="历史上的今天">
-                <b>🗓 历史上的今天</b>
+                <b><CalendarDays size={14} aria-hidden="true" /> 历史上的今天</b>
                 {#each historyToday as item (item.eventId)}
                     <div class="lvct-detail__timeline-row">
                         <span class="ft__on-surface">{item.localDate}</span>
@@ -1587,7 +1666,7 @@ import StatusNotice from "../StatusNotice.svelte";
                             class="lvct-detail__relation-remove"
                             title="解除关系"
                             disabled={busy}
-                            onclick={() => mutate(() => removeRelation(settings, current, other))}
+                            onclick={() => mutateRelationAction("remove", other)}
                         >×</button>
                     </span>
                 {/each}
@@ -1604,7 +1683,7 @@ import StatusNotice from "../StatusNotice.svelte";
                 disabled={busy || othersLoading || !!othersError}
                 onSelect={(itemId) => {
                     const other = others.find((item) => item.itemId === itemId);
-                    if (other) mutate(() => addRelation(settings, current, other));
+                    if (other) mutateRelationAction("add", other);
                 }}
             />
         </div>
@@ -1620,7 +1699,11 @@ import StatusNotice from "../StatusNotice.svelte";
     {/if}
 
     {#if errorText}
-        <div class="lvct-form__error" role="alert">{errorText}</div>
+        <div class="lvct-form__error" role="alert">{errorText}
+            {#if pendingRelationMutation}
+                <button type="button" class="b3-button b3-button--outline" disabled={busy} onclick={retryRelationMutation}>重新读取并继续关系操作</button>
+            {/if}
+        </div>
     {/if}
 
     <div class="lvct-form__actions">

@@ -15,7 +15,8 @@
     import GroupField from "./GroupField.svelte";
     import BirthdayField from "./BirthdayField.svelte";
     import { ClipboardPaste } from "@lucide/svelte";
-    import { onDestroy, onMount, untrack } from "svelte";
+    import { onDestroy, onMount, tick, untrack } from "svelte";
+    import { requestErrorMessage } from "../../shared/error-presenter";
 
     let {
         settings,
@@ -70,6 +71,12 @@
     let running: boolean = $state(false);
     let groupValid = $state(true);
     let errorText: string = $state("");
+    type ValidationField = "name" | "email" | "birthday";
+    type ValidationIssue = { field: ValidationField; message: string };
+    let fieldErrors: Partial<Record<ValidationField, string>> = $state({});
+    let validationFocusField: ValidationField | null = $state(null);
+    let emailInput: HTMLInputElement | undefined = $state();
+    let birthdayField: HTMLElement | undefined = $state();
     let failedFields: WritableContactField[] = $state([]);
     let pending: { draft: ContactDraft; report: ContactWriteReport } | undefined;
     const target = untrack(() => ({ docId: person.docId, itemId: person.itemId }));
@@ -114,19 +121,39 @@
     let editingOrgNote = $state("");
     let editingOrgKind = $state<OrgAffiliationKind>("unspecified");
     let creatingOrganization = $state(false);
-    function validateEditDraft(value: ContactDraft): string[] {
-        const errors: string[] = [];
-        if (!value.name.trim()) errors.push("姓名不能为空");
-        if (value.email.trim() && !/^\S+@\S+\.\S+$/.test(value.email.trim())) errors.push("邮箱格式不正确");
+    let createOrganizationTrigger: HTMLButtonElement | undefined = $state();
+    let profileSection: HTMLElement | undefined = $state();
+    function validateEditDraft(value: ContactDraft): ValidationIssue[] {
+        const errors: ValidationIssue[] = [];
+        if (!value.name.trim()) errors.push({ field: "name", message: "姓名不能为空" });
+        if (value.email.trim() && !/^\S+@\S+\.\S+$/.test(value.email.trim())) errors.push({ field: "email", message: "邮箱格式不正确" });
         if (value.birthday.trim()) {
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(value.birthday.trim())) errors.push("生日日期格式不正确");
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(value.birthday.trim())) errors.push({ field: "birthday", message: "生日日期格式不正确" });
             else {
                 const [year, month, day] = value.birthday.split("-").map(Number);
                 const date = new Date(year, month - 1, day);
-                if (!value.isLunar && (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day)) errors.push("生日不是有效日期");
+                if (!value.isLunar && (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day)) errors.push({ field: "birthday", message: "生日不是有效日期" });
             }
         }
         return errors;
+    }
+    function clearFieldError(field: ValidationField): void {
+        if (!(field in fieldErrors)) return;
+        const next = { ...fieldErrors };
+        delete next[field];
+        fieldErrors = next;
+        if (validationFocusField === field) validationFocusField = null;
+    }
+    async function showFieldError(issue: ValidationIssue): Promise<void> {
+        fieldErrors = { [issue.field]: issue.message };
+        validationFocusField = issue.field;
+        await tick();
+        const target = issue.field === "email"
+            ? emailInput
+            : issue.field === "birthday"
+                ? birthdayField?.querySelector<HTMLElement>("input, select")
+                : null;
+        target?.focus();
     }
     // 使用 .by 形式与编辑器逻辑的无 Svelte 运行时测试夹具保持兼容；
     // 这里的派生值仍会由 Svelte 编译器按依赖追踪更新。
@@ -182,7 +209,7 @@
                 relationshipDraft = "";
             }
         } catch (error) {
-            profileError = error instanceof Error ? error.message : String(error);
+            profileError = requestErrorMessage(error);
         } finally { profileLoading = false; }
     }
     /** 新建组织后留在编辑页，并立即刷新候选，避免用户看到过期的“暂无组织”。 */
@@ -194,9 +221,14 @@
             await onCreateOrganization();
             await loadProfileEditor();
         } catch (error) {
-            profileError = error instanceof Error ? error.message : String(error);
+            profileError = requestErrorMessage(error);
         } finally {
             creatingOrganization = false;
+            // 候选刷新会重建组织区内容；恢复当前按钮，创建成功后则进入已更新的组织选择框。
+            await tick();
+            const target = createOrganizationTrigger
+                ?? profileSection?.querySelector<HTMLElement>("select:not([disabled]), input:not([disabled])");
+            if (target?.isConnected) target.focus({ preventScroll: true });
         }
     }
     function membershipSnapshot(membership: import("../../services/org").PersonOrgMembershipView): OrgMembership {
@@ -234,7 +266,7 @@
             profileMessage = "组织归属已删除";
             onSaved();
             await loadProfileEditor();
-        } catch (error) { profileError = error instanceof Error ? error.message : String(error); }
+        } catch (error) { profileError = requestErrorMessage(error); }
         finally { profileBusy = false; }
     }
     // 运行时由 Svelte 注入 onMount；控制逻辑单测以无生命周期夹具执行，需安全跳过。
@@ -309,7 +341,7 @@
             profileMessage = "组织经历或关系称谓已保存";
             onSaved();
         } catch (error) {
-            profileError = error instanceof Error ? error.message : String(error);
+            profileError = requestErrorMessage(error);
         } finally {
             profileBusy = false;
             if (!profileError) await loadProfileEditor();
@@ -343,7 +375,10 @@
         const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
         const next = { ...draft, tags };
         const validationErrors = validateEditDraft(next);
-        if (validationErrors.length > 0) throw new Error(validationErrors.join("；"));
+        if (validationErrors.length > 0) {
+            await showFieldError(validationErrors[0]);
+            throw new Error(validationErrors.map((issue) => issue.message).join("；"));
+        }
         const changed = pending ? changedContactWriteFields(pending.draft, next) : [];
         if (pending && changed.length > 0 && (retrying || pending.report.unknown.length > 0)) {
             throw new Error("草稿与原请求不同；未知字段请先恢复原输入并核实，明确失败后修改输入请使用保存");
@@ -373,7 +408,7 @@
             await persist(true);
             if (alive) onClose();
         } catch (error) {
-            if (alive) errorText = error instanceof Error ? error.message : String(error);
+            if (alive) errorText = requestErrorMessage(error);
         } finally {
             running = false;
         }
@@ -430,14 +465,25 @@
 
     async function submit() {
         if (running) return;
+        const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
+        const validationErrors = validateEditDraft({ ...draft, tags });
+        if (validationErrors.length > 0) {
+            errorText = "";
+            await showFieldError(validationErrors[0]);
+            return;
+        }
         running = true;
         errorText = "";
         try {
             await persistAll();
             if (alive) onClose();
         } catch (error) {
-            if (alive) errorText = error instanceof Error ? error.message : String(error);
-            if (alive) focusError();
+            if (alive && validationFocusField && validationFocusField !== "name") {
+                errorText = "";
+            } else if (alive) {
+                errorText = requestErrorMessage(error);
+                focusError();
+            }
         } finally {
             running = false;
         }
@@ -451,7 +497,7 @@
         </button>
     </div>
     {#if profileSupported}
-        <section class="lvct-detail__section lvct-person-edit__profile" aria-labelledby="lvct-person-edit-profile-title">
+        <section class="lvct-detail__section lvct-person-edit__profile" aria-labelledby="lvct-person-edit-profile-title" bind:this={profileSection}>
             <div class="lvct-detail__section-head">
                 <div>
                     <h4 id="lvct-person-edit-profile-title">{person.isSelf ? "工作单位与学校" : "工作单位、学校与我的关系"}</h4>
@@ -526,7 +572,7 @@
                     {/if}
                     {#if availableOrgCandidates.length === 0}
                         <p class="ft__smaller ft__on-surface">暂无可选择的活跃组织；可先新建组织。已有组织经历可逐条编辑，历史不会被覆盖。</p>
-                        {#if onCreateOrganization}<button type="button" class="b3-button b3-button--outline" onclick={() => void createOrganizationFromEditor()} disabled={profileBusy || profileLoading || creatingOrganization}>{creatingOrganization ? "组织创建中…" : text("orgCreateFirst", "新建组织")}</button>{/if}
+                        {#if onCreateOrganization}<button type="button" class="b3-button b3-button--outline" bind:this={createOrganizationTrigger} onclick={() => void createOrganizationFromEditor()} disabled={profileBusy || profileLoading || creatingOrganization}>{creatingOrganization ? "组织创建中…" : text("orgCreateFirst", "新建组织")}</button>{/if}
                     {/if}
                 {/if}
                 {#if profileError}
@@ -553,15 +599,17 @@
         </label>
         <label class="lvct-form__item">
             <span>{text("formEmail", "邮箱")}</span>
-            <input class="b3-text-field fn__block" type="email" bind:value={draft.email} disabled={running} />
+            <input class="b3-text-field fn__block" type="email" bind:this={emailInput} bind:value={draft.email} aria-invalid={Boolean(fieldErrors.email)} aria-describedby={fieldErrors.email ? "lvct-person-edit-email-error" : undefined} oninput={() => clearFieldError("email")} disabled={running} />
+            {#if fieldErrors.email}<small id="lvct-person-edit-email-error" class="lvct-form__error" role="alert">{fieldErrors.email}</small>{/if}
         </label>
         <label class="lvct-form__item">
             <span>{text("formWebsite", "网站")}</span>
             <input class="b3-text-field fn__block" type="url" bind:value={draft.website} disabled={running} />
         </label>
-        <div class="lvct-form__item">
+        <div class="lvct-form__item" bind:this={birthdayField}>
             <span>{text("formBirthday", "生日")}</span>
-            <BirthdayField label={text("formBirthday", "生日")} value={draft.birthday} isLunar={draft.isLunar} disabled={running} onValueChange={(value) => (draft.birthday = value)} onModeChange={(isLunar) => (draft.isLunar = isLunar)} />
+            <BirthdayField label={text("formBirthday", "生日")} value={draft.birthday} isLunar={draft.isLunar} invalid={Boolean(fieldErrors.birthday)} describedBy={fieldErrors.birthday ? "lvct-person-edit-birthday-error" : undefined} disabled={running} onValueChange={(value) => { draft.birthday = value; clearFieldError("birthday"); }} onModeChange={(isLunar) => { draft.isLunar = isLunar; clearFieldError("birthday"); }} />
+            {#if fieldErrors.birthday}<small id="lvct-person-edit-birthday-error" class="lvct-form__error" role="alert">{fieldErrors.birthday}</small>{/if}
         </div>
         <GroupField {i18n} value={draft.group} onValueChange={(value) => (draft.group = value)} onValidityChange={(valid) => (groupValid = valid)} label={text("formGroup", "分组")} ungroupedLabel={text("formUngrouped", "未分组")} disabled={running} />
         <label class="lvct-form__item">

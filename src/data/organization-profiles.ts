@@ -11,6 +11,22 @@ const DOC_ID = /^\d{14}-[0-9a-z]{7}$/;
 
 type ProfileStore = { schemaVersion: 1; profiles: Record<string, OrganizationProfileDraft> };
 
+/** 另一窗口已先修改组织资料；拒绝用旧草稿静默覆盖最新事实。 */
+export class OrganizationProfileConflictError extends Error {
+    readonly docId: string;
+    constructor(docId: string) {
+        super("组织资料已被其他操作修改，请重新读取后再提交；当前修改未覆盖最新资料");
+        this.name = "OrganizationProfileConflictError";
+        this.docId = docId;
+    }
+}
+
+function profileFingerprint(profile: OrganizationProfileDraft | null | undefined): string {
+    if (!profile) return "<missing>";
+    const normalized = normalizeOrganizationProfileDraft(profile);
+    return JSON.stringify(normalized);
+}
+
 function decodeStore(raw: unknown): ProfileStore {
     if (raw === null || raw === "") return { schemaVersion: 1, profiles: {} };
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("组织资料存储格式不正确，操作已停止");
@@ -38,7 +54,12 @@ export async function loadOrganizationProfile(plugin: Plugin, docId: string): Pr
     return profiles[docId] ? { ...profiles[docId], departments: profiles[docId].departments.map((item) => ({ ...item })), customFields: profiles[docId].customFields.map((item) => ({ ...item })) } : null;
 }
 
-export async function saveOrganizationProfile(plugin: Plugin, docId: string, draft: OrganizationProfileDraft): Promise<OrganizationProfileDraft> {
+export async function saveOrganizationProfile(
+    plugin: Plugin,
+    docId: string,
+    draft: OrganizationProfileDraft,
+    expected?: OrganizationProfileDraft | null,
+): Promise<OrganizationProfileDraft> {
     if (!DOC_ID.test(docId)) throw new Error("组织文档 ID 无效");
     const validation = validateOrganizationProfile(draft);
     if (!validation.valid) throw new Error(validation.errors.join("、"));
@@ -46,6 +67,9 @@ export async function saveOrganizationProfile(plugin: Plugin, docId: string, dra
     await withStoreLock(ORGANIZATION_PROFILES_STORAGE_KEY, async () => {
         const raw = await loadJsonStrict(plugin, ORGANIZATION_PROFILES_STORAGE_KEY);
         const store = decodeStore(raw);
+        if (expected !== undefined && profileFingerprint(store.profiles[docId]) !== profileFingerprint(expected)) {
+            throw new OrganizationProfileConflictError(docId);
+        }
         store.profiles[docId] = normalized;
         await saveJsonVerified(plugin, ORGANIZATION_PROFILES_STORAGE_KEY, store);
     });

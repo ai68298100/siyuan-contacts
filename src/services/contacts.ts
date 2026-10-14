@@ -551,7 +551,24 @@ export async function applyContactCandidateFields(
  */
 export async function removeContact(settings: ContactsSettings, person: Pick<ContactSummary, "itemId">): Promise<void> {
     await withStoreLock(contactWriteLock(settings), async () => {
-        await unbindRows(settings.avId, [person.itemId]);
+        const verify = async (): Promise<boolean> => {
+            const rendered = await renderView(settings.avId, settings.dbBlockId);
+            return !rosterFromRender(rendered, settings.fieldMap).some((entry) => entry.itemId === person.itemId);
+        };
+        try {
+            await unbindRows(settings.avId, [person.itemId]);
+        } catch (cause) {
+            // removeAttributeViewBlocks may have been accepted before the transport failed.
+            // Read the authoritative view before allowing a retry, otherwise a retry could
+            // hide an unknown result behind a generic failure.
+            try {
+                if (await verify()) { invalidateRoster(); return; }
+            } catch (readError) {
+                throw new Error("联系人移除结果未知，未自动重试；请重新读取名册核实。", { cause: readError });
+            }
+            throw new Error("联系人移除结果未知，未自动重试；请重新读取名册核实。", { cause });
+        }
+        if (!(await verify())) throw new Error("联系人移除请求已发出，但名册仍显示该联系人；结果未知，请重新读取后再试。");
         invalidateRoster();
     });
 }
@@ -563,7 +580,22 @@ export async function removeContacts(settings: ContactsSettings, itemIds: readon
     return withStoreLock(contactWriteLock(settings), async () => {
         const CHUNK = 200;
         for (let start = 0; start < ids.length; start += CHUNK) {
-            await unbindRows(settings.avId, ids.slice(start, start + CHUNK));
+            const chunk = ids.slice(start, start + CHUNK);
+            try {
+                await unbindRows(settings.avId, chunk);
+            } catch (cause) {
+                try {
+                    const rendered = await renderView(settings.avId, settings.dbBlockId);
+                    const remaining = new Set(rosterFromRender(rendered, settings.fieldMap).map((entry) => entry.itemId));
+                    if (chunk.some((itemId) => remaining.has(itemId))) throw new Error("仍有联系人保留");
+                    continue;
+                } catch (readError) {
+                    throw new Error("批量移除结果未知，未自动重试；请重新读取名册核实。", { cause: readError ?? cause });
+                }
+            }
+            const rendered = await renderView(settings.avId, settings.dbBlockId);
+            const remaining = new Set(rosterFromRender(rendered, settings.fieldMap).map((entry) => entry.itemId));
+            if (chunk.some((itemId) => remaining.has(itemId))) throw new Error("批量移除请求已发出，但名册仍显示联系人；结果未知，请重新读取后再试。");
         }
         invalidateRoster();
         return ids.length;
@@ -691,17 +723,25 @@ export async function adoptDocs(
     options: AdoptOptions = {},
 ): Promise<number> {
     if (candidates.length === 0) return 0;
-    const boundMap = await mapBoundDocIds(settings.avId, candidates.map((candidate) => candidate.docId));
-    const unbound = candidates.filter((candidate) => !boundMap[candidate.docId]);
-    const CHUNK = 200;
-    for (let start = 0; start < unbound.length; start += CHUNK) {
-        const chunk = unbound.slice(start, start + CHUNK);
-        await bindDocsAsRows(
-            settings.avId,
-            settings.dbBlockId,
-            chunk.map((candidate) => ({ id: candidate.docId, content: candidate.name })),
-        );
-    }
+    const unbound = await withStoreLock(contactWriteLock(settings), async () => {
+        const boundMap = await mapBoundDocIds(settings.avId, candidates.map((candidate) => candidate.docId));
+        const pending = candidates.filter((candidate) => !boundMap[candidate.docId]);
+        const CHUNK = 200;
+        for (let start = 0; start < pending.length; start += CHUNK) {
+            const chunk = pending.slice(start, start + CHUNK);
+            await bindDocsAsRows(settings.avId, settings.dbBlockId, chunk.map((candidate) => ({ id: candidate.docId, content: candidate.name })));
+        }
+        if (pending.length === 0) return [] as ImportCandidate[];
+        let verified: Record<string, string>;
+        try {
+            verified = await mapBoundDocIds(settings.avId, pending.map((candidate) => candidate.docId));
+        } catch (cause) {
+            throw new Error("收编请求结果未知，未自动重建；请重新读取候选后再试。", { cause });
+        }
+        const missing = pending.filter((candidate) => !verified[candidate.docId]);
+        if (missing.length > 0) throw new Error(`已有 ${missing.length} 个文档的收编结果未核实，未继续写入；请重新读取后重试。`);
+        return pending;
+    });
     const group = options.group?.trim() ?? "";
     const tags = [...new Set((options.tags ?? []).map((tag) => tag.trim()).filter(Boolean))];
     if (unbound.length > 0 && (group || tags.length > 0)) {
