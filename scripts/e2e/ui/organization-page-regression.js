@@ -1,7 +1,8 @@
-import { mount, unmount, tick } from "svelte";
+import { mount, unmount, tick, createRawSnippet } from "svelte";
 import OrgManagerDialog from "../../../src/components/org/OrgManagerDialog.svelte";
 import OrgsView from "../../../src/components/org/OrgsView.svelte";
 import OrganizationProfileEditor from "../../../src/components/org/OrganizationProfileEditor.svelte";
+import LvctDialog from "../../../src/components/LvctDialog.svelte";
 import GroupFieldFixture from "./GroupFieldFixture.svelte";
 import { GROUP_CUSTOM_OPTION } from "../../../src/domain/contact-group";
 import { listOrganizationMembersPage } from "../../../src/services/org";
@@ -84,6 +85,33 @@ export async function runOrganizationPageRegression({ test, assert, kernel, sett
         } finally {
             if (readerDescriptor) Object.defineProperty(window, "FileReader", readerDescriptor);
             else delete window.FileReader;
+            await unmount(instance);
+        }
+    });
+
+    await test("Issue #31：组织管理/资料弹窗在桌面放大，移动端保持全屏", async () => {
+        const instance = mount(LvctDialog, { target: fixture, props: {
+            title: "编辑组织资料",
+            wide: true,
+            onClose() {},
+            children: createRawSnippet(() => ({ render: () => '<div class="lvct-org-profile-editor"></div>' })),
+        } });
+        try {
+            /* 对话框入场动画会先以 96% 缩放，待动画完成后再核对真实工作区尺寸。 */
+            await new Promise((resolve) => setTimeout(resolve, 240));
+            const panel = fixture.querySelector(".lvct-dialog-panel");
+            assert(panel, "组织资料弹窗容器未渲染");
+            const rect = panel.getBoundingClientRect();
+            if (window.innerWidth > 640) {
+                assert(rect.width >= Math.min(920, window.innerWidth * .96) - 2,
+                    `组织资料弹窗桌面宽度不足：${rect.width}（视口 ${window.innerWidth}）`);
+                assert(parseFloat(getComputedStyle(panel).maxHeight) >= Math.min(window.innerHeight * .92, 960) - 2,
+                    `组织资料弹窗桌面高度不足：${getComputedStyle(panel).maxHeight}`);
+            } else {
+                assert(Math.abs(rect.width - window.innerWidth) <= 2 && Math.abs(rect.height - window.innerHeight) <= 2,
+                    `组织资料弹窗移动端未保持全屏：${rect.width}x${rect.height}`);
+            }
+        } finally {
             await unmount(instance);
         }
     });

@@ -96,6 +96,96 @@ async function disposePeople(component, state, fixture, until, gate) {
 }
 
 export async function runBatchSelectionRegression({ test, assert, kernel, settings, fixture, until, button }) {
+    await test("批量加入组织：固定联系人范围、核对目标组织并逐人调用成员服务", async () => {
+        const state = configureBatchSelection(kernel, settings, 2);
+        const calls = [];
+        const component = mount(PeopleView, { target: fixture, props: {
+            settings, preferences: { ...DEFAULT_VIEW_PREFERENCES, peopleView: "card" }, revision: 0,
+            initialSort: "name", loadRecentInteractions: async () => ({}), onOpenDetail() {},
+            onPreferencesChange: async (next) => next,
+            onLoadOrgCandidates: async () => [{ docId: "20261004000000-org0001", name: "曙光科技" }],
+            onAddOrgMembership: async (personDocId, orgDocId, extra) => { calls.push({ personDocId, orgDocId, extra }); },
+        } });
+        try {
+            await until(() => fixture.querySelectorAll(".lvct-person-card").length === 2, "批量组织夹具未加载");
+            button("选择当前页（2 人）").click();
+            await until(() => fixture.querySelectorAll(".lvct-person-card__select:checked").length === 2, "组织批量目标未选中");
+            button("加入组织").click();
+            await until(() => fixture.querySelector("[role='dialog']")?.textContent.includes("批量加入组织 · 2 人"), "批量加入组织弹窗未打开");
+            const dialog = fixture.querySelector("[role='dialog']");
+            await until(() => [...dialog.querySelectorAll("option")].some((option) => option.textContent.includes("曙光科技")), "组织候选未加载");
+            button("加入所选组织", dialog).click();
+            await until(() => fixture.textContent.includes("已将 2 人加入「曙光科技」") && !fixture.querySelector("[role='dialog']"), "批量组织写入未完成");
+            assert(calls.length === 2 && calls.every((call) => call.orgDocId === "20261004000000-org0001" && call.extra?.status === "active"), "批量组织写入未逐人调用当前成员服务");
+        } finally { await disposePeople(component, state, fixture, until); }
+    });
+
+    await test("批量加入组织部分失败：重试只处理失败联系人，成功项不会重复调用", async () => {
+        const state = configureBatchSelection(kernel, settings, 2);
+        const calls = [];
+        let failFirst = true;
+        const component = mount(PeopleView, { target: fixture, props: {
+            settings, preferences: { ...DEFAULT_VIEW_PREFERENCES, peopleView: "card" }, revision: 0,
+            initialSort: "name", loadRecentInteractions: async () => ({}), onOpenDetail() {},
+            onPreferencesChange: async (next) => next,
+            onLoadOrgCandidates: async () => [{ docId: "20261004000000-org0001", name: "曙光科技" }],
+            onAddOrgMembership: async (personDocId, orgDocId) => {
+                calls.push({ personDocId, orgDocId });
+                if (personDocId.endsWith("doc0001") && failFirst) { failFirst = false; throw new Error("组织服务暂时不可用"); }
+            },
+        } });
+        try {
+            await until(() => fixture.querySelectorAll(".lvct-person-card").length === 2, "部分失败夹具未加载");
+            button("选择当前页（2 人）").click();
+            await until(() => fixture.querySelectorAll(".lvct-person-card__select:checked").length === 2, "部分失败目标未选中");
+            button("加入组织").click();
+            const dialog = await (async () => { await until(() => fixture.querySelector("[role='dialog']")?.textContent.includes("批量加入组织"), "部分失败弹窗未打开"); return fixture.querySelector("[role='dialog']"); })();
+            await until(() => [...dialog.querySelectorAll("option")].some((option) => option.textContent.includes("曙光科技")), "部分失败组织未加载");
+            button("加入所选组织", dialog).click();
+            await until(() => dialog.textContent.includes("1 人失败") && Boolean([...dialog.querySelectorAll("button")].find((node) => node.textContent.trim() === "重试失败项")), "部分失败结果未显示可重试入口");
+            assert(calls.length === 2, "首次批量加入没有逐人调用");
+            button("重试失败项", dialog).click();
+            await until(() => !fixture.querySelector("[role='dialog']"), "失败项重试未完成");
+            assert(calls.length === 3 && calls.filter((call) => call.personDocId.endsWith("doc0001")).length === 2
+                && calls.filter((call) => call.personDocId.endsWith("doc0002")).length === 1, "重试错误地重复调用了成功联系人");
+        } finally { await disposePeople(component, state, fixture, until); }
+    });
+
+    await test("批量加入组织空态与忙态：无组织可引导新建，保存期间锁定重复操作", async () => {
+        const state = configureBatchSelection(kernel, settings, 2);
+        let createRequested = 0;
+        let hasOrg = false;
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        const component = mount(PeopleView, { target: fixture, props: {
+            settings, preferences: { ...DEFAULT_VIEW_PREFERENCES, peopleView: "card" }, revision: 0,
+            initialSort: "name", loadRecentInteractions: async () => ({}), onOpenDetail() {},
+            onPreferencesChange: async (next) => next,
+            onLoadOrgCandidates: async () => hasOrg ? [{ docId: "20261004000000-org0001", name: "新组织" }] : [],
+            onCreateOrganization: () => { createRequested += 1; hasOrg = true; },
+            onAddOrgMembership: async () => { await gate; },
+        } });
+        try {
+            await until(() => fixture.querySelectorAll(".lvct-person-card").length === 2, "空态夹具未加载");
+            button("选择当前页（2 人）").click();
+            await until(() => fixture.querySelectorAll(".lvct-person-card__select:checked").length === 2, "空态批量目标未选中");
+            button("加入组织").click();
+            const emptyDialog = await (async () => { await until(() => fixture.querySelector("[role='dialog']")?.textContent.includes("还没有组织"), "组织空态未显示"); return fixture.querySelector("[role='dialog']"); })();
+            button("新建组织", emptyDialog).click();
+            assert(createRequested === 1, "组织空态没有触发新建组织入口");
+            emptyDialog.querySelector(".lvct-dialog-panel__close")?.click();
+            await until(() => !fixture.querySelector("[role='dialog']"), "空态弹窗关闭失败");
+            button("加入组织").click();
+            const dialog = await (async () => { await until(() => fixture.querySelector("[role='dialog']")?.textContent.includes("批量加入组织"), "忙态弹窗未打开"); return fixture.querySelector("[role='dialog']"); })();
+            await until(() => [...dialog.querySelectorAll("option")].some((option) => option.textContent.includes("新组织")), "新建组织后未重新读取候选");
+            button("加入所选组织", dialog).click();
+            await until(() => dialog.textContent.includes("加入中…"), "批量加入未进入忙态");
+            assert(button("加入中…", dialog).disabled && button("取消", dialog).disabled && button("重新读取组织", dialog).disabled, "批量加入忙态仍可重复触发或修改目标");
+            release();
+            await until(() => !fixture.querySelector("[role='dialog']"), "忙态批量加入未完成");
+        } finally { release(); await disposePeople(component, state, fixture, until); }
+    });
+
     await test("批量选择 200/201 边界：当前页不含第 201 人，加载更多不暗增选择，全部筛选包含下一页", async () => {
         const state = configureBatchSelection(kernel, settings, 201);
         const component = mountPeople(fixture, settings);

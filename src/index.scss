@@ -5896,6 +5896,10 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     align-items: center;
     flex-wrap: wrap;
 
+    /* 说明文字独占一行，避免占用字段行的可伸缩空间。 */
+    > p { flex: 1 1 100%; min-width: 100%; margin: 0; line-height: var(--lvct-lh-body); }
+    /* 选人器与普通字段使用相同的基准宽度，避免 flex-basis: 0 把它压成窄条。 */
+    > .lvct-picker { flex: 1 1 180px; min-width: 160px; }
     label { display: flex; flex: 1 1 180px; min-width: 160px; flex-direction: column; gap: 4px; font-size: var(--lvct-fs-caption); }
     .lvct-org-manager__add-note { flex-basis: 100%; }
 }
@@ -6023,9 +6027,27 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         border-radius: var(--lvct-r-md);
         background: var(--lvct-bg-elevated);
 
-        > p { grid-column: 1 / -1; margin: 0; line-height: var(--lvct-lh-body); }
+        > p { grid-column: 1 / -1; min-width: 0; }
+        > .lvct-picker { grid-column: 1 / -1; min-width: 0; width: 100%; }
         > select { width: 100%; min-width: 0; }
         > button { grid-column: 1 / -1; min-height: var(--lvct-touch-min-mobile); justify-self: start; }
+    }
+}
+
+/* Issue #31：组织管理和组织资料需要更大的桌面工作区；移动端由全屏模态规则接管。 */
+@media (min-width: 641px) {
+    .lvct-dialog-panel:has(.lvct-org-manager) {
+        width: min(900px, 96vw);
+        max-height: min(92vh, 900px);
+    }
+
+    .lvct-dialog-panel:has(.lvct-org-profile-editor) {
+        width: min(920px, 96vw);
+        max-height: min(92vh, 960px);
+    }
+
+    .lvct-org-profile-editor {
+        max-height: min(82vh, 960px);
     }
 }
 

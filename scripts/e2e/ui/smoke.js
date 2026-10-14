@@ -1854,6 +1854,15 @@ await test("B13.3 组织管理弹窗：新建组织、添加/移除成员经 fac
     /* 添加成员 */
     await until(() => fixture.querySelector('.lvct-org-manager__add .lvct-picker__trigger[aria-label="选择要添加的联系人"]'), "添加成员选择器未出现");
     const picker = fixture.querySelector('.lvct-org-manager__add .lvct-picker__trigger[aria-label="选择要添加的联系人"]');
+    /* Issue #31：桌面端选人器不能因 flex-basis 为 0 被压成窄条；移动端仍需占满栅格。 */
+    const pickerWrap = picker?.closest(".lvct-picker");
+    if (window.innerWidth > 640) {
+        const pickerRect = pickerWrap?.getBoundingClientRect();
+        assert(pickerRect && pickerRect.width >= 160 && pickerRect.height >= 32,
+            `桌面组织添加区选人器被压缩：${pickerRect ? `${pickerRect.width}x${pickerRect.height}` : "未找到"}`);
+    } else {
+        assert(pickerWrap && getComputedStyle(pickerWrap).width !== "0px", "移动端组织添加区选人器不可见");
+    }
     picker.click();
     await until(() => fixture.querySelector(".lvct-picker__panel"), "添加成员选人器浮层未打开");
     const option = [...fixture.querySelectorAll(".lvct-picker__option")].find((node) => node.textContent.includes("张三"));

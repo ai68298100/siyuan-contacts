@@ -672,6 +672,7 @@
                     {onOpenPersonDoc}
                     onLoadOrgCandidates={async () => (await facade.listOrganizations()).map((org) => ({ docId: org.docId, name: org.name, archived: org.archived }))}
                     onCreateOrganization={openCreateOrganizationForContact}
+                    onAddOrgMembership={(personDocId, orgDocId, extra) => facade.addOrganizationMember(orgDocId, personDocId, extra)}
                     onCreateSelfProfile={() => facade.createSelfProfile()}
                     onLoadSelfCandidates={() => facade.listContacts()}
                     onPreviewSelfIdentityChange={(personItemId) => facade.previewSelfIdentityChange(personItemId)}
