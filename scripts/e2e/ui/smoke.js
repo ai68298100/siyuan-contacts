@@ -4234,6 +4234,78 @@ await test("表格列显隐与顺序偏好持久化，姓名列固定，恢复�
     assert(preferenceCalls[1].next.peopleView === "card" && preferenceCalls[1].baseline.peopleView === "table", "第二次反向切换未携带最新本地基线");
 });
 
+await test("联系人视图切换：旧偏好刷新不能让卡片/表格反跳或短暂空白", async () => {
+    let releaseSave;
+    let saveStarted;
+    const saveGate = new Promise((resolve) => { releaseSave = resolve; });
+    const saveStartedGate = new Promise((resolve) => { saveStarted = resolve; });
+    const stalePreferences = { ...DEFAULT_VIEW_PREFERENCES, peopleView: "card", revision: 0 };
+    const savedPreferences = { ...DEFAULT_VIEW_PREFERENCES, peopleView: "table", revision: 1 };
+    let loadCalls = 0;
+    const states = [];
+    const stateOf = () => fixture.querySelector("table")
+        ? "table"
+        : fixture.querySelector(".lvct-people__cards")
+            ? "cards"
+            : fixture.querySelector(".lvct-people__skeleton")
+                ? "loading"
+                : "empty";
+    const observer = new MutationObserver(() => {
+        const state = stateOf();
+        if (states.at(-1) !== state) states.push(state);
+    });
+
+    mounted = mount(Workbench, { target: fixture, props: {
+        settings, preferences: stalePreferences, isMobile: false,
+        onPreferencesUpdated() {}, onOpenPersonDoc() {},
+        facade: {
+            settings,
+            loadRecentInteractions: async () => ({}),
+            loadDashboard: async () => ({
+                people: 1, relations: 0, birthdays: [], birthdaysThisWeek: 0,
+                stale: [], staleTotal: 0, neverContacted: 0, neverContactedItemIds: [],
+                followUps: [], actions: [], neverOrder: {},
+            }),
+            loadViewPreferences: async () => { loadCalls += 1; return { ...stalePreferences }; },
+            saveViewPreferences: async () => {
+                saveStarted?.();
+                await saveGate;
+                return savedPreferences;
+            },
+        },
+    } });
+
+    try {
+        const peopleNav = () => [...fixture.querySelectorAll(".lvct-workbench__nav-item")]
+            .find((node) => node.textContent.trim() === "联系人");
+        await until(() => peopleNav(), "联系人导航未渲染");
+        peopleNav().click();
+        await until(() => fixture.querySelector(".lvct-people__cards"), "初始卡片视图未渲染");
+
+        observer.observe(fixture, { childList: true, subtree: true });
+        const tableButton = button("表格");
+        tableButton.click();
+        await saveStartedGate;
+        await tick();
+        await until(() => fixture.querySelector("table"), "切换表格后目标视图未出现");
+
+        /* 模拟跨窗口数据通知：工作台读取到旧的卡片偏好，但本地表格意图仍在保存。 */
+        emitDataChanged();
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        await tick();
+        assert(loadCalls >= 2, `旧偏好刷新未触发，读取次数：${loadCalls}`);
+        assert(stateOf() === "table", `旧偏好刷新导致视图反跳：${stateOf()}`);
+        assert(!states.includes("cards") && !states.includes("loading") && !states.includes("empty"), `切换期间出现中间视图：${JSON.stringify(states)}`);
+
+        releaseSave?.();
+        await until(() => fixture.querySelector("table") && !fixture.querySelector(".lvct-people__skeleton"), "保存完成后表格视图未保持");
+        assert(stateOf() === "table", `保存完成后视图未稳定为表格：${stateOf()}`);
+    } finally {
+        observer.disconnect();
+        releaseSave?.();
+    }
+});
+
 await test("组合筛选数量与生效条件一致，单项清除与清除全部不遗留", async () => {
     const row = (id, name, group, tags) => ({
         id: `item-${id}`,

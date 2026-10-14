@@ -524,10 +524,22 @@
         void preferenceRequests.load().catch(() => {});
         const unsubscribe = subscribeDataChangedDebounced((change) => {
             if (!lifecycleToken.isAlive()) return;
-            dataRevision += 1;
+            // 偏好保存已经在当前工作台即时应用。它会通过同一事件通道通知其它
+            // 工作台，但当前实例无需因此重新读取联系人名册；否则切换卡片/表格
+            // 时会被无关的 loading 骨架短暂替换，连续保存还会造成多次闪烁。
+            const hasDataScope = Boolean(change.topics?.length || change.docIds?.length);
+            const preferenceRevision = change.preferencesRevision;
+            const preferenceOnly = preferenceRevision !== undefined && !change.preferencesError && !hasDataScope;
+            if (preferenceOnly && preferenceRevision <= currentPreferences.revision) return;
             if (change.preferencesError) {
                 preferencesNotice = `偏好读取失败，当前值尚未核实：${change.preferencesError}`;
             }
+            if (preferenceOnly) {
+                // 外部窗口的偏好变更需要应用到当前工作台，但不应触发联系人名册刷新。
+                void preferenceRequests.load().catch(() => {});
+                return;
+            }
+            dataRevision += 1;
             void preferenceRequests.load().catch(() => {});
             if (anyDirtyChanges()) {
                 dataChangeNotice = text("dataChangedWhileEditing", "数据已在其他窗口更新：列表已刷新，未保存的草稿已保留。");

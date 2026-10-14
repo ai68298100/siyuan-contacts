@@ -161,6 +161,9 @@
     // 等持久化响应回来后再由 preferences effect 对齐，避免“切回原值”被旧快照吞掉。
     // svelte-ignore state_referenced_locally
     let preferenceIntent: ViewPreferences = $state(preferences);
+    // 视图切换会先更新本地界面，再异步保存偏好。保存响应/跨窗口回读到达前，
+    // 父层可能仍携带旧 peopleView；保留这份意图，避免卡片与表格反复卸载重建造成闪烁。
+    let pendingViewMode: "cards" | "table" | null = $state(null);
     let prefError = $state("");
     let colMenuOpen = $state(false);
     const columnLabels: Record<PeopleTableColumn, { labelKey: string; fallback: string }> = {
@@ -178,9 +181,14 @@
 
     // 外部偏好更新（设置页保存/恢复默认）时同步本地显示
     $effect(() => {
+        const incomingMode = preferences.peopleView === "table" ? "table" : "cards";
         preferenceIntent = preferences;
-        viewMode = preferences.peopleView === "table" ? "table" : "cards";
         tableColumns = normalizeTableColumns(preferences.tableColumns);
+        if (pendingViewMode !== null) {
+            if (incomingMode === pendingViewMode) pendingViewMode = null;
+            else return;
+        }
+        viewMode = incomingMode;
     });
 
     // svelte-ignore state_referenced_locally
@@ -216,6 +224,7 @@
     function setViewMode(mode: "cards" | "table") {
         if (viewMode === mode) return;
         viewMode = mode;
+        pendingViewMode = mode;
         virtualScrollTop = 0;
         if (peopleListElement) peopleListElement.scrollTop = 0;
         const intent = nextPreferenceIntent({ peopleView: mode === "table" ? "table" : "card" });
@@ -245,6 +254,7 @@
 
     function resetDisplayPreferences() {
         viewMode = "cards";
+        pendingViewMode = "cards";
         tableColumns = [...DEFAULT_VIEW_PREFERENCES.tableColumns];
         colMenuOpen = false;
         const intent = nextPreferenceIntent({
@@ -916,7 +926,9 @@
         rosterAbortController = abortController;
         rosterLoadGeneration += 1;
         const pageGeneration = rosterLoadGeneration;
-        loading = true;
+        // 已有名册刷新时保留当前内容，避免视图偏好/跨窗口通知触发骨架屏闪烁。
+        // 首次读取仍显示完整加载态，避免空白区域缺少反馈。
+        loading = people.length === 0;
         errorText = "";
         rosterLoadError = "";
         rosterLoadingMore = false;
@@ -1540,7 +1552,7 @@
             <p>联系人加载失败：{errorText}</p>
             <button type="button" class="b3-button b3-button--outline" disabled={loading} onclick={() => void refresh()}>重新加载</button>
         </div>
-    {:else if loading}
+    {:else if loading && (people.length === 0 || filtered.length === 0)}
         <div class="lvct-people__skeleton" aria-busy="true" aria-label="联系人加载中">
             {#each Array(6) as _, index (index)}
                 <div class="lvct-people__skeleton-card">
