@@ -116,6 +116,13 @@ export interface AvRenderResult {
     };
 }
 
+/**
+ * 思源属性视图的单页上限。renderAttributeView 在 pageSize < 1 时会回退到
+ * 视图默认页大小（通常是 50），因此不能再用 pageSize=-1 表示“全部”。
+ * 全量读取由 renderView 通过这个上限分页汇总完成。
+ */
+const ATTRIBUTE_VIEW_PAGE_SIZE = 500;
+
 function decodeAvRenderResult(route: string, data: unknown): AvRenderResult {
     const result = assertKernelRecord(route, data);
     const view = assertKernelRecord(route, result.view);
@@ -181,12 +188,86 @@ export async function renderView(
     createIfNotExist: boolean = false,
     options: Pick<RenderPageOptions, "signal" | "dedupe"> = {},
 ): Promise<AvRenderResult> {
+    const firstPage = await requestRenderViewPage(
+        avId,
+        dbBlockId,
+        query,
+        1,
+        ATTRIBUTE_VIEW_PAGE_SIZE,
+        createIfNotExist,
+        options,
+    );
+    const rows = new Map(firstPage.view.rows.map((row) => [row.id, row]));
+    const rawRowCount = firstPage.view.rowCount;
+    const declaredRowCount = typeof rawRowCount === "number" && Number.isSafeInteger(rawRowCount) && rawRowCount >= 0
+        ? rawRowCount
+        : undefined;
+
+    // rowCount 是过滤后的总行数；没有 rowCount 的旧响应只能按短页结束。
+    // 真实思源 3.8.x 会返回 rowCount，有总数时即使服务端将 500 降级成 50
+    // 也会继续跨页；无总数时无法可靠区分“代理限页”和“已到末尾”。
+    let page = 2;
+    while ((declaredRowCount !== undefined && rows.size < declaredRowCount)
+        || (declaredRowCount === undefined && firstPage.view.rows.length >= ATTRIBUTE_VIEW_PAGE_SIZE)) {
+        const result = await requestRenderViewPage(
+            avId,
+            dbBlockId,
+            query,
+            page,
+            ATTRIBUTE_VIEW_PAGE_SIZE,
+            false,
+            options,
+        );
+        const before = rows.size;
+        for (const row of result.view.rows) rows.set(row.id, row);
+        if (result.view.rows.length === 0) {
+            if (declaredRowCount !== undefined && rows.size < declaredRowCount) {
+                throw new KernelProtocolError(
+                    "/api/av/renderAttributeView",
+                    `分页读取属性视图不完整（已读取 ${rows.size}/${declaredRowCount} 行）`,
+                );
+            }
+            break;
+        }
+        if (rows.size === before) {
+            if (declaredRowCount === undefined) break;
+            throw new KernelProtocolError(
+                "/api/av/renderAttributeView",
+                `分页读取属性视图未前进（第 ${page} 页未返回新行）`,
+            );
+        }
+        if (declaredRowCount !== undefined && rows.size > declaredRowCount) {
+            throw new KernelProtocolError(
+                "/api/av/renderAttributeView",
+                `分页读取属性视图超过声明总数（已读取 ${rows.size}/${declaredRowCount} 行）`,
+            );
+        }
+        if (declaredRowCount === undefined && result.view.rows.length < ATTRIBUTE_VIEW_PAGE_SIZE) break;
+        page += 1;
+        // 防止损坏的 rowCount 让读取请求无限增长。
+        if (page > 100_000) throw new KernelProtocolError("/api/av/renderAttributeView", "分页读取属性视图超过安全页数");
+    }
+
+    return { view: { ...firstPage.view, rows: [...rows.values()], ...(declaredRowCount !== undefined ? { rowCount: declaredRowCount } : {}) } };
+}
+
+/** 单页渲染请求。createIfNotExist 只在首次请求使用，后续页不能重复建库。 */
+async function requestRenderViewPage(
+    avId: string,
+    dbBlockId: string,
+    query: string,
+    page: number,
+    pageSize: number,
+    createIfNotExist: boolean,
+    options: Pick<RenderPageOptions, "signal" | "dedupe">,
+): Promise<AvRenderResult> {
     try {
         return await kernelPost("/api/av/renderAttributeView", {
             id: avId,
             blockID: dbBlockId,
             query,
-            pageSize: -1,
+            page,
+            pageSize,
             createIfNotExist,
         }, {
             signal: options.signal,
