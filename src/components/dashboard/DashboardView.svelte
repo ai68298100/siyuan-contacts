@@ -850,8 +850,11 @@
                         <div class="lvct-dash__row lvct-dash__action-row">
                             <button class="lvct-dash__row-main" onclick={() => onOpenDetail(card.person)}>
                                 <span class="lvct-dash__row-primary">
+                                    <span class="lvct-dash__person-avatar" data-group={card.person.group || "未分组"}>
+                                        {card.person.name.slice(0, 1)}
+                                    </span>
                                     <b>{card.person.name}</b>
-                                    <PersonProfileSummary profile={card.person.profile} compact />
+                                    <PersonProfileSummary profile={card.person.profile} compact hideEmpty />
                                 </span>
                                 <span class="lvct-dash__reasons">
                                     {#each card.reasons as reason (reason.kind + (reason.followUpId ?? ""))}
@@ -963,20 +966,32 @@
                 {:else}
                     <div class="lvct-dash__list">
                         {#each previewList(data?.birthdays ?? [], showAllBirthdays, BIRTHDAY_PREVIEW_LIMIT) as item (item.person.itemId)}
-                            <div class="lvct-dash__row">
+                            <div class="lvct-dash__row lvct-dash__row--contact">
                                 <button type="button" class="lvct-dash__row-main" onclick={() => onOpenDetail(item.person)}>
-                                    <b>{item.person.name}</b>
-                                    <PersonProfileSummary profile={item.person.profile} compact />
-                                    <span class="ft__smaller ft__on-surface">
-                                        {#if item.person.isLunar}
-                                            {item.projection.label}（农历 · 对应公历 {item.projection.date.toLocaleDateString("zh-CN")}）
-                                        {:else}
-                                            {item.projection.label}（公历）
-                                        {/if}
+                                    <span class="lvct-dash__person-avatar" data-group={item.person.group || "未分组"}>
+                                        {item.person.name.slice(0, 1)}
                                     </span>
-                                    <span class="lvct-bucket {bucketStyles[item.bucket]}">
-                                        {item.projection.daysUntil === 0 ? text("dashFuToday", "今天") : text("dashDaysUntilN", "{n}天", { n: item.projection.daysUntil })}
-                                    </span>
+                                    <div class="lvct-dash__person-info">
+                                        <div class="lvct-dash__person-header">
+                                            <b>{item.person.name}</b>
+                                            {#if item.person.group}
+                                                <span class="lvct-chip lvct-chip--group">{item.person.group}</span>
+                                            {/if}
+                                            <PersonProfileSummary profile={item.person.profile} compact hideEmpty />
+                                        </div>
+                                        <div class="lvct-dash__person-sub">
+                                            <span class="ft__smaller ft__on-surface">
+                                                {#if item.person.isLunar}
+                                                    {item.projection.label}（农历 · 对应公历 {item.projection.date.toLocaleDateString("zh-CN")}）
+                                                {:else}
+                                                    {item.projection.label}（公历）
+                                                {/if}
+                                            </span>
+                                            <span class="lvct-bucket {bucketStyles[item.bucket]}">
+                                                {item.projection.daysUntil === 0 ? text("dashFuToday", "今天") : text("dashDaysUntilN", "{n}天", { n: item.projection.daysUntil })}
+                                            </span>
+                                        </div>
+                                    </div>
                                 </button>
                                 <button
                                     type="button"
@@ -1023,14 +1038,26 @@
                 {:else}
                     <div class="lvct-dash__list">
                         {#each previewList(data?.stale ?? [], showAllStale, STALE_PREVIEW_LIMIT) as item (item.person.itemId)}
-                            <div class="lvct-dash__row">
+                            <div class="lvct-dash__row lvct-dash__row--contact">
                                 <button class="lvct-dash__row-main" onclick={() => onOpenDetail(item.person)}>
-                                    <b>{item.person.name}</b>
-                                    <PersonProfileSummary profile={item.person.profile} compact />
-                                    <span class="ft__smaller ft__on-surface">
-                                        {item.lastDaysAgo === undefined ? text("dashNeverContacted", "从未互动") : text("dashDaysAgo", "{n} 天前", { n: item.lastDaysAgo })}
+                                    <span class="lvct-dash__person-avatar" data-group={item.person.group || "未分组"}>
+                                        {item.person.name.slice(0, 1)}
                                     </span>
-                                    <span class="lvct-bucket lvct-bucket--stale">{text("dashReachOut", "联系一下")}</span>
+                                    <div class="lvct-dash__person-info">
+                                        <div class="lvct-dash__person-header">
+                                            <b>{item.person.name}</b>
+                                            {#if item.person.group}
+                                                <span class="lvct-chip lvct-chip--group">{item.person.group}</span>
+                                            {/if}
+                                            <PersonProfileSummary profile={item.person.profile} compact hideEmpty />
+                                        </div>
+                                        <div class="lvct-dash__person-sub">
+                                            <span class="ft__smaller ft__on-surface">
+                                                {item.lastDaysAgo === undefined ? text("dashNeverContacted", "从未互动") : text("dashDaysAgo", "{n} 天前", { n: item.lastDaysAgo })}
+                                            </span>
+                                            <span class="lvct-bucket lvct-bucket--stale">{text("dashReachOut", "联系一下")}</span>
+                                        </div>
+                                    </div>
                                 </button>
                                 {#if quickPersonId === item.person.itemId}
                                     <div class="lvct-dash__quick-form">

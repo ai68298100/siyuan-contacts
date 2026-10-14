@@ -50,6 +50,27 @@
     .lvct-profile-summary div { display: flex; gap: 8px; margin: 4px 0; }
     .lvct-profile-summary dt { flex: 0 0 84px; color: var(--lvct-text-3); }
     .lvct-profile-summary dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-    .lvct-profile-summary--compact { display: block; margin: 4px 0; }
-    .lvct-profile-summary--compact > span { display: block; overflow-wrap: anywhere; }
+    .lvct-profile-summary--compact {
+        display: inline-flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 4px;
+        max-width: 100%;
+        margin: 2px 0;
+        vertical-align: middle;
+    }
+    .lvct-profile-summary--compact > span {
+        display: inline-flex;
+        align-items: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 180px;
+        font-size: 11px;
+        line-height: 1.4;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: color-mix(in srgb, var(--lvct-accent) 8%, var(--lvct-bg-app));
+        color: var(--lvct-text-2);
+    }
 </style>

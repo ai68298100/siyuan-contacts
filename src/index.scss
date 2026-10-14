@@ -4946,8 +4946,96 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
         flex-shrink: 0;
     }
 
-    span:nth-child(2) {
+    > span:nth-child(2):not(.lvct-dash__person-avatar) {
         flex: 1;
+    }
+}
+
+.lvct-dash__row--contact {
+    padding: 8px 10px;
+    gap: 10px;
+
+    .lvct-dash__row-main {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+.lvct-dash__person-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #ffffff;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--lvct-accent) 80%, #ffffff 20%), var(--lvct-accent));
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-accent) 24%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+
+    &[data-group="家人"] {
+        background: linear-gradient(135deg, #f472b6, var(--lvct-group-family));
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-family) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    &[data-group="朋友"] {
+        background: linear-gradient(135deg, #34d399, var(--lvct-group-friend));
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-friend) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    &[data-group="同事"] {
+        background: linear-gradient(135deg, #60a5fa, var(--lvct-group-work));
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-work) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    &[data-group="同学"] {
+        background: linear-gradient(135deg, #fbbf24, var(--lvct-group-school));
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-school) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    &[data-group="其他"] {
+        background: linear-gradient(135deg, #94a3b8, var(--lvct-group-other));
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-other) 25%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+}
+
+.lvct-dash__person-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+}
+
+.lvct-dash__person-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-width: 0;
+
+    b {
+        font-size: 13.5px;
+        font-weight: 650;
+        color: var(--lvct-text-1);
+        white-space: nowrap;
+    }
+}
+
+.lvct-dash__person-sub {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 11.5px;
+    color: var(--lvct-text-3);
+
+    .lvct-bucket {
+        padding: 1px 7px;
+        font-size: 10.5px;
+        font-weight: 600;
+        border-radius: var(--lvct-r-pill);
     }
 }
 
