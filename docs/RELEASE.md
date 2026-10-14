@@ -4,7 +4,7 @@
 
 > v0.5.7 已发布：提交 f8d7c76 已推送至 dev/thispc-1010-org-affiliations，annotated tag、GitHub Release 与附件校验均已完成。 [GitHub Release v0.5.7](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.7)
 
-> v0.5.8 发布准备中：本轮修复 Issue #29–#32，版本号、README、变更日志和发布说明已更新。
+> v0.5.8 已发布：提交 `7416531` 已推送至 `dev/thispc-1010-org-affiliations`，annotated tag、GitHub Release 与附件校验均已完成。 [GitHub Release v0.5.8](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.8)
 
 ## v0.5.8 本轮状态
 
@@ -12,7 +12,8 @@
 - [x] README、README.en-US、CHANGELOG、PROGRESS 与 v0.5.8 发布说明已更新
 - [x] Issue #29–#32 已修复、评论并关闭
 - [x] `pnpm check`、`pnpm test` 594/594、桌面 UI 378/378、移动 UI 378/378
-- [ ] `pnpm build`、`pnpm check:release`、推送、annotated tag、GitHub Release 与附件校验
+- [x] `pnpm build`、`pnpm check:release`、推送、annotated tag、GitHub Release 与附件校验
+- [x] `package.zip` 575,158 B，SHA-256 `528768fcbbbd19570bf7bc02f352769b85ff508f6ef082db074b3938aeb2c790`
 
 ## v0.5.7 本轮状态
 
