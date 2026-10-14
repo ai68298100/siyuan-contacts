@@ -4,7 +4,7 @@
  */
 import { KernelPermissionError, KernelResponseError, listNotebooks, newNodeId } from "../api/client";
 import { documentHPath } from "../domain/format";
-import { bindDocsAsRows, mapBoundDocIds, renderView, renderViewPage, setCell, unbindRows } from "../api/av";
+import { ATTRIBUTE_VIEW_BATCH_SIZE, bindDocsAsRows, mapBoundDocIds, renderView, renderViewPage, setCell, unbindRows } from "../api/av";
 import type { AvRenderResult, CellValue } from "../api/av";
 import { CONTACT_DRAFT_ATTR, listNotebookDocs, NOTEBOOK_DOC_PAGE_SIZE, readMarkedBlocks, readNotebookDocument } from "../api/blocks";
 import { ensurePersonRequestDocument } from "./person-document";
@@ -714,8 +714,8 @@ export async function discoverImportCandidates(
 
 /**
  * 批量收编：绑行为联系人（文档标题即主键显示名）。返回成功数。
- * 性能：先一次批量映射过滤已绑定，再按 200/批合并绑定——
- * 500 篇文档 = 1 次映射 + 3 次绑定，而不是 1500 次逐个调用。
+ * 性能：先按兼容批次映射过滤已绑定，再按同一批次合并绑定；
+ * 批量大小由 api/av.ts 统一控制，避免宿主只处理请求前缀而静默漏项。
  */
 export async function adoptDocs(
     settings: ContactsSettings,
@@ -726,9 +726,8 @@ export async function adoptDocs(
     const unbound = await withStoreLock(contactWriteLock(settings), async () => {
         const boundMap = await mapBoundDocIds(settings.avId, candidates.map((candidate) => candidate.docId));
         const pending = candidates.filter((candidate) => !boundMap[candidate.docId]);
-        const CHUNK = 200;
-        for (let start = 0; start < pending.length; start += CHUNK) {
-            const chunk = pending.slice(start, start + CHUNK);
+        for (let start = 0; start < pending.length; start += ATTRIBUTE_VIEW_BATCH_SIZE) {
+            const chunk = pending.slice(start, start + ATTRIBUTE_VIEW_BATCH_SIZE);
             await bindDocsAsRows(settings.avId, settings.dbBlockId, chunk.map((candidate) => ({ id: candidate.docId, content: candidate.name })));
         }
         if (pending.length === 0) return [] as ImportCandidate[];

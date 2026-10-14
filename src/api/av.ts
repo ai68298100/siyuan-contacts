@@ -335,21 +335,42 @@ export interface BindRowSource {
     content: string;
 }
 
-/** 把文档绑定为行（isDetached: false）。内核不返回 itemID，需要随后 mapBoundDocIds 或渲染换算 */
+/**
+ * 属性视图批量请求的兼容上限。
+ *
+ * 思源 3.8.x 的端点没有在契约中声明 srcs/blockIDs 的最大长度；部分版本和
+ * 宿主代理会接受请求但只处理前一段数据。统一按 50 条拆分，避免“大批量
+ * 请求返回成功、实际只落库一部分”的静默丢失。写入仍然不自动重试，调用方
+ * 必须通过 mapBoundDocIds 回读核实结果。
+ */
+export const ATTRIBUTE_VIEW_BATCH_SIZE = 50;
+
+/** 把文档绑定为行（isDetached: false）。内核不返回 itemID，需要随后 mapBoundDocIds 或渲染换算。 */
 export async function bindDocsAsRows(avId: string, dbBlockId: string, srcs: readonly BindRowSource[]): Promise<void> {
-    await kernelPost<unknown>("/api/av/addAttributeViewBlocks", {
-        avID: avId,
-        blockID: dbBlockId,
-        srcs: srcs.map((src) => ({ id: src.id, isDetached: false, content: src.content })),
-    });
+    const unique = [...new Map(srcs.map((src) => [src.id, src])).values()];
+    for (let start = 0; start < unique.length; start += ATTRIBUTE_VIEW_BATCH_SIZE) {
+        const chunk = unique.slice(start, start + ATTRIBUTE_VIEW_BATCH_SIZE);
+        await kernelPost<unknown>("/api/av/addAttributeViewBlocks", {
+            avID: avId,
+            blockID: dbBlockId,
+            srcs: chunk.map((src) => ({ id: src.id, isDetached: false, content: src.content })),
+        });
+    }
 }
 
 /** 绑定文档 ID → 行 itemID 的官方换算端点 */
 export async function mapBoundDocIds(avId: string, docIds: readonly string[]): Promise<Record<string, string>> {
-    return kernelPost("/api/av/getAttributeViewItemIDsByBoundIDs", {
-        avID: avId,
-        blockIDs: docIds,
-    }, { decode: (data) => decodeStringMap("/api/av/getAttributeViewItemIDsByBoundIDs", data) });
+    const unique = [...new Set(docIds)];
+    const mapped: Record<string, string> = {};
+    for (let start = 0; start < unique.length; start += ATTRIBUTE_VIEW_BATCH_SIZE) {
+        const chunk = unique.slice(start, start + ATTRIBUTE_VIEW_BATCH_SIZE);
+        const part = await kernelPost("/api/av/getAttributeViewItemIDsByBoundIDs", {
+            avID: avId,
+            blockIDs: chunk,
+        }, { decode: (data) => decodeStringMap("/api/av/getAttributeViewItemIDsByBoundIDs", data) });
+        Object.assign(mapped, part);
+    }
+    return mapped;
 }
 
 /** 解绑行（绑定行只解绑，不删文档——spike 假设⑥） */

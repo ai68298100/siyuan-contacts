@@ -44,7 +44,7 @@ export async function scanImportCandidates(
                 && (!keyword || row.content.toLowerCase().includes(keyword) || row.hpath.toLowerCase().includes(keyword)));
             const ids = eligible.map((row) => row.id);
             const bindings: Record<string, string> = {};
-            for (let offset = 0; offset < ids.length; offset += 200) Object.assign(bindings, await mapBoundDocIds(settings.avId, ids.slice(offset, offset + 200)));
+            Object.assign(bindings, await mapBoundDocIds(settings.avId, ids));
             const unbound = ids.filter((docId) => !bindings[docId]);
             const orgs = unbound.length ? await querySql<{ root_id: unknown }>(
                 `SELECT DISTINCT root_id FROM blocks WHERE root_id IN (${unbound.map((docId) => `'${docId}'`).join(",")}) AND ial LIKE '%custom-lvct-org="%'`,
