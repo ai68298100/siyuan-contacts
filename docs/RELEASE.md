@@ -2,7 +2,7 @@
 
 > v0.5.6 已发布：PR #27 已普通合并至 `main`，合并提交 `449f7722859c547aeb93f2048506ef5786c767fb`；annotated tag、GitHub Release 和附件下载校验均已完成。
 
-> v0.5.7 发布准备中：本轮完成设计令牌收敛、原型与交付文档同步，待最终门禁通过后创建 GitHub Release。
+> v0.5.7 已发布：提交 f8d7c76 已推送至 dev/thispc-1010-org-affiliations，annotated tag、GitHub Release 与附件校验均已完成。 [GitHub Release v0.5.7](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.7)
 
 ## v0.5.7 本轮状态
 
@@ -10,7 +10,7 @@
 - [x] README、README.en-US、CHANGELOG、PROGRESS 与 v0.5.7 发布说明已更新
 - [x] 令牌审计基线与收敛后数据已保存，报告给出覆盖率和硬编码变化
 - [x] pnpm check、pnpm test 591/591、桌面 UI 373/373、移动 UI 373/373、pnpm build、pnpm check:release、git diff --check
-- [ ] 推送当前分支并创建 annotated tag v0.5.7 与 GitHub Release，附件上传后复核 SHA-256（本地 package.zip 572,221 B，SHA-256 ff17a1ada80333a5e4b916b9df8131e06fd42cad34475d107969dac493d443ab）
+- [x] 推送当前分支并创建 annotated tag v0.5.7 与 GitHub Release，附件上传后复核 SHA-256（package.zip 572,221 B，SHA-256 ff17a1ada80333a5e4b916b9df8131e06fd42cad34475d107969dac493d443ab）
 - [ ] 真实思源宿主、Android 真机、原生图入口、任务管理器互读、集市客户端可见性和 CardDAV 在线同步仍需单独验收
 
 ## v0.5.6 本轮状态
