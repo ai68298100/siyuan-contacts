@@ -890,7 +890,7 @@
                             {/if}
                             <label><span>{text("orgAffiliationKind", "归属分类")}</span>
                                 <select class="b3-select fn__block" bind:value={addAffiliationKind} disabled={busy || !!memberError || !!rosterError || rosterLoading || selectionGuardBusy || !!editingMemberId || !!replacingMemberId || !!removingMemberId || !!movingMemberId || renaming} aria-label={text("orgAffiliationKind", "归属分类")}>
-                                    <option value="family">{affiliationLabel("family")}</option><option value="unspecified">{affiliationLabel("unspecified")}</option><option value="work">{affiliationLabel("work")}</option><option value="education">{affiliationLabel("education")}</option>
+                                    <option value="work">{affiliationLabel("work")}</option><option value="education">{affiliationLabel("education")}</option><option value="family">{affiliationLabel("family")}</option><option value="unspecified">{affiliationLabel("unspecified")}</option>
                                 </select></label>
                             <label><span>{text("orgMemberDeptLabel", "部门")}</span>
                                 <input class="b3-text-field fn__block" bind:value={addDepartment} disabled={busy || !!memberError || !!rosterError || rosterLoading || selectionGuardBusy || !!editingMemberId || !!replacingMemberId || !!removingMemberId || !!movingMemberId || renaming}
@@ -950,10 +950,10 @@
                                                     aria-label={text("orgMemberTitleLabel", "职位")} /></label>
                                             <label>{text("orgAffiliationKind", "归属分类")}
                                                 <select class="b3-select fn__block" bind:value={replacementAffiliationKind} disabled={busy} aria-label={text("orgAffiliationKind", "归属分类")}>
-                                                    <option value="family">{affiliationLabel("family")}</option>
-                                                    <option value="unspecified">{affiliationLabel("unspecified")}</option>
                                                     <option value="work">{affiliationLabel("work")}</option>
                                                     <option value="education">{affiliationLabel("education")}</option>
+                                                    <option value="family">{affiliationLabel("family")}</option>
+                                                    <option value="unspecified">{affiliationLabel("unspecified")}</option>
                                                 </select></label>
                                             <label>{text("orgMemberFormerLeftLabel", "原成员离开日期")}
                                                 <input class="b3-text-field fn__block" type="date" bind:value={replacementLeftOn} disabled={busy}
@@ -1013,10 +1013,10 @@
                                             <label><span>{text("orgMemberNote", "成员备注")}</span><input class="b3-text-field fn__block" maxlength="240" bind:value={editNote} disabled={busy} placeholder={text("orgMemberNotePlaceholder", "仅记录这段组织经历")} /></label>
                                             <label>{text("orgAffiliationKind", "归属分类")}
                                                 <select class="b3-select fn__block" bind:value={editAffiliationKind} disabled={busy} aria-label={text("orgAffiliationKind", "归属分类")}>
-                                                    <option value="family">{affiliationLabel("family")}</option>
-                                                    <option value="unspecified">{affiliationLabel("unspecified")}</option>
                                                     <option value="work">{affiliationLabel("work")}</option>
                                                     <option value="education">{affiliationLabel("education")}</option>
+                                                    <option value="family">{affiliationLabel("family")}</option>
+                                                    <option value="unspecified">{affiliationLabel("unspecified")}</option>
                                                 </select></label>
                                                 <p class="ft__smaller ft__on-surface">{currentOrg?.archived ? "该组织已归档，不能新增或恢复当前归属；可维护现存记录并保留历史。" : text("orgMembershipEditImpact", "保存会更新这段成员记录及双方当前双链；离开保留历史。恢复在职/在学须清空离开日期。")}</p>
                                             <div class="fn__flex" style="gap: 8px;">

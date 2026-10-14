@@ -542,7 +542,7 @@
                                 </div>
                                 {#if editingMembershipId === membership.id}
                                     <div class="lvct-form__grid lvct-person-edit__org-edit">
-                                        <label class="lvct-form__item"><span>归属分类</span><select class="b3-select fn__block" bind:value={editingOrgKind} disabled={profileBusy}><option value="family">家庭</option><option value="unspecified">其他组织</option><option value="work">工作单位</option><option value="education">学校</option></select></label>
+                                        <label class="lvct-form__item"><span>归属分类</span><select class="b3-select fn__block" bind:value={editingOrgKind} disabled={profileBusy}><option value="work">工作单位</option><option value="education">学校</option><option value="family">家庭</option><option value="unspecified">其他组织</option></select></label>
                                         <label class="lvct-form__item"><span>当前状态</span><select class="b3-select fn__block" value={editingOrgStatus} onchange={(event) => changeEditingOrgStatus(event.currentTarget.value as OrgMembershipStatus)} disabled={profileBusy}><option value="active" disabled={membership.archived}>当前在职/就读</option><option value="former">已离开/毕业</option></select></label>
                                         <label class="lvct-form__item"><span>自定义状态</span><input class="b3-text-field fn__block" maxlength="40" bind:value={editingOrgStatusLabel} disabled={profileBusy} placeholder="例如：实习、兼职、休学" /></label>
                                         <label class="lvct-form__item"><span>{text("orgMemberNote", "成员备注")}</span><input class="b3-text-field fn__block" maxlength="240" bind:value={editingOrgNote} disabled={profileBusy} placeholder={text("orgMemberNotePlaceholder", "仅记录这段组织经历")} /></label>
@@ -559,7 +559,7 @@
                     {#if otherOrgOpen}
                     <div class="lvct-form__grid">
                         <label class="lvct-form__item"><span>新增组织</span><select class="b3-select fn__block" value={selectedOrgDocId} onchange={(event) => changeSelectedOrg(event.currentTarget.value)} disabled={profileBusy || availableOrgCandidates.length === 0}><option value="">选择组织…</option>{#each availableOrgCandidates as org (org.docId)}<option value={org.docId}>{org.name}{org.archived ? "（已归档，仅补录历史）" : ""}</option>{/each}</select></label>
-                        <label class="lvct-form__item"><span>归属分类</span><select class="b3-select fn__block" bind:value={selectedOrgKind} disabled={profileBusy || !selectedOrgDocId}><option value="family">家庭</option><option value="unspecified">其他组织</option><option value="work">工作单位</option><option value="education">学校</option></select></label>
+                        <label class="lvct-form__item"><span>归属分类</span><select class="b3-select fn__block" bind:value={selectedOrgKind} disabled={profileBusy || !selectedOrgDocId}><option value="work">工作单位</option><option value="education">学校</option><option value="family">家庭</option><option value="unspecified">其他组织</option></select></label>
                         <label class="lvct-form__item"><span>当前状态</span><select class="b3-select fn__block" value={selectedOrgStatus} onchange={(event) => changeSelectedOrgStatus(event.currentTarget.value as OrgMembershipStatus)} disabled={profileBusy || !selectedOrgDocId}><option value="active" disabled={Boolean(selectedOrgCandidate?.archived)}>当前在职/就读</option><option value="former">已离开/毕业</option></select></label>
                         <label class="lvct-form__item"><span>自定义状态</span><input class="b3-text-field fn__block" maxlength="40" bind:value={selectedOrgStatusLabel} disabled={profileBusy || !selectedOrgDocId} placeholder="例如：实习、兼职、休学" /></label>
                         <label class="lvct-form__item"><span>部门/院系</span><input class="b3-text-field fn__block" bind:value={selectedOrgDepartment} disabled={profileBusy || !selectedOrgDocId} /></label>
@@ -628,11 +628,11 @@
         {#if failedFields.length > 0}
             <button class="b3-button b3-button--outline" onclick={retryFailed} disabled={running || !groupValid}>{text("formRetryFailed", "核实并重试未完成字段")}</button>
         {/if}
-        <button class="b3-button b3-button--text" onclick={submit} disabled={running || !groupValid}>
+        <button class="b3-button b3-button--primary" onclick={submit} disabled={running || !groupValid}>
             {running ? text("formSaving", "保存中…") : text("formSave", "保存")}
         </button>
     </div>
-    <p class="ft__smaller ft__on-surface lvct-form__hint">{text("formEditHint", "留空即清空对应字段；姓名在思源里改文档名即可。")}</p>
+    <p class="ft__smaller ft__on-surface lvct-form__hint">{text("formEditHint", "留空将清除该字段；如需修改姓名，重命名对应的人物文档即可。")}</p>
 </div>
 
 {#if quickFillOpen}

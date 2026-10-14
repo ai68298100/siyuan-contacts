@@ -1,6 +1,19 @@
 # 发布清单（RELEASE）
 
-> v0.5.9 本轮发布：聚焦现代高级 UI 质感深度重塑，全面提升视觉深度、排版层次、触感动效与跨端一致性。 [GitHub Release v0.5.9](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.9)
+> v0.5.10 本轮发布：修复首页久未联系排版问题，全面梳理新建、编辑与组织管理等核心页面的文字与表单选项合理性。 [GitHub Release v0.5.10](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.10)
+
+## v0.5.10 本轮状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.10
+- [x] README、README.en-US、CHANGELOG 与 v0.5.10 发布说明已更新
+- [x] 彻底根除久未联系文字挤压竖排缺陷，优化紧凑资料摘要单行防换行与平滑省略
+- [x] 久未联系与近期生日列表重构为“主信息层 + 状态/行动层”现代双层卡片排版，增加 32px Squircle 渐变微头像
+- [x] 新建与编辑弹窗保存动作升级为实色高光主按钮，表单提示语去技术化，组织归属分类按高频直觉排序
+- [x] `pnpm check`、`pnpm test` 594/594、桌面 UI 378/378、移动 UI 378/378 全部通过
+- [x] `pnpm build`、`pnpm check:release` 通过
+- [x] `package.zip` 580,794 B，SHA-256 `1eed20907102bb80bab1205ac33f6424a0f8eb1eb4233dc097f13fec20bd030c`
+
+> v0.5.9 已发布：提交 `35df172` 已推送至 `dev/thispc-1010-org-affiliations`，annotated tag、GitHub Release 与附件校验均已完成。 [GitHub Release v0.5.9](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.9)
 
 ## v0.5.9 本轮状态
 

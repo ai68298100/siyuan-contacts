@@ -360,7 +360,7 @@
             </button>
             {#if extraOpen}
                 <div id="lvct-contact-extra-body" class="lvct-form__optional-body">
-                    <p id="lvct-contact-extra-title" class="ft__smaller ft__on-surface">姓名是唯一必填项；组织、关系和备注可在创建后继续修改。</p>
+                    <p id="lvct-contact-extra-title" class="ft__smaller ft__on-surface">姓名是必填项，组织、称谓和备注可在创建后随时在联系人详情中修改。</p>
                     {#if onLoadOrgCandidates}
                         <div class="lvct-form__actions"><b>组织经历（可选，可添加多条）</b><button type="button" class="b3-button b3-button--outline" onclick={() => orgAffiliations = [...orgAffiliations, emptyOrgAffiliation()]} disabled={running || extraLoading}>添加组织经历</button></div>
                         {#each orgAffiliations as affiliation, index (index)}
@@ -369,7 +369,7 @@
                                     <option value="">{extraLoading ? "读取组织中…" : "选择组织…"}</option>{#each orgCandidates as org (org.docId)}<option value={org.docId}>{org.name}{org.archived ? "（已归档，仅补录历史）" : ""}</option>{/each}
                                 </select></label>
                                 <label class="lvct-form__item"><span>归属分类</span><select class="b3-select fn__block" value={affiliation.orgAffiliationKind} onchange={(event) => patchOrgAffiliation(index, { orgAffiliationKind: event.currentTarget.value as ContactOrgAffiliationDraft["orgAffiliationKind"] })} disabled={running || !affiliation.orgDocId}>
-                                    <option value="family">家庭</option><option value="unspecified">其他组织</option><option value="work">工作单位</option><option value="education">学校</option>
+                                    <option value="work">工作单位</option><option value="education">学校</option><option value="family">家庭</option><option value="unspecified">其他组织</option>
                                 </select></label>
                                 <label class="lvct-form__item"><span>状态</span><select class="b3-select fn__block" value={affiliation.orgStatus} onchange={(event) => changeOrgStatus(index, event.currentTarget.value as ContactOrgAffiliationDraft["orgStatus"])} disabled={running || !affiliation.orgDocId}>
                                     <option value="active" disabled={Boolean(orgCandidates.find((org) => org.docId === affiliation.orgDocId)?.archived)}>当前在职/就读</option><option value="former">已离开/毕业</option>
@@ -466,12 +466,12 @@
 
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={running}>{text("formCancel", "取消")}</button>
-        <button class="b3-button b3-button--text" onclick={submit} disabled={running || !groupValid || !!currentPreview && !creationRequest && !creationChoice}>
+        <button class="b3-button b3-button--primary" onclick={submit} disabled={running || !groupValid || !!currentPreview && !creationRequest && !creationChoice}>
             {running ? text("formCreating", "创建中…") : creationRequest ? text("contactContinueCreation", "核实并继续原请求") : text("formCreate", "创建联系人")}
         </button>
     </div>
     <p class="ft__smaller ft__on-surface lvct-form__hint">
-        {text("formCreateHint", "将创建文档「{name}」并绑定为数据库一行；同名候选须核对后选择具体文档或独立人物。", { name: draft.name || "…" })}
+        {text("formCreateHint", "将在人脉笔记本中创建「{name}」文档并建立档案卡片；同名候选须核对后选择具体文档或独立人物。", { name: draft.name || "…" })}
     </p>
 </div>
 

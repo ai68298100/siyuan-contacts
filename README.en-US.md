@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.9** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.9) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.10** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.10) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -20,6 +20,23 @@ English | [简体中文](README.md)
 ---
 
 Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
+
+## What's new in v0.5.10
+
+This patch release resolves vertical text compression in the stale-contacts dashboard and streamlines form wording and option hierarchies across creation, editing, and organization workflows.
+
+Fixed: stale contacts layout and text compression
+
+- Eliminated vertical single-character text squeezing caused by unconfigured profile fields in narrow flex containers; compact profile summaries now enforce single-line layout and smooth truncation.
+- Redesigned stale-contacts and upcoming-birthdays lists into modern two-tier card rows with 32px Squircle soft-gradient avatars mapped to five relationship groups.
+
+Improved: creation, edit, and organization form options
+
+- Upgraded primary save and creation buttons from text-only links to solid buttons with 1px top highlights and tactile micro-press feedback.
+- Refined form hint copy, removing internal implementation jargon in favor of natural product descriptions.
+- Reordered organization affiliation categories to match real-world frequency (Work, Education, Family, Other).
+
+Validation: `pnpm check` (0 errors / 0 warnings), 594 unit tests (100% pass), desktop/mobile UI regression 378/378 each, and release gates pass.
 
 ## What's new in v0.5.9
 
@@ -140,7 +157,7 @@ Each plugin is maintained independently and can be used on its own or alongside 
 
 Manual installation from GitHub Releases is currently recommended. The Marketplace submission has been merged, but availability in the client has not been verified on a real device.
 
-1. Download package.zip from the [v0.5.9 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.9).
+1. Download package.zip from the [v0.5.10 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.10).
 2. Extract its contents into data/plugins/siyuan-contacts/ in your SiYuan workspace. plugin.json must be at that directory root.
 3. Restart SiYuan and enable **Lv Contacts** under **Settings → Marketplace → Installed**.
 
@@ -161,7 +178,7 @@ The migration bundle is a JSON value snapshot with a preview and merge flow, not
 - The in-app English translation is incomplete, so some interface text may appear in Chinese.
 - CardDAV address-book sync and CalDAV calendar sync are not supported. Contacts can be exchanged using vCard files.
 
-See the [v0.5.9 release notes](docs/RELEASE-NOTES-v0.5.9.md) for validation scope; previous release notes remain available for v0.5.8, v0.5.7 and v0.5.6.
+See the [v0.5.10 release notes](docs/RELEASE-NOTES-v0.5.10.md) for validation scope; previous release notes remain available for v0.5.9, v0.5.8, v0.5.7 and v0.5.6.
 
 ## Quick start
 
