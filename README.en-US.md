@@ -29,7 +29,7 @@ This patch fixes a stale-read race in the exchange ledger.
 - Consecutive writes no longer hide an earlier confirmed record during the stale-read window.
 - Regression coverage now includes creation, consecutive writes, and status changes.
 
-Validation: `pnpm check`, 596 unit tests, desktop UI 381/381, and mobile/host-style UI 379/379 pass.
+Validation: `pnpm check`, 596 unit tests, and desktop/mobile/host-style UI 381/381 pass.
 
 ## Previous release: v0.5.14 (2026-10-16)
 

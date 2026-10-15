@@ -6,7 +6,7 @@
 
 - [x] `package.json` 与 `plugin.json` 版本统一为 0.5.15
 - [x] 往来账本创建/连续写入/状态变更陈旧回读修复
-- [x] `pnpm check`、`pnpm test` 596/596、桌面 UI 381/381、移动/宿主样式 UI 379/379
+- [x] `pnpm check`、`pnpm test` 596/596、桌面/移动/宿主样式 UI 381/381
 - [x] `pnpm build`、`pnpm check:release`、`git diff --check`
 - [x] 本地 `package.zip`：581,964 B；SHA-256 `c1a45de73b907ad2fc99f079dbe325bf1907821ad8d384f0c446d9176cd4529b`
 - [x] annotated tag `v0.5.15` 已推送；[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.15) 已创建
