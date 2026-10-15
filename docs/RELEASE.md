@@ -9,7 +9,8 @@
 - [x] `pnpm check`、`pnpm test` 596/596、桌面 UI 381/381、移动/宿主样式 UI 379/379
 - [x] `pnpm build`、`pnpm check:release`、`git diff --check`
 - [x] 本地 `package.zip`：581,964 B；SHA-256 `c1a45de73b907ad2fc99f079dbe325bf1907821ad8d384f0c446d9176cd4529b`
-- [ ] annotated tag、GitHub Release 与附件下载复核待完成
+- [x] annotated tag `v0.5.15` 已推送；[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.15) 已创建
+- [x] Release 附件下载复核一致：`package.zip` 581,964 B，SHA-256 `c1a45de73b907ad2fc99f079dbe325bf1907821ad8d384f0c446d9176cd4529b`
 - [ ] Issue #35 原始小米 VCF 未提供，不能确认 vCard 候选修复命中根因
 
 > v0.5.14 为 vCard 导入补丁版本：无名卡片逐卡跳过并继续处理后续有效卡。Issue #35 仍等待真实脱敏小米 VCF，候选修复未宣称为已确认根因。
