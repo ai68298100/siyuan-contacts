@@ -1,5 +1,18 @@
 # 发布清单（RELEASE）
 
+> v0.5.14 为 vCard 导入补丁版本：无名卡片逐卡跳过并继续处理后续有效卡。Issue #35 仍等待真实脱敏小米 VCF，候选修复未宣称为已确认根因。
+
+## v0.5.14 发布状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.14
+- [x] vCard 无名卡片逐卡跳过，整文件无有效卡片时明确失败
+- [x] `pnpm check`、`pnpm test` 596/596、桌面/移动 UI 378/378
+- [x] `pnpm build`、`pnpm check:release`、`git diff --check`
+- [ ] tag、GitHub Release 与附件下载复核（本地候选已生成，待推送）
+- [ ] Issue #35 原始小米 VCF 未提供，不能确认候选修复命中根因
+
+本地候选包：`package.zip` 581,455 B，SHA-256 `c3b55321df8b8dfeb36693e96b60783e1e9dec8de548f2b52a7d3c40f9cb319a`。
+
 > v0.5.13 已发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.13)。组织历史成员图谱、组织管理切换草稿、联系人文字对齐和 vCard 兼容性修复已通过隔离验证；#35 仍等待脱敏 VCF。
 
 ## v0.5.13 发布状态

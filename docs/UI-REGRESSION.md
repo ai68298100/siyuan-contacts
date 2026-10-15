@@ -1,5 +1,7 @@
 # UI 隔离回归
 
+> **2026-10-16 v0.5.14 候选回归：** vCard 无名卡片逐卡跳过并继续后续有效卡；`pnpm check` 0 errors / 0 warnings、`pnpm test` 596/596、桌面/移动 UI 378/378 通过。生产构建与发布门禁已通过；本地 package.zip 为 581,455 B，SHA-256 `c3b55321df8b8dfeb36693e96b60783e1e9dec8de548f2b52a7d3c40f9cb319a`。Issue #35 仍缺原始脱敏 VCF，候选修复未被证明命中小米文件根因。
+
 > **2026-10-15 v0.5.13 发布门禁：** `pnpm check` 0 errors / 0 warnings、`pnpm test` 596/596、桌面 UI 378/378、移动 UI 378/378、`pnpm build` 和 `pnpm check:release` 全部通过。C03 在移动运行中显式使用真实的“筛选与整理”抽屉路径；这修正了测试夹具，不代表 Android 真机或真实思源宿主验收。Issue #35 仍缺原始脱敏 VCF，vCard 兼容性补强未被证明命中该 issue。发布限制与产物见 [RELEASE](RELEASE.md)，任务顺序见 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md)。下方日期记录均为对应时点的历史回归结果。
 
 > **2026-10-10 v0.5.5 发布候选：** 新增本人组织编辑和相关人空关系读取回归；发布前完整结果以本轮命令输出为准。

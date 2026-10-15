@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.13** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.13) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.14** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.14) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -21,17 +21,15 @@ English | [简体中文](README.md)
 
 Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
 
-## This release: v0.5.13 (2026-10-15)
+## This release: v0.5.14 (2026-10-16)
 
-This patch closes the organization-history, organization-manager context, contact-list alignment, and vCard compatibility fixes.
+This patch fixes vCard imports stopping at a nameless card.
 
-- Organization graphs retain both active and former membership edges while keeping relationship queries separate.
-- Organization switching keeps the add-member editor stable during loading, preventing blank frames and stale notes.
-- Desktop contact cards and tables now use stable text baselines, line heights, and vertical alignment.
-- vCard import handles blank `FN`, UTF-8 BOM, and quoted-printable names with structured `N` fallback.
-- Issue #35 has no sanitized VCF sample yet, so this does not confirm the reported Xiaomi export's root cause.
+- Cards with both `FN` and `N` empty are skipped individually so later named cards can still be imported.
+- A file with no valid named cards still fails clearly and creates no empty contacts.
+- Issue #35 still lacks the original Xiaomi VCF, so the candidate format root cause remains unconfirmed.
 
-Validation: `pnpm check`, 596 unit tests, desktop/mobile UI 378/378, production build, and release gates pass.
+Validation: `pnpm check`, 596 unit tests, and desktop/mobile UI 378/378 pass.
 
 ## What's new in v0.5.12
 
@@ -173,7 +171,7 @@ Each plugin is maintained independently and can be used on its own or alongside 
 
 Manual installation from GitHub Releases is currently recommended. The Marketplace submission has been merged, but availability in the client has not been verified on a real device.
 
-1. Download package.zip from the latest stable [v0.5.13 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.13).
+1. Download package.zip from the latest stable [v0.5.14 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.14).
 2. Extract its contents into data/plugins/siyuan-contacts/ in your SiYuan workspace. plugin.json must be at that directory root.
 3. Restart SiYuan and enable **Lv Contacts** under **Settings → Marketplace → Installed**.
 
@@ -194,7 +192,7 @@ The migration bundle is a JSON value snapshot with a preview and merge flow, not
 - The in-app English translation is incomplete, so some interface text may appear in Chinese.
 - CardDAV address-book sync and CalDAV calendar sync are not supported. Contacts can be exchanged using vCard files.
 
-See the [v0.5.13 release notes](docs/RELEASE-NOTES-v0.5.13.md) for validation scope; previous release notes remain available for v0.5.12, v0.5.11, v0.5.10, v0.5.9 and v0.5.8.
+See the [v0.5.14 release notes](docs/RELEASE-NOTES-v0.5.14.md) for validation scope; previous release notes remain available for v0.5.13, v0.5.12, v0.5.11, v0.5.10, v0.5.9 and v0.5.8.
 
 ## Quick start
 
