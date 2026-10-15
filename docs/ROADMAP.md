@@ -5,7 +5,7 @@
 
 > 产品定位与已交付基线见 [产品愿景与后续开发总计划](PRODUCT-PLAN.md)，需求来源见 [用户反馈待办](FEEDBACK-BACKLOG.md)。当前执行顺序、任务状态和验收见 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md)；下文保留历史阶段与远期设计。
 
-> **2026-10-15 计划校准：** v0.5.12 已发布；最终发布包由 CI run 38748666687 生成并完成 Release 下载复核。Issue #35 缺少脱敏 VCF，不能确认该修复是否命中报告根因；C03 移动夹具已改为真实移动路径且桌面/移动隔离 UI 全量通过。本文继续承载产品取舍、调研候选和历史路线；原子任务状态与顺序唯一以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准，发布门禁以 [RELEASE](RELEASE.md) 和 [UI-REGRESSION](UI-REGRESSION.md) 为准。下一步：有隔离真实思源环境则推进 Host Queue `AG-HOST-003/006`；没有则先做 `AG-B13-007` 契约决策，不直接写运行时代码。`AG-SCALE-001` 保持 P2/partial，R54 视觉迁移仍需拆为带依赖和验收标准的原子任务卡。
+> **2026-10-15 计划校准：** v0.5.13 已发布；发布包与附件校验见 [RELEASE](RELEASE.md)。Issue #35 缺少脱敏 VCF，不能确认兼容性补强是否命中报告根因；#36–#40 已完成并关闭。本文继续承载产品取舍、调研候选和历史路线；原子任务状态与顺序唯一以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准，发布门禁以 [RELEASE](RELEASE.md) 和 [UI-REGRESSION](UI-REGRESSION.md) 为准。下一步：有隔离真实思源环境则推进 Host Queue `AG-HOST-003/006`；没有则先做 `AG-B13-007` 契约决策，不直接写运行时代码。`AG-SCALE-001` 保持 P2/partial，R54 视觉迁移仍需拆为带依赖和验收标准的原子任务卡。
 
 > **历史快照说明：** 下文按日期记录的 v0.3.0/v0.5.0 阶段路线、B11–B14 初始待办及产品候选，均保留为需求来源；它们不描述当前版本、当前任务状态或发布状态。
 

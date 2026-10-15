@@ -1,6 +1,6 @@
 # 下一阶段开发计划（历史规划与需求来源）
 
-> **2026-10-15 计划校准：** 当前稳定发布为 v0.5.12，最终 CI run 38748666687 全绿，发布包与附件校验见 [RELEASE](RELEASE.md) 和 [UI-REGRESSION](UI-REGRESSION.md)；任务状态和认领顺序唯一以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准。Issue [#35](https://github.com/ai68298100/siyuan-contacts/issues/35) 暂无脱敏 VCF，已发布的空白 `FN` 回退是否命中根因未知，保持开放；C03 移动夹具问题已解决并改用真实移动抽屉路径，全量桌面/移动 UI 均 378/378。下一项依赖宿主条件：有隔离真实思源环境时推进 `AG-HOST-003/006`；没有时先完成 `AG-B13-007` 契约决策。`AG-SCALE-001` 保持 P2/partial；R54 视觉迁移先拆出带依赖和验收条件的任务卡。下方按日期记录的计划和功能矩阵保留为需求来源与历史快照，不代表当前认领队列。
+> **2026-10-15 计划校准：** 当前稳定发布为 v0.5.13，发布包与附件校验见 [RELEASE](RELEASE.md) 和 [UI-REGRESSION](UI-REGRESSION.md)；任务状态和认领顺序唯一以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准。Issue [#35](https://github.com/ai68298100/siyuan-contacts/issues/35) 暂无脱敏 VCF，vCard 兼容性补强是否命中根因未知，保持开放；#36–#40 已完成并关闭。C03 移动夹具问题已解决，全量桌面/移动 UI 均 378/378。下一项依赖宿主条件：有隔离真实思源环境时推进 `AG-HOST-003/006`；没有时先完成 `AG-B13-007` 契约决策。`AG-SCALE-001` 保持 P2/partial；R54 视觉迁移先拆出带依赖和验收条件的任务卡。下方按日期记录的计划和功能矩阵保留为需求来源与历史快照，不代表当前认领队列。
 
 > **2026-10-05 历史快照：** 当时隔离实现与回归的门禁结果为单测 508/508、桌面 315/315、390px 316/316、宿主样式 315/315，实际服务重启回读 9/9，多插件并行 E2E 3/3。联系人/组织分页与当时的规模证据及限制保留作历史记录；不要用这些数字推断当前版本状态。
 
