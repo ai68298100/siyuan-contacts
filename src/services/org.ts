@@ -124,8 +124,9 @@ export async function refreshPersonOrgLinkSections(plugin: Plugin, docIds: reado
 }
 
 /**
- * B12：人物 → 单位显示串（active 优先，其次最近一条成员记录）。
+ * B12：人物 → 当前单位显示串（仅 active 成员）。
  * 形态：组织名 或 组织名 · 部门。供联系人卡片/选人提示等投影。
+ * former 成员只在历史详情、共同背景历史和历史筛选中展示，不进入当前单位行。
  */
 export async function buildOrgDisplayByPerson(): Promise<Map<string, string>> {
     const [orgs, store] = await Promise.all([
@@ -142,10 +143,9 @@ export async function buildOrgDisplayByPerson(): Promise<Map<string, string>> {
     }
     const display = new Map<string, string>();
     for (const [personDocId, list] of byPerson) {
-        const eligible = sortOrgMemberships(list.filter((membership) => nameByDoc.has(membership.orgDocId)));
-        const current = eligible.filter((membership) => membership.status === "active");
-        /* 多组织同时归属全部保留；只有没有当前归属时才回退到最近一段历史。 */
-        const visible = current.length > 0 ? current : eligible.slice(-1);
+        /* 当前单位投影只消费 active；former 记录保留给历史视图，不能回退显示为当前单位。 */
+        const visible = sortOrgMemberships(list.filter((membership) =>
+            membership.status === "active" && nameByDoc.has(membership.orgDocId)));
         const labels = visible.flatMap((membership) => {
             const orgName = nameByDoc.get(membership.orgDocId);
             const affiliationKind = membership.affiliationKind ?? (orgName === "家庭" ? "family" : undefined);

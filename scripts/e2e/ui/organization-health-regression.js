@@ -62,13 +62,17 @@ export async function runOrganizationHealthRegression({ test, assert, kernel, se
         assert(state.writes === before, "回读已归档后仍重复写入");
     });
 
-    await test("组织健康实际服务：归档首条成员不遮蔽另一正常组织的单位投影", async () => {
+    await test("组织健康实际服务：归档首条成员不遮蔽正常单位，former 不进入当前单位投影", async () => {
         const firstOrg = "20261004000000-org0001";
         const secondOrg = "20261004000000-org0002";
         const personDocId = "20261004000000-person1";
+        const formerOnlyPersonDocId = "20261004000000-person2";
         const plugin = { loadData: async () => ({ schemaVersion: 1, memberships: [firstOrg, secondOrg].map((orgDocId, index) => ({
             id: `20261004000000-member${index + 1}`, orgDocId, personDocId, status: "active", joinedOn: "2026-01-01", leftOn: "", department: "", title: "",
-        })) }) };
+        })).concat({
+            id: "20261004000000-member3", orgDocId: secondOrg, personDocId: formerOnlyPersonDocId,
+            status: "former", joinedOn: "2024-01-01", leftOn: "2025-12-31", department: "", title: "",
+        }) }) };
         bindOrgMembershipStorage(plugin);
         kernel.handler = async (route, body) => {
             if (route !== "/api/query/sql") throw new Error(`单位夹具拒绝 ${route}`);
@@ -78,7 +82,9 @@ export async function runOrganizationHealthRegression({ test, assert, kernel, se
             ];
             return [firstOrg, secondOrg].map((id, index) => ({ id, content: index === 0 ? "已归档" : "正常单位", hpath: "/组织", box: settings.notebookId }));
         };
-        assert((await buildOrgDisplayByPerson()).get(personDocId) === "正常单位", "归档首条成员遮蔽了正常单位");
+        const display = await buildOrgDisplayByPerson();
+        assert(display.get(personDocId) === "正常单位", "归档首条成员遮蔽了正常单位");
+        assert(!display.has(formerOnlyPersonDocId), "只有 former 成员时不应显示为当前单位");
     });
 
     await test("组织健康界面：异常数量显示待核实，修复原标记后重新读取恢复", async () => {
