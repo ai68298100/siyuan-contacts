@@ -120,7 +120,7 @@
         const generation = personGeneration;
         try {
             const amount = kind === "money" && String(amountText ?? "").trim() ? Number(amountText) : undefined;
-            await onCreate({
+            const created = await onCreate({
                 requestId: activeRequestId,
                 personDocId: docId,
                 kind,
@@ -136,6 +136,14 @@
             resetForm();
             await load(docId);
             if (!alive || generation !== personGeneration || docId !== personDocId) return;
+            // A confirmed write can become visible to the host storage reader
+            // one tick later than the save response. Keep the confirmed record
+            // in the list so a stale immediate read cannot make a successful
+            // submission look lost; the next refresh will reconcile the rest.
+            if (!records.some((record) => record.id === created.id)) {
+                records = [...records, created].sort((left, right) =>
+                    right.occurredOn.localeCompare(left.occurredOn) || right.updatedAt - left.updatedAt);
+            }
             onChanged?.();
         } catch (error) {
             if (!alive || generation !== personGeneration || docId !== personDocId || activeRequestId !== requestId) return;

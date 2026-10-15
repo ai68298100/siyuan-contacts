@@ -2294,6 +2294,28 @@ await test("账本界面：已写未知保留原输入与请求，读取失败�
     assert(raw.records.length === 2 && requests.at(-1).requestId !== requests[0].requestId, "新业务沿用旧请求被合并");
 });
 
+await test("账本界面：确认写入后陈旧列表回读仍立即显示新记录", async () => {
+    const created = {
+        id: "20261004000001-ex00001", personDocId: person.docId, kind: "money", direction: "receivable",
+        description: "新建后陈旧回读", amount: 35, currency: "CNY", occurredOn: "2026-10-04", dueOn: "", status: "open",
+        settledOn: "", note: "", createdAt: 1, updatedAt: 1,
+    };
+    mounted = mount(ExchangeLedger, { target: fixture, props: {
+        personDocId: person.docId,
+        onLoad: async () => [],
+        onCreate: async () => created,
+        onChangeStatus: async () => {},
+    } });
+    await until(() => fixture.textContent.includes("还没有记录"), "账本初始空态未显示");
+    const description = fixture.querySelector('input[type="text"]');
+    input(description, "新建后陈旧回读");
+    input(fixture.querySelector('input[type="number"]'), "35");
+    await tick();
+    button("记一笔往来").click();
+    await until(() => fixture.textContent.includes("新建后陈旧回读"), "陈旧列表回读遮蔽了已确认的新往来");
+    assert(fixture.querySelectorAll(".lvct-exchange-row").length === 1, "陈旧回读合并后记录数量不正确");
+});
+
 await test("详情子面板：草稿取消保留原标签和人物，保存挂起阻断切标签、切人与关闭", async () => {
     for (const module of ["exchange", "alias"]) {
         let closed = false;
