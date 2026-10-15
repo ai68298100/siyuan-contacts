@@ -25,3 +25,9 @@
 ## 回滚
 
 回滚到 v0.5.12 的 `package.zip`，保留用户工作区和插件自管数据。
+
+## 产物校验
+
+- GitHub Release 附件 `package.zip`：581,735 B。
+- SHA-256：`2fb0d7e0c6dab395dd76c4208480db3ff06a6650f41e2e41139a9b37ca222cf3`。
+- 发布 tag：[`v0.5.13`](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.13)。
