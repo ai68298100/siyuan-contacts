@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.11** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.11) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.12** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.12) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -21,14 +21,14 @@ English | [简体中文](README.md)
 
 Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
 
-## Release candidate v0.5.12 (not published)
+## This release: v0.5.12 (2026-10-15)
 
 This patch lets vCard import fall back to the structured `N` name when `FN` is blank or whitespace-only.
 
 - Added strict-import regression coverage for a blank `FN` alongside a valid `N` name.
 - Issue #35 has no sanitized VCF sample yet, so this does not confirm the reported Xiaomi export's root cause.
 
-Validation: `pnpm check`, 594 unit tests, desktop and mobile UI 378/378, production build and local release gates pass. The C03 mobile case now exercises profile-gap filtering through the actual “Tools and filters” sheet.
+Validation: GitHub Actions [run 38747219905](https://github.com/ai68298100/siyuan-contacts/actions/runs/38747219905) passed all jobs, including `pnpm check`, 594 unit tests, desktop/mobile UI 378/378, production build and release gates. C03 exercises profile-gap filtering through the actual “Tools and filters” sheet. Issue #35 still needs a sanitized VCF sample to confirm the reported root cause.
 
 ## What's new in v0.5.11
 
@@ -170,7 +170,7 @@ Each plugin is maintained independently and can be used on its own or alongside 
 
 Manual installation from GitHub Releases is currently recommended. The Marketplace submission has been merged, but availability in the client has not been verified on a real device.
 
-1. Download package.zip from the latest stable [v0.5.11 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.11).
+1. Download package.zip from the latest stable [v0.5.12 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.12).
 2. Extract its contents into data/plugins/siyuan-contacts/ in your SiYuan workspace. plugin.json must be at that directory root.
 3. Restart SiYuan and enable **Lv Contacts** under **Settings → Marketplace → Installed**.
 

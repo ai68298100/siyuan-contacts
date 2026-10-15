@@ -1,11 +1,11 @@
-# 小驴人脉 v0.5.12（发布候选）
+# 小驴人脉 v0.5.12
 
-本候选修复 vCard 严格导入中空白 `FN` 遮住有效 `N` 结构化姓名的边界，并补回归测试。
+本次修复 vCard 严格导入中空白 `FN` 遮住有效 `N` 结构化姓名回退的边界，并补充回归测试。
 
 ## 修复
 
 - `FN` 为空或仅含空格时，允许使用有效的 `N` 姓名回退。
-- Issue #35 目前只有错误截图，没有脱敏 VCF；本候选覆盖已复现边界，但尚不能确认它就是小米导出文件的根因。
+- Issue #35 尚未提供脱敏 VCF 样本，因此不能确认此边界就是小米导出文件的根因；该 issue 保持开放。
 
 ## 数据与迁移
 
@@ -14,19 +14,19 @@
 
 ## 已验证环境
 
-- 插件版本候选：v0.5.12
+- 插件版本：v0.5.12
+- GitHub Actions [run 38747219905](https://github.com/ai68298100/siyuan-contacts/actions/runs/38747219905)：所有 job 通过
 - `pnpm check`：0 errors / 0 warnings
 - `pnpm test`：594/594
-- `pnpm test:ui`：378/378
-- `pnpm test:ui:mobile`：378/378；C03 用例使用真实移动工具抽屉路径
-- `pnpm build`：通过
-- `pnpm check:release`：通过（本地产物重建后）
+- 桌面隔离 UI：378/378
+- 移动隔离 UI：378/378；C03 用例使用真实移动工具抽屉路径
+- `pnpm build` 与 `pnpm check:release`：通过
 
 ## 未验证与已知限制
 
-- Issue #35 的原始小米 VCF 尚未提供，不能确认本候选已解决该报告。
+- Issue #35 的原始小米 VCF 尚未提供，不能确认本修复已解决该报告。
 - 真实思源宿主、Android 真机、多窗口、原生图入口、任务管理器互读和集市客户端可见性仍需单独验收。
-- CI、tag、GitHub Release 和附件下载校验尚未完成；本文件在发布前需更新为实际结果。
+- 集市目录已收录插件，但客户端可见性尚未在真实设备验证。
 
 ## 回滚
 
@@ -34,6 +34,7 @@
 
 ## 产物校验
 
-- 本地产物：`package.zip` 581,466 B；SHA-256 `d6efa7dc4afea695ed099373b2374e45fac05c8b724578ec5ce2515ac055d51c`。
-- 上传前以通过 CI 的正式附件为准，并重新核对下载附件的哈希。
-- 产物来源提交：待候选提交确定。
+- GitHub Release 附件 `package.zip`：581,460 B。
+- SHA-256：`b87b9e0bf937e10cd827f7ea2de4d7efc10ef3a4c360214006ebe9439e65b04a`（与 Release 下载的 `package.zip.sha256` 一致）。
+- 产物来源提交：`589da09584a4946c641eba047e1f0b7f33c93d60`；CI run 38747219905。
+- [GitHub Release v0.5.12](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.12)。
