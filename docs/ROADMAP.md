@@ -5,7 +5,7 @@
 
 > 产品定位与已交付基线见 [产品愿景与后续开发总计划](PRODUCT-PLAN.md)，需求来源见 [用户反馈待办](FEEDBACK-BACKLOG.md)。当前执行顺序、任务状态和验收见 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md)；下文保留历史阶段与远期设计。
 
-> **2026-10-16 计划校准：** v0.5.14 已发布；发布包与附件校验见 [RELEASE](RELEASE.md)。Issue #35 缺少脱敏 VCF，不能确认 vCard 无名卡片候选修复是否命中报告根因；#36–#40 已完成并关闭。本文继续承载产品取舍、调研候选和历史路线；原子任务状态与顺序唯一以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准，发布门禁以 [RELEASE](RELEASE.md) 和 [UI-REGRESSION](UI-REGRESSION.md) 为准。v3.8.7 隔离内核服务验收已通过 9/9，但 browser-desktop 在往来账本提交回读处 LIMITED；下一步优先诊断该前端路径，并继续保持 Host Queue `AG-HOST-003/006` 未完成。没有宿主条件时先做 `AG-B13-007` 契约评审，不直接写运行时代码。`AG-SCALE-001` 保持 P2/partial，R54 视觉迁移仍需拆为带依赖和验收标准的原子任务卡。
+> **2026-10-16 计划校准：** v0.5.15 已发布；发布包与附件校验见 [RELEASE](RELEASE.md)。往来账本陈旧回读竞态已修复并完成创建、连续写入和状态变更回归。Issue #35 缺少脱敏 VCF，不能确认 vCard 无名卡片候选修复是否命中报告根因；#36–#40 已完成并关闭。本文继续承载产品取舍、调研候选和历史路线；原子任务状态与顺序唯一以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准，发布门禁以 [RELEASE](RELEASE.md) 和 [UI-REGRESSION](UI-REGRESSION.md) 为准。v3.8.7 隔离内核服务验收已通过 9/9，但 browser-desktop 其他用户工作区、多窗口、原生图和真机仍属 Host Queue；下一步优先推进 `AG-HOST-003/006`，无宿主条件时先做 `AG-B13-007` 契约评审，不直接扩大运行时代码。`AG-SCALE-001` 保持 P2/partial，R54 视觉迁移仍需拆为带依赖和验收标准的原子任务卡。
 
 > **历史快照说明：** 下文按日期记录的 v0.3.0/v0.5.0 阶段路线、B11–B14 初始待办及产品候选，均保留为需求来源；它们不描述当前版本、当前任务状态或发布状态。
 

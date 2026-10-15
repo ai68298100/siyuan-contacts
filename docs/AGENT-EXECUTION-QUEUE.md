@@ -4,7 +4,7 @@
 
 ## 当前状态（2026-10-16）
 
-该文档只提供短索引；若与 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 不一致，以主看板为准。v0.5.14 已发布并收口 Issue #36–#40 的代码修复和隔离回归；本轮 v3.8.7 隔离内核服务验收 9/9 通过，但 browser-desktop 在往来账本提交回读处 LIMITED，AG-HOST-003/006 仍不能收口。AG-B13-007 的 active/former 契约草案和影响矩阵已完成，当前直接前置是契约评审、Issue #35 的脱敏 VCF 复现与宿主验收，推荐的后续工作如下：
+该文档只提供短索引；若与 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 不一致，以主看板为准。v0.5.15 已发布并修复往来账本陈旧回读竞态；Issue #36–#40 的代码修复和隔离回归已收口。本轮 v3.8.7 隔离内核服务验收 9/9 通过，但 browser-desktop 其他用户工作区、多窗口、原生图和真机仍属 Host Queue，AG-HOST-003/006 不能收口。AG-B13-007 的 active/former 契约草案和影响矩阵已完成，当前直接前置是契约评审、Issue #35 的脱敏 VCF 复现与宿主验收，推荐的后续工作如下：
 
 | 顺序 | 工作 | 当前处理方式 |
 |---:|---|---|
