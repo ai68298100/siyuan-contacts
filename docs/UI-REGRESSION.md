@@ -1,6 +1,6 @@
 # UI 隔离回归
 
-> **2026-10-16 v0.5.15 发布回归：** 往来账本创建、连续写入和状态变更均覆盖陈旧列表回读；`pnpm check` 0 errors / 0 warnings、`pnpm test` 596/596、桌面/移动/宿主样式 UI 381/381 通过。`package.zip` 581,964 B，SHA-256 `c1a45de73b907ad2fc99f079dbe325bf1907821ad8d384f0c446d9176cd4529b`。Issue #35 仍缺原始脱敏 VCF。
+> **2026-10-16 v0.5.15 发布回归：** 往来账本创建、连续写入和状态变更均覆盖陈旧列表回读；`pnpm check` 0 errors / 0 warnings、`pnpm test` 596/596、桌面/移动/宿主样式 UI 381/381 通过。`package.zip` 581,946 B，SHA-256 `cd271b7b62db1b1ce86d99b17e64e4a7a547963f79db70016bac467553ab2f8b`。Issue #35 仍缺原始脱敏 VCF。
 
 > **2026-10-16 v0.5.14 候选回归：** vCard 无名卡片逐卡跳过并继续后续有效卡；`pnpm check` 0 errors / 0 warnings、`pnpm test` 596/596、桌面/移动 UI 378/378 通过。生产构建与发布门禁已通过；本地 package.zip 为 581,455 B，SHA-256 `c3b55321df8b8dfeb36693e96b60783e1e9dec8de548f2b52a7d3c40f9cb319a`。Issue #35 仍缺原始脱敏 VCF，候选修复未被证明命中小米文件根因。
 

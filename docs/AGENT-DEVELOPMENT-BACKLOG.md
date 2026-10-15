@@ -62,7 +62,7 @@ evidence_paths / owner / last_updated / commit
 
 > **2026-10-15 v0.5.11 发布快照：** 已发布提交 `2638540`。当时桌面 UI 为 378/378，移动隔离 UI 为 377/378，C03 仍以桌面控件路径运行；下方 v0.5.12 发布状态记录了后续测试夹具修正与最新结果。历史发布证据和当前门禁见 [RELEASE](RELEASE.md)、[UI-REGRESSION](UI-REGRESSION.md)。
 
-> **v0.5.15 发布状态（2026-10-16）：** 已发布 tag/Release；往来账本创建、连续写入和状态变更的陈旧回读竞态已修复，`pnpm check`、596/596 单测、桌面/移动/宿主样式 UI 381/381、构建与发布门禁通过。`package.zip` 581,964 B，SHA-256 `c1a45de73b907ad2fc99f079dbe325bf1907821ad8d384f0c446d9176cd4529b`，Release 下载复核一致。Issue #35 仍缺脱敏 VCF，不能确认 vCard 候选修复就是报告根因；#36–#40 已关闭。
+> **v0.5.15 发布状态（2026-10-16）：** 已发布 tag/Release；往来账本创建、连续写入和状态变更的陈旧回读竞态已修复，`pnpm check`、596/596 单测、桌面/移动/宿主样式 UI 381/381、构建与发布门禁通过。`package.zip` 581,946 B，SHA-256 `cd271b7b62db1bce86d99b17e64e4a7a547963f79db70016bac467553ab2f8b`，Release 下载复核一致。Issue #35 仍缺脱敏 VCF，不能确认 vCard 候选修复就是报告根因；#36–#40 已关闭。
 
 > **v0.5.14 后执行顺序：** ① Issue [#35 无法导入联系人](https://github.com/ai68298100/siyuan-contacts/issues/35) 继续保持开放，取得保留首卡属性结构的脱敏 VCF 后再确认候选修复是否命中根因；② 若具备隔离的真实思源测试环境，优先推进 P0 `AG-HOST-003`（任务块全量对账）和 `AG-HOST-006`（用户反馈真实读写验收）；③ 若没有该环境，先完成 AG-B13-007 的 active/former 契约评审，不直接扩大运行时代码；④ `AG-SCALE-001` 保持 P2/partial，R54 视觉迁移先补成有依赖和验收条件的原子任务卡。
 
