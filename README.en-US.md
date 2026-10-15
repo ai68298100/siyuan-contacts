@@ -21,14 +21,18 @@ English | [简体中文](README.md)
 
 Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
 
+## Release candidate v0.5.12 (not published)
+
+This patch lets vCard import fall back to the structured `N` name when `FN` is blank or whitespace-only.
+
+- Added strict-import regression coverage for a blank `FN` alongside a valid `N` name.
+- Issue #35 has no sanitized VCF sample yet, so this does not confirm the reported Xiaomi export's root cause.
+
+Validation: `pnpm check`, 594 unit tests, desktop and mobile UI 378/378, production build and local release gates pass. The C03 mobile case now exercises profile-gap filtering through the actual “Tools and filters” sheet.
+
 ## What's new in v0.5.11
 
-This patch fixes the empty-state relation picker being closed immediately by outside-click handling.
-
-- The empty-state “Choose contact” entry now keeps the relation picker open so users can search and select a contact.
-- Added a regression test covering the empty-state entry and picker-opening timing.
-
-Validation: `pnpm check`, 594 unit tests, desktop UI 378/378, production build and release gates pass; one pre-existing mobile fixture timing case remains documented in the release notes.
+Fixed the empty-state “Choose contact” entry so outside-click handling no longer immediately closes the relation picker. Added a regression test for the opening timing.
 
 ## What's new in v0.5.10
 
@@ -166,7 +170,7 @@ Each plugin is maintained independently and can be used on its own or alongside 
 
 Manual installation from GitHub Releases is currently recommended. The Marketplace submission has been merged, but availability in the client has not been verified on a real device.
 
-1. Download package.zip from the [v0.5.11 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.11).
+1. Download package.zip from the latest stable [v0.5.11 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.11).
 2. Extract its contents into data/plugins/siyuan-contacts/ in your SiYuan workspace. plugin.json must be at that directory root.
 3. Restart SiYuan and enable **Lv Contacts** under **Settings → Marketplace → Installed**.
 
@@ -187,7 +191,7 @@ The migration bundle is a JSON value snapshot with a preview and merge flow, not
 - The in-app English translation is incomplete, so some interface text may appear in Chinese.
 - CardDAV address-book sync and CalDAV calendar sync are not supported. Contacts can be exchanged using vCard files.
 
-See the [v0.5.11 release notes](docs/RELEASE-NOTES-v0.5.11.md) for validation scope; previous release notes remain available for v0.5.10, v0.5.9, v0.5.8 and v0.5.7.
+See the [v0.5.12 release notes](docs/RELEASE-NOTES-v0.5.12.md) for validation scope; previous release notes remain available for v0.5.11, v0.5.10, v0.5.9, v0.5.8 and v0.5.7.
 
 ## Quick start
 

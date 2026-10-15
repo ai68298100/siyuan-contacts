@@ -54,7 +54,7 @@ pnpm install          # 国内网络慢可先: pnpm config set registry https://
 
 ## 当前状态速览（详见 docs/PROGRESS.md）
 
-- v0.5.0 为两机合并后的统一发布候选；GitHub Release 与集市状态以 `docs/RELEASE.md` 最新记录为准
+- v0.5.11 已发布；当前门禁和未验证项以 [docs/RELEASE.md](RELEASE.md) 为准
 - 已完成：F01–F16 及联系人管理（含存量笔记收编）、vCard (.vcf) 导入导出、关系图谱、相关人物双链区块、
   农历生日提醒、久未联系仪表盘、从笔记捕获（含 AI 抽取）、人物文档档案条、对外人员服务桥、性能预算
-- 待办：真实宿主/真机/多窗口验收；反馈总表中的功能闭环、快速录入、UI 与页面状态收口；集市上架
+- 下一步：v0.5.12 候选已通过当前桌面/移动隔离门禁；Issue #35 仍需脱敏 VCF 确认是否命中根因，C03 移动夹具问题已解决。按 [执行看板](AGENT-DEVELOPMENT-BACKLOG.md) 条件推进 Host Queue 或 B13-007 契约决策；没有 ready 实现卡时，不从历史待办直接开工。

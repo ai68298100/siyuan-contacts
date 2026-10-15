@@ -1,6 +1,6 @@
 # 当前页面与控件事实基线
 
-2026-10-04，AG-UX-001。源码、隔离行为测试、截图和真实宿主是不同证据。历史 PAGE-STATUS 表用于追踪，以本表为当前事实核对入口；原型表达设计目标。
+> **历史快照：2026-10-04，AG-UX-001。** 本文记录当日源码、隔离行为测试、截图与宿主边界，只用于追溯 UI 设计和当时发现的问题，不是 v0.5.11 的当前事实入口。当前版本/门禁见 [RELEASE](RELEASE.md) 与 [UI-REGRESSION](UI-REGRESSION.md)，页面任务状态见 [PAGE-STATUS](PAGE-STATUS.md) 和 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md)。原型表达设计目标。
 
 ## 页面、事实源与出口
 

@@ -862,6 +862,7 @@ await test("相关人选择走可搜索选人器：电话关键词筛选、空�
 });
 
 await test("资料完整度筛选与串行补录：缺电话列表、逐个保存且不清空已有资料（C03）", async () => {
+    const isMobile = window.innerWidth <= 640;
     const cellWrites = [];
     const rows = [
         { id: "row-1", docId: "20260927000000-person1", name: "全空甲", phone: "", wechat: "", email: "", group: "", tags: [] },
@@ -888,21 +889,34 @@ await test("资料完整度筛选与串行补录：缺电话列表、逐个保�
     mounted = mount(PeopleView, { target: fixture, props: {
         settings, preferences: DEFAULT_VIEW_PREFERENCES,
         loadRecentInteractions: async () => ({}),
-        revision: 0, initialSort: "name",
+        revision: 0, initialSort: "name", isMobile,
         onOpenDetail() {}, onOpenPersonDoc() {},
         onPreferencesChange: async (next) => next,
     } });
     await until(() => fixture.querySelector(".lvct-person-card"), "列表未渲染");
-    const peopleSearch = fixture.querySelector('.lvct-people__toolbar input[placeholder*="搜索姓名"]');
+    const peopleSearch = fixture.querySelector(isMobile
+        ? ".lvct-people__toolbar .lvct-people__mobile-search"
+        : ".lvct-people__toolbar .lvct-people__desktop-search");
     assert(peopleSearch?.getAttribute("aria-label") === "搜索联系人", "桌面联系人搜索缺少可访问名称");
-    assert(peopleSearch.getBoundingClientRect().width >= 260, `联系人搜索框宽度不足：${Math.round(peopleSearch.getBoundingClientRect().width)}px`);
-    fixture.style.width = "520px";
-    await tick();
-    assert(peopleSearch.getBoundingClientRect().width >= 300, `窄桌面下联系人搜索框被挤压：${Math.round(peopleSearch.getBoundingClientRect().width)}px`);
-    fixture.style.width = "min(1000px,100%)";
-    const peopleGroupFilter = fixture.querySelector('.lvct-people__toolbar select');
+    if (!isMobile) {
+        assert(peopleSearch.getBoundingClientRect().width >= 260, `联系人搜索框宽度不足：${Math.round(peopleSearch.getBoundingClientRect().width)}px`);
+        fixture.style.width = "520px";
+        await tick();
+        assert(peopleSearch.getBoundingClientRect().width >= 300, `窄桌面下联系人搜索框被挤压：${Math.round(peopleSearch.getBoundingClientRect().width)}px`);
+        fixture.style.width = "min(1000px,100%)";
+    }
+    let controls = fixture;
+    if (isMobile) {
+        const mobileTools = [...fixture.querySelectorAll(".lvct-people__toolbar button")]
+            .find((node) => node.textContent.includes("筛选与整理"));
+        assert(mobileTools, "移动端筛选与整理入口未显示");
+        mobileTools.click();
+        await until(() => fixture.querySelector(".lvct-sheet"), "移动筛选与整理抽屉未打开");
+        controls = fixture.querySelector(".lvct-sheet");
+    }
+    const peopleGroupFilter = controls.querySelector("select[aria-label='分组筛选']");
     assert(peopleGroupFilter?.getAttribute("aria-label") === "分组筛选", "分组筛选缺少可访问名称");
-    const viewsTrigger = button("视图");
+    const viewsTrigger = button("视图", controls);
     assert(viewsTrigger.getAttribute("aria-expanded") === "false" && viewsTrigger.getAttribute("aria-controls") === null, "视图面板关闭时不应保留悬空 aria-controls");
     viewsTrigger.click();
     await until(() => fixture.querySelector("#lvct-people-viewsmenu-panel"), "视图面板未打开");
@@ -912,10 +926,10 @@ await test("资料完整度筛选与串行补录：缺电话列表、逐个保�
     viewsTrigger.click();
     await tick();
     assert(viewsTrigger.getAttribute("aria-expanded") === "false" && viewsTrigger.getAttribute("aria-controls") === null, "关闭视图面板后仍保留悬空 aria-controls");
-    const moreTrigger = button("更多筛选");
+    const moreTrigger = button("更多筛选", controls);
     assert(moreTrigger.getAttribute("aria-controls") === null, "更多筛选关闭时不应保留悬空 aria-controls");
     moreTrigger.click();
-    await until(() => fixture.querySelector('input[name="lvct-profile-gap"]'), "资料完整度筛选组未显示");
+    await until(() => moreTrigger.getAttribute("aria-expanded") === "true" && fixture.querySelector('input[name="lvct-profile-gap"]'), `资料完整度筛选组未显示；expanded=${moreTrigger.getAttribute("aria-expanded")} controls=${moreTrigger.getAttribute("aria-controls")}`);
     assert(moreTrigger.getAttribute("aria-expanded") === "true" && moreTrigger.getAttribute("aria-controls") === fixture.querySelector(".lvct-people__moremenu").id, "打开更多筛选后触发器未关联面板");
     [...fixture.querySelectorAll('input[name="lvct-profile-gap"]')][0].click();
     await until(() => fixture.textContent.includes("逐个补录（2）"), "缺口人数统计错误");

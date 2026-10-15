@@ -102,6 +102,8 @@ test("严格导入拒绝空、截断、缺姓名和损坏卡片，保留额外�
     for (const input of ["", "BEGIN:VCARD\nFN:甲", "BEGIN:VCARD\nTEL:123\nEND:VCARD", "BEGIN:VCARD\nFN:甲\n坏属性\nEND:VCARD"]) {
         assert.throws(() => parseVcfForImport(input));
     }
+    const structuredFallback = parseVcfForImport("BEGIN:VCARD\r\nVERSION:3.0\r\nFN:   \r\nN:张;三;;;\r\nEND:VCARD");
+    assert.equal(structuredFallback[0].name, "张三", "空白 FN 不应遮蔽有效 N 姓名");
     const cards = parseVcfForImport("BEGIN:VCARD\nVERSION:3.0\nFN:甲\nEMAIL:one@example.com\nEMAIL:two@example.com\nORG:组织\nPHOTO:图片\nEND:VCARD");
     assert.equal(cards[0].email, "one@example.com");
     assert.ok(cards[0].unsupportedProperties?.includes("EMAIL（第 2 项起）"));

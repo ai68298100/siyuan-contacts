@@ -1,8 +1,23 @@
 # 发布清单（RELEASE）
 
-> v0.5.11 本轮发布：修复空状态“选择联系人”入口打开关系选择器后被 outside-click 监听立即关闭的问题，并增加回归测试。
+> v0.5.12 发布候选：修复 vCard 导入中空白 `FN` 遮住有效 `N` 姓名回退的边界，并增加严格导入回归测试。C03 移动用例现在通过真实移动工具抽屉运行，完整桌面与移动隔离 UI 均为 378/378。Issue #35 没有脱敏 VCF 样本，尚不能确认此边界就是报告根因；本候选不关闭该 issue。
 
-## v0.5.11 本轮状态
+## v0.5.12 候选状态（尚未发布）
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.12
+- [x] README、CHANGELOG 与 v0.5.12 发布说明已更新
+- [x] 空白 `FN` 回退有效 `N`，严格导入新增回归测试
+- [x] `pnpm check`、`pnpm test` 594/594、桌面 UI 378/378
+- [x] 移动隔离 UI 378/378；C03 通过移动“筛选与整理”抽屉路径
+- [x] `pnpm build`、`pnpm check:release`、校验和复核
+- [x] 本地产物 `package.zip` 581,466 B，SHA-256 `d6efa7dc4afea695ed099373b2374e45fac05c8b724578ec5ce2515ac055d51c`
+- [ ] Issue #35 的原始小米 VCF 未提供，不能确认本修复覆盖报告根因
+- [ ] 版本号确认、CI、tag、GitHub Release 与上传附件核对尚未完成
+- [ ] 真实思源宿主、Android 真机、多窗口、原生图入口、任务管理器互读和集市客户端可见性仍需单独验收
+
+> v0.5.11 已发布：[GitHub Release v0.5.11](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.11)
+
+## v0.5.11 发布状态
 
 - [x] `package.json` 与 `plugin.json` 版本统一为 0.5.11
 - [x] README、README.en-US、CHANGELOG 与 v0.5.11 发布说明已更新

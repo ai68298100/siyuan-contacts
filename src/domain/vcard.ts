@@ -140,8 +140,10 @@ function contactFromCard(lines: string[]): VCardContact | null {
     };
     const all = (name: string) => props.filter((prop) => prop.name === name).map((prop) => prop.value);
 
-    const fn = first("FN");
-    const name = (fn || structuredName(first("N"))).trim();
+    // Empty or whitespace-only FN values are not usable names; allow a valid
+    // structured N value to serve as the fallback in that case.
+    const fn = first("FN").trim();
+    const name = fn || structuredName(first("N")).trim();
     if (!name) return null;
 
     const phones = all("TEL")
