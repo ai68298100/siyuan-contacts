@@ -9,9 +9,9 @@
 - [x] 空白 `FN` 回退有效 `N`，严格导入新增回归测试
 - [x] `pnpm check`、`pnpm test` 594/594、桌面 UI 378/378
 - [x] 移动隔离 UI 378/378；C03 通过移动“筛选与整理”抽屉路径
-- [x] `pnpm build`、`pnpm check:release`；GitHub Actions [run 38747219905](https://github.com/ai68298100/siyuan-contacts/actions/runs/38747219905) 全部通过
+- [x] `pnpm build`、`pnpm check:release`；GitHub Actions [run 38748666687](https://github.com/ai68298100/siyuan-contacts/actions/runs/38748666687) 全部通过
 - [x] annotated tag `v0.5.12` 指向候选提交 `589da09584a4946c641eba047e1f0b7f33c93d60`
-- [x] GitHub Release 已创建；重新下载附件核对一致：`package.zip` 581,460 B，SHA-256 `b87b9e0bf937e10cd827f7ea2de4d7efc10ef3a4c360214006ebe9439e65b04a`
+- [x] GitHub Release 已创建；重新下载附件核对一致：`package.zip` 581,557 B，SHA-256 `df49569967bd6c93e63728da62e42f1512e6eb973d85870ba5e46ae57986e660`
 - [x] 集市目录已有 `ai68298100/siyuan-contacts`；上架 PR [#2289](https://github.com/siyuan-note/bazaar/pull/2289) 已合并
 - [ ] Issue #35 的原始小米 VCF 未提供，不能确认本修复覆盖报告根因
 - [ ] 真实思源宿主、Android 真机、多窗口、原生图入口、任务管理器互读和集市客户端可见性仍需单独验收

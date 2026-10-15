@@ -1,6 +1,6 @@
 # 产品愿景与后续开发总计划
 
-> **2026-10-15 计划校准：** v0.5.11 已发布。本文保留产品愿景、边界和历史规划；当前执行顺序与任务状态唯一以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准，门禁以 [RELEASE](RELEASE.md) / [UI-REGRESSION](UI-REGRESSION.md) 为准。
+> **2026-10-15 计划校准：** v0.5.12 已发布。本文保留产品愿景、边界和历史规划；当前执行顺序与任务状态唯一以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准，门禁以 [RELEASE](RELEASE.md) / [UI-REGRESSION](UI-REGRESSION.md) 为准。
 
 > **2026-10-08 历史状态快照：** 当时发布候选为 v0.5.0，单测 537/537、桌面 319/319、390px 320/320。该日期的分支、版本和测试结果不代表当前状态；当前基线见本文件顶部链接。
 

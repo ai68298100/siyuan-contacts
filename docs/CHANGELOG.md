@@ -11,7 +11,7 @@
 - 空白或仅含空格的 `FN` 不再遮住有效的 `N` 结构化姓名，严格导入路径增加回归覆盖。
 - Issue #35 的原始小米 VCF 尚未提供，本修复覆盖已复现的解析器边界，但不代表已确认该 issue 的根因。
 
-验证：GitHub Actions [run 38747219905](https://github.com/ai68298100/siyuan-contacts/actions/runs/38747219905) 全部通过；`pnpm check`、594/594 单测、桌面/移动 UI 均 378/378、构建与发布门禁通过；C03 移动用例使用真实工具抽屉路径。
+验证：GitHub Actions [run 38748666687](https://github.com/ai68298100/siyuan-contacts/actions/runs/38748666687) 全部通过；`pnpm check`、594/594 单测、桌面/移动 UI 均 378/378、构建与发布门禁通过；C03 移动用例使用真实工具抽屉路径。
 
 ## [0.5.11] — 2026-10-15
 

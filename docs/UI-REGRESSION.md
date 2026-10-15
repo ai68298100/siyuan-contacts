@@ -1,6 +1,6 @@
 # UI 隔离回归
 
-> **2026-10-15 v0.5.12 本地候选最新门禁：** `pnpm check` 0 errors / 0 warnings、`pnpm test` 594/594、桌面 UI 378/378、移动 UI 378/378、`pnpm build` 和 `pnpm check:release` 通过。C03 在移动运行中显式使用真实的“筛选与整理”抽屉路径；这修正了测试夹具，不代表 Android 真机或真实思源宿主验收。Issue #35 仍缺原始脱敏 VCF，解析器候选修复未被证明命中该 issue。发布限制与产物见 [RELEASE](RELEASE.md)，任务顺序见 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md)。下方日期记录均为对应时点的历史回归结果。
+> **2026-10-15 v0.5.12 发布门禁：** GitHub Actions run 38748666687 全部通过：`pnpm check` 0 errors / 0 warnings、`pnpm test` 594/594、桌面 UI 378/378、移动 UI 378/378、`pnpm build` 和 `pnpm check:release`。C03 在移动运行中显式使用真实的“筛选与整理”抽屉路径；这修正了测试夹具，不代表 Android 真机或真实思源宿主验收。Issue #35 仍缺原始脱敏 VCF，解析器修复未被证明命中该 issue。发布限制与产物见 [RELEASE](RELEASE.md)，任务顺序见 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md)。下方日期记录均为对应时点的历史回归结果。
 
 > **2026-10-10 v0.5.5 发布候选：** 新增本人组织编辑和相关人空关系读取回归；发布前完整结果以本轮命令输出为准。
 

@@ -1,6 +1,6 @@
 # 用户反馈待办（BACKLOG）
 
-> **2026-10-15 当前基线：** 当前稳定发布为 v0.5.11，v0.5.12 为本地候选；`pnpm check`、594/594 单测、桌面/移动 UI 378/378、构建和本地发布门禁通过。C03 移动用例现走真实移动抽屉；Issue #35 仍缺脱敏 VCF，候选修复是否命中根因未知。完整门禁见 [RELEASE](RELEASE.md) / [UI-REGRESSION](UI-REGRESSION.md)。本文保存反馈来源、产品决定和历史状态快照；任务状态和开发顺序唯一以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准。
+> **2026-10-15 当前基线：** 当前稳定发布为 v0.5.12；CI、发布包和附件校验见 [RELEASE](RELEASE.md) / [UI-REGRESSION](UI-REGRESSION.md)。Issue #35 仍缺脱敏 VCF，不能确认此次空白 `FN` 回退是否命中根因。C03 移动用例现走真实移动抽屉并全量通过。本文保存反馈来源、产品决定和历史状态快照；任务状态和开发顺序唯一以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准。
 
 > **Agent 执行入口：** 本文件保留反馈来源、历史批次和审计细节；开发 Agent 只从 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 的任务卡认领工作，不直接从本文件的历史条目开工。
 

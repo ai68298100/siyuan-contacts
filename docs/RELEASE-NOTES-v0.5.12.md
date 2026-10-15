@@ -15,7 +15,7 @@
 ## 已验证环境
 
 - 插件版本：v0.5.12
-- GitHub Actions [run 38747219905](https://github.com/ai68298100/siyuan-contacts/actions/runs/38747219905)：所有 job 通过
+- GitHub Actions [run 38748666687](https://github.com/ai68298100/siyuan-contacts/actions/runs/38748666687)：所有 job 通过
 - `pnpm check`：0 errors / 0 warnings
 - `pnpm test`：594/594
 - 桌面隔离 UI：378/378
@@ -34,7 +34,7 @@
 
 ## 产物校验
 
-- GitHub Release 附件 `package.zip`：581,460 B。
-- SHA-256：`b87b9e0bf937e10cd827f7ea2de4d7efc10ef3a4c360214006ebe9439e65b04a`（与 Release 下载的 `package.zip.sha256` 一致）。
-- 产物来源提交：`589da09584a4946c641eba047e1f0b7f33c93d60`；CI run 38747219905。
+- GitHub Release 附件 `package.zip`：581,557 B。
+- SHA-256：`df49569967bd6c93e63728da62e42f1512e6eb973d85870ba5e46ae57986e660`（与 Release 下载的 `package.zip.sha256` 一致）。
+- 发布 tag 指向代码提交：`589da09584a4946c641eba047e1f0b7f33c93d60`；最终安装包由文档同步提交 `75b634ddb2df46c5be816cdeb67e1767164ace34` 的 CI run 38748666687 构建，未修改运行时代码。
 - [GitHub Release v0.5.12](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.12)。
