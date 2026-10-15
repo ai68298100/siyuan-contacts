@@ -3908,7 +3908,7 @@ await test("关系图组织增强：组织节点与成员边分源展示，开�
     await until(() => canvas()?.getElementById(orgDocId).nonempty(), "组织节点未挂载");
     const cy = canvas();
     assert(cy.getElementById(ghostId).empty(), "悬空成员不应产生节点");
-    assert(cy.edges().length === 1, "仅 active 且在名册的成员成边（former/悬空丢弃）");
+    assert(cy.edges().length === 1, "active/former 同组织成员合并为一条边，悬空成员丢弃");
     assert(fixture.textContent.includes("显示组织（1）"), "组织开关计数错误");
     assert(cy.getElementById(orgDocId).style("shape") === "round-rectangle", "组织节点未用方形区分");
     /* 组织节点不触发人物详情 */

@@ -46,6 +46,17 @@ test("orderGraph：未声明边类型规范化为 related，输入顺序不影�
     assert.deepEqual(first.nodes.map((node) => node.degree), [1, 1]);
 });
 
+test("orderGraph：不同成员生命周期状态保留为独立展示边", () => {
+    const nodes = ["person", "org"].map((id) => ({ id, label: id, group: "", degree: 0 }));
+    const graph = orderGraph({ nodes, edges: [
+        { source: "org", target: "person", kind: "member" as const, memberStatus: "former" as const },
+        { source: "person", target: "org", kind: "member" as const, memberStatus: "active" as const },
+        { source: "person", target: "org", kind: "member" as const, memberStatus: "active" as const },
+    ] });
+    assert.deepEqual(graph.edges.map((edge) => edge.memberStatus), ["active", "former"]);
+    assert.deepEqual(graph.nodes.map((node) => node.degree), [2, 2]);
+});
+
 test("最短路径：优先较短链路、支持反向关系且不改变输入", () => {
     const graph = {
         nodes: ["a", "b", "c", "d", "e"].map((id) => ({ id, label: id, group: "", degree: 0 })),

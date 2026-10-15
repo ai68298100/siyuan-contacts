@@ -1502,7 +1502,7 @@
         <details class="lvct-graph-summary__details" open={snapshot.state === "unknown" || snapshot.state === "center_missing"}>
             <summary>{text("graphSummaryDetails", "来源与排除详情")}</summary>
             <p>登记 {snapshot.counts.registered ?? "未知"} · 来源节点 {snapshot.counts.sourceNodes ?? "未知"} / 边 {snapshot.counts.sourceEdges ?? "未知"} · 范围内 {snapshot.counts.rangeNodes} · 筛选后 {snapshot.counts.filteredNodes} · 范围排除 {snapshot.counts.rangeExcluded ?? "未知"} · 筛选排除 {snapshot.counts.filterExcluded}</p>
-            <p>{graphMode === "relations" ? `${graphEdgeLabel("related")}；${graphEdgeLabel("member")}。只有 related 参与关系查询。` : `${graphEdgeLabel("ref")}（含回链）；只读思源双链索引，只展示登记文档之间的引用，不是整库图，不修改思源图谱设置。`}</p>
+            <p>{graphMode === "relations" ? `${graphEdgeLabel("related")}；${graphEdgeLabel("member", "active")}（虚线）、${graphEdgeLabel("member", "former")}（点线）、${graphEdgeLabel("member", "mixed")}（加粗虚线）。只有 related 参与关系查询。` : `${graphEdgeLabel("ref")}（含回链）；只读思源双链索引，只展示登记文档之间的引用，不是整库图，不修改思源图谱设置。`}</p>
             {#if graphMode === "native"}<p>使用思源自己的图谱或反链：打开节点的来源文档，再从思源文档菜单进入关系图或反链。此处采用同一份双链索引独立绘制，不代替思源原生面板。</p>{/if}
             {#if graphMode === "native" && (groupFilter || isolatedOnly)}<p>已保留关系图分组/无关系筛选；这些条件不应用于文档引用图。</p>{/if}
             {#if snapshot.retainedByRange.length}<p>{text("graphRangeRetained", "范围外中心优先保留：{names}（不属于当前范围或组织成员集合，不新增关系事实）", { names: snapshot.retainedByRange.map(nodeName).join("、") })}</p>{/if}

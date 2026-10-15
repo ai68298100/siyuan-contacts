@@ -188,6 +188,9 @@ export async function runGraphQueryRegression({ test, assert, kernel, settings, 
             assert(!fixture.querySelector(".lvct-graph-view__canvas"), "文本视图仍要求画布");
             assert(fixture.textContent.includes("组织成员（member）") && fixture.textContent.includes("显式人物关系（related）"), "文本没有边来源");
             assert(fixture.textContent.includes("组织成员（member）·当前+历史"), "文本没有成员当前+历史生命周期标签");
+            assert(fixture.textContent.includes("组织成员（member）·当前（虚线）")
+                && fixture.textContent.includes("组织成员（member）·历史（点线）")
+                && fixture.textContent.includes("组织成员（member）·当前+历史（加粗虚线）"), "图谱没有成员边状态图例");
             const textView = fixture.querySelector(".lvct-graph-text");
             assert(textView.scrollWidth <= textView.clientWidth + 2, "文本视图横向溢出");
             textView.style.fontSize = "200%";

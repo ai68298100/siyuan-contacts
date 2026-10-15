@@ -121,7 +121,8 @@ export function orderGraph(graph: PersonGraph): PersonGraph {
         if (edge.source === edge.target || !byId.has(edge.source) || !byId.has(edge.target)) continue;
         const kind = edge.kind ?? "related";
         const [source, target] = [edge.source, edge.target].sort();
-        const key = `${kind}:${source}:${target}`;
+        const memberStatus = kind === "member" ? edge.memberStatus ?? "" : "";
+        const key = `${kind}:${memberStatus}:${source}:${target}`;
         if (seen.has(key)) continue;
         seen.add(key);
         edges.push({ ...edge, source, target, kind });
@@ -130,6 +131,7 @@ export function orderGraph(graph: PersonGraph): PersonGraph {
     }
     nodes.sort((left, right) => right.degree - left.degree || compareGraphIds(left.id, right.id));
     edges.sort((left, right) => compareGraphIds(left.kind ?? "related", right.kind ?? "related")
+        || compareGraphIds(left.memberStatus ?? "", right.memberStatus ?? "")
         || compareGraphIds(left.source, right.source) || compareGraphIds(left.target, right.target));
     return { nodes, edges };
 }
