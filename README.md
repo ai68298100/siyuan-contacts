@@ -9,7 +9,7 @@
 
 **在思源笔记中管理联系人、人际关系、组织归属与重要日期。**
 
-**最新稳定版：v0.5.12** · [下载与安装](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.12) · [提交问题](https://github.com/ai68298100/siyuan-contacts/issues)
+**最新稳定版：v0.5.13** · [下载与安装](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.13) · [提交问题](https://github.com/ai68298100/siyuan-contacts/issues)
 
 [English README](README.en-US.md)
 
@@ -21,18 +21,21 @@
 
 小驴人脉把联系人、关系和共同经历放进思源工作空间。每个人对应一篇普通思源文档，结构化资料保存在关联的思源数据库中，可以继续使用思源的搜索、双链和同步能力。
 
-## 本次发布（v0.5.12 · 2026-10-15）
+## 本次发布（v0.5.13 · 2026-10-15）
 
-本次补丁让 vCard 导入在 `FN` 为空白时回退到有效的 `N` 结构化姓名。
+本次补丁收口组织历史关联、组织管理切换和联系人列表排版问题，并补强 vCard 导入兼容性。
 
-- 增加严格导入回归测试，覆盖空白 `FN` 与有效 `N` 并存时的姓名回退。
+- 图谱保留在职与离职/离校成员的组织历史边，关系查询仍与组织展示边隔离。
+- 组织管理切换期间保留添加成员编辑器节点，避免加载空态和旧备注草稿残留。
+- 桌面联系人卡片和表格统一文字基线、行高与单元格垂直对齐。
+- vCard 在空白 `FN`、UTF-8 BOM 和 QP 编码姓名下回退并解析结构化 `N`。
 - Issue #35 缺少脱敏 VCF 样本，尚不能确认这是否是原始小米导出文件的根因。
 
-验证：GitHub Actions [run 38747219905](https://github.com/ai68298100/siyuan-contacts/actions/runs/38747219905) 全部通过；`pnpm check`、594 项单测、桌面/移动 UI 均为 378/378、生产构建和发布门禁通过。C03 移动用例通过真实的“筛选与整理”抽屉验证资料完整度路径。Issue #35 尚无脱敏 VCF 样本，根因仍待确认。
+验证：`pnpm check`、596 项单测、桌面/移动 UI 均为 378/378、生产构建和发布门禁通过。
 
-## 上一版本（v0.5.11 · 2026-10-15）
+## 上一版本（v0.5.12 · 2026-10-15）
 
-修复空状态下从“选择联系人”入口打开关系选择器后，选人器被 outside-click 处理器立即关闭的问题，并增加入口时序回归测试。
+补强 vCard 导入中空白 `FN` 的结构化 `N` 姓名回退，并增加 BOM 与严格导入回归测试。
 
 ## 更早版本（v0.5.10 · 2026-10-15）
 
@@ -333,7 +336,7 @@
 
 当前建议通过 GitHub Release 手动安装；集市上架 PR 已合并，但客户端可见性尚未在真实设备核验。
 
-1. 从 [v0.5.12 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.12) 下载最新稳定版 `package.zip`。
+1. 从 [v0.5.13 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.13) 下载最新稳定版 `package.zip`。
 2. 将压缩包内容解压到思源工作空间的 `data/plugins/siyuan-contacts/`，确认 `plugin.json` 位于该目录根部。
 3. 重启思源，在“设置 → 集市 → 已安装”中启用“小驴人脉”。
 
@@ -362,7 +365,7 @@
 - 插件界面英文翻译尚未完整，部分内容可能显示为中文。
 - 当前不支持 CardDAV 通讯录或 CalDAV 日历在线同步；通讯录交换通过 vCard 文件完成。
 
-各项验证范围见 [v0.5.12 发布说明](docs/RELEASE-NOTES-v0.5.12.md)；上一版本记录见 [v0.5.11 发布说明](docs/RELEASE-NOTES-v0.5.11.md)。
+各项验证范围见 [v0.5.13 发布说明](docs/RELEASE-NOTES-v0.5.13.md)；上一版本记录见 [v0.5.12 发布说明](docs/RELEASE-NOTES-v0.5.12.md)。
 
 ## 开发
 

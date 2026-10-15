@@ -150,7 +150,7 @@ export function groupColor(group: string): string {
 
 /* ---------- B14.6：组织节点与成员边增强（只进渲染层，不参与关系查询） ---------- */
 
-/** 组织增强输入：组织文档 + 参与成员边的人物文档 ID（调用方先按 status=active 过滤） */
+/** 组织增强输入：组织文档 + 参与成员边的人物文档 ID（active 与 former 均可） */
 export interface OrgAugmentationInput {
     docId: string;
     name: string;

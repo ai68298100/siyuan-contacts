@@ -6401,6 +6401,11 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
     .lvct-org-manager__add-note { flex-basis: 100%; }
 }
 
+/* Keep the editor node stable while a new organization context is loading.
+   This preserves bound input state and focus references without showing an
+   empty add-member frame during the request. */
+.lvct-org-manager__add--loading { display: none; }
+
 .lvct-org-manager__footer {
     display: flex;
     justify-content: flex-end;
@@ -7974,4 +7979,45 @@ html[data-theme-mode="dark"] .lvct-org-profile-editor__section {
     .lvct-workbench__body {
         max-width: none;
     }
+}
+
+/* Issue #38：联系人卡片的标题/副标题保留稳定的文本基线；长姓名不会把
+   同一行的生日信息上下推移。移动端仍允许卡片按内容收缩。 */
+@media (min-width: 641px) {
+    .lvct-person-card__main {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+    }
+
+    .lvct-person-card__name {
+        min-height: 2.7em;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+    }
+}
+
+.lvct-person-card__sub {
+    display: block;
+    min-height: 1.35em;
+    line-height: 1.35;
+}
+
+.lvct-people__table-wrap table {
+    line-height: var(--lvct-lh-body);
+}
+
+.lvct-people__table-wrap th,
+.lvct-people__table-wrap td {
+    vertical-align: middle;
+}
+
+.lvct-people__table-wrap td:nth-child(2) {
+    line-height: var(--lvct-lh-body);
+}
+
+.lvct-people__open-doc {
+    vertical-align: middle;
 }

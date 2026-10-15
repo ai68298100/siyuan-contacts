@@ -55,6 +55,9 @@
     let memberOffset = $state(0);
     let memberTotal = $state(0);
     let memberHasMore = $state(false);
+    // Keep the editor open for the established empty-state workflow.  The
+    // template hides it while a selection is still loading so that the loading
+    // frame is not mistaken for an unexplained blank box.
     let showAddMember = $state(true);
     let memberLoading = $state(false);
     let memberError = $state("");
@@ -867,7 +870,7 @@
                         </select>
                     </div>
                     {#if showAddMember}
-                        <div class="lvct-org-manager__add" aria-label={text("orgMemberAddPanel", "添加成员") }>
+                        <div class="lvct-org-manager__add" class:lvct-org-manager__add--loading={memberLoading} aria-label={text("orgMemberAddPanel", "添加成员") }>
                             <p class="ft__smaller ft__on-surface">{text("orgMembershipAddImpact", "添加会登记新期间并更新双方当前双链；已离开的期间保留，重复添加当前成员不新增记录。")}</p>
                             {#if rosterError}
                                 <p class="lvct-form__error" role="alert">{text("orgRosterReadError", "联系人名册读取失败") }：{rosterError}</p>

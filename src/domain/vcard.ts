@@ -50,7 +50,11 @@ interface VCardProperty {
 
 /** 物理行展开：RFC 6350 折行（续行以空格/制表符开头）+ QP 软换行（续行不以空格开头的常见变体） */
 export function unfoldVcfLines(text: string): string[] {
-    const raw = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+    // File.text() decodes UTF-8, preserving a leading BOM when the exporter
+    // writes one.  Treat it as transport metadata so strict import does not
+    // mistake `\uFEFFBEGIN:VCARD` for content outside a card (some mobile
+    // contacts exporters, including common Android variants, do this).
+    const raw = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
     const unfolded: string[] = [];
     for (const line of raw) {
         const isContinuation = (line.startsWith(" ") || line.startsWith("\t")) && unfolded.length > 0;

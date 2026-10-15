@@ -4,7 +4,7 @@
 
 ## 当前状态（2026-10-15）
 
-该文档只提供短索引；若与 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 不一致，以主看板为准。当前没有已登记且可直接认领的运行时代码卡，推荐的前置工作如下：
+该文档只提供短索引；若与 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 不一致，以主看板为准。v0.5.13 已收口 Issue #36–#40 的代码修复和隔离回归；当前直接前置是 Issue #35 的脱敏 VCF 复现与宿主验收，推荐的后续工作如下：
 
 | 顺序 | 工作 | 当前处理方式 |
 |---:|---|---|

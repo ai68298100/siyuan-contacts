@@ -129,13 +129,20 @@ export function graphRegistry(sources: GraphSources): { people: ContactSummary[]
     const orgs = rawOrgs.filter((org) => !duplicateOrgs.has(org.docId) && !overlapping.has(org.docId));
     for (const org of orgs) {
         for (const member of org.memberships) {
-            if (member.status === "active" && !personIds.has(member.personDocId)) {
+            // Historical (former) memberships remain valid graph facts.  Only
+            // memberships whose person is outside the verified roster are
+            // dangling and must be omitted from the rendered member edge.
+            if (!personIds.has(member.personDocId)) {
                 diagnostics.push({ code: "dangling_member", id: member.personDocId, message: `组织 ${org.docId} 的成员 ${member.personDocId} 未唯一登记，未生成成员边。` });
             }
         }
     }
     const overlay = buildOrgAugmentation(orgs.map((org) => ({
-        docId: org.docId, name: org.name, memberDocIds: org.memberships.filter((member) => member.status === "active").map((member) => member.personDocId),
+        // Keep both active and former memberships in the display graph.  The
+        // former status is a lifecycle fact, not a deletion of the historical
+        // organisation affiliation.  `buildOrgAugmentation` still drops
+        // dangling person IDs against the verified roster.
+        docId: org.docId, name: org.name, memberDocIds: org.memberships.map((member) => member.personDocId),
     })), personIds);
     const related = buildGraph(people);
     return { people, organizations: overlay.nodes.sort((left, right) => compareGraphIds(left.id, right.id)),

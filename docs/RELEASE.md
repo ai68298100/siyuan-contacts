@@ -1,5 +1,17 @@
 # 发布清单（RELEASE）
 
+> v0.5.13 发布准备完成：组织历史成员图谱、组织管理切换草稿、联系人文字对齐和 vCard 兼容性修复已通过隔离验证；#35 仍等待脱敏 VCF。
+
+## v0.5.13 发布状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.13
+- [x] README、README.en-US、CHANGELOG 与 v0.5.13 发布说明已更新
+- [x] #36、#37、#38、#39、#40 的代码路径修复并完成回归
+- [x] `pnpm check`、`pnpm test` 596/596、桌面 UI 378/378、移动 UI 378/378
+- [x] `pnpm build`、`pnpm check:release`、`git diff --check`
+- [ ] Issue #35 的原始小米 VCF 未提供，不能确认报告根因
+- [ ] 推送 tag、创建 GitHub Release 并下载复核附件校验和
+
 > v0.5.12 已发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.12)。修复 vCard 导入中空白 `FN` 遮住有效 `N` 姓名回退的边界；Issue #35 仍缺脱敏 VCF 样本，不能确认报告根因。
 
 ## v0.5.12 发布状态

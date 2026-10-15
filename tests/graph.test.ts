@@ -122,8 +122,8 @@ test("图快照：related/member/ref 分源，成员或引用不能缩短人物�
     assert.equal(snapshot.state, "ready");
     assert.deepEqual(snapshot.result.pathIds, ["a", "b", "c"]);
     assert.equal(snapshot.counts.displayedNodes, 5);
-    assert.equal(snapshot.counts.displayedEdges, 4);
-    assert.equal(snapshot.graph.edges.filter((edge) => edge.kind === "member").length, 2);
+    assert.equal(snapshot.counts.displayedEdges, 5);
+    assert.equal(snapshot.graph.edges.filter((edge) => edge.kind === "member").length, 3);
     const mixed = { ...snapshot.graph, edges: [...snapshot.graph.edges, { source: "a", target: "c", kind: "ref" as const }] };
     assert.deepEqual(shortestGraphPath(mixed, "a", "c"), ["a", "b", "c"]);
     assert.deepEqual(secondDegreeGraphIds(mixed, "a"), ["c"]);
@@ -162,11 +162,16 @@ test("图快照：800 预算包含组织且保留低度中心，计数与丢弃�
     assert.deepEqual(buildGraphQuerySnapshot({ ...sources, people: [...sources.people].reverse() }, { ...query, focusId: "1000", compareId: "", orgDocId: "org" }).graph, global.graph);
 });
 
-test("图快照：组织聚焦保留 active 事实，former/归档不成边且查询不走成员边", () => {
+test("图快照：组织聚焦保留 active/former 事实，归档组织不成边且查询不走成员边", () => {
     const { sources, query } = graphFixture();
     const snapshot = buildGraphQuerySnapshot(sources, { ...query, scope: "org", orgDocId: "org", focusId: "", compareId: "" });
-    assert.deepEqual(snapshot.graph.nodes.map((node) => node.id).sort(), ["a", "c", "org"]);
+    assert.deepEqual(snapshot.graph.nodes.map((node) => node.id).sort(), ["a", "c", "d", "org"]);
     assert(snapshot.graph.edges.every((edge) => edge.kind === "member"));
+    assert.deepEqual(snapshot.graph.edges.map((edge) => [edge.source, edge.target]).sort(), [["a", "org"], ["c", "org"], ["d", "org"]]);
+    // Former membership is display-only and must not create a related edge or
+    // change direct/common/path relationship results.
+    assert.deepEqual(snapshot.relationGraph.nodes.map((node) => node.id).sort(), ["a", "c", "d"]);
+    assert.deepEqual(queryGraphRelations(snapshot.relationGraph, "d").neighborIds, []);
     const removed = buildGraphQuerySnapshot({ ...sources, organizations: sources.organizations.map((org) => ({ ...org, archived: true })) }, { ...query, scope: "org", orgDocId: "org" });
     assert.equal(removed.state, "center_missing");
     assert.equal(removed.query.orgDocId, "org");
@@ -216,7 +221,7 @@ test("图快照：引用按登记人物与组织收窄，只有 ref；未知引�
         edges: [{ source: "org", target: "a", kind: "ref" as const }, { source: "a", target: "note", kind: "ref" as const }] };
     const nativeQuery = { ...query, mode: "native" as const, scope: "org" as const, orgDocId: "org" };
     const snapshot = buildGraphQuerySnapshot(sources, nativeQuery, { status: "verified", graph });
-    assert.deepEqual(snapshot.graph.nodes.map((node) => node.id).sort(), ["a", "c", "org"]);
+    assert.deepEqual(snapshot.graph.nodes.map((node) => node.id).sort(), ["a", "c", "d", "org"]);
     assert.equal(snapshot.graph.edges.length, 1);
     assert.equal(snapshot.graph.edges[0].kind, "ref");
     assert.equal(snapshot.result.status, "none");
@@ -250,7 +255,8 @@ test("图快照：范围外关系端点和非组织成员中心保留时明示�
     assert.deepEqual(snapshot.retainedByRange, ["b", "d"]);
     assert(snapshot.graph.nodes.some((node) => node.id === "b"));
     assert(snapshot.graph.nodes.some((node) => node.id === "d"));
-    assert(!snapshot.graph.edges.some((edge) => edge.kind === "member" && (edge.source === "b" || edge.target === "b" || edge.source === "d" || edge.target === "d")));
+    assert(!snapshot.graph.edges.some((edge) => edge.kind === "member" && (edge.source === "b" || edge.target === "b")));
+    assert(snapshot.graph.edges.some((edge) => edge.kind === "member" && (edge.source === "d" || edge.target === "d")));
     assert.deepEqual(snapshot.query.orgDocId, "org");
     assert.equal(snapshot.result.status, "no_path");
 });
