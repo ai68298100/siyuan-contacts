@@ -3,7 +3,7 @@
 - `parseVcfForImport` 逐卡跳过 `FN`/`N` 都为空的合法卡片，不再因首卡无名而中止后续有效联系人；整文件无有效姓名时仍明确失败。
 - 新增混合卡片回归测试；`pnpm check`、596/596 单测、桌面/移动 UI 各 378/378 通过。
 - Issue #35 仍缺真实小米 VCF，仅记录候选格式覆盖，不宣称根因已确认。
-- 本地发布包已构建：`package.zip` 581,455 B，SHA-256 `c3b55321df8b8dfeb36693e96b60783e1e9dec8de548f2b52a7d3c40f9cb319a`；`pnpm check:release` 已通过，待提交、推送 tag 与 GitHub Release。
+- `package.zip` 581,455 B，SHA-256 `c3b55321df8b8dfeb36693e96b60783e1e9dec8de548f2b52a7d3c40f9cb319a`；`pnpm check:release`、tag、GitHub Release 与附件下载复核均已通过。
 
 ## 2026-10-15 v0.5.13 发布准备：组织 Issue 收口
 

@@ -8,7 +8,8 @@
 - [x] vCard 无名卡片逐卡跳过，整文件无有效卡片时明确失败
 - [x] `pnpm check`、`pnpm test` 596/596、桌面/移动 UI 378/378
 - [x] `pnpm build`、`pnpm check:release`、`git diff --check`
-- [ ] tag、GitHub Release 与附件下载复核（本地候选已生成，待推送）
+- [x] annotated tag `v0.5.14` 已推送；[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.14) 已创建
+- [x] Release 附件下载复核一致：`package.zip` 581,455 B，SHA-256 `c3b55321df8b8dfeb36693e96b60783e1e9dec8de548f2b52a7d3c40f9cb319a`
 - [ ] Issue #35 原始小米 VCF 未提供，不能确认候选修复命中根因
 
 本地候选包：`package.zip` 581,455 B，SHA-256 `c3b55321df8b8dfeb36693e96b60783e1e9dec8de548f2b52a7d3c40f9cb319a`。
