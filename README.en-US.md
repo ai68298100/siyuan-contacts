@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.6** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.6) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.15** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.15) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -21,7 +21,106 @@ English | [简体中文](README.md)
 
 Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
 
-## What's new in v0.5.6
+## This release: v0.5.15 (2026-10-16)
+
+This patch fixes a stale-read race in the exchange ledger.
+
+- Confirmed new and updated records remain visible when the host briefly returns an older list.
+- Consecutive writes no longer hide an earlier confirmed record during the stale-read window.
+- Regression coverage now includes creation, consecutive writes, and status changes.
+
+Validation: `pnpm check`, 596 unit tests, and desktop/mobile/host-style UI 381/381 pass.
+
+## Previous release: v0.5.14 (2026-10-16)
+
+This patch fixes vCard imports stopping at a nameless card.
+
+- Cards with both `FN` and `N` empty are skipped individually so later named cards can still be imported.
+- A file with no valid named cards still fails clearly and creates no empty contacts.
+- Issue #35 still lacks the original Xiaomi VCF, so the candidate format root cause remains unconfirmed.
+
+Validation: `pnpm check`, 596 unit tests, and desktop/mobile UI 378/378 pass.
+
+## What's new in v0.5.12
+
+Improved vCard import fallback for blank `FN` values and added strict-import regression coverage for BOM and structured `N` names.
+
+## What's new in v0.5.10
+
+This patch release resolves vertical text compression in the stale-contacts dashboard and streamlines form wording and option hierarchies across creation, editing, and organization workflows.
+
+Fixed: stale contacts layout and text compression
+
+- Eliminated vertical single-character text squeezing caused by unconfigured profile fields in narrow flex containers; compact profile summaries now enforce single-line layout and smooth truncation.
+- Redesigned stale-contacts and upcoming-birthdays lists into modern two-tier card rows with 32px Squircle soft-gradient avatars mapped to five relationship groups.
+
+Improved: creation, edit, and organization form options
+
+- Upgraded primary save and creation buttons from text-only links to solid buttons with 1px top highlights and tactile micro-press feedback.
+- Refined form hint copy, removing internal implementation jargon in favor of natural product descriptions.
+- Reordered organization affiliation categories to match real-world frequency (Work, Education, Family, Other).
+
+Validation: `pnpm check` (0 errors / 0 warnings), 594 unit tests (100% pass), desktop/mobile UI regression 378/378 each, and release gates pass.
+
+## What's new in v0.5.9
+
+This release delivers an extensive modern design overhaul, restoring visual depth, typography hierarchy, micro-interactions, and refined physical feel across both desktop and mobile viewports.
+
+Added: modern design system and layered depth
+
+- Introduced Ambient Occlusion multi-layer soft shadows and 1px inner rim highlights, resolving pale card washout and harsh dark wireframe aesthetics.
+- Upgraded avatars, person details, wizard logos, and organization badges to smooth Squircle geometry with 135° dual-color gradients across five contact groups.
+- Dashboard stats now feature a radial ambient glow and 28px tabular-nums typography.
+
+Added: segmented sliding controls and frosted glass panels
+
+- Rebuilt card/table view toggles as iOS/Linear-grade inset sliding tracks with active floating pill indicators and micro-haptic press feedback.
+- Upgraded dialog backdrops with modern 10px frosted blur (`backdrop-filter: blur(10px)`) and a bold 22px / 700 header layout.
+- Graph controls now float as a frosted capsule island (`blur(16px)`), complemented by a central radial light field.
+- Organization cards feature 40px Squircle badge boxes and active member status breathing dots (Status Dot).
+
+Improved: sidebar, table view, timeline and details
+
+- Sidebar navigation items adopt modern floating pill selection and glowing brand iconography.
+- Contacts table introduces sticky frosted headers (`backdrop-filter: blur(8px)`) and active row accent highlights.
+- Person detail interaction history is restructured into a connected timeline track with stepped cards and dual-color exchange ledger badges.
+- Upgraded settings navigation, tactile iOS 18-grade switches, 18px Squircle welcome wizard, 6px slim frosted scrollbars, and mobile bottom bar blur.
+
+Validation: `pnpm check` (0 errors / 0 warnings), 594 unit tests (100% pass), desktop/mobile UI regression 378/378 each, and production release gates all pass.
+
+## What's new in v0.5.8
+
+This patch release fixes large imports, contact view switching and organization management, and adds batch organization membership actions.
+
+Added: batch add contacts to an organization
+
+- Select multiple contacts and register them in one organization. The selected scope is frozen, archived organizations are disabled, and empty states offer a create-organization route.
+- Loading and saving lock duplicate actions, closing and scope changes.
+
+Improved: batch feedback
+
+- Partial failures show the affected contacts and readable errors; retry only sends failed contacts and never repeats successful writes.
+- Successful writes refresh the roster and expose a clear result.
+
+Fixed: large imports, view flicker and organization layout
+
+- Attribute-view binding and document mapping use verified batches of 50, preventing 400+ imports from stopping after the first 50 contacts.
+- Card/table switching keeps the local view intent, avoids skeleton flicker and restores detail focus after refresh.
+- Organization member controls no longer collapse; desktop dialogs use a wider workspace while mobile remains full screen.
+
+Validation: `pnpm check`, 594 unit tests, desktop/mobile UI regression 378/378 each, `pnpm build` and `pnpm check:release` pass.
+
+## What's new in v0.5.7
+
+### Design tokens and component consistency
+
+- Added a three-layer Primitive → Semantic → Component token system for color, spacing, typography, radii, shadows, z-index, motion and control sizes. Light and dark themes now share the same semantic contract.
+- Unified button, field, checkbox, radio, loading and focus-ring variants so new screens can reuse the same components.
+
+### Measured consolidation
+
+- Token coverage: 38.86% → 41.19%; color literals: 202 → 196; length literals: 2,057 → 1,936; non-4px-grid lengths: 1,159 → 1,071; font-size variants: 29 → 28.
+- Reproduce the audit with pnpm audit:tokens; see [token consolidation report](docs/TOKEN-CONSOLIDATION-2026-10-14.md).
 
 This release completes isolated-kernel and real browser-desktop acceptance, fixes the authentication cleanup boundary, and continues the contact and organization workflow refinements.
 
@@ -82,7 +181,7 @@ Each plugin is maintained independently and can be used on its own or alongside 
 
 Manual installation from GitHub Releases is currently recommended. The Marketplace submission has been merged, but availability in the client has not been verified on a real device.
 
-1. Download package.zip from the [v0.5.5 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.5).
+1. Download package.zip from the latest stable [v0.5.14 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.14).
 2. Extract its contents into data/plugins/siyuan-contacts/ in your SiYuan workspace. plugin.json must be at that directory root.
 3. Restart SiYuan and enable **Lv Contacts** under **Settings → Marketplace → Installed**.
 
@@ -103,7 +202,7 @@ The migration bundle is a JSON value snapshot with a preview and merge flow, not
 - The in-app English translation is incomplete, so some interface text may appear in Chinese.
 - CardDAV address-book sync and CalDAV calendar sync are not supported. Contacts can be exchanged using vCard files.
 
-See the [v0.5.6 release notes](docs/RELEASE-NOTES-v0.5.6.md) for validation scope.
+See the [v0.5.14 release notes](docs/RELEASE-NOTES-v0.5.14.md) for validation scope; previous release notes remain available for v0.5.13, v0.5.12, v0.5.11, v0.5.10, v0.5.9 and v0.5.8.
 
 ## Quick start
 

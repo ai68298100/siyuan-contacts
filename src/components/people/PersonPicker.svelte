@@ -3,6 +3,7 @@
      *  浮层复用 popover 定位原语（B02），在 Peek/工作台滚动容器内不被裁剪。
      *  只改选择交互，不改变调用方的写入语义（选中后由调用方走既有服务）。 */
     import { onDestroy, tick } from "svelte";
+    import { getFrontend } from "siyuan";
     import { attachPopover } from "../../libs/popover";
     import { translateText } from "../../domain/translation";
     import { loadContactAliasIndex } from "../../services/contact-aliases";
@@ -46,6 +47,8 @@
         onSelect: (id: string) => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string) => translateText(i18n, key, fallback));
+    const frontend = getFrontend();
+    const keepOpenOnViewportChange = frontend === "mobile" || frontend === "browser-mobile";
 
     let open = $state(false);
     let query = $state("");
@@ -98,7 +101,12 @@
 
     $effect(() => {
         if (!open || !wrap || !panel) return;
-        return attachPopover(panel, wrap, () => (open = false));
+        // 移动端聚焦搜索框会唤起输入法并触发 viewport resize/scroll；
+        // 这些变化不代表用户要关闭选人器，否则浮层会在键盘出现后立即消失。
+        return attachPopover(panel, wrap, () => (open = false), keepOpenOnViewportChange ? {
+            closeOnScroll: false,
+            closeOnResize: false,
+        } : undefined);
     });
 
     // 浮层由全局 Escape 监听关闭时，把焦点还给触发按钮，避免键盘用户落到页面随机位置。
@@ -113,7 +121,18 @@
     });
 
     export function openPicker(): void {
-        if (!disabled) void show();
+        if (disabled) return;
+        /*
+         * The empty-state CTA lives outside this component's wrapper. If it
+         * opens the picker synchronously, attachPopover installs its global
+         * click listener before the original click finishes bubbling and
+         * immediately treats that same click as an outside click. Defer the
+         * programmatic open until the event has finished propagating; the
+         * picker trigger itself still opens synchronously.
+         */
+        queueMicrotask(() => {
+            if (!disabled) void show();
+        });
     }
 
     async function show(): Promise<void> {
@@ -122,7 +141,8 @@
         open = true;
         void loadAliases();
         await tick();
-        inputEl?.focus();
+        // 已按触发器定位浮层，避免自动聚焦滚动父窗口而触发关闭。
+        inputEl?.focus({ preventScroll: true });
     }
     function choose(item: PickerItem): void {
         open = false;

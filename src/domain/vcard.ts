@@ -50,7 +50,11 @@ interface VCardProperty {
 
 /** 物理行展开：RFC 6350 折行（续行以空格/制表符开头）+ QP 软换行（续行不以空格开头的常见变体） */
 export function unfoldVcfLines(text: string): string[] {
-    const raw = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+    // File.text() decodes UTF-8, preserving a leading BOM when the exporter
+    // writes one.  Treat it as transport metadata so strict import does not
+    // mistake `\uFEFFBEGIN:VCARD` for content outside a card (some mobile
+    // contacts exporters, including common Android variants, do this).
+    const raw = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
     const unfolded: string[] = [];
     for (const line of raw) {
         const isContinuation = (line.startsWith(" ") || line.startsWith("\t")) && unfolded.length > 0;
@@ -113,8 +117,10 @@ export function parseVcfForImport(text: string): VCardContact[] {
         } else if (marker === "END:VCARD") {
             if (!current) throw new Error("vCard 的开始/结束标记不匹配，请修复文件后重试");
             const contact = contactFromCard(current);
-            if (!contact) throw new Error(`第 ${cardNumber} 张卡片缺少 FN/N 姓名，未生成空联系人`);
-            contacts.push(contact);
+            // Android/AOSP exporters may emit a valid phone-only card with
+            // empty FN/N.  The vCard contract says such cards are discarded;
+            // do that per card so a later named contact can still be imported.
+            if (contact) contacts.push(contact);
             current = null;
         } else if (current) {
             if (line.trim() && !parsePropertyLine(line)) throw new Error(`第 ${cardNumber} 张卡片含损坏属性行，请核对原文件`);
@@ -124,7 +130,7 @@ export function parseVcfForImport(text: string): VCardContact[] {
         }
     }
     if (current) throw new Error(`第 ${cardNumber} 张卡片未结束，请修复文件后重试`);
-    if (!contacts.length) throw new Error("文件没有有效 vCard 卡片，请核对 BEGIN:VCARD/END:VCARD 标记");
+    if (!contacts.length) throw new Error("文件没有有效 vCard 卡片，请核对 FN/N 姓名和 BEGIN:VCARD/END:VCARD 标记");
     return contacts;
 }
 
@@ -140,8 +146,10 @@ function contactFromCard(lines: string[]): VCardContact | null {
     };
     const all = (name: string) => props.filter((prop) => prop.name === name).map((prop) => prop.value);
 
-    const fn = first("FN");
-    const name = (fn || structuredName(first("N"))).trim();
+    // Empty or whitespace-only FN values are not usable names; allow a valid
+    // structured N value to serve as the fallback in that case.
+    const fn = first("FN").trim();
+    const name = fn || structuredName(first("N")).trim();
     if (!name) return null;
 
     const phones = all("TEL")

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { requestErrorMessage } from "../../shared/error-presenter";
     /** B13.3 组织管理：组织列表/新建/成员维护（svelteDialog 直挂）。
      *  数据经 facade（listOrganizations/createOrganization/listOrganizationMembers/
      *  addOrganizationMember/removeOrganizationMember/listContacts），写入语义在 services/org。 */
@@ -54,6 +55,9 @@
     let memberOffset = $state(0);
     let memberTotal = $state(0);
     let memberHasMore = $state(false);
+    // Keep the editor open for the established empty-state workflow.  The
+    // template hides it while a selection is still loading so that the loading
+    // frame is not mistaken for an unexplained blank box.
     let showAddMember = $state(true);
     let memberLoading = $state(false);
     let memberError = $state("");
@@ -64,7 +68,7 @@
     let organizationMissing = $state(false);
     let managerElement: HTMLDivElement | undefined = $state();
     let changesReceived = 0;
-    let organizationReadError = "";
+    let organizationReadError = $state("");
     let pendingViewport: ReturnType<typeof captureViewport> | undefined;
     let handledInitialOrgDocId: string | undefined;
     let alive = true;
@@ -81,6 +85,7 @@
     let newOrgName = $state("");
     let addPersonId = $state("");
     let formBusy = $state(false);
+    let formBusyLabel = $state("");
     let recoveryBusy = $state(false);
     const busy = $derived(formBusy || recoveryBusy);
     let loading = $state(true);
@@ -240,7 +245,7 @@
             completedMemberLoad = true;
         } catch (error) {
             if (!alive || request !== organizationsRequest) return;
-            organizationReadError = error instanceof Error ? error.message : String(error);
+            organizationReadError = requestErrorMessage(error);
             errorMessage = organizationReadError;
         } finally {
             if (alive && request === organizationsRequest) {
@@ -267,7 +272,7 @@
     $effect(() => {
         if (!refreshNeeded || busy || loading || organizationsRefreshing || selectionGuardBusy || memberLoading || hasDraft) return;
         refreshNeeded = false;
-        void loadOrgs(true).catch((error) => { if (alive) errorMessage = error instanceof Error ? error.message : String(error); });
+        void loadOrgs(true).catch((error) => { if (alive) errorMessage = requestErrorMessage(error); });
     });
 
     $effect(() => {
@@ -344,7 +349,7 @@
                 if (page.total === 0) showAddMember = true;
             }
         } catch (error) {
-            if (alive && request === membersRequest) memberError = error instanceof Error ? error.message : String(error);
+            if (alive && request === membersRequest) memberError = requestErrorMessage(error);
         } finally {
             if (alive && request === membersRequest) {
                 if (viewport) await restoreViewport(viewport, () => request === membersRequest);
@@ -359,7 +364,7 @@
             try {
                 await loadMembers(true);
             } catch (error) {
-                errorMessage = error instanceof Error ? error.message : String(error);
+                errorMessage = requestErrorMessage(error);
             }
         })();
     }
@@ -370,7 +375,7 @@
             try {
                 await loadMembers(false);
             } catch (error) {
-                errorMessage = error instanceof Error ? error.message : String(error);
+                errorMessage = requestErrorMessage(error);
             }
         })();
     }
@@ -382,7 +387,7 @@
 
     function reloadOrganizations(): void {
         if (busy || loading || memberLoading || organizationsRefreshing || selectionGuardBusy || hasDraft) return;
-        void loadOrgs(true).catch((error) => { if (alive) errorMessage = error instanceof Error ? error.message : String(error); });
+        void loadOrgs(true).catch((error) => { if (alive) errorMessage = requestErrorMessage(error); });
     }
 
     async function loadRoster(): Promise<void> {
@@ -394,7 +399,7 @@
             if (!alive || request !== rosterRequest) return;
             roster = next;
         } catch (error) {
-            if (alive && request === rosterRequest) rosterError = error instanceof Error ? error.message : String(error);
+            if (alive && request === rosterRequest) rosterError = requestErrorMessage(error);
         } finally {
             if (alive && request === rosterRequest) rosterLoading = false;
         }
@@ -410,39 +415,41 @@
                 await loadOrgs(true);
                 await rosterTask;
             } catch (error) {
-                if (alive) errorMessage = error instanceof Error ? error.message : String(error);
+                if (alive) errorMessage = requestErrorMessage(error);
             } finally {
                 if (alive) loading = false;
             }
         })();
     });
 
-    async function run(task: () => Promise<void>): Promise<void> {
+    async function run(task: () => Promise<void>, label = "处理中…"): Promise<void> {
         /* 成员初次读取与组织列表刷新可以与已展示的编辑草稿并行；写操作自身
          * 通过 formBusy 串行化，完成后统一重新读取。这样早到的“编辑”点击不会
          * 因后台刷新标记短暂为 true 而无反馈。 */
         if (busy || loading || selectionGuardBusy || organizationMissing) return;
         formBusy = true;
+        formBusyLabel = label;
         errorMessage = "";
         try {
             await task();
         } catch (error) {
-            if (alive) errorMessage = error instanceof Error ? error.message : String(error);
+            if (alive) errorMessage = requestErrorMessage(error);
         } finally {
-            if (alive) { formBusy = false; recoveryRefreshKey += 1; }
+            if (alive) { formBusy = false; formBusyLabel = ""; recoveryRefreshKey += 1; }
             await tick();
         }
     }
 
     /* 归档/恢复只改组织标记，不依赖成员分页完成；成员列表会在随后统一重读。 */
-    async function runOrganizationStateTask(task: () => Promise<void>): Promise<void> {
+    async function runOrganizationStateTask(task: () => Promise<void>, label = "保存中…"): Promise<void> {
         if (busy || loading || selectionGuardBusy || organizationMissing) return;
         formBusy = true;
+        formBusyLabel = label;
         errorMessage = "";
         try { await task(); }
-        catch (error) { if (alive) errorMessage = error instanceof Error ? error.message : String(error); }
+        catch (error) { if (alive) errorMessage = requestErrorMessage(error); }
         finally {
-            if (alive) formBusy = false;
+            if (alive) { formBusy = false; formBusyLabel = ""; }
             await tick();
         }
     }
@@ -462,6 +469,7 @@
                 addStatusLabel = "";
                 addDepartment = "";
                 addTitle = "";
+                addNote = "";
                 addJoinedOn = "";
                 addLeftOn = "";
                 editingMemberId = "";
@@ -492,7 +500,7 @@
                     return;
                 }
                 if (orgs.find((org) => org.docId === docId)?.archived) showArchived = true;
-                void loadMembers().catch((error) => { if (alive) errorMessage = error instanceof Error ? error.message : String(error); });
+                void loadMembers().catch((error) => { if (alive) errorMessage = requestErrorMessage(error); });
             });
         } finally {
             if (alive) selectionGuardBusy = false;
@@ -503,6 +511,7 @@
         const name = newOrgName.trim();
         if (!name || busy) return;
         formBusy = true;
+        formBusyLabel = "创建中…";
         errorMessage = "";
         void (async () => {
             try {
@@ -513,12 +522,13 @@
                 /* 创建写入已完成，组织刷新是只读收口；允许新组织的成员入口
                    在列表出现后立即可用，不把后台成员读取误报成写入忙态。 */
                 formBusy = false;
+                formBusyLabel = "";
                 await loadOrgs(true);
                 onCreated?.(created.docId);
             } catch (error) {
-                if (alive) errorMessage = error instanceof Error ? error.message : String(error);
+                if (alive) errorMessage = requestErrorMessage(error);
             } finally {
-                if (alive) { formBusy = false; recoveryRefreshKey += 1; }
+                if (alive) { formBusy = false; formBusyLabel = ""; recoveryRefreshKey += 1; }
                 await tick();
             }
         })();
@@ -548,9 +558,8 @@
             addNote = "";
             addJoinedOn = "";
             addLeftOn = "";
-            formBusy = false;
             await loadOrgs(true);
-        });
+        }, "添加中…");
     }
 
     function removeMember(id: string): void {
@@ -561,9 +570,8 @@
             membershipReport = report ?? null;
             removingMemberId = "";
             removingMemberSnapshot = null;
-            formBusy = false;
             await loadOrgs(true);
-        });
+        }, "移除中…");
     }
 
     /** B13.4：进入成员编辑（表单初始化自当前记录） */
@@ -606,9 +614,8 @@
             membershipReport = report ?? null;
             editingMemberId = "";
             editingMemberSnapshot = null;
-            formBusy = false;
             await loadOrgs(true);
-        });
+        }, "保存中…");
     }
 
     function startMoveMember(member: OrganizationMember): void {
@@ -635,10 +642,9 @@
             membershipReport = report ?? null;
             const target = moveTargetOrgId;
             cancelMoveMember();
-            formBusy = false;
             currentOrgDocId = target;
             await loadOrgs(true);
-        });
+        }, "移动中…");
     }
 
     function startReplaceMember(member: OrganizationMember): void {
@@ -675,9 +681,8 @@
             membershipReport = report ?? null;
             replacingMemberId = "";
             replacingMemberSnapshot = null;
-            formBusy = false;
             await loadOrgs(true);
-        });
+        }, "接替中…");
     }
 
     /** B13：归档当前组织（文档与成员记录保留，可恢复） */
@@ -687,9 +692,8 @@
         void runOrganizationStateTask(async () => {
             await facade.archiveOrganization(docId);
             /* 组织状态写入已完成；让恢复/重试入口在成员分页重读期间保持可用。 */
-            formBusy = false;
             await loadOrgs(true);
-        });
+        }, "归档中…");
     }
 
     /** B13：恢复归档组织 */
@@ -698,9 +702,8 @@
         if (!docId || busy) return;
         void runOrganizationStateTask(async () => {
             await facade.restoreOrganization(docId);
-            formBusy = false;
             await loadOrgs(true);
-        });
+        }, "恢复中…");
     }
 
     /** B13.4：组织改名（同名检查与标记块文案同步在服务层） */
@@ -718,9 +721,8 @@
             await facade.renameOrganization(docId, name);
             if (!alive) return;
             renaming = false;
-            formBusy = false;
             await loadOrgs(true);
-        });
+        }, "保存中…");
     }
 
     function cancelRename(): void {
@@ -742,13 +744,23 @@
     }
 </script>
 
-<div class="lvct-dialog-root lvct-org-manager" data-org-doc-id={currentOrgDocId} bind:this={managerElement}>
+<div class="lvct-dialog-root lvct-org-manager" data-org-doc-id={currentOrgDocId} aria-busy={busy} bind:this={managerElement}>
+    {#if busy}<p class="ft__smaller ft__on-surface" role="status" aria-live="polite">{formBusyLabel || "正在处理…"}</p>{/if}
     {#if refreshNeeded}<p class="lvct-org-manager__refresh" role="status">{text("orgMembershipRefreshNeeded", "成员或组织有新变化，重新读取后核对。未保存的表单保留。")}</p>{/if}
     <div class="lvct-org-manager__layout">
         <div class="lvct-org-manager__list">
             <b>{text("orgListTitle", "组织")}</b>
+            {#if organizationReadError}
+                <ViewState compact error title={text("orgLoadFail", "组织列表加载失败")} description={organizationReadError}>
+                    <button type="button" class="b3-button b3-button--outline" onclick={reloadOrganizations} disabled={organizationsRefreshing || busy}>
+                        {text("orgMembershipReloadAll", "重新读取组织和成员")}
+                    </button>
+                </ViewState>
+            {/if}
             {#if loading}
                 <ViewState compact loading title={text("orgLoading", "正在加载组织…")} />
+            {:else if organizationReadError && orgs.length === 0}
+                <!-- 错误和重试入口已在列表标题下方显示。 -->
             {:else if orgs.length === 0 && !organizationMissing && !errorMessage}
                 <p class="ft__smaller ft__on-surface">{text("orgEmpty", "暂无组织。输入名称新建第一个组织。")}</p>
             {:else}
@@ -798,7 +810,10 @@
                     disabled={busy || loading || selectionGuardBusy}
                     aria-label={text("orgCreateLabel", "新建组织名称")}
                 />
-                <button class="b3-button b3-button--text" disabled={busy || loading || selectionGuardBusy || !newOrgName.trim()} onclick={createOrg}>
+                <button class="b3-button b3-button--text"
+                    disabled={busy || loading || selectionGuardBusy || !newOrgName.trim()}
+                    title={busy || loading || selectionGuardBusy ? "组织列表仍在读取或保存，请稍候" : !newOrgName.trim() ? "请输入组织名称后再创建" : undefined}
+                    onclick={createOrg}>
                     {text("orgCreate", "新建组织")}</button>
             </div>
         </div>
@@ -833,7 +848,7 @@
                         {/if}
                     </div>
                 {/if}
-                <div class="lvct-org-manager__members">
+                <div class="lvct-org-manager__members" aria-busy={busy}>
                     <div class="fn__flex" style="gap: 8px; align-items: center; flex-wrap: wrap;">
                         <b>{text("orgMembersTitle", "成员")}</b>
                         <span class="ft__smaller ft__on-surface">{text("orgMemberCount", "{n} 条记录", { n: memberTotal })}</span>
@@ -855,7 +870,7 @@
                         </select>
                     </div>
                     {#if showAddMember}
-                        <div class="lvct-org-manager__add" aria-label={text("orgMemberAddPanel", "添加成员") }>
+                        <div class="lvct-org-manager__add" class:lvct-org-manager__add--loading={memberLoading} aria-label={text("orgMemberAddPanel", "添加成员") }>
                             <p class="ft__smaller ft__on-surface">{text("orgMembershipAddImpact", "添加会登记新期间并更新双方当前双链；已离开的期间保留，重复添加当前成员不新增记录。")}</p>
                             {#if rosterError}
                                 <p class="lvct-form__error" role="alert">{text("orgRosterReadError", "联系人名册读取失败") }：{rosterError}</p>
@@ -878,7 +893,7 @@
                             {/if}
                             <label><span>{text("orgAffiliationKind", "归属分类")}</span>
                                 <select class="b3-select fn__block" bind:value={addAffiliationKind} disabled={busy || !!memberError || !!rosterError || rosterLoading || selectionGuardBusy || !!editingMemberId || !!replacingMemberId || !!removingMemberId || !!movingMemberId || renaming} aria-label={text("orgAffiliationKind", "归属分类")}>
-                                    <option value="family">{affiliationLabel("family")}</option><option value="unspecified">{affiliationLabel("unspecified")}</option><option value="work">{affiliationLabel("work")}</option><option value="education">{affiliationLabel("education")}</option>
+                                    <option value="work">{affiliationLabel("work")}</option><option value="education">{affiliationLabel("education")}</option><option value="family">{affiliationLabel("family")}</option><option value="unspecified">{affiliationLabel("unspecified")}</option>
                                 </select></label>
                             <label><span>{text("orgMemberDeptLabel", "部门")}</span>
                                 <input class="b3-text-field fn__block" bind:value={addDepartment} disabled={busy || !!memberError || !!rosterError || rosterLoading || selectionGuardBusy || !!editingMemberId || !!replacingMemberId || !!removingMemberId || !!movingMemberId || renaming}
@@ -895,7 +910,10 @@
                             <label><span>{text("orgMemberLeftLabel", "离开日期")}</span><input class="b3-text-field fn__block" type="date" bind:value={addLeftOn} disabled={busy || addStatus === "active" || !!memberError || !!rosterError || rosterLoading || selectionGuardBusy || !!editingMemberId || !!replacingMemberId || !!removingMemberId || !!movingMemberId || renaming} aria-label={text("orgMemberLeftLabel", "离开日期")} /></label>
                             <label class="lvct-org-manager__add-note"><span>{text("orgMemberNote", "成员备注")}</span><input class="b3-text-field fn__block" maxlength="240" bind:value={addNote} disabled={busy || !!memberError || !!rosterError || rosterLoading || selectionGuardBusy || !!editingMemberId || !!replacingMemberId || !!removingMemberId || !!movingMemberId || renaming} placeholder={text("orgMemberNotePlaceholder", "仅记录这段组织经历")} /></label>
                             {#if currentOrg?.archived}<p class="ft__smaller ft__on-surface">{text("orgArchivedAddHistoryOnly", "组织已归档，只能补录历史成员记录。")} </p>{/if}
-                            <button class="b3-button b3-button--text" disabled={busy || !!memberError || !!rosterError || rosterLoading || selectionGuardBusy || !addPersonId} onclick={addMember}>{text("orgMemberAdd", "添加成员")}</button>
+                            <button class="b3-button b3-button--text"
+                                disabled={busy || !!memberError || !!rosterError || rosterLoading || selectionGuardBusy || !addPersonId}
+                                title={busy || rosterLoading ? "联系人名册仍在读取，请稍候" : memberError || rosterError ? "请先重新读取联系人名册或成员列表" : selectionGuardBusy ? "正在核对组织关系，请稍候" : !addPersonId ? "请选择联系人后再添加成员" : undefined}
+                                onclick={addMember}>{busy && formBusyLabel === "添加中…" ? "添加中…" : text("orgMemberAdd", "添加成员")}</button>
                         </div>
                     {/if}
                     {#if memberError}
@@ -935,10 +953,10 @@
                                                     aria-label={text("orgMemberTitleLabel", "职位")} /></label>
                                             <label>{text("orgAffiliationKind", "归属分类")}
                                                 <select class="b3-select fn__block" bind:value={replacementAffiliationKind} disabled={busy} aria-label={text("orgAffiliationKind", "归属分类")}>
-                                                    <option value="family">{affiliationLabel("family")}</option>
-                                                    <option value="unspecified">{affiliationLabel("unspecified")}</option>
                                                     <option value="work">{affiliationLabel("work")}</option>
                                                     <option value="education">{affiliationLabel("education")}</option>
+                                                    <option value="family">{affiliationLabel("family")}</option>
+                                                    <option value="unspecified">{affiliationLabel("unspecified")}</option>
                                                 </select></label>
                                             <label>{text("orgMemberFormerLeftLabel", "原成员离开日期")}
                                                 <input class="b3-text-field fn__block" type="date" bind:value={replacementLeftOn} disabled={busy}
@@ -949,7 +967,8 @@
                                             <div class="fn__flex" style="gap: 8px;">
                                                 <button type="button" class="b3-button b3-button--text"
                                                     disabled={busy || !replacementPersonId || !replacementJoinedOn || !replacementLeftOn}
-                                                    onclick={saveReplaceMember}>{text("orgMemberReplaceSave", "保存接替")}</button>
+                                                    title={busy ? "成员资料保存中，请稍候" : !replacementPersonId ? "请选择接替联系人" : !replacementJoinedOn || !replacementLeftOn ? "请填写接替成员加入日期和原成员离开日期" : undefined}
+                                                    onclick={saveReplaceMember}>{busy && formBusyLabel === "接替中…" ? "接替中…" : text("orgMemberReplaceSave", "保存接替")}</button>
                                                 <button type="button" class="b3-button b3-button--cancel" disabled={busy}
                                                     onclick={cancelReplaceMember}>{text("orgMemberReplaceCancel", "取消")}</button>
                                             </div>
@@ -966,7 +985,10 @@
                                                 </select>
                                             </label>
                                             <div class="fn__flex" style="gap: 8px; flex-wrap: wrap;">
-                                                <button type="button" class="b3-button b3-button--text" disabled={busy || !moveTargetOrgId} onclick={saveMoveMember}>{text("orgMemberMoveSave", "确认移动")}</button>
+                                                <button type="button" class="b3-button b3-button--text"
+                                                    disabled={busy || !moveTargetOrgId}
+                                                    title={busy ? "成员资料保存中，请稍候" : !moveTargetOrgId ? "请选择目标组织后再移动" : undefined}
+                                                    onclick={saveMoveMember}>{busy && formBusyLabel === "移动中…" ? "移动中…" : text("orgMemberMoveSave", "确认移动")}</button>
                                                 <button type="button" class="b3-button b3-button--cancel" disabled={busy} onclick={cancelMoveMember}>{text("orgMemberMoveCancel", "取消移动")}</button>
                                             </div>
                                         </div>
@@ -994,15 +1016,15 @@
                                             <label><span>{text("orgMemberNote", "成员备注")}</span><input class="b3-text-field fn__block" maxlength="240" bind:value={editNote} disabled={busy} placeholder={text("orgMemberNotePlaceholder", "仅记录这段组织经历")} /></label>
                                             <label>{text("orgAffiliationKind", "归属分类")}
                                                 <select class="b3-select fn__block" bind:value={editAffiliationKind} disabled={busy} aria-label={text("orgAffiliationKind", "归属分类")}>
-                                                    <option value="family">{affiliationLabel("family")}</option>
-                                                    <option value="unspecified">{affiliationLabel("unspecified")}</option>
                                                     <option value="work">{affiliationLabel("work")}</option>
                                                     <option value="education">{affiliationLabel("education")}</option>
+                                                    <option value="family">{affiliationLabel("family")}</option>
+                                                    <option value="unspecified">{affiliationLabel("unspecified")}</option>
                                                 </select></label>
                                                 <p class="ft__smaller ft__on-surface">{currentOrg?.archived ? "该组织已归档，不能新增或恢复当前归属；可维护现存记录并保留历史。" : text("orgMembershipEditImpact", "保存会更新这段成员记录及双方当前双链；离开保留历史。恢复在职/在学须清空离开日期。")}</p>
                                             <div class="fn__flex" style="gap: 8px;">
                                                 <button type="button" class="b3-button b3-button--text" disabled={busy}
-                                                    onclick={saveEditMember}>{text("orgMemberSave", "保存")}</button>
+                                                    onclick={saveEditMember}>{busy && formBusyLabel === "保存中…" ? "保存中…" : text("orgMemberSave", "保存")}</button>
                                                 <button type="button" class="b3-button b3-button--cancel" disabled={busy}
                                                     onclick={cancelEditMember}>{text("orgMemberCancel", "取消")}</button>
                                             </div>
@@ -1038,7 +1060,7 @@
                                         {#if removingMemberId === member.id}
                                             <div class="lvct-org-manager__member-confirm" role="group" aria-label={text("orgMembershipRemoveConfirm", "确认移除这段成员历史")}>
                                                 <p>{text("orgMembershipRemoveImpact", "将删除这段成员历史并重建双方当前双链。普通离职请编辑为已离开；人物和组织文档保留。")}</p>
-                                                <button class="b3-button b3-button--cancel" disabled={busy} onclick={() => removeMember(member.id)}>{text("orgMembershipRemoveConfirm", "确认移除这段成员历史")}</button>
+                                                <button class="b3-button b3-button--cancel" disabled={busy} onclick={() => removeMember(member.id)}>{busy && formBusyLabel === "移除中…" ? "移除中…" : text("orgMembershipRemoveConfirm", "确认移除这段成员历史")}</button>
                                                 <button class="b3-button b3-button--outline" disabled={busy} onclick={() => (removingMemberId = "")}>{text("orgMemberCancel", "取消")}</button>
                                             </div>
                                         {/if}
@@ -1047,19 +1069,23 @@
                             {/each}
                         </ul>
                         {#if memberHasMore}
-                            <button type="button" class="b3-button b3-button--outline" onclick={loadMoreMembers} disabled={busy || memberLoading || hasDraft || !!memberError || selectionGuardBusy}>
+                            <button type="button" class="b3-button b3-button--outline" onclick={loadMoreMembers}
+                                disabled={busy || memberLoading || hasDraft || !!memberError || selectionGuardBusy}
+                                title={busy || memberLoading ? "成员列表仍在读取，请稍候" : hasDraft ? "请先保存或取消当前成员编辑" : memberError ? "请先重试成员列表读取" : selectionGuardBusy ? "正在核对组织关系，请稍候" : undefined}>
                                 {memberLoading ? text("orgMembersLoading", "正在加载成员…") : text("orgMembersLoadMore", "加载更多")}
                             </button>
                         {/if}
                     {/if}
                 </div>
+            {:else if organizationReadError && orgs.length === 0}
+                <p class="ft__smaller ft__on-surface" role="status">组织列表读取失败，请先在左侧重新读取后再查看成员。</p>
             {:else}
                 <p class="ft__smaller ft__on-surface">{text("orgPickHint", "从左侧选择一个组织查看成员。")}</p>
             {/if}
         </div>
     </div>
-    {#if errorMessage || refreshNeeded}
-        {#if errorMessage}<div class="lvct-form__error" role="alert">{errorMessage}</div>{/if}
+    {#if (errorMessage && errorMessage !== organizationReadError) || refreshNeeded}
+        {#if errorMessage && errorMessage !== organizationReadError}<div class="lvct-form__error" role="alert">{errorMessage}</div>{/if}
         <button class="b3-button b3-button--outline" disabled={busy || loading || memberLoading || organizationsRefreshing || selectionGuardBusy || hasDraft} onclick={reloadOrganizations}>{text("orgMembershipReloadAll", "重新读取组织和成员")}</button>
     {/if}
     <OrgMembershipResult report={membershipReport} {i18n} />

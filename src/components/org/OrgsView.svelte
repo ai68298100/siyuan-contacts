@@ -8,6 +8,7 @@
     import type { OrganizationWithMembers } from "../../services/org";
     import { filterOrganizations, type OrganizationStatusFilter } from "../../domain/organization-scan";
     import { onDestroy } from "svelte";
+    import { requestErrorMessage } from "../../shared/error-presenter";
 
     let {
         facade,
@@ -36,6 +37,7 @@
     let organizationLoadError = $state("");
     let organizationQuery = $state("");
     let organizationStatus = $state<OrganizationStatusFilter>("all");
+    let failedLogoUrls = $state<Record<string, string>>({});
     let refreshVersion = 0;
     let organizationLoadGeneration = 0;
     let alive = true;
@@ -63,11 +65,17 @@
                 return;
             }
             const result = await facade.listOrganizations();
-            if (version === refreshVersion) orgs = result;
+            // 旧版全量入口没有分页代际可依赖；组件卸载后也必须丢弃迟到结果，
+            // 否则切页期间会向已销毁视图回填旧组织列表并触发响应式更新。
+            if (alive && version === refreshVersion && generation === organizationLoadGeneration) orgs = result;
         } catch (error) {
-            if (version === refreshVersion) errorText = error instanceof Error ? error.message : String(error);
+            if (alive && version === refreshVersion && generation === organizationLoadGeneration) {
+                /* 读取失败不能被渲染成空组织列表；保留“待核实”状态和
+                 * 可操作的统一提示，避免暴露内核路由或重复拼接异常细节。 */
+                errorText = `组织状态未核实：${requestErrorMessage(error)}`;
+            }
         } finally {
-            if (version === refreshVersion) loading = false;
+            if (alive && version === refreshVersion && generation === organizationLoadGeneration) loading = false;
         }
     }
 
@@ -91,7 +99,7 @@
             }
         } catch (error) {
             if (alive && version === refreshVersion && generation === organizationLoadGeneration) {
-                organizationLoadError = error instanceof Error ? error.message : String(error);
+                organizationLoadError = requestErrorMessage(error);
             }
         } finally {
             if (generation === organizationLoadGeneration) organizationLoadingMore = false;
@@ -120,6 +128,11 @@
     const organizationFilterActive = $derived(organizationQuery.trim().length > 0 || organizationStatus !== "all");
     const activeCountOf = (org: OrganizationWithMembers) => org.memberships.filter((membership) => membership.status === "active").length;
     const formerCountOf = (org: OrganizationWithMembers) => org.memberships.filter((membership) => membership.status === "former").length;
+    const logoUrlOf = (org: OrganizationWithMembers) => org.profile?.logoDataUrl || org.profile?.logoUrl || "";
+
+    function markLogoFailed(docId: string, url: string) {
+        failedLogoUrls = { ...failedLogoUrls, [docId]: url };
+    }
 </script>
 
 <div class="lvct-orgs-view">
@@ -146,8 +159,10 @@
             placeholder={text("orgsSearchPlaceholder", "按组织名称搜索")}
             bind:value={organizationQuery}
             disabled={loading || !!errorText}
+            title={loading ? "组织列表正在读取，请稍候" : errorText ? "组织列表读取失败，请先重新加载" : undefined}
         />
-        <select class="b3-select lvct-orgs-view__filter" aria-label={text("orgsStatusLabel", "组织状态")} bind:value={organizationStatus} disabled={loading || !!errorText}>
+        <select class="b3-select lvct-orgs-view__filter" aria-label={text("orgsStatusLabel", "组织状态")} bind:value={organizationStatus} disabled={loading || !!errorText}
+            title={loading ? "组织列表正在读取，请稍候" : errorText ? "组织列表读取失败，请先重新加载" : undefined}>
             <option value="all">{text("orgsStatusAll", "全部状态")}</option>
             <option value="active">{text("orgsStatusActive", "仅活跃")}</option>
             <option value="archived">{text("orgsStatusArchived", "仅已归档")}</option>
@@ -158,15 +173,17 @@
             </button>
         {/if}
         <!-- B13.8：手动对账入口（外部编辑无通知时，打开时对账 + 手动刷新兜底） -->
-        <button type="button" class="b3-button b3-button--text" onclick={() => void refresh()} disabled={loading}>
+        <button type="button" class="b3-button b3-button--text" onclick={() => void refresh()} disabled={loading}
+            title={loading ? "组织列表正在读取，请稍候" : undefined}>
             {text("graphReload", "重新加载")}</button>
         <button type="button" class="b3-button b3-button--text" onclick={() => onOpenOrgManager()}>
             {text("orgsManage", "组织管理")}
         </button>
         {#if onCreateOrganization}<button type="button" class="b3-button b3-button--primary" onclick={onCreateOrganization}><Plus size={15} />{text("orgsCreateFirst", "新建组织")}</button>{/if}
         {#if organizationLoadError}
-            <button type="button" class="b3-button b3-button--text" onclick={retryRemainingOrganizations} disabled={organizationLoadingMore}>
-                继续读取
+            <button type="button" class="b3-button b3-button--text" onclick={retryRemainingOrganizations} disabled={organizationLoadingMore}
+                title={organizationLoadingMore ? "组织列表正在继续读取，请稍候" : undefined}>
+                {organizationLoadingMore ? "继续读取中…" : "继续读取"}
             </button>
         {/if}
     </div>
@@ -180,7 +197,8 @@
         <ViewState loading title={text("orgsLoading", "正在加载组织…")} />
     {:else if filteredOrgs.length === 0 && !errorText && !loading && organizationLoadError}
         <ViewState error title="组织列表读取未完成" description={`已读取 ${orgs.length} 个组织，后续读取失败：${organizationLoadError}`}>
-            <button type="button" class="b3-button b3-button--outline" disabled={organizationLoadingMore} onclick={retryRemainingOrganizations}>
+            <button type="button" class="b3-button b3-button--outline" disabled={organizationLoadingMore}
+                title={organizationLoadingMore ? "组织列表正在继续读取，请稍候" : undefined} onclick={retryRemainingOrganizations}>
                 {organizationLoadingMore ? "正在继续读取…" : "继续读取"}
             </button>
         </ViewState>
@@ -200,8 +218,8 @@
             {#each filteredOrgs as org (org.docId)}
                 <div class="lvct-orgs-view__card" data-org-doc-id={org.docId} class:lvct-orgs-view__card--archived={org.archived}>
                     <div class="lvct-orgs-view__card-head">
-                        {#if org.profile?.logoDataUrl || org.profile?.logoUrl}
-                            <img class="lvct-orgs-view__card-logo" src={org.profile.logoDataUrl || org.profile.logoUrl} alt="" />
+                        {#if logoUrlOf(org) && failedLogoUrls[org.docId] !== logoUrlOf(org)}
+                            <img class="lvct-orgs-view__card-logo" src={logoUrlOf(org)} alt="" width="40" height="40" loading="lazy" decoding="async" onerror={() => markLogoFailed(org.docId, logoUrlOf(org))} />
                         {:else}
                             <span class="lvct-orgs-view__card-icon" aria-hidden="true"><Building2 size={16} /></span>
                         {/if}
@@ -215,9 +233,13 @@
                         {#if formerCountOf(org) > 0}<span class="lvct-orgs-view__card-history"> · {formerCountOf(org)} 条历史</span>{/if}
                     </div>
                     <div class="lvct-orgs-view__card-actions">
-                        <button type="button" class="b3-button b3-button--text" disabled={loading || !!errorText} onclick={() => onOpenOrgManager(org.docId)}>
+                        <button type="button" class="b3-button b3-button--text" disabled={loading || !!errorText}
+                            title={loading ? "组织列表正在读取，请稍候" : errorText ? "组织列表读取失败，请先重新加载" : undefined}
+                            onclick={() => onOpenOrgManager(org.docId)}>
                             {text("orgsManageOrg", "管理")}</button>
-                        {#if onEditOrganization}<button type="button" class="b3-button b3-button--text" disabled={loading || !!errorText} onclick={() => onEditOrganization?.(org.docId)}>
+                        {#if onEditOrganization}<button type="button" class="b3-button b3-button--text" disabled={loading || !!errorText}
+                            title={loading ? "组织列表正在读取，请稍候" : errorText ? "组织列表读取失败，请先重新加载" : undefined}
+                            onclick={() => onEditOrganization?.(org.docId)}>
                             {text("orgsEditProfile", "编辑资料")}</button>{/if}
                     </div>
                 </div>

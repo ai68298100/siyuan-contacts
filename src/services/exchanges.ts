@@ -49,8 +49,8 @@ export async function createPersonExchange(plugin: Plugin, input: CreatePersonEx
     return createExchangeRecord(plugin, input);
 }
 
-export async function updatePersonExchange(plugin: Plugin, id: string, patch: ExchangePatch): Promise<ExchangeRecord> {
-    return updateExchangeRecord(plugin, id, patch);
+export async function updatePersonExchange(plugin: Plugin, id: string, patch: ExchangePatch, expected?: Pick<ExchangeRecord, "updatedAt">): Promise<ExchangeRecord> {
+    return updateExchangeRecord(plugin, id, patch, expected);
 }
 
 export async function changePersonExchangeStatus(
@@ -58,6 +58,7 @@ export async function changePersonExchangeStatus(
     id: string,
     status: ExchangeStatus,
     settledOn?: string,
+    expected?: Pick<ExchangeRecord, "updatedAt">,
 ): Promise<ExchangeRecord> {
-    return setExchangeStatus(plugin, id, status, settledOn ?? "");
+    return setExchangeStatus(plugin, id, status, settledOn ?? "", expected);
 }

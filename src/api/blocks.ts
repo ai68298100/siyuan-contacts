@@ -231,6 +231,9 @@ export async function listNotebookDocs(
     const afterClause = afterDocId ? ` AND id > '${afterDocId}'` : "";
     const rows = await querySql<unknown>(
         `SELECT id, content, hpath FROM blocks WHERE type='d' AND box='${notebookId}'${afterClause} ORDER BY id LIMIT ${safeLimit} OFFSET ${safeOffset}`,
+        // 搜索条件在服务层按关键词过滤；同一页的两次扫描可能属于不同搜索代次，
+        // 不能共享旧的 in-flight SQL，否则新关键词会被旧响应卡住。
+        { dedupe: false },
     );
     return rows.map((row) => {
         const record = assertKernelRecord("/api/query/sql", row);

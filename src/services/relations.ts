@@ -30,7 +30,8 @@ export class RelationFactUnknownError extends Error {
     readonly otherItemId: string;
 
     constructor(operation: RelationOperation, personItemId: string, otherItemId: string, cause?: unknown) {
-        super("关系写入已发出，但写后回读未能核实；未自动重试，请重新读取后显式重试。", { cause });
+        const detail = cause instanceof Error && cause.message ? ` ${cause.message}` : "";
+        super(`关系写入已发出，但写后回读未能核实；未自动重试，请重新读取后显式重试。${detail}`, { cause });
         this.name = "RelationFactUnknownError";
         this.operation = operation;
         this.personItemId = personItemId;
@@ -162,11 +163,20 @@ async function mutateRelation(
             const after = await readFreshRoster(settings);
             verified = requirePerson(after, fresh);
             verifiedOther = requirePerson(after, counterpart);
+            const missing: ContactSummary[] = [];
             for (const change of changes) {
                 const actual = requirePerson(after, change.person);
-                if (change.relatedItemIds.some((itemId) => !actual.relatedItemIds.includes(itemId))) {
-                    throw new Error("回读缺少预期关系边，结果尚未核实");
-                }
+                const matches = operation === "add"
+                    ? change.relatedItemIds.every((itemId) => actual.relatedItemIds.includes(itemId))
+                    : !actual.relatedItemIds.includes(change.person.itemId === fresh.itemId ? counterpart.itemId : fresh.itemId);
+                if (!matches) missing.push(change.person);
+            }
+            if (missing.length > 0) {
+                const appliedCount = changes.length - missing.length;
+                const detail = appliedCount > 0
+                    ? `关系写入部分成功：已核实 ${appliedCount} 条，仍有 ${missing.length} 条未更新。`
+                    : "回读缺少预期关系边，结果尚未核实。";
+                throw new Error(detail);
             }
         } catch (error) {
             throw new RelationFactUnknownError(operation, fresh.itemId, other.itemId, error);

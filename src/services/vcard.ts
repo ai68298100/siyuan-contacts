@@ -12,7 +12,7 @@ import { buildContactWritePlan } from "../domain/contact-write.ts";
 import type { ContactsSettings } from "../domain/model";
 import { VCARD_REQUEST_ATTR } from "../api/blocks";
 import { ensurePersonRequestDocument, PersonCreationUnknownError } from "./person-document";
-import { bindDocsAsRows, mapBoundDocIds } from "../api/av";
+import { ATTRIBUTE_VIEW_BATCH_SIZE, bindDocsAsRows, mapBoundDocIds } from "../api/av";
 import { getRoster, invalidateRoster } from "./roster";
 import { assertContactWriteReady, previewContactCreation } from "./contacts";
 import { withStoreLock } from "../data/storage";
@@ -22,7 +22,7 @@ import { writeImportFields } from "./import";
 import type { ImportQueueControl } from "./import";
 import { discoverAllImportCandidates } from "./import-scan";
 
-const BIND_CHUNK = 200;
+const BIND_CHUNK = ATTRIBUTE_VIEW_BATCH_SIZE;
 
 export interface VcfImportPlan {
     contact: VCardContact;
@@ -185,7 +185,7 @@ async function importVcfContactsLocked(
         onProgress?.(done, chosen.length);
     }
 
-    // ② 绑行为联系人（200/批，与收编同款写放大控制）→ ③ 批量映射 → ④ 逐人写单元格。
+    // ② 绑行为联系人（兼容批次）→ ③ 批量映射 → ④ 逐人写单元格。
     // 批量之后的失败无法归因单条写入状态 → unknown（文档可能已建，重试前核对名册）
     for (let start = 0; start < created.length; start += BIND_CHUNK) {
         const chunk = created.slice(start, start + BIND_CHUNK);

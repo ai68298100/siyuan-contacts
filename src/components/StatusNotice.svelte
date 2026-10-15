@@ -2,12 +2,13 @@
     import { onDestroy } from "svelte";
     import { CheckCircle2, CircleAlert } from "@lucide/svelte";
 
-    let { message, error = false, onDismiss, actionLabel, onAction }: {
+    let { message, error = false, onDismiss, actionLabel, onAction, actionDisabled = false }: {
         message: string;
         error?: boolean;
         onDismiss?: () => void;
         actionLabel?: string;
         onAction?: () => void;
+        actionDisabled?: boolean;
     } = $props();
 
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -22,6 +23,6 @@
     <div class="lvct-notice" class:lvct-notice--error={error} role={error ? "alert" : "status"}>
         {#if error}<CircleAlert size={16}/>{:else}<CheckCircle2 size={16}/>{/if}
         <span>{message}</span>
-        {#if actionLabel && onAction}<button type="button" class="lvct-notice__action" onclick={onAction}>{actionLabel}</button>{/if}
+        {#if actionLabel && onAction}<button type="button" class="lvct-notice__action" disabled={actionDisabled} aria-disabled={actionDisabled} onclick={onAction}>{actionLabel}</button>{/if}
     </div>
 {/if}

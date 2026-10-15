@@ -27,7 +27,7 @@ const hooks = registerHooks({
     },
 });
 const { startOrganizationCreate, startOrganizationRename, inspectOrganizationOperation, listPendingOrganizationOperations, resumeOrganizationOperation } = await import("../src/services/organization-writes.ts");
-const { archiveOrganization, createOrganization, renameOrganization } = await import("../src/services/org.ts");
+const { archiveOrganization, createOrganization, renameOrganization, scanOrganizations, invalidateOrganizationScan } = await import("../src/services/org.ts");
 const { ORGANIZATION_OPERATIONS_STORAGE_KEY, saveOrganizationOperation, loadOrganizationOperations } = await import("../src/data/organization-operations.ts");
 const { kernelConfig } = await import("../src/api/client.ts");
 test.after(() => hooks.deregister());
@@ -46,6 +46,9 @@ function fixture() {
         loseCreateResponse: false, skipCreate: false, rejectCreate: false,
         loseTitleResponse: false, rejectTitle: false, loseMarkerResponse: false, rejectMarker: false,
         onJsonSave: undefined as (() => void) | undefined,
+        queryStatements: [] as string[],
+        queryGates: [] as Promise<void>[],
+        onMarkerWrite: undefined as (() => Promise<void>) | undefined,
         onTitleWrite: undefined as (() => Promise<void>) | undefined,
         userBody: "原用户正文与链接",
     };
@@ -67,6 +70,10 @@ function fixture() {
         if (route === "/api/query/sql") {
             if (state.failFacts || state.failFactsAfterWrite && state.writes.length) return rejected();
             const statement = body.stmt;
+            state.queryStatements.push(statement);
+            if (statement.includes("GROUP BY root_id") && state.queryGates.length > 0) {
+                await state.queryGates.shift();
+            }
             if (statement.includes("GROUP BY root_id")) return accepted([...state.markers.values()].map((marker) => ({ root_id: marker.root_id, ial: marker.ial, markerCount: 1 })));
             if (statement.includes("id IN")) return accepted([...state.docs.values()]);
             if (statement.includes("custom-lvct-org-draft=")) {
@@ -103,6 +110,7 @@ function fixture() {
         }
         if (route === "/api/block/updateBlock") {
             state.writes.push("marker");
+            await state.onMarkerWrite?.();
             if (state.rejectMarker) return rejected();
             state.markers.get(body.id)!.markdown = body.data.split("\n")[0];
             state.markers.get(body.id)!.ial = body.data.split("\n").at(-1)!;
@@ -363,4 +371,61 @@ test("组织公共入口：无插件句柄也先拒绝非法名称，同标题�
     addOrganization();
     await renameOrganization(docId, "原组织");
     assert.deepEqual(state.writes, []);
+});
+
+test("组织扫描：并发读取合并为一组 SQL，失效后旧请求不会清掉新 pending", async () => {
+    const { state } = fixture();
+    let releaseFirst!: () => void;
+    let releaseSecond!: () => void;
+    state.queryGates.push(new Promise<void>((resolve) => { releaseFirst = resolve; }));
+
+    const first = scanOrganizations();
+    /* 让首个根标记查询进入 gate，确保 pending 已建立。 */
+    await Promise.resolve();
+    const joined = scanOrganizations();
+    assert.equal(state.queryStatements.filter((stmt) => stmt.includes("GROUP BY root_id")).length, 1);
+
+    /* 新请求必须在失效后重新开始；让新 pending 与旧 pending 短暂重叠，
+       这样旧请求 finally 的清理逻辑才会被真实覆盖。 */
+    invalidateOrganizationScan();
+    state.queryGates.push(new Promise<void>((resolve) => { releaseSecond = resolve; }));
+    const second = scanOrganizations();
+    await Promise.resolve();
+    const secondJoined = scanOrganizations();
+    releaseFirst();
+    const firstResult = await first;
+    const joinedResult = await joined;
+    assert.deepEqual(joinedResult, firstResult);
+    assert.equal(state.queryStatements.filter((stmt) => stmt.includes("GROUP BY root_id")).length, 2);
+    /* first 的 finally 已运行；second 仍应是可复用的 pending。 */
+    const secondStillJoined = scanOrganizations();
+    assert.equal(state.queryStatements.filter((stmt) => stmt.includes("GROUP BY root_id")).length, 2);
+    releaseSecond();
+    await Promise.all([second, secondJoined, secondStillJoined]);
+    assert.equal(state.queryStatements.filter((stmt) => stmt.includes("GROUP BY root_id")).length, 2);
+});
+
+test("组织归档写后失效：核验读取不复用写前仍在途的扫描", async () => {
+    const { state, addOrganization } = fixture();
+    addOrganization();
+    let releaseWrite!: () => void;
+    let enteredWrite!: () => void;
+    state.onMarkerWrite = async () => {
+        enteredWrite();
+        await new Promise<void>((resolve) => { releaseWrite = resolve; });
+    };
+    const writeStarted = new Promise<void>((resolve) => { enteredWrite = resolve; });
+    const archiving = archiveOrganization(docId);
+    await writeStarted;
+
+    let releaseStaleScan!: () => void;
+    state.queryGates.push(new Promise<void>((resolve) => { releaseStaleScan = resolve; }));
+    const staleScan = scanOrganizations();
+    await Promise.resolve();
+    releaseWrite();
+    /* 写后核验应启动第三次根扫描，不应等待仍被 gate 挂起的写前扫描。 */
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    assert.equal(state.queryStatements.filter((stmt) => stmt.includes("GROUP BY root_id")).length, 3);
+    releaseStaleScan();
+    await Promise.all([archiving, staleScan]);
 });

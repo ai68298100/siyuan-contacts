@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { requestErrorMessage } from "../../shared/error-presenter";
     import { onMount, onDestroy } from "svelte";
     /** 交往回顾报表（F12）：区间互动统计与明细，只读投影；可解释口径，无评分 */
     import { monthToDateRange } from "../../domain/review-report";
@@ -83,7 +84,7 @@
             const result = await buildReport(range);
             if (current === request) report = result;
         } catch (error) {
-            if (current === request) errorText = error instanceof Error ? error.message : String(error);
+            if (current === request) errorText = requestErrorMessage(error);
         } finally {
             if (current === request) loading = false;
         }
@@ -98,7 +99,7 @@
             const result = await buildAuditReport(auditReport ?? undefined);
             if (alive && current === auditRequest) { auditReport = result; auditPreviewIssue = null; }
         } catch (error) {
-            if (current === auditRequest) auditErrorText = error instanceof Error ? error.message : String(error);
+            if (current === auditRequest) auditErrorText = requestErrorMessage(error);
         } finally {
             if (current === auditRequest) auditLoading = false;
         }
@@ -114,7 +115,7 @@
             const result = await retryFailedAuditModules(auditReport);
             if (alive && current === auditRequest) { auditReport = result; auditPreviewIssue = null; }
         } catch (error) {
-            if (alive && current === auditRequest) auditErrorText = error instanceof Error ? error.message : String(error);
+            if (alive && current === auditRequest) auditErrorText = requestErrorMessage(error);
         } finally {
             if (alive && current === auditRequest) auditLoading = false;
         }

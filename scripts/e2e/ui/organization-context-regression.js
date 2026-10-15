@@ -140,6 +140,51 @@ export async function runOrganizationContextRegression({ test, assert, kernel, s
         } finally { await unmount(instance); }
     });
 
+    await test("组织管理：首次读取失败显示独立错误态，重试后恢复组织列表", async () => {
+        const state = contextFixture();
+        state.failOrganizations = true;
+        const instance = mount(OrgManagerDialog, { target: fixture, props: { facade: state.facade, onClose() {} } });
+        try {
+            await until(() => fixture.querySelector(".lvct-org-manager__list .lvct-view-state__content")
+                ?.textContent.includes("组织列表加载失败"), "首次读取失败没有显示独立错误态");
+            assert(fixture.querySelectorAll(".lvct-org-manager__orgs").length === 0, "首次读取失败被渲染为空组织列表");
+            assert(fixture.textContent.includes("组织列表读取失败，请先在左侧重新读取后再查看成员。"), "右侧仍提示从左侧选择组织，错误态不一致");
+            const retry = button("重新读取组织和成员", fixture);
+            assert(retry && !retry.disabled, "组织读取失败后重试入口不可用");
+            state.failOrganizations = false;
+            retry.click();
+            await until(() => ready(fixture) && fixture.querySelectorAll(".lvct-org-manager__org-item").length === 2,
+                "组织列表重试成功后没有恢复组织");
+            assert(!fixture.textContent.includes("组织列表加载失败")
+                && fixture.querySelector(".lvct-org-manager__org-item--active")?.textContent.includes("同名单位"), "重试后仍保留错误态或未选择加载成功的组织");
+        } finally { await unmount(instance); }
+    });
+
+    await test("组织管理：确认放弃切换组织时清空成员备注草稿", async () => {
+        const state = contextFixture();
+        const instance = mount(OrgManagerDialog, { target: fixture, props: {
+            facade: state.facade, initialOrgDocId: state.orgB, onClose() {},
+        } });
+        try {
+            await until(() => ready(fixture) && fixture.querySelector(".lvct-org-manager__member"), "组织或成员列表未就绪");
+            const manager = fixture.querySelector(".lvct-org-manager");
+            const note = fixture.querySelector(".lvct-org-manager__add-note input");
+            input(note, "仅属于原组织的备注");
+            const anotherOrg = [...fixture.querySelectorAll(".lvct-org-manager__org-item")]
+                .find((item) => item.textContent.includes("（1）"));
+            assert(anotherOrg, "没有找到目标组织入口");
+            anotherOrg.click();
+            await until(() => document.querySelector('.lvct-closeguard button[data-choice="discard"]'), "切换组织未保护备注草稿");
+            document.querySelector('.lvct-closeguard button[data-choice="discard"]').click();
+            await until(() => manager.dataset.orgDocId === state.orgA && note.isConnected && note.value === "",
+                "放弃原组织草稿后仍把旧备注带入目标组织");
+            assert(state.writes.length === 0, "切换组织意外写入成员记录");
+        } finally {
+            document.querySelector('.lvct-closeguard button[data-choice="cancel"]')?.click();
+            await unmount(instance);
+        }
+    });
+
     await test("组织上下文：initialOrgDocId 变化先守卫，草稿取消保留，放弃才切换，事件只补刷新一次", async () => {
         const state = contextFixture();
         const target = writable(state.orgB);

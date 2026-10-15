@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { requestErrorMessage } from "../../shared/error-presenter";
     /** 新建联系人弹窗 */
     import { ContactCreationError, ContactNameAmbiguityError, createContact } from "../../services/contacts";
     import type { ContactCreationPreview, ContactCreationRequest } from "../../services/contacts";
@@ -14,6 +15,7 @@
     import type { ContactExtendedDraft, ContactOrgAffiliationDraft } from "../../domain/contact-create";
     import { validateContactExtendedDraft } from "../../domain/contact-create";
     import type { SelfIdentity, SelfIdentityChangePreview } from "../../domain/self-identity";
+    import { tick } from "svelte";
 
     let {
         settings,
@@ -61,6 +63,7 @@
     let tagsText: string = $state(initial ? initial.tags.join(" ") : "");
     let running: boolean = $state(false);
     let groupValid = $state(true);
+    let nameInvalid = $state(false);
     let errorText: string = $state("");
     let saved = $state(false);
     let creationPreview = $state<ContactCreationPreview | null>(null);
@@ -84,6 +87,7 @@
     let selfCandidates = $state<ContactSummary[]>([]);
     let selfCandidateItemId = $state("");
     let selfPreview = $state<SelfIdentityChangePreview | null>(null);
+    let nameInput: HTMLInputElement | undefined = $state();
     const extendedSupported = $derived(Boolean(onSaveExtended));
     const currentPreview = $derived(creationPreview?.name === draft.name.trim() ? creationPreview : null);
     function emptyOrgAffiliation(): ContactOrgAffiliationDraft {
@@ -148,7 +152,7 @@
                 try {
                     await onSaveExtended(person, extendedDetails);
                 } catch (error) {
-                    throw new Error(`联系人已创建，但补充资料保存失败：${error instanceof Error ? error.message : String(error)}`);
+                    throw new Error(`联系人已创建，但补充资料保存失败：${requestErrorMessage(error)}`);
                 }
             }
             saved = true;
@@ -168,7 +172,7 @@
         extraLoading = true;
         extraError = "";
         try { orgCandidates = await onLoadOrgCandidates(); }
-        catch (error) { extraError = error instanceof Error ? error.message : String(error); }
+        catch (error) { extraError = requestErrorMessage(error); }
         finally { extraLoading = false; }
     }
     function toggleExtended(): void {
@@ -190,7 +194,7 @@
         if (!onLoadSelfCandidates || selfCandidates.length > 0 || selfSetupBusy) return;
         selfSetupBusy = true;
         try { selfCandidates = await onLoadSelfCandidates(); }
-        catch (error) { selfSetupError = error instanceof Error ? error.message : String(error); }
+        catch (error) { selfSetupError = requestErrorMessage(error); }
         finally { selfSetupBusy = false; }
     }
     async function createSelfProfileFromContact(): Promise<void> {
@@ -204,7 +208,7 @@
             selfSetupOpen = false;
             selfSetupNotice = "本人档案已设置；当前联系人草稿已保留，请继续创建。";
             errorText = "";
-        } catch (error) { selfSetupError = error instanceof Error ? error.message : String(error); }
+        } catch (error) { selfSetupError = requestErrorMessage(error); }
         finally { selfSetupBusy = false; }
     }
     async function previewSelfCandidate(): Promise<void> {
@@ -212,7 +216,7 @@
         selfSetupBusy = true;
         selfSetupError = "";
         try { selfPreview = await onPreviewSelfIdentityChange(selfCandidateItemId); }
-        catch (error) { selfSetupError = error instanceof Error ? error.message : String(error); }
+        catch (error) { selfSetupError = requestErrorMessage(error); }
         finally { selfSetupBusy = false; }
     }
     async function confirmSelfCandidate(): Promise<void> {
@@ -227,10 +231,10 @@
             selfSetupOpen = false;
             selfSetupNotice = `已将「${targetName}」设为本人；当前联系人草稿已保留，请继续创建。`;
             errorText = "";
-        } catch (error) { selfSetupError = error instanceof Error ? error.message : String(error); }
+        } catch (error) { selfSetupError = requestErrorMessage(error); }
         finally { selfSetupBusy = false; }
     }
-    async function createOrganizationFromContact(): Promise<void> {
+    async function createOrganizationFromContact(trigger: HTMLButtonElement): Promise<void> {
         if (!onCreateOrganization || creatingOrganization || running) return;
         creatingOrganization = true;
         extraError = "";
@@ -238,9 +242,11 @@
             await onCreateOrganization();
             await reloadOrgCandidates();
         } catch (error) {
-            extraError = error instanceof Error ? error.message : String(error);
+            extraError = requestErrorMessage(error);
         } finally {
             creatingOrganization = false;
+            await tick();
+            if (trigger.isConnected) trigger.focus({ preventScroll: true });
         }
     }
     function draftChanges(): string[] {
@@ -285,13 +291,20 @@
 
     async function submit() {
         if (running) return;
+        nameInvalid = draft.name.trim().length === 0;
+        if (nameInvalid) {
+            errorText = "";
+            await tick();
+            nameInput?.focus();
+            return;
+        }
         running = true;
         errorText = "";
         try {
             await persist();
             onClose();
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
             if (errorText.includes("请先在设置中指定“我”的档案")) void openSelfSetup();
         } finally {
             running = false;
@@ -308,7 +321,8 @@
     <fieldset class="lvct-form__fields" disabled={running || !!creationRequest}>
     <label class="lvct-form__item">
         <span>{text("formName", "姓名")} <b class="ft__error">*</b></span>
-        <input class="b3-text-field fn__block" type="text" bind:value={draft.name} placeholder={text("formNameHint", "联系人文档名将以此为题")} />
+        <input id="lvct-contact-name" class="b3-text-field fn__block" bind:this={nameInput} type="text" bind:value={draft.name} placeholder={text("formNameHint", "联系人文档名将以此为题")} aria-invalid={nameInvalid} aria-describedby={nameInvalid ? "lvct-contact-name-error" : undefined} oninput={() => { if (draft.name.trim()) nameInvalid = false; }} />
+        {#if nameInvalid}<small id="lvct-contact-name-error" class="lvct-form__error" role="alert">请输入联系人姓名</small>{/if}
     </label>
     <div class="lvct-form__grid">
         <label class="lvct-form__item">
@@ -341,12 +355,12 @@
 
     {#if extendedSupported}
         <section class="lvct-form__optional" aria-labelledby="lvct-contact-extra-toggle">
-            <button id="lvct-contact-extra-toggle" type="button" class="b3-button b3-button--text lvct-form__optional-toggle" aria-expanded={extraOpen} aria-controls="lvct-contact-extra-body" onclick={toggleExtended} disabled={running || !!creationRequest}>
+            <button id="lvct-contact-extra-toggle" type="button" class="b3-button b3-button--text lvct-form__optional-toggle" aria-expanded={extraOpen} aria-controls={extraOpen ? "lvct-contact-extra-body" : undefined} onclick={toggleExtended} disabled={running || !!creationRequest}>
                 {extraOpen ? "收起补充资料" : "补充资料（可选）"}
             </button>
             {#if extraOpen}
                 <div id="lvct-contact-extra-body" class="lvct-form__optional-body">
-                    <p id="lvct-contact-extra-title" class="ft__smaller ft__on-surface">姓名是唯一必填项；组织、关系和备注可在创建后继续修改。</p>
+                    <p id="lvct-contact-extra-title" class="ft__smaller ft__on-surface">姓名是必填项，组织、称谓和备注可在创建后随时在联系人详情中修改。</p>
                     {#if onLoadOrgCandidates}
                         <div class="lvct-form__actions"><b>组织经历（可选，可添加多条）</b><button type="button" class="b3-button b3-button--outline" onclick={() => orgAffiliations = [...orgAffiliations, emptyOrgAffiliation()]} disabled={running || extraLoading}>添加组织经历</button></div>
                         {#each orgAffiliations as affiliation, index (index)}
@@ -355,7 +369,7 @@
                                     <option value="">{extraLoading ? "读取组织中…" : "选择组织…"}</option>{#each orgCandidates as org (org.docId)}<option value={org.docId}>{org.name}{org.archived ? "（已归档，仅补录历史）" : ""}</option>{/each}
                                 </select></label>
                                 <label class="lvct-form__item"><span>归属分类</span><select class="b3-select fn__block" value={affiliation.orgAffiliationKind} onchange={(event) => patchOrgAffiliation(index, { orgAffiliationKind: event.currentTarget.value as ContactOrgAffiliationDraft["orgAffiliationKind"] })} disabled={running || !affiliation.orgDocId}>
-                                    <option value="family">家庭</option><option value="unspecified">其他组织</option><option value="work">工作单位</option><option value="education">学校</option>
+                                    <option value="work">工作单位</option><option value="education">学校</option><option value="family">家庭</option><option value="unspecified">其他组织</option>
                                 </select></label>
                                 <label class="lvct-form__item"><span>状态</span><select class="b3-select fn__block" value={affiliation.orgStatus} onchange={(event) => changeOrgStatus(index, event.currentTarget.value as ContactOrgAffiliationDraft["orgStatus"])} disabled={running || !affiliation.orgDocId}>
                                     <option value="active" disabled={Boolean(orgCandidates.find((org) => org.docId === affiliation.orgDocId)?.archived)}>当前在职/就读</option><option value="former">已离开/毕业</option>
@@ -371,7 +385,7 @@
                             </div>
                         {/each}
                         {#if !extraLoading}
-                            <span class="lvct-form__hint">{orgCandidates.length === 0 ? "暂无可选组织。" : "没有合适组织？"}{#if onCreateOrganization}<button type="button" class="b3-button b3-button--text lvct-form__inline-action" onclick={() => void createOrganizationFromContact()} disabled={running || creatingOrganization}>{creatingOrganization ? "组织创建中…" : "新建组织"}</button>{/if}<button type="button" class="b3-button b3-button--text lvct-form__inline-action" onclick={() => void reloadOrgCandidates()} disabled={running || creatingOrganization}>重新读取</button></span>
+                            <span class="lvct-form__hint">{orgCandidates.length === 0 ? "暂无可选组织。" : "没有合适组织？"}{#if onCreateOrganization}<button type="button" class="b3-button b3-button--text lvct-form__inline-action" onclick={(event) => void createOrganizationFromContact(event.currentTarget)} disabled={running || creatingOrganization}>{creatingOrganization ? "组织创建中…" : "新建组织"}</button>{/if}<button type="button" class="b3-button b3-button--text lvct-form__inline-action" onclick={() => void reloadOrgCandidates()} disabled={running || creatingOrganization}>重新读取</button></span>
                         {/if}
                         {#if extraError}<p class="lvct-form__error" role="alert">组织读取失败：{extraError} <button type="button" class="b3-button b3-button--text" onclick={() => void openExtended()}>重试</button></p>{/if}
                     {/if}
@@ -409,7 +423,7 @@
 
         {#if errorText}
             <!-- D-35：读屏即时播报（role=alert），focus 落到错误块便于键盘继续操作 -->
-            <div class="lvct-form__error" role="alert" tabindex="-1" bind:this={errorEl}>{errorText}</div>
+            <div id="lvct-contact-error" class="lvct-form__error" role="alert" tabindex="-1" bind:this={errorEl}>{errorText}</div>
         {/if}
         {#if selfSetupOpen}
             <section class="lvct-form__optional-body" aria-label="设置本人档案" aria-busy={selfSetupBusy}>
@@ -452,12 +466,12 @@
 
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={running}>{text("formCancel", "取消")}</button>
-        <button class="b3-button b3-button--text" onclick={submit} disabled={running || !groupValid || draft.name.trim().length === 0 || !!currentPreview && !creationRequest && !creationChoice}>
+        <button class="b3-button b3-button--primary" onclick={submit} disabled={running || !groupValid || !!currentPreview && !creationRequest && !creationChoice}>
             {running ? text("formCreating", "创建中…") : creationRequest ? text("contactContinueCreation", "核实并继续原请求") : text("formCreate", "创建联系人")}
         </button>
     </div>
     <p class="ft__smaller ft__on-surface lvct-form__hint">
-        {text("formCreateHint", "将创建文档「{name}」并绑定为数据库一行；同名候选须核对后选择具体文档或独立人物。", { name: draft.name || "…" })}
+        {text("formCreateHint", "将在人脉笔记本中创建「{name}」文档并建立档案卡片；同名候选须核对后选择具体文档或独立人物。", { name: draft.name || "…" })}
     </p>
 </div>
 

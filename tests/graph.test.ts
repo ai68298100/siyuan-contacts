@@ -46,6 +46,17 @@ test("orderGraph：未声明边类型规范化为 related，输入顺序不影�
     assert.deepEqual(first.nodes.map((node) => node.degree), [1, 1]);
 });
 
+test("orderGraph：不同成员生命周期状态保留为独立展示边", () => {
+    const nodes = ["person", "org"].map((id) => ({ id, label: id, group: "", degree: 0 }));
+    const graph = orderGraph({ nodes, edges: [
+        { source: "org", target: "person", kind: "member" as const, memberStatus: "former" as const },
+        { source: "person", target: "org", kind: "member" as const, memberStatus: "active" as const },
+        { source: "person", target: "org", kind: "member" as const, memberStatus: "active" as const },
+    ] });
+    assert.deepEqual(graph.edges.map((edge) => edge.memberStatus), ["active", "former"]);
+    assert.deepEqual(graph.nodes.map((node) => node.degree), [2, 2]);
+});
+
 test("最短路径：优先较短链路、支持反向关系且不改变输入", () => {
     const graph = {
         nodes: ["a", "b", "c", "d", "e"].map((id) => ({ id, label: id, group: "", degree: 0 })),
@@ -122,8 +133,8 @@ test("图快照：related/member/ref 分源，成员或引用不能缩短人物�
     assert.equal(snapshot.state, "ready");
     assert.deepEqual(snapshot.result.pathIds, ["a", "b", "c"]);
     assert.equal(snapshot.counts.displayedNodes, 5);
-    assert.equal(snapshot.counts.displayedEdges, 4);
-    assert.equal(snapshot.graph.edges.filter((edge) => edge.kind === "member").length, 2);
+    assert.equal(snapshot.counts.displayedEdges, 5);
+    assert.equal(snapshot.graph.edges.filter((edge) => edge.kind === "member").length, 3);
     const mixed = { ...snapshot.graph, edges: [...snapshot.graph.edges, { source: "a", target: "c", kind: "ref" as const }] };
     assert.deepEqual(shortestGraphPath(mixed, "a", "c"), ["a", "b", "c"]);
     assert.deepEqual(secondDegreeGraphIds(mixed, "a"), ["c"]);
@@ -162,11 +173,21 @@ test("图快照：800 预算包含组织且保留低度中心，计数与丢弃�
     assert.deepEqual(buildGraphQuerySnapshot({ ...sources, people: [...sources.people].reverse() }, { ...query, focusId: "1000", compareId: "", orgDocId: "org" }).graph, global.graph);
 });
 
-test("图快照：组织聚焦保留 active 事实，former/归档不成边且查询不走成员边", () => {
+test("图快照：组织聚焦保留 active/former 事实，归档组织不成边且查询不走成员边", () => {
     const { sources, query } = graphFixture();
     const snapshot = buildGraphQuerySnapshot(sources, { ...query, scope: "org", orgDocId: "org", focusId: "", compareId: "" });
-    assert.deepEqual(snapshot.graph.nodes.map((node) => node.id).sort(), ["a", "c", "org"]);
+    assert.deepEqual(snapshot.graph.nodes.map((node) => node.id).sort(), ["a", "c", "d", "org"]);
     assert(snapshot.graph.edges.every((edge) => edge.kind === "member"));
+    assert.deepEqual(snapshot.graph.edges.map((edge) => [edge.source, edge.target]).sort(), [["a", "org"], ["c", "org"], ["d", "org"]]);
+    const memberStatus = (personId: string) => snapshot.graph.edges.find((edge) => edge.kind === "member"
+        && (edge.source === personId || edge.target === personId))?.memberStatus;
+    assert.equal(memberStatus("a"), "active");
+    assert.equal(memberStatus("c"), "active");
+    assert.equal(memberStatus("d"), "former");
+    // Former membership is display-only and must not create a related edge or
+    // change direct/common/path relationship results.
+    assert.deepEqual(snapshot.relationGraph.nodes.map((node) => node.id).sort(), ["a", "c", "d"]);
+    assert.deepEqual(queryGraphRelations(snapshot.relationGraph, "d").neighborIds, []);
     const removed = buildGraphQuerySnapshot({ ...sources, organizations: sources.organizations.map((org) => ({ ...org, archived: true })) }, { ...query, scope: "org", orgDocId: "org" });
     assert.equal(removed.state, "center_missing");
     assert.equal(removed.query.orgDocId, "org");
@@ -205,7 +226,9 @@ test("图快照：筛选保中心，重复身份排除，已删除查询端点�
     assert(!snapshot.graph.nodes.some((node) => node.id === "a"));
     const tooSmall = buildGraphQuerySnapshot(sources, { ...query, orgDocId: "org", maxNodes: 1 });
     assert.equal(tooSmall.state, "unknown");
-    assert(tooSmall.diagnostics.some((entry) => entry.code === "budget_unknown"));
+    const budgetDiagnostic = tooSmall.diagnostics.find((entry) => entry.code === "budget_unknown");
+    assert(budgetDiagnostic);
+    assert.match(budgetDiagnostic.message, /节点预算不足以保留查询中心/);
 });
 
 test("图快照：引用按登记人物与组织收窄，只有 ref；未知引用明确停止", () => {
@@ -214,7 +237,7 @@ test("图快照：引用按登记人物与组织收窄，只有 ref；未知引�
         edges: [{ source: "org", target: "a", kind: "ref" as const }, { source: "a", target: "note", kind: "ref" as const }] };
     const nativeQuery = { ...query, mode: "native" as const, scope: "org" as const, orgDocId: "org" };
     const snapshot = buildGraphQuerySnapshot(sources, nativeQuery, { status: "verified", graph });
-    assert.deepEqual(snapshot.graph.nodes.map((node) => node.id).sort(), ["a", "c", "org"]);
+    assert.deepEqual(snapshot.graph.nodes.map((node) => node.id).sort(), ["a", "c", "d", "org"]);
     assert.equal(snapshot.graph.edges.length, 1);
     assert.equal(snapshot.graph.edges[0].kind, "ref");
     assert.equal(snapshot.result.status, "none");
@@ -248,7 +271,8 @@ test("图快照：范围外关系端点和非组织成员中心保留时明示�
     assert.deepEqual(snapshot.retainedByRange, ["b", "d"]);
     assert(snapshot.graph.nodes.some((node) => node.id === "b"));
     assert(snapshot.graph.nodes.some((node) => node.id === "d"));
-    assert(!snapshot.graph.edges.some((edge) => edge.kind === "member" && (edge.source === "b" || edge.target === "b" || edge.source === "d" || edge.target === "d")));
+    assert(!snapshot.graph.edges.some((edge) => edge.kind === "member" && (edge.source === "b" || edge.target === "b")));
+    assert(snapshot.graph.edges.some((edge) => edge.kind === "member" && (edge.source === "d" || edge.target === "d")));
     assert.deepEqual(snapshot.query.orgDocId, "org");
     assert.equal(snapshot.result.status, "no_path");
 });
@@ -349,25 +373,27 @@ test("capGraph：超限时按度数保留头部节点，只留两端存活的边
 test("组织增强（B14.6）：成员边只连名册内人物，多段记录合并，kind/degree 正确", () => {
     const roster = new Set(["d-1", "d-2", "d-3"]);
     const augmentation = buildOrgAugmentation([
-        { docId: "org-1", name: "曙光科技", memberDocIds: ["d-1", "d-1", "ghost", "", "org-1", "d-2"] },
-        { docId: "org-2", name: "无成员组织", memberDocIds: [] },
+        { docId: "org-1", name: "曙光科技", memberships: [
+            { personDocId: "d-1", status: "active" }, { personDocId: "d-1", status: "former" },
+            { personDocId: "ghost", status: "active" }, { personDocId: "", status: "active" },
+            { personDocId: "org-1", status: "active" }, { personDocId: "d-2", status: "former" },
+        ] },
+        { docId: "org-2", name: "无成员组织", memberships: [] },
     ], roster);
     assert.equal(augmentation.nodes.length, 2);
     const org1 = augmentation.nodes.find((node) => node.id === "org-1");
     assert.equal(org1?.kind, "org");
     assert.equal(org1?.group, "组织");
     assert.equal(org1?.degree, 2);
-    assert.deepEqual(
-        augmentation.edges.filter((edge) => edge.source === "org-1").map((edge) => edge.target).sort(),
-        ["d-1", "d-2"],
-    );
+    assert.deepEqual(augmentation.edges.filter((edge) => edge.source === "org-1")
+        .map((edge) => [edge.target, edge.memberStatus]).sort(), [["d-1", "mixed"], ["d-2", "former"]]);
     for (const edge of augmentation.edges) {
         assert.equal(edge.kind, "member", "成员边必须标记 kind=member");
         assert.notEqual(edge.target, edge.source, "不造自环");
         assert.ok(roster.has(edge.target), "不连名册外人物");
     }
     assert.deepEqual(buildOrgAugmentation([], roster), { nodes: [], edges: [] });
-    assert.equal(buildOrgAugmentation([{ docId: "org-3", name: "", memberDocIds: ["d-1"] }], roster).nodes.length, 0, "无名可称的组织跳过");
+    assert.equal(buildOrgAugmentation([{ docId: "org-3", name: "", memberships: [{ personDocId: "d-1", status: "active" }] }], roster).nodes.length, 0, "无名可称的组织跳过");
 });
 
 test("组织增强不污染 related 图：成员边不进 buildGraph 产物，查询图保持纯 related", () => {
@@ -377,7 +403,7 @@ test("组织增强不污染 related 图：成员边不进 buildGraph 产物，�
     ];
     const related = buildGraph(people);
     const augmentation = buildOrgAugmentation(
-        [{ docId: "org-1", name: "组织", memberDocIds: ["d-1", "d-2"] }],
+        [{ docId: "org-1", name: "组织", memberships: [{ personDocId: "d-1", status: "active" }, { personDocId: "d-2", status: "former" }] }],
         new Set(["d-1", "d-2"]),
     );
     /* 关系查询只吃 related 图：甲乙同组织但没有显式 related → 无边、非二度 */

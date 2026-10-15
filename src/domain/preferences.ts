@@ -5,6 +5,10 @@ import type { SavedView } from "./saved-views";
 export const VIEW_PREFERENCES_STORAGE_KEY = "view-preferences.json";
 export const VIEW_PREFERENCES_VERSION = 1;
 
+/** 品牌头像 data URL 的最大长度（约 1 MB 图片，避免偏好文件被大图拖慢）。 */
+export const BRAND_AVATAR_IMAGE_MAX_LENGTH = 1_500_000;
+const BRAND_AVATAR_IMAGE_PATTERN = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/;
+
 export type DefaultView = "home" | "people" | "graph" | "orgs";
 export type PeopleSortMode = "name" | "group" | "birthday" | "recent";
 /** 联系人默认形态（F02）：卡片 / 表格 */
@@ -16,6 +20,21 @@ export type PeopleTableColumn = "group" | "phone" | "wechat" | "birthday" | "rec
 export type GraphViewMode = "relations" | "native";
 /** 文档引用图范围（B14.8/B14.4）：self=以本人为中心一度；person=以指定联系人为中心一度；global=全部登记文档 */
 export type NativeGraphScope = "self" | "person" | "global";
+
+/** 仅接受可内嵌的常见位图，避免把远程资源或任意内容写进偏好。 */
+export function isValidBrandAvatarImage(value: unknown): boolean {
+    return typeof value === "string"
+        && value.length > 0
+        && value.length <= BRAND_AVATAR_IMAGE_MAX_LENGTH
+        && BRAND_AVATAR_IMAGE_PATTERN.test(value)
+        && ((value.slice(value.indexOf(",") + 1).length % 4) === 0);
+}
+
+function normalizeBrandAvatarText(value: unknown): string {
+    if (typeof value !== "string") return DEFAULT_VIEW_PREFERENCES.brandAvatar;
+    const text = Array.from(value.trim()).slice(0, 4).join("");
+    return text || DEFAULT_VIEW_PREFERENCES.brandAvatar;
+}
 
 /** 表格可选列的展示顺序默认值（常用常驻、次要折叠的排序基础） */
 export const PEOPLE_TABLE_COLUMNS: readonly PeopleTableColumn[] = ["group", "phone", "wechat", "birthday", "recent", "tags", "org", "school", "relationship"];
@@ -48,6 +67,10 @@ export interface ViewPreferences {
     readonly reminderGraceDays: number;
     /** 新用户首页快速开始引导是否已关闭。 */
     readonly onboardingDismissed: boolean;
+    /** 工作台左上角品牌头像文字；仅影响品牌标记，不改变联系人头像。 */
+    readonly brandAvatar: string;
+    /** 工作台左上角品牌头像图片；仅接受受限 data URL，空串表示使用文字头像。 */
+    readonly brandAvatarImage: string;
 }
 
 export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
@@ -69,6 +92,8 @@ export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
     summaryDismissedOn: "",
     reminderGraceDays: 14,
     onboardingDismissed: false,
+    brandAvatar: "驴",
+    brandAvatarImage: "",
 };
 
 /** 设置页数字输入的保存前校验：必须是 0–365 的整数。 */
@@ -143,6 +168,8 @@ export function normalizeViewPreferences(raw: unknown): ViewPreferences {
         onboardingDismissed: typeof record.onboardingDismissed === "boolean"
             ? record.onboardingDismissed
             : DEFAULT_VIEW_PREFERENCES.onboardingDismissed,
+        brandAvatar: normalizeBrandAvatarText(record.brandAvatar),
+        brandAvatarImage: isValidBrandAvatarImage(record.brandAvatarImage) ? record.brandAvatarImage as string : "",
     };
 }
 

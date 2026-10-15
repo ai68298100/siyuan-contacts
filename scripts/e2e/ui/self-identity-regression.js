@@ -251,6 +251,13 @@ export async function runSelfIdentityRegression({ test, assert, kernel, settings
             }
             picker.click();
             await until(() => fixture.querySelector(".lvct-picker__panel"), "本人改绑选人器浮层未打开");
+            if (new URLSearchParams(window.location.search).get("mobile") === "1") {
+                // 移动端软键盘会让 WebView 触发 resize/scroll；选人浮层应重新定位并保持打开。
+                window.dispatchEvent(new Event("resize"));
+                window.dispatchEvent(new Event("scroll"));
+                await tick();
+                assert(fixture.querySelector(".lvct-picker__panel"), "输入法引起 viewport 变化后本人改绑浮层被错误关闭");
+            }
             const targetOption = [...fixture.querySelectorAll(".lvct-picker__option")]
                 .find((node) => node.textContent.includes("同名本人"));
             assert(targetOption, "本人改绑候选未显示");

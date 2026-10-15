@@ -14,6 +14,7 @@
     import { useCloseGuard } from "../close-guard";
     import { CheckCircle2 } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
+    import { requestErrorMessage } from "../../shared/error-presenter";
 
     let {
         settings,
@@ -121,7 +122,7 @@
             await persistCurrent();
             advance();
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
             if (currentPerson && !results[currentPerson.docId]) results[currentPerson.docId] = "未核实，原输入保留";
         } finally {
             running = false;
@@ -141,7 +142,7 @@
             await persistCurrent();
             advance();
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
             if (currentPerson && !results[currentPerson.docId]) results[currentPerson.docId] = "未核实，原输入保留";
         } finally {
             running = false;

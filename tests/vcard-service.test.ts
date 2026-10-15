@@ -76,6 +76,31 @@ test("批量入口：明确确认同批同名建两份独立文档，仍合并�
     assert.deepEqual(state.writes.map((write) => write.value.phone.content), ["13800000005", "13800000006"]);
 });
 
+test("大批量 vCard 导入按兼容批次绑定并完整核实，不丢失第 51 项之后的联系人", async () => {
+    const { state, kernel } = fixture();
+    const mapBatchSizes: number[] = [];
+    const baseHandler = kernel.handler;
+    kernel.handler = async (route, body) => {
+        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") mapBatchSizes.push((body.blockIDs as string[]).length);
+        const result = await baseHandler(route, body);
+        // 模拟旧宿主/代理只返回前 50 个映射；生产 API 层必须在请求前拆分，
+        // 否则第 51 项之后会被误判为未绑定。
+        if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") {
+            return Object.fromEntries(Object.entries(result as Record<string, string>).slice(0, 50));
+        }
+        return result;
+    };
+    const cards = Array.from({ length: 101 }, (_, index) =>
+        `BEGIN:VCARD\r\nVERSION:3.0\r\nFN:批量人物 ${index + 1}\r\nEND:VCARD\r\n`).join("");
+    const plans = await buildVcfImportPlan(settings, cards);
+    const report = await importVcfContacts(settings, plans.map((plan, planIndex) => ({ plan, planIndex })));
+    assert.equal(report.imported, 101);
+    assert.equal(report.unknown.length + report.failed.length, 0);
+    assert.deepEqual(state.binds.map((request) => request.srcs.length), [50, 50, 1]);
+    assert.ok(mapBatchSizes.length > 0 && Math.max(...mapBatchSizes) <= 50);
+    assert.equal(state.rows.size, 101);
+});
+
 test("未明确确认的名册同名项默认跳过，零建档/绑定/资料写入", async () => {
     const { state } = fixture();
     state.sameName(name);

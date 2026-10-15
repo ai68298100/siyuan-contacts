@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_VIEW_PREFERENCES, isValidPreferenceDays, normalizeTableColumns, normalizeViewPreferences } from "../src/domain/preferences.ts";
+import { BRAND_AVATAR_IMAGE_MAX_LENGTH, DEFAULT_VIEW_PREFERENCES, isValidBrandAvatarImage, isValidPreferenceDays, normalizeTableColumns, normalizeViewPreferences } from "../src/domain/preferences.ts";
 import type { ViewPreferences } from "../src/domain/preferences.ts";
 import type { Plugin } from "siyuan";
 import { applyPreferencePatch, decodeViewPreferences, diffViewPreferences, rebasePreferenceDraft } from "../src/domain/preferences-concurrency.ts";
@@ -16,6 +16,37 @@ test("视图偏好：首页快速开始引导状态兼容旧数据", () => {
     assert.equal(normalizeViewPreferences({ onboardingDismissed: true }).onboardingDismissed, true);
     assert.equal(normalizeViewPreferences({ onboardingDismissed: false }).onboardingDismissed, false);
     assert.equal(normalizeViewPreferences({ onboardingDismissed: "true" }).onboardingDismissed, false);
+});
+
+test("工作台品牌头像：旧偏好回退简洁默认，文字裁剪并优先图片", () => {
+    const legacy = normalizeViewPreferences({});
+    assert.equal(legacy.brandAvatar, "驴");
+    assert.equal(legacy.brandAvatarImage, "");
+    const image = "data:image/png;base64,AAAA";
+    const customized = normalizeViewPreferences({ brandAvatar: "  小驴人脉  ", brandAvatarImage: image });
+    assert.equal(customized.brandAvatar, "小驴人脉");
+    assert.equal(customized.brandAvatarImage, image);
+    assert.equal(normalizeViewPreferences({ brandAvatar: "   " }).brandAvatar, "驴");
+    assert.equal(normalizeViewPreferences({ brandAvatar: "一二三四五" }).brandAvatar, "一二三四");
+});
+
+test("工作台品牌头像：仅接受受限的位图 data URL", () => {
+    assert.equal(isValidBrandAvatarImage("data:image/png;base64,AAAA"), true);
+    assert.equal(isValidBrandAvatarImage("data:image/jpeg;base64,AAA="), true);
+    assert.equal(isValidBrandAvatarImage("https://example.com/avatar.png"), false);
+    assert.equal(isValidBrandAvatarImage("data:image/svg+xml;base64,AAAA"), false);
+    assert.equal(isValidBrandAvatarImage("data:image/png;base64,not-base64?"), false);
+    assert.equal(isValidBrandAvatarImage(`data:image/png;base64,${"A".repeat(BRAND_AVATAR_IMAGE_MAX_LENGTH)}`), false);
+    assert.equal(normalizeViewPreferences({ brandAvatarImage: "https://example.com/avatar.png" }).brandAvatarImage, "");
+});
+
+test("工作台品牌头像：并发差异会包含文字与图片偏好", () => {
+    const image = "data:image/webp;base64,AAAA";
+    assert.deepEqual(diffViewPreferences(DEFAULT_VIEW_PREFERENCES, {
+        ...DEFAULT_VIEW_PREFERENCES,
+        brandAvatar: "我",
+        brandAvatarImage: image,
+    }), { brandAvatar: "我", brandAvatarImage: image });
 });
 
 test("设置页提醒数字：保存前只接受 0–365 的整数", () => {

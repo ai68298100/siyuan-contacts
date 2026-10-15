@@ -1,0 +1,40 @@
+{
+  "checkedAt": "2026-10-12T11:29:19.168Z",
+  "results": [
+    {
+      "name": "隔离内核启动",
+      "ok": true,
+      "detail": "v3.8.7-alpha.7; 随机回环端口; 独立标记工作区"
+    },
+    {
+      "name": "生产局部引用投影",
+      "ok": true,
+      "detail": "205 出链 + 1 回链；多块同文档引用合为文档对；自引用、非登记笔记和协议链接排除"
+    },
+    {
+      "name": "真实复合 keyset 分页",
+      "ok": true,
+      "detail": "200+1 文档对；第二页完整读取；未受宿主默认 SQL 行数限制截断"
+    },
+    {
+      "name": "生产登记引用投影",
+      "ok": true,
+      "detail": "208 登记文档 / 206 引用文档对；文档和源引用按 100 ID 分批读取"
+    },
+    {
+      "name": "SQL 两端登记范围",
+      "ok": true,
+      "detail": "局部/全局 SQL 响应均无非登记端点和自引用；普通笔记引用不占页数或 50k 预算"
+    },
+    {
+      "name": "白名单 SQL 参数规模",
+      "ok": true,
+      "detail": "{\"measurements\":[{\"filterIds\":208,\"durationMs\":15.2,\"maxSqlBytes\":10829},{\"filterIds\":1000,\"durationMs\":17.13,\"maxSqlBytes\":50429,\"requests\":5},{\"filterIds\":10000,\"durationMs\":105.41,\"maxSqlBytes\":500429,\"requests\":5}],\"note\":\"208 个真实登记文档，其余为合法但不存在的过滤 ID；衡量参数体积/解析，不代表真实 10k 库性能\"}"
+    },
+    {
+      "name": "宿主原生图配置保护",
+      "ok": true,
+      "detail": "所有生产读取仅 SELECT；局部/全局 dailyNote、type、d3、minRefs 配置前后相同"
+    }
+  ]
+}

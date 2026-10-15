@@ -5,6 +5,7 @@
     import StatusNotice from "../StatusNotice.svelte";
     import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
+    import { requestErrorMessage } from "../../shared/error-presenter";
 
     let {
         templates,
@@ -62,7 +63,7 @@
             savedDraft = draft.map((item) => ({ ...item }));
             savedMessage = text("tplManagerSaved", "模板已保存");
         } catch (error) {
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             busy = false;
         }

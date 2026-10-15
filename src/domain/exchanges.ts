@@ -36,6 +36,20 @@ export class ExchangeWriteUnknownError extends Error {
     }
 }
 
+/** 另一窗口已先写入同一条往来记录；拒绝用旧快照覆盖最新事实。 */
+export class ExchangeConflictError extends Error {
+    readonly id: string;
+    readonly expectedUpdatedAt: number;
+    readonly actualUpdatedAt: number;
+    constructor(id: string, expectedUpdatedAt: number, actualUpdatedAt: number) {
+        super("往来记录已被其他操作修改，请重新读取后再提交；当前修改未覆盖最新事实");
+        this.name = "ExchangeConflictError";
+        this.id = id;
+        this.expectedUpdatedAt = expectedUpdatedAt;
+        this.actualUpdatedAt = actualUpdatedAt;
+    }
+}
+
 export type ExchangePatch = Partial<Pick<ExchangeRecord,
     "kind" | "direction" | "description" | "amount" | "currency" | "occurredOn" | "dueOn" | "status" | "settledOn" | "note"
 >>;

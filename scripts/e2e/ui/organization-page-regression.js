@@ -1,6 +1,8 @@
-import { mount, unmount, tick } from "svelte";
+import { mount, unmount, tick, createRawSnippet } from "svelte";
 import OrgManagerDialog from "../../../src/components/org/OrgManagerDialog.svelte";
 import OrgsView from "../../../src/components/org/OrgsView.svelte";
+import OrganizationProfileEditor from "../../../src/components/org/OrganizationProfileEditor.svelte";
+import LvctDialog from "../../../src/components/LvctDialog.svelte";
 import GroupFieldFixture from "./GroupFieldFixture.svelte";
 import { GROUP_CUSTOM_OPTION } from "../../../src/domain/contact-group";
 import { listOrganizationMembersPage } from "../../../src/services/org";
@@ -25,6 +27,90 @@ export async function runOrganizationPageRegression({ test, assert, kernel, sett
             await tick();
             assert(fixture.querySelector("[data-group-valid]")?.textContent === "true"
                 && fixture.querySelector("[data-group-value]")?.textContent === "校友会", "自定义分组文字没有回填到草稿");
+        } finally {
+            await unmount(instance);
+        }
+    });
+
+    await test("组织资料编辑器：空名称触发定位错误，Logo 读取完成前锁定提交", async () => {
+        const saved = [];
+        const instance = mount(OrganizationProfileEditor, { target: fixture, props: {
+            onSave: async (draft) => { saved.push(draft); },
+        } });
+        const readerDescriptor = Object.getOwnPropertyDescriptor(window, "FileReader");
+        let pendingReader;
+        try {
+            const name = fixture.querySelector('[aria-label="组织名称（必填）"]');
+            const submit = button("创建组织", fixture);
+            assert(name && submit && !submit.disabled, "空名称时应允许提交以展示必填校验");
+            submit.click();
+            await until(() => name.getAttribute("aria-invalid") === "true" && document.activeElement === name,
+                "空组织名称未展示错误并聚焦到字段");
+
+            class DeferredFileReader {
+                result = "data:image/png;base64,aGVsbG8=";
+                onload = null;
+                onerror = null;
+                readAsDataURL() { pendingReader = this; }
+            }
+            Object.defineProperty(window, "FileReader", { configurable: true, writable: true, value: DeferredFileReader });
+            name.value = "图片读取测试组织";
+            name.dispatchEvent(new Event("input", { bubbles: true }));
+            const data = new DataTransfer();
+            data.items.add(new File(["png"], "logo.png", { type: "image/png" }));
+            const fileInput = fixture.querySelector('input[aria-label="上传组织 Logo"]');
+            fileInput.files = data.files;
+            fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+            await until(() => fixture.textContent.includes("正在读取 Logo…"), "Logo 读取中状态未显示");
+            assert(submit.disabled && saved.length === 0, "Logo 尚未读取完成时提交没有锁定");
+            assert(fixture.querySelector('[role="status"][aria-live="polite"]')?.textContent.includes("正在读取 Logo"), "Logo 读取状态没有被辅助技术播报");
+
+            pendingReader.onerror?.();
+            await until(() => fixture.querySelector('[role="alert"]')?.textContent.includes("图片读取失败，请重试"), "Logo 读取失败没有显示可理解的错误");
+            assert(!submit.disabled && saved.length === 0, "Logo 读取失败后提交仍被锁定或已经误提交");
+            const failedReader = pendingReader;
+            const retryData = new DataTransfer();
+            retryData.items.add(new File(["png"], "logo.png", { type: "image/png" }));
+            fileInput.files = retryData.files;
+            fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+            await until(() => pendingReader !== failedReader, "读取失败后无法重新选择同一图片");
+            await until(() => fixture.textContent.includes("正在读取 Logo…"), "重新选择图片后没有恢复读取状态");
+
+            pendingReader.result = "data:image/png;base64,aGVsbG8=";
+            pendingReader.onload?.();
+            await until(() => !submit.disabled, "Logo 读取完成后提交仍被锁定");
+            submit.click();
+            await until(() => saved.length === 1, "资料保存未完成");
+            assert(saved[0].logoDataUrl === "data:image/png;base64,aGVsbG8=", "Logo 读取完成后提交的数据未包含图片");
+        } finally {
+            if (readerDescriptor) Object.defineProperty(window, "FileReader", readerDescriptor);
+            else delete window.FileReader;
+            await unmount(instance);
+        }
+    });
+
+    await test("Issue #31：组织管理/资料弹窗在桌面放大，移动端保持全屏", async () => {
+        const instance = mount(LvctDialog, { target: fixture, props: {
+            title: "编辑组织资料",
+            wide: true,
+            onClose() {},
+            children: createRawSnippet(() => ({ render: () => '<div class="lvct-org-profile-editor"></div>' })),
+        } });
+        try {
+            /* 对话框入场动画会先以 96% 缩放，待动画完成后再核对真实工作区尺寸。 */
+            await new Promise((resolve) => setTimeout(resolve, 240));
+            const panel = fixture.querySelector(".lvct-dialog-panel");
+            assert(panel, "组织资料弹窗容器未渲染");
+            const rect = panel.getBoundingClientRect();
+            if (window.innerWidth > 640) {
+                assert(rect.width >= Math.min(920, window.innerWidth * .96) - 2,
+                    `组织资料弹窗桌面宽度不足：${rect.width}（视口 ${window.innerWidth}）`);
+                assert(parseFloat(getComputedStyle(panel).maxHeight) >= Math.min(window.innerHeight * .92, 960) - 2,
+                    `组织资料弹窗桌面高度不足：${getComputedStyle(panel).maxHeight}`);
+            } else {
+                assert(Math.abs(rect.width - window.innerWidth) <= 2 && Math.abs(rect.height - window.innerHeight) <= 2,
+                    `组织资料弹窗移动端未保持全屏：${rect.width}x${rect.height}`);
+            }
         } finally {
             await unmount(instance);
         }
@@ -93,14 +179,71 @@ export async function runOrganizationPageRegression({ test, assert, kernel, sett
             await until(() => fixture.querySelector(".lvct-orgs-view__card-logo"), "组织 Logo 未渲染");
             const logo = fixture.querySelector(".lvct-orgs-view__card-logo");
             const cardHead = logo?.closest(".lvct-orgs-view__card-head");
+            const name = cardHead?.querySelector(".lvct-orgs-view__card-name");
+            const badges = [...(cardHead?.querySelectorAll(".lvct-chip") ?? [])];
             const style = logo ? getComputedStyle(logo) : null;
             const headStyle = cardHead ? getComputedStyle(cardHead) : null;
             assert(style?.width === "40px" && style.height === "40px"
                 && style.objectFit === "contain", "组织 Logo 未限制为固定尺寸或未使用 contain");
-            assert((cardHead?.getBoundingClientRect().height ?? 0) <= 48
-                && (headStyle?.minWidth ?? "") === "0px", "组织 Logo 仍然挤压组织名称区域");
+            assert(name && badges.length === 1 && headStyle?.minWidth === "0px", "组织名称或简称区域未渲染");
+            const headRect = cardHead.getBoundingClientRect();
+            const logoRect = logo.getBoundingClientRect();
+            const nameRect = name.getBoundingClientRect();
+            assert(nameRect.width >= 80 && logoRect.right <= nameRect.left + 1, "组织 Logo 挤压或覆盖了名称");
+            assert(name.textContent === "厦门大学超长组织名称", "组织名称在渲染时被截断");
+            for (const node of [logo, name, ...badges]) {
+                const rect = node.getBoundingClientRect();
+                assert(rect.left >= headRect.left - 1 && rect.right <= headRect.right + 1
+                    && rect.top >= headRect.top - 1 && rect.bottom <= headRect.bottom + 1, "组织标题或徽标越出卡片头部");
+            }
+            for (const badge of badges) {
+                const rect = badge.getBoundingClientRect();
+                const overlaps = rect.left < nameRect.right - 1 && rect.right > nameRect.left + 1
+                    && rect.top < nameRect.bottom - 1 && rect.bottom > nameRect.top + 1;
+                assert(!overlaps, "组织简称徽标与完整名称重叠");
+            }
+            logo.dispatchEvent(new Event("error"));
+            await tick();
+            assert(!fixture.querySelector(".lvct-orgs-view__card-logo")
+                && fixture.querySelector(".lvct-orgs-view__card-icon"), "组织 Logo 加载失败后没有回退到默认组织图标");
         } finally {
             await unmount(instance);
+        }
+    });
+
+    await test("组织视图旧版全量读取：卸载后迟到结果不回填", async () => {
+        const org = (name) => ({
+            docId: `20261005000000-${name}`,
+            name,
+            hpath: `/${name}`,
+            notebookId: "20261005000000-book001",
+            archived: false,
+            memberships: [],
+        });
+        let releaseOld;
+        let calls = 0;
+        const facade = {
+            listOrganizations: () => {
+                calls += 1;
+                return calls === 1
+                    ? new Promise((resolve) => { releaseOld = resolve; })
+                    : Promise.resolve([org("最新组织")]);
+            },
+        };
+        const stale = mount(OrgsView, { target: fixture, props: { facade, onOpenOrgManager() {} } });
+        try {
+            await until(() => calls === 1, "旧版组织读取未发起");
+        } finally {
+            await unmount(stale);
+        }
+        const fresh = mount(OrgsView, { target: fixture, props: { facade, onOpenOrgManager() {} } });
+        try {
+            await until(() => fixture.querySelector('[data-org-doc-id$="最新组织"]'), "新组织视图未完成读取");
+            releaseOld([org("旧组织")]);
+            await tick();
+            assert(fixture.textContent.includes("最新组织") && !fixture.textContent.includes("旧组织"), "卸载后的旧请求回填了组织列表");
+        } finally {
+            await unmount(fresh);
         }
     });
 

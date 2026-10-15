@@ -4,6 +4,7 @@
     import type { RelationshipLabelEditorState } from "../../services/people-profiles";
     import { useCloseGuard } from "../close-guard";
     import { MigrationWriteUnknownError } from "../../domain/migration-records";
+    import { requestErrorMessage } from "../../shared/error-presenter";
 
     let { personDocId, revision = 0, onLoad, onSave, onChanged }: {
         personDocId: string; revision?: number;
@@ -48,7 +49,7 @@
                 unknown = false;
             }
         } catch (error) {
-            if (alive && generation === request) readError = error instanceof Error ? error.message : String(error);
+            if (alive && generation === request) readError = requestErrorMessage(error);
         } finally { if (alive && generation === request) loading = false; }
     }
 
@@ -82,7 +83,7 @@
         } catch (error) {
             if (!alive || generation !== request || docId !== personDocId) return;
             unknown = error instanceof MigrationWriteUnknownError;
-            message = error instanceof Error ? error.message : String(error);
+            message = requestErrorMessage(error);
         } finally {
             if (alive && generation === request) {
                 busy = false;

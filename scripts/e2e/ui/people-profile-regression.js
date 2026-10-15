@@ -1,4 +1,5 @@
 import { mount, unmount } from "svelte";
+import { fromStore, writable } from "svelte/store";
 import { projectionFixture } from "./organization-projection-regression.js";
 import { bindPeopleProfileStorage, loadPersonRelationshipLabels, savePersonRelationshipLabels } from "../../../src/services/people-profiles";
 import { loadRelationshipLabelStore, RELATIONSHIP_LABEL_STORAGE_KEY } from "../../../src/data/person-relationship-labels";
@@ -194,5 +195,57 @@ export async function runPeopleProfileRegression({ test, assert, kernel, setting
             await until(() => fixture.textContent.includes("工作单位：不存在的单位"), "生效条件未显示");
             assert(!fixture.querySelector("tbody"), "单位筛选没有重新求值");
         } finally { await unmount(component); bindPeopleProfileStorage(undefined); }
+    });
+
+    await test("最近互动读取失败后切回姓名排序且不使用旧快照", async () => {
+        const state = profileFixture(kernel, settings);
+        bindPeopleProfileStorage(state.plugin);
+        let recentReadFails = true;
+        const revision = writable(0);
+        const currentRevision = fromStore(revision);
+        const recentSnapshot = {
+            [state.personDocId]: { occurredAt: 10, localDate: "2026-10-01" },
+            [state.selfDocId]: { occurredAt: 20, localDate: "2026-10-02" },
+        };
+        const component = mount(PeopleView, { target: fixture, props: {
+            settings, preferences: DEFAULT_VIEW_PREFERENCES, get revision() { return currentRevision.current; }, initialSort: "name",
+            loadRecentInteractions: async () => {
+                if (recentReadFails) throw new Error("最近互动服务不可用");
+                return recentSnapshot;
+            },
+            onOpenDetail() {}, onPreferencesChange: async (next) => next,
+        } });
+        const cards = () => [...fixture.querySelectorAll(".lvct-person-card")].map((card) => card.dataset.personItemId);
+        const nameOrder = state.people
+            .map((person) => person.itemId)
+            .sort((left, right) => state.people.find((person) => person.itemId === left).name.localeCompare(
+                state.people.find((person) => person.itemId === right).name, "zh-CN"));
+        try {
+            await until(() => fixture.querySelectorAll(".lvct-person-card").length === 2, "联系人列表未加载");
+            await until(() => fixture.textContent.includes("最近互动服务不可用"), "首轮最近互动故障没有反馈");
+            recentReadFails = false;
+            revision.set(1);
+            await until(() => !fixture.textContent.includes("最近互动服务不可用"), "最近互动重试没有恢复");
+            const sort = fixture.querySelector("select[aria-label='排序方式']");
+            const recentOption = [...sort.options].find((option) => option.value === "recent");
+            assert(recentOption && !recentOption.disabled, "读取成功时最近互动排序应可用");
+            sort.value = "recent";
+            sort.dispatchEvent(new Event("change", { bubbles: true }));
+            await until(() => cards()[0] === "20261004000000-selfrow", "最近互动排序没有使用已核实快照");
+
+            recentReadFails = true;
+            revision.set(2);
+            await until(() => fixture.textContent.includes("最近互动服务不可用"), "最近互动失败没有反馈");
+            await until(() => sort.value === "name" && recentOption.disabled, "失败后没有切回姓名排序或禁用最近互动选项");
+            assert(cards().join() === nameOrder.join(), "读取失败后仍按旧互动快照排序");
+
+            // 模拟脚本或外部控件绕过 disabled 属性，排序逻辑仍必须忽略过期快照。
+            sort.value = "recent";
+            sort.dispatchEvent(new Event("change", { bubbles: true }));
+            await until(() => cards().join() === nameOrder.join(), "失败状态下最近互动排序仍使用旧快照");
+        } finally {
+            await unmount(component);
+            bindPeopleProfileStorage(undefined);
+        }
     });
 }

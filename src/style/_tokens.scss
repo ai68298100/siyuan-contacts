@@ -4,15 +4,15 @@
  * 事实源：docs/UI-HANDOFF.md §3；视觉对照：docs/ui-prototype.html「色彩与令牌」。
  *
  * 三层架构（自上而下只准单向引用）：
- *   b3 变量（思源主题，随用户主题/明暗自动变化）
- *     → --lvct-* 语义令牌（本文件，唯一允许桥接 b3 的地方）
+ *   宿主主题（提供明暗上下文和字体 fallback）
+ *     → --lvct-* 语义令牌（本文件，稳定的插件视觉体系）
  *       → 组件类（.lvct-*，只准消费 --lvct-* 令牌）
  *
  * 硬性规则（与 AGENTS.md 铁律 6 同级）：
  *   1. 组件 SCSS 中禁止出现 hex/rgba 字面值与 --b3-* 直接引用，一律 var(--lvct-*)。
  *      （历史代码暂豁免，按 docs/UI-REFACTOR-PLAN.md UI-01 逐步迁移。）
  *   2. 新增令牌：先在本文件登记并注明用途/b3 映射，再在组件中使用。
- *   3. 引用 b3 变量必须带 fallback（b3 变量随思源版本有增删，见 DATA-CONTRACT §6 同款教训）。
+ *   3. 需要读取宿主 b3 变量时必须带 fallback（b3 变量随思源版本有增删，见 DATA-CONTRACT §6 同款教训）。
  *   4. 令牌只挂在插件根类上（.lvct-tab-root / .lvct-dialog-root / .lvct-doc-strip），不污染全局 :root。
  *      自绘浮层（fixed 定位）仍是插件根的 DOM 后代；文档档案条独立继承令牌。
  *   5. 明暗差异只允许出现在本文件的 [data-theme-mode="dark"] 覆写块中。
@@ -22,49 +22,88 @@
 .lvct-dialog-root,
 .lvct-doc-strip {
 
-    /* ---------- 1. 品牌色（与插件图标同视觉语言：蓝紫渐变 + 橙点） ---------- */
-    --lvct-brand-from: #6366f1;
-    --lvct-brand-to: #8b5cf6;
+    /* ---------- 0. 原始值（Primitive） ----------
+     * 原始值只在这一层出现；组件应使用下方语义/组件令牌。保留少量
+     * 原始值便于主题覆写，也让审计可以准确识别重复色值。 */
+    --lvct-color-white: #ffffff;
+    --lvct-color-ink-900: #2a2b35;
+    --lvct-color-ink-700: #45475a;
+    --lvct-color-ink-500: #63657a;
+    --lvct-color-brand-500: #129e9a;
+    --lvct-color-brand-700: #087f7b;
+    --lvct-color-brand-800: #06645f;
+    --lvct-color-brand-soft: #dff5f2;
+    --lvct-color-border-200: #dfe7f3;
+    --lvct-color-border-300: #cdd8e8;
+    --lvct-color-canvas: #f5f7ff;
+    --lvct-color-surface: #ffffff;
+    --lvct-color-danger: #e5484d;
+    --lvct-color-success: #3ba55d;
+    --lvct-color-info: #3b91c7;
+
+    /* ---------- 1. 品牌色（青色主色 + 珊瑚提醒色） ---------- */
+    /* 小驴人脉使用独立的青色体系，与小驴打卡区分；渐变只用于品牌标识。 */
+    --lvct-brand-from: #0f9d98;
+    --lvct-brand-to: #44c8bd;
     --lvct-brand-gradient: linear-gradient(135deg, var(--lvct-brand-from) 0%, var(--lvct-brand-to) 100%);
-    /* 点缀橙：生日/提醒/图标橙点；暗色下提高明度（见 dark 覆写） */
-    --lvct-highlight: #d97706;
+    /* 点缀珊瑚：生日/提醒/图标强调；暗色下提高明度（见 dark 覆写） */
+    --lvct-highlight: #e56b5d;
     --lvct-highlight-soft: color-mix(in srgb, var(--lvct-highlight) 12%, transparent);
 
-    /* ---------- 2. 语义色：表面层级（全部桥接 b3，主题切换零成本） ----------
-     * UX-01.1 四级单调层级（两种明色下都是 app < base < surface < elevated 的显著度序）：
+    /* ---------- 2. 语义色：表面层级（插件自有稳定配方） ----------
+     * UX-01.1 四级单调层级（两种明暗模式下都是 app < base < surface < elevated 的显著度序）：
      *   亮色 app=约#f4f4f4 < base=约#fafafa < surface(卡)=background(#fff) < elevated(浮层)
      *   暗色 app=约#191a1c < base=background < surface(卡)=约#282a2e < elevated(浮层)
-     * b3 变量本身明暗方向相反（亮色 surface 比 background 深、暗色则浅），
-     * 因此配方按 [data-theme-mode="dark"] 分块，见文末覆写。 */
-    --lvct-bg-app: color-mix(in srgb, var(--b3-theme-surface, var(--b3-theme-background)) 70%, var(--b3-theme-background));  /* 侧栏 / 外壳最底层 */
-    --lvct-bg-base: color-mix(in srgb, var(--b3-theme-surface, var(--b3-theme-background)) 30%, var(--b3-theme-background)); /* 内容区 */
-    --lvct-bg-surface: var(--b3-theme-background);                              /* 卡片 / 面板 / 输入框 */
-    --lvct-bg-elevated: var(--b3-menu-background, var(--b3-theme-surface, var(--b3-theme-background))); /* 弹窗 / 下拉 / 悬停卡；对齐宿主 .b3-menu 配方（B02） */
-    --lvct-bg-elevated-glass: color-mix(in srgb, var(--b3-menu-background, var(--b3-theme-surface, var(--b3-theme-background))) 86%, transparent); /* UX-02.7 浮层玻璃底（配 backdrop-filter 用） */
-    --lvct-bg-hover: var(--b3-list-hover);                                      /* 行/项悬停 */
-    --lvct-bg-active: var(--b3-list-icon-hover, var(--b3-list-hover));          /* 按下/选中底 */
+     * 亮暗配方按 [data-theme-mode="dark"] 分块，避免第三方主题改变卡片、边界和选中态的层级。 */
+    /* 浅色画布回到轻盈的冷蓝灰；青色只承担品牌与操作反馈。 */
+    --lvct-bg-app: #f3f6fc; /* 侧栏 / 外壳最底层 */
+    --lvct-bg-base: #f8f9fd; /* 内容区 */
+    /* 工作台画布使用极浅的冷蓝灰，避免大面积色彩压过内容。 */
+    --lvct-bg-canvas: var(--lvct-color-canvas);
+    --lvct-canvas-glow: color-mix(in srgb, var(--lvct-accent) 7%, transparent);
+    --lvct-bg-sidebar: #f1f4fb; /* 导航侧栏 */
+    --lvct-bg-surface: var(--lvct-color-surface); /* 卡片 / 面板 / 输入框 */
+    /* 浅色模式的内容面统一为白色；冷蓝灰画布依靠边界和阴影区分层级。 */
+    --lvct-surface-2: var(--lvct-color-surface); /* 次级卡片 / 可选区块 */
+    --lvct-surface-muted: var(--lvct-color-surface); /* 工具栏 / 低强调区域 */
+    --lvct-surface-tint: var(--lvct-color-surface); /* 卡片顶部高光 */
+    --lvct-surface-inset: var(--lvct-color-surface); /* 控件内层 / 内嵌卡片 */
+    --lvct-bg-elevated: var(--lvct-color-surface); /* 弹窗 / 下拉 / 悬停卡 */
+    --lvct-bg-elevated-glass: color-mix(in srgb, #ffffff 88%, transparent); /* 浮层玻璃底 */
+    --lvct-bg-hover: #eef4fc; /* 行/项悬停 */
+    --lvct-bg-active: #e3f4f3; /* 按下/选中底 */
+    --lvct-bg-raised: var(--lvct-bg-elevated); /* 原型命名别名 */
+    --lvct-bg-selected: var(--lvct-bg-active); /* 原型命名别名 */
 
     /* ---------- 3. 语义色：文字三级 ---------- */
-    --lvct-text-1: var(--b3-theme-on-background);        /* 标题、正文 */
-    --lvct-text-2: var(--b3-theme-on-surface);           /* 描述、字段值 */
-    --lvct-text-3: var(--b3-theme-on-surface-light);     /* 占位、辅助说明（非关键信息） */
+    --lvct-text-1: var(--lvct-color-ink-900); /* 标题、正文 */
+    --lvct-text-2: var(--lvct-color-ink-700); /* 描述、字段值 */
+    --lvct-text-3: var(--lvct-color-ink-500); /* 占位、辅助说明（非关键信息） */
 
     /* ---------- 4. 语义色：描边两级 ---------- */
-    --lvct-border-subtle: var(--b3-border-color);
-    --lvct-border-strong: color-mix(in srgb, var(--b3-theme-on-background) 18%, transparent);
+    --lvct-border-subtle: var(--lvct-color-border-200);
+    --lvct-border-strong: var(--lvct-color-border-300);
+    --lvct-border-hairline: #e8eef7;
 
     /* ---------- 5. 语义色：主色与状态色 ---------- */
-    --lvct-accent: var(--b3-theme-primary);
-    --lvct-on-accent: var(--b3-theme-on-primary, #fff);
-    --lvct-accent-soft: var(--b3-theme-primary-lightest,
-        color-mix(in srgb, var(--b3-theme-primary) 12%, transparent));
-    --lvct-success: var(--b3-theme-success, #23b27c);
-    --lvct-success-soft: color-mix(in srgb, var(--lvct-success) 13%, transparent);
-    --lvct-danger: var(--b3-theme-error);
-    --lvct-danger-soft: var(--b3-card-error-background,
-        color-mix(in srgb, var(--lvct-danger) 11%, transparent));
-    --lvct-info: var(--b3-theme-info, #3b82f6);
-    --lvct-info-soft: color-mix(in srgb, var(--lvct-info) 13%, transparent);
+    --lvct-accent: var(--lvct-color-brand-500);
+    /* accent 用于图标/装饰；填充与正文各自采用更高对比度的变体。 */
+    --lvct-accent-fill: var(--lvct-color-brand-700);
+    --lvct-accent-text: #05716d;
+    --lvct-accent-hover: var(--lvct-color-brand-800);
+    --lvct-on-accent: #ffffff;
+    --lvct-accent-soft: var(--lvct-color-brand-soft);
+    --lvct-success: var(--lvct-color-success);
+    --lvct-success-soft: #e3f4e9;
+    --lvct-danger: var(--lvct-color-danger);
+    --lvct-danger-soft: #fde9ea;
+    --lvct-info: var(--lvct-color-info);
+    --lvct-info-soft: #e3f0fc;
+
+    /* Cytoscape 不能直接消费 CSS 变量；图谱保留稳定 fallback，同时响应宿主主题的显式颜色变量。 */
+    --lvct-graph-text: var(--b3-theme-on-surface, #45475a);
+    --lvct-graph-edge: var(--lvct-text-3); /* 连线是信息，不能沿用低对比度的面板边框色。 */
+    --lvct-graph-surface: var(--lvct-bg-surface);
 
     /* ---------- 6. 分组色板（插件自有令牌，明暗双套；dark 覆写见文末） ----------
      * 语义固定：家人/朋友/同事/同学/其他。
@@ -73,9 +112,9 @@
     --lvct-group-family: #e05260;
     --lvct-group-friend: #1a9e6e;
     --lvct-group-work: #2b87db;
-    --lvct-group-school: #d9822b;
-    --lvct-group-other: #7a8194;
-    --lvct-group-org: #8e5ad8;
+    --lvct-group-school: #d95f78;
+    --lvct-group-other: #718096;
+    --lvct-group-org: #2f8fa3;
     --lvct-group-family-soft: color-mix(in srgb, var(--lvct-group-family) 14%, transparent);
     --lvct-group-friend-soft: color-mix(in srgb, var(--lvct-group-friend) 14%, transparent);
     --lvct-group-work-soft: color-mix(in srgb, var(--lvct-group-work) 14%, transparent);
@@ -83,22 +122,29 @@
     --lvct-group-other-soft: color-mix(in srgb, var(--lvct-group-other) 14%, transparent);
 
     /* ---------- 7. 字体（字族跟随思源，只定义尺寸/字重梯度） ---------- */
-    --lvct-font-family: var(--b3-font-family, inherit);
+    --lvct-font-family: Inter, "PingFang SC", "Microsoft YaHei", var(--b3-font-family, ui-sans-serif), sans-serif;
     --lvct-font-code: var(--b3-font-family-code, monospace);
     --lvct-fs-display: 20px;   /* 向导标题、页头问候 */
     --lvct-fs-title: 20px;     /* 视图页头；与原型 page title 层级对齐 */
-    --lvct-fs-page-title: clamp(21px, 2vw, 27px); /* 工作台/设置页标题，对齐原型 page title */
+    --lvct-fs-page-title: 26px; /* 工作台/设置页标题，对齐原型 page title */
     --lvct-fs-subtitle: 14px;  /* 页头副标题，对齐原型正文层级 */
     --lvct-fs-heading: 13.5px; /* 面板/弹窗标题 */
-    --lvct-fs-body: 13px;      /* 正文、列表主行 */
-    --lvct-fs-caption: 12px;   /* 次级信息、元数据 */
-    --lvct-fs-micro: 11px;     /* 分区标签、徽标 */
+    --lvct-fs-body: 14px;      /* 正文、列表主行 */
+    --lvct-fs-caption: 13px;   /* 次级信息、元数据 */
+    --lvct-fs-micro: 12px;     /* 分区标签、徽标 */
+    --lvct-fs-section-title: 16px; /* 区块标题 */
+    /* 有限的字号梯度：display/title/section/body/caption/micro。历史别名
+     * 保留用于兼容旧页面，新页面应优先使用这六档。 */
+    --lvct-lh-display: 1.3;
+    --lvct-lh-title: 1.35;
+    --lvct-lh-section: 1.45;
+    --lvct-lh-caption: 1.5;
     --lvct-fw-bold: 700;
     --lvct-fw-medium: 600;
     --lvct-fw-regular: 400;
     --lvct-lh-body: 1.6;
     --lvct-lh-tight: 1.35;
-    --lvct-ls-micro: 0.04em;
+    --lvct-ls-micro: 0;
 
     /* ---------- 8. 间距（4pt 网格） ---------- */
     --lvct-sp-1: 4px;    /* 图标与文字间距、chip 内距 */
@@ -107,19 +153,25 @@
     --lvct-sp-4: 16px;   /* 视图内容区 padding（宽屏可到 22px） */
     --lvct-sp-5: 24px;   /* 区块间大间隔 */
     --lvct-sp-6: 36px;
+    --lvct-sp-7: 48px;   /* 页面级留白；仍遵循 4pt 网格 */
 
     /* ---------- 9. 圆角 ---------- */
-    --lvct-r-sm: 7px;    /* 按钮、chip、小头像 */
-    --lvct-r-control: 4px; /* 原生语义控件的轻圆角 */
-    --lvct-r-md: 10px;   /* 输入框、下拉、步骤条 */
-    --lvct-r-lg: 13px;   /* 卡片、面板 */
-    --lvct-r-xl: 15px;   /* 弹窗 */
+    --lvct-r-sm: 8px;    /* 按钮、chip、小头像 */
+    --lvct-r-control: 8px; /* 原生语义控件的轻圆角 */
+    --lvct-r-md: 12px;   /* 输入框、下拉、步骤条 */
+    --lvct-r-lg: 18px;   /* 卡片、面板 */
+    --lvct-r-xl: 20px;   /* 弹窗 */
     --lvct-r-pill: 999px;
 
     /* ---------- 10. 阴影（明暗不同配方；dark 覆写见文末） ---------- */
-    --lvct-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.06);   /* 卡片静止 */
-    --lvct-shadow-2: 0 4px 16px rgba(15, 23, 42, 0.08);  /* 卡片悬停提升 */
-    --lvct-shadow-3: 0 12px 40px rgba(15, 23, 42, 0.16); /* 浮层（弹窗/下拉/Toast） */
+    --lvct-card-inner-glow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    --lvct-shadow-1: 0 1px 3px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.02);   /* 卡片静止自然漫反射 */
+    --lvct-shadow-2: 0 3px 8px rgba(18, 158, 154, 0.06), 0 10px 24px rgba(15, 23, 42, 0.07);  /* 卡片悬停提升 */
+    --lvct-shadow-3: 0 8px 24px rgba(15, 23, 42, 0.10), 0 24px 60px rgba(15, 23, 42, 0.14); /* 浮层（弹窗/下拉/Toast） */
+    --lvct-shadow-card: var(--lvct-shadow-1), var(--lvct-card-inner-glow);
+    --lvct-shadow-card-hover: var(--lvct-shadow-2), inset 0 1px 0 #ffffff;
+    --lvct-shadow-panel: 0 1px 2px rgba(15, 23, 42, 0.03), 0 6px 18px rgba(15, 23, 42, 0.04); /* 面板静止 */
+    --lvct-shadow-float: 0 4px 12px rgba(15, 23, 42, 0.06), 0 16px 40px rgba(15, 23, 42, 0.10); /* 内容浮起 */
 
     /* ---------- 11. 动效 ----------
      * 全部过渡 ≤ 250ms；prefers-reduced-motion 时组件降级为透明度过渡。 */
@@ -127,65 +179,137 @@
     --lvct-dur-base: 200ms;   /* 视图切换、弹窗 */
     --lvct-dur-slow: 250ms;   /* 上限 */
     --lvct-dur-micro: 80ms;   /* 按下回压等即时反馈 */
+    --lvct-dur-loading: 700ms; /* 加载旋转；无障碍降级时由媒体查询覆盖 */
     --lvct-ease: cubic-bezier(0.2, 0.8, 0.3, 1);
     --lvct-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* 浮层 pop-in（UX-02.1） */
 
-    /* ---------- 12. 层级（L0 内容 < L1 Peek < L2 模态 < L3 浮层） ---------- */
-    --lvct-z-peek: 20;
+    /* ---------- 12. 层级（L0 内容 < L1 导航 < L2 模态 < L3 浮层） ---------- */
+    --lvct-z-navigation: 20;
     --lvct-z-dialog: 100;   /* 与既有 .lvct-dialog-mask 一致 */
     --lvct-z-popover: 200;  /* 下拉、悬停卡 */
     --lvct-z-toast: 300;
     --lvct-overlay: color-mix(in srgb, var(--lvct-text-1) 35%, transparent);
+    --lvct-mask-opaque: #000;
 
     /* ---------- 13. 布局尺寸 ---------- */
-    --lvct-sidebar-w: 216px;         /* 桌面端左侧栏导航；与原型侧栏宽度对齐 */
-    --lvct-peek-w: 400px;            /* 人物详情 Peek 侧栏 */
+    --lvct-sidebar-w: 192px;         /* 桌面端左侧栏导航；对齐原型与 R54 的紧凑工作台 */
     --lvct-dialog-w: 560px;          /* 标准模态（与 libs/dialog.ts 一致） */
     --lvct-dialog-w-wide: 720px;     /* 宽版模态（导入/vCard） */
-    --lvct-touch-min: 32px;          /* 桌面触控目标下限 */
-    --lvct-touch-min-mobile: 40px;   /* 移动端触控目标下限 */
+    --lvct-touch-min: 40px;          /* 桌面交互目标下限 */
+    --lvct-touch-min-mobile: 44px;   /* 移动端触控目标下限 */
+    --lvct-graph-height: clamp(520px, 68dvh, 880px);
+    --lvct-graph-height-expanded: clamp(640px, 82dvh, 1040px);
 
     /* ---------- 13b. D-31 键盘焦点环令牌 ---------- */
     --lvct-focus-ring-color: var(--lvct-accent);
-    --lvct-focus-ring-width: 2px;
-    --lvct-focus-ring-offset: 2px;
+
+    /* 第二层尺寸令牌：卡片和面板比弹窗更克制，避免页面被圆角切碎。 */
+    --lvct-r-card: 14px;
+    --lvct-r-panel: 14px;
+    --lvct-r-dialog: 18px;
 
     /* ---------- 14. 组件尺寸 ---------- */
     --lvct-avatar-sm: 30px;
     --lvct-avatar-md: 40px;
     --lvct-avatar-lg: 56px;
+
+    /* ---------- 15. 组件令牌（Component） ---------- */
+    --lvct-control-h: var(--lvct-touch-min);
+    --lvct-control-h-compact: 36px;
+    --lvct-control-h-small: 32px;
+    --lvct-control-padding-inline: var(--lvct-sp-3);
+    --lvct-control-gap: var(--lvct-sp-2);
+    --lvct-control-border-width: 1px;
+    --lvct-focus-ring-width: 2px;
+    --lvct-focus-ring-offset: 2px;
+    --lvct-focus-ring-size: 3px;
+    --lvct-icon-xs: 12px;
+    --lvct-icon-sm: 16px;
+    --lvct-icon-md: 20px;
+    --lvct-check-size: 16px;
+    --lvct-check-mark-w: 7px;
+    --lvct-check-mark-h: 4px;
+    --lvct-spinner-size: 14px;
+    --lvct-spinner-border: 2px;
+    --lvct-check-indeterminate-w: 8px;
+    --lvct-check-indeterminate-h: 2px;
+    --lvct-radio-dot-size: 6px;
+    --lvct-check-mark-stroke: 2px;
+    --lvct-state-disabled-opacity: 0.5;
+    --lvct-dur-reduced: 1.6s;
+    --lvct-dur-none: 0.01ms;
 }
 
 @media (max-width: 640px) {
     .lvct-tab-root,
     .lvct-dialog-root,
     .lvct-doc-strip {
-        --lvct-fs-page-title: clamp(21px, 5.6vw, 24px);
+        --lvct-fs-page-title: 23px;
+    --lvct-graph-height: clamp(400px, 58dvh, 640px);
+        --lvct-graph-height-expanded: clamp(480px, 76dvh, 800px);
     }
 }
 
 /* ============================================================================
- * 暗色覆写：只放明暗配方不同的令牌（阴影、分组色明度、点缀橙）。
- * 表面/文字/主色全部走 b3 变量，思源切主题时自动变化，无需覆写。
+ * 暗色覆写：只放明暗配方不同的令牌（表面、文字、状态、阴影、分组色明度和珊瑚强调）。
+ * 思源切换明暗模式时由 data-theme-mode 触发，插件内部保持同一套层级和对比度。
  * ========================================================================== */
 html[data-theme-mode="dark"] .lvct-tab-root,
 html[data-theme-mode="dark"] .lvct-dialog-root,
 html[data-theme-mode="dark"] .lvct-doc-strip {
-    --lvct-highlight: #f59e0b;
+    --lvct-brand-from: #51cfc4;
+    --lvct-brand-to: #7adfd4;
+    --lvct-highlight: #f08a7c;
 
-    --lvct-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --lvct-shadow-2: 0 4px 16px rgba(0, 0, 0, 0.35);
-    --lvct-shadow-3: 0 12px 40px rgba(0, 0, 0, 0.5);
+    --lvct-bg-app: #11181c;
+    --lvct-bg-base: #141c21;
+    --lvct-bg-canvas: #11181c;
+    --lvct-bg-sidebar: #172227;
+    --lvct-bg-surface: #1d282d;
+    --lvct-surface-2: #25343a;
+    --lvct-surface-muted: #25343a;
+    --lvct-surface-tint: #223039;
+    --lvct-surface-inset: #202b30;
+    --lvct-bg-elevated: #223039;
+    --lvct-bg-elevated-glass: color-mix(in srgb, #223039 90%, transparent);
+    --lvct-bg-hover: #2b3e43;
+    --lvct-bg-active: #153c43;
+    --lvct-text-1: #eff8f7;
+    --lvct-text-2: #d4e4e3;
+    --lvct-text-3: #9db5b5;
+    --lvct-border-subtle: #2b3c42;
+    --lvct-border-strong: #385058;
+    --lvct-border-hairline: #31434a;
+    --lvct-accent: #57d1c6;
+    --lvct-accent-fill: #40bdb4;
+    --lvct-accent-text: #80e5dc;
+    --lvct-accent-hover: #96ede5;
+    --lvct-on-accent: #071f21;
+    --lvct-accent-soft: #153c43;
+    --lvct-success: #4cbb7f;
+    --lvct-success-soft: #1f3329;
+    --lvct-danger: #f07c7c;
+    --lvct-danger-soft: #3a2428;
+    --lvct-info: #68b5dc;
+    --lvct-info-soft: #1e3040;
+    --lvct-graph-text: var(--b3-theme-on-surface, #d0d0dc);
+    --lvct-graph-edge: var(--lvct-text-3);
+    --lvct-graph-surface: var(--lvct-bg-surface);
 
-    /* UX-01.1 暗色四级表面：app 比 base 深、surface（卡片）比 base 浅，与原型同构 */
-    --lvct-bg-app: color-mix(in srgb, var(--b3-theme-background, #000) 78%, #000);
-    --lvct-bg-base: var(--b3-theme-background);
-    --lvct-bg-surface: color-mix(in srgb, var(--b3-theme-surface, var(--b3-theme-background)) 50%, var(--b3-theme-background));
+    --lvct-canvas-glow: color-mix(in srgb, var(--lvct-accent) 11%, transparent);
+    --lvct-card-inner-glow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --lvct-shadow-1: 0 2px 6px rgba(0, 0, 0, 0.35), 0 8px 20px rgba(0, 0, 0, 0.25);
+    --lvct-shadow-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 14px 32px rgba(0, 0, 0, 0.40), 0 0 14px color-mix(in srgb, var(--lvct-accent) 14%, transparent);
+    --lvct-shadow-3: 0 12px 32px rgba(0, 0, 0, 0.6), 0 28px 72px rgba(0, 0, 0, 0.7);
+    --lvct-shadow-card: var(--lvct-shadow-1), var(--lvct-card-inner-glow);
+    --lvct-shadow-card-hover: var(--lvct-shadow-2), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    --lvct-shadow-panel: 0 2px 6px rgba(0, 0, 0, 0.30), 0 8px 24px rgba(0, 0, 0, 0.35);
+    --lvct-shadow-float: 0 6px 16px rgba(0, 0, 0, 0.45), 0 20px 48px rgba(0, 0, 0, 0.55);
 
     /* 分组色暗色配方：提高明度，保证图谱与头像在深色表面上的可读性 */
     --lvct-group-family: #f2707a;
     --lvct-group-friend: #34c98e;
     --lvct-group-work: #54a8f5;
-    --lvct-group-school: #f5a54b;
-    --lvct-group-other: #8b91a0;
+    --lvct-group-school: #ef8294;
+    --lvct-group-other: #9bb0b3;
 }

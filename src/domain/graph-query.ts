@@ -129,13 +129,20 @@ export function graphRegistry(sources: GraphSources): { people: ContactSummary[]
     const orgs = rawOrgs.filter((org) => !duplicateOrgs.has(org.docId) && !overlapping.has(org.docId));
     for (const org of orgs) {
         for (const member of org.memberships) {
-            if (member.status === "active" && !personIds.has(member.personDocId)) {
+            // Historical (former) memberships remain valid graph facts.  Only
+            // memberships whose person is outside the verified roster are
+            // dangling and must be omitted from the rendered member edge.
+            if (!personIds.has(member.personDocId)) {
                 diagnostics.push({ code: "dangling_member", id: member.personDocId, message: `组织 ${org.docId} 的成员 ${member.personDocId} 未唯一登记，未生成成员边。` });
             }
         }
     }
     const overlay = buildOrgAugmentation(orgs.map((org) => ({
-        docId: org.docId, name: org.name, memberDocIds: org.memberships.filter((member) => member.status === "active").map((member) => member.personDocId),
+        // Keep both active and former memberships in the display graph.  The
+        // former status is a lifecycle fact, not a deletion of the historical
+        // organisation affiliation.  `buildOrgAugmentation` still drops
+        // dangling person IDs against the verified roster.
+        docId: org.docId, name: org.name, memberships: org.memberships,
     })), personIds);
     const related = buildGraph(people);
     return { people, organizations: overlay.nodes.sort((left, right) => compareGraphIds(left.id, right.id)),
@@ -233,7 +240,13 @@ export function buildGraphQuerySnapshot(sources: GraphSources, query: GraphQuery
     let budgetUnknown = false;
     if (!criticalUnknown && center.status !== "missing") {
         try { capped = capGraph(filtered, query.maxNodes ?? GRAPH_MAX_NODES, [...pins]); }
-        catch (error) { budgetUnknown = true; diagnostics.push({ code: "budget_unknown", message: error instanceof Error ? error.message : String(error) }); }
+        catch (error) {
+            budgetUnknown = true;
+            diagnostics.push({
+                code: "budget_unknown",
+                message: error instanceof Error ? error.message : "图谱规模尚未核实，请调整范围或提高节点预算后重试。",
+            });
+        }
     }
     const graph = capped.graph;
     const relationGraph = orderGraph({ nodes: graph.nodes.filter((node) => node.kind !== "org"), edges: graph.edges.filter((edge) => edge.kind === "related") });
@@ -263,6 +276,10 @@ export function buildGraphQuerySnapshot(sources: GraphSources, query: GraphQuery
         result: { kind, status: resultStatus, ids: [...resultIds].sort(compareGraphIds), pathIds, neighborIds: relations.neighborIds, reason } };
 }
 
-export function graphEdgeLabel(kind: "related" | "member" | "ref" | undefined): string {
-    return kind === "member" ? "组织成员（member）" : kind === "ref" ? "文档块引用（ref）" : "显式人物关系（related）";
+export function graphEdgeLabel(kind: "related" | "member" | "ref" | undefined, memberStatus?: "active" | "former" | "mixed"): string {
+    if (kind === "member") {
+        const lifecycle = memberStatus === "active" ? "当前" : memberStatus === "former" ? "历史" : memberStatus === "mixed" ? "当前+历史" : "";
+        return `组织成员（member）${lifecycle ? `·${lifecycle}` : ""}`;
+    }
+    return kind === "ref" ? "文档块引用（ref）" : "显式人物关系（related）";
 }

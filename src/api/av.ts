@@ -116,6 +116,13 @@ export interface AvRenderResult {
     };
 }
 
+/**
+ * 思源属性视图的单页上限。renderAttributeView 在 pageSize < 1 时会回退到
+ * 视图默认页大小（通常是 50），因此不能再用 pageSize=-1 表示“全部”。
+ * 全量读取由 renderView 通过这个上限分页汇总完成。
+ */
+const ATTRIBUTE_VIEW_PAGE_SIZE = 500;
+
 function decodeAvRenderResult(route: string, data: unknown): AvRenderResult {
     const result = assertKernelRecord(route, data);
     const view = assertKernelRecord(route, result.view);
@@ -179,15 +186,94 @@ export async function renderView(
     dbBlockId: string,
     query: string = "",
     createIfNotExist: boolean = false,
+    options: Pick<RenderPageOptions, "signal" | "dedupe"> = {},
+): Promise<AvRenderResult> {
+    const firstPage = await requestRenderViewPage(
+        avId,
+        dbBlockId,
+        query,
+        1,
+        ATTRIBUTE_VIEW_PAGE_SIZE,
+        createIfNotExist,
+        options,
+    );
+    const rows = new Map(firstPage.view.rows.map((row) => [row.id, row]));
+    const rawRowCount = firstPage.view.rowCount;
+    const declaredRowCount = typeof rawRowCount === "number" && Number.isSafeInteger(rawRowCount) && rawRowCount >= 0
+        ? rawRowCount
+        : undefined;
+
+    // rowCount 是过滤后的总行数；没有 rowCount 的旧响应只能按短页结束。
+    // 真实思源 3.8.x 会返回 rowCount，有总数时即使服务端将 500 降级成 50
+    // 也会继续跨页；无总数时无法可靠区分“代理限页”和“已到末尾”。
+    let page = 2;
+    while ((declaredRowCount !== undefined && rows.size < declaredRowCount)
+        || (declaredRowCount === undefined && firstPage.view.rows.length >= ATTRIBUTE_VIEW_PAGE_SIZE)) {
+        const result = await requestRenderViewPage(
+            avId,
+            dbBlockId,
+            query,
+            page,
+            ATTRIBUTE_VIEW_PAGE_SIZE,
+            false,
+            options,
+        );
+        const before = rows.size;
+        for (const row of result.view.rows) rows.set(row.id, row);
+        if (result.view.rows.length === 0) {
+            if (declaredRowCount !== undefined && rows.size < declaredRowCount) {
+                throw new KernelProtocolError(
+                    "/api/av/renderAttributeView",
+                    `分页读取属性视图不完整（已读取 ${rows.size}/${declaredRowCount} 行）`,
+                );
+            }
+            break;
+        }
+        if (rows.size === before) {
+            if (declaredRowCount === undefined) break;
+            throw new KernelProtocolError(
+                "/api/av/renderAttributeView",
+                `分页读取属性视图未前进（第 ${page} 页未返回新行）`,
+            );
+        }
+        if (declaredRowCount !== undefined && rows.size > declaredRowCount) {
+            throw new KernelProtocolError(
+                "/api/av/renderAttributeView",
+                `分页读取属性视图超过声明总数（已读取 ${rows.size}/${declaredRowCount} 行）`,
+            );
+        }
+        if (declaredRowCount === undefined && result.view.rows.length < ATTRIBUTE_VIEW_PAGE_SIZE) break;
+        page += 1;
+        // 防止损坏的 rowCount 让读取请求无限增长。
+        if (page > 100_000) throw new KernelProtocolError("/api/av/renderAttributeView", "分页读取属性视图超过安全页数");
+    }
+
+    return { view: { ...firstPage.view, rows: [...rows.values()], ...(declaredRowCount !== undefined ? { rowCount: declaredRowCount } : {}) } };
+}
+
+/** 单页渲染请求。createIfNotExist 只在首次请求使用，后续页不能重复建库。 */
+async function requestRenderViewPage(
+    avId: string,
+    dbBlockId: string,
+    query: string,
+    page: number,
+    pageSize: number,
+    createIfNotExist: boolean,
+    options: Pick<RenderPageOptions, "signal" | "dedupe">,
 ): Promise<AvRenderResult> {
     try {
         return await kernelPost("/api/av/renderAttributeView", {
             id: avId,
             blockID: dbBlockId,
             query,
-            pageSize: -1,
+            page,
+            pageSize,
             createIfNotExist,
-        }, { decode: (data) => decodeAvRenderResult("/api/av/renderAttributeView", data) });
+        }, {
+            signal: options.signal,
+            dedupe: options.dedupe,
+            decode: (data) => decodeAvRenderResult("/api/av/renderAttributeView", data),
+        });
     } catch (error) {
         rethrowAttributeViewCarrierMissing(error, avId, dbBlockId);
     }
@@ -235,6 +321,8 @@ export interface RenderPageOptions {
     pageSize?: number;
     /** 读取分页可由视图切换/用户停止操作取消；取消只终止本次等待，不重试请求。 */
     signal?: AbortSignal;
+    /** 服务层已完成代际合并时可关闭底层同键请求共享，避免旧请求占住新读取。 */
+    dedupe?: boolean;
 }
 
 export async function renderViewPage(avId: string, dbBlockId: string, options: RenderPageOptions = {}): Promise<AvRenderResult> {
@@ -252,6 +340,7 @@ export async function renderViewPage(avId: string, dbBlockId: string, options: R
             createIfNotExist: false,
         }, {
             signal: options.signal,
+            dedupe: options.dedupe,
             decode: (data) => decodeAvRenderResult("/api/av/renderAttributeView", data),
         });
     } catch (error) {
@@ -327,21 +416,42 @@ export interface BindRowSource {
     content: string;
 }
 
-/** 把文档绑定为行（isDetached: false）。内核不返回 itemID，需要随后 mapBoundDocIds 或渲染换算 */
+/**
+ * 属性视图批量请求的兼容上限。
+ *
+ * 思源 3.8.x 的端点没有在契约中声明 srcs/blockIDs 的最大长度；部分版本和
+ * 宿主代理会接受请求但只处理前一段数据。统一按 50 条拆分，避免“大批量
+ * 请求返回成功、实际只落库一部分”的静默丢失。写入仍然不自动重试，调用方
+ * 必须通过 mapBoundDocIds 回读核实结果。
+ */
+export const ATTRIBUTE_VIEW_BATCH_SIZE = 50;
+
+/** 把文档绑定为行（isDetached: false）。内核不返回 itemID，需要随后 mapBoundDocIds 或渲染换算。 */
 export async function bindDocsAsRows(avId: string, dbBlockId: string, srcs: readonly BindRowSource[]): Promise<void> {
-    await kernelPost<unknown>("/api/av/addAttributeViewBlocks", {
-        avID: avId,
-        blockID: dbBlockId,
-        srcs: srcs.map((src) => ({ id: src.id, isDetached: false, content: src.content })),
-    });
+    const unique = [...new Map(srcs.map((src) => [src.id, src])).values()];
+    for (let start = 0; start < unique.length; start += ATTRIBUTE_VIEW_BATCH_SIZE) {
+        const chunk = unique.slice(start, start + ATTRIBUTE_VIEW_BATCH_SIZE);
+        await kernelPost<unknown>("/api/av/addAttributeViewBlocks", {
+            avID: avId,
+            blockID: dbBlockId,
+            srcs: chunk.map((src) => ({ id: src.id, isDetached: false, content: src.content })),
+        });
+    }
 }
 
 /** 绑定文档 ID → 行 itemID 的官方换算端点 */
 export async function mapBoundDocIds(avId: string, docIds: readonly string[]): Promise<Record<string, string>> {
-    return kernelPost("/api/av/getAttributeViewItemIDsByBoundIDs", {
-        avID: avId,
-        blockIDs: docIds,
-    }, { decode: (data) => decodeStringMap("/api/av/getAttributeViewItemIDsByBoundIDs", data) });
+    const unique = [...new Set(docIds)];
+    const mapped: Record<string, string> = {};
+    for (let start = 0; start < unique.length; start += ATTRIBUTE_VIEW_BATCH_SIZE) {
+        const chunk = unique.slice(start, start + ATTRIBUTE_VIEW_BATCH_SIZE);
+        const part = await kernelPost("/api/av/getAttributeViewItemIDsByBoundIDs", {
+            avID: avId,
+            blockIDs: chunk,
+        }, { decode: (data) => decodeStringMap("/api/av/getAttributeViewItemIDsByBoundIDs", data) });
+        Object.assign(mapped, part);
+    }
+    return mapped;
 }
 
 /** 解绑行（绑定行只解绑，不删文档——spike 假设⑥） */

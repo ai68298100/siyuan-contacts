@@ -7,6 +7,7 @@ import {
     ORGANIZATION_TEMPLATES,
     validateOrganizationProfile,
 } from "../src/domain/organization-profile.ts";
+import { saveOrganizationProfile, OrganizationProfileConflictError } from "../src/data/organization-profiles.ts";
 
 test("组织资料名称为必填，模板提供可编辑的内置组织", () => {
     assert.equal(validateOrganizationProfile(emptyOrganizationProfileDraft()).valid, false);
@@ -49,4 +50,22 @@ test("组织部门循环和重复自定义标识会被拒绝", () => {
     assert.equal(result.valid, false);
     assert.match(result.errors.join("、"), /循环/);
     assert.match(result.errors.join("、"), /标识重复/);
+});
+
+test("组织资料保存使用打开时快照，拒绝覆盖其他窗口的新版本", async () => {
+    const docId = "20261014000000-org0001";
+    let stored: unknown = null;
+    const plugin = {
+        async loadData() { return structuredClone(stored); },
+        async saveData(_key: string, value: unknown) { stored = structuredClone(value); },
+    } as never;
+    const original = organizationTemplateDraft("company");
+    original.name = "原公司";
+    await saveOrganizationProfile(plugin, docId, original, null);
+    const external = { ...original, description: "其他窗口的最新介绍" };
+    await saveOrganizationProfile(plugin, docId, external, original);
+    const stale = { ...original, description: "旧窗口草稿" };
+    await assert.rejects(saveOrganizationProfile(plugin, docId, stale, original), OrganizationProfileConflictError);
+    const latest = JSON.parse(JSON.stringify(stored)) as { profiles: Record<string, { description: string }> };
+    assert.equal(latest.profiles[docId].description, external.description);
 });

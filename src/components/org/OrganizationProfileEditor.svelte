@@ -1,9 +1,11 @@
 <script lang="ts">
     /** 组织资料编辑器原型：可嵌入新建/编辑组织页面。保存由宿主通过 onSave 接入，组件不直接写入内核。 */
     import { Plus, Trash2, Upload, X } from "@lucide/svelte";
+    import { onDestroy, tick } from "svelte";
     import type { OrganizationProfileDraft, OrganizationDepartment, OrganizationCustomField } from "../../domain/organization-profile";
     import { emptyOrganizationProfileDraft, ORGANIZATION_TEMPLATES, organizationTemplateDraft, validateOrganizationProfile } from "../../domain/organization-profile";
     import { useCloseGuard } from "../close-guard";
+    import { requestErrorMessage } from "../../shared/error-presenter";
 
     const PRESETS = ORGANIZATION_TEMPLATES.map((item) => ({
         id: item.key,
@@ -46,10 +48,18 @@
     const initialSnapshot = JSON.stringify(draft);
     let selectedPreset = $state("");
     let validationError = $state("");
+    let validationErrorField = $state<"name" | "qccUrl" | "logoUrl" | null>(null);
     let logoError = $state("");
     let logoPreviewError = $state("");
+    let logoReading = $state(false);
     let logoInput: HTMLInputElement | undefined = $state();
+    let nameInput: HTMLInputElement | undefined = $state();
+    let qccUrlInput: HTMLInputElement | undefined = $state();
+    let logoUrlInput: HTMLInputElement | undefined = $state();
+    let validationSummary: HTMLElement | undefined = $state();
     let logoReadRequest = 0;
+    // 弹窗关闭后让尚未完成的本地文件读取失效，避免迟到结果回填旧草稿。
+    onDestroy(() => { logoReadRequest += 1; });
 
     $effect(() => {
         /* 输入新的 URL 或重新上传后，允许预览重新尝试加载。 */
@@ -87,19 +97,30 @@
         const file = target.files[0];
         const request = ++logoReadRequest;
         logoError = "";
-        if (!file.type.startsWith("image/")) { logoError = "请选择图片文件"; return; }
-        if (file.size > 2 * 1024 * 1024) { logoError = "图片不能超过 2 MB"; return; }
+        logoReading = false;
+        if (!file.type.startsWith("image/")) { logoError = "请选择图片文件"; target.value = ""; return; }
+        if (file.size > 2 * 1024 * 1024) { logoError = "图片不能超过 2 MB"; target.value = ""; return; }
+        logoReading = true;
         const reader = new FileReader();
         reader.onload = () => {
             if (request !== logoReadRequest) return;
+            logoReading = false;
             draft.logoDataUrl = typeof reader.result === "string" ? reader.result : "";
+            if (logoInput) logoInput.value = "";
         };
-        reader.onerror = () => { if (request === logoReadRequest) logoError = "图片读取失败，请重试"; };
+        reader.onerror = () => {
+            if (request !== logoReadRequest) return;
+            logoReading = false;
+            logoError = "图片读取失败，请重试";
+            if (logoInput) logoInput.value = "";
+        };
         reader.readAsDataURL(file);
     }
     function clearLogo(): void {
         // 让尚未完成的 FileReader 结果失效，避免点击“移除”后旧文件又回填。
         logoReadRequest += 1;
+        logoReading = false;
+        logoError = "";
         draft.logoUrl = "";
         draft.logoDataUrl = "";
         if (logoInput) logoInput.value = "";
@@ -108,33 +129,69 @@
         logoPreviewError = "Logo 暂时无法加载，保存后仍会保留链接。";
     }
     function logoPreview(): string { return draft.logoDataUrl || draft.logoUrl; }
+    async function showFieldError(field: "name" | "qccUrl" | "logoUrl", message: string): Promise<void> {
+        validationError = message;
+        validationErrorField = field;
+        await tick();
+        ({ name: nameInput, qccUrl: qccUrlInput, logoUrl: logoUrlInput })[field]?.focus();
+    }
+    async function showSummaryError(message: string): Promise<void> {
+        validationError = message;
+        validationErrorField = null;
+        await tick();
+        validationSummary?.focus();
+    }
+    function clearFieldError(field: "name" | "qccUrl" | "logoUrl"): void {
+        if (validationErrorField !== field) return;
+        validationError = "";
+        validationErrorField = null;
+    }
     function validUrl(value: string): boolean {
         if (!value.trim()) return true;
         try { const url = new URL(value); return url.protocol === "https:" || url.protocol === "http:"; } catch { return false; }
     }
     async function submit(): Promise<void> {
+        if (saving || readOnly) return;
         validationError = "";
+        validationErrorField = null;
+        if (logoReading) {
+            await showSummaryError("Logo 正在读取，请稍候再保存");
+            return;
+        }
         const name = draft.name.trim();
-        if (!name) { validationError = "组织名称为必填项"; return; }
-        if (name.length > 80) { validationError = "组织名称不能超过 80 个字符"; return; }
-        if (!validUrl(draft.qccUrl)) { validationError = "企查查链接格式不正确，请填写 http(s) 地址"; return; }
-        if (!validUrl(draft.logoUrl)) { validationError = "Logo 链接格式不正确，请填写 http(s) 地址"; return; }
+        if (!name) { await showFieldError("name", "组织名称为必填项"); return; }
+        if (name.length > 80) { await showFieldError("name", "组织名称不能超过 80 个字符"); return; }
+        if (!validUrl(draft.qccUrl)) { await showFieldError("qccUrl", "企查查链接格式不正确，请填写 http(s) 地址"); return; }
+        if (!validUrl(draft.logoUrl)) { await showFieldError("logoUrl", "Logo 链接格式不正确，请填写 http(s) 地址"); return; }
         const normalized: OrganizationProfileDraft = { ...draft, name, shortName: draft.shortName.trim(), qccUrl: draft.qccUrl.trim(), logoUrl: draft.logoUrl.trim(), description: draft.description.trim(), departments: draft.departments.map((item) => ({ ...item, name: item.name.trim(), description: item.description.trim(), parentId: item.parentId?.trim() || null })).filter((item) => item.name), customFields: draft.customFields.map((item) => ({ ...item, label: item.label.trim(), value: item.value.trim() })).filter((item) => item.label) };
         const checked = validateOrganizationProfile(normalized);
-        if (!checked.valid) { validationError = checked.errors[0] ?? "组织资料未通过校验"; return; }
+        if (!checked.valid) {
+            const message = checked.errors[0] ?? "组织资料未通过校验";
+            const field = message.includes("组织名称") ? "name" : message.includes("企查查链接") ? "qccUrl" : message.includes("Logo 链接") ? "logoUrl" : null;
+            if (field) await showFieldError(field, message);
+            else await showSummaryError(message);
+            return;
+        }
         try {
             await onSave(normalized);
         } catch (error) {
             // onSave 通常由宿主负责展示错误，但编辑器也要兜底处理接入方的 rejected Promise。
-            validationError = error instanceof Error ? error.message : String(error);
+            await showSummaryError(requestErrorMessage(error));
         }
     }
 
     const guardedClose = useCloseGuard({
         busy: () => saving,
-        dirty: () => JSON.stringify(draft) !== initialSnapshot,
+        dirty: () => logoReading || JSON.stringify(draft) !== initialSnapshot,
         changes: () => [mode === "create" ? "新建组织资料尚未保存" : "组织资料修改尚未保存"],
     });
+
+    /** X、Esc 与取消使用同一个局部守卫，父编辑器可能正在等待此窗口完成。 */
+    export async function requestClose(): Promise<boolean> {
+        let allowed = false;
+        await guardedClose(() => { allowed = true; });
+        return allowed;
+    }
 
     function requestCancel(): void {
         if (!onCancel) return;
@@ -168,9 +225,9 @@
     <section class="lvct-org-profile-editor__section" aria-labelledby="org-basic-title">
         <div class="lvct-org-profile-editor__section-head"><div><h4 id="org-basic-title">基本资料</h4><span class="ft__smaller ft__on-surface">名称会显示在组织列表和联系人归属中。</span></div><span class="lvct-org-profile-editor__required">* 必填</span></div>
         <div class="lvct-org-profile-editor__form-grid">
-            <label class="lvct-org-profile-editor__field lvct-org-profile-editor__field--required">组织名称 *<input class="b3-text-field" bind:value={draft.name} maxlength="80" placeholder="例如：远山科技" aria-label="组织名称（必填）" disabled={saving || readOnly} /></label>
+            <label class="lvct-org-profile-editor__field lvct-org-profile-editor__field--required">组织名称 *<input id="lvct-org-name" class="b3-text-field" bind:this={nameInput} bind:value={draft.name} maxlength="80" placeholder="例如：远山科技" aria-label="组织名称（必填）" aria-invalid={validationErrorField === "name"} aria-describedby={validationErrorField === "name" ? "lvct-org-profile-error" : undefined} oninput={() => clearFieldError("name")} disabled={saving || readOnly} /></label>
             <label class="lvct-org-profile-editor__field">简称<input class="b3-text-field" bind:value={draft.shortName} maxlength="30" placeholder="例如：远山" aria-label="组织简称" disabled={saving || readOnly} /></label>
-            <label class="lvct-org-profile-editor__field lvct-org-profile-editor__field--wide">企查查链接<input class="b3-text-field" type="url" bind:value={draft.qccUrl} placeholder="https://www.qcc.com/..." aria-label="企查查链接" disabled={saving || readOnly} /><small>可粘贴企查查企业详情页链接，便于回查工商信息。</small></label>
+            <label class="lvct-org-profile-editor__field lvct-org-profile-editor__field--wide">企查查链接<input id="lvct-org-qcc-url" class="b3-text-field" type="url" bind:this={qccUrlInput} bind:value={draft.qccUrl} placeholder="https://www.qcc.com/..." aria-label="企查查链接" aria-invalid={validationErrorField === "qccUrl"} aria-describedby={validationErrorField === "qccUrl" ? "lvct-org-profile-error" : undefined} oninput={() => clearFieldError("qccUrl")} disabled={saving || readOnly} /><small>可粘贴企查查企业详情页链接，便于回查工商信息。</small></label>
             <label class="lvct-org-profile-editor__field lvct-org-profile-editor__field--wide">介绍<textarea class="b3-text-field" rows="3" bind:value={draft.description} maxlength="1000" placeholder="记录组织定位、合作背景或你希望记住的内容" aria-label="组织介绍" disabled={saving || readOnly}></textarea></label>
         </div>
     </section>
@@ -178,12 +235,13 @@
     <section class="lvct-org-profile-editor__section" aria-labelledby="org-logo-title">
         <div class="lvct-org-profile-editor__section-head"><div><h4 id="org-logo-title">Logo</h4><span class="ft__smaller ft__on-surface">支持上传本地图片，或填写公开图片链接。</span></div></div>
         <div class="lvct-org-profile-editor__logo-row">
-            <div class="lvct-org-profile-editor__logo-preview">{#if logoPreview() && !logoPreviewError}<img src={logoPreview()} alt="组织 Logo 预览" onerror={handleLogoPreviewError} />{:else}<span aria-hidden="true">{draft.shortName?.slice(0, 2) || draft.name?.slice(0, 2) || "组"}</span>{/if}</div>
+            <div class="lvct-org-profile-editor__logo-preview">{#if logoPreview() && !logoPreviewError}<img src={logoPreview()} alt="组织 Logo 预览" width="48" height="48" decoding="async" onerror={handleLogoPreviewError} />{:else}<span aria-hidden="true">{draft.shortName?.slice(0, 2) || draft.name?.slice(0, 2) || "组"}</span>{/if}</div>
             <div class="lvct-org-profile-editor__logo-actions">
                 <input bind:this={logoInput} class="lvct-org-profile-editor__file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange={handleLogoFile} disabled={saving || readOnly} aria-label="上传组织 Logo" />
                 <button type="button" class="b3-button b3-button--outline" onclick={() => logoInput?.click()} disabled={saving || readOnly}><Upload size={15} />上传图片</button>
-                <label class="lvct-org-profile-editor__field">Logo 链接<input class="b3-text-field" type="url" bind:value={draft.logoUrl} placeholder="https://.../logo.png" aria-label="Logo 链接" disabled={saving || readOnly} /></label>
+                <label class="lvct-org-profile-editor__field">Logo 链接<input id="lvct-org-logo-url" class="b3-text-field" type="url" bind:this={logoUrlInput} bind:value={draft.logoUrl} placeholder="https://.../logo.png" aria-label="Logo 链接" aria-invalid={validationErrorField === "logoUrl"} aria-describedby={validationErrorField === "logoUrl" ? "lvct-org-profile-error" : undefined} oninput={() => clearFieldError("logoUrl")} disabled={saving || readOnly} /></label>
                 {#if logoPreview()}<button type="button" class="b3-button b3-button--text" onclick={clearLogo} disabled={saving || readOnly}>移除 Logo</button>{/if}
+                {#if logoReading}<p class="ft__smaller ft__on-surface" role="status" aria-live="polite">正在读取 Logo…</p>{/if}
                 {#if logoError}<p class="lvct-form__error" role="alert">{logoError}</p>{/if}
                 {#if logoPreviewError}<p class="ft__smaller ft__on-surface" role="status">{logoPreviewError}</p>{/if}
             </div>
@@ -208,6 +266,6 @@
         </div>
     </section>
 
-    {#if validationError || error}<p class="lvct-form__error" role="alert" tabindex="-1">{validationError || error}{#if readOnly && onRetry}<button type="button" class="b3-button b3-button--outline" onclick={onRetry} disabled={saving}>重新读取组织资料</button>{/if}</p>{/if}
-    <div class="lvct-org-profile-editor__footer"><span class="ft__smaller ft__on-surface">保存后可在组织列表、联系人归属和关系图中使用。</span><span class="fn__flex-1"></span>{#if onCancel}<button type="button" class="b3-button b3-button--cancel" onclick={requestCancel} disabled={saving}>取消</button>{/if}<button type="button" class="b3-button b3-button--primary" onclick={submit} disabled={saving || readOnly || !draft.name.trim()}>{saving ? "保存中…" : readOnly ? "等待读取" : mode === "create" ? "创建组织" : "保存资料"}</button></div>
+    {#if validationError || error}<p id="lvct-org-profile-error" class="lvct-form__error" role="alert" tabindex="-1" bind:this={validationSummary}>{validationError || error}{#if readOnly && onRetry}<button type="button" class="b3-button b3-button--outline" onclick={onRetry} disabled={saving}>重新读取组织资料</button>{/if}</p>{/if}
+    <div class="lvct-org-profile-editor__footer"><span class="ft__smaller ft__on-surface">保存后可在组织列表、联系人归属和关系图中使用。</span><span class="fn__flex-1"></span>{#if onCancel}<button type="button" class="b3-button b3-button--cancel" onclick={requestCancel} disabled={saving}>取消</button>{/if}<button type="button" class="b3-button b3-button--primary" onclick={submit} disabled={saving || readOnly || logoReading}>{saving ? "保存中…" : logoReading ? "正在读取 Logo…" : readOnly ? "等待读取" : mode === "create" ? "创建组织" : "保存资料"}</button></div>
 </div>

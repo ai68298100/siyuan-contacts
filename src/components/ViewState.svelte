@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { Snippet } from "svelte";
+    import { Cake, CalendarDays, Check } from "@lucide/svelte";
 
     let {
         title,
@@ -29,7 +30,19 @@
                 <span class="lvct-skeleton lvct-skeleton--l3"></span>
             </div>
         {:else}
-            <div class="lvct-empty__icon" aria-hidden="true">{error ? "!" : icon}</div>
+            <div class="lvct-empty__icon" aria-hidden="true">
+                {#if error}
+                    !
+                {:else if icon === "birthday"}
+                    <Cake size={20} strokeWidth={1.8} />
+                {:else if icon === "calendar"}
+                    <CalendarDays size={20} strokeWidth={1.8} />
+                {:else if icon === "check"}
+                    <Check size={20} strokeWidth={1.8} />
+                {:else}
+                    {icon}
+                {/if}
+            </div>
         {/if}
         <b>{title}</b>
         {#if description}<p>{description}</p>{/if}

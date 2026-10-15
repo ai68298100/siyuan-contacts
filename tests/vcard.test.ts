@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
     parseVcf,
+    parseVcfForImport,
     serializeVcf,
     normalizeVcfDate,
     unfoldVcfLines,
@@ -85,6 +86,20 @@ test("parseVcf：无 FN 时回退 N 结构名（姓+名连写）；转义的逗�
     const escaped = 'BEGIN:VCARD\r\nFN:Morrissey\\, St.\\;John\\\\end\\nnext\r\nEND:VCARD';
     const [contact] = parseVcf(escaped);
     assert.equal(contact.name, "Morrissey, St.;John\\end\nnext");
+});
+
+test("parseVcf：空白 FN 回退 N，且接受 UTF-8 BOM 文件头", () => {
+    const vcf = "\uFEFFBEGIN:VCARD\r\nVERSION:3.0\r\nN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:=E5=BC=A0=3B=E4=B8=89;;;\r\nFN:   \r\nTEL;TYPE=CELL:13800138000\r\nEND:VCARD";
+    const [contact] = parseVcf(vcf);
+    assert.ok(contact);
+    assert.equal(contact.name, "张三");
+    assert.equal(contact.phone, "13800138000");
+    assert.equal(parseVcfForImport(vcf)[0].name, "张三");
+});
+
+test("parseVcfForImport：BOM 不会被当作卡片外的非法内容", () => {
+    const vcf = "\uFEFFBEGIN:VCARD\r\nVERSION:3.0\r\nFN:小米联系人\r\nEND:VCARD\r\n";
+    assert.deepEqual(parseVcfForImport(vcf).map((contact) => contact.name), ["小米联系人"]);
 });
 
 test("parseVcf：QP 编码的 UTF-8 中文名解码（CHARSET 参数）", () => {

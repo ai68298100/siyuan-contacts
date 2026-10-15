@@ -36,6 +36,21 @@
     overflow: auto;
 }
 
+.lvct-workbench-load-state {
+    min-height: 160px;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: var(--lvct-sp-3);
+    padding: var(--lvct-sp-6);
+    color: var(--lvct-text-2);
+    text-align: center;
+}
+
+.lvct-workbench-load-state[role="alert"] {
+    color: var(--lvct-danger);
+}
+
 /* ---------- 工作台 ---------- */
 
 .lvct-workbench {
@@ -71,13 +86,17 @@
     }
 
     b {
-        font-size: var(--lvct-fs-heading);
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        line-height: 1.3;
     }
 
     small {
         margin-top: 2px;
         color: var(--lvct-text-3);
-        font-size: var(--lvct-fs-micro);
+        font-size: 11px;
+        font-weight: 500;
     }
 }
 
@@ -86,10 +105,24 @@
     place-items: center;
     width: var(--lvct-avatar-md);
     height: var(--lvct-avatar-md);
-    border-radius: var(--lvct-r-md);
+    overflow: hidden;
+    border-radius: 11px;
     background: var(--lvct-brand-gradient);
     color: var(--lvct-on-accent);
     font-weight: var(--lvct-fw-bold);
+    line-height: 1;
+    font-size: clamp(12px, 2.2vw, 18px);
+    text-align: center;
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--lvct-accent) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    flex-shrink: 0;
+
+    img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: inherit;
+    }
 }
 
 .lvct-workbench__main {
@@ -113,7 +146,7 @@
         margin: 0;
         font-size: var(--lvct-fs-page-title);
         line-height: 1.25;
-        letter-spacing: -0.02em;
+        letter-spacing: 0;
         font-weight: var(--lvct-fw-bold);
     }
 
@@ -123,13 +156,27 @@
         font-size: var(--lvct-fs-subtitle);
     }
 }
+
+.lvct-workbench__header--settings {
+    min-height: 56px;
+    padding-bottom: 10px;
+}
+
+.lvct-settings__topbar .lvct-settings__heading {
+    display: none;
+}
+
+.lvct-settings__topbar {
+    padding-top: 0;
+    padding-bottom: var(--lvct-sp-3);
+}
 .lvct-workbench__header-actions {
     display: flex;
     align-items: center;
     gap: var(--lvct-sp-2);
     min-width: 0;
     input { width: min(260px, 100%); min-width: 0; }
-    button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; }
+    button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: var(--lvct-sp-2); }
 }
 @media (max-width: 960px) {
     .lvct-workbench__header { align-items: flex-start; flex-wrap: wrap; }
@@ -218,11 +265,18 @@
     align-items: center;
     gap: var(--lvct-sp-2);
     color: var(--lvct-text-2);
-    padding: var(--lvct-sp-2);
-    min-height: 40px;
-    border-radius: var(--lvct-r-sm);
+    padding: 7px 10px;
+    min-height: 38px;
+    border-radius: 9px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: var(--lvct-fs-body);
+    font-weight: 500;
+    transition:
+        background var(--lvct-dur-fast) var(--lvct-ease),
+        color var(--lvct-dur-fast) var(--lvct-ease),
+        transform var(--lvct-dur-micro) var(--lvct-ease),
+        box-shadow var(--lvct-dur-fast) var(--lvct-ease);
+
     /* UX-01.3：图标与文字分开定位——此前 `> span` 把文字 span 也压进 18px 盒子导致逐字竖排 */
     .lvct-workbench__nav-icon {
         display: inline-flex;
@@ -230,6 +284,7 @@
         justify-content: center;
         width: 18px;
         flex: 0 0 18px;
+        transition: color var(--lvct-dur-fast) var(--lvct-ease), transform var(--lvct-dur-fast) var(--lvct-ease);
     }
 
     .lvct-workbench__nav-text {
@@ -246,9 +301,13 @@
         color: var(--lvct-text-1);
     }
 
+    &:active:not(:disabled) {
+        transform: scale(0.98);
+    }
+
     &:focus-visible {
         outline: 2px solid var(--lvct-accent);
-        outline-offset: 2px;
+        outline-offset: 1px;
     }
 
     &:disabled {
@@ -257,10 +316,23 @@
     }
 
     &--active {
-        background: var(--lvct-accent-soft);
-        color: var(--lvct-accent);
-        font-weight: 500;
+        position: relative;
+        background: var(--lvct-bg-surface);
+        color: var(--lvct-accent-text);
+        font-weight: 650;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+        .lvct-workbench__nav-icon {
+            color: var(--lvct-accent-fill);
+            transform: scale(1.05);
+        }
     }
+}
+
+html[data-theme-mode="dark"] .lvct-workbench__nav-item--active {
+    background: color-mix(in srgb, var(--lvct-accent) 14%, var(--lvct-bg-surface));
+    color: var(--lvct-accent-text);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .lvct-workbench__nav-item--mobile-settings { display: none; }
 
@@ -278,16 +350,21 @@
 .lvct-tab-root,
 .lvct-dialog-root {
     scrollbar-width: thin;
-    scrollbar-color: var(--lvct-border-strong) transparent;
+    scrollbar-color: color-mix(in srgb, var(--lvct-border-strong) 70%, transparent) transparent;
 }
 .lvct-tab-root ::-webkit-scrollbar,
-.lvct-dialog-root ::-webkit-scrollbar { width: 8px; height: 8px; }
+.lvct-dialog-root ::-webkit-scrollbar { width: 6px; height: 6px; }
 .lvct-tab-root ::-webkit-scrollbar-thumb,
 .lvct-dialog-root ::-webkit-scrollbar-thumb {
-    border: 2px solid transparent;
+    border: 1px solid transparent;
     border-radius: var(--lvct-r-pill);
-    background: var(--lvct-border-strong);
+    background: color-mix(in srgb, var(--lvct-text-3) 28%, transparent);
     background-clip: padding-box;
+    transition: background var(--lvct-dur-fast) var(--lvct-ease);
+
+    &:hover {
+        background: color-mix(in srgb, var(--lvct-text-2) 48%, transparent);
+    }
 }
 
 .lvct-placeholder {
@@ -296,7 +373,7 @@
     justify-content: center;
     height: 100%;
     color: var(--lvct-text-2);
-    font-size: 14px;
+    font-size: var(--lvct-fs-body);
 }
 
 /* ---------- 首页 ---------- */
@@ -324,13 +401,13 @@
 .lvct-home__row {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
-    padding: 3px 0;
-    font-size: 13px;
+    gap: var(--lvct-sp-2);
+    padding: var(--lvct-sp-1) 0;
+    font-size: var(--lvct-fs-caption);
 }
 
 .lvct-home__actions {
-    margin-top: 10px;
+    margin-top: var(--lvct-sp-3);
 }
 
 /* ---------- 向导 ---------- */
@@ -339,17 +416,22 @@
     width: min(560px, calc(100% - 32px));
     max-width: 560px;
     margin: clamp(24px, 8vh, 80px) auto;
-    padding: 32px 40px 36px;
+    padding: 36px 40px 40px;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 18px;
     text-align: center;
     color: var(--lvct-text-1);
     background: var(--lvct-bg-surface);
-    border: 1px solid var(--lvct-border-subtle);
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
     border-radius: var(--lvct-r-xl);
-    box-shadow: var(--lvct-shadow-2);
+    box-shadow: var(--lvct-shadow-3), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+html[data-theme-mode="dark"] .lvct-wizard {
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 /* UX-01.9：运行时不确定进度条（对齐原型 progress） */
@@ -385,7 +467,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 14px;
+    gap: var(--lvct-sp-4);
     text-align: center;
     margin-bottom: var(--lvct-sp-1);
 
@@ -394,7 +476,7 @@
         color: var(--lvct-text-1);
         font-size: var(--lvct-fs-display);
         line-height: 1.3;
-        letter-spacing: -0.01em;
+        letter-spacing: 0;
     }
 
     p {
@@ -433,14 +515,14 @@
 }
 
 .lvct-wizard__logo {
-    width: 64px;
-    height: 64px;
-    border-radius: var(--lvct-r-xl);
+    width: 68px;
+    height: 68px;
+    border-radius: 18px;
     background: var(--lvct-brand-gradient);
     fill: var(--lvct-on-accent);
-    padding: 14px;
+    padding: 15px;
     box-sizing: border-box;
-    box-shadow: var(--lvct-shadow-2);
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--lvct-accent) 32%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.5);
     position: relative;
     flex-shrink: 0;
 
@@ -454,6 +536,7 @@
         border-radius: 50%;
         background: var(--lvct-highlight);
         border: 3px solid var(--lvct-bg-base);
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-highlight) 40%, transparent);
     }
 }
 
@@ -504,7 +587,7 @@
 
     input[type="checkbox"] {
         flex: 0 0 auto;
-        margin: 3px 0 0;
+        margin: var(--lvct-sp-1) 0 0;
         accent-color: var(--lvct-accent);
     }
 }
@@ -513,7 +596,7 @@
 .lvct-wizard__cta {
     align-self: center;
     width: min(240px, 100%);
-    min-height: 40px;
+    min-height: var(--lvct-control-h);
     border: 0;
     border-radius: var(--lvct-r-md);
     background: var(--lvct-brand-gradient);
@@ -549,7 +632,7 @@
     color: var(--lvct-danger);
     border-inline-start-width: 3px;
     border-radius: var(--lvct-r-md);
-    padding: 12px 14px;
+    padding: var(--lvct-sp-3) var(--lvct-sp-4);
     font-size: var(--lvct-fs-body);
     line-height: 1.5;
     text-align: left;
@@ -571,7 +654,7 @@
     border: 1px solid var(--lvct-border-subtle);
     border-inline-start: 3px solid var(--lvct-accent);
     border-radius: var(--lvct-r-md);
-    padding: 12px 14px;
+    padding: var(--lvct-sp-3) var(--lvct-sp-4);
     box-shadow: var(--lvct-shadow-1);
     font-size: var(--lvct-fs-body);
     color: var(--lvct-text-2);
@@ -587,7 +670,7 @@
     button {
         align-self: flex-start;
         padding: 0;
-        margin-top: 2px;
+        margin-top: var(--lvct-sp-1);
     }
 }
 
@@ -598,12 +681,12 @@
     background: var(--lvct-bg-surface);
     border: 1px solid var(--lvct-border-subtle);
     border-radius: var(--lvct-r-md);
-    padding: 12px 14px;
+    padding: var(--lvct-sp-3) var(--lvct-sp-4);
     max-height: 200px;
     overflow: auto;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--lvct-sp-1);
     line-height: 1.5;
     text-align: left;
 }
@@ -613,8 +696,8 @@
         width: calc(100% - 24px);
         max-width: none;
         margin: max(16px, env(safe-area-inset-top)) auto max(16px, env(safe-area-inset-bottom));
-        padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
-        gap: 14px;
+        padding: var(--lvct-sp-5) var(--lvct-sp-4) calc(24px + env(safe-area-inset-bottom));
+        gap: var(--lvct-sp-4);
         border-radius: var(--lvct-r-lg);
     }
 
@@ -623,9 +706,9 @@
     }
 
     .lvct-wizard__header {
-        gap: 12px;
+        gap: var(--lvct-sp-3);
 
-        h2 { font-size: 19px; }
+        h2 { font-size: var(--lvct-fs-title); }
     }
 
     .lvct-wizard__logo {
@@ -639,18 +722,19 @@
 
 .lvct-people {
     height: 100%;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--lvct-sp-3);
 }
 
 .lvct-people__toolbar {
-    gap: 8px;
+    gap: var(--lvct-sp-2);
     align-items: center;
     /* 拥挤时整钮换行（配合按钮 nowrap，防汉字竖排，见下） */
     flex-wrap: wrap;
     row-gap: var(--lvct-sp-2);
-    > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    > button { display: inline-flex; align-items: center; justify-content: center; gap: var(--lvct-sp-2); }
 
     /* 拥挤时整钮换行而非汉字竖排（导航竖排 UX-01.3 同款教训，覆盖桌面+移动） */
     .b3-button { white-space: nowrap; flex-shrink: 0; }
@@ -661,13 +745,14 @@
     order: -1;
     flex: 1 0 100%;
     width: 100%;
-    min-width: 0;
+    /* 保证独立使用的搜索入口不会被工具栏的固有宽度压成窄条。 */
+    min-width: 260px;
     box-sizing: border-box;
 }
 
 .lvct-people__mobile-search {
     flex: 1 0 100%;
-    min-height: 36px;
+    min-height: var(--lvct-control-h-compact);
     order: -1;
 }
 
@@ -686,7 +771,7 @@
     align-items: center;
     flex-wrap: wrap;
     gap: var(--lvct-sp-2);
-    min-height: 32px;
+    min-height: var(--lvct-control-h-small);
     padding: 0 var(--lvct-sp-1);
 }
 
@@ -698,7 +783,7 @@
 
 .lvct-people__savedview {
     min-height: 28px;
-    padding: 3px 10px;
+    padding: var(--lvct-sp-1) var(--lvct-sp-3);
     border: 1px solid var(--lvct-border-subtle);
     border-radius: var(--lvct-r-pill);
     background: var(--lvct-bg-surface);
@@ -741,7 +826,7 @@
     }
 
     .lvct-people__toolbar-actions > .b3-button {
-        min-height: 32px;
+        min-height: var(--lvct-control-h-small);
         background: var(--lvct-bg-app);
         border-color: var(--lvct-border-subtle);
         color: var(--lvct-text-2);
@@ -755,15 +840,27 @@
 
 .lvct-people__viewtoggle { display: inline-flex; }
 
-/* UX-02.5 分段控件（iOS segmented）：凹槽容器 + 浮起活动段 */
+.lvct-people__batch-hint {
+    margin: var(--lvct-sp-2) 0 0;
+    padding: var(--lvct-sp-2) var(--lvct-sp-3);
+    border: 1px solid color-mix(in srgb, var(--lvct-accent) 26%, var(--lvct-border-subtle));
+    border-radius: var(--lvct-r-sm);
+    background: var(--lvct-accent-soft);
+    color: var(--lvct-text-2);
+    font-size: var(--lvct-fs-caption);
+    line-height: var(--lvct-lh-body);
+}
+
+/* UX-02.5 分段控件（iOS / Linear segmented）：凹槽容器 + 悬浮胶囊活动段 */
 .lvct-seg {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
-    padding: 2px;
-    border: 1px solid var(--lvct-border-subtle);
+    gap: 3px;
+    padding: 3px;
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
     border-radius: var(--lvct-r-pill);
     background: var(--lvct-bg-app);
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
     /* 工具栏拥挤时禁止收缩，防汉字竖排（UX-01.3 同款教训） */
     flex-shrink: 0;
     white-space: nowrap;
@@ -772,22 +869,26 @@
 .lvct-seg__item {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    min-height: calc(var(--lvct-touch-min) - 6px);
-    padding: 0 12px;
+    gap: 6px;
+    min-height: 32px;
+    padding: 0 14px;
     border: 0;
     border-radius: var(--lvct-r-pill);
     background: transparent;
     color: var(--lvct-text-2);
     font-size: var(--lvct-fs-caption);
+    font-weight: 500;
     cursor: pointer;
     white-space: nowrap;
     transition:
         background var(--lvct-dur-fast) var(--lvct-ease),
         color var(--lvct-dur-fast) var(--lvct-ease),
+        transform var(--lvct-dur-micro) var(--lvct-ease),
         box-shadow var(--lvct-dur-fast) var(--lvct-ease);
 
     &:hover { color: var(--lvct-text-1); }
+
+    &:active { transform: scale(0.97); }
 
     &:focus-visible {
         outline: 2px solid var(--lvct-accent);
@@ -796,13 +897,25 @@
 
     &--active {
         background: var(--lvct-bg-surface);
-        color: var(--lvct-text-1);
-        font-weight: 600;
-        box-shadow: var(--lvct-shadow-1);
+        color: var(--lvct-accent-text);
+        font-weight: 650;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
     }
 }
 
-/* B09-5：移动端分段控件触控目标 ≥40px */
+html[data-theme-mode="dark"] .lvct-seg {
+    background: rgba(0, 0, 0, 0.25);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+
+    .lvct-seg__item--active {
+        background: var(--lvct-bg-surface);
+        color: var(--lvct-accent-text);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+}
+
+/* B09-5：移动端分段控件触控目标 ≥44px */
 @media (max-width: 640px) {
     .lvct-people__conditions {
         flex-wrap: nowrap;
@@ -841,26 +954,27 @@
 
 // F02 列设置 / F03 组合筛选面板：锚定在工具栏按钮下方，窄屏不越界
 .lvct-people__colmenu,
-.lvct-people__moremenu {
+.lvct-people__moremenu,
+.lvct-people__viewsmenu {
     /* 定位（fixed/left/top）由 libs/popover.ts 注入：absolute 面板会被滚动祖先裁剪（B02），
        思源自家的 .b3-menu 同样用 position:fixed */
     position: fixed;
     z-index: var(--lvct-z-popover, 150);
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    min-width: 218px;
+    gap: var(--lvct-sp-1);
+    min-width: 220px;
     max-width: calc(100vw - 32px);
     max-height: min(340px, calc(100vh - 120px));
     overflow-y: auto;
-    padding: var(--lvct-sp-2);
-    border: 1px solid var(--lvct-border-subtle);
-    border-radius: var(--lvct-r-md);
-    /* UX-02.7 浮层玻璃质感：半透明底 + 背景模糊（不支持时回落不透明 elevated） */
+    padding: 6px;
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
+    border-radius: 12px;
+    /* UX-02.7 浮层玻璃质感：半透明底 + 背景模糊 + 顶切微高光 */
     background: var(--lvct-bg-elevated-glass, var(--lvct-bg-elevated));
-    backdrop-filter: blur(14px) saturate(1.15);
-    -webkit-backdrop-filter: blur(14px) saturate(1.15);
-    box-shadow: var(--lvct-shadow-3);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
     animation: lvct-pop-in var(--lvct-dur-base) var(--lvct-ease-spring);
     transform-origin: top left;
 
@@ -868,25 +982,29 @@
         display: flex;
         align-items: center;
         gap: var(--lvct-sp-2);
-        padding: 4px 6px;
-        border-radius: var(--lvct-r-sm);
+        padding: 6px 8px;
+        border-radius: 7px;
         font-size: var(--lvct-fs-body);
+        transition: background var(--lvct-dur-fast) var(--lvct-ease), color var(--lvct-dur-fast) var(--lvct-ease);
 
-        &:hover { background: var(--lvct-accent-soft); }
+        &:hover {
+            background: color-mix(in srgb, var(--lvct-accent) 12%, var(--lvct-bg-hover));
+            color: var(--lvct-accent-text);
+        }
 
-        small { margin-left: auto; color: var(--lvct-text-3); }
+        small { margin-left: auto; color: var(--lvct-text-3); font-weight: 500; }
     }
 
     .lvct-people__colmenu-actions {
         margin-left: auto;
         display: inline-flex;
-        gap: 2px;
+        gap: var(--lvct-sp-1);
 
         button {
             min-width: 22px;
             height: 22px;
             padding: 0;
-            border: 1px solid var(--lvct-border-subtle);
+            border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
             border-radius: var(--lvct-r-sm);
             background: var(--lvct-bg-surface);
             color: var(--lvct-text-2);
@@ -902,6 +1020,13 @@
         border-top: 1px solid var(--lvct-border-subtle);
         text-align: right;
     }
+}
+
+html[data-theme-mode="dark"] .lvct-people__colmenu,
+html[data-theme-mode="dark"] .lvct-people__moremenu,
+html[data-theme-mode="dark"] .lvct-people__viewsmenu {
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 2px 10px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .lvct-people__menu-title {
@@ -1101,8 +1226,13 @@
 
 .lvct-review__section {
     margin-bottom: var(--lvct-sp-3);
+    padding: 14px 16px;
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
+    border-radius: var(--lvct-r-md);
+    background: var(--lvct-bg-surface);
+    box-shadow: var(--lvct-shadow-panel);
 
-    > b { display: block; margin-bottom: var(--lvct-sp-1); }
+    > b { display: block; margin-bottom: var(--lvct-sp-1); font-size: 14.5px; font-weight: 650; }
 }
 
 .lvct-review__top {
@@ -1227,14 +1357,14 @@
     background: transparent;
     color: var(--lvct-text-2);
 
-    &:hover,
+    &:hover:not(:disabled),
     &:focus-visible {
         border-color: transparent;
         background: var(--lvct-bg-hover);
         color: var(--lvct-text-1);
     }
 
-    &:active { transform: translateY(1px); }
+    &:active:not(:disabled) { transform: translateY(1px); }
 }
 
 /* 仪表盘行动卡采用 panel header/body 节奏，避免标题、批量操作和列表挤在同一层。 */
@@ -1356,22 +1486,35 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: var(--lvct-sp-2);
-    padding: var(--lvct-sp-2) var(--lvct-sp-3);
-    border: 1px solid var(--lvct-accent);
-    border-radius: var(--lvct-r-md);
-    background: var(--lvct-accent-soft);
+    gap: 8px 12px;
+    padding: 8px 16px;
+    border: 1px solid color-mix(in srgb, var(--lvct-accent) 34%, transparent);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--lvct-accent) 8%, var(--lvct-bg-elevated));
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--lvct-accent) 14%, transparent), 0 2px 6px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    animation: lvct-pop-in var(--lvct-dur-base) var(--lvct-ease-spring);
 
     b {
         margin-right: auto;
-        color: var(--lvct-accent);
-        font-size: var(--lvct-fs-caption);
+        color: var(--lvct-accent-text);
+        font-size: 13.5px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
     }
 
     > span {
-        color: var(--lvct-text-3);
-        font-size: var(--lvct-fs-caption);
+        color: var(--lvct-text-2);
+        font-size: 12px;
+        font-weight: 500;
     }
+}
+
+html[data-theme-mode="dark"] .lvct-people__batchbar {
+    background: color-mix(in srgb, var(--lvct-accent) 12%, var(--lvct-bg-elevated));
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .lvct-people__remove {
@@ -1408,8 +1551,26 @@
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 285px), 1fr));
     gap: var(--lvct-sp-3);
     align-content: start;
+    grid-auto-rows: max-content;
+    align-items: start;
     overflow: auto;
+    overflow-anchor: none;
     flex: 1;
+    min-height: 0;
+}
+
+/* 长列表窗口化占位：必须占满网格行，避免离屏数据卸载后滚动高度塌陷。 */
+.lvct-people__cards > .lvct-people__virtual-spacer {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-height: 0;
+    pointer-events: none;
+}
+
+.lvct-people__virtual-row > td {
+    padding: 0;
+    border: 0;
+    line-height: 0;
 }
 
 .lvct-people__skeleton {
@@ -1464,8 +1625,19 @@
     color: var(--lvct-text-2);
     text-align: center;
 
-    b { color: var(--lvct-text-1); }
-    p { max-width: 420px; margin: var(--lvct-sp-2) 0; color: var(--lvct-text-3); }
+    b {
+        font-size: 15.5px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+        color: var(--lvct-text-1);
+    }
+    p {
+        max-width: 400px;
+        margin: 6px 0 14px;
+        color: var(--lvct-text-3);
+        font-size: 13px;
+        line-height: 1.6;
+    }
 
     &--compact {
         min-height: 140px;
@@ -1476,13 +1648,15 @@
 .lvct-empty__icon {
     display: grid;
     place-items: center;
-    width: 48px;
-    height: 48px;
-    margin-bottom: var(--lvct-sp-2);
-    border-radius: var(--lvct-r-lg);
-    background: var(--lvct-accent-soft);
-    color: var(--lvct-accent);
-    font-size: 26px;
+    width: 52px;
+    height: 52px;
+    margin-bottom: 14px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--lvct-accent) 18%, var(--lvct-bg-surface)), var(--lvct-accent-soft));
+    border: 1px solid color-mix(in srgb, var(--lvct-accent) 24%, transparent);
+    color: var(--lvct-accent-fill);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--lvct-accent) 16%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    font-size: 24px;
 }
 
 .lvct-empty__actions {
@@ -1516,10 +1690,12 @@
     span:nth-child(3) { width: 60%; }
 }
 
-/* UX-02.6 错误态：图标章转危险色 */
+/* UX-02.6 错误态：图标章转危险色 + 微高光 */
 .lvct-empty--error .lvct-empty__icon {
-    background: var(--lvct-danger-soft);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--lvct-danger) 18%, var(--lvct-bg-surface)), var(--lvct-danger-soft));
+    border-color: color-mix(in srgb, var(--lvct-danger) 28%, transparent);
     color: var(--lvct-danger);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--lvct-danger) 18%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .lvct-dash__welcome {
@@ -1655,7 +1831,7 @@
     margin: 0 0 var(--lvct-sp-1);
     font-size: var(--lvct-fs-page-title);
     line-height: 1.25;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
     font-weight: 700;
     display: none;
 }
@@ -1737,7 +1913,7 @@
         color: var(--lvct-text-1);
         font-size: var(--lvct-fs-page-title);
         line-height: 1.25;
-        letter-spacing: -0.02em;
+        letter-spacing: 0;
         font-weight: var(--lvct-fw-bold);
     }
 
@@ -1760,7 +1936,7 @@
     top: var(--lvct-sp-3);
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--lvct-sp-1);
     flex-shrink: 0;
     width: 168px;
     padding: var(--lvct-sp-1);
@@ -1776,13 +1952,18 @@
     display: flex;
     align-items: center;
     gap: var(--lvct-sp-2);
-    padding: 8px 10px;
-    border-radius: var(--lvct-r-sm);
+    padding: 8px 12px;
+    border-radius: 9px;
     color: var(--lvct-text-2);
     font-size: var(--lvct-fs-body);
+    font-weight: 500;
     text-align: left;
     cursor: pointer;
-    transition: background var(--lvct-dur-fast) var(--lvct-ease), color var(--lvct-dur-fast) var(--lvct-ease);
+    transition:
+        background var(--lvct-dur-fast) var(--lvct-ease),
+        color var(--lvct-dur-fast) var(--lvct-ease),
+        transform var(--lvct-dur-micro) var(--lvct-ease),
+        box-shadow var(--lvct-dur-fast) var(--lvct-ease);
 
     &:hover { background: var(--lvct-bg-hover); color: var(--lvct-text-1); }
 
@@ -1791,7 +1972,7 @@
         outline-offset: 1px;
     }
 
-    &:active { transform: translateY(1px); }
+    &:active { transform: scale(0.98); }
 
     &:disabled {
         opacity: 0.5;
@@ -1804,10 +1985,24 @@
     }
 
     &--active {
-        background: var(--lvct-accent-soft);
-        color: var(--lvct-accent);
-        font-weight: 600;
+        background: var(--lvct-bg-surface);
+        color: var(--lvct-accent-text);
+        font-weight: 650;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
     }
+}
+
+html[data-theme-mode="dark"] .lvct-settings__nav-item--active {
+    background: color-mix(in srgb, var(--lvct-accent) 14%, var(--lvct-bg-surface));
+    color: var(--lvct-accent-text);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.lvct-settings__nav-status {
+    margin: var(--lvct-sp-2) var(--lvct-sp-1) 0;
+    color: var(--lvct-text-3);
+    font-size: var(--lvct-fs-micro);
+    line-height: 1.45;
 }
 
 .lvct-settings__body {
@@ -1881,7 +2076,7 @@
     div { min-width: 0; }
     b, small { display: block; }
     b { color: var(--lvct-text-1); font-size: var(--lvct-fs-body); }
-    small { margin-top: 2px; color: var(--lvct-text-3); font-size: var(--lvct-fs-caption); }
+    small { margin-top: var(--lvct-sp-1); color: var(--lvct-text-3); font-size: var(--lvct-fs-caption); }
 }
 
 .lvct-settings__row--status {
@@ -1911,6 +2106,86 @@
         min-width: 0;
         max-width: 100%;
     }
+}
+
+/* 工作台品牌头像：与联系人头像保持独立，预览始终固定尺寸，避免大图挤压设置行。 */
+.lvct-settings__brand-avatar-row {
+    align-items: flex-start;
+}
+
+.lvct-settings__brand-avatar-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--lvct-sp-3);
+    min-width: 0;
+    max-width: 100%;
+}
+
+.lvct-settings__brand-avatar-preview {
+    display: grid;
+    place-items: center;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--lvct-accent) 30%, var(--lvct-border-subtle));
+    border-radius: var(--lvct-r-md);
+    background: var(--lvct-brand-gradient);
+    color: var(--lvct-on-accent);
+    font-size: 18px;
+    font-weight: var(--lvct-fw-bold);
+    box-shadow: var(--lvct-shadow-1), inset 0 1px 0 color-mix(in srgb, var(--lvct-on-accent) 24%, transparent);
+
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+}
+
+.lvct-settings__brand-avatar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--lvct-sp-2);
+    min-width: 0;
+}
+
+.lvct-settings__brand-avatar-presets,
+.lvct-settings__brand-avatar-buttons {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.lvct-settings__brand-avatar-hint {
+    flex: 1 1 100%;
+    color: var(--lvct-text-3);
+    font-size: var(--lvct-fs-micro);
+    line-height: 1.45;
+}
+
+.lvct-settings__brand-avatar-preset-active {
+    color: var(--lvct-accent);
+    background: var(--lvct-accent-soft);
+}
+
+.lvct-settings__brand-avatar-text {
+    width: 72px;
+    min-width: 52px;
+    text-align: center;
+}
+
+.lvct-settings__brand-avatar-file {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
 }
 
 .lvct-settings__backup-input {
@@ -1979,7 +2254,7 @@
     div { min-width: 0; }
     b, small { display: block; }
     b { color: var(--lvct-text-1); font-size: var(--lvct-fs-body); }
-    small { margin-top: 2px; color: var(--lvct-text-3); font-size: var(--lvct-fs-caption); }
+    small { margin-top: var(--lvct-sp-1); color: var(--lvct-text-3); font-size: var(--lvct-fs-caption); }
 }
 
 .lvct-settings__form-grid {
@@ -2024,9 +2299,36 @@
 
 .lvct-settings__missing {
     margin: var(--lvct-sp-2) 0;
-    padding-left: 20px;
-    color: var(--lvct-danger);
-    font-size: var(--lvct-fs-caption);
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    li {
+        padding: 10px 14px;
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--lvct-danger) 4%, var(--lvct-bg-surface));
+        border: 1px solid color-mix(in srgb, var(--lvct-danger) 20%, transparent);
+        border-left: 3px solid var(--lvct-danger);
+        color: var(--lvct-text-1);
+        font-size: var(--lvct-fs-caption);
+        line-height: 1.5;
+
+        .ft__smaller {
+            font-weight: 600;
+            color: var(--lvct-danger);
+            margin-bottom: 2px;
+        }
+
+        .b3-button--text {
+            margin-top: 4px;
+            margin-right: 6px;
+            padding: 2px 6px;
+            font-size: 11.5px;
+            font-weight: 600;
+        }
+    }
 }
 
 .lvct-settings__mapping {
@@ -2088,23 +2390,28 @@
         height: 22px;
         padding: 0 3px;
         border-radius: var(--lvct-r-pill);
-        background: var(--lvct-bg-active);
-        transition: background var(--lvct-dur-fast) var(--lvct-ease);
+        background: color-mix(in srgb, var(--lvct-border-strong) 45%, var(--lvct-bg-app));
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.12);
+        transition: background var(--lvct-dur-fast) var(--lvct-ease), border-color var(--lvct-dur-fast) var(--lvct-ease);
     }
 
     &__thumb {
         width: 16px;
         height: 16px;
         border-radius: 50%;
-        background: var(--lvct-bg-elevated);
-        box-shadow: var(--lvct-shadow-1);
-        transition: transform var(--lvct-dur-fast) var(--lvct-ease);
+        background: #ffffff;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2), 0 2px 6px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+        transition: transform var(--lvct-dur-fast) var(--lvct-ease), width var(--lvct-dur-fast) var(--lvct-ease);
+    }
+
+    input:active + &__track &__thumb {
+        width: 18px;
     }
 
     input:checked + &__track {
-        background: var(--lvct-accent);
+        background: var(--lvct-accent-fill);
 
-        .lvct-switch__thumb { transform: translateX(16px); background: var(--lvct-on-accent); }
+        .lvct-switch__thumb { transform: translateX(16px); background: #ffffff; }
     }
 
     input:focus-visible + &__track {
@@ -2116,19 +2423,20 @@
     flex-direction: column;
     gap: var(--lvct-sp-3);
     background: var(--lvct-bg-surface);
-    border: 1px solid var(--lvct-border-subtle);
-    border-radius: var(--lvct-r-md);
-    padding: var(--lvct-sp-3);
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
+    border-radius: var(--lvct-r-card);
+    padding: 16px;
     cursor: pointer;
     min-width: 0;
     min-height: 172px;
     box-sizing: border-box;
-    box-shadow: var(--lvct-shadow-1);
+    box-shadow: var(--lvct-shadow-card);
+    transition: transform var(--lvct-dur-base) var(--lvct-ease), box-shadow var(--lvct-dur-base) var(--lvct-ease), border-color var(--lvct-dur-fast) var(--lvct-ease);
 
     &:hover {
-        border-color: var(--lvct-border-strong);
-        box-shadow: var(--lvct-shadow-2);
-        transform: translateY(-1px);
+        border-color: color-mix(in srgb, var(--lvct-accent) 42%, var(--lvct-border-subtle));
+        box-shadow: var(--lvct-shadow-card-hover);
+        transform: translateY(-2px);
     }
     &--active {
         border-color: var(--lvct-accent);
@@ -2138,8 +2446,37 @@
     &:active { transform: translateY(0); }
 }
 .lvct-person-card__top { display: flex; align-items: center; gap: var(--lvct-sp-2); min-width: 0; }
-.lvct-person-card__sub { color: var(--lvct-text-3); font-size: var(--lvct-fs-caption); margin-top: 3px; }
-.lvct-person-card__org { color: var(--lvct-text-3); font-size: var(--lvct-fs-caption); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lvct-person-card__details {
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    gap: var(--lvct-sp-2);
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:focus-visible { outline: 2px solid var(--lvct-accent); outline-offset: 3px; border-radius: var(--lvct-r-sm); }
+}
+.lvct-person-card__sub { color: var(--lvct-text-3); font-size: 12px; margin-top: 3px; font-weight: 450; }
+.lvct-person-card__org {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    max-width: 100%;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--lvct-accent) 7%, var(--lvct-bg-base));
+    color: var(--lvct-text-2);
+    font-size: var(--lvct-fs-caption);
+    font-weight: 500;
+    margin-top: 2px;
+    overflow-wrap: anywhere;
+}
 .lvct-person-card__tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: auto; }
 .lvct-person-card__open-doc, .lvct-people__open-doc {
     border: 0;
@@ -2156,38 +2493,63 @@
     transition: background var(--lvct-dur-fast) var(--lvct-ease), color var(--lvct-dur-fast) var(--lvct-ease), transform var(--lvct-dur-fast) var(--lvct-ease);
 }
 .lvct-notice {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: 8px;
     width: fit-content;
     max-width: 100%;
-    padding: 7px 10px;
-    border: 1px solid var(--lvct-accent);
-    border-radius: 6px;
-    background: var(--lvct-accent-soft);
+    padding: 8px 12px;
+    border: 1px solid color-mix(in srgb, var(--lvct-accent) 26%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--lvct-accent) 9%, var(--lvct-bg-surface));
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--lvct-accent) 12%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.7);
     color: var(--lvct-text-1);
     font-size: var(--lvct-fs-caption);
+    font-weight: 500;
     box-sizing: border-box;
-    > span { min-width: 0; overflow-wrap: anywhere; }
+
+    > span { min-width: 0; overflow-wrap: anywhere; line-height: 1.45; }
     > svg { flex: 0 0 auto; color: var(--lvct-accent); }
 }
+
 .lvct-notice--error {
-    border-color: color-mix(in srgb, var(--lvct-danger) 48%, var(--lvct-border-subtle));
-    background: var(--lvct-danger-soft);
+    border-color: color-mix(in srgb, var(--lvct-danger) 32%, transparent);
+    background: color-mix(in srgb, var(--lvct-danger) 9%, var(--lvct-bg-surface));
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--lvct-danger) 14%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+
+    > svg { color: var(--lvct-danger); }
+
+    .lvct-notice__action {
+        background: color-mix(in srgb, var(--lvct-danger) 14%, transparent);
+        color: var(--lvct-danger);
+
+        &:hover {
+            background: color-mix(in srgb, var(--lvct-danger) 22%, transparent);
+        }
+    }
 }
-.lvct-notice--error > svg { color: var(--lvct-danger); }
+
 .lvct-notice__action {
     border: 0;
-    background: none;
-    color: var(--lvct-accent);
+    background: color-mix(in srgb, var(--lvct-accent) 14%, transparent);
+    color: var(--lvct-accent-fill);
+    font-weight: 600;
+    font-size: 11.5px;
     cursor: pointer;
     white-space: nowrap;
-    border-radius: var(--lvct-r-sm);
-    padding: 4px 6px;
+    border-radius: 5px;
+    padding: 2px 8px;
+    margin-left: 4px;
+    transition: background var(--lvct-dur-fast) var(--lvct-ease), transform var(--lvct-dur-micro) var(--lvct-ease);
 
-    &:hover { background: var(--lvct-accent-soft); }
+    &:hover { background: color-mix(in srgb, var(--lvct-accent) 22%, transparent); }
     &:focus-visible { outline: 2px solid var(--lvct-accent); outline-offset: 1px; }
-    &:active { transform: translateY(1px); }
+    &:active { transform: scale(0.97); }
+    &:disabled { opacity: .58; cursor: wait; }
+}
+
+html[data-theme-mode="dark"] .lvct-notice {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .lvct-person-card__open-doc:hover, .lvct-people__open-doc:hover {
     background: var(--lvct-bg-hover);
@@ -2201,24 +2563,41 @@
 .lvct-people__row--active { background: var(--lvct-accent-soft); }
 
 .lvct-person-card__avatar {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    background: var(--lvct-accent-soft);
-    color: var(--lvct-accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 17px;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffffff;
     flex-shrink: 0;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--lvct-accent) 80%, #ffffff 20%), var(--lvct-accent));
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-accent) 24%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    transition: transform var(--lvct-dur-fast) var(--lvct-ease), box-shadow var(--lvct-dur-fast) var(--lvct-ease);
 }
 
-/* UX-01.4：分组头像背景色（家人红/朋友绿/工作蓝/同学橙/其他灰），与图例色板一致 */
-.lvct-person-card__avatar[data-group="家人"] { background: var(--lvct-group-family); color: var(--lvct-on-accent); }
-.lvct-person-card__avatar[data-group="朋友"] { background: var(--lvct-group-friend); color: var(--lvct-on-accent); }
-.lvct-person-card__avatar[data-group="同事"] { background: var(--lvct-group-work); color: var(--lvct-on-accent); }
-.lvct-person-card__avatar[data-group="同学"] { background: var(--lvct-group-school); color: var(--lvct-on-accent); }
-.lvct-person-card__avatar[data-group="其他"] { background: var(--lvct-group-other); color: var(--lvct-on-accent); }
+/* UX-01.4：分组头像背景色（家人红/朋友绿/工作蓝/同学珊瑚/其他灰），Squircle 微渐变配方 */
+.lvct-person-card__avatar[data-group="家人"] {
+    background: linear-gradient(135deg, #f472b6, var(--lvct-group-family));
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-family) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.lvct-person-card__avatar[data-group="朋友"] {
+    background: linear-gradient(135deg, #34d399, var(--lvct-group-friend));
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-friend) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.lvct-person-card__avatar[data-group="同事"] {
+    background: linear-gradient(135deg, #60a5fa, var(--lvct-group-work));
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-work) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.lvct-person-card__avatar[data-group="同学"] {
+    background: linear-gradient(135deg, #fbbf24, var(--lvct-group-school));
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-school) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.lvct-person-card__avatar[data-group="其他"] {
+    background: linear-gradient(135deg, #94a3b8, var(--lvct-group-other));
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-other) 25%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
 
 .lvct-person-card__main {
     min-width: 0;
@@ -2229,34 +2608,78 @@
     align-self: center;
     flex: 0 0 auto;
     margin: 0;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+.lvct-person-card__select-hit-area {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    margin: -3px;
+    cursor: pointer;
 }
 
 .lvct-person-card__name {
-    font-size: 14px;
-    font-weight: 500;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
+    font-size: 15px;
+    font-weight: 650;
+    color: var(--lvct-text-1);
+    display: block;
+    overflow-wrap: anywhere;
     line-height: var(--lvct-lh-tight);
-    gap: 6px;
+    letter-spacing: -0.01em;
+
+    .lvct-chip {
+        display: inline-block;
+        vertical-align: middle;
+        margin-inline-start: 6px;
+        padding: 2px 7px;
+        font-size: var(--lvct-fs-micro);
+        font-weight: 600;
+        line-height: 1.2;
+    }
 }
 
 .lvct-person-card__meta {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 6px;
     color: var(--lvct-text-2);
     font-size: var(--lvct-fs-caption);
 
-    > div { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    > div > span { flex: 0 0 16px; color: var(--lvct-text-3); text-align: center; }
+    > div {
+        display: grid;
+        grid-template-columns: 16px minmax(0, 1fr);
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        line-height: var(--lvct-lh-body);
+
+        span[aria-hidden] {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--lvct-text-3);
+            opacity: 0.75;
+        }
+    }
+
+    .lvct-person-card__meta-value {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        white-space: normal;
+    }
 
     a {
         color: var(--lvct-text-2);
+        text-decoration: none;
 
         &:hover {
             color: var(--lvct-accent);
+            text-decoration: underline;
         }
     }
 }
@@ -2280,10 +2703,16 @@
 .lvct-people__table-wrap {
     position: relative;
     overflow: auto;
+    overflow-anchor: none;
     flex: 1;
+    min-height: 0;
     scrollbar-color: var(--lvct-border-strong) transparent;
     scrollbar-width: thin;
     overscroll-behavior-x: contain;
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
+    border-radius: var(--lvct-r-lg);
+    background: var(--lvct-bg-surface);
+    box-shadow: var(--lvct-shadow-panel);
 
     &:focus-visible {
         outline: 2px solid var(--lvct-accent);
@@ -2294,25 +2723,27 @@
         width: 100%;
         min-width: max-content;
         border-collapse: collapse;
-        font-size: 13px;
+        font-size: var(--lvct-fs-caption);
 
         th,
         td {
             text-align: left;
-            padding: 6px 10px;
-            border-bottom: 1px solid var(--lvct-border-subtle);
+            padding: 8px 12px;
+            border-bottom: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 75%, transparent);
             white-space: nowrap;
         }
 
         .lvct-people__select-cell {
             width: 30px;
             padding-right: 2px;
-            padding-left: 6px;
+            padding-left: 8px;
         }
 
         th {
-            color: var(--lvct-text-2);
-            font-weight: 500;
+            color: var(--lvct-text-3);
+            font-size: 11.5px;
+            font-weight: 650;
+            letter-spacing: 0.03em;
         }
 
         /* 首列和姓名列保持可见，横向浏览时给用户一个稳定锚点。 */
@@ -2338,7 +2769,10 @@
             position: sticky;
             top: 0;
             z-index: 2;
-            background: var(--lvct-bg-surface);
+            background: color-mix(in srgb, var(--lvct-bg-surface) 94%, transparent);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--lvct-border-strong) 70%, transparent);
         }
 
         thead th:first-child,
@@ -2346,12 +2780,13 @@
 
         tbody tr {
             cursor: pointer;
+            transition: background var(--lvct-dur-fast) var(--lvct-ease);
 
             &:hover {
-                background: var(--lvct-bg-hover);
+                background: color-mix(in srgb, var(--lvct-accent) 4.5%, var(--lvct-bg-hover));
 
                 td:first-child,
-                td:nth-child(2) { background: var(--lvct-bg-hover); }
+                td:nth-child(2) { background: color-mix(in srgb, var(--lvct-accent) 4.5%, var(--lvct-bg-hover)); }
             }
 
             &:focus-visible {
@@ -2370,31 +2805,36 @@
     text-align: right;
 }
 
+.lvct-people__table-wrap tbody tr {
+    content-visibility: auto;
+    contain-intrinsic-size: 44px;
+}
+
 /* ---------- 表单与轻量弹窗 ---------- */
 
 .lvct-form {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--lvct-sp-3);
     padding: 4px 2px;
 }
 
 .lvct-form__grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: var(--lvct-sp-3);
 }
 
 .lvct-form__item {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 13px;
+    font-size: var(--lvct-fs-caption);
 
     &--inline {
         flex-direction: row;
         align-items: center;
-        gap: 8px;
+        gap: var(--lvct-sp-2);
         padding-top: 22px;
     }
 }
@@ -2405,7 +2845,7 @@
     color: var(--lvct-danger);
     border-radius: var(--lvct-r-sm);
     padding: 8px 12px;
-    font-size: 13px;
+    font-size: var(--lvct-fs-caption);
     line-height: var(--lvct-lh-body);
     overflow-wrap: anywhere;
     word-break: normal;
@@ -2414,7 +2854,7 @@
 .lvct-form__actions {
     display: flex;
     justify-content: flex-end;
-    gap: 8px;
+    gap: var(--lvct-sp-2);
 }
 
 .lvct-form__toolbar {
@@ -2426,21 +2866,21 @@
 .lvct-form__toolbar-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--lvct-sp-2);
 }
 
 /* 生日字段：先选历法，再展示对应的日期控件，避免把农历当成公历后的附加开关。 */
 .lvct-birthday-field {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--lvct-sp-2);
     min-width: 0;
 }
 
 .lvct-birthday-field__mode {
     display: inline-flex;
     align-self: flex-start;
-    gap: 2px;
+    gap: var(--lvct-sp-1);
     padding: 2px;
     border: 1px solid var(--lvct-border-subtle);
     border-radius: var(--lvct-r-pill);
@@ -2469,7 +2909,7 @@
 .lvct-birthday-field__lunar {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+    gap: var(--lvct-sp-2);
 }
 
 .lvct-birthday-field__lunar .b3-select {
@@ -2643,7 +3083,7 @@
 .lvct-capture__done-line {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--lvct-sp-2);
     margin: 2px 0;
 
     svg { flex: 0 0 auto; color: var(--lvct-success); }
@@ -2662,8 +3102,9 @@
 .lvct-dialog-mask {
     position: fixed;
     inset: 0;
-    background: var(--lvct-overlay);
-    backdrop-filter: blur(2px);
+    background: color-mix(in srgb, var(--lvct-text-1) 32%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2677,18 +3118,23 @@
     from { opacity: 0; }
 }
 
-/* UX-02.9 对话框入场：桌面缩放淡入；≤640px bottom-sheet 滑入；Peek 右滑入 */
+/* 对话框入场：桌面居中缩放淡入；≤640px 全屏滑入。 */
 .lvct-dialog-panel {
     background: var(--lvct-bg-elevated);
-    border: 1px solid var(--lvct-border-strong);
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
     border-radius: var(--lvct-r-xl);
-    box-shadow: var(--lvct-shadow-3);
+    box-shadow: var(--lvct-shadow-3), inset 0 1px 0 rgba(255, 255, 255, 0.85);
     width: min(var(--lvct-dialog-w), 92vw);
     max-height: min(90vh, 760px);
     overflow: auto;
     padding: var(--lvct-sp-4);
     box-sizing: border-box;
     animation: lvct-dialog-in var(--lvct-dur-base) var(--lvct-ease-spring);
+}
+
+html[data-theme-mode="dark"] .lvct-dialog-panel {
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: var(--lvct-shadow-3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 @keyframes lvct-dialog-in {
@@ -2716,64 +3162,44 @@
     width: min(var(--lvct-dialog-w-wide), 94vw);
 }
 
-.lvct-dialog-mask--peek {
-    align-items: stretch;
-    justify-content: flex-end;
-    background: transparent;
-    backdrop-filter: none;
-    pointer-events: none;
-}
-
-.lvct-dialog-panel--peek {
-    width: min(var(--lvct-peek-w), 100vw);
-    height: 100%;
-    max-height: 100%;
-    border-top: 0;
-    border-right: 0;
-    border-bottom: 0;
-    border-left: 1px solid var(--lvct-border-subtle);
-    border-radius: 0;
-    box-shadow: -12px 0 32px color-mix(in srgb, var(--lvct-text-1) 14%, transparent);
-    padding: var(--lvct-sp-4) var(--lvct-sp-4) var(--lvct-sp-5);
-    pointer-events: auto;
-    animation: lvct-peek-in var(--lvct-dur-base) var(--lvct-ease);
-}
-
-@keyframes lvct-peek-in {
-    from { transform: translateX(24px); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-}
-
 .lvct-dialog-panel__header {
     display: flex;
     align-items: center;
     gap: var(--lvct-sp-2);
     margin-bottom: var(--lvct-sp-3);
-    min-height: 32px;
+    min-height: var(--lvct-control-h-small);
+    background: color-mix(in srgb, var(--lvct-bg-elevated) 92%, var(--lvct-accent) 8%);
 }
 
 .lvct-dialog-panel__title {
     flex: 1;
+    min-width: 0;
     margin: 0;
     font-size: var(--lvct-fs-heading);
     font-weight: var(--lvct-fw-bold);
+    overflow-wrap: anywhere;
 }
 
 .lvct-dialog-panel__close {
+    flex: 0 0 auto;
     width: var(--lvct-touch-min);
     height: var(--lvct-touch-min);
-    border: 0;
+    border: 1px solid var(--lvct-border-strong);
     border-radius: var(--lvct-r-sm);
-    background: transparent;
-    color: var(--lvct-text-2);
+    background: var(--lvct-bg-surface);
+    color: var(--lvct-text-1);
     font-size: 20px;
     line-height: 1;
     cursor: pointer;
+    box-shadow: var(--lvct-shadow-1);
+    transition: border-color var(--lvct-dur-fast) var(--lvct-ease), background var(--lvct-dur-fast) var(--lvct-ease), color var(--lvct-dur-fast) var(--lvct-ease), box-shadow var(--lvct-dur-fast) var(--lvct-ease);
 
     &:hover,
     &:focus-visible {
-        background: var(--lvct-bg-hover);
-        color: var(--lvct-text-1);
+        border-color: var(--lvct-accent);
+        background: var(--lvct-accent-soft);
+        color: var(--lvct-accent-text);
+        box-shadow: var(--lvct-shadow-2);
     }
 
     &:focus-visible {
@@ -2826,12 +3252,26 @@
     }
 }
 
+.lvct-people__list-context {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--lvct-sp-1) var(--lvct-sp-3);
+    min-width: 0;
+    padding-block: var(--lvct-sp-2);
+    border-bottom: 1px solid var(--lvct-border-hairline);
+
+    .lvct-people__actions { margin: 0; padding: 0; border: 0; }
+    .lvct-people__progress { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--lvct-text-3); }
+}
+
 .lvct-people__filters {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: var(--lvct-sp-1);
-    margin: 0 0 var(--lvct-sp-3);
+    margin: 0;
 }
 
 .lvct-people__filter,
@@ -2899,7 +3339,7 @@
         color: var(--lvct-text-3);
         font-size: var(--lvct-fs-micro);
         font-weight: var(--lvct-fw-medium);
-        letter-spacing: 0.02em;
+        letter-spacing: 0;
     }
 
     &__fields,
@@ -2923,14 +3363,14 @@
         min-width: 0;
         max-width: 170px;
         border-radius: var(--lvct-r-pill);
-        padding: 3px 10px;
+        padding: var(--lvct-sp-1) var(--lvct-sp-3);
         font-size: var(--lvct-fs-caption);
     }
 
     label {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--lvct-sp-2);
         min-width: 0;
         max-width: 100%;
     }
@@ -2940,7 +3380,7 @@
 .lvct-graph-isolated {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--lvct-sp-2);
     max-width: 100%;
     overflow-wrap: anywhere;
 }
@@ -2949,7 +3389,7 @@
 .lvct-graph-mode {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: var(--lvct-sp-1);
     padding: 2px;
     border: 1px solid var(--lvct-border-subtle);
     border-radius: var(--lvct-r-sm);
@@ -2957,7 +3397,7 @@
     flex-shrink: 0;
 
     > .b3-button {
-        min-height: 28px;
+        min-height: var(--lvct-touch-min);
         border-radius: calc(var(--lvct-r-sm) - 2px);
         transition:
             background var(--lvct-dur-fast) var(--lvct-ease),
@@ -2991,71 +3431,83 @@
 
 .lvct-graph-view__canvas {
     flex: 1;
-    min-height: 320px;
+    min-height: 0;
     border: 1px solid var(--lvct-border-subtle);
     border-radius: var(--lvct-r-lg);
-    /* UX-01.7：柔和径向背景（对齐原型，非平面纯色） */
-    background: radial-gradient(ellipse at 50% 40%, var(--lvct-bg-surface) 0%, var(--lvct-bg-app) 100%);
-    /* UX-02.4 科技感点阵网格 */
+    /* 白色内容面承载节点与连线，中央柔和光场与轻点阵帮助定位 */
+    background-color: var(--lvct-bg-surface);
     background-image:
-        radial-gradient(circle, color-mix(in srgb, var(--lvct-text-3) 45%, transparent) 1px, transparent 1px),
-        radial-gradient(ellipse at 50% 40%, var(--lvct-bg-surface) 0%, var(--lvct-bg-app) 100%);
-    background-size: 20px 20px, 100% 100%;
+        radial-gradient(circle, color-mix(in srgb, var(--lvct-text-3) 14%, transparent) 1px, transparent 1px),
+        radial-gradient(ellipse at 50% 45%, color-mix(in srgb, var(--lvct-accent) 6%, transparent) 0%, transparent 68%);
+    background-size: 24px 24px, 100% 100%;
 }
 
-/* 暗色画布降低点阵对比度，保证节点与连线承担主要视觉重量。 */
+/* 暗色画布微调光场与点阵对比度，保证节点与连线承担主要视觉重量 */
 html[data-theme-mode="dark"] .lvct-tab-root .lvct-graph-view__canvas,
 html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     background-image:
-        radial-gradient(circle, color-mix(in srgb, var(--lvct-text-3) 26%, transparent) 1px, transparent 1px),
-        radial-gradient(ellipse at 50% 40%, var(--lvct-bg-surface) 0%, var(--lvct-bg-app) 100%);
+        radial-gradient(circle, color-mix(in srgb, var(--lvct-text-3) 12%, transparent) 1px, transparent 1px),
+        radial-gradient(ellipse at 50% 45%, color-mix(in srgb, var(--lvct-accent) 9%, transparent) 0%, transparent 70%);
+    background-size: 24px 24px, 100% 100%;
 }
 
 .lvct-graph-view__canvas-wrap {
     position: relative;
-    flex: 1;
-    min-height: 320px;
+    flex: 0 0 auto;
+    height: var(--lvct-graph-height);
+    min-height: var(--lvct-graph-height);
     /* 让 canvas（flex:1）撑满 wrap，浮动簇/悬停卡才锚在画布而非 wrap 空白区 */
     display: flex;
     flex-direction: column;
+
+    &--expanded { height: var(--lvct-graph-height-expanded); min-height: var(--lvct-graph-height-expanded); }
 }
 
-/* UX-02.13 图谱画布浮动操作簇：玻璃底 + 图标钮（地图应用范式） */
+/* UX-02.13 图谱画布浮动操作岛：全胶囊磨砂玻璃底 + 顶高光 + 微交互反馈 */
 .lvct-graph__fab {
     position: absolute;
     right: 12px;
     bottom: calc(12px + env(safe-area-inset-bottom));
     z-index: 5;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 4px;
-    border: 1px solid var(--lvct-border-subtle);
-    border-radius: var(--lvct-r-md);
-    background: var(--lvct-bg-elevated-glass, var(--lvct-bg-elevated));
-    backdrop-filter: blur(14px) saturate(1.15);
-    -webkit-backdrop-filter: blur(14px) saturate(1.15);
-    box-shadow: var(--lvct-shadow-2);
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    max-width: calc(100% - 24px);
+    box-sizing: border-box;
+    gap: 4px;
+    padding: 4px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: var(--lvct-r-pill);
+    background: color-mix(in srgb, var(--lvct-bg-elevated) 84%, transparent);
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+html[data-theme-mode="dark"] .lvct-graph__fab {
+    background: color-mix(in srgb, var(--lvct-bg-elevated) 78%, transparent);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .lvct-graph__fab-btn {
     display: grid;
     place-items: center;
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     border: 0;
-    border-radius: var(--lvct-r-sm);
+    border-radius: var(--lvct-r-pill);
     background: transparent;
     color: var(--lvct-text-2);
     cursor: pointer;
     transition:
         background var(--lvct-dur-fast) var(--lvct-ease),
         color var(--lvct-dur-fast) var(--lvct-ease),
-        transform var(--lvct-dur-fast) var(--lvct-ease);
+        transform var(--lvct-dur-micro) var(--lvct-ease);
 
-    &:hover {
-        background: var(--lvct-bg-hover);
-        color: var(--lvct-text-1);
+    &:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--lvct-accent) 14%, transparent);
+        color: var(--lvct-accent-text);
     }
 
     &:focus-visible {
@@ -3063,14 +3515,26 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         outline-offset: 1px;
     }
 
-    &:active { transform: translateY(1px); }
+    &:active:not(:disabled) { transform: scale(0.92); }
+
+    &:disabled {
+        cursor: not-allowed;
+        opacity: .42;
+        transform: none;
+    }
 }
 
-/* B09-5：移动端浮动钮触控目标 ≥40px */
+/* 移动端图谱操作按钮保留图标视觉，扩展为标准触控尺寸。 */
 @media (max-width: 640px) {
     .lvct-graph-view {
         /* 底部导航固定在视口上方，给文本结果和画布留下完整滚动终点。 */
         padding-bottom: calc(88px + env(safe-area-inset-bottom));
+    }
+
+    .lvct-graph__fab {
+        top: calc(12px + env(safe-area-inset-top));
+        right: 12px;
+        bottom: auto;
     }
 
     .lvct-graph-query {
@@ -3085,14 +3549,9 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         &__result { justify-content: flex-start; }
     }
 
-    .lvct-graph-view__canvas-wrap,
-    .lvct-graph-view__canvas {
-        min-height: 260px;
-    }
-
     .lvct-graph__fab-btn {
-        width: 38px;
-        height: 38px;
+        width: var(--lvct-touch-min-mobile);
+        height: var(--lvct-touch-min-mobile);
     }
 }
 
@@ -3100,6 +3559,9 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     position: absolute;
     z-index: var(--lvct-z-popover);
     width: min(220px, calc(100% - 24px));
+    max-height: calc(100% - 24px);
+    overflow: auto;
+    box-sizing: border-box;
     padding: var(--lvct-sp-3);
     border: 1px solid var(--lvct-border-strong);
     border-radius: var(--lvct-r-lg);
@@ -3271,25 +3733,33 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 .lvct-doc-strip {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--lvct-sp-2);
     margin: 4px 0 8px;
-    padding: 6px 12px;
+    padding: 7px 14px;
     background: var(--lvct-bg-surface);
-    border: 1px solid var(--lvct-border-subtle);
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
     border-radius: var(--lvct-r-lg);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.85);
     flex-wrap: wrap;
+}
+
+html[data-theme-mode="dark"] .lvct-doc-strip {
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .lvct-strip__avatar {
     display: inline-grid;
     place-items: center;
-    width: 30px;
-    height: 30px;
-    flex: 0 0 30px;
-    border-radius: 50%;
-    background: var(--lvct-accent-soft);
-    color: var(--lvct-accent);
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--lvct-accent) 80%, #ffffff 20%), var(--lvct-accent));
+    color: #ffffff;
     font-weight: var(--lvct-fw-bold);
+    font-size: 13.5px;
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-accent) 24%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .lvct-strip__main {
@@ -3303,10 +3773,12 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 .lvct-strip__identity {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--lvct-sp-2);
     min-width: 0;
 
     b {
+        font-weight: 650;
+        color: var(--lvct-text-1);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -3316,20 +3788,26 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 .lvct-strip__badges {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 5px;
 }
 
 .lvct-strip__badge {
-    padding: 1px 5px;
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
     border-radius: var(--lvct-r-pill);
-    background: var(--lvct-bg-surface);
+    background: color-mix(in srgb, var(--lvct-text-1) 5%, var(--lvct-bg-surface));
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 60%, transparent);
     color: var(--lvct-text-2);
     font-size: var(--lvct-fs-micro);
+    font-weight: 500;
 }
 
 .lvct-strip__badge--group {
-    background: var(--lvct-accent-soft);
-    color: var(--lvct-accent);
+    background: color-mix(in srgb, var(--lvct-accent) 10%, transparent);
+    border-color: color-mix(in srgb, var(--lvct-accent) 25%, transparent);
+    color: var(--lvct-accent-text);
+    font-weight: 600;
 }
 
 .lvct-strip__badge--birthday {
@@ -3381,7 +3859,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     div {
         display: grid;
         grid-template-columns: 64px minmax(0, 1fr);
-        gap: 8px;
+        gap: var(--lvct-sp-2);
     }
 
     dt {
@@ -3416,7 +3894,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 
 .lvct-graph-view__hover-insights {
     display: grid;
-    gap: 2px;
+    gap: var(--lvct-sp-1);
     margin: 5px 0;
     padding-top: 5px;
     border-top: 1px solid var(--lvct-border-subtle);
@@ -3466,7 +3944,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 .lvct-closeguard__hint {
     margin: 0 0 8px;
     color: var(--lvct-text-2);
-    font-size: 13px;
+    font-size: var(--lvct-fs-caption);
 }
 
 .lvct-closeguard__list {
@@ -3475,7 +3953,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     max-height: 180px;
     overflow: auto;
     color: var(--lvct-text-1);
-    font-size: 13px;
+    font-size: var(--lvct-fs-caption);
     line-height: 1.7;
     word-break: break-all;
 }
@@ -3489,41 +3967,64 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 /* ---------- 人物详情 ---------- */
 
 .lvct-detail {
+    container: lvct-person-detail / inline-size;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: var(--lvct-sp-4);
 }
 
 .lvct-detail__header {
-    display: flex;
+    display: grid;
+    grid-template-columns: var(--lvct-avatar-lg) minmax(0, 1fr) auto;
     gap: var(--lvct-sp-3);
     align-items: center;
 
     h3 {
-        margin: 0 0 2px;
+        margin: 0 0 4px;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.015em;
+        line-height: 1.3;
+        color: var(--lvct-text-1);
     }
 }
 
-/* UX-01.6：详情头部 56px 分组色头像 + 分组胶囊 */
+/* UX-01.6：详情头部 56px Squircle 柔光渐变大头像 */
 .lvct-detail__avatar {
     width: var(--lvct-avatar-lg);
     height: var(--lvct-avatar-lg);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    font-size: 24px;
+    font-weight: 700;
+    color: #ffffff;
     flex-shrink: 0;
-    background: var(--lvct-accent-soft);
-    color: var(--lvct-accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lvct-accent-soft) 72%, transparent);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--lvct-accent) 80%, #ffffff 20%), var(--lvct-accent));
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--lvct-accent) 26%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
-.lvct-detail__avatar[data-group="家人"] { background: var(--lvct-group-family); color: var(--lvct-on-accent); }
-.lvct-detail__avatar[data-group="朋友"] { background: var(--lvct-group-friend); color: var(--lvct-on-accent); }
-.lvct-detail__avatar[data-group="同事"] { background: var(--lvct-group-work); color: var(--lvct-on-accent); }
-.lvct-detail__avatar[data-group="同学"] { background: var(--lvct-group-school); color: var(--lvct-on-accent); }
-.lvct-detail__avatar[data-group="其他"] { background: var(--lvct-group-other); color: var(--lvct-on-accent); }
+.lvct-detail__avatar[data-group="家人"] {
+    background: linear-gradient(135deg, #f472b6, var(--lvct-group-family));
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--lvct-group-family) 30%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.lvct-detail__avatar[data-group="朋友"] {
+    background: linear-gradient(135deg, #34d399, var(--lvct-group-friend));
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--lvct-group-friend) 30%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.lvct-detail__avatar[data-group="同事"] {
+    background: linear-gradient(135deg, #60a5fa, var(--lvct-group-work));
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--lvct-group-work) 30%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.lvct-detail__avatar[data-group="同学"] {
+    background: linear-gradient(135deg, #fbbf24, var(--lvct-group-school));
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--lvct-group-school) 30%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.lvct-detail__avatar[data-group="其他"] {
+    background: linear-gradient(135deg, #94a3b8, var(--lvct-group-other));
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--lvct-group-other) 25%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
 
 .lvct-detail__meta {
     display: flex;
@@ -3534,14 +4035,20 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 }
 
 .lvct-detail__group-chip {
-    display: inline-block;
-    font-size: var(--lvct-fs-micro);
-    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 2px 9px;
     border-radius: var(--lvct-r-pill);
-    border: 1px solid var(--lvct-border-subtle);
-    color: var(--lvct-text-2);
-    flex-shrink: 0;
-    white-space: nowrap;
+    background: color-mix(in srgb, var(--lvct-accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--lvct-accent) 26%, transparent);
+    color: var(--lvct-accent-text);
+    max-width: 100%;
+    box-sizing: border-box;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .lvct-detail__id {
@@ -3560,29 +4067,25 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     box-sizing: border-box;
 }
 
-/* Peek 侧栏固定在较窄宽度，头像信息与导航按钮分行，避免生日和按钮互相挤压。 */
-.lvct-dialog-panel--peek .lvct-detail__header {
-    display: grid;
-    grid-template-columns: var(--lvct-avatar-lg) minmax(0, 1fr);
-    align-items: center;
-}
+/* 详情按窗口内实际可用宽度安排动作，兼容移动端和宿主分栏。 */
+@container lvct-person-detail (max-width: 520px) {
+    .lvct-detail__header { grid-template-columns: var(--lvct-avatar-lg) minmax(0, 1fr); }
+    .lvct-detail__header-actions {
+        grid-column: 1 / -1;
+        width: 100%;
+        margin: 0;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
 
-.lvct-dialog-panel--peek .lvct-detail__header-actions {
-    grid-column: 1 / -1;
-    width: 100%;
-    margin-left: 0;
-    min-width: 0;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-
-    > button { min-width: 0; }
+        > button { min-width: 0; min-height: var(--lvct-control-h); }
+    }
 }
 
 .lvct-detail__tabs {
     display: flex;
     gap: var(--lvct-sp-1);
     border-bottom: 1px solid var(--lvct-border-subtle);
-    min-height: 40px;
+    min-height: var(--lvct-control-h);
 }
 
 .lvct-detail__tabs button {
@@ -3623,8 +4126,8 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     div {
         display: flex;
         align-items: baseline;
-        gap: 10px;
-        font-size: 13px;
+        gap: var(--lvct-sp-3);
+        font-size: var(--lvct-fs-caption);
         line-height: 1.45;
     }
 
@@ -3653,7 +4156,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 
     h4 {
         margin: 0 0 6px;
-        font-size: 13px;
+        font-size: var(--lvct-fs-caption);
     }
 
     p {
@@ -3667,7 +4170,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 
 .lvct-detail__relationship-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
     gap: var(--lvct-sp-2);
     margin: var(--lvct-sp-2) 0 0;
 
@@ -3694,12 +4197,6 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         color: var(--lvct-text-1);
         font-size: var(--lvct-fs-body);
         line-height: 1.4;
-    }
-}
-
-@media (max-width: 640px) {
-    .lvct-detail__relationship-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -3752,7 +4249,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 .lvct-detail__relations {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--lvct-sp-2);
 }
 
 .lvct-detail__relation {
@@ -3769,7 +4266,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     color: var(--lvct-accent);
     padding: 3px 8px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--lvct-fs-caption);
 
     &:hover {
         background: var(--lvct-bg-hover);
@@ -3793,7 +4290,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     color: var(--lvct-text-2);
     padding: 3px 7px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--lvct-fs-caption);
 
     &:hover {
         background: var(--lvct-danger-soft);
@@ -3804,10 +4301,12 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 .lvct-detail__timeline {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    margin: 0;
-    padding: 0;
+    gap: 8px;
+    margin: var(--lvct-sp-2) 0;
+    padding: 2px 0 2px 14px;
+    border-left: 2px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
     list-style: none;
+    position: relative;
 }
 
 .lvct-detail__advanced {
@@ -3819,7 +4318,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         display: flex;
         align-items: center;
         gap: var(--lvct-sp-2);
-        min-height: 36px;
+        min-height: var(--lvct-control-h-compact);
         color: var(--lvct-text-2);
         cursor: pointer;
         list-style: none;
@@ -3842,31 +4341,126 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 }
 
 .lvct-detail__timeline-row {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 12px;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--lvct-bg-app) 60%, var(--lvct-bg-surface));
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 60%, transparent);
+    font-size: 12.5px;
+    transition: background var(--lvct-dur-fast) var(--lvct-ease), border-color var(--lvct-dur-fast) var(--lvct-ease);
+
+    &::before {
+        content: "";
+        position: absolute;
+        left: -19px;
+        top: 13px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--lvct-accent);
+        box-shadow: 0 0 0 3px var(--lvct-bg-surface);
+        flex-shrink: 0;
+    }
+
+    &:hover {
+        background: var(--lvct-bg-hover);
+        border-color: color-mix(in srgb, var(--lvct-accent) 26%, var(--lvct-border-subtle));
+    }
+
+    .b3-button { flex-shrink: 0; }
 }
 
 .lvct-detail__timeline-note {
     flex: 1 1 140px;
     min-width: 0;
+    font-weight: 500;
+    color: var(--lvct-text-1);
     overflow-wrap: anywhere;
     white-space: normal;
 }
 
-.lvct-detail__activity-filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--lvct-sp-2);
-    margin-bottom: var(--lvct-sp-3);
-    input { flex: 1; min-width: 120px; }
-    select { max-width: 100%; }
+.lvct-detail__timeline-source {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    background: color-mix(in srgb, var(--lvct-text-1) 6%, transparent);
+    color: var(--lvct-text-3);
+    white-space: nowrap;
 }
 
-.lvct-detail__timeline-row {
-    flex-wrap: wrap;
-    .b3-button { flex-shrink: 0; }
+html[data-theme-mode="dark"] .lvct-detail__timeline-row {
+    background: color-mix(in srgb, var(--lvct-bg-base) 65%, var(--lvct-bg-surface));
+    border-color: rgba(255, 255, 255, 0.07);
+
+    &::before {
+        box-shadow: 0 0 0 3px var(--lvct-bg-elevated);
+    }
+
+    &:hover {
+        background: color-mix(in srgb, var(--lvct-accent) 8%, var(--lvct-bg-surface));
+    }
+}
+
+/* 往来账本行现代高级微卡片 */
+.lvct-exchange-row {
+    position: relative;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--lvct-bg-app) 60%, var(--lvct-bg-surface));
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 75%, transparent);
+
+    &[data-direction="receivable"] {
+        border-left: 3px solid var(--lvct-success);
+        &::before { background: var(--lvct-success); }
+    }
+
+    &[data-direction="payable"] {
+        border-left: 3px solid var(--lvct-highlight);
+        &::before { background: var(--lvct-highlight); }
+    }
+
+    &[data-status="settled"] {
+        opacity: 0.65;
+        background: color-mix(in srgb, var(--lvct-text-3) 4%, var(--lvct-bg-surface));
+        border-color: color-mix(in srgb, var(--lvct-border-subtle) 50%, transparent);
+
+        .lvct-exchange-desc {
+            text-decoration: line-through;
+            color: var(--lvct-text-3);
+        }
+    }
+
+    .lvct-exchange-date {
+        font-variant-numeric: tabular-nums;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--lvct-text-3);
+    }
+
+    .lvct-exchange-desc {
+        font-weight: 600;
+        color: var(--lvct-text-1);
+    }
+
+    .lvct-chip--receivable {
+        background: var(--lvct-success-soft);
+        color: var(--lvct-success);
+        border: 1px solid color-mix(in srgb, var(--lvct-success) 24%, transparent);
+        font-weight: 600;
+    }
+
+    .lvct-chip--payable {
+        background: var(--lvct-highlight-soft);
+        color: var(--lvct-highlight);
+        border: 1px solid color-mix(in srgb, var(--lvct-highlight) 24%, transparent);
+        font-weight: 600;
+    }
 }
 
 .lvct-detail__org-actions {
@@ -3903,7 +4497,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 }
 
 .lvct-detail__add {
-    gap: 8px;
+    gap: var(--lvct-sp-2);
     margin-top: 8px;
 }
 
@@ -4009,7 +4603,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--lvct-sp-1);
 }
 
 .lvct-picker__option {
@@ -4071,18 +4665,18 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 .lvct-dash__stats {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
+    gap: var(--lvct-sp-4);
 }
 
-/* UX-02.3 统计卡：左对齐渐变大数字 + 图标章 + 悬停提升 + 顶部渐变发丝线 */
+/* UX-02.3 统计卡：左对齐渐变大数字 + 图标章 + 悬停提升 + 顶部渐变发丝线 + 漫反射微光晕 */
 .lvct-dash__stat {
     position: relative;
     overflow: hidden;
     background: var(--lvct-bg-surface);
-    border: 1px solid var(--lvct-border-subtle);
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
     border-radius: var(--lvct-r-lg);
     padding: var(--lvct-sp-4);
-    box-shadow: var(--lvct-shadow-1);
+    box-shadow: var(--lvct-shadow-card);
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -4090,29 +4684,48 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     cursor: pointer;
     text-align: left;
     transition:
-        transform var(--lvct-dur-fast) var(--lvct-ease),
-        box-shadow var(--lvct-dur-fast) var(--lvct-ease),
+        transform var(--lvct-dur-base) var(--lvct-ease),
+        box-shadow var(--lvct-dur-base) var(--lvct-ease),
         border-color var(--lvct-dur-fast) var(--lvct-ease);
 
-    &::before {
+    &::after {
         content: "";
         position: absolute;
-        inset: 0 0 auto 0;
-        height: 2px;
-        background: var(--lvct-brand-gradient);
-        opacity: 0;
-        transition: opacity var(--lvct-dur-base) var(--lvct-ease);
+        right: -24px;
+        top: -24px;
+        width: 84px;
+        height: 84px;
+        border-radius: 50%;
+        background: radial-gradient(circle, color-mix(in srgb, var(--lvct-accent) 24%, transparent) 0%, transparent 70%);
+        pointer-events: none;
+        transition: opacity var(--lvct-dur-base) var(--lvct-ease), transform var(--lvct-dur-base) var(--lvct-ease);
+        opacity: 0.7;
+    }
+
+    &:hover::after {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+
+    &:hover {
+        border-color: color-mix(in srgb, var(--lvct-accent) 42%, var(--lvct-border-subtle));
+        box-shadow: var(--lvct-shadow-card-hover);
+        transform: translateY(-2px);
     }
 
     b {
-        font-size: 26px;
+        font-size: 28px;
+        font-weight: 700;
         line-height: 1.15;
+        letter-spacing: -0.02em;
         font-variant-numeric: tabular-nums;
         color: var(--lvct-text-1);
+        margin: 4px 0 2px;
     }
 
     > span {
-        font-size: 12px;
+        font-size: 13px;
+        font-weight: 500;
         color: var(--lvct-text-2);
     }
 
@@ -4144,7 +4757,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         }
     }
 
-    &:hover,
+    &:hover:not(:disabled),
     &:focus-visible {
         border-color: color-mix(in srgb, var(--lvct-accent) 45%, var(--lvct-border-subtle));
         box-shadow: var(--lvct-shadow-2);
@@ -4199,8 +4812,8 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 
 .lvct-dash__grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+    gap: var(--lvct-sp-4);
 }
 
 /* 新增的久未联系/待办跟进是首页的次级洞察，降低容器对比度以保持原型中
@@ -4216,7 +4829,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 .lvct-dash__list {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--lvct-sp-1);
 }
 
 /* B01：今日行动分组折叠 */
@@ -4282,7 +4895,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 .lvct-dash__rowwrap {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--lvct-sp-1);
 }
 
 /* UX-02.1 行内处置菜单 pop-in 入场 */
@@ -4322,7 +4935,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     padding: 8px;
     border-radius: var(--lvct-r-sm);
     cursor: default;
-    font-size: 13px;
+    font-size: var(--lvct-fs-caption);
     color: var(--lvct-text-1);
 
     &:hover {
@@ -4333,8 +4946,96 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         flex-shrink: 0;
     }
 
-    span:nth-child(2) {
+    > span:nth-child(2):not(.lvct-dash__person-avatar) {
         flex: 1;
+    }
+}
+
+.lvct-dash__row--contact {
+    padding: 8px 10px;
+    gap: 10px;
+
+    .lvct-dash__row-main {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+.lvct-dash__person-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #ffffff;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--lvct-accent) 80%, #ffffff 20%), var(--lvct-accent));
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-accent) 24%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+
+    &[data-group="家人"] {
+        background: linear-gradient(135deg, #f472b6, var(--lvct-group-family));
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-family) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    &[data-group="朋友"] {
+        background: linear-gradient(135deg, #34d399, var(--lvct-group-friend));
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-friend) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    &[data-group="同事"] {
+        background: linear-gradient(135deg, #60a5fa, var(--lvct-group-work));
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-work) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    &[data-group="同学"] {
+        background: linear-gradient(135deg, #fbbf24, var(--lvct-group-school));
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-school) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    &[data-group="其他"] {
+        background: linear-gradient(135deg, #94a3b8, var(--lvct-group-other));
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-group-other) 25%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+}
+
+.lvct-dash__person-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+}
+
+.lvct-dash__person-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-width: 0;
+
+    b {
+        font-size: 13.5px;
+        font-weight: 650;
+        color: var(--lvct-text-1);
+        white-space: nowrap;
+    }
+}
+
+.lvct-dash__person-sub {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 11.5px;
+    color: var(--lvct-text-3);
+
+    .lvct-bucket {
+        padding: 1px 7px;
+        font-size: 10.5px;
+        font-weight: 600;
+        border-radius: var(--lvct-r-pill);
     }
 }
 
@@ -4362,7 +5063,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     align-items: center;
     flex-wrap: wrap;
     row-gap: 4px;
-    gap: 8px;
+    gap: var(--lvct-sp-2);
     flex: 1;
     min-width: 0;
     border: 0;
@@ -4383,7 +5084,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 .lvct-dash__row-primary {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--lvct-sp-2);
     min-width: 0;
     flex: 1 1 auto;
 }
@@ -4391,20 +5092,20 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 /* UX-02.8 行动区快捷按钮 tonal 化：主动作 accent 软填充；⋯ 更多保持中性 */
 .lvct-dash__quick-button {
     flex-shrink: 0;
-    padding: 3px 10px;
+    padding: var(--lvct-sp-1) var(--lvct-sp-3);
     font-size: var(--lvct-fs-micro);
     background: var(--lvct-accent-soft);
     border-color: transparent;
     color: var(--lvct-accent);
     font-weight: 500;
 
-    &:hover {
+    &:hover:not(:disabled) {
         background: color-mix(in srgb, var(--lvct-accent) 20%, transparent);
         border-color: transparent;
         color: var(--lvct-accent);
     }
 
-    &:active {
+    &:active:not(:disabled) {
         background: color-mix(in srgb, var(--lvct-accent) 28%, transparent);
     }
 }
@@ -4413,7 +5114,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     background: var(--lvct-bg-elevated);
     color: var(--lvct-text-2);
 
-    &:hover {
+    &:hover:not(:disabled) {
         background: var(--lvct-bg-hover);
         color: var(--lvct-text-1);
     }
@@ -4496,7 +5197,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 .lvct-import {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--lvct-sp-3);
 }
 
 .lvct-import__scan-status {
@@ -4516,7 +5217,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 .lvct-import__queue-item {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 2px var(--lvct-sp-2);
+    gap: var(--lvct-sp-1) var(--lvct-sp-2);
     padding: var(--lvct-sp-2) var(--lvct-sp-3);
     border-bottom: 1px solid var(--lvct-border-subtle);
 
@@ -4562,10 +5263,10 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 .lvct-import__row {
     display: flex;
     align-items: center;
-    min-height: 36px;
+    min-height: var(--lvct-control-h-compact);
     gap: var(--lvct-sp-2);
     padding: var(--lvct-sp-2) var(--lvct-sp-3);
-    font-size: 13px;
+    font-size: var(--lvct-fs-caption);
     cursor: pointer;
     border-bottom: 1px solid var(--lvct-border-subtle);
     transition: background var(--lvct-dur-fast) var(--lvct-ease), box-shadow var(--lvct-dur-fast) var(--lvct-ease);
@@ -4761,18 +5462,23 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         left: 0;
         right: 0;
         bottom: 0;
-        z-index: var(--lvct-z-peek);
+        z-index: var(--lvct-z-navigation);
         flex-direction: row;
         align-items: center;
         gap: var(--lvct-sp-2);
         padding: var(--lvct-sp-2) var(--lvct-sp-2) calc(var(--lvct-sp-2) + env(safe-area-inset-bottom));
         border-right: 0;
-        border-bottom: 1px solid var(--lvct-border-subtle);
-        border-top: 1px solid var(--lvct-border-subtle);
+        border-bottom: 0;
+        border-top: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
         /* 与内容区拉开层级，同时保留宿主主题的底色变化。 */
         background: var(--lvct-bg-elevated-glass);
-        box-shadow: 0 -8px 24px color-mix(in srgb, var(--lvct-text-1) 8%, transparent);
-        backdrop-filter: blur(12px);
+        box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(20px) saturate(1.2);
+        -webkit-backdrop-filter: blur(20px) saturate(1.2);
+    }
+
+    html[data-theme-mode="dark"] & {
+        box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
 
     .lvct-workbench__brand,
@@ -4800,7 +5506,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         min-width: 0;
         justify-content: center;
         flex-direction: column;
-        gap: 2px;
+        gap: var(--lvct-sp-1);
         padding: 6px 2px;
         font-size: var(--lvct-fs-micro);
         transition: color var(--lvct-dur-fast) var(--lvct-ease),
@@ -4826,16 +5532,25 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     /* Match the prototype's restrained bottom nav: active state is carried by the label/icon. */
     .lvct-workbench__nav-item--active {
         background: transparent;
-        color: var(--lvct-accent);
-        font-weight: var(--lvct-fw-bold);
+        color: var(--lvct-accent-fill);
+        font-weight: 650;
+
+        .lvct-workbench__nav-icon {
+            transform: scale(1.08);
+            color: var(--lvct-accent-fill);
+        }
     }
+
+    /* 桌面侧栏用左侧竖线标记当前项；底部导航已用图标/文字变色表达，
+       隐藏继承的竖线，避免在窄屏按钮左缘出现孤立色条。 */
+    .lvct-workbench__nav-item--active::before { display: none; }
 
     .lvct-workbench__nav-item:active:not(:disabled) {
-        transform: translateY(1px) scale(0.98);
+        transform: scale(0.94);
     }
 
 
-    /* B09-5：触控目标 ≥40px（令牌 --lvct-touch-min-mobile）；
+/* 触控目标 ≥44px（令牌 --lvct-touch-min-mobile）；
        图标-only 的紧凑按钮保持视觉尺寸、用透明热区补足 */
     .lvct-tab-root .b3-button,
     .lvct-dialog-root .b3-button,
@@ -4869,13 +5584,13 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     .lvct-doc-strip {
         margin: 2px 0 6px;
         padding: 6px 8px;
-        gap: 6px;
+        gap: var(--lvct-sp-2);
     }
     .lvct-strip__avatar {
         width: 26px;
         height: 26px;
         flex-basis: 26px;
-        font-size: 13px;
+        font-size: var(--lvct-fs-caption);
     }
     .lvct-strip__actions {
         flex-basis: 100%;
@@ -4965,6 +5680,10 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         font-size: var(--lvct-fs-caption);
     }
     .lvct-settings__nav-item > span { display: inline-flex; }
+    .lvct-settings__nav-status {
+        grid-column: 1 / -1;
+        margin: var(--lvct-sp-1) var(--lvct-sp-2) 0;
+    }
     .lvct-settings__panel { border: 0; border-radius: 0; background: transparent; padding: var(--lvct-sp-3); }
 
     .lvct-settings__form-grid,
@@ -5040,13 +5759,26 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     }
 
     .lvct-people__filters {
+        position: relative;
         flex-wrap: nowrap;
         overflow-x: auto;
         padding-bottom: 2px;
-        padding-inline-end: var(--lvct-sp-4);
+        padding-inline-end: 32px;
         scrollbar-width: thin;
         scrollbar-color: var(--lvct-border-strong) transparent;
         box-shadow: inset -18px 0 14px -16px color-mix(in srgb, var(--lvct-text-2) 28%, transparent);
+    }
+
+    /* 标签较多时保留右侧渐隐，明确这里仍可横向继续浏览，避免最后一个标签像被截断。 */
+    .lvct-people__filters::after {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 2px;
+        width: 28px;
+        background: linear-gradient(90deg, transparent, var(--lvct-bg-canvas));
+        content: "";
+        pointer-events: none;
     }
 
     .lvct-people__filters > * {
@@ -5094,23 +5826,6 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         padding-bottom: calc(var(--lvct-sp-4) + env(safe-area-inset-bottom));
     }
 
-    .lvct-dialog-panel--peek {
-        width: 100%;
-        min-height: 100%;
-    }
-    .lvct-detail__header {
-        display: grid;
-        grid-template-columns: var(--lvct-avatar-lg) minmax(0, 1fr);
-        align-items: center;
-    }
-    .lvct-detail__header-actions {
-        grid-column: 1 / -1;
-        width: 100%;
-        margin-left: 0;
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        > button { min-width: 0; }
-    }
     .lvct-detail__record { min-width: 0; }
     /* 只压标题文本框；date 若被清零会整只消失（UX-02.13 复盘） */
     .lvct-detail__record > input[type="text"] { min-width: 0; width: 0; }
@@ -5338,11 +6053,11 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         align-items: center;
         flex-wrap: nowrap;
         flex-shrink: 0;
-        gap: 2px;
+        gap: var(--lvct-sp-1);
 
         .b3-button {
             min-width: 52px;
-            min-height: 30px;
+            min-height: var(--lvct-touch-min);
             padding-inline: var(--lvct-sp-2);
             border-color: transparent;
             color: var(--lvct-text-2);
@@ -5370,6 +6085,22 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     background: var(--lvct-danger-soft);
 
     p { margin: 0 0 var(--lvct-sp-2); color: var(--lvct-text-2); font-size: var(--lvct-fs-caption); }
+}
+
+.lvct-person-aliases__confirm {
+    margin-block: var(--lvct-sp-2);
+    padding: var(--lvct-sp-2);
+    border-left: 3px solid var(--lvct-danger);
+    border-radius: var(--lvct-r-sm);
+    background: var(--lvct-danger-soft);
+
+    p { margin: 0 0 var(--lvct-sp-2); color: var(--lvct-text-2); font-size: var(--lvct-fs-caption); }
+}
+
+.lvct-person-aliases__confirm-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--lvct-sp-2);
 }
 
 .lvct-org-manager__member-name {
@@ -5413,8 +6144,9 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 .lvct-orgs-view {
     display: flex;
     flex-direction: column;
-    gap: var(--lvct-sp-2);
+    gap: var(--lvct-sp-4);
     min-height: 0;
+    min-width: 0;
 
     &__filter[type="search"] {
         width: min(180px, 28vw);
@@ -5427,18 +6159,21 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
 
     &__grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
-        gap: var(--lvct-sp-2);
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+        gap: var(--lvct-sp-4);
         align-content: start;
+        align-items: stretch;
+        min-width: 0;
         overflow: auto;
     }
 
     &__card {
         display: flex;
         flex-direction: column;
-        gap: var(--lvct-sp-1);
-        min-height: 108px;
-        padding: var(--lvct-sp-3);
+        gap: var(--lvct-sp-2);
+        min-height: 148px;
+        padding: var(--lvct-sp-4);
+        box-sizing: border-box;
         border: 1px solid var(--lvct-border-subtle);
         border-radius: var(--lvct-r-md);
         min-width: 0;
@@ -5446,8 +6181,8 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         box-shadow: var(--lvct-shadow-1);
         transition: border-color var(--lvct-dur-fast) var(--lvct-ease), box-shadow var(--lvct-dur-fast) var(--lvct-ease), transform var(--lvct-dur-fast) var(--lvct-ease);
 
-        /* 归档态用低对比度表达状态，但保留名称、成员数和管理入口的可读性。 */
-        &--archived { opacity: 0.8; }
+        /* 归档状态由徽标说明；名称和操作保持正常对比度。 */
+        &--archived { opacity: 1; }
 
         &:hover {
             border-color: var(--lvct-border-strong);
@@ -5457,9 +6192,11 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     }
 
     &__card-head {
-        display: flex;
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr) auto;
         align-items: center;
-        gap: var(--lvct-sp-2);
+        column-gap: var(--lvct-sp-2);
+        row-gap: var(--lvct-sp-1);
         min-width: 0;
     }
 
@@ -5467,34 +6204,79 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 28px;
-        height: 28px;
-        flex: 0 0 28px;
-        border-radius: var(--lvct-r-sm);
-        background: var(--lvct-accent-soft);
-        color: var(--lvct-accent);
+        grid-column: 1;
+        grid-row: 1 / span 2;
+        align-self: start;
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        max-width: 40px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, color-mix(in srgb, var(--lvct-accent) 18%, var(--lvct-bg-surface)), var(--lvct-accent-soft));
+        border: 1px solid color-mix(in srgb, var(--lvct-accent) 26%, transparent);
+        color: var(--lvct-accent-fill);
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-accent) 16%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.6);
     }
 
     /* Logo 来自用户上传或外部链接，不能让原始尺寸改变卡片标题区域。 */
     &__card-logo {
         display: block;
+        grid-column: 1;
+        grid-row: 1 / span 2;
+        align-self: start;
         width: 40px;
         height: 40px;
-        flex: 0 0 40px;
+        min-width: 40px;
         max-width: 40px;
         max-height: 40px;
-        border: 1px solid var(--lvct-border-subtle);
-        border-radius: var(--lvct-r-sm);
-        background: var(--lvct-accent-soft);
+        box-sizing: border-box;
+        padding: 2px;
+        border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
+        border-radius: 10px;
+        background: var(--lvct-bg-surface);
         object-fit: contain;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8);
     }
 
     &__card-name {
-        display: -webkit-box;
-        overflow: hidden;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        line-height: 1.4;
+        grid-column: 2;
+        grid-row: 1;
+        min-width: 0;
+        display: block;
+        overflow-wrap: anywhere;
+        font-size: 15.5px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+        line-height: 1.35;
+        color: var(--lvct-text-1);
+    }
+
+    &__card-head > .lvct-chip {
+        grid-column: 2;
+        grid-row: 2;
+        justify-self: start;
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
+        font-size: var(--lvct-fs-micro);
+        line-height: var(--lvct-lh-tight);
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    /* 简称与归档徽标在标题下共享一行，避免挤压完整名称。 */
+    &__card-head > .lvct-chip + .lvct-chip {
+        grid-column: 3;
+        justify-self: end;
+    }
+
+    &__card > .ft__smaller {
+        flex-wrap: wrap;
+        column-gap: var(--lvct-sp-1);
+        row-gap: var(--lvct-sp-1);
+        min-width: 0;
+        line-height: var(--lvct-lh-body);
+        overflow-wrap: anywhere;
     }
 
     &__card-history { color: var(--lvct-text-3); }
@@ -5524,7 +6306,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     &__peer {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--lvct-sp-2);
         flex-wrap: wrap;
     }
 }
@@ -5566,7 +6348,7 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     &__preset { display: flex; align-items: center; gap: var(--lvct-sp-2); min-height: 58px; padding: var(--lvct-sp-2); text-align: left; border: 1px solid var(--lvct-border-subtle); border-radius: var(--lvct-r-sm); background: var(--lvct-bg-surface); cursor: pointer; }
     &__preset:hover, &__preset:focus-visible, &__preset--active { border-color: var(--lvct-accent); background: var(--lvct-accent-soft); }
     &__preset-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex: 0 0 28px; border-radius: 50%; background: var(--lvct-accent-soft); color: var(--lvct-accent); font-weight: 600; }
-    &__preset span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    &__preset span:last-child { display: flex; flex-direction: column; gap: var(--lvct-sp-1); min-width: 0; }
     &__preset small { color: var(--lvct-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     &__logo-row { align-items: flex-start; }
     &__logo-preview { display: flex; align-items: center; justify-content: center; width: 72px; height: 72px; flex: 0 0 72px; overflow: hidden; border: 1px solid var(--lvct-border-subtle); border-radius: var(--lvct-r-md); background: var(--lvct-accent-soft); color: var(--lvct-accent); font-size: 22px; font-weight: 700; }
@@ -5611,9 +6393,18 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     align-items: center;
     flex-wrap: wrap;
 
+    /* 说明文字独占一行，避免占用字段行的可伸缩空间。 */
+    > p { flex: 1 1 100%; min-width: 100%; margin: 0; line-height: var(--lvct-lh-body); }
+    /* 选人器与普通字段使用相同的基准宽度，避免 flex-basis: 0 把它压成窄条。 */
+    > .lvct-picker { flex: 1 1 180px; min-width: 160px; }
     label { display: flex; flex: 1 1 180px; min-width: 160px; flex-direction: column; gap: 4px; font-size: var(--lvct-fs-caption); }
     .lvct-org-manager__add-note { flex-basis: 100%; }
 }
+
+/* Keep the editor node stable while a new organization context is loading.
+   This preserves bound input state and focus references without showing an
+   empty add-member frame during the request. */
+.lvct-org-manager__add--loading { display: none; }
 
 .lvct-org-manager__footer {
     display: flex;
@@ -5663,8 +6454,8 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         padding: 0 var(--lvct-sp-5) var(--lvct-sp-1) 0;
         scrollbar-width: thin;
         scroll-padding-inline: var(--lvct-sp-3);
-        -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - var(--lvct-sp-5)), transparent);
-        mask-image: linear-gradient(90deg, #000 calc(100% - var(--lvct-sp-5)), transparent);
+        -webkit-mask-image: linear-gradient(90deg, var(--lvct-mask-opaque) calc(100% - var(--lvct-sp-5)), transparent);
+        mask-image: linear-gradient(90deg, var(--lvct-mask-opaque) calc(100% - var(--lvct-sp-5)), transparent);
 
         li { flex: 0 0 auto; min-width: 0; }
     }
@@ -5738,9 +6529,27 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
         border-radius: var(--lvct-r-md);
         background: var(--lvct-bg-elevated);
 
-        > p { grid-column: 1 / -1; margin: 0; line-height: var(--lvct-lh-body); }
+        > p { grid-column: 1 / -1; min-width: 0; }
+        > .lvct-picker { grid-column: 1 / -1; min-width: 0; width: 100%; }
         > select { width: 100%; min-width: 0; }
         > button { grid-column: 1 / -1; min-height: var(--lvct-touch-min-mobile); justify-self: start; }
+    }
+}
+
+/* Issue #31：组织管理和组织资料需要更大的桌面工作区；移动端由全屏模态规则接管。 */
+@media (min-width: 641px) {
+    .lvct-dialog-panel:has(.lvct-org-manager) {
+        width: min(900px, 96vw);
+        max-height: min(92vh, 900px);
+    }
+
+    .lvct-dialog-panel:has(.lvct-org-profile-editor) {
+        width: min(920px, 96vw);
+        max-height: min(92vh, 960px);
+    }
+
+    .lvct-org-profile-editor {
+        max-height: min(82vh, 960px);
     }
 }
 
@@ -5749,4 +6558,1466 @@ html[data-theme-mode="dark"] .lvct-dialog-root .lvct-graph-view__canvas {
     padding: 0;
     margin: 0;
     min-width: 0;
+}
+
+/* ============================================================================
+ * UX-03 · 现代化视觉升级
+ *
+ * 参考 Notion / Linear / Google Contacts / Monica 的共同模式：中性画布、
+ * 轻量分层、少量品牌色、明确的主次操作和稳定的内容节奏。这里集中收口
+ * 跨页面的视觉语言，业务组件仍只负责结构与状态。
+ * ========================================================================== */
+
+.lvct-workbench {
+    background: var(--lvct-bg-canvas);
+}
+
+.lvct-workbench__sidebar {
+    padding: 20px 14px 16px;
+    border-right-color: color-mix(in srgb, var(--lvct-border-subtle) 72%, transparent);
+    background: var(--lvct-bg-sidebar);
+}
+
+.lvct-workbench__brand {
+    gap: var(--lvct-sp-3);
+    padding: 0 8px 8px;
+
+    b { font-size: 15px; letter-spacing: 0; }
+    small { margin-top: 3px; font-size: 12px; }
+}
+
+.lvct-workbench__brand-mark {
+    width: 38px;
+    height: 38px;
+    border: 1px solid color-mix(in srgb, var(--lvct-on-accent) 20%, transparent);
+    border-radius: 12px;
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--lvct-accent) 22%, transparent);
+}
+
+.lvct-workbench__nav {
+    gap: 4px;
+}
+
+.lvct-workbench__nav-label {
+    padding: 12px 10px 5px;
+    color: var(--lvct-text-3);
+    font-size: 11px;
+    font-weight: var(--lvct-fw-medium);
+}
+
+.lvct-workbench__nav-item {
+    min-height: 42px;
+    padding: 10px 11px;
+    border-radius: 10px;
+    font-size: var(--lvct-fs-body);
+    transition: background var(--lvct-dur-fast) var(--lvct-ease), color var(--lvct-dur-fast) var(--lvct-ease), box-shadow var(--lvct-dur-fast) var(--lvct-ease), transform var(--lvct-dur-micro) var(--lvct-ease);
+
+    &--active {
+        background: var(--lvct-accent-soft);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lvct-accent) 14%, transparent);
+        color: var(--lvct-accent);
+        font-weight: var(--lvct-fw-medium);
+    }
+}
+
+.lvct-workbench__sidebar-footer {
+    padding: 14px 0 0;
+    border-top-color: color-mix(in srgb, var(--lvct-border-subtle) 72%, transparent);
+}
+
+.lvct-workbench__main {
+    background: var(--lvct-bg-canvas);
+}
+
+.lvct-workbench__header {
+    position: relative;
+    z-index: 2;
+    min-height: 112px;
+    padding: 30px clamp(18px, 3vw, 42px) 22px;
+    border-bottom: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 68%, transparent);
+    background: color-mix(in srgb, var(--lvct-bg-canvas) 78%, var(--lvct-bg-surface));
+
+    h1 {
+        font-size: var(--lvct-fs-page-title);
+        letter-spacing: 0;
+    }
+
+    p {
+        margin-top: 6px;
+        font-size: var(--lvct-fs-body);
+    }
+}
+
+.lvct-workbench__header-actions {
+    gap: var(--lvct-sp-3);
+
+    input {
+        width: min(300px, 100%);
+        min-height: var(--lvct-control-h);
+        background: var(--lvct-bg-surface);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lvct-border-subtle) 28%, transparent);
+    }
+
+    .b3-button { min-height: var(--lvct-control-h); }
+}
+
+.lvct-workbench__body {
+    max-width: 1280px;
+    padding-bottom: 48px;
+}
+
+.lvct-home__card,
+.lvct-dash__stat,
+.lvct-dash__actions,
+.lvct-person-card,
+.lvct-orgs-view__card,
+.lvct-settings__panel {
+    border-color: color-mix(in srgb, var(--lvct-border-subtle) 78%, transparent);
+    border-radius: var(--lvct-r-card);
+    box-shadow: var(--lvct-shadow-1);
+}
+
+.lvct-home__card {
+    padding: 20px;
+
+    h3 {
+        margin-bottom: 12px;
+        font-size: var(--lvct-fs-section-title);
+        letter-spacing: 0;
+    }
+}
+
+.lvct-dash {
+    gap: 18px;
+}
+
+.lvct-dash__stats,
+.lvct-dash__grid {
+    gap: 16px;
+}
+
+.lvct-dash__stat {
+    min-height: 138px;
+    padding: 18px;
+    background: var(--lvct-bg-surface);
+    transition: border-color var(--lvct-dur-fast) var(--lvct-ease), box-shadow var(--lvct-dur-fast) var(--lvct-ease), transform var(--lvct-dur-fast) var(--lvct-ease);
+
+    &:hover:not(:disabled),
+    &:focus-visible {
+        border-color: color-mix(in srgb, var(--lvct-accent) 28%, var(--lvct-border-subtle));
+        box-shadow: var(--lvct-shadow-2);
+        transform: translateY(-1px);
+    }
+
+    b { font-size: 30px; }
+    > span { font-size: var(--lvct-fs-body); }
+}
+
+.lvct-dash__stat-ic {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+}
+
+.lvct-dash__actions {
+    border-radius: var(--lvct-r-lg);
+
+    .lvct-dash__actions-head {
+        min-height: 58px;
+        padding-inline: 20px;
+        background: var(--lvct-surface-2);
+    }
+
+    > .lvct-dash__groups { padding: 14px 20px 20px; }
+}
+
+.lvct-dash__group-head {
+    padding-block: 7px;
+    font-size: var(--lvct-fs-body);
+}
+
+.lvct-dash__row {
+    min-height: 46px;
+    padding: 10px;
+    border-radius: 10px;
+}
+
+.lvct-dash__row + .lvct-dash__row { border-top-color: color-mix(in srgb, var(--lvct-border-subtle) 72%, transparent); }
+
+.lvct-dash__secondary-card {
+    background: var(--lvct-surface-muted);
+    border-color: color-mix(in srgb, var(--lvct-border-subtle) 62%, transparent);
+}
+
+.lvct-people {
+    gap: var(--lvct-sp-4);
+}
+
+.lvct-people__control-surface {
+    padding: 16px;
+    border-radius: var(--lvct-r-lg);
+    background: var(--lvct-bg-surface);
+    border-color: color-mix(in srgb, var(--lvct-border-subtle) 72%, transparent);
+    box-shadow: none;
+}
+
+.lvct-people__desktop-search,
+.lvct-people__mobile-search {
+    min-height: 42px;
+}
+
+.lvct-people__cards {
+    gap: 16px;
+}
+
+.lvct-person-card {
+    min-height: 184px;
+    padding: 18px;
+    gap: 16px;
+    transition: transform var(--lvct-dur-fast) var(--lvct-ease), box-shadow var(--lvct-dur-fast) var(--lvct-ease), border-color var(--lvct-dur-fast) var(--lvct-ease), background var(--lvct-dur-fast) var(--lvct-ease);
+
+    &:hover {
+        border-color: color-mix(in srgb, var(--lvct-accent) 36%, var(--lvct-border-subtle));
+        box-shadow: var(--lvct-shadow-2);
+        transform: translateY(-2px);
+    }
+}
+
+.lvct-person-card__avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+    font-size: 17px;
+}
+
+.lvct-person-card__name {
+    font-size: 15px;
+    font-weight: var(--lvct-fw-medium);
+}
+
+.lvct-person-card__meta {
+    gap: 7px;
+    font-size: var(--lvct-fs-caption);
+}
+
+.lvct-chip {
+    padding: 4px 9px;
+    font-size: var(--lvct-fs-micro);
+}
+
+.lvct-settings__layout {
+    gap: 22px;
+}
+
+.lvct-settings__nav {
+    width: 184px;
+    padding: 8px;
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 68%, transparent);
+    border-radius: var(--lvct-r-panel);
+    background: var(--lvct-surface-muted);
+}
+
+.lvct-settings__nav-item {
+    min-height: var(--lvct-control-h);
+    padding: 9px 11px;
+    border-radius: 10px;
+
+    &--active {
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lvct-accent) 14%, transparent);
+    }
+}
+
+.lvct-settings__panel {
+    padding: 24px;
+    border-radius: var(--lvct-r-panel);
+}
+
+.lvct-settings__panel h2 {
+    font-size: var(--lvct-fs-section-title);
+}
+
+.lvct-settings__sub-heading {
+    margin-top: 22px;
+    padding-top: 16px;
+
+    b { font-size: var(--lvct-fs-body); }
+}
+
+.lvct-settings__draft-status {
+    display: flex;
+    align-items: center;
+    gap: var(--lvct-sp-2);
+    margin: -4px 0 14px;
+    padding: 7px 10px;
+    border: 1px solid color-mix(in srgb, var(--lvct-highlight) 28%, var(--lvct-border-subtle));
+    border-radius: var(--lvct-r-sm);
+    background: var(--lvct-highlight-soft);
+    color: var(--lvct-text-2);
+    font-size: var(--lvct-fs-caption);
+    line-height: var(--lvct-lh-tight);
+}
+
+.lvct-orgs-view {
+    gap: var(--lvct-sp-4);
+
+    &__grid { gap: 16px; }
+
+    &__card {
+        /* 组织卡片以名称、成员数和两个动作构成紧凑的信息单元；
+           避免少内容组织在移动端被 `margin-top:auto` 拉出大块空白。 */
+        min-height: 108px;
+        padding: 18px;
+        gap: var(--lvct-sp-2);
+    }
+
+    &__card-head { gap: var(--lvct-sp-3); }
+
+    &__card-icon,
+    &__card-logo {
+        width: 40px;
+        height: 40px;
+        flex-basis: 40px;
+        border-radius: 12px;
+    }
+
+    &__card-name { font-size: 15px; }
+
+    &__card-actions { gap: 4px; }
+}
+
+.lvct-dialog-panel {
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 70%, transparent);
+    border-radius: var(--lvct-r-dialog);
+    box-shadow: var(--lvct-shadow-3);
+}
+
+.lvct-dialog-panel {
+    scroll-padding-top: calc(72px + env(safe-area-inset-top));
+}
+
+.lvct-dialog-panel__header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    box-sizing: border-box;
+    min-height: 48px;
+    margin: calc(-1 * var(--lvct-sp-4)) calc(-1 * var(--lvct-sp-4)) var(--lvct-sp-3);
+    padding: calc(var(--lvct-sp-4) + env(safe-area-inset-top)) var(--lvct-sp-4) var(--lvct-sp-2);
+    border-bottom: 1px solid var(--lvct-border-hairline);
+    background: var(--lvct-bg-elevated);
+    box-shadow: 0 1px 0 var(--lvct-border-hairline);
+}
+
+.lvct-dialog-panel__title {
+    font-size: var(--lvct-fs-section-title);
+    letter-spacing: 0;
+}
+
+.lvct-empty {
+    min-height: 280px;
+    padding: 36px 24px;
+    border: 1px dashed color-mix(in srgb, var(--lvct-border-subtle) 86%, transparent);
+    border-radius: var(--lvct-r-panel);
+    background: var(--lvct-surface-muted);
+}
+
+@media (max-width: 640px) {
+    .lvct-workbench__sidebar {
+        padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+        border-top-color: color-mix(in srgb, var(--lvct-border-subtle) 72%, transparent);
+    }
+
+    .lvct-workbench__header {
+        min-height: 72px;
+        padding: 18px 14px 12px;
+        background: var(--lvct-bg-canvas);
+    }
+
+    .lvct-workbench__header-actions { gap: var(--lvct-sp-2); }
+    .lvct-workbench__body { padding: 0 14px 96px; }
+    .lvct-home__card { padding: 16px; }
+    .lvct-dash__stat { min-height: 124px; padding: 15px; }
+    .lvct-dash__stat b { font-size: 26px; }
+    .lvct-dash__actions .lvct-dash__actions-head { padding-inline: 16px; }
+    .lvct-dash__actions > .lvct-dash__groups { padding-inline: 16px; }
+    .lvct-person-card { min-height: 0; }
+    .lvct-settings__layout { gap: var(--lvct-sp-3); }
+    /* 设置分区在窄屏保持单行滚动；此前前置规则使用 grid，
+       这里仅写 flex-direction 不会生效，新增分区会被压成多行并挤占表单首屏。 */
+    .lvct-settings__nav {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        min-width: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+        scrollbar-color: var(--lvct-border-strong) transparent;
+    }
+    .lvct-settings__nav-item {
+        flex: 0 0 auto;
+        min-width: max-content;
+        white-space: nowrap;
+    }
+    .lvct-settings__panel { padding: 18px 16px; }
+
+    .lvct-settings__brand-avatar-controls {
+        flex: 1 1 100%;
+        width: 100%;
+        justify-content: flex-start;
+        align-items: flex-start;
+    }
+
+    .lvct-settings__brand-avatar-actions {
+        justify-content: flex-start;
+    }
+}
+
+/* UX-2026-10-11：收束页头、联系人工具栏与移动端控件节奏。
+   仅调整呈现层，避免窄屏上的长标题、长按钮或图谱切换组撑破布局。 */
+.lvct-workbench__header {
+    border-bottom: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 72%, transparent);
+    background: color-mix(in srgb, var(--lvct-bg-canvas) 92%, var(--lvct-bg-surface));
+}
+
+.lvct-workbench__header > div:first-child {
+    flex: 1 1 280px;
+    min-width: 0;
+}
+
+.lvct-workbench__header h1,
+.lvct-workbench__header p {
+    max-width: 72ch;
+    overflow-wrap: anywhere;
+}
+
+.lvct-workbench__header-actions .b3-button {
+    justify-content: center;
+}
+
+.lvct-people > .lvct-people__toolbar > .lvct-people__viewtoggle {
+    min-width: 0;
+}
+
+.lvct-people > .lvct-people__toolbar > .lvct-people__viewtoggle .lvct-seg {
+    max-width: 100%;
+}
+
+.lvct-orgs-view__card-description {
+    margin: 2px 0 0;
+    color: var(--lvct-text-2);
+    font-size: var(--lvct-fs-caption);
+    line-height: var(--lvct-lh-body);
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.lvct-orgs-view__card-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+
+@media (max-width: 640px) {
+    .lvct-workbench__header-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: stretch;
+        width: 100%;
+    }
+
+    .lvct-workbench__header-actions input {
+        grid-column: 1 / -1;
+        width: 100%;
+    }
+
+    .lvct-workbench__header-actions .b3-button {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .lvct-people > .lvct-people__toolbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: stretch;
+    }
+
+    .lvct-people > .lvct-people__toolbar > .lvct-people__mobile-search {
+        grid-column: 1 / -1;
+        width: 100%;
+    }
+
+    /* 窄视口下桌面模式可能仍由宿主保留（例如测试夹具或响应式容器），
+       搜索仍应独占一行，避免被视图和筛选控件的固有宽度挤压。 */
+    .lvct-people > .lvct-people__toolbar > .lvct-people__desktop-search {
+        grid-column: 1 / -1;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .lvct-people > .lvct-people__toolbar > .lvct-people__viewtoggle {
+        width: 100%;
+    }
+
+    .lvct-people > .lvct-people__toolbar > .lvct-people__viewtoggle .lvct-seg,
+    .lvct-people > .lvct-people__toolbar > .lvct-people__viewtoggle .lvct-seg__item {
+        width: 100%;
+    }
+
+    .lvct-people > .lvct-people__toolbar > .lvct-people__viewtoggle .lvct-seg__item {
+        flex: 1 1 0;
+        justify-content: center;
+    }
+
+    .lvct-orgs-view__card-actions .b3-button {
+        flex: 1 1 112px;
+        min-width: 0;
+    }
+
+    .lvct-graph-toolbar__primary {
+        align-items: stretch;
+    }
+
+    .lvct-graph-mode {
+        width: 100%;
+    }
+
+    .lvct-graph-mode > .b3-button {
+        flex: 1 1 0;
+        justify-content: center;
+    }
+
+    .lvct-graph-toolbar__actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--lvct-sp-2);
+        align-items: stretch;
+    }
+
+    .lvct-graph-toolbar__actions > [role="group"] {
+        width: 100%;
+    }
+
+    .lvct-graph-toolbar__actions > [role="group"] > .b3-button {
+        flex: 1 1 0;
+        justify-content: center;
+    }
+
+    .lvct-graph-toolbar__actions > .b3-button {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
+/* UX-2026-10-11：补齐悬停、键盘聚焦和表面层级的微交互。 */
+.lvct-home__card,
+.lvct-orgs-view__card,
+.lvct-settings__panel,
+.lvct-people__control-surface {
+    transition:
+        border-color var(--lvct-dur-fast) var(--lvct-ease),
+        box-shadow var(--lvct-dur-fast) var(--lvct-ease);
+}
+
+.lvct-home__card:hover,
+.lvct-orgs-view__card:hover,
+.lvct-settings__panel:focus-within,
+.lvct-people__control-surface:focus-within {
+    border-color: color-mix(in srgb, var(--lvct-accent) 22%, var(--lvct-border-subtle));
+    box-shadow: var(--lvct-shadow-2);
+}
+
+.lvct-person-card:focus-within,
+.lvct-dash__row:focus-within {
+    border-color: color-mix(in srgb, var(--lvct-accent) 34%, var(--lvct-border-subtle));
+    box-shadow: 0 0 0 3px var(--lvct-accent-soft);
+}
+
+.lvct-workbench__sidebar {
+    box-shadow: inset -1px 0 0 color-mix(in srgb, var(--lvct-border-subtle) 48%, transparent);
+}
+
+@media (max-width: 640px) {
+    .lvct-workbench__sidebar {
+        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--lvct-border-subtle) 48%, transparent);
+    }
+
+    .lvct-dialog-panel__header {
+        background: color-mix(in srgb, var(--lvct-bg-elevated) 96%, var(--lvct-accent) 4%);
+    }
+}
+
+/* ============================================================================
+ * UX-04 · 材质与页面质感（2026-10-11）
+ *
+ * 这一层只处理整体观感：画布有很轻的环境光，内容面用单一高光方向抬升，
+ * 面板边界改为发丝线和分层阴影，导航/页头/浮层保持同一深度语言。所有颜色
+ * 仍来自设计令牌，移动端沿用同一套材质并降低阴影和光晕强度。
+ * ========================================================================== */
+
+.lvct-workbench {
+    /* 质感来自稳定的表面层级，画布本身保持中性，避免装饰性光晕干扰内容。 */
+    background: var(--lvct-bg-canvas);
+}
+
+.lvct-workbench__main {
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--lvct-bg-canvas) 94%, var(--lvct-bg-surface) 6%), var(--lvct-bg-canvas));
+}
+
+.lvct-workbench__sidebar {
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--lvct-bg-sidebar) 94%, var(--lvct-accent) 6%), var(--lvct-bg-sidebar));
+    border-right-color: var(--lvct-border-hairline);
+    box-shadow: inset -1px 0 0 color-mix(in srgb, var(--lvct-border-strong) 26%, transparent), 8px 0 24px color-mix(in srgb, var(--lvct-text-1) 2%, transparent);
+}
+
+.lvct-workbench__brand-mark {
+    background:
+        linear-gradient(145deg, color-mix(in srgb, var(--lvct-brand-from) 88%, var(--lvct-on-accent) 12%), var(--lvct-brand-to));
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--lvct-accent) 18%, transparent), inset 0 1px 0 color-mix(in srgb, var(--lvct-on-accent) 28%, transparent);
+}
+
+.lvct-workbench__header {
+    background: color-mix(in srgb, var(--lvct-bg-canvas) 84%, var(--lvct-bg-surface) 16%);
+    border-bottom-color: var(--lvct-border-hairline);
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--lvct-bg-surface) 26%, transparent);
+}
+
+.lvct-home__card,
+.lvct-dash__quickstart,
+.lvct-dash__actions,
+.lvct-settings__panel,
+.lvct-orgs-view__card,
+.lvct-person-card,
+.lvct-people__control-surface,
+.lvct-org-profile-editor__section {
+    background: var(--lvct-bg-surface);
+    border-color: var(--lvct-border-hairline);
+    box-shadow: var(--lvct-shadow-panel);
+    background-clip: padding-box;
+}
+
+.lvct-home__card,
+.lvct-dash__quickstart,
+.lvct-dash__actions,
+.lvct-settings__panel,
+.lvct-orgs-view__card,
+.lvct-person-card,
+.lvct-people__control-surface {
+    position: relative;
+}
+
+.lvct-home__card::before,
+.lvct-dash__quickstart::before,
+.lvct-dash__actions::before,
+.lvct-settings__panel::before,
+.lvct-orgs-view__card::before,
+.lvct-person-card::before,
+.lvct-people__control-surface::before {
+    content: "";
+    position: absolute;
+    inset: 0 12px auto;
+    height: 1px;
+    border-radius: var(--lvct-r-pill);
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lvct-accent) 24%, transparent), transparent);
+    opacity: .72;
+    pointer-events: none;
+}
+
+.lvct-home__card:hover,
+.lvct-dash__quickstart:focus-within,
+.lvct-settings__panel:focus-within,
+.lvct-orgs-view__card:hover,
+.lvct-person-card:hover,
+.lvct-people__control-surface:focus-within {
+    border-color: color-mix(in srgb, var(--lvct-accent) 28%, var(--lvct-border-hairline));
+    box-shadow: var(--lvct-shadow-float);
+}
+
+.lvct-dash__stat {
+    background: var(--lvct-bg-surface);
+    border-color: var(--lvct-border-hairline);
+    box-shadow: var(--lvct-shadow-panel);
+}
+
+.lvct-dash__actions .lvct-dash__actions-head {
+    background: linear-gradient(180deg, var(--lvct-surface-inset), var(--lvct-surface-2));
+    border-bottom-color: var(--lvct-border-hairline);
+}
+
+.lvct-people__control-surface {
+    background: var(--lvct-bg-surface);
+}
+
+.lvct-people__desktop-search,
+.lvct-people__mobile-search,
+.lvct-workbench__header-actions input {
+    background: var(--lvct-surface-inset);
+    border-color: var(--lvct-border-hairline);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--lvct-bg-surface) 44%, transparent);
+}
+
+.lvct-settings__nav {
+    background: color-mix(in srgb, var(--lvct-surface-muted) 86%, var(--lvct-bg-canvas));
+    border-color: var(--lvct-border-hairline);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--lvct-bg-surface) 34%, transparent);
+}
+
+.lvct-dialog-panel,
+.lvct-sheet,
+.lvct-closeguard__panel,
+.lvct-picker__panel {
+    background: var(--lvct-bg-elevated);
+    border-color: var(--lvct-border-strong);
+    box-shadow: var(--lvct-shadow-float);
+}
+
+.lvct-dialog-panel__header {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--lvct-bg-elevated) 88%, var(--lvct-accent) 12%), var(--lvct-bg-elevated));
+    border-bottom-color: var(--lvct-border-hairline);
+}
+
+.lvct-detail__section,
+.lvct-detail__tabs,
+.lvct-settings__sub-heading {
+    border-color: var(--lvct-border-hairline);
+}
+
+.lvct-detail__relationship-grid > div,
+.lvct-review__cell,
+.lvct-settings__mapping,
+.lvct-org-profile-editor__preset,
+.lvct-org-manager__add {
+    background: var(--lvct-surface-inset);
+    border-color: var(--lvct-border-hairline);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--lvct-bg-surface) 30%, transparent);
+}
+
+.lvct-chip,
+.lvct-progress,
+.lvct-people__progress {
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--lvct-bg-surface) 36%, transparent);
+}
+
+@media (max-width: 640px) {
+    .lvct-workbench {
+        background: var(--lvct-bg-canvas);
+    }
+
+    .lvct-workbench__main {
+        background: var(--lvct-bg-canvas);
+    }
+
+    .lvct-workbench__sidebar {
+        background: var(--lvct-bg-sidebar);
+        box-shadow: inset 0 1px 0 var(--lvct-border-hairline);
+    }
+
+    .lvct-home__card,
+    .lvct-dash__quickstart,
+    .lvct-dash__actions,
+    .lvct-settings__panel,
+    .lvct-orgs-view__card,
+    .lvct-person-card,
+    .lvct-people__control-surface {
+        box-shadow: var(--lvct-shadow-1);
+    }
+
+    .lvct-dialog-panel,
+    .lvct-sheet,
+    .lvct-closeguard__panel,
+    .lvct-picker__panel {
+        box-shadow: var(--lvct-shadow-3);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lvct-home__card,
+    .lvct-dash__quickstart,
+    .lvct-dash__stat,
+    .lvct-settings__panel,
+    .lvct-orgs-view__card,
+    .lvct-person-card,
+    .lvct-people__control-surface {
+        transition-duration: .01ms !important;
+    }
+}
+
+/* ============================================================================
+ * UX-05 · 视觉节奏收口（2026-10-11）
+ *
+ * 统一内容卡片与浮层的圆角、层级和选中反馈。这里仅调整呈现层，避免
+ * 各页面在不同组件覆盖顺序下出现“卡片太硬/弹窗太重/导航太满”的观感。
+ * ========================================================================== */
+
+.lvct-home__card,
+.lvct-dash__quickstart,
+.lvct-dash__actions,
+.lvct-dash__stat,
+.lvct-settings__panel,
+.lvct-orgs-view__card,
+.lvct-person-card,
+.lvct-people__control-surface,
+.lvct-org-profile-editor__section {
+    border-radius: 16px;
+}
+
+.lvct-workbench__nav-item {
+    /* 激活态保留清晰的品牌提示，但降低整块色彩面积，让侧栏更像工具导航。 */
+    &--active {
+        background: color-mix(in srgb, var(--lvct-accent-soft) 72%, var(--lvct-bg-sidebar));
+        color: var(--lvct-text-1);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lvct-accent) 16%, transparent);
+
+        .lvct-workbench__nav-icon { color: var(--lvct-accent); }
+    }
+
+    &:hover:not(&--active) {
+        background: color-mix(in srgb, var(--lvct-bg-hover) 72%, var(--lvct-bg-sidebar));
+    }
+}
+
+.lvct-dialog-panel__header {
+    /* 正常窗口沿用白色内容表面，以分隔线建立标题层级。 */
+    background: var(--lvct-bg-elevated);
+}
+
+.lvct-detail__tabs button {
+    border-radius: var(--lvct-r-sm) var(--lvct-r-sm) 0 0;
+
+    &:hover:not(.lvct-detail__tab--active),
+    &:focus-visible:not(.lvct-detail__tab--active) {
+        background: var(--lvct-bg-hover);
+    }
+
+    &.lvct-detail__tab--active {
+        background: color-mix(in srgb, var(--lvct-accent-soft) 64%, var(--lvct-bg-elevated));
+    }
+}
+
+@media (max-width: 640px) {
+    .lvct-home__card,
+    .lvct-dash__quickstart,
+    .lvct-dash__actions,
+    .lvct-dash__stat,
+    .lvct-settings__panel,
+    .lvct-orgs-view__card,
+    .lvct-person-card,
+    .lvct-people__control-surface,
+    .lvct-org-profile-editor__section {
+        border-radius: 14px;
+    }
+}
+
+/* ============================================================================
+ * UX-06 · 联系人页工具层级与内容节奏（2026-10-11）
+ *
+ * 联系人页的搜索、浏览和整理入口很多，保持同一工具面板的前提下，
+ * 通过边界、间距和卡片信息层级让主操作更容易被扫描。仅涉及呈现层。
+ * ========================================================================== */
+
+@media (min-width: 641px) {
+    .lvct-people__toolbar-actions {
+        flex: 1 0 100%;
+        justify-content: flex-end;
+        margin-top: var(--lvct-sp-1);
+        padding-top: var(--lvct-sp-2);
+        border-top: 1px solid var(--lvct-border-hairline);
+    }
+
+    .lvct-people__create {
+        min-height: var(--lvct-control-h-compact);
+        border-color: var(--lvct-accent-fill, var(--lvct-accent));
+        background: var(--lvct-accent-fill, var(--lvct-accent));
+        color: var(--lvct-on-accent, #fff);
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--lvct-accent) 18%, transparent);
+    }
+
+    .lvct-people__create:hover {
+        border-color: var(--lvct-accent-hover, var(--lvct-accent));
+        background: var(--lvct-accent-hover, var(--lvct-accent));
+        color: var(--lvct-on-accent, #fff);
+        box-shadow: 0 4px 10px color-mix(in srgb, var(--lvct-accent) 22%, transparent);
+    }
+}
+
+.lvct-people__viewtoggle {
+    padding: 2px;
+    border: 1px solid var(--lvct-border-hairline);
+    border-radius: var(--lvct-r-pill);
+    background: var(--lvct-surface-inset);
+}
+
+.lvct-person-card {
+    gap: var(--lvct-sp-2);
+    padding: 14px;
+}
+
+@media (min-width: 641px) {
+    .lvct-person-card {
+        min-height: 172px;
+    }
+}
+
+.lvct-person-card__top {
+    align-items: flex-start;
+}
+
+.lvct-person-card__name {
+    font-size: var(--lvct-fs-body);
+    line-height: 1.35;
+}
+
+.lvct-person-card__sub,
+.lvct-person-card__org {
+    line-height: var(--lvct-lh-tight);
+}
+
+.lvct-person-card__meta {
+    gap: 4px;
+    margin-top: var(--lvct-sp-1);
+}
+
+.lvct-person-card__tags {
+    gap: 4px;
+    padding-top: var(--lvct-sp-1);
+    border-top: 1px solid var(--lvct-border-hairline);
+}
+
+.lvct-people__progress {
+    background: var(--lvct-surface-inset);
+    border-color: var(--lvct-border-hairline);
+}
+
+@media (max-width: 640px) {
+    .lvct-people__toolbar {
+        gap: var(--lvct-sp-2);
+        padding: var(--lvct-sp-2);
+    }
+
+    .lvct-people__toolbar > .lvct-people__viewtoggle {
+        min-width: 0;
+    }
+
+    .lvct-people__toolbar > .lvct-people__viewtoggle,
+    .lvct-people__toolbar > .b3-button {
+        min-height: var(--lvct-touch-min-mobile);
+    }
+
+    .lvct-people__toolbar > .b3-button[aria-label="筛选与整理"] {
+        border-color: color-mix(in srgb, var(--lvct-accent) 26%, var(--lvct-border-subtle));
+        background: var(--lvct-accent-soft);
+        color: var(--lvct-accent-text, var(--lvct-accent));
+    }
+
+    .lvct-people__filters {
+        margin: 0 calc(var(--lvct-sp-2) * -1);
+        padding: var(--lvct-sp-2) var(--lvct-sp-2) var(--lvct-sp-2);
+        border-top: 1px solid var(--lvct-border-hairline);
+        border-bottom: 1px solid var(--lvct-border-hairline);
+    }
+
+    .lvct-people__actions {
+        margin-top: var(--lvct-sp-2);
+        padding-top: var(--lvct-sp-2);
+    }
+
+    .lvct-person-card {
+        min-height: 0;
+        padding: 14px;
+    }
+
+    .lvct-person-card__tags {
+        padding-top: var(--lvct-sp-2);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lvct-people__create,
+    .lvct-person-card {
+        transition: none;
+    }
+}
+
+/* ============================================================================
+ * UX-07 · 页面分区识别与操作收口（2026-10-11）
+ *
+ * 让首页、组织页和设置页共享同一套“标题 - 内容 - 操作”节奏，
+ * 在信息较长或移动端滚动时仍能快速定位当前分区。
+ * ========================================================================== */
+
+.lvct-dash__actions .lvct-dash__actions-head h3,
+.lvct-settings__sub-heading b {
+    position: relative;
+    padding-left: 10px;
+}
+
+.lvct-dash__actions .lvct-dash__actions-head h3::before,
+.lvct-settings__sub-heading b::before {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    left: 0;
+    width: 3px;
+    border-radius: var(--lvct-r-pill);
+    background: var(--lvct-accent);
+    content: "";
+    opacity: .72;
+}
+
+.lvct-orgs-view__card > .ft__smaller {
+    min-height: 22px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--lvct-text-2);
+    font-weight: 500;
+
+    &::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--lvct-success);
+        box-shadow: 0 0 0 2px var(--lvct-success-soft);
+        flex-shrink: 0;
+    }
+}
+
+.lvct-orgs-view__card--archived > .ft__smaller::before {
+    background: var(--lvct-text-3);
+    box-shadow: none;
+}
+
+.lvct-orgs-view__card-actions {
+    gap: 4px;
+    padding-top: var(--lvct-sp-1);
+    border-top: 1px solid var(--lvct-border-hairline);
+}
+
+.lvct-orgs-view__card-actions .b3-button {
+    min-height: 30px;
+}
+
+.lvct-orgs-view__card--archived .lvct-orgs-view__card-actions {
+    border-top-color: color-mix(in srgb, var(--lvct-border-hairline) 76%, transparent);
+}
+
+.lvct-settings__sub-heading {
+    scroll-margin-top: var(--lvct-sp-4);
+}
+
+@media (max-width: 640px) {
+    .lvct-dash__actions .lvct-dash__actions-head {
+        gap: var(--lvct-sp-1);
+        align-items: flex-start;
+    }
+
+    .lvct-dash__actions .lvct-dash__actions-head h3 {
+        line-height: var(--lvct-lh-tight);
+    }
+
+    .lvct-orgs-view__card-actions {
+        margin-top: var(--lvct-sp-1);
+        padding-top: var(--lvct-sp-2);
+    }
+
+    .lvct-orgs-view__card-actions .b3-button {
+        min-height: var(--lvct-touch-min-mobile);
+    }
+
+    .lvct-settings__sub-heading {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: var(--lvct-sp-1);
+    }
+}
+
+/* ============================================================================
+ * UX-08 · 今日行动对齐与扫描（2026-10-11）
+ *
+ * 在行动卡的实际宽度内分配联系人、提醒原因和固定操作列。
+ * 所有布局规则限于行动卡，避免改变近期生日、联系节奏和待办列表。
+ * ========================================================================== */
+
+.lvct-home__card.lvct-dash__actions {
+    container: lvct-actions / inline-size;
+    padding: 0;
+    background: var(--lvct-bg-surface);
+}
+
+.lvct-dash__actions {
+    .lvct-dash__actions-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--lvct-sp-3);
+        padding: var(--lvct-sp-4) 20px;
+        background: var(--lvct-bg-surface);
+        border-bottom-color: var(--lvct-border-hairline);
+    }
+
+    .lvct-dash__actions-title {
+        min-width: 0;
+
+        h3 { margin: 0; }
+        p {
+            margin: var(--lvct-sp-1) 0 0 10px;
+            font-size: var(--lvct-fs-caption);
+            line-height: var(--lvct-lh-body);
+            color: var(--lvct-text-3);
+        }
+    }
+
+    .lvct-dash__actions-tools {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
+        gap: var(--lvct-sp-1);
+        min-width: 0;
+
+        .b3-button {
+            white-space: normal;
+            text-align: left;
+            color: var(--lvct-text-2);
+            border-color: transparent;
+            background: transparent;
+
+            &:hover:not(:disabled) { color: var(--lvct-text-1); background: var(--lvct-bg-hover); border-color: transparent; }
+        }
+    }
+
+    > .lvct-dash__groups {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        padding: var(--lvct-sp-2) 20px var(--lvct-sp-3);
+    }
+
+    .lvct-dash__group {
+        min-width: 0;
+        padding-block: var(--lvct-sp-1);
+    }
+
+    .lvct-dash__group + .lvct-dash__group {
+        border-top: 1px solid var(--lvct-border-hairline);
+    }
+
+    .lvct-dash__group-head {
+        width: 100%;
+        min-height: var(--lvct-control-h);
+        box-sizing: border-box;
+        justify-content: flex-start;
+        padding: var(--lvct-sp-2) 0;
+        font-size: var(--lvct-fs-caption);
+    }
+
+    .lvct-dash__group-count {
+        margin-left: auto;
+        background: var(--lvct-surface-inset);
+        border-color: transparent;
+    }
+
+    [data-action-group="overdue"] .lvct-dash__group-head > b { color: var(--lvct-danger); }
+
+    .lvct-dash__list { min-width: 0; gap: 0; }
+    .lvct-dash__rowwrap + .lvct-dash__rowwrap { border-top: 1px solid var(--lvct-border-hairline); }
+
+    .lvct-dash__action-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 72px 40px;
+        align-items: center;
+        gap: var(--lvct-sp-2);
+        min-width: 0;
+        padding: var(--lvct-sp-3) 0;
+        border-radius: var(--lvct-r-sm);
+
+        .lvct-dash__row-main {
+            display: grid;
+            grid-template-columns: minmax(180px, .85fr) minmax(0, 1.15fr);
+            gap: var(--lvct-sp-3);
+            align-items: center;
+            min-width: 0;
+            width: 100%;
+            min-height: var(--lvct-control-h);
+        }
+
+        .lvct-dash__row-primary {
+            display: block;
+            min-width: 0;
+            overflow-wrap: anywhere;
+
+            > b { display: block; font-size: var(--lvct-fs-body); line-height: var(--lvct-lh-body); }
+            .lvct-profile-summary--compact { margin: var(--lvct-sp-1) 0 0; line-height: var(--lvct-lh-body); }
+        }
+
+        .lvct-dash__reasons {
+            display: flex;
+            width: auto;
+            min-width: 0;
+            flex: initial;
+            align-items: flex-start;
+            gap: var(--lvct-sp-2);
+
+            .lvct-action-chip {
+                flex: initial;
+                min-width: 0;
+                max-width: 100%;
+                box-sizing: border-box;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                line-height: var(--lvct-lh-body);
+                padding: 3px 8px;
+                border-radius: var(--lvct-r-sm);
+
+                &.lvct-action-chip--overdue { background: var(--lvct-danger-soft); color: var(--lvct-danger); }
+                &.lvct-action-chip--today { background: var(--lvct-highlight-soft); color: var(--lvct-highlight); }
+                &.lvct-action-chip--week { background: var(--lvct-accent-soft); color: var(--lvct-accent-text); }
+                &.lvct-action-chip--stale { background: var(--lvct-surface-inset); color: var(--lvct-text-2); }
+            }
+        }
+
+        > .lvct-dash__quick-button {
+            width: 100%;
+            min-width: 0;
+            min-height: var(--lvct-control-h);
+            box-sizing: border-box;
+            padding-inline: 6px;
+            white-space: nowrap;
+            border-color: transparent;
+            background: var(--lvct-accent-soft);
+            color: var(--lvct-accent-text);
+
+            &:hover:not(:disabled) { background: var(--lvct-bg-active); border-color: transparent; color: var(--lvct-accent-text); }
+        }
+
+        > .lvct-dash__quick-button--more {
+            font-size: var(--lvct-fs-body);
+            background: transparent;
+            color: var(--lvct-text-2);
+            border-color: var(--lvct-border-hairline);
+
+            &:hover:not(:disabled) { background: var(--lvct-bg-hover); color: var(--lvct-text-1); }
+        }
+    }
+
+    .lvct-dash__rowmenu {
+        margin: 0 0 var(--lvct-sp-2);
+        padding: var(--lvct-sp-2);
+        border-radius: var(--lvct-r-sm);
+        background: var(--lvct-surface-inset);
+        gap: var(--lvct-sp-2);
+    }
+}
+
+@container lvct-actions (max-width: 660px) {
+    .lvct-dash__actions .lvct-dash__actions-head {
+        align-items: flex-start;
+    }
+
+    .lvct-dash__actions .lvct-dash__action-row .lvct-dash__row-main {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--lvct-sp-2);
+    }
+}
+
+@container lvct-actions (max-width: 440px) {
+    .lvct-dash__actions .lvct-dash__actions-head {
+        flex-direction: column;
+        padding: var(--lvct-sp-3) var(--lvct-sp-4);
+        gap: var(--lvct-sp-2);
+    }
+
+    .lvct-dash__actions .lvct-dash__actions-tools {
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .lvct-dash__actions > .lvct-dash__groups { padding-inline: var(--lvct-sp-4); }
+
+    .lvct-dash__actions .lvct-dash__action-row {
+        grid-template-columns: minmax(0, 1fr) 72px 40px;
+        align-items: start;
+        gap: var(--lvct-sp-2);
+
+        .lvct-dash__row-main { grid-column: 1 / -1; }
+        > .lvct-dash__quick-button { grid-column: 2; }
+        > .lvct-dash__quick-button--more { grid-column: 3; }
+    }
+}
+
+/* UX-11 · R54 质感收口（2026-10-12）
+ * 页面内容面保持白色与轻描边，阴影只承担浮层层级；首页把阅读重点留给
+ * 今日行动，普通卡片不再用悬浮位移或顶部高光制造过重的视觉噪声。 */
+.lvct-workbench__body {
+    max-width: 1240px;
+}
+
+.lvct-workbench__header {
+    min-height: 72px;
+    padding-top: 18px;
+    padding-bottom: 16px;
+}
+
+.lvct-workbench__header--settings {
+    min-height: 56px;
+    padding-bottom: 10px;
+}
+
+.lvct-settings__topbar .lvct-settings__heading {
+    display: none;
+}
+
+.lvct-settings__topbar {
+    padding-top: 0;
+    padding-bottom: var(--lvct-sp-3);
+}
+
+.lvct-workbench__sidebar {
+    padding-inline: 10px;
+}
+
+.lvct-home__card,
+.lvct-dash__quickstart,
+.lvct-dash__stat,
+.lvct-settings__panel,
+.lvct-orgs-view__card,
+.lvct-person-card,
+.lvct-org-profile-editor__section {
+    background: var(--lvct-bg-surface);
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
+    box-shadow: var(--lvct-shadow-card);
+    transition: transform var(--lvct-dur-base) var(--lvct-ease), box-shadow var(--lvct-dur-base) var(--lvct-ease), border-color var(--lvct-dur-fast) var(--lvct-ease);
+}
+
+.lvct-dash__actions,
+.lvct-people__control-surface {
+    background: var(--lvct-bg-surface);
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
+    box-shadow: none;
+}
+
+.lvct-home__card::before,
+.lvct-dash__quickstart::before,
+.lvct-dash__actions::before,
+.lvct-settings__panel::before,
+.lvct-orgs-view__card::before,
+.lvct-person-card::before,
+.lvct-people__control-surface::before {
+    display: none;
+}
+
+.lvct-home__card:hover,
+.lvct-orgs-view__card:hover,
+.lvct-person-card:hover,
+.lvct-dash__stat:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--lvct-accent) 42%, var(--lvct-border-subtle));
+    background: var(--lvct-bg-surface);
+    box-shadow: var(--lvct-shadow-card-hover);
+    transform: translateY(-2px);
+}
+
+.lvct-dash__quickstart:focus-within,
+.lvct-settings__panel:focus-within,
+.lvct-people__control-surface:focus-within {
+    border-color: color-mix(in srgb, var(--lvct-accent) 32%, var(--lvct-border-subtle));
+    box-shadow: var(--lvct-shadow-panel);
+}
+
+.lvct-dash__secondary-card {
+    background: var(--lvct-bg-surface);
+    border-color: var(--lvct-border-hairline);
+}
+
+.lvct-dash__actions .lvct-dash__actions-head {
+    background: var(--lvct-bg-surface);
+}
+
+.lvct-dash__summary {
+    margin-top: var(--lvct-sp-4);
+    border-color: var(--lvct-border-hairline);
+    background: var(--lvct-surface-inset);
+    color: var(--lvct-text-2);
+}
+
+.lvct-dash__birthday-banner {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--lvct-sp-2);
+}
+
+.lvct-dash__birthday-banner svg {
+    flex: 0 0 auto;
+    color: var(--lvct-highlight);
+}
+
+/* 暗色模式下卡片与面板采用金属/玻璃微发丝内切光与环境漫反射 */
+html[data-theme-mode="dark"] .lvct-home__card,
+html[data-theme-mode="dark"] .lvct-dash__quickstart,
+html[data-theme-mode="dark"] .lvct-dash__actions,
+html[data-theme-mode="dark"] .lvct-dash__stat,
+html[data-theme-mode="dark"] .lvct-settings__panel,
+html[data-theme-mode="dark"] .lvct-orgs-view__card,
+html[data-theme-mode="dark"] .lvct-person-card,
+html[data-theme-mode="dark"] .lvct-people__control-surface,
+html[data-theme-mode="dark"] .lvct-org-profile-editor__section {
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: var(--lvct-shadow-card);
+}
+
+@media (max-width: 640px) {
+    .lvct-workbench__header {
+        min-height: 56px;
+        padding-top: 14px;
+        padding-bottom: 12px;
+    }
+
+    .lvct-workbench__body {
+        max-width: none;
+    }
+}
+
+/* Issue #38：联系人卡片的标题/副标题保留稳定的文本基线；长姓名不会把
+   同一行的生日信息上下推移。移动端仍允许卡片按内容收缩。 */
+@media (min-width: 641px) {
+    .lvct-person-card__main {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+    }
+
+    .lvct-person-card__name {
+        min-height: 2.7em;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+    }
+}
+
+.lvct-person-card__sub {
+    display: block;
+    min-height: 1.35em;
+    line-height: 1.35;
+}
+
+.lvct-people__table-wrap table {
+    line-height: var(--lvct-lh-body);
+}
+
+.lvct-people__table-wrap th,
+.lvct-people__table-wrap td {
+    vertical-align: middle;
+}
+
+.lvct-people__table-wrap td:nth-child(2) {
+    line-height: var(--lvct-lh-body);
+}
+
+.lvct-people__open-doc {
+    vertical-align: middle;
 }

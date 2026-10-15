@@ -6,8 +6,27 @@ export const kernel = {
     faultLog: [],
 };
 
+// 打开文档 API 的隔离观测点：只记录平台分派，不打开真实文档。
+export const documentNavigation = {
+    frontend: null,
+    calls: [],
+    desktopHandler: () => undefined,
+    mobileHandler: () => undefined,
+};
+
 export function getFrontend() {
+    if (documentNavigation.frontend) return documentNavigation.frontend;
     return new URLSearchParams(window.location.search).get("mobile") === "1" ? "mobile" : "desktop";
+}
+
+export function openTab(options) {
+    documentNavigation.calls.push({ platform: "desktop", app: options.app, docId: options.doc?.id });
+    return Promise.resolve().then(() => documentNavigation.desktopHandler(options));
+}
+
+export function openMobileFileById(app, docId) {
+    documentNavigation.calls.push({ platform: "mobile", app, docId });
+    documentNavigation.mobileHandler(app, docId);
 }
 
 export function fetchPost(route, body, callback) {

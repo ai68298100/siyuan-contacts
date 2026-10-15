@@ -87,6 +87,9 @@ export default defineConfig({
 
             output: {
                 entryFileNames: "[name].js",
+                /* 思源插件 loader 只加载入口 index.js；禁止 dynamic import 产生外置 chunk。
+                   Vite 8/Rolldown 使用 codeSplitting=false（inlineDynamicImports 已弃用）。 */
+                codeSplitting: false,
                 assetFileNames: (assetInfo) => assetInfo.name ?? "asset",
             },
         },

@@ -1,4 +1,6 @@
 import { addRelation, removeRelation, retryRelationProjections } from "../../../src/services/relations";
+import { mount, tick, unmount } from "svelte";
+import PersonDetail from "../../../src/components/people/PersonDetail.svelte";
 
 function relationFixture(kernel, settings) {
     const people = ["甲", "乙", "丙"].map((name, index) => ({
@@ -10,6 +12,7 @@ function relationFixture(kernel, settings) {
         people, sections: new Map(), relationWrites: 0, sectionWrites: 0,
         skipRelationWrite: false, failRender: false, failAfterWrite: false,
         failSectionDoc: "", failSectionReadback: false, loseWriteResponse: false,
+        failNextRelationItemId: "", relationWriteItemIds: [],
         duplicateSectionDoc: "", emptyRelationShape: false, invalidRelationShape: false,
     };
     kernel.handler = async (route, body) => {
@@ -29,7 +32,12 @@ function relationFixture(kernel, settings) {
         }
         if (route === "/api/av/setAttributeViewBlockAttr") {
             state.relationWrites += 1;
+            state.relationWriteItemIds.push(body.itemID);
             const person = people.find((person) => person.itemId === body.itemID);
+            if (state.failNextRelationItemId === body.itemID) {
+                state.failNextRelationItemId = "";
+                throw new Error("隔离的一次性关系写入失败");
+            }
             if (!state.skipRelationWrite) person.relatedItemIds = [...body.value.relation.blockIDs];
             if (state.failAfterWrite) state.failRender = true;
             if (state.loseWriteResponse) throw new Error("隔离已应用写入但响应丢失");
@@ -141,6 +149,85 @@ export async function runRelationRegression({ test, assert, kernel, settings }) 
         await retryRelationProjections(settings, [first.docId, second.docId]);
         assert(!state.sections.has(second.docId) && state.sections.get(first.docId).markdown.includes(third.docId)
             && !state.sections.get(first.docId).markdown.includes(second.docId), "旧重试恢复已删除关系");
+    });
+
+    await test("关系部分成功恢复：双向解除一侧失败后详情页显式重读，只补未完成边并保留其他边", async () => {
+        const state = relationFixture(kernel, settings);
+        const [first, second, third] = state.people;
+        const fourth = {
+            itemId: "20261004000000-item004",
+            docId: "20261004000000-pers004",
+            name: "丁", relatedItemIds: [],
+        };
+        state.people.push(fourth);
+        first.relatedItemIds = [second.itemId, third.itemId];
+        second.relatedItemIds = [first.itemId, fourth.itemId];
+        third.relatedItemIds = [first.itemId];
+        fourth.relatedItemIds = [second.itemId];
+        state.failNextRelationItemId = second.itemId;
+
+        const host = document.createElement("div");
+        document.body.append(host);
+        const contact = {
+            ...first, phone: "", email: "", wechat: "", website: "", birthday: "", isLunar: false,
+            group: "朋友", tags: [],
+        };
+        const component = mount(PersonDetail, { target: host, props: {
+            settings,
+            person: contact,
+            onRecord: async () => {},
+            onLoadInsights: async () => ({ timeline: [], coAttendance: [], totalEvents: 0 }),
+            onOpenPersonDoc: () => {},
+            onNavigate: () => {},
+            onChanged: () => {},
+            onDeleted: () => {},
+            onClose: () => {},
+        } });
+
+        const waitFor = async (predicate, message) => {
+            const deadline = Date.now() + 5000;
+            while (!predicate()) {
+                if (Date.now() >= deadline) throw new Error(`${message}\n界面状态：${host.textContent}`);
+                await new Promise((resolve) => setTimeout(resolve, 20));
+                await tick();
+            }
+        };
+        try {
+            await waitFor(() => host.querySelector('[role="tab"][aria-controls="lvct-detail-panel-relations"]'), "人物详情未挂载");
+            host.querySelector('[role="tab"][aria-controls="lvct-detail-panel-relations"]').click();
+            await waitFor(() => host.querySelectorAll(".lvct-detail__relation-remove").length === 2, "相关人列表未读取最新名册");
+            const secondRelation = [...host.querySelectorAll(".lvct-detail__relation")]
+                .find((node) => node.textContent.includes(second.name));
+            assert(secondRelation, "详情页未展示要解除的人物");
+            secondRelation.querySelector(".lvct-detail__relation-remove").click();
+
+            const retryButton = () => [...host.querySelectorAll("button")]
+                .find((button) => button.textContent.trim() === "重新读取并继续关系操作");
+            await waitFor(() => retryButton(), "部分失败后没有显示重新读取入口");
+            assert(state.relationWriteItemIds.length === 2
+                && state.relationWriteItemIds[0] === first.itemId
+                && state.relationWriteItemIds[1] === second.itemId,
+            "第一次双向解除没有按双方顺序写入并在第二侧失败");
+            assert(!first.relatedItemIds.includes(second.itemId)
+                && second.relatedItemIds.includes(first.itemId)
+                && first.relatedItemIds.includes(third.itemId)
+                && second.relatedItemIds.includes(fourth.itemId),
+            "第一次部分成功意外丢失了其他关系边");
+
+            retryButton().click();
+            await waitFor(() => state.relationWriteItemIds.length === 3 && !retryButton(), "显式重试未完成或未收起失败入口");
+            assert(state.relationWriteItemIds[2] === second.itemId,
+                "重试重新写了已经完成的一侧，而非只写未完成一侧");
+            assert(!first.relatedItemIds.includes(second.itemId) && !second.relatedItemIds.includes(first.itemId),
+                "重试后双向关系仍未全部解除");
+            assert(first.relatedItemIds.includes(third.itemId) && third.relatedItemIds.includes(first.itemId)
+                && second.relatedItemIds.includes(fourth.itemId) && fourth.relatedItemIds.includes(second.itemId),
+            "重试删除了与目标无关的其他关系边");
+            assert(host.textContent.includes("相关人（1）"), "关系完成后详情列表没有刷新为剩余关系");
+        } finally {
+            await unmount(component);
+            host.remove();
+        }
     });
 
     await test("关系实际服务：投影写后回读失败标未知，重复标记及已移除人物零覆盖", async () => {

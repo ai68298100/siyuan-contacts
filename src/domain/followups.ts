@@ -30,6 +30,41 @@ export interface FollowUpStore {
     items: FollowUpItem[];
 }
 
+/**
+ * 跟进创建请求使用思源节点 ID 作为稳定幂等键。
+ * 请求结果未知时，调用方必须保留这个 key 并用同一个 key 重试，
+ * 不能因为未读到结果就生成另一条事项。
+ */
+export function isFollowUpRequestId(value: unknown): value is string {
+    return typeof value === "string" && /^\d{14}-[0-9a-z]{7}$/.test(value);
+}
+
+export interface FollowUpCreateRequest {
+    requestId: string;
+    personDocId: string;
+    title?: string;
+    dueDate: string;
+}
+
+/** 只比较创建请求的不可变输入；状态和文档投影字段属于后续事实。 */
+export function matchesFollowUpCreateRequest(item: FollowUpItem, request: FollowUpCreateRequest): boolean {
+    return item.id === request.requestId
+        && item.personDocId === request.personDocId
+        && item.title === (request.title?.trim() ?? "")
+        && item.dueDate === request.dueDate;
+}
+
+/** 写入后无法回读时保留 requestId，供 UI 只读核实或原 key 重试。 */
+export class FollowUpWriteUnknownError extends Error {
+    readonly requestId: string;
+
+    constructor(requestId: string, cause: unknown) {
+        super(`跟进保存结果未知（请求 ${requestId}），可能已保存；请使用原请求重试，不要新建另一条`, { cause });
+        this.name = "FollowUpWriteUnknownError";
+        this.requestId = requestId;
+    }
+}
+
 export const FOLLOW_UP_STORE_VERSION = 1;
 
 import { isValidDateKey } from "./date-key.ts";

@@ -14,6 +14,8 @@
         label = "生日",
         onValueChange,
         onModeChange,
+        invalid = false,
+        describedBy = undefined,
     }: {
         value?: string;
         isLunar?: boolean;
@@ -21,6 +23,8 @@
         label?: string;
         onValueChange: (value: string) => void;
         onModeChange: (isLunar: boolean) => void;
+        invalid?: boolean;
+        describedBy?: string;
     } = $props();
 
     const MIN_YEAR = 1900;
@@ -132,7 +136,7 @@
     }
 </script>
 
-<div class="lvct-birthday-field">
+<div class="lvct-birthday-field" aria-invalid={invalid} aria-describedby={describedBy}>
     <div class="lvct-birthday-field__mode" role="group" aria-label="生日历法">
         <button type="button" class:lvct-birthday-field__mode-active={!isLunar} class="b3-button b3-button--text" aria-pressed={!isLunar} onclick={() => switchMode(false)} {disabled}>公历</button>
         <button type="button" class:lvct-birthday-field__mode-active={isLunar} class="b3-button b3-button--text" aria-pressed={isLunar} onclick={() => switchMode(true)} {disabled}>农历</button>
@@ -140,22 +144,22 @@
     {#if modeError}<small class="ft__error" role="alert">{modeError}</small>{/if}
     {#if isLunar}
         <div class="lvct-birthday-field__lunar" aria-label={`${label}（农历）`}>
-            <select class="b3-select" aria-label="农历年份" value={lunarYear || ""} onchange={(event) => updateLunarPart("year", (event.currentTarget as HTMLSelectElement).value)} {disabled}>
+            <select class="b3-select" aria-label="农历年份" aria-invalid={invalid} aria-describedby={describedBy} value={lunarYear || ""} onchange={(event) => updateLunarPart("year", (event.currentTarget as HTMLSelectElement).value)} {disabled}>
                 <option value="">年</option>
                 {#each years as year}<option value={year}>{year}年</option>{/each}
             </select>
-            <select class="b3-select" aria-label="农历月份" value={lunarMonth || ""} onchange={(event) => updateLunarPart("month", (event.currentTarget as HTMLSelectElement).value)} {disabled}>
+            <select class="b3-select" aria-label="农历月份" aria-invalid={invalid} aria-describedby={describedBy} value={lunarMonth || ""} onchange={(event) => updateLunarPart("month", (event.currentTarget as HTMLSelectElement).value)} {disabled}>
                 <option value="">月</option>
                 {#each LUNAR_MONTH_NAMES as name, index}<option value={index + 1}>{name}月</option>{/each}
             </select>
-            <select class="b3-select" aria-label="农历日期" value={lunarDay || ""} onchange={(event) => updateLunarPart("day", (event.currentTarget as HTMLSelectElement).value)} {disabled}>
+            <select class="b3-select" aria-label="农历日期" aria-invalid={invalid} aria-describedby={describedBy} value={lunarDay || ""} onchange={(event) => updateLunarPart("day", (event.currentTarget as HTMLSelectElement).value)} {disabled}>
                 <option value="">日</option>
                 {#each validLunarDays as day}<option value={day}>{LUNAR_DAY_NAMES[day - 1]}</option>{/each}
             </select>
         </div>
         <small class="lvct-form__hint">直接选择农历年、月、日；保存时会按农历计算生日提醒。</small>
     {:else}
-        <input class="b3-text-field fn__block" type="date" aria-label={`${label}（公历）`} value={value} oninput={(event) => onValueChange((event.currentTarget as HTMLInputElement).value)} {disabled} />
+        <input class="b3-text-field fn__block" type="date" aria-label={`${label}（公历）`} aria-invalid={invalid} aria-describedby={describedBy} value={value} oninput={(event) => onValueChange((event.currentTarget as HTMLInputElement).value)} {disabled} />
         <small class="lvct-form__hint">按公历选择生日。</small>
     {/if}
 </div>

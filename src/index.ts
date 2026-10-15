@@ -7,7 +7,6 @@ import { Plugin, getFrontend, openTab, showMessage, Dialog, getActiveEditor } fr
 import { mount, unmount } from "svelte";
 import "./index.scss";
 
-import WorkbenchRoot from "./components/WorkbenchRoot.svelte";
 import CaptureDialog from "./components/capture/CaptureDialog.svelte";
 import OrgManagerDialog from "./components/org/OrgManagerDialog.svelte";
 import QuickFillDialog from "./components/people/QuickFillDialog.svelte";
@@ -54,6 +53,7 @@ import {
     getOrganizationProfile,
     updateOrganizationProfile,
     ensureDefaultFamilyOrganization,
+    invalidateOrganizationScan,
 } from "./services/org";
 import { exportMigrationBundle, importMigrationBundle, previewMigrationImport } from "./services/migration-bundle";
 import { previewOrganizationProjections, repairOrganizationProjection } from "./services/org-projections";
@@ -68,6 +68,7 @@ import {
     exportFollowUpsJson,
     importFollowUpsJson,
     listPersonFollowUps,
+    newFollowUpRequestId,
     previewFollowUpsImport,
     setFollowUpStatus,
     snoozeFollowUp,
@@ -87,6 +88,7 @@ import { previewInteractionImportDiff } from "./services/interaction-import";
 import { initExternalBridge, disposeExternalBridge } from "./bridge/external-bridge";
 import { handleProtyleEvent, type PanelContext } from "./panels/person-panel";
 import { svelteDialog } from "./libs/dialog";
+import { openSiYuanDocument } from "./libs/open-document";
 import { emitDataChanged, emitWorkspaceState } from "./libs/data-events";
 import type { ContactsSettings } from "./domain/model";
 import type { ContactSummary } from "./domain/person";
@@ -95,6 +97,7 @@ import { DEFAULT_VIEW_PREFERENCES, type ViewPreferences } from "./domain/prefere
 import { createLifecycleToken, LIFECYCLE_CONTEXT, type LifecycleToken } from "./domain/lifecycle";
 import type { ContactsPluginFacade, WorkbenchView } from "./types";
 import type { WorkspaceState } from "./domain/workspace-state";
+import WorkbenchRoot from "./components/WorkbenchRoot.svelte";
 
 const TAB_TYPE = "workbench";
 
@@ -279,16 +282,9 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
                 state.__lvctDispose = dispose;
                 plugin.tabMounts.set(state.element, tabToken);
                 plugin.tabDisposers.add(dispose);
-                try {
-                    instance = mount(WorkbenchRoot, {
-                        target: container,
-                        props: { facade: plugin, initialView },
-                        context: new Map([[LIFECYCLE_CONTEXT, tabToken]]),
-                    });
-                } catch (error) {
-                    dispose();
-                    throw error;
-                }
+                void plugin.mountWorkbenchRoot(container, tabToken, initialView,
+                    () => tabToken.isAlive() && plugin.tabMounts.get(state.element) === tabToken,
+                    (mounted) => { instance = mounted; });
             },
             destroy() {
                 if (!plugin.isLifecycleActive(lifecycleToken)) return;
@@ -892,12 +888,12 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         return createPersonExchange(this, input);
     }
 
-    async updatePersonExchange(id: string, patch: import("./domain/exchanges").ExchangePatch) {
-        return updatePersonExchange(this, id, patch);
+    async updatePersonExchange(id: string, patch: import("./domain/exchanges").ExchangePatch, expected?: Pick<import("./domain/exchanges").ExchangeRecord, "updatedAt">) {
+        return updatePersonExchange(this, id, patch, expected);
     }
 
-    async changePersonExchangeStatus(id: string, status: import("./domain/exchanges").ExchangeStatus, settledOn?: string) {
-        return changePersonExchangeStatus(this, id, status, settledOn);
+    async changePersonExchangeStatus(id: string, status: import("./domain/exchanges").ExchangeStatus, settledOn?: string, expected?: Pick<import("./domain/exchanges").ExchangeRecord, "updatedAt">) {
+        return changePersonExchangeStatus(this, id, status, settledOn, expected);
     }
 
     async listPersonAliases(personDocId: string) {
@@ -1013,9 +1009,9 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         return getOrganizationProfile(this, orgDocId);
     }
 
-    async saveOrganizationProfile(orgDocId: string, profile: import("./domain/organization-profile").OrganizationProfileDraft) {
+    async saveOrganizationProfile(orgDocId: string, profile: import("./domain/organization-profile").OrganizationProfileDraft, expected?: import("./domain/organization-profile").OrganizationProfileDraft | null) {
         if (!this.isLifecycleActive() || !this.settings) throw new Error("人脉工作空间尚未初始化");
-        const result = await updateOrganizationProfile(this, orgDocId, profile);
+        const result = await updateOrganizationProfile(this, orgDocId, profile, expected);
         if (!this.isLifecycleActive()) return result;
         emitDataChanged({ topics: ["organizations"] }, this.lifecycleToken);
         return result;
@@ -1102,12 +1098,16 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     async inspectOrganizationOperation(requestId: string) {
-        return inspectOrganizationOperation(this, requestId);
+        const report = await inspectOrganizationOperation(this, requestId);
+        if (report.status === "complete") invalidateOrganizationScan();
+        return report;
     }
 
     async resumeOrganizationOperation(requestId: string) {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
-        return resumeOrganizationOperation(this, this.settings, requestId);
+        const report = await resumeOrganizationOperation(this, this.settings, requestId);
+        if (report.status === "complete") invalidateOrganizationScan();
+        return report;
     }
 
     /** B13.9：移除悬空的 org-links 区块（体检修复入口；逐块隔离返回失败清单） */
@@ -1296,16 +1296,30 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         return saved;
     }
 
-    async createFollowUp(personDocId: string, title: string, dueDate: string) {
-        return createFollowUp(this, { personDocId, title, dueDate });
+    async createFollowUp(personDocId: string, title: string, dueDate: string, requestId = newFollowUpRequestId()) {
+        const token = this.lifecycleToken;
+        const item = await createFollowUp(this, { requestId, personDocId, title, dueDate });
+        emitDataChanged({ topics: ["people"], docIds: [personDocId] }, token);
+        return item;
+    }
+
+    async retryCreateFollowUp(requestId: string, personDocId: string, title: string, dueDate: string) {
+        if (!this.isLifecycleActive()) throw new Error("插件生命周期已结束，未重试跟进创建");
+        const item = await createFollowUp(this, { requestId, personDocId, title, dueDate });
+        emitDataChanged({ topics: ["people"], docIds: [personDocId] }, this.lifecycleToken);
+        return item;
     }
 
     async setFollowUpStatus(id: string, status: "open" | "done" | "cancelled") {
-        await setFollowUpStatus(this, id, status);
+        const token = this.lifecycleToken;
+        const item = await setFollowUpStatus(this, id, status);
+        emitDataChanged({ topics: ["people"], docIds: [item.personDocId] }, token);
     }
 
     async snoozeFollowUp(id: string, option: SnoozeOption, customDate?: string) {
-        await snoozeFollowUp(this, id, option, customDate);
+        const token = this.lifecycleToken;
+        const item = await snoozeFollowUp(this, id, option, customDate);
+        emitDataChanged({ topics: ["people"], docIds: [item.personDocId] }, token);
     }
 
     async exportFollowUpsJson() {
@@ -1317,7 +1331,10 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     async importFollowUpsJson(text: string) {
-        return importFollowUpsJson(this, text);
+        const token = this.lifecycleToken;
+        const result = await importFollowUpsJson(this, text);
+        if (result.added > 0) emitDataChanged({ topics: ["people"] }, token);
+        return result;
     }
 
     async getPersonCadence(personDocId: string) {
@@ -1394,16 +1411,22 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     openHostDoc() {
         if (!this.isLifecycleActive() || !this.settings) return;
-        openTab({ app: this.app, doc: { id: this.settings.hostDocId } });
+        return this.openDoc(this.settings.hostDocId);
     }
 
     openDoc(docId: string) {
         if (!this.isLifecycleActive() || !docId) return;
-        openTab({ app: this.app, doc: { id: docId } });
+        const opening = openSiYuanDocument(this.app, docId);
+        // 按钮旧入口可能没有 await：旁路处理避免未处理拒绝，原 Promise 仍供图谱等调用方捕获。
+        void opening.catch((error: unknown) => {
+            if (!this.isLifecycleActive()) return;
+            showMessage(`打开文档失败，请重试：${error instanceof Error ? error.message : String(error)}`, 6000, "error");
+        });
+        return opening;
     }
 
     openPersonDoc(docId: string) {
-        this.openDoc(docId);
+        return this.openDoc(docId);
     }
 
     openSettings() {
@@ -1454,13 +1477,48 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const target = this.workbenchDialog.element.querySelector<HTMLElement>(".lvct-dialog-root");
         try {
             if (!target) throw new Error("dialog 容器缺失");
-            this.dialogInstance = mount(WorkbenchRoot, {
-                target, props: { facade: this, initialView },
-                context: new Map([[LIFECYCLE_CONTEXT, dialogToken]]),
-            });
+            void this.mountWorkbenchRoot(target, dialogToken, initialView,
+                () => dialogToken.isAlive() && this.workbenchDialogToken === dialogToken,
+                (instance) => { this.dialogInstance = instance; });
         } catch (error) {
             this.workbenchDialog?.destroy();
             throw error;
+        }
+    }
+
+    private async mountWorkbenchRoot(
+        target: HTMLElement,
+        token: LifecycleToken,
+        initialView: WorkbenchView | undefined,
+        isCurrent: () => boolean,
+        onMounted: (instance: ReturnType<typeof mount>) => void,
+    ): Promise<void> {
+        const loadState = document.createElement("div");
+        loadState.className = "lvct-workbench-load-state";
+        loadState.setAttribute("role", "status");
+        loadState.textContent = "正在载入小驴人脉…";
+        target.replaceChildren(loadState);
+        try {
+            if (!isCurrent()) return;
+            target.replaceChildren();
+            onMounted(mount(WorkbenchRoot, {
+                target,
+                props: { facade: this, initialView },
+                context: new Map([[LIFECYCLE_CONTEXT, token]]),
+            }));
+        } catch (error) {
+            if (!isCurrent()) return;
+            loadState.textContent = `工作台载入失败：${error instanceof Error ? error.message : String(error)}`;
+            loadState.setAttribute("role", "alert");
+            const retry = document.createElement("button");
+            retry.type = "button";
+            retry.className = "b3-button b3-button--outline";
+            retry.textContent = "重试载入";
+            retry.onclick = () => {
+                retry.disabled = true;
+                void this.mountWorkbenchRoot(target, token, initialView, isCurrent, onMounted);
+            };
+            loadState.append(document.createTextNode(" "), retry);
         }
     }
 }

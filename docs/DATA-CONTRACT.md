@@ -172,7 +172,7 @@ vCard 同名项默认跳过，但允许逐项人工确认“作为独立人物�
 | `interaction-events.json` | （M4） | 互动事件（只追加）：`{id, personDocId, occurredAt, localDate, source, externalRef?, note}`；`personDocId+source+externalRef` 幂等；删除写墓碑 |
 | `exchange-records.json` | 1 | 人情往来账本：`{schemaVersion, records: [{id, personDocId, kind, direction, description, amount?, currency?, occurredOn, dueOn?, status, settledOn?, note?, createdAt, updatedAt}]}`；`kind ∈ money/item/favor`，`direction ∈ receivable/payable`（对方欠我/我欠对方），`status ∈ open/settled/cancelled`；金额仅 money 使用且必须为正数，日期为真实存在的 `YYYY-MM-DD`；按人物查询，写入锁内严格读 + 写后回读，删除保留记录并改为 `cancelled`，不物理丢失往来事实 |
 | `person-aliases.json` | 1 | 人物称呼索引：`{schemaVersion, aliases: [{id, personDocId, alias, createdAt, updatedAt}]}`；别名以规范化文本全局唯一，重复归属返回歧义并禁止自动写入；拒绝“王总”这类仅由姓氏/短名 + 职务或泛称组成的模糊称呼；删除别名不删除人物或历史互动；读写遵守严格读、Web Lock 与写后回读 |
-| `follow-ups.json` | 1 | 跟进事项（F05）：`{id, personDocId, title, dueDate, status, createdAt, updatedAt, closedAt?, docBlockId?, docMissing?}`。`dueDate` 为 `YYYY-MM-DD`（严格校验：格式错误或不存在的日期拒绝创建/改期，不顺延回退）；`status ∈ open/done/cancelled`，完成或取消写 `closedAt`，重新打开清除 `closedAt`——**完成跟进不自动写互动事件，记录互动也不悄悄完成跟进**（两类数据独立）。**B07-a 对账字段（可选，向后兼容）**：`docBlockId` 为最近一次对账观测到的文档任务块 ID；`docMissing: true` 表示该任务块已被删除/移出人物文档——显式「不可达」，写侧不再自动重建任务块（不复活用户删掉的块），插件侧对该事项的显式改动（改标题/改期/状态变更，非对账写入）清除标记并在下次同步重建；对账发现块重新出现时清除标记恢复跟踪。人物按 `personDocId` 关联：人物解绑后事项保留并显示「不可达」，仍可推迟/取消，不指向他人。人物跟进列表与备份预览用严格展示读（读取失败显式报错，见上）；新增与状态变更在存储锁内严格读取，损坏或未知版本拒绝写入不覆盖原文件。导出为 `{schemaVersion, exportedAt, storageKey, rawStore, items}` 快照（与互动导出同纪律：锁内严格读取，失败不生成空备份）；**rawStore 兼容三种形态**——字符串（文本快照）、对象（真实宿主 loadData 返回已解析对象）、null/空串（首次未创建=空快照），解析下沉域层 `domain/followup-backup.ts`（FUNC-01.6-a 往返纪律）；合并导入按 `id` 现状优先，新增其余条目，预览零写入，确认时锁内重读重算 |
+| `follow-ups.json` | 1 | 跟进事项（F05）：`{id, personDocId, title, dueDate, status, createdAt, updatedAt, closedAt?, docBlockId?, docMissing?}`。创建请求的 `requestId` 直接作为 `id` 使用，必须是稳定思源节点 ID；同一 key 重试时只在人物、标题、日期等不可变输入完全一致时返回原记录，输入不同则拒绝覆盖。写入或同步结果未知时，调用方必须保留原 key 和原输入，只读核实或用原 key 重试，不能自动生成新 key。`dueDate` 为 `YYYY-MM-DD`（严格校验：格式错误或不存在的日期拒绝创建/改期，不顺延回退）；`status ∈ open/done/cancelled`，完成或取消写 `closedAt`，重新打开清除 `closedAt`——**完成跟进不自动写互动事件，记录互动也不悄悄完成跟进**（两类数据独立）。**B07-a 对账字段（可选，向后兼容）**：`docBlockId` 为最近一次对账观测到的文档任务块 ID；`docMissing: true` 表示该任务块已被删除/移出人物文档——显式「不可达」，写侧不再自动重建任务块（不复活用户删掉的块），插件侧对该事项的显式改动（改标题/改期/状态变更，非对账写入）清除标记并在下次同步重建；对账发现块重新出现时清除标记恢复跟踪。人物按 `personDocId` 关联：人物解绑后事项保留并显示「不可达」，仍可推迟/取消，不指向他人。人物跟进列表与备份预览用严格展示读（读取失败显式报错，见上）；新增与状态变更在存储锁内严格读取，损坏或未知版本拒绝写入不覆盖原文件。创建中的 `follow-up-create-requests.json` 仅用于本工作区恢复未知结果，不属于迁移备份，迁移或恢复工作区后必须重新核实原人物与请求键，不能把断点复制到另一套数据库。导出为 `{schemaVersion, exportedAt, storageKey, rawStore, items}` 快照（与互动导出同纪律：锁内严格读取，失败不生成空备份）；**rawStore 兼容三种形态**——字符串（文本快照）、对象（真实宿主 loadData 返回已解析对象）、null/空串（首次未创建=空快照），解析下沉域层 `domain/followup-backup.ts`（FUNC-01.6-a 往返纪律）；合并导入按 `id` 现状优先，新增其余条目，预览零写入，确认时锁内重读重算 |
 | `person-cadences.json` | 1 | 按人物联系节奏（F06）：`{schemaVersion, cadences: {"<personDocId>": {days, paused}}}`。仅存覆盖项，未登记的人物跟随全局久未联系阈值；`days` 为 1–365 整数（写入时钳制），`paused: true` 表示对该人暂停提醒（久未联系与从未互动均不再出现）。键必须是通过 `^\d{14}-[0-9a-z]{7}$` 校验的人物文档 ID，非法键或非法值条目在归一化时丢弃；补录过去互动不影响（最近互动一律取最大 `occurredAt`）。仪表盘读取为严格展示读（失败计入 `readFailures`，见上）；写入在存储锁内严格读取，损坏拒绝不覆盖。删除键即清除覆盖回退全局 |
 | `interaction-templates.json` | 1 | 互动备注模板（F09）：`{schemaVersion, templates: [{id, name, content}]}`。归一化丢弃缺 id 或 name/content 非字符串的条目，name/content 去首尾空白，按 id 去重，上限 50 条。存储为空时展示内置默认三个模板（见面/电话/聚会，来自代码常量不落盘）；任何增改删即全量落盘，此后以存储为准（删除内置模板即永久移除）。模板内容支持 `{{姓名}}`/`{{日期}}`/`{{上次互动}}` 占位符，应用时纯本地字符串替换，未知占位符原样保留；模板文本不发送 AI，应用模板不自动提交、不悄悄覆盖已有草稿 |
 | `bridge-state.json` | （M4） | 打卡联动状态机（unsupported/pending/ready/failed） |
@@ -414,7 +414,10 @@ AI 附加写入。AI 附加项本身的稳定身份及逐项安全重试由 AG-A
 
 - **请求边界纪律（CODE-02.6）**：所有内核请求经 `kernelPost` 有界等待（`kernelConfig.timeoutMs`，
   默认 15s）——宿主挂起时抛 `AsyncTimeoutError`，调用方传入已取消的 `AbortSignal` 或主动取消时抛
-  `AsyncAbortError`；**不自动重试**（写入类重试会产生重复块/重复文档，重试由用户在界面显式发起）。
+  `AsyncAbortError`。写入请求不自动重试（写入类重试会产生重复块/重复文档，重试由用户在界面显式发起）；
+  已登记的只读端点（SQL、笔记本列表、属性视图读取）允许相同请求在飞行期间去重，并仅在传输失败时
+  在同一超时预算内自动重试一次。权限、协议、内核业务错误和超时均不重试。去重请求不共享调用方的
+  `AbortSignal`；取消/超时只停止当前调用者等待，因思源 `fetchPost` 无中止能力，已经发给内核的操作仍可能完成。
   思源 `fetchPost` 无中止能力，因此取消/超时只停止等待，不能撤销已经发给内核的请求。协议异常形状
   必须上抛、不得归一为空：响应信封非法抛 `KernelProtocolError`，401/403 或明确权限消息抛
   `KernelPermissionError`，其他非零 code 抛 `KernelResponseError`，回调失败或同步抛错抛
@@ -606,13 +609,17 @@ AG-B13-006 先提供共用核对/修复服务与设置入口；成员保存后�
   （"relations" | "native"，缺省 relations）。边语义在 UI 恒有标识：文档引用图边=块引用
   （双向一度含回链），与 related 关系边不同源、不互相推断（B14.8）。
 
-**B14.6 关系图组织增强契约（第 70 轮，2026-09-30）**：GraphNode 增 `kind`（person/org）、
-GraphEdge 增 `kind`（related/member）——**成员边与 related 边分源**：关系查询（一度/二度/共同/
-最短路径）只消费 buildGraph 的 related 图；`buildOrgAugmentation` 产物（组织节点 + 成员边）只
-叠加渲染。成员边数据源 = `org-membership.json` 中 **status=active** 的记录 join 名册 docId
-（former/悬空/已解绑不成边，多段记录合并）；组织节点 id=组织文档 ID、label=文档标题、
-固定色 ORG_NODE_COLOR（#8e5ad8）；画布成员边只连当前裁剪后画布内人物。组织维度照旧零写库
-（扫描 + JSON 投影，不写 related、不写数据库）。
+**B14.6 关系图组织增强契约（D-0037，2026-10-16）**：GraphNode 增 `kind`（person/org）、
+GraphEdge 增 `kind`（related/member）；`member` 边另带派生的 `memberStatus`（`active|former|mixed`，
+related/ref 边不带此字段）——**成员边与 related 边分源**：关系查询（一度/二度/共同/最短路径）只消费
+buildGraph 的 related 图；`buildOrgAugmentation` 产物（组织节点 + 成员边）只叠加渲染。成员边数据源 =
+`org-membership.json` 中 **status=active 或 former** 的记录 join 名册 docId，且组织必须健康、未归档
+（悬空/不可达/重复绑定/来源未知不成边；同组织同人多段记录合并一条展示边）。同一组织/人物只有 active
+记录时为 `active`，只有 former 记录时为 `former`，两者同时存在时必须为 `mixed`，不能静默选一类。
+former 边是历史归属展示事实，不计入当前成员统计、当前单位投影或 related 查询；文本、Markdown、画布详情
+或等价状态样式必须能区分当前、历史和混合状态。组织节点 id=组织文档 ID、label=文档标题、固定色
+ORG_NODE_COLOR；画布成员边只连当前裁剪后画布内人物。组织维度照旧零写库（扫描 + JSON 投影，不写
+related、不写数据库）。
 **B14.8 引用图范围契约（第 71 轮，2026-09-30）**：`view-preferences.json` 新增 `nativeScope`
 （"self" | "person" | "global"，缺省 "self"）与 `nativeCenterDocId`（person 模式中心文档 ID，
 非法值丢弃、失效由加载侧回退本人）。范围语义：self/person=以指定文档为中心的 getLocalGraph
@@ -623,17 +630,17 @@ UI 范围说明行必须如实标注实际生效范围与纳入/图外统计，g
 
 ## 9. 图查询快照（AG-B14-001/003/004）
 
-本节是当前图查询入口的口径，替代上文 B14 历史实现中的仅人物引用白名单、人物裁剪后另叠组织、失效中心自动回退等展示规则；不修改组织、成员、本人或 related 的存储事实。所有查询只读，仅使用已实证的 getGraph/getLocalGraph 及现有名册、组织和身份读取入口，不新增内核参数或原生面板打开方式。
+本节是当前图查询入口的口径，替代上文 B14 历史实现中的仅人物引用白名单、人物裁剪后另叠组织、失效中心自动回退等展示规则；不修改组织、成员、本人或 related 的存储事实。引用数据通过已实证的 `/api/query/sql` 读取思源原生 `refs`/`blocks` 索引，不再调用 getGraph/getLocalGraph。已核对官方源码：这两个图查询端点会保存传入的宿主图配置，不能视为无副作用读取；固定 `conf={type:{}}` 会覆盖用户原生图偏好。新实现不新增内核端点、参数或原生面板打开方式。
 
 ### 9.1 数据源与边
 
 一次来源读取分别核实名册、组织成员与本人身份，记录各自 verified/unknown 和错误。登记集合为唯一绑定的人物文档与健康未归档组织文档；本人必须在名册中唯一绑定才可作为中心，不额外重复计数。重复人物 docId/itemId、人物与组织身份冲突、悬空成员、重复组织 ID 均有诊断；歧义目标不进入查询，不按姓名合并。组织或本人读失败允许展示已核实的人物关系，但标明未核实范围；依赖该来源的范围停止，不归一为空组织或空本人。
 
-related 仅来自 AV 显式人物关系；member 仅来自成员 JSON 的 active 记录与健康未归档组织的 join，同组织同人多段合为一条展示边；ref 仅来自已核实内核图的文档块引用。边的 kind 必须明确，不由成员或引用推断 related。直接、二度、共同联系人和关系最短路径只消费 related 子图；引用图只展示 ref。无向展示去重按 kind 与两端稳定 ID，不合并不同来源的边，不推断关系强弱或引荐意愿。
+related 仅来自 AV 显式人物关系；member 来自成员 JSON 的 active/former 记录与健康未归档组织的 join，同组织同人多段合为一条展示边并派生 `memberStatus=active|former|mixed`；ref 仅来自已核实思源 `refs.root_id → refs.def_block_root_id` 的文档块引用。边的 kind 必须明确，不由成员或引用推断 related。直接、二度、共同联系人和关系最短路径只消费 related 子图；引用图只展示 ref。相同文档对的多块引用先按有向文档对聚合，展示再按 kind、memberStatus 与无向两端稳定 ID 去重；不合并不同来源的边，不推断关系强弱或引荐意愿。
 
 ### 9.2 范围、中心与组织聚焦
 
-关系图支持 global（登记集合）、self/person（中心及显式 related 的一度或二度）、org（组织与其 active 登记成员）。引用图的 global 使用 getGraph 后过滤登记集合，self/person/org 使用原文档 ID 的 getLocalGraph 双向一度后过滤登记集合；始终说明这是插件引用视图，不是已打开思源原生面板，也不是整库图。组织聚焦在这份来源快照上收窄人物到所选组织 active 成员，不改写事实；中心保留且解释其不满足其他筛选的例外。归档、失联或未核实组织不自动换成其他组织；缺本人、缺指定中心、歧义中心、来源未知分别显示原因，保持原选择并提供切全局/重新核实出口。
+关系图支持 global（登记集合）、self/person（中心及显式 related 的一度或二度）、org（组织与其 active/former 登记成员）。引用图的 global 仅读取登记文档为源的原生引用，再过滤两端到登记集合；self/person/org 只读原文档 ID 的出链与回链，保留中心和双向一度的登记文档。节点标题由登记 ID 对应的 `blocks` 文档行回读，不读整库图，也不受原生图的标签、日记或最小引用数设置影响；始终说明这是插件引用视图，不是已打开思源原生面板，也不是整库图。组织聚焦在这份来源快照上收窄人物到所选组织 active/former 成员；当前统计和当前单位投影仍只计 active，不改写事实；中心保留且解释其不满足其他筛选的例外。归档、失联或未核实组织不自动换成其他组织；缺本人、缺指定中心、歧义中心、来源未知分别显示原因，保持原选择并提供切全局/重新核实出口。
 
 搜索、分组、无关系筛选和组织聚焦属于显式查询条件，切换模式或范围保留条件。只适用于关系图的条件在引用图保持保存但标明未应用。无关系按完整已核实 related 图计算，不因隐藏对端而误报。查询请求携带当前来源代次、模式、范围与中心，旧响应或已销毁实例不能更新结果；刷新重新读取实际生效来源，失败保留明确未知状态。
 
@@ -649,7 +656,15 @@ related 仅来自 AV 显式人物关系；member 仅来自成员 JSON 的 active
 
 文本视图无需创建 Cytoscape 即可读取范围、来源、计数、截断、节点、边和路径，并用原生按钮经键盘打开人物、聚焦组织或定位画布；member/ref/related 和 person/org 均有文字标签。列表渐进展示不改变快照或导出范围；390px 允许换行，无横向溢出。移动前端由 getFrontend 判定，默认文本；切画布有显式动作。状态使用必要的 aria-live/alert，关闭人物 Peek 后恢复原触发按钮，来源节点消失时回到结果标题。跨页面来源上下文和真实系统返回仍交 AG-UX-002/Host Queue。
 
-本节允许隔离实现与定向纯测试；真实原生面板打开、siyuan://blocks 成边、多窗口外部编辑、真机软键盘/系统返回继续分别由 AG-HOST-001/002/004 验收，不能以隔离夹具代替。
+### 9.5 原生引用只读与读取预算
+
+SQL 自由值只含严格校验过的思源 ID；文档与全局源批次最多 100 个 ID，引用页按 `(root_id, def_block_root_id)` 的稳定复合游标排序、分组并多读一条（200+1）判断后续，不依赖宿主默认 SQL 行数限制。禁止无界 `SELECT * FROM refs`。**SQL 在分页之前就限制两端到登记集合并排除自引用**，普通笔记引用不进入响应、分页或 50,000 文档对预算，API 再校验两端范围，不靠绘图后过滤补救。
+
+全局每个源批次使用同一份已回读登记目标 ID 过滤，不做源×目标批次组合；登记集合超过 10,000 文档时在发请求前明确拒绝并引导改用人物/组织中心，避免无界请求体及全部范围的查询次数。局部出链/回链的对端白名单以最多 10,000 ID 线性分批，超过 10,000 的工作区仍可看局部中心，不产生组合爆炸；单次局部 SQL 的白名单参数约不超过 500KB。标题回读仍每 100 ID 一批。相同文档不同块的重复引用由 SQL 聚合，跨页/批次再去重。超出 50,000 个登记文档对读取预算时显式拒绝，不静默截断成正常结果。异常形状、越界行、不前进游标、失效中心、权限拒绝或超时均保留为未知来源，不归一为空图。
+
+读取过程不调用原生图查询或配置保存/重置端点，不修改 `window.siyuan.config.graph`，不暂存/恢复宿主设置。宿主配置保持实证由 `scripts/spike/b14-native-refs-spike.mjs` 的隔离内核检查覆盖。组件代次阻止旧结果回写，但目前切换或销毁不会立即中止已开始的服务分页后续读取；跨页也非内核事务快照。这里只读且有每请求超时与总读取预算，后续需贯通 AbortSignal 做资源取消，不能宣称已经物理取消。
+
+本节允许隔离实现与定向纯测试；真实原生面板打开、多窗口外部编辑、真机软键盘/系统返回继续分别由 AG-HOST-001/002/004 验收，不能以隔离夹具代替。普通 Markdown 的 `siyuan://blocks` 跳转不形成 refs 边，属于已实证限制；需要原生双链时必须写真正的块引用。
 
 ## 10. 导入来源、映射与会话队列（AG-IMP-001/002）
 

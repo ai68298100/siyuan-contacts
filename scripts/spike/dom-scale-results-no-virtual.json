@@ -1,0 +1,956 @@
+{
+  "at": "2026-10-14T06:33:27.084Z",
+  "node": "v24.16.0",
+  "browser": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "repetitions": 3,
+  "virtualization": "disabled",
+  "viewport": {
+    "width": 1280,
+    "height": 900
+  },
+  "contentMode": "default",
+  "samples": [
+    {
+      "fixtureSize": 200,
+      "repetitions": 3,
+      "firstPageMsMedian": 105,
+      "loadedMsMedian": 541.5,
+      "firstPageCardDomCount": 200,
+      "firstPageDomNodes": 7141,
+      "firstPageHeapBytesMedian": 67830248,
+      "expandedCardDomCount": 200,
+      "expandedDomNodes": 7141,
+      "bottomCardDomCount": 200,
+      "bottomDomNodes": 7141,
+      "tableRowCount": 200,
+      "cardTopWindowCount": 200,
+      "cardMiddleWindowCount": 200,
+      "cardBottomWindowCount": 200,
+      "tableTopWindowRows": 200,
+      "tableMiddleWindowRows": 200,
+      "tableBottomWindowRows": 200,
+      "fullHeapBytesMedian": 67830248,
+      "fullRenderMsMedian": 0.10000000894069672,
+      "tableSwitchMsMedian": 65.59999999403954,
+      "cardsSwitchMsMedian": 99.59999999403954,
+      "initialLayoutShiftScoreMedian": 0.002808203125,
+      "syntheticInteractionLayoutShiftScoreMedian": 0.0038771484375,
+      "totalRecordedLayoutShiftScoreMedian": 0.0066853515625,
+      "samples": [
+        {
+          "repetition": 1,
+          "fixtureSize": 200,
+          "firstPageMs": 100.1000000089407,
+          "loadedMs": 548.4000000059605,
+          "loadedPeople": 200,
+          "firstPageCardDomCount": 200,
+          "firstPageDomNodes": 7141,
+          "firstPageHeapBytes": 44902834,
+          "expansionClicks": 0,
+          "fullRenderMs": 0.09999999403953552,
+          "expandedCardDomCount": 200,
+          "expandedDomNodes": 7141,
+          "expandedHeapBytes": 44902834,
+          "bottomCardDomCount": 200,
+          "bottomDomNodes": 7141,
+          "expandedHeapAtBottom": 44975230,
+          "tableRowCount": 200,
+          "viewportMetrics": {
+            "clientHeight": 484,
+            "scrollHeight": 12857,
+            "clientWidth": 1249
+          },
+          "cardWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "cardCount": 200,
+              "domNodes": 7141
+            },
+            {
+              "requestedScrollTop": 6186,
+              "actualScrollTop": 6186,
+              "firstRenderedIndex": 0,
+              "cardCount": 200,
+              "domNodes": 7141
+            },
+            {
+              "requestedScrollTop": 12373,
+              "actualScrollTop": 12373,
+              "firstRenderedIndex": 0,
+              "cardCount": 200,
+              "domNodes": 7141
+            }
+          ],
+          "tableWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "rowCount": 200,
+              "domNodes": 2512
+            },
+            {
+              "requestedScrollTop": 2979,
+              "actualScrollTop": 2979,
+              "firstRenderedIndex": 0,
+              "rowCount": 200,
+              "domNodes": 2512
+            },
+            {
+              "requestedScrollTop": 5958,
+              "actualScrollTop": 5958,
+              "firstRenderedIndex": 0,
+              "rowCount": 200,
+              "domNodes": 2512
+            }
+          ],
+          "initialLayoutShiftScore": 0.002808203125,
+          "cardScrollLayoutShiftScore": 0,
+          "tableScrollLayoutShiftScore": 0.00193857421875,
+          "cardsSwitchLayoutShiftScore": 0.00193857421875,
+          "syntheticInteractionLayoutShiftScore": 0.0038771484375,
+          "fullHeapBytes": 44902834,
+          "tableSwitchMs": 65.59999999403954,
+          "cardsSwitchMs": 99.59999999403954,
+          "totalRecordedLayoutShiftScore": 0.0066853515625,
+          "paintEntries": [
+            {
+              "name": "first-paint",
+              "startTime": 820
+            },
+            {
+              "name": "first-contentful-paint",
+              "startTime": 820
+            }
+          ],
+          "navigationTiming": {
+            "startTime": 0,
+            "domInteractive": 8.700000002980232,
+            "domContentLoaded": 795.5999999940395,
+            "loadEventEnd": 812.7000000029802
+          }
+        },
+        {
+          "repetition": 2,
+          "fixtureSize": 200,
+          "firstPageMs": 133.80000001192093,
+          "loadedMs": 541.5,
+          "loadedPeople": 200,
+          "firstPageCardDomCount": 200,
+          "firstPageDomNodes": 7141,
+          "firstPageHeapBytes": 67830248,
+          "expansionClicks": 0,
+          "fullRenderMs": 0.10000000894069672,
+          "expandedCardDomCount": 200,
+          "expandedDomNodes": 7141,
+          "expandedHeapBytes": 67830248,
+          "bottomCardDomCount": 200,
+          "bottomDomNodes": 7141,
+          "expandedHeapAtBottom": 67895293,
+          "tableRowCount": 200,
+          "viewportMetrics": {
+            "clientHeight": 484,
+            "scrollHeight": 12857,
+            "clientWidth": 1249
+          },
+          "cardWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "cardCount": 200,
+              "domNodes": 7141
+            },
+            {
+              "requestedScrollTop": 6186,
+              "actualScrollTop": 6186,
+              "firstRenderedIndex": 0,
+              "cardCount": 200,
+              "domNodes": 7141
+            },
+            {
+              "requestedScrollTop": 12373,
+              "actualScrollTop": 12373,
+              "firstRenderedIndex": 0,
+              "cardCount": 200,
+              "domNodes": 7141
+            }
+          ],
+          "tableWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "rowCount": 200,
+              "domNodes": 2512
+            },
+            {
+              "requestedScrollTop": 2979,
+              "actualScrollTop": 2979,
+              "firstRenderedIndex": 0,
+              "rowCount": 200,
+              "domNodes": 2512
+            },
+            {
+              "requestedScrollTop": 5958,
+              "actualScrollTop": 5958,
+              "firstRenderedIndex": 0,
+              "rowCount": 200,
+              "domNodes": 2512
+            }
+          ],
+          "initialLayoutShiftScore": 0.002808203125,
+          "cardScrollLayoutShiftScore": 0,
+          "tableScrollLayoutShiftScore": 0.00193857421875,
+          "cardsSwitchLayoutShiftScore": 0.00193857421875,
+          "syntheticInteractionLayoutShiftScore": 0.0038771484375,
+          "fullHeapBytes": 67830248,
+          "tableSwitchMs": 67.70000000298023,
+          "cardsSwitchMs": 99.09999999403954,
+          "totalRecordedLayoutShiftScore": 0.0066853515625,
+          "paintEntries": [
+            {
+              "name": "first-paint",
+              "startTime": 92
+            },
+            {
+              "name": "first-contentful-paint",
+              "startTime": 92
+            }
+          ],
+          "navigationTiming": {
+            "startTime": 0,
+            "domInteractive": 4.700000002980232,
+            "domContentLoaded": 85.20000000298023,
+            "loadEventEnd": 87.40000000596046
+          }
+        },
+        {
+          "repetition": 3,
+          "fixtureSize": 200,
+          "firstPageMs": 105,
+          "loadedMs": 539,
+          "loadedPeople": 200,
+          "firstPageCardDomCount": 200,
+          "firstPageDomNodes": 7141,
+          "firstPageHeapBytes": 88410449,
+          "expansionClicks": 0,
+          "fullRenderMs": 0.20000000298023224,
+          "expandedCardDomCount": 200,
+          "expandedDomNodes": 7141,
+          "expandedHeapBytes": 88410449,
+          "bottomCardDomCount": 200,
+          "bottomDomNodes": 7141,
+          "expandedHeapAtBottom": 88475558,
+          "tableRowCount": 200,
+          "viewportMetrics": {
+            "clientHeight": 484,
+            "scrollHeight": 12857,
+            "clientWidth": 1249
+          },
+          "cardWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "cardCount": 200,
+              "domNodes": 7141
+            },
+            {
+              "requestedScrollTop": 6186,
+              "actualScrollTop": 6186,
+              "firstRenderedIndex": 0,
+              "cardCount": 200,
+              "domNodes": 7141
+            },
+            {
+              "requestedScrollTop": 12373,
+              "actualScrollTop": 12373,
+              "firstRenderedIndex": 0,
+              "cardCount": 200,
+              "domNodes": 7141
+            }
+          ],
+          "tableWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "rowCount": 200,
+              "domNodes": 2512
+            },
+            {
+              "requestedScrollTop": 2979,
+              "actualScrollTop": 2979,
+              "firstRenderedIndex": 0,
+              "rowCount": 200,
+              "domNodes": 2512
+            },
+            {
+              "requestedScrollTop": 5958,
+              "actualScrollTop": 5958,
+              "firstRenderedIndex": 0,
+              "rowCount": 200,
+              "domNodes": 2512
+            }
+          ],
+          "initialLayoutShiftScore": 0.002808203125,
+          "cardScrollLayoutShiftScore": 0,
+          "tableScrollLayoutShiftScore": 0.00193857421875,
+          "cardsSwitchLayoutShiftScore": 0.00193857421875,
+          "syntheticInteractionLayoutShiftScore": 0.0038771484375,
+          "fullHeapBytes": 88410449,
+          "tableSwitchMs": 65,
+          "cardsSwitchMs": 115.70000000298023,
+          "totalRecordedLayoutShiftScore": 0.0066853515625,
+          "paintEntries": [
+            {
+              "name": "first-paint",
+              "startTime": 68
+            },
+            {
+              "name": "first-contentful-paint",
+              "startTime": 68
+            }
+          ],
+          "navigationTiming": {
+            "startTime": 0,
+            "domInteractive": 7,
+            "domContentLoaded": 61.79999999701977,
+            "loadEventEnd": 63.5
+          }
+        }
+      ]
+    },
+    {
+      "fixtureSize": 1000,
+      "repetitions": 3,
+      "firstPageMsMedian": 143.6000000089407,
+      "loadedMsMedian": 1284.4000000059605,
+      "firstPageCardDomCount": 200,
+      "firstPageDomNodes": 7142,
+      "firstPageHeapBytesMedian": 195352304,
+      "expandedCardDomCount": 1000,
+      "expandedDomNodes": 35329,
+      "bottomCardDomCount": 1000,
+      "bottomDomNodes": 35329,
+      "tableRowCount": 1000,
+      "cardTopWindowCount": 1000,
+      "cardMiddleWindowCount": 1000,
+      "cardBottomWindowCount": 1000,
+      "tableTopWindowRows": 1000,
+      "tableMiddleWindowRows": 1000,
+      "tableBottomWindowRows": 1000,
+      "fullHeapBytesMedian": 255346053,
+      "fullRenderMsMedian": 167.5,
+      "tableSwitchMsMedian": 181.20000000298023,
+      "cardsSwitchMsMedian": 399.70000000298023,
+      "initialLayoutShiftScoreMedian": 0.002808203125,
+      "syntheticInteractionLayoutShiftScoreMedian": 0.0039014631907145184,
+      "totalRecordedLayoutShiftScoreMedian": 0.006709666315714518,
+      "samples": [
+        {
+          "repetition": 1,
+          "fixtureSize": 1000,
+          "firstPageMs": 143.6000000089407,
+          "loadedMs": 1284.4000000059605,
+          "loadedPeople": 1000,
+          "firstPageCardDomCount": 200,
+          "firstPageDomNodes": 7142,
+          "firstPageHeapBytes": 121853066,
+          "expansionClicks": 4,
+          "fullRenderMs": 205.19999998807907,
+          "expandedCardDomCount": 1000,
+          "expandedDomNodes": 35329,
+          "expandedHeapBytes": 171879302,
+          "bottomCardDomCount": 1000,
+          "bottomDomNodes": 35329,
+          "expandedHeapAtBottom": 171892995,
+          "tableRowCount": 1000,
+          "viewportMetrics": {
+            "clientHeight": 484,
+            "scrollHeight": 64379,
+            "clientWidth": 1249
+          },
+          "cardWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "cardCount": 1000,
+              "domNodes": 35329
+            },
+            {
+              "requestedScrollTop": 31947,
+              "actualScrollTop": 31947,
+              "firstRenderedIndex": 0,
+              "cardCount": 1000,
+              "domNodes": 35329
+            },
+            {
+              "requestedScrollTop": 63895,
+              "actualScrollTop": 63895,
+              "firstRenderedIndex": 0,
+              "cardCount": 1000,
+              "domNodes": 35329
+            }
+          ],
+          "tableWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "rowCount": 1000,
+              "domNodes": 12112
+            },
+            {
+              "requestedScrollTop": 15779,
+              "actualScrollTop": 15779,
+              "firstRenderedIndex": 0,
+              "rowCount": 1000,
+              "domNodes": 12112
+            },
+            {
+              "requestedScrollTop": 31558,
+              "actualScrollTop": 31558,
+              "firstRenderedIndex": 0,
+              "rowCount": 1000,
+              "domNodes": 12112
+            }
+          ],
+          "initialLayoutShiftScore": 0.002808203125,
+          "cardScrollLayoutShiftScore": 0.000024314753214518227,
+          "tableScrollLayoutShiftScore": 0.00193857421875,
+          "cardsSwitchLayoutShiftScore": 0.00193857421875,
+          "syntheticInteractionLayoutShiftScore": 0.0039014631907145184,
+          "fullHeapBytes": 171879302,
+          "tableSwitchMs": 164.8999999910593,
+          "cardsSwitchMs": 432.40000000596046,
+          "totalRecordedLayoutShiftScore": 0.006709666315714518,
+          "paintEntries": [
+            {
+              "name": "first-paint",
+              "startTime": 76
+            },
+            {
+              "name": "first-contentful-paint",
+              "startTime": 76
+            }
+          ],
+          "navigationTiming": {
+            "startTime": 0,
+            "domInteractive": 4.799999997019768,
+            "domContentLoaded": 68.20000000298023,
+            "loadEventEnd": 70
+          }
+        },
+        {
+          "repetition": 2,
+          "fixtureSize": 1000,
+          "firstPageMs": 215.5,
+          "loadedMs": 1307.300000011921,
+          "loadedPeople": 1000,
+          "firstPageCardDomCount": 200,
+          "firstPageDomNodes": 7142,
+          "firstPageHeapBytes": 195352304,
+          "expansionClicks": 4,
+          "fullRenderMs": 165.5,
+          "expandedCardDomCount": 1000,
+          "expandedDomNodes": 35329,
+          "expandedHeapBytes": 255346053,
+          "bottomCardDomCount": 1000,
+          "bottomDomNodes": 35329,
+          "expandedHeapAtBottom": 246134890,
+          "tableRowCount": 1000,
+          "viewportMetrics": {
+            "clientHeight": 484,
+            "scrollHeight": 64379,
+            "clientWidth": 1249
+          },
+          "cardWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "cardCount": 1000,
+              "domNodes": 35329
+            },
+            {
+              "requestedScrollTop": 31947,
+              "actualScrollTop": 31947,
+              "firstRenderedIndex": 0,
+              "cardCount": 1000,
+              "domNodes": 35329
+            },
+            {
+              "requestedScrollTop": 63895,
+              "actualScrollTop": 63895,
+              "firstRenderedIndex": 0,
+              "cardCount": 1000,
+              "domNodes": 35329
+            }
+          ],
+          "tableWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "rowCount": 1000,
+              "domNodes": 12112
+            },
+            {
+              "requestedScrollTop": 15779,
+              "actualScrollTop": 15779,
+              "firstRenderedIndex": 0,
+              "rowCount": 1000,
+              "domNodes": 12112
+            },
+            {
+              "requestedScrollTop": 31558,
+              "actualScrollTop": 31558,
+              "firstRenderedIndex": 0,
+              "rowCount": 1000,
+              "domNodes": 12112
+            }
+          ],
+          "initialLayoutShiftScore": 0,
+          "cardScrollLayoutShiftScore": 0.000024314753214518227,
+          "tableScrollLayoutShiftScore": 0.00193857421875,
+          "cardsSwitchLayoutShiftScore": 0.00193857421875,
+          "syntheticInteractionLayoutShiftScore": 0.0039014631907145184,
+          "fullHeapBytes": 255346053,
+          "tableSwitchMs": 181.20000000298023,
+          "cardsSwitchMs": 399.70000000298023,
+          "totalRecordedLayoutShiftScore": 0.0039014631907145184,
+          "paintEntries": [
+            {
+              "name": "first-paint",
+              "startTime": 324
+            },
+            {
+              "name": "first-contentful-paint",
+              "startTime": 324
+            }
+          ],
+          "navigationTiming": {
+            "startTime": 0,
+            "domInteractive": 57.1000000089407,
+            "domContentLoaded": 111.70000000298023,
+            "loadEventEnd": 113.40000000596046
+          }
+        },
+        {
+          "repetition": 3,
+          "fixtureSize": 1000,
+          "firstPageMs": 134,
+          "loadedMs": 1251.7999999970198,
+          "loadedPeople": 1000,
+          "firstPageCardDomCount": 200,
+          "firstPageDomNodes": 7142,
+          "firstPageHeapBytes": 283151135,
+          "expansionClicks": 4,
+          "fullRenderMs": 167.5,
+          "expandedCardDomCount": 1000,
+          "expandedDomNodes": 35329,
+          "expandedHeapBytes": 333359592,
+          "bottomCardDomCount": 1000,
+          "bottomDomNodes": 35329,
+          "expandedHeapAtBottom": 314181844,
+          "tableRowCount": 1000,
+          "viewportMetrics": {
+            "clientHeight": 484,
+            "scrollHeight": 64379,
+            "clientWidth": 1249
+          },
+          "cardWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "cardCount": 1000,
+              "domNodes": 35329
+            },
+            {
+              "requestedScrollTop": 31947,
+              "actualScrollTop": 31947,
+              "firstRenderedIndex": 0,
+              "cardCount": 1000,
+              "domNodes": 35329
+            },
+            {
+              "requestedScrollTop": 63895,
+              "actualScrollTop": 63895,
+              "firstRenderedIndex": 0,
+              "cardCount": 1000,
+              "domNodes": 35329
+            }
+          ],
+          "tableWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "rowCount": 1000,
+              "domNodes": 12112
+            },
+            {
+              "requestedScrollTop": 15779,
+              "actualScrollTop": 15779,
+              "firstRenderedIndex": 0,
+              "rowCount": 1000,
+              "domNodes": 12112
+            },
+            {
+              "requestedScrollTop": 31558,
+              "actualScrollTop": 31558,
+              "firstRenderedIndex": 0,
+              "rowCount": 1000,
+              "domNodes": 12112
+            }
+          ],
+          "initialLayoutShiftScore": 0.002808203125,
+          "cardScrollLayoutShiftScore": 0.000024314753214518227,
+          "tableScrollLayoutShiftScore": 0.00193857421875,
+          "cardsSwitchLayoutShiftScore": 0.00193857421875,
+          "syntheticInteractionLayoutShiftScore": 0.0039014631907145184,
+          "fullHeapBytes": 333359592,
+          "tableSwitchMs": 193.19999998807907,
+          "cardsSwitchMs": 398.20000000298023,
+          "totalRecordedLayoutShiftScore": 0.006709666315714518,
+          "paintEntries": [
+            {
+              "name": "first-paint",
+              "startTime": 96
+            },
+            {
+              "name": "first-contentful-paint",
+              "startTime": 96
+            }
+          ],
+          "navigationTiming": {
+            "startTime": 0,
+            "domInteractive": 36.099999994039536,
+            "domContentLoaded": 90,
+            "loadEventEnd": 92.20000000298023
+          }
+        }
+      ]
+    },
+    {
+      "fixtureSize": 5000,
+      "repetitions": 3,
+      "firstPageMsMedian": 1431.4000000059605,
+      "loadedMsMedian": 12322.20000000298,
+      "firstPageCardDomCount": 200,
+      "firstPageDomNodes": 7142,
+      "firstPageHeapBytesMedian": 831667183,
+      "expandedCardDomCount": 5000,
+      "expandedDomNodes": 176276,
+      "bottomCardDomCount": 5000,
+      "bottomDomNodes": 176276,
+      "tableRowCount": 5000,
+      "cardTopWindowCount": 5000,
+      "cardMiddleWindowCount": 5000,
+      "cardBottomWindowCount": 5000,
+      "tableTopWindowRows": 5000,
+      "tableMiddleWindowRows": 5000,
+      "tableBottomWindowRows": 5000,
+      "fullHeapBytesMedian": 1020394136,
+      "fullRenderMsMedian": 2747.8999999910593,
+      "tableSwitchMsMedian": 2175,
+      "cardsSwitchMsMedian": 4248.5999999940395,
+      "initialLayoutShiftScoreMedian": 0.002808203125,
+      "syntheticInteractionLayoutShiftScoreMedian": 0.0039014631907145184,
+      "totalRecordedLayoutShiftScoreMedian": 0.006709666315714518,
+      "samples": [
+        {
+          "repetition": 1,
+          "fixtureSize": 5000,
+          "firstPageMs": 1269.6000000089407,
+          "loadedMs": 12622.40000000596,
+          "loadedPeople": 5000,
+          "firstPageCardDomCount": 200,
+          "firstPageDomNodes": 7142,
+          "firstPageHeapBytes": 472646152,
+          "expansionClicks": 24,
+          "fullRenderMs": 2747.8999999910593,
+          "expandedCardDomCount": 5000,
+          "expandedDomNodes": 176276,
+          "expandedHeapBytes": 708128964,
+          "bottomCardDomCount": 5000,
+          "bottomDomNodes": 176276,
+          "expandedHeapAtBottom": 708144469,
+          "tableRowCount": 5000,
+          "viewportMetrics": {
+            "clientHeight": 484,
+            "scrollHeight": 321774,
+            "clientWidth": 1249
+          },
+          "cardWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "cardCount": 5000,
+              "domNodes": 176276
+            },
+            {
+              "requestedScrollTop": 160645,
+              "actualScrollTop": 160645,
+              "firstRenderedIndex": 0,
+              "cardCount": 5000,
+              "domNodes": 176276
+            },
+            {
+              "requestedScrollTop": 321290,
+              "actualScrollTop": 321290,
+              "firstRenderedIndex": 0,
+              "cardCount": 5000,
+              "domNodes": 176276
+            }
+          ],
+          "tableWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "rowCount": 5000,
+              "domNodes": 60112
+            },
+            {
+              "requestedScrollTop": 79779,
+              "actualScrollTop": 79779,
+              "firstRenderedIndex": 0,
+              "rowCount": 5000,
+              "domNodes": 60112
+            },
+            {
+              "requestedScrollTop": 159558,
+              "actualScrollTop": 159558,
+              "firstRenderedIndex": 0,
+              "rowCount": 5000,
+              "domNodes": 60112
+            }
+          ],
+          "initialLayoutShiftScore": 0.002808203125,
+          "cardScrollLayoutShiftScore": 0.000024314753214518227,
+          "tableScrollLayoutShiftScore": 0.00193857421875,
+          "cardsSwitchLayoutShiftScore": 0.00193857421875,
+          "syntheticInteractionLayoutShiftScore": 0.0039014631907145184,
+          "fullHeapBytes": 708128964,
+          "tableSwitchMs": 2661.7000000029802,
+          "cardsSwitchMs": 4250.199999988079,
+          "totalRecordedLayoutShiftScore": 0.006709666315714518,
+          "paintEntries": [
+            {
+              "name": "first-paint",
+              "startTime": 196
+            },
+            {
+              "name": "first-contentful-paint",
+              "startTime": 196
+            }
+          ],
+          "navigationTiming": {
+            "startTime": 0,
+            "domInteractive": 95.70000000298023,
+            "domContentLoaded": 183,
+            "loadEventEnd": 186.80000001192093
+          }
+        },
+        {
+          "repetition": 2,
+          "fixtureSize": 5000,
+          "firstPageMs": 1437.699999988079,
+          "loadedMs": 12255.39999999106,
+          "loadedPeople": 5000,
+          "firstPageCardDomCount": 200,
+          "firstPageDomNodes": 7142,
+          "firstPageHeapBytes": 831667183,
+          "expansionClicks": 24,
+          "fullRenderMs": 3085.699999988079,
+          "expandedCardDomCount": 5000,
+          "expandedDomNodes": 176276,
+          "expandedHeapBytes": 1020394136,
+          "bottomCardDomCount": 5000,
+          "bottomDomNodes": 176276,
+          "expandedHeapAtBottom": 1020409613,
+          "tableRowCount": 5000,
+          "viewportMetrics": {
+            "clientHeight": 484,
+            "scrollHeight": 321774,
+            "clientWidth": 1249
+          },
+          "cardWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "cardCount": 5000,
+              "domNodes": 176276
+            },
+            {
+              "requestedScrollTop": 160645,
+              "actualScrollTop": 160645,
+              "firstRenderedIndex": 0,
+              "cardCount": 5000,
+              "domNodes": 176276
+            },
+            {
+              "requestedScrollTop": 321290,
+              "actualScrollTop": 321290,
+              "firstRenderedIndex": 0,
+              "cardCount": 5000,
+              "domNodes": 176276
+            }
+          ],
+          "tableWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "rowCount": 5000,
+              "domNodes": 60112
+            },
+            {
+              "requestedScrollTop": 79779,
+              "actualScrollTop": 79779,
+              "firstRenderedIndex": 0,
+              "rowCount": 5000,
+              "domNodes": 60112
+            },
+            {
+              "requestedScrollTop": 159558,
+              "actualScrollTop": 159558,
+              "firstRenderedIndex": 0,
+              "rowCount": 5000,
+              "domNodes": 60112
+            }
+          ],
+          "initialLayoutShiftScore": 0.002808203125,
+          "cardScrollLayoutShiftScore": 0.000024314753214518227,
+          "tableScrollLayoutShiftScore": 0.00193857421875,
+          "cardsSwitchLayoutShiftScore": 0.00193857421875,
+          "syntheticInteractionLayoutShiftScore": 0.0039014631907145184,
+          "fullHeapBytes": 1020394136,
+          "tableSwitchMs": 1828.1000000089407,
+          "cardsSwitchMs": 4248.5999999940395,
+          "totalRecordedLayoutShiftScore": 0.006709666315714518,
+          "paintEntries": [
+            {
+              "name": "first-paint",
+              "startTime": 204
+            },
+            {
+              "name": "first-contentful-paint",
+              "startTime": 204
+            }
+          ],
+          "navigationTiming": {
+            "startTime": 0,
+            "domInteractive": 77,
+            "domContentLoaded": 183.70000000298023,
+            "loadEventEnd": 188.40000000596046
+          }
+        },
+        {
+          "repetition": 3,
+          "fixtureSize": 5000,
+          "firstPageMs": 1431.4000000059605,
+          "loadedMs": 12322.20000000298,
+          "loadedPeople": 5000,
+          "firstPageCardDomCount": 200,
+          "firstPageDomNodes": 7142,
+          "firstPageHeapBytes": 1167596064,
+          "expansionClicks": 24,
+          "fullRenderMs": 2607.4000000059605,
+          "expandedCardDomCount": 5000,
+          "expandedDomNodes": 176276,
+          "expandedHeapBytes": 1507934146,
+          "bottomCardDomCount": 5000,
+          "bottomDomNodes": 176276,
+          "expandedHeapAtBottom": 1507948951,
+          "tableRowCount": 5000,
+          "viewportMetrics": {
+            "clientHeight": 484,
+            "scrollHeight": 321774,
+            "clientWidth": 1249
+          },
+          "cardWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "cardCount": 5000,
+              "domNodes": 176276
+            },
+            {
+              "requestedScrollTop": 160645,
+              "actualScrollTop": 160645,
+              "firstRenderedIndex": 0,
+              "cardCount": 5000,
+              "domNodes": 176276
+            },
+            {
+              "requestedScrollTop": 321290,
+              "actualScrollTop": 321290,
+              "firstRenderedIndex": 0,
+              "cardCount": 5000,
+              "domNodes": 176276
+            }
+          ],
+          "tableWindowSamples": [
+            {
+              "requestedScrollTop": 0,
+              "actualScrollTop": 0,
+              "firstRenderedIndex": 0,
+              "rowCount": 5000,
+              "domNodes": 60112
+            },
+            {
+              "requestedScrollTop": 79779,
+              "actualScrollTop": 79779,
+              "firstRenderedIndex": 0,
+              "rowCount": 5000,
+              "domNodes": 60112
+            },
+            {
+              "requestedScrollTop": 159558,
+              "actualScrollTop": 159558,
+              "firstRenderedIndex": 0,
+              "rowCount": 5000,
+              "domNodes": 60112
+            }
+          ],
+          "initialLayoutShiftScore": 0.002808203125,
+          "cardScrollLayoutShiftScore": 0.000024314753214518227,
+          "tableScrollLayoutShiftScore": 0.00193857421875,
+          "cardsSwitchLayoutShiftScore": 0.00193857421875,
+          "syntheticInteractionLayoutShiftScore": 0.0039014631907145184,
+          "fullHeapBytes": 1507934146,
+          "tableSwitchMs": 2175,
+          "cardsSwitchMs": 4199,
+          "totalRecordedLayoutShiftScore": 0.006709666315714518,
+          "paintEntries": [
+            {
+              "name": "first-paint",
+              "startTime": 192
+            },
+            {
+              "name": "first-contentful-paint",
+              "startTime": 192
+            }
+          ],
+          "navigationTiming": {
+            "startTime": 0,
+            "domInteractive": 73.29999999701977,
+            "domContentLoaded": 175.1000000089407,
+            "loadEventEnd": 179.70000000298023
+          }
+        }
+      ]
+    }
+  ]
+}

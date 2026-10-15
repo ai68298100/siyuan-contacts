@@ -6,7 +6,7 @@
     :root {
         --b3-theme-background: #fff; --b3-theme-surface: #f5f5f5; --b3-theme-surface-lighter: #efefef;
         --b3-theme-on-background: #222; --b3-theme-on-surface: #444; --b3-theme-on-surface-light: #888;
-        --b3-theme-primary: #6366f1; --b3-theme-primary-lightest: #e8e9fe; --b3-theme-on-primary: #fff;
+        --b3-theme-primary: #129e9a; --b3-theme-primary-lightest: #dff5f2; --b3-theme-on-primary: #fff;
         --b3-border-color: #e2e2e2; --b3-list-hover: #eee; --b3-list-icon-hover: #e6e6e6;
         --b3-theme-error: #d32f2f; --b3-theme-success: #23b27c; --b3-theme-info: #3b82f6;
         --b3-font-family: system-ui, sans-serif;
@@ -14,11 +14,10 @@
     html[data-theme="dark"] {
         --b3-theme-background: #202124; --b3-theme-surface: #303136; --b3-theme-surface-lighter: #393a40;
         --b3-theme-on-background: #f2f2f3; --b3-theme-on-surface: #d4d5d8; --b3-theme-on-surface-light: #aaaeb5;
-        --b3-theme-primary: #7c8aff; --b3-theme-primary-lightest: #343957; --b3-theme-on-primary: #10121d;
+        --b3-theme-primary: #57d1c6; --b3-theme-primary-lightest: #153c43; --b3-theme-on-primary: #071f21;
         --b3-border-color: #484a50; --b3-list-hover: #383a42; --b3-list-icon-hover: #454751;
     }
     body { margin: 0; background: var(--b3-theme-background); color: var(--b3-theme-on-background); font-family: var(--b3-font-family); }
-    #shot { width: 100%; height: 100vh; }
     button, input, select { font: inherit; }
     .fn__flex { display: flex; }
     .fn__flex-1 { flex: 1; }
@@ -34,6 +33,8 @@
     .b3-dialog__body { min-height: 0; overflow: auto; flex: 1; display: flex; flex-direction: column; }
     .b3-dialog__close { position: absolute; cursor: pointer; top: 4px; right: 4px; height: 18px; width: 18px; opacity: .68; color: var(--b3-theme-on-surface); padding: 8px; z-index: 1; }
 </style>
+<!-- 测试承载框始终保留尺寸；切换真实宿主样式时只替换近似主题/控件。 -->
+<style id="shot-frame-style">#shot { width: 100%; height: 100vh; }</style>
 <script id="host-baseline-boot">
     /* 宿主样式基线（C01）：?host=1 时注入真实思源 base.css + 官方主题变量，
        并撤下手写近似样式；暗色属性对齐宿主的 data-theme-mode。 */
@@ -65,11 +66,13 @@
     import OrgManagerDialog from "../../src/components/org/OrgManagerDialog.svelte";
     import { svelteDialog } from "../../src/libs/dialog.ts";
     import { kernel } from "./ui/siyuan-mock.js";
+    import { nativeRefsFixture } from "./ui/native-refs-fixture.js";
     import { FIELD_SPECS } from "../../src/domain/fields.ts";
     import { DEFAULT_VIEW_PREFERENCES } from "../../src/domain/preferences.ts";
     import { pageOrgMemberships } from "../../src/domain/org-membership.ts";
     import { loadGraphSources, loadGraphReferences } from "../../src/services/graph-query.ts";
     import { buildGraphQuerySnapshot } from "../../src/domain/graph-query.ts";
+    import { bindPeopleProfileStorage } from "../../src/services/people-profiles.ts";
 
     const params = new URLSearchParams(location.search);
     const view = params.get("view") || "home";
@@ -86,6 +89,27 @@
         { name: "郑好", docId: "20260927000000-person3", itemId: "row-3", group: "朋友", phone: "13688402253", tags: ["球友"], birthday: "", related: [] },
         { name: "苏婉清 · 跨校联合课程与社区项目协调负责人", docId: "20260927000000-person4", itemId: "row-4", group: "同学", phone: "13755190086", tags: ["校友", "跨校联合课程项目协作", "社区公益活动与长期志愿服务"], birthday: "1991-10-12", related: ["row-2"] },
     ];
+    const longContacts = view === "peoplelong" || view === "detaillong";
+    const emptyAffiliations = () => ({ family: [], work: [], education: [], unspecified: [], history: [], unresolved: [] });
+    if (longContacts) {
+        const rowIds = new Map(seedPeople.map((person, index) => [person.itemId, `20260927000000-row000${index + 1}`]));
+        for (const person of seedPeople) {
+            person.related = person.related.map(id => rowIds.get(id));
+            person.itemId = rowIds.get(person.itemId);
+        }
+        seedPeople[0].name = "林晓梅 · 跨校联合课程与社区公益项目协调负责人";
+        seedPeople[0].group = "跨校联合课程与社区公益长期协作组";
+        seedPeople[0].email = "xiaomei.community.partnership.and.curriculum@example.edu.cn";
+        seedPeople[0].wechat = "community_curriculum_partnership_xiaomei_2026";
+        seedPeople[0].profile = { readAt: Date.now(), affiliations: { state: "known", value: {
+            ...emptyAffiliations(), work: [{ orgName: "曙光教育科技 · 跨校联合课程研究与社区协作中心", status: "active", affiliationKind: "work", department: "课程设计与跨校协作研究部", title: "项目协调负责人" }],
+        } }, relationship: { state: "self", labels: null } };
+        seedPeople[1].profile = { readAt: Date.now(), affiliations: { state: "known", value: { ...emptyAffiliations(), unspecified: [{ orgName: "曙光教育科技", status: "active", affiliationKind: "unspecified" }] } }, relationship: { state: "known", labels: [], recordId: null, updatedAt: null } };
+        seedPeople[2].profile = { readAt: Date.now(), affiliations: { state: "known", value: emptyAffiliations() }, relationship: { state: "known", labels: [], recordId: null, updatedAt: null } };
+        seedPeople[3].profile = { readAt: Date.now(), affiliations: { state: "known", value: {
+            ...emptyAffiliations(), history: [{ orgName: "母校学院", status: "former", affiliationKind: "education" }],
+        } }, relationship: { state: "known", labels: [], recordId: null, updatedAt: null } };
+    }
     const people = scaleSize > 0
         ? [...seedPeople, ...Array.from({ length: scaleSize - seedPeople.length }, (_, index) => {
             const ordinal = index + seedPeople.length + 1;
@@ -108,7 +132,7 @@
         fieldMap: Object.fromEntries(FIELD_SPECS.map((field) => [field.key, field.key])),
     };
     const preferences = { ...structuredClone(DEFAULT_VIEW_PREFERENCES), peopleSort: "recent" };
-    const summary = (person) => ({ ...person, email: "", wechat: "", website: "", isLunar: false, relatedItemIds: [...person.related] });
+    const summary = (person) => ({ ...person, email: person.email ?? "", wechat: person.wechat ?? "", website: "", isLunar: false, relatedItemIds: [...person.related] });
     const organizations = [
         { docId: "20261004000000-org0001", name: "曙光教育科技 · 跨校联合课程研究与社区协作中心", hpath: "/组织/曙光教育科技", notebookId: settings.notebookId, archived: false, memberships: [
             { id: "20261004000000-mem0001", orgDocId: "20261004000000-org0001", personDocId: people[1].docId, status: "active", affiliationKind: "work", department: "课程设计与跨校协作研究部", title: "高级课程研究与项目协调负责人", joinedOn: "2024-09-01", leftOn: "" },
@@ -125,24 +149,38 @@
     ];
     const organizationMembers = (docId) => (organizations.find((org) => org.docId === docId)?.memberships ?? [])
         .map((member) => ({ ...member, personName: people.find((person) => person.docId === member.personDocId)?.name ?? "（已解绑）" }));
+    /* 长资料通过实际名单读取/组织投影链路渲染，不能仅在 facade 摘要中添加字段。 */
+    if (longContacts) bindPeopleProfileStorage({
+        loadData: async key => key === "self-identity.json" ? { schemaVersion: 1, selfDocId: people[0].docId, selfItemId: people[0].itemId, createdAt: "2026-09-27" }
+            : key === "person-relationship-labels.json" ? { schemaVersion: 1, labels: [] }
+            : key === "org-membership.json" ? { schemaVersion: 1, memberships: [
+                { id: "20261004000000-mem0001", orgDocId: organizations[0].docId, personDocId: people[0].docId, status: "active", affiliationKind: "work", department: "课程设计与跨校协作研究部", title: "项目协调负责人", joinedOn: "2024-09-01", leftOn: "" },
+                { id: "20261004000000-mem0002", orgDocId: organizations[0].docId, personDocId: people[1].docId, status: "active", affiliationKind: "unspecified", department: "", title: "", joinedOn: "", leftOn: "" },
+                { id: "20261004000000-mem0003", orgDocId: organizations[1].docId, personDocId: people[3].docId, status: "former", affiliationKind: "education", department: "教育学院", title: "", joinedOn: "2009-09-01", leftOn: "2013-06-30" },
+            ] } : null,
+    });
     kernel.handler = async (route, body) => {
+        if (longContacts && route === "/api/query/sql") {
+            if (body.stmt.includes("COUNT(*) AS markerCount")) return organizations.map(org => ({ root_id: org.docId, ial: `custom-lvct-org="${org.archived ? "archived" : "1"}"`, markerCount: 1 }));
+            if (body.stmt.includes("SELECT id, content, hpath, box")) return organizations.map(org => ({ id: org.docId, content: org.name, hpath: org.hpath, box: org.notebookId }));
+        }
         if (route === "/api/av/renderAttributeView") return { view: {
             columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })),
             rows: people.map((person) => ({ id: person.itemId, cells: [
                 { valueType: "block", value: { type: "block", keyID: "name", block: { id: person.docId, content: person.name } } },
                 { valueType: "phone", value: { type: "phone", keyID: "phone", phone: { content: person.phone } } },
-                { valueType: "text", value: { type: "text", keyID: "wechat", text: { content: person.name === "陈立群" ? "chenliqun88" : "" } } },
+                { valueType: "text", value: { type: "text", keyID: "wechat", text: { content: person.wechat ?? (person.name === "陈立群" ? "chenliqun88" : "") } } },
+                { valueType: "email", value: { type: "email", keyID: "email", email: { content: person.email ?? "" } } },
                 { valueType: "date", value: { type: "date", keyID: "birthday", date: { content: person.birthday ? new Date(`${person.birthday}T00:00:00`).getTime() : 0, isNotEmpty: Boolean(person.birthday) } } },
                 { valueType: "select", value: { type: "select", keyID: "group", mSelect: [{ content: person.group }] } },
                 { valueType: "mSelect", value: { type: "mSelect", keyID: "tags", mSelect: person.tags.map((tag) => ({ content: tag })) } },
                 { valueType: "relation", value: { type: "relation", keyID: "related", relation: { blockIDs: person.related } } },
             ] })), rowCount: people.length,
         } };
-        if (route === "/api/graph/getGraph" || route === "/api/graph/getLocalGraph") {
+        if (route === "/api/query/sql" && /FROM (refs|blocks)/.test(body.stmt)) {
             const nodes = [...people.map((person) => ({ id: person.docId, label: person.name })), ...organizations.filter((org) => !org.archived).map((org) => ({ id: org.docId, label: org.name }))];
             const links = [{ from: people[0].docId, to: people[1].docId }, { from: people[1].docId, to: organizations[0].docId }];
-            const ids = route === "/api/graph/getGraph" ? new Set(nodes.map((node) => node.id)) : new Set([body.id, ...links.filter((link) => link.from === body.id || link.to === body.id).flatMap((link) => [link.from, link.to])]);
-            return { nodes: nodes.filter((node) => ids.has(node.id)).map((node) => ({ ...node, type: "NodeDocument", refs: 0, defs: 0 })), links: links.filter((link) => ids.has(link.from) && ids.has(link.to)) };
+            return nativeRefsFixture(body.stmt, {nodes, links});
         }
         throw new Error(`截图环境不允许请求 ${route}`);
     };
@@ -187,6 +225,13 @@
         ] },
         { docId: "20260101000000-orgsh03", name: "已注销工作室", hpath: "/已注销工作室", notebookId: settings.notebookId, archived: true, memberships: [] },
     ];
+    if (view === "orgslong") {
+        const demoLogo = `data:image/svg+xml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg" width="3000" height="1600" viewBox="0 0 3000 1600"><rect width="3000" height="1600" rx="300" fill="#129e9a"/><path d="M600 500h1800v600H600z" fill="white"/></svg>')}`;
+        for (const [index, org] of orgShotList.entries()) {
+            org.name = index === 2 ? "已归档 · 跨校联合课程研究与社区公益协作工作室" : index === 0 ? "曙光教育科技 · 跨校联合课程研究与社区协作中心" : org.name;
+            org.profile = { name: org.name, shortName: index === 2 ? "社区公益协作工作室" : "跨校课程协作", description: "持续记录组织成员、当前状态与历史经历，让每一段关系都可以回溯。", logoDataUrl: demoLogo, logoUrl: "", qccUrl: "", departments: [], customFields: [] };
+        }
+    }
     const facade = {
         listPersonOrgMemberships: async (docId) => organizations.flatMap((org) => org.memberships.filter((member) => member.personDocId === docId)
             .map((member) => ({ ...member, orgName: org.name, archived: org.archived, reachable: true }))),
@@ -222,8 +267,16 @@
                 reachable: true,
             })),
             actions: [
-                { person: summary(people[0]), bucket: "today", reasons: [
+                { person: view === "actions" ? { ...summary(people[0]), name: "林晓梅 · 跨校联合课程与社区项目协调负责人", profile: {
+                    readAt: Date.now(), affiliations: { state: "known", value: {
+                        family: [{ orgName: "家庭", status: "active", affiliationKind: "family" }],
+                        work: [{ orgName: "青禾科技", status: "active", affiliationKind: "work", department: "项目协作中心" }],
+                        education: [{ orgName: "海岚大学", status: "active", affiliationKind: "education" }],
+                        unspecified: [], history: [], unresolved: [],
+                    } }, relationship: { state: "known", labels: ["多年朋友"] },
+                } } : summary(people[0]), bucket: "today", reasons: [
                     { kind: "birthday", label: "今天生日", bucket: "today", dueDate: localDateKey(0) },
+                    ...(view === "actions" ? [{ kind: "followup", label: "跟进「确认跨校联合课程与社区公益项目的下一阶段协作安排」今天到期", bucket: "today", dueDate: localDateKey(0), followUpId: "fu-shot-long" }] : []),
                 ] },
                 { person: summary(people[1]), bucket: "overdue", reasons: [
                     { kind: "followup", label: "跟进「寄生日礼物」已逾期", bucket: "overdue", dueDate: localDateKey(-2), followUpId: "fu-shot-1" },
@@ -364,7 +417,7 @@
         facade, settings, preferences,
         /* V-26：settings 曾落入 people 兜底——断点矩阵 settings-* 与 people-* 字节相同；
            V-16 余项：orgmgr 先落组织视图再由触发器开组织管理弹窗 */
-        initialView: (view === "home" || view === "quickfill") ? "home" : view === "graph" ? "graph" : view === "orgs" || view === "orgdetail" || view === "orgmgr" ? "orgs" : view === "settings" ? "settings" : "people",
+        initialView: (view === "home" || view === "actions" || view === "quickfill") ? "home" : view === "graph" ? "graph" : ["orgs", "orgslong", "orgdetail", "orgmgr"].includes(view) ? "orgs" : view === "settings" ? "settings" : "people",
         isMobile: innerWidth <= 640, onPreferencesUpdated() {}, onOpenPersonDoc() {},
     } });
     async function waitFor(predicate, message) {
@@ -383,7 +436,7 @@
             await waitFor(segToTable, "表格切换入口未出现");
             segToTable().click();
         }
-        if (view === "peek") {
+        if (["peek", "detail", "detaillong"].includes(view)) {
             await waitFor(() => document.querySelector(".lvct-person-card"), "联系人卡片未出现");
             document.querySelector(".lvct-person-card").click();
         }
@@ -437,17 +490,18 @@
             graphSnapshot = await facade.loadGraphQuerySnapshot({ mode: preferences.graphMode, scope: "global", centerDocId: "", orgDocId: "",
                 search: "", group: "", isolatedOnly: false, showOrgs: true, depth: "direct", focusId: "", compareId: "", queryMode: "common" });
             if (graphSnapshot.state !== "ready" || graphSnapshot.graph.nodes.length !== people.length + organizations.filter((org) => !org.archived).length) throw new Error("截图图查询来源未完整核实");
-            const presentation = innerWidth <= 640 ? "文本视图" : "画布视图";
+            const presentation = "画布视图";
             [...document.querySelectorAll(".lvct-graph-view button")].find((button) => button.textContent.trim() === presentation).click();
         }
-        const expected = view === "home" ? ".lvct-dash__stats"
-                : view === "graph" ? innerWidth <= 640 ? ".lvct-graph-text" : ".lvct-graph-view__canvas"
-                : view === "orgs" ? ".lvct-orgs-view__card"
+        const expected = view === "actions" ? ".lvct-dash__actions"
+                : view === "home" ? ".lvct-dash__stats"
+                : view === "graph" ? ".lvct-graph-view__canvas"
+                : view === "orgs" || view === "orgslong" ? ".lvct-orgs-view__card"
                 : view === "orgdetail" ? ".lvct-org-manager__member"
                 : view === "orgmgr" ? ".lvct-dialog-panel .lvct-org-manager"
                 : view === "settings" ? ".lvct-settings"
                 : view === "table" ? ".lvct-people__table-wrap"
-                : view === "peek" ? ".lvct-detail"
+                : ["peek", "detail", "detaillong"].includes(view) ? ".lvct-detail"
                 : view === "viewsmenu" ? ".lvct-people__viewsmenu"
                 : view === "morefilter" ? ".lvct-people__moremenu"
                 : view === "quickfill" ? ".lvct-qf__input"
@@ -465,7 +519,6 @@
                 await waitFor(() => {
                     const summary = document.querySelector(".lvct-graph-summary");
                     if (summary?.getAttribute("aria-busy") !== "false") return false;
-                    if (innerWidth <= 640) return document.querySelectorAll("[data-graph-id]").length === graphSnapshot.graph.nodes.length;
                     const graph = document.querySelector(expected)?._cyreg?.cy;
                     return graph?.nodes().length === graphSnapshot.graph.nodes.length && graph.edges().length === graphSnapshot.graph.edges.length;
                 }, "实际图界面与查询快照不一致");

@@ -1,6 +1,117 @@
 # 发布清单（RELEASE）
 
-> v0.5.6 已发布：PR #27 已普通合并至 `main`，合并提交 `449f7722859c547aeb93f2048506ef5786c767fb`；annotated tag、GitHub Release 和附件下载校验均已完成。
+> v0.5.15 为往来账本陈旧回读竞态补丁：确认写入后保留新记录和最新状态。Issue #35 仍等待真实脱敏小米 VCF，vCard 候选修复未宣称为已确认根因。
+
+## v0.5.15 发布状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.15
+- [x] 往来账本创建/连续写入/状态变更陈旧回读修复
+- [x] `pnpm check`、`pnpm test` 596/596、桌面/移动/宿主样式 UI 381/381
+- [x] `pnpm build`、`pnpm check:release`、`git diff --check`
+- [x] 本地 `package.zip`：581,946 B；SHA-256 `cd271b7b62db1b1ce86d99b17e64e4a7a547963f79db70016bac467553ab2f8b`
+- [x] annotated tag `v0.5.15` 已推送；[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.15) 已创建
+- [x] Release 附件下载复核一致：`package.zip` 581,946 B，SHA-256 `cd271b7b62db1b1ce86d99b17e64e4a7a547963f79db70016bac467553ab2f8b`
+- [ ] Issue #35 原始小米 VCF 未提供，不能确认 vCard 候选修复命中根因
+
+> v0.5.14 为 vCard 导入补丁版本：无名卡片逐卡跳过并继续处理后续有效卡。Issue #35 仍等待真实脱敏小米 VCF，候选修复未宣称为已确认根因。
+
+## v0.5.14 发布状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.14
+- [x] vCard 无名卡片逐卡跳过，整文件无有效卡片时明确失败
+- [x] `pnpm check`、`pnpm test` 596/596、桌面/移动 UI 378/378
+- [x] `pnpm build`、`pnpm check:release`、`git diff --check`
+- [x] annotated tag `v0.5.14` 已推送；[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.14) 已创建
+- [x] Release 附件下载复核一致：`package.zip` 581,455 B，SHA-256 `c3b55321df8b8dfeb36693e96b60783e1e9dec8de548f2b52a7d3c40f9cb319a`
+- [ ] Issue #35 原始小米 VCF 未提供，不能确认候选修复命中根因
+
+本地候选包：`package.zip` 581,455 B，SHA-256 `c3b55321df8b8dfeb36693e96b60783e1e9dec8de548f2b52a7d3c40f9cb319a`。
+
+> v0.5.13 已发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.13)。组织历史成员图谱、组织管理切换草稿、联系人文字对齐和 vCard 兼容性修复已通过隔离验证；#35 仍等待脱敏 VCF。
+
+## v0.5.13 发布状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.13
+- [x] README、README.en-US、CHANGELOG 与 v0.5.13 发布说明已更新
+- [x] #36、#37、#38、#39、#40 的代码路径修复并完成回归
+- [x] `pnpm check`、`pnpm test` 596/596、桌面 UI 378/378、移动 UI 378/378
+- [x] `pnpm build`、`pnpm check:release`、`git diff --check`
+- [ ] Issue #35 的原始小米 VCF 未提供，不能确认报告根因
+- [x] annotated tag `v0.5.13` 指向候选提交 `325bb98`
+- [x] GitHub Release 已创建；下载附件复核一致：`package.zip` 581,735 B，SHA-256 `2fb0d7e0c6dab395dd76c4208480db3ff06a6650f41e2e41139a9b37ca222cf3`
+
+> v0.5.12 已发布：[GitHub Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.12)。修复 vCard 导入中空白 `FN` 遮住有效 `N` 姓名回退的边界；Issue #35 仍缺脱敏 VCF 样本，不能确认报告根因。
+
+## v0.5.12 发布状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.12
+- [x] README、README.en-US、CHANGELOG 与 v0.5.12 发布说明已更新
+- [x] 空白 `FN` 回退有效 `N`，严格导入新增回归测试
+- [x] `pnpm check`、`pnpm test` 594/594、桌面 UI 378/378
+- [x] 移动隔离 UI 378/378；C03 通过移动“筛选与整理”抽屉路径
+- [x] `pnpm build`、`pnpm check:release`；GitHub Actions [run 38748666687](https://github.com/ai68298100/siyuan-contacts/actions/runs/38748666687) 全部通过
+- [x] annotated tag `v0.5.12` 指向候选提交 `589da09584a4946c641eba047e1f0b7f33c93d60`
+- [x] GitHub Release 已创建；重新下载附件核对一致：`package.zip` 581,557 B，SHA-256 `df49569967bd6c93e63728da62e42f1512e6eb973d85870ba5e46ae57986e660`
+- [x] 集市目录已有 `ai68298100/siyuan-contacts`；上架 PR [#2289](https://github.com/siyuan-note/bazaar/pull/2289) 已合并
+- [ ] Issue #35 的原始小米 VCF 未提供，不能确认本修复覆盖报告根因
+- [ ] 真实思源宿主、Android 真机、多窗口、原生图入口、任务管理器互读和集市客户端可见性仍需单独验收
+
+> v0.5.11 历史发布记录：[GitHub Release v0.5.11](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.11)
+
+## v0.5.11 发布状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.11
+- [x] README、README.en-US、CHANGELOG 与 v0.5.11 发布说明已更新
+- [x] Issue #34 修复：空状态关系选择器保持打开
+- [x] `pnpm check`、`pnpm test` 594/594、桌面 UI 378/378
+- [x] `pnpm build`、`pnpm check:release`、`git diff --check`
+- [x] `package.zip` 581,145 B，SHA-256 `74a74877995a66a650cb1b4133d5fd81a4ba4d1dd0e32f6ba550111ea9b88883`
+- [ ] `pnpm test:ui:mobile`：现有 C03 夹具时序问题仍有 1 项失败（“资料完整度筛选组未显示”或“视图面板未打开”），与本次修复无关，未作为移动全绿证据
+- [ ] 真实思源宿主、Android 真机、原生图入口、任务管理器互读、集市客户端可见性和 CardDAV 在线同步仍需单独验收
+
+> v0.5.10 本轮发布：修复首页久未联系排版问题，全面梳理新建、编辑与组织管理等核心页面的文字与表单选项合理性。 [GitHub Release v0.5.10](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.10)
+
+## v0.5.10 本轮状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.10
+- [x] README、README.en-US、CHANGELOG 与 v0.5.10 发布说明已更新
+- [x] 彻底根除久未联系文字挤压竖排缺陷，优化紧凑资料摘要单行防换行与平滑省略
+- [x] 久未联系与近期生日列表重构为“主信息层 + 状态/行动层”现代双层卡片排版，增加 32px Squircle 渐变微头像
+- [x] 新建与编辑弹窗保存动作升级为实色高光主按钮，表单提示语去技术化，组织归属分类按高频直觉排序
+- [x] `pnpm check`、`pnpm test` 594/594、桌面 UI 378/378、移动 UI 378/378 全部通过
+- [x] `pnpm build`、`pnpm check:release` 通过
+- [x] `package.zip` 580,794 B，SHA-256 `1eed20907102bb80bab1205ac33f6424a0f8eb1eb4233dc097f13fec20bd030c`
+
+> v0.5.9 已发布：提交 `35df172` 已推送至 `dev/thispc-1010-org-affiliations`，annotated tag、GitHub Release 与附件校验均已完成。 [GitHub Release v0.5.9](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.9)
+
+## v0.5.9 本轮状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.9
+- [x] README、README.en-US、CHANGELOG 与 v0.5.9 发布说明已更新
+- [x] `pnpm check`、`pnpm test` 594/594、桌面 UI 378/378、移动 UI 378/378 全部通过
+- [x] 复合微质感、Squircle 双色渐变、分段滑轨、磨砂玻璃与时间轴现代高级 UI 落地
+- [x] `pnpm build`、`pnpm check:release` 通过
+- [x] `package.zip` 579,325 B，SHA-256 `b515c522f703eb046ec1a2338097fe8f48be43d26bc407a4bc1f010c8b13aa94`
+
+> v0.5.8 已发布：提交 `7416531` 已推送至 `dev/thispc-1010-org-affiliations`，annotated tag、GitHub Release 与附件校验均已完成。 [GitHub Release v0.5.8](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.8)
+
+## v0.5.8 本轮状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.8
+- [x] README、README.en-US、CHANGELOG、PROGRESS 与 v0.5.8 发布说明已更新
+- [x] Issue #29–#32 已修复、评论并关闭
+- [x] `pnpm check`、`pnpm test` 594/594、桌面 UI 378/378、移动 UI 378/378
+- [x] `pnpm build`、`pnpm check:release`、推送、annotated tag、GitHub Release 与附件校验
+- [x] `package.zip` 575,158 B，SHA-256 `528768fcbbbd19570bf7bc02f352769b85ff508f6ef082db074b3938aeb2c790`
+
+## v0.5.7 本轮状态
+
+- [x] package.json 与 plugin.json 版本统一为 0.5.7
+- [x] README、README.en-US、CHANGELOG、PROGRESS 与 v0.5.7 发布说明已更新
+- [x] 令牌审计基线与收敛后数据已保存，报告给出覆盖率和硬编码变化
+- [x] pnpm check、pnpm test 591/591、桌面 UI 373/373、移动 UI 373/373、pnpm build、pnpm check:release、git diff --check
+- [x] 推送当前分支并创建 annotated tag v0.5.7 与 GitHub Release，附件上传后复核 SHA-256（package.zip 572,221 B，SHA-256 ff17a1ada80333a5e4b916b9df8131e06fd42cad34475d107969dac493d443ab）
+- [ ] 真实思源宿主、Android 真机、原生图入口、任务管理器互读、集市客户端可见性和 CardDAV 在线同步仍需单独验收
 
 ## v0.5.6 本轮状态
 

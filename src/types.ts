@@ -54,8 +54,8 @@ export interface ContactsPluginFacade {
     /** 个人往来账本：金钱、物品、人情均按人物独立记录 */
     listPersonExchanges(personDocId: string): Promise<ExchangeRecord[]>;
     createPersonExchange(input: CreatePersonExchangeInput): Promise<ExchangeRecord>;
-    updatePersonExchange(id: string, patch: ExchangePatch): Promise<ExchangeRecord>;
-    changePersonExchangeStatus(id: string, status: ExchangeStatus, settledOn?: string): Promise<ExchangeRecord>;
+    updatePersonExchange(id: string, patch: ExchangePatch, expected?: Pick<ExchangeRecord, "updatedAt">): Promise<ExchangeRecord>;
+    changePersonExchangeStatus(id: string, status: ExchangeStatus, settledOn?: string, expected?: Pick<ExchangeRecord, "updatedAt">): Promise<ExchangeRecord>;
     listPersonAliases(personDocId: string): Promise<PersonAlias[]>;
     addPersonAlias(personDocId: string, alias: string): Promise<PersonAlias>;
     removePersonAlias(id: string): Promise<void>;
@@ -81,7 +81,9 @@ export interface ContactsPluginFacade {
     /** 跟进事项（F05）：日期型联系计划，独立于互动事实 */
     listPersonFollowUps(personDocId: string): Promise<FollowUpItem[]>;
     /** 创建跟进计划；dueDate 为 YYYY-MM-DD，非法日期抛错 */
-    createFollowUp(personDocId: string, title: string, dueDate: string): Promise<FollowUpItem>;
+    createFollowUp(personDocId: string, title: string, dueDate: string, requestId?: string): Promise<FollowUpItem>;
+    /** 用原创建 key 补同步或核实跟进；未知结果不得自动换 key。 */
+    retryCreateFollowUp(requestId: string, personDocId: string, title: string, dueDate: string): Promise<FollowUpItem>;
     /** 状态变更：open（重新打开）/ done（完成）/ cancelled（取消）；完成不自动写互动 */
     setFollowUpStatus(id: string, status: "open" | "done" | "cancelled"): Promise<void>;
     /** 语义化推迟：tomorrow/threeDays/nextMonday/nextMonth 或 custom（需合法日期） */
@@ -133,7 +135,7 @@ export interface ContactsPluginFacade {
     /** B13.3：新建组织（文档 + custom-lvct-org 标记区块；同名拒绝） */
     createOrganization(name: string, profile?: import("./domain/organization-profile").OrganizationProfileDraft): Promise<{ docId: string; profileSaved?: boolean; profileError?: string }>;
     loadOrganizationProfile?(orgDocId: string): Promise<import("./domain/organization-profile").OrganizationProfileDraft | null>;
-    saveOrganizationProfile?(orgDocId: string, profile: import("./domain/organization-profile").OrganizationProfileDraft): Promise<import("./domain/organization-profile").OrganizationProfileDraft>;
+    saveOrganizationProfile?(orgDocId: string, profile: import("./domain/organization-profile").OrganizationProfileDraft, expected?: import("./domain/organization-profile").OrganizationProfileDraft | null): Promise<import("./domain/organization-profile").OrganizationProfileDraft>;
     /** B13.3：组织成员列举（join 名册姓名） */
     listOrganizationMembers(orgDocId: string): Promise<import("./services/org").OrganizationMember[]>;
     /** B13.5b：组织成员稳定分页与筛选；旧宿主未提供时由 UI 回退全量列举 */
@@ -173,9 +175,9 @@ export interface ContactsPluginFacade {
     prepareAiExtraction(docId: string, options?: AiPreflightOptions): Promise<AiPreflight>;
     aiExtractFromDoc(docId: string, confirmation?: AiExtractionConfirmation): Promise<AiExtractOutcome>;
     /** 打开任意思源文档（捕获完成页等快捷入口使用） */
-    openDoc(docId: string): void;
-    openHostDoc(): void;
+    openDoc(docId: string): void | Promise<void>;
+    openHostDoc(): void | Promise<void>;
     /** 打开人物文档（联系人详情页 = 人物文档） */
-    openPersonDoc(docId: string): void;
+    openPersonDoc(docId: string): void | Promise<void>;
     openSettings(): void;
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { requestErrorMessage } from "../../shared/error-presenter";
     import { onDestroy, untrack } from "svelte";
     import { newExchangeRequestId } from "../../services/exchanges";
     import { useCloseGuard } from "../close-guard";
@@ -30,7 +31,7 @@
             dueOn?: string;
             note?: string;
         }) => Promise<ExchangeRecord>;
-        onChangeStatus: (id: string, status: ExchangeStatus, settledOn?: string) => Promise<ExchangeRecord>;
+        onChangeStatus: (id: string, status: ExchangeStatus, settledOn?: string, expected?: { updatedAt: number }) => Promise<ExchangeRecord>;
         onChanged?: () => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
@@ -45,6 +46,7 @@
     let requestId = newExchangeRequestId();
     let loadGeneration = 0;
     let personGeneration = 0;
+    let confirmedRecords: ExchangeRecord[] = [];
     let alive = true;
     let kind = $state<ExchangeKind>("money");
     let direction = $state<ExchangeDirection>("receivable");
@@ -78,11 +80,22 @@
             const loaded = await onLoad(docId);
             if (!alive || generation !== loadGeneration || docId !== personDocId) return;
             if (loaded.some((record) => record.personDocId !== docId)) throw new Error("往来读取结果包含其他人物，未自动显示");
-            records = loaded;
+            const loadedById = new Map(loaded.map((record) => [record.id, record]));
+            const stillPending: ExchangeRecord[] = [];
+            for (const confirmed of confirmedRecords) {
+                const visible = loadedById.get(confirmed.id);
+                if (!visible || visible.updatedAt < confirmed.updatedAt) {
+                    loadedById.set(confirmed.id, confirmed);
+                    stillPending.push(confirmed);
+                }
+            }
+            confirmedRecords = stillPending;
+            records = [...loadedById.values()].sort((left, right) =>
+                right.occurredOn.localeCompare(left.occurredOn) || right.updatedAt - left.updatedAt);
         } catch (error) {
             if (!alive || generation !== loadGeneration || docId !== personDocId) return;
             readFailed = true;
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             if (alive && generation === loadGeneration && docId === personDocId) loading = false;
         }
@@ -93,6 +106,7 @@
         untrack(() => {
             personGeneration += 1;
             records = [];
+            confirmedRecords = [];
             resetForm();
             busy = false;
             void load(docId);
@@ -110,6 +124,10 @@
         formBaseline = formSignature();
     }
 
+    function rememberConfirmedRecord(record: ExchangeRecord): void {
+        confirmedRecords = [...confirmedRecords.filter((candidate) => candidate.id !== record.id), record];
+    }
+
     async function submit(): Promise<void> {
         if (busy || loading || readFailed || !description.trim()) return;
         busy = true;
@@ -119,7 +137,7 @@
         const generation = personGeneration;
         try {
             const amount = kind === "money" && String(amountText ?? "").trim() ? Number(amountText) : undefined;
-            await onCreate({
+            const created = await onCreate({
                 requestId: activeRequestId,
                 personDocId: docId,
                 kind,
@@ -132,14 +150,20 @@
                 note: note.trim(),
             });
             if (!alive || generation !== personGeneration || docId !== personDocId || activeRequestId !== requestId) return;
+            if (created.personDocId !== docId) throw new Error("往来写入返回了其他人物记录，未自动显示");
+            rememberConfirmedRecord(created);
             resetForm();
             await load(docId);
             if (!alive || generation !== personGeneration || docId !== personDocId) return;
+            // A confirmed write can become visible to the host storage reader
+            // one tick later than the save response. Keep the confirmed record
+            // in the list so a stale immediate read cannot make a successful
+            // submission look lost; the next refresh will reconcile the rest.
             onChanged?.();
         } catch (error) {
             if (!alive || generation !== personGeneration || docId !== personDocId || activeRequestId !== requestId) return;
             saveUnknown = saveUnknown || error instanceof ExchangeWriteUnknownError;
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             if (alive && generation === personGeneration && docId === personDocId) busy = false;
         }
@@ -147,19 +171,22 @@
 
     async function changeStatus(record: ExchangeRecord, status: ExchangeStatus): Promise<void> {
         if (busy || loading || readFailed || saveUnknown) return;
+        if (status === "cancelled" && !window.confirm(`确定取消「${recordLabel(record)}」吗？取消后仍保留历史记录。`)) return;
         busy = true;
         errorText = "";
         const docId = personDocId;
         const generation = personGeneration;
         try {
-            await onChangeStatus(record.id, status, status === "settled" ? toLocalDateKey(new Date()) : undefined);
+            const updated = await onChangeStatus(record.id, status, status === "settled" ? toLocalDateKey(new Date()) : undefined, { updatedAt: record.updatedAt });
             if (!alive || docId !== personDocId || generation !== personGeneration) return;
+            if (updated.id !== record.id || updated.personDocId !== docId) throw new Error("往来状态写入返回了其他记录，未自动显示");
+            rememberConfirmedRecord(updated);
             await load(docId);
             if (!alive || docId !== personDocId || generation !== personGeneration) return;
             onChanged?.();
         } catch (error) {
             if (!alive || docId !== personDocId || generation !== personGeneration) return;
-            errorText = error instanceof Error ? error.message : String(error);
+            errorText = requestErrorMessage(error);
         } finally {
             if (alive && docId === personDocId && generation === personGeneration) busy = false;
         }
@@ -233,12 +260,14 @@
     {:else}
         <div class="lvct-detail__timeline">
             {#each records as record (record.id)}
-                <div class="lvct-detail__timeline-row">
-                    <span class="ft__on-surface">{record.occurredOn}</span>
-                    <span class="lvct-detail__timeline-note">{recordLabel(record)}</span>
-                    <span class="lvct-chip">{kindLabel(record.kind)} · {directionLabel(record.direction)}</span>
+                <div class="lvct-detail__timeline-row lvct-exchange-row" data-direction={record.direction} data-status={record.status}>
+                    <span class="lvct-exchange-date ft__on-surface">{record.occurredOn}</span>
+                    <span class="lvct-detail__timeline-note lvct-exchange-desc">{recordLabel(record)}</span>
+                    <span class="lvct-chip lvct-exchange-chip" class:lvct-chip--receivable={record.direction === "receivable"} class:lvct-chip--payable={record.direction === "payable"}>
+                        {kindLabel(record.kind)} · {directionLabel(record.direction)}
+                    </span>
                     {#if record.dueOn}<span class="ft__smaller ft__on-surface">到期 {record.dueOn}</span>{/if}
-                    <span class="ft__smaller ft__on-surface">{record.status === "open" ? "待处理" : record.status === "settled" ? `已结清${record.settledOn ? ` · ${record.settledOn}` : ""}` : "已取消"}</span>
+                    <span class="lvct-exchange-status ft__smaller ft__on-surface">{record.status === "open" ? "待处理" : record.status === "settled" ? `已结清${record.settledOn ? ` · ${record.settledOn}` : ""}` : "已取消"}</span>
                     {#if record.status === "open"}
                         <button class="b3-button b3-button--text" disabled={formDisabled || loading || readFailed} onclick={() => changeStatus(record, "settled")}>结清</button>
                         <button class="b3-button b3-button--cancel" disabled={formDisabled || loading || readFailed} onclick={() => changeStatus(record, "cancelled")}>取消</button>
