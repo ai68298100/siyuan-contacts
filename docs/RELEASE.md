@@ -1,5 +1,19 @@
 # 发布清单（RELEASE）
 
+> v0.5.16 为图谱组织成员生命周期补丁：当前单位只投影 active 成员，图谱统一表达 active/former/mixed。Issue #35 仍等待真实脱敏小米 VCF，vCard 候选修复未宣称为已确认根因。
+
+## v0.5.16 发布状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.16
+- [x] 组织当前单位投影排除 former 成员；成员边合并并保留 active/former/mixed 生命周期
+- [x] 文本视图、Markdown 导出、画布线型和图例显示成员生命周期；related 查询边界保持不变
+- [x] `pnpm check`、`pnpm test` 597/597、桌面/移动/宿主样式 UI 381/381
+- [x] `pnpm build`、`pnpm check:release`、`git diff --check`
+- [x] 本地 `package.zip`：582,401 B；SHA-256 `91c2d4bece34509a2a72468a7d097af4d1bd566ceadfcb2a392fc4331cd731b8`
+- [ ] annotated tag `v0.5.16` 与 GitHub Release：发布后回填
+- [ ] Release 附件下载复核：发布后回填
+- [ ] Issue #35 原始小米 VCF 未提供，不能确认 vCard 候选修复命中根因
+
 > v0.5.15 为往来账本陈旧回读竞态补丁：确认写入后保留新记录和最新状态。Issue #35 仍等待真实脱敏小米 VCF，vCard 候选修复未宣称为已确认根因。
 
 ## v0.5.15 发布状态

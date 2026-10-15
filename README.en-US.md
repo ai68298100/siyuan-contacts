@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.15** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.15) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.16** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.16) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -21,15 +21,17 @@ English | [简体中文](README.md)
 
 Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
 
-## This release: v0.5.15 (2026-10-16)
+## This release: v0.5.16 (2026-10-16)
 
-This patch fixes a stale-read race in the exchange ledger.
+This patch completes lifecycle-aware organization membership edges in the relationship graph and fixes the current-organization projection.
 
-- Confirmed new and updated records remain visible when the host briefly returns an older list.
-- Consecutive writes no longer hide an earlier confirmed record during the stale-read window.
-- Regression coverage now includes creation, consecutive writes, and status changes.
+- The current-organization projection uses only `active` memberships in non-archived organizations; historical `former` memberships are no longer shown as current.
+- Multiple membership periods for the same person and organization merge into one edge labeled `active`, `former`, or `mixed`.
+- Text view, Markdown export, canvas styles, and the legend expose membership lifecycle; `related` queries still use explicit person relationships only.
+- `orderGraph` now orders member edges by lifecycle state and has regression coverage.
 
-Validation: `pnpm check`, 596 unit tests, and desktop/mobile/host-style UI 381/381 pass.
+Validation: `pnpm check`, 597 unit tests, and desktop/mobile/host-style UI 381/381 pass.
+Issue #35 still awaits a redacted Xiaomi VCF; the candidate vCard fix is not claimed as a confirmed root-cause fix.
 
 ## Previous release: v0.5.14 (2026-10-16)
 
