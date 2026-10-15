@@ -1,5 +1,18 @@
 # 发布清单（RELEASE）
 
+> v0.5.11 本轮发布：修复空状态“选择联系人”入口打开关系选择器后被 outside-click 监听立即关闭的问题，并增加回归测试。
+
+## v0.5.11 本轮状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.11
+- [x] README、README.en-US、CHANGELOG 与 v0.5.11 发布说明已更新
+- [x] Issue #34 修复：空状态关系选择器保持打开
+- [x] `pnpm check`、`pnpm test` 594/594、桌面 UI 378/378
+- [x] `pnpm build`、`pnpm check:release`、`git diff --check`
+- [x] `package.zip` 581,145 B，SHA-256 `74a74877995a66a650cb1b4133d5fd81a4ba4d1dd0e32f6ba550111ea9b88883`
+- [ ] `pnpm test:ui:mobile`：现有 C03 夹具时序问题仍有 1 项失败（“资料完整度筛选组未显示”或“视图面板未打开”），与本次修复无关，未作为移动全绿证据
+- [ ] 真实思源宿主、Android 真机、原生图入口、任务管理器互读、集市客户端可见性和 CardDAV 在线同步仍需单独验收
+
 > v0.5.10 本轮发布：修复首页久未联系排版问题，全面梳理新建、编辑与组织管理等核心页面的文字与表单选项合理性。 [GitHub Release v0.5.10](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.10)
 
 ## v0.5.10 本轮状态

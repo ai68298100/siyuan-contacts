@@ -29,3 +29,10 @@
 - 统一按钮、输入、复选框、单选框、加载、禁用和键盘焦点反馈，避免列表页、详情页和设置页出现不同表现。
 
 验证：pnpm check、pnpm test、pnpm test:ui、pnpm test:ui:mobile、pnpm build、pnpm check:release 和 git diff --check 均通过；具体运行数据在发布记录中更新。
+
+## 2026-10-15 v0.5.11 发布：Issue #34 关系选择器修复
+
+- 修复空状态“选择联系人”入口触发 outside-click 竞态，关系选择器现在会保持打开。
+- 增加空状态入口回归测试。
+- 发布门禁：`pnpm check`、594/594 单测、桌面 UI 378/378、生产构建与 `pnpm check:release` 通过。
+- 移动隔离 UI 仍有 1 项既有 C03 夹具时序失败；这不代表 Android 真机验证。

@@ -9,7 +9,7 @@
 
 **在思源笔记中管理联系人、人际关系、组织归属与重要日期。**
 
-**最新稳定版：v0.5.10** · [下载与安装](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.10) · [提交问题](https://github.com/ai68298100/siyuan-contacts/issues)
+**最新稳定版：v0.5.11** · [下载与安装](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.11) · [提交问题](https://github.com/ai68298100/siyuan-contacts/issues)
 
 [English README](README.en-US.md)
 
@@ -21,7 +21,16 @@
 
 小驴人脉把联系人、关系和共同经历放进思源工作空间。每个人对应一篇普通思源文档，结构化资料保存在关联的思源数据库中，可以继续使用思源的搜索、双链和同步能力。
 
-## 本次更新（v0.5.10 · 2026-10-15）
+## 本次更新（v0.5.11 · 2026-10-15）
+
+本次补丁修复空状态下从“选择联系人”入口打开关系选择器后，选择器被外部点击处理器立即关闭的问题。
+
+- 空状态入口现在稳定保持关系选择器打开，可继续搜索并选择联系人。
+- 增加回归测试，覆盖空状态入口与选人器打开时序。
+
+验证：`pnpm check`、594 项单测、桌面 UI 378/378、生产构建和发布门禁通过；移动隔离 UI 回归有 1 项既有夹具时序失败，详见发布说明。
+
+## 上一版本（v0.5.10 · 2026-10-15）
 
 本次发布修复首页久未联系排版问题，并全面梳理新建、编辑与组织管理等核心页面的文字与表单选项合理性。
 
@@ -320,7 +329,7 @@
 
 当前建议通过 GitHub Release 手动安装；集市上架 PR 已合并，但客户端可见性尚未在真实设备核验。
 
-1. 从 [v0.5.10 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.10) 下载 `package.zip`。
+1. 从 [v0.5.11 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.11) 下载 `package.zip`。
 2. 将压缩包内容解压到思源工作空间的 `data/plugins/siyuan-contacts/`，确认 `plugin.json` 位于该目录根部。
 3. 重启思源，在“设置 → 集市 → 已安装”中启用“小驴人脉”。
 
@@ -349,7 +358,7 @@
 - 插件界面英文翻译尚未完整，部分内容可能显示为中文。
 - 当前不支持 CardDAV 通讯录或 CalDAV 日历在线同步；通讯录交换通过 vCard 文件完成。
 
-各项验证范围见 [v0.5.8 发布说明](docs/RELEASE-NOTES-v0.5.8.md)；上一版本记录见 [v0.5.7 发布说明](docs/RELEASE-NOTES-v0.5.7.md)。
+各项验证范围见 [v0.5.11 发布说明](docs/RELEASE-NOTES-v0.5.11.md)；上一版本记录见 [v0.5.10 发布说明](docs/RELEASE-NOTES-v0.5.10.md)。
 
 ## 开发
 
