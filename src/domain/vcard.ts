@@ -117,8 +117,10 @@ export function parseVcfForImport(text: string): VCardContact[] {
         } else if (marker === "END:VCARD") {
             if (!current) throw new Error("vCard 的开始/结束标记不匹配，请修复文件后重试");
             const contact = contactFromCard(current);
-            if (!contact) throw new Error(`第 ${cardNumber} 张卡片缺少 FN/N 姓名，未生成空联系人`);
-            contacts.push(contact);
+            // Android/AOSP exporters may emit a valid phone-only card with
+            // empty FN/N.  The vCard contract says such cards are discarded;
+            // do that per card so a later named contact can still be imported.
+            if (contact) contacts.push(contact);
             current = null;
         } else if (current) {
             if (line.trim() && !parsePropertyLine(line)) throw new Error(`第 ${cardNumber} 张卡片含损坏属性行，请核对原文件`);
@@ -128,7 +130,7 @@ export function parseVcfForImport(text: string): VCardContact[] {
         }
     }
     if (current) throw new Error(`第 ${cardNumber} 张卡片未结束，请修复文件后重试`);
-    if (!contacts.length) throw new Error("文件没有有效 vCard 卡片，请核对 BEGIN:VCARD/END:VCARD 标记");
+    if (!contacts.length) throw new Error("文件没有有效 vCard 卡片，请核对 FN/N 姓名和 BEGIN:VCARD/END:VCARD 标记");
     return contacts;
 }
 

@@ -98,10 +98,24 @@ test("同日不同历法的粘贴生日需要人工单选", () => {
     assert.deepEqual(quickFillDefaultIndexes(result, emptyDraft()), []);
 });
 
-test("严格导入拒绝空、截断、缺姓名和损坏卡片，保留额外邮箱与映射边界", () => {
+test("严格导入拒绝空、截断、全无名和损坏卡片，混合文件逐卡跳过无名卡", () => {
     for (const input of ["", "BEGIN:VCARD\nFN:甲", "BEGIN:VCARD\nTEL:123\nEND:VCARD", "BEGIN:VCARD\nFN:甲\n坏属性\nEND:VCARD"]) {
         assert.throws(() => parseVcfForImport(input));
     }
+    const mixed = parseVcfForImport([
+        "BEGIN:VCARD",
+        "VERSION:3.0",
+        "FN:",
+        "N:",
+        "TEL:13800000000",
+        "END:VCARD",
+        "BEGIN:VCARD",
+        "VERSION:3.0",
+        "FN:甲",
+        "TEL:13900000000",
+        "END:VCARD",
+    ].join("\r\n"));
+    assert.deepEqual(mixed.map((card) => card.name), ["甲"], "无 FN/N 卡片只跳过，不应阻断后续有效卡片");
     const structuredFallback = parseVcfForImport("BEGIN:VCARD\r\nVERSION:3.0\r\nFN:   \r\nN:张;三;;;\r\nEND:VCARD");
     assert.equal(structuredFallback[0].name, "张三", "空白 FN 不应遮蔽有效 N 姓名");
     const cards = parseVcfForImport("BEGIN:VCARD\nVERSION:3.0\nFN:甲\nEMAIL:one@example.com\nEMAIL:two@example.com\nORG:组织\nPHOTO:图片\nEND:VCARD");
