@@ -2316,6 +2316,51 @@ await test("账本界面：确认写入后陈旧列表回读仍立即显示新�
     assert(fixture.querySelectorAll(".lvct-exchange-row").length === 1, "陈旧回读合并后记录数量不正确");
 });
 
+await test("账本界面：连续写入期间陈旧列表回读不丢已确认记录", async () => {
+    let sequence = 0;
+    const makeRecord = (description, id) => ({
+        id, personDocId: person.docId, kind: "money", direction: "receivable", description, amount: 35, currency: "CNY",
+        occurredOn: "2026-10-04", dueOn: "", status: "open", settledOn: "", note: "", createdAt: 1, updatedAt: 1,
+    });
+    mounted = mount(ExchangeLedger, { target: fixture, props: {
+        personDocId: person.docId,
+        onLoad: async () => [],
+        onCreate: async () => {
+            sequence += 1;
+            return makeRecord(`连续写入 ${sequence}`, `2026100400000${sequence}-ex00001`);
+        },
+        onChangeStatus: async () => {},
+    } });
+    await until(() => fixture.textContent.includes("还没有记录"), "账本初始空态未显示");
+    for (const descriptionText of ["连续写入 1", "连续写入 2"]) {
+        input(fixture.querySelector('input[type="text"]'), descriptionText);
+        input(fixture.querySelector('input[type="number"]'), "35");
+        await tick();
+        button("记一笔往来").click();
+        await until(() => fixture.textContent.includes(descriptionText), `未显示已确认记录：${descriptionText}`);
+    }
+    assert(fixture.querySelectorAll(".lvct-exchange-row").length === 2, "连续陈旧回读丢失了先前已确认记录");
+});
+
+await test("账本界面：状态写入后陈旧列表回读仍立即显示最新状态", async () => {
+    const open = {
+        id: "20261004000002-ex00001", personDocId: person.docId, kind: "money", direction: "receivable",
+        description: "状态后陈旧回读", amount: 35, currency: "CNY", occurredOn: "2026-10-04", dueOn: "", status: "open",
+        settledOn: "", note: "", createdAt: 1, updatedAt: 1,
+    };
+    const settled = { ...open, status: "settled", settledOn: "2026-10-16", updatedAt: 2 };
+    mounted = mount(ExchangeLedger, { target: fixture, props: {
+        personDocId: person.docId,
+        onLoad: async () => [open],
+        onCreate: async () => open,
+        onChangeStatus: async () => settled,
+    } });
+    await until(() => fixture.textContent.includes("状态后陈旧回读"), "账本初始记录未显示");
+    button("结清").click();
+    await until(() => fixture.textContent.includes("已结清"), "陈旧列表回读遮蔽了已确认的结清状态");
+    assert(fixture.querySelector('.lvct-exchange-row[data-status="settled"]'), "陈旧回读合并后状态仍为旧值");
+});
+
 await test("详情子面板：草稿取消保留原标签和人物，保存挂起阻断切标签、切人与关闭", async () => {
     for (const module of ["exchange", "alias"]) {
         let closed = false;

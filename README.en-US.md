@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.14** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.14) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.15** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.15) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -21,7 +21,17 @@ English | [简体中文](README.md)
 
 Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
 
-## This release: v0.5.14 (2026-10-16)
+## This release: v0.5.15 (2026-10-16)
+
+This patch fixes a stale-read race in the exchange ledger.
+
+- Confirmed new and updated records remain visible when the host briefly returns an older list.
+- Consecutive writes no longer hide an earlier confirmed record during the stale-read window.
+- Regression coverage now includes creation, consecutive writes, and status changes.
+
+Validation: `pnpm check`, 596 unit tests, desktop UI 381/381, and mobile/host-style UI 379/379 pass.
+
+## Previous release: v0.5.14 (2026-10-16)
 
 This patch fixes vCard imports stopping at a nameless card.
 

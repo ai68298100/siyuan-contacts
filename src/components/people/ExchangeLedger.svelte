@@ -46,6 +46,7 @@
     let requestId = newExchangeRequestId();
     let loadGeneration = 0;
     let personGeneration = 0;
+    let confirmedRecords: ExchangeRecord[] = [];
     let alive = true;
     let kind = $state<ExchangeKind>("money");
     let direction = $state<ExchangeDirection>("receivable");
@@ -79,7 +80,18 @@
             const loaded = await onLoad(docId);
             if (!alive || generation !== loadGeneration || docId !== personDocId) return;
             if (loaded.some((record) => record.personDocId !== docId)) throw new Error("往来读取结果包含其他人物，未自动显示");
-            records = loaded;
+            const loadedById = new Map(loaded.map((record) => [record.id, record]));
+            const stillPending: ExchangeRecord[] = [];
+            for (const confirmed of confirmedRecords) {
+                const visible = loadedById.get(confirmed.id);
+                if (!visible || visible.updatedAt < confirmed.updatedAt) {
+                    loadedById.set(confirmed.id, confirmed);
+                    stillPending.push(confirmed);
+                }
+            }
+            confirmedRecords = stillPending;
+            records = [...loadedById.values()].sort((left, right) =>
+                right.occurredOn.localeCompare(left.occurredOn) || right.updatedAt - left.updatedAt);
         } catch (error) {
             if (!alive || generation !== loadGeneration || docId !== personDocId) return;
             readFailed = true;
@@ -94,6 +106,7 @@
         untrack(() => {
             personGeneration += 1;
             records = [];
+            confirmedRecords = [];
             resetForm();
             busy = false;
             void load(docId);
@@ -109,6 +122,10 @@
         requestId = newExchangeRequestId();
         saveUnknown = false;
         formBaseline = formSignature();
+    }
+
+    function rememberConfirmedRecord(record: ExchangeRecord): void {
+        confirmedRecords = [...confirmedRecords.filter((candidate) => candidate.id !== record.id), record];
     }
 
     async function submit(): Promise<void> {
@@ -133,6 +150,8 @@
                 note: note.trim(),
             });
             if (!alive || generation !== personGeneration || docId !== personDocId || activeRequestId !== requestId) return;
+            if (created.personDocId !== docId) throw new Error("往来写入返回了其他人物记录，未自动显示");
+            rememberConfirmedRecord(created);
             resetForm();
             await load(docId);
             if (!alive || generation !== personGeneration || docId !== personDocId) return;
@@ -140,10 +159,6 @@
             // one tick later than the save response. Keep the confirmed record
             // in the list so a stale immediate read cannot make a successful
             // submission look lost; the next refresh will reconcile the rest.
-            if (!records.some((record) => record.id === created.id)) {
-                records = [...records, created].sort((left, right) =>
-                    right.occurredOn.localeCompare(left.occurredOn) || right.updatedAt - left.updatedAt);
-            }
             onChanged?.();
         } catch (error) {
             if (!alive || generation !== personGeneration || docId !== personDocId || activeRequestId !== requestId) return;
@@ -162,8 +177,10 @@
         const docId = personDocId;
         const generation = personGeneration;
         try {
-            await onChangeStatus(record.id, status, status === "settled" ? toLocalDateKey(new Date()) : undefined, { updatedAt: record.updatedAt });
+            const updated = await onChangeStatus(record.id, status, status === "settled" ? toLocalDateKey(new Date()) : undefined, { updatedAt: record.updatedAt });
             if (!alive || docId !== personDocId || generation !== personGeneration) return;
+            if (updated.id !== record.id || updated.personDocId !== docId) throw new Error("往来状态写入返回了其他记录，未自动显示");
+            rememberConfirmedRecord(updated);
             await load(docId);
             if (!alive || docId !== personDocId || generation !== personGeneration) return;
             onChanged?.();
