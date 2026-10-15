@@ -75,7 +75,7 @@ test("快照导出：与展示节点和边一致，同名按 ID 区分，特殊�
     const first = person("a", "item-a");
     first.relatedItemIds.push("item-b");
     const sources: GraphSources = { people: [first, person("b", "item-b")], organizations: [{ docId: "org", name: "组织|[*]", archived: false,
-        memberships: [{ personDocId: "a", status: "active" }] }], selfDocId: "a", status: { roster: "verified", self: "verified", organizations: "verified" }, errors: {}, revision: 3 };
+        memberships: [{ personDocId: "a", status: "active" }, { personDocId: "a", status: "former" }] }], selfDocId: "a", status: { roster: "verified", self: "verified", organizations: "verified" }, errors: {}, revision: 3 };
     const query: GraphQuery = { mode: "relations", scope: "global", centerDocId: "", orgDocId: "", search: "", group: "", isolatedOnly: false,
         showOrgs: true, depth: "direct", focusId: "a", compareId: "b", queryMode: "path" };
     const snapshot = buildGraphQuerySnapshot(sources, query);
@@ -84,6 +84,7 @@ test("快照导出：与展示节点和边一致，同名按 ID 区分，特殊�
     assert(markdown.includes(`展示节点 ${snapshot.graph.nodes.length} / 边 ${snapshot.graph.edges.length}`));
     assert(markdown.includes("（a）") && markdown.includes("（b）"));
     assert(markdown.includes("显式人物关系（related）") && markdown.includes("组织成员（member）"));
+    assert(markdown.includes("组织成员（member）·当前+历史"), "成员边导出缺少混合生命周期标签");
     assert(markdown.includes("同名\\[\\*\\] \\#伪标题"));
     assert(!markdown.includes("\n#伪标题"));
     assert.equal(markdown, renderGraphSnapshotMarkdown(snapshot, "2026-10-04"));

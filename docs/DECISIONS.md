@@ -322,7 +322,7 @@ v0.5.13 的图谱修复暴露出旧契约的一处口径缺口：成员事实已
 1. **事实层不变。** `org-membership.json` 以稳定 `membership.id` 保存每段组织经历；`status=active|former` 是生命周期状态，`joinedOn/leftOn` 为空表示未知或仍在当前期间，日期格式和 `joinedOn <= leftOn` 校验保持不变。同一人物/组织最多一条 active；former 可以有多段历史。再次加入生成新 ID，恢复旧段必须显式编辑，不能按名称合并。
 2. **显示语义分层。** `active + work` 默认显示“在职”，`former + work` 默认显示“已离开”；`active + education` 显示“就读”，`former + education` 显示“已毕业/离校”；家庭和 unspecified 沿用现有默认文案。`statusLabel` 只覆盖显示文案，不改变生命周期状态。自定义状态不能把 former 变成 active，也不参与当前性统计。
 3. **投影口径保持当前性。** `custom-lvct-org-links`、人物当前组织段落、单位/学校当前资料和归档组织投影只消费 active 且组织未归档的记录；former 只在历史详情、共同背景历史和成员管理的历史筛选中出现。投影失败不回滚成员事实。
-4. **图谱口径明确。** 自研关系图的 `member` 边来自健康未归档组织与名册中可达人物的 active 或 former 记录；同一人物/组织的多段记录合并为一条显示边，边标签/详情标明当前或历史。悬空、不可达、重复绑定和未知来源不生成边。`member` 边只叠加渲染，direct/second-degree/common/path 和 `related` 导出只消费显式人物关系图。引用图不纳入组织成员边。
+4. **图谱口径明确。** 自研关系图的 `member` 边来自健康未归档组织与名册中可达人物的 active 或 former 记录；同一人物/组织的多段记录合并为一条显示边，并派生 `memberStatus=active|former|mixed`：仅当前、仅历史或当前与历史并存分别标明，不能静默选一类。悬空、不可达、重复绑定和未知来源不生成边。`member` 边只叠加渲染，direct/second-degree/common/path 和 `related` 导出只消费显式人物关系图。引用图不纳入组织成员边。
 5. **时间与排序。** 缺失日期保持未知；日期倒挂拒绝写入；多段历史按 `status`（active 优先）、`joinedOn`、稳定 ID 排序；同日结束/开始允许并存，因为段落由不同 membership ID 区分，当前唯一性仍只约束 active。重叠历史不自动合并或删除，详情和体检负责提示核对。
 6. **迁移与兼容。** 旧 `schemaVersion: 1` 数据无需迁移；缺少 `statusLabel/affiliationKind/note/tombstones` 按既有兼容默认值读取。迁移、备份和恢复保留所有 active/former 记录及稳定 ID，不把 former 恢复为 active，不按姓名或日期猜测合并。任何未知/损坏成员模块保持模块失败，不降级为空库。
 

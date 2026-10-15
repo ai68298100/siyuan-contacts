@@ -104,10 +104,21 @@ export async function runGraphQueryRegression({ test, assert, kernel, settings, 
         };
         invalidateRoster();
         const orgs = organizations(3);
+        // One person has both a current and a historical record; another only
+        // has historical membership so every lifecycle label is exercised.
+        orgs[0].memberships.push({ id: "20261004000000-mixed", orgDocId: orgId, personDocId: personId(0),
+            status: "former", joinedOn: "2024-01-01", leftOn: "2025-01-01", department: "", title: "" });
+        orgs[0].memberships[2].status = "former";
+        orgs[0].memberships[2].leftOn = "2025-01-01";
         const sources = await loadGraphSources(settings, { listOrganizations: async () => orgs, loadSelfIdentity: async () => ({ selfDocId: personId(0) }) }, 1);
         orgs[0].memberships[0].status = "former";
         assert(sources.organizations[0].memberships[0].status === "active", "来源快照被后续修改混入");
         const related = buildGraphQuerySnapshot(sources, query({ focusId: personId(0), compareId: personId(2), queryMode: "path" }));
+        const memberEdges = related.graph.edges.filter((edge) => edge.kind === "member");
+        assert(memberEdges.find((edge) => edge.target === personId(0))?.memberStatus === "mixed", "成员边没有合并当前与历史状态");
+        assert(memberEdges.find((edge) => edge.target === personId(2))?.memberStatus === "former", "仅历史成员边状态缺失");
+        const relatedMarkdown = renderGraphSnapshotMarkdown(related, "2026-10-04");
+        assert(relatedMarkdown.includes("组织成员（member）·当前+历史") && relatedMarkdown.includes("组织成员（member）·历史"), "Markdown 未导出成员生命周期标签");
         assert(related.result.pathIds.join(",") === [personId(0), personId(1), personId(2)].join(","), "成员边污染人物最短路径");
         const nativeQuery = query({ mode: "native", scope: "org", orgDocId: orgId });
         const references = await loadGraphReferences(sources, nativeQuery);
@@ -142,6 +153,9 @@ export async function runGraphQueryRegression({ test, assert, kernel, settings, 
         const previousWidth = fixture.style.width;
         fixture.style.width = "390px";
         let detailDialog;
+        const textOrganizations = organizations(1001);
+        textOrganizations[0].memberships.push({ id: "20261004000000-mixed-text", orgDocId: orgId, personDocId: personId(0),
+            status: "former", joinedOn: "2024-01-01", leftOn: "2025-01-01", department: "", title: "" });
         const instance = mount(RelationGraph, { target: fixture, props: { settings, preferences: DEFAULT_VIEW_PREFERENCES,
             onPreferencesChange: async (next) => next, onOpenPeople() {}, onOpenDetail: (person) => {
                 opened.push(person.docId);
@@ -149,7 +163,7 @@ export async function runGraphQueryRegression({ test, assert, kernel, settings, 
                     onClose() { const current = detailDialog; detailDialog = null; void unmount(current); },
                     children: createRawSnippet(() => ({ render: () => "<p>图谱只读详情测试</p>" })) } });
             },
-            facade: { listOrganizations: async () => organizations(1001), loadSelfIdentity: async () => ({ selfDocId: personId(1000) }) } } });
+            facade: { listOrganizations: async () => textOrganizations, loadSelfIdentity: async () => ({ selfDocId: personId(1000) }) } } });
         try {
             button("文本视图").click();
             await until(() => fixture.textContent.includes("查询完成"), "来源读取未完成");
@@ -173,6 +187,7 @@ export async function runGraphQueryRegression({ test, assert, kernel, settings, 
             await until(() => document.activeElement?.textContent === "当前图查询", "原文本目标不可见时没有返回结果标题");
             assert(!fixture.querySelector(".lvct-graph-view__canvas"), "文本视图仍要求画布");
             assert(fixture.textContent.includes("组织成员（member）") && fixture.textContent.includes("显式人物关系（related）"), "文本没有边来源");
+            assert(fixture.textContent.includes("组织成员（member）·当前+历史"), "文本没有成员当前+历史生命周期标签");
             const textView = fixture.querySelector(".lvct-graph-text");
             assert(textView.scrollWidth <= textView.clientWidth + 2, "文本视图横向溢出");
             textView.style.fontSize = "200%";

@@ -4,6 +4,7 @@
  * 换算在本层完成，指向未知目标的边丢弃（对端联系人已删等场景）。
  */
 import type { ContactSummary } from "./person";
+import type { OrgMembershipStatus } from "./org-membership";
 
 export interface GraphNode {
     /** 文档 ID（cytoscape 节点 id，点击即开文档） */
@@ -21,6 +22,8 @@ export interface GraphEdge {
     target: string;
     /** B14.6 边来源：related=显式关系（查询唯一依据）；member=组织成员（仅展示，不参与关系查询） */
     kind?: "related" | "member" | "ref";
+    /** Member lifecycle on the derived organisation edge. Related/ref edges omit this field. */
+    memberStatus?: "active" | "former" | "mixed";
 }
 
 export interface PersonGraph {
@@ -154,7 +157,8 @@ export function groupColor(group: string): string {
 export interface OrgAugmentationInput {
     docId: string;
     name: string;
-    memberDocIds: readonly string[];
+    /** All verified membership records; repeated person IDs are merged into one edge. */
+    memberships: readonly Pick<import("./org-membership").OrgMembership, "personDocId" | "status">[];
 }
 
 export interface GraphOrgAugmentation {
@@ -181,12 +185,21 @@ export function buildOrgAugmentation(
     for (const org of orgs ?? []) {
         if (!org || typeof org.docId !== "string" || org.docId === "") continue;
         if (typeof org.name !== "string" || org.name === "") continue;
-        const connected = new Set<string>();
-        for (const personDocId of org.memberDocIds ?? []) {
+        const connected = new Map<string, Set<OrgMembershipStatus>>();
+        for (const membership of org.memberships ?? []) {
+            const personDocId = membership?.personDocId;
+            const status = membership?.status;
             if (typeof personDocId !== "string" || personDocId === "" || personDocId === org.docId) continue;
-            if (!rosterDocIds.has(personDocId) || connected.has(personDocId)) continue;
-            connected.add(personDocId);
-            edges.push({ source: org.docId, target: personDocId, kind: "member" as const });
+            if (status !== "active" && status !== "former") continue;
+            if (!rosterDocIds.has(personDocId)) continue;
+            const statuses = connected.get(personDocId) ?? new Set<OrgMembershipStatus>();
+            statuses.add(status);
+            connected.set(personDocId, statuses);
+        }
+        for (const [personDocId, statuses] of connected) {
+            const memberStatus = statuses.has("active") && statuses.has("former") ? "mixed"
+                : statuses.has("active") ? "active" : "former";
+            edges.push({ source: org.docId, target: personDocId, kind: "member" as const, memberStatus });
         }
         nodes.push({ id: org.docId, label: org.name, group: "组织", kind: "org" as const, degree: connected.size });
     }

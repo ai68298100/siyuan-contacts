@@ -142,7 +142,7 @@ export function graphRegistry(sources: GraphSources): { people: ContactSummary[]
         // former status is a lifecycle fact, not a deletion of the historical
         // organisation affiliation.  `buildOrgAugmentation` still drops
         // dangling person IDs against the verified roster.
-        docId: org.docId, name: org.name, memberDocIds: org.memberships.map((member) => member.personDocId),
+        docId: org.docId, name: org.name, memberships: org.memberships,
     })), personIds);
     const related = buildGraph(people);
     return { people, organizations: overlay.nodes.sort((left, right) => compareGraphIds(left.id, right.id)),
@@ -276,6 +276,10 @@ export function buildGraphQuerySnapshot(sources: GraphSources, query: GraphQuery
         result: { kind, status: resultStatus, ids: [...resultIds].sort(compareGraphIds), pathIds, neighborIds: relations.neighborIds, reason } };
 }
 
-export function graphEdgeLabel(kind: "related" | "member" | "ref" | undefined): string {
-    return kind === "member" ? "组织成员（member）" : kind === "ref" ? "文档块引用（ref）" : "显式人物关系（related）";
+export function graphEdgeLabel(kind: "related" | "member" | "ref" | undefined, memberStatus?: "active" | "former" | "mixed"): string {
+    if (kind === "member") {
+        const lifecycle = memberStatus === "active" ? "当前" : memberStatus === "former" ? "历史" : memberStatus === "mixed" ? "当前+历史" : "";
+        return `组织成员（member）${lifecycle ? `·${lifecycle}` : ""}`;
+    }
+    return kind === "ref" ? "文档块引用（ref）" : "显式人物关系（related）";
 }

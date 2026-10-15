@@ -124,7 +124,7 @@ export function renderGraphSnapshotMarkdown(snapshot: GraphQuerySnapshot, genera
         `- 来源：${Object.entries(snapshot.sourceStatus).map(([key, status]) => `${key}=${status}`).join("；")}`, "", "## 节点"];
     for (const node of snapshot.graph.nodes) lines.push(`- ${label(node.id)} · ${node.kind === "org" ? "组织" : "人物"} · 图内连接 ${node.degree}`);
     lines.push("", "## 边");
-    for (const edge of snapshot.graph.edges) lines.push(`- ${label(edge.source)} — ${label(edge.target)} · ${graphEdgeLabel(edge.kind)}`);
+    for (const edge of snapshot.graph.edges) lines.push(`- ${label(edge.source)} — ${label(edge.target)} · ${graphEdgeLabel(edge.kind, edge.memberStatus)}`);
     lines.push("", "## related 查询", `- ${snapshot.result.kind}：${snapshot.result.status}`, `- ${safeGraphText(snapshot.result.reason)}`);
     if (snapshot.result.pathIds.length) lines.push(`- 路径：${snapshot.result.pathIds.map(label).join(" — ")}`);
     else for (const id of snapshot.result.ids) lines.push(`- ${label(id)}`);

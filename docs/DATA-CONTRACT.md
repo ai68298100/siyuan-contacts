@@ -610,13 +610,16 @@ AG-B13-006 先提供共用核对/修复服务与设置入口；成员保存后�
   （双向一度含回链），与 related 关系边不同源、不互相推断（B14.8）。
 
 **B14.6 关系图组织增强契约（D-0037，2026-10-16）**：GraphNode 增 `kind`（person/org）、
-GraphEdge 增 `kind`（related/member）——**成员边与 related 边分源**：关系查询（一度/二度/共同/
-最短路径）只消费 buildGraph 的 related 图；`buildOrgAugmentation` 产物（组织节点 + 成员边）只
-叠加渲染。成员边数据源 = `org-membership.json` 中 **status=active 或 former** 的记录 join 名册 docId，
-且组织必须健康、未归档（悬空/不可达/重复绑定/来源未知不成边；同组织同人多段记录合并一条展示边）。
-former 边是历史归属展示事实，不计入当前成员统计、当前单位投影或 related 查询；边标签/详情必须能区分
-当前与历史。组织节点 id=组织文档 ID、label=文档标题、固定色 ORG_NODE_COLOR；画布成员边只连当前裁剪
-后画布内人物。组织维度照旧零写库（扫描 + JSON 投影，不写 related、不写数据库）。
+GraphEdge 增 `kind`（related/member）；`member` 边另带派生的 `memberStatus`（`active|former|mixed`，
+related/ref 边不带此字段）——**成员边与 related 边分源**：关系查询（一度/二度/共同/最短路径）只消费
+buildGraph 的 related 图；`buildOrgAugmentation` 产物（组织节点 + 成员边）只叠加渲染。成员边数据源 =
+`org-membership.json` 中 **status=active 或 former** 的记录 join 名册 docId，且组织必须健康、未归档
+（悬空/不可达/重复绑定/来源未知不成边；同组织同人多段记录合并一条展示边）。同一组织/人物只有 active
+记录时为 `active`，只有 former 记录时为 `former`，两者同时存在时必须为 `mixed`，不能静默选一类。
+former 边是历史归属展示事实，不计入当前成员统计、当前单位投影或 related 查询；文本、Markdown、画布详情
+或等价状态样式必须能区分当前、历史和混合状态。组织节点 id=组织文档 ID、label=文档标题、固定色
+ORG_NODE_COLOR；画布成员边只连当前裁剪后画布内人物。组织维度照旧零写库（扫描 + JSON 投影，不写
+related、不写数据库）。
 **B14.8 引用图范围契约（第 71 轮，2026-09-30）**：`view-preferences.json` 新增 `nativeScope`
 （"self" | "person" | "global"，缺省 "self"）与 `nativeCenterDocId`（person 模式中心文档 ID，
 非法值丢弃、失效由加载侧回退本人）。范围语义：self/person=以指定文档为中心的 getLocalGraph
@@ -633,7 +636,7 @@ UI 范围说明行必须如实标注实际生效范围与纳入/图外统计，g
 
 一次来源读取分别核实名册、组织成员与本人身份，记录各自 verified/unknown 和错误。登记集合为唯一绑定的人物文档与健康未归档组织文档；本人必须在名册中唯一绑定才可作为中心，不额外重复计数。重复人物 docId/itemId、人物与组织身份冲突、悬空成员、重复组织 ID 均有诊断；歧义目标不进入查询，不按姓名合并。组织或本人读失败允许展示已核实的人物关系，但标明未核实范围；依赖该来源的范围停止，不归一为空组织或空本人。
 
-related 仅来自 AV 显式人物关系；member 来自成员 JSON 的 active/former 记录与健康未归档组织的 join，同组织同人多段合为一条展示边；ref 仅来自已核实思源 `refs.root_id → refs.def_block_root_id` 的文档块引用。边的 kind 必须明确，不由成员或引用推断 related。直接、二度、共同联系人和关系最短路径只消费 related 子图；引用图只展示 ref。相同文档对的多块引用先按有向文档对聚合，展示再按 kind 与无向两端稳定 ID 去重；不合并不同来源的边，不推断关系强弱或引荐意愿。
+related 仅来自 AV 显式人物关系；member 来自成员 JSON 的 active/former 记录与健康未归档组织的 join，同组织同人多段合为一条展示边并派生 `memberStatus=active|former|mixed`；ref 仅来自已核实思源 `refs.root_id → refs.def_block_root_id` 的文档块引用。边的 kind 必须明确，不由成员或引用推断 related。直接、二度、共同联系人和关系最短路径只消费 related 子图；引用图只展示 ref。相同文档对的多块引用先按有向文档对聚合，展示再按 kind、memberStatus 与无向两端稳定 ID 去重；不合并不同来源的边，不推断关系强弱或引荐意愿。
 
 ### 9.2 范围、中心与组织聚焦
 

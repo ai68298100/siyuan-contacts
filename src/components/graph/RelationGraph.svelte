@@ -666,7 +666,7 @@
                     classes: searchNeedle ? "lvct-graph-hit" : "",
                 })),
                 ...graph.edges.map((edge) => ({
-                    data: { source: edge.source, target: edge.target, kind: edge.kind ?? "related", themeEdge: palette.edge },
+                    data: { source: edge.source, target: edge.target, kind: edge.kind ?? "related", memberStatus: edge.memberStatus, themeEdge: palette.edge },
                 })),
             ],
             // 同步完成布局，避免筛选/切页销毁画布后动画帧继续访问 renderer。
@@ -719,6 +719,8 @@
                 /* B14.6：组织节点方形、成员边虚线——与 related 边视觉分源 */
                 { selector: 'node[kind = "org"]', style: { shape: "round-rectangle" } },
                 { selector: 'edge[kind = "member"]', style: { "line-style": "dashed" } },
+                { selector: 'edge[kind = "member"][memberStatus = "former"]', style: { "line-style": "dotted" } },
+                { selector: 'edge[kind = "member"][memberStatus = "mixed"]', style: { "line-style": "dashed", width: 3 } },
                 // 引用是双向连接投影，不画方向箭头，以免把无向去重后的端点误作引用方向。
                 { selector: 'edge[kind = "ref"]', style: { "line-style": "dotted", width: 3 } },
             ],
@@ -1305,7 +1307,7 @@
                 {/each}
             </ul>
             <h3>{text("graphTextEdges", "边及来源")}（{snapshot.graph.edges.length}）</h3>
-            <ul>{#each snapshot.graph.edges.slice(0, textLimit) as edge}<li title={`${edge.source} — ${edge.target}（无向展示）`}>{nodeName(edge.source)} — {nodeName(edge.target)} · {graphEdgeLabel(edge.kind)}</li>{/each}</ul>
+            <ul>{#each snapshot.graph.edges.slice(0, textLimit) as edge}<li title={`${edge.source} — ${edge.target}（无向展示）`}>{nodeName(edge.source)} — {nodeName(edge.target)} · {graphEdgeLabel(edge.kind, edge.memberStatus)}</li>{/each}</ul>
             {#if snapshot.result.pathIds.length}<h3>{text("graphTextPath", "related 路径链")}</h3><ol>{#each snapshot.result.pathIds as id}<li title={id}>{nodeName(id)}</li>{/each}</ol>{/if}
             <p role="status">文本已列出 {Math.min(textLimit, snapshot.graph.nodes.length)} / {snapshot.graph.nodes.length} 节点，{Math.min(textLimit, snapshot.graph.edges.length)} / {snapshot.graph.edges.length} 边；导出包含完整展示快照。</p>
             {#if textLimit < Math.max(snapshot.graph.nodes.length, snapshot.graph.edges.length)}<button class="b3-button b3-button--outline" onclick={() => (textLimit += 100)}>{text("graphTextMore", "继续列出节点与边")}</button>{/if}
