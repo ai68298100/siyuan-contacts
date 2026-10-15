@@ -836,6 +836,14 @@ await test("相关人选择走可搜索选人器：电话关键词筛选、空�
     } });
     button("相关人").click();
     await until(() => fixture.querySelector(".lvct-picker__trigger"), "选人器未渲染");
+    /* 回归 issue #34：任务/人物详情空态里的“选择联系人”按钮在选人器外部，
+       点击后不能被浮层的 outside-click 监听立即关掉。 */
+    const emptyRelationCta = fixture.querySelector(".lvct-empty__actions button");
+    assert(emptyRelationCta?.textContent.trim() === "选择联系人", "相关人空态缺少选择联系人入口");
+    emptyRelationCta.click();
+    await until(() => fixture.querySelector(".lvct-picker__panel"), "空态选择联系人按钮未打开选人浮层");
+    fixture.querySelector(".lvct-picker__search").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    await until(() => !fixture.querySelector(".lvct-picker__panel"), "空态选择联系人浮层无法关闭");
     fixture.querySelector(".lvct-picker__trigger").click();
     await until(() => fixture.querySelector(".lvct-picker__panel"), "选人浮层未打开");
     const search = fixture.querySelector(".lvct-picker__search");

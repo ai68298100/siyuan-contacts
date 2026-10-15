@@ -121,7 +121,18 @@
     });
 
     export function openPicker(): void {
-        if (!disabled) void show();
+        if (disabled) return;
+        /*
+         * The empty-state CTA lives outside this component's wrapper. If it
+         * opens the picker synchronously, attachPopover installs its global
+         * click listener before the original click finishes bubbling and
+         * immediately treats that same click as an outside click. Defer the
+         * programmatic open until the event has finished propagating; the
+         * picker trigger itself still opens synchronously.
+         */
+        queueMicrotask(() => {
+            if (!disabled) void show();
+        });
     }
 
     async function show(): Promise<void> {
