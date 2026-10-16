@@ -282,7 +282,9 @@ export async function verifyRealFrontend({
         followUpCreated: false,
         followUpCompleted: false,
         followUpKernelVerified: false,
+        detailCloseDiagnostic: null,
         organizationView: false,
+        organizationNavigationDiagnostic: null,
         organizationRenamed: false,
         organizationMemberEdited: false,
         organizationArchived: false,
@@ -597,8 +599,63 @@ export async function verifyRealFrontend({
 
         const orgName = organization?.name;
         if (!orgName) throw new Error('组织验收缺少稳定组织名称');
+
+        // Workbench.selectView() is asynchronous and the person detail dialog
+        // remains mounted while its close guards resolve. Close it explicitly
+        // before clicking the underlying navigation item so the browser test
+        // does not race a modal close with view selection.
+        evidence.detailCloseDiagnostic = await browserSession.evaluate(`(()=>{
+            const detail = document.querySelector('.lvct-detail');
+            return {
+                present: Boolean(detail),
+                disabledHeaderActions: detail ? [...detail.querySelectorAll('.lvct-detail__header-actions button')].filter((button) => button.disabled).map((button) => button.textContent?.trim()) : [],
+                loadingStatuses: detail ? [...detail.querySelectorAll('[role="status"]')].map((node) => node.textContent?.trim()).filter(Boolean) : [],
+                closeGuardVisible: Boolean(document.querySelector('.lvct-closeguard')),
+            };
+        })()`);
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`(()=>{
+            const detail = document.querySelector('.lvct-detail');
+            if (!detail || detail.querySelector('.lvct-detail__header-actions button:first-child[disabled]')) return false;
+            const pending = [...detail.querySelectorAll('[role="status"]')].some((node) => /正在核实本人参照与称谓|正在读取个人备注|正在加载成员|正在读取组织候选/.test(node.textContent || ''));
+            return !pending;
+        })()`)), "人物详情就绪");
+        // A close guard may reject a click while a nested read is still busy.
+        // Retry the same explicit close action until it either closes or opens
+        // the guard; this keeps the test deterministic without bypassing the
+        // product's close policy.
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`(()=>{
+            const detail = document.querySelector('.lvct-detail');
+            if (!detail || document.querySelector('.lvct-closeguard')) return true;
+            const panel = detail.closest('.lvct-dialog-panel');
+            const button = panel?.querySelector('.lvct-dialog-panel__close');
+            if (!(button instanceof HTMLElement) || (button instanceof HTMLButtonElement && button.disabled)) return false;
+            button.click();
+            return false;
+        })()`)), "人物详情关闭/离开确认");
+        const closeGuardVisible = await browserSession.evaluate("Boolean(document.querySelector('.lvct-closeguard'))");
+        if (closeGuardVisible) {
+            const discarded = await browserSession.evaluate(`(()=>{
+                const button = document.querySelector('.lvct-closeguard button[data-choice="discard"]');
+                if (!button || button.disabled) return false;
+                button.click();
+                return true;
+            })()`);
+            if (!discarded) throw new Error('人物详情离开确认不可定位');
+            await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("!document.querySelector('.lvct-detail')")), "人物详情关闭");
+        }
         const orgsNavigation = await browserSession.evaluate("(()=>{const node=document.querySelector('[data-navigation-view=orgs]');if(!node)return false;node.click();return true})()");
         if (!orgsNavigation) throw new Error('工作台组织导航不存在');
+        evidence.organizationNavigationDiagnostic = await browserSession.evaluate(`(()=>{
+            const node = document.querySelector('[data-navigation-view="orgs"]');
+            return {
+                activeNavigation: document.querySelector('.lvct-workbench__nav-item--active')?.getAttribute('data-navigation-view') || null,
+                requestedNavigation: node ? { ariaCurrent: node.getAttribute('aria-current'), disabled: node.disabled === true } : null,
+                detailVisible: Boolean(document.querySelector('.lvct-detail')),
+                dialogVisible: Boolean(document.querySelector('.lvct-dialog-panel')),
+                closeGuardVisible: Boolean(document.querySelector('.lvct-closeguard')),
+                organizationViewVisible: Boolean(document.querySelector('.lvct-orgs-view')),
+            };
+        })()`);
         await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('.lvct-orgs-view')")), "组织工作台");
         await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`[...document.querySelectorAll('.lvct-orgs-view__card')].some((card) => card.textContent?.includes(${json(orgName)}))`)), "组织卡片");
         evidence.organizationView = true;
