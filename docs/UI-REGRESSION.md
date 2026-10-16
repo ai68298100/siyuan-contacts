@@ -1,5 +1,7 @@
 # UI 隔离回归
 
+> **2026-10-16 v0.5.16 发布回归：** 当前单位 active 投影、图谱 member 生命周期和 related 查询隔离已发布；发布前本地 `pnpm check` 0 errors / 0 warnings、单测 597/597、桌面/移动/宿主样式 UI 各 381/381、构建与发布门禁通过。AG-B13-007 契约复评的定向域测试 55/55 通过，见 [成员历史矩阵](verification/ORG-MEMBERSHIP-HISTORY-MATRIX-2026-10-16.md)。Release 附件下载复核为 582,401 B，SHA-256 `91c2d4bece34509a2a72468a7d097af4d1bd566ceadfcb2a392fc4331cd731b8`。PR #42 两条 CI 通过；发布后 main CI 首次 B03 失败及复跑单列于 [RELEASE](RELEASE.md)。Issue #35 与真实宿主余项继续保留。
+
 > **2026-10-16 v0.5.15 发布回归：** 往来账本创建、连续写入和状态变更均覆盖陈旧列表回读；`pnpm check` 0 errors / 0 warnings、`pnpm test` 596/596、桌面/移动/宿主样式 UI 381/381 通过。`package.zip` 581,946 B，SHA-256 `cd271b7b62db1b1ce86d99b17e64e4a7a547963f79db70016bac467553ab2f8b`。Issue #35 仍缺原始脱敏 VCF。
 
 > **2026-10-16 v0.5.14 候选回归：** vCard 无名卡片逐卡跳过并继续后续有效卡；`pnpm check` 0 errors / 0 warnings、`pnpm test` 596/596、桌面/移动 UI 378/378 通过。生产构建与发布门禁已通过；本地 package.zip 为 581,455 B，SHA-256 `c3b55321df8b8dfeb36693e96b60783e1e9dec8de548f2b52a7d3c40f9cb319a`。Issue #35 仍缺原始脱敏 VCF，候选修复未被证明命中小米文件根因。

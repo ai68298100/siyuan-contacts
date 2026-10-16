@@ -10,9 +10,11 @@
 - [x] `pnpm check`、`pnpm test` 597/597、桌面/移动/宿主样式 UI 381/381
 - [x] `pnpm build`、`pnpm check:release`、`git diff --check`
 - [x] 本地 `package.zip`：582,401 B；SHA-256 `91c2d4bece34509a2a72468a7d097af4d1bd566ceadfcb2a392fc4331cd731b8`
-- [ ] annotated tag `v0.5.16` 与 GitHub Release：发布后回填
-- [ ] Release 附件下载复核：发布后回填
+- [x] PR [#42](https://github.com/ai68298100/siyuan-contacts/pull/42) 通过两条 CI 后普通合并；annotated tag `v0.5.16` 指向 `43725933e516fb36b8c8f108e47687c98872c798`
+- [x] [GitHub Release v0.5.16](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.16) 已发布；附件下载复核一致：582,401 B，SHA-256 `91c2d4bece34509a2a72468a7d097af4d1bd566ceadfcb2a392fc4331cd731b8`
 - [ ] Issue #35 原始小米 VCF 未提供，不能确认 vCard 候选修复命中根因
+
+发布后 main CI [run 38815793263，attempt 1](https://github.com/ai68298100/siyuan-contacts/actions/runs/38815793263/attempts/1) 首次桌面 UI 为 380/381，B03 在 Esc 关闭后再次打开时报“选人浮层未打开”。同提交无代码变更的 [attempt 2](https://github.com/ai68298100/siyuan-contacts/actions/runs/38815793263/attempts/2) 已全部通过（类型、单测、桌面/移动 UI、构建、发布门禁）；首次失败仍保留为待复现的 CI 稳定性记录，不宣称根因已修复。
 
 > v0.5.15 为往来账本陈旧回读竞态补丁：确认写入后保留新记录和最新状态。Issue #35 仍等待真实脱敏小米 VCF，vCard 候选修复未宣称为已确认根因。
 
