@@ -11,6 +11,7 @@ import ts from "typescript";
 import { assertIsolatedPath, assertTestPortAvailable, observeTestKernel, prepareIsolatedWorkspace } from "./kernel-safety.mjs";
 import { stopIsolatedBrowser } from "./browser-cleanup.mjs";
 import { verifyRealFrontend } from "./frontend-flow.mjs";
+import { prepareFollowUpsFlow } from "./followups-flow.mjs";
 import { guardScratch, kernelTokenFromConfig, makeApi, sweepOrphans } from "../lib/smoke-kernel.mjs";
 
 function readArg(name) {
@@ -170,6 +171,7 @@ let captured;
 let exchange;
 let org;
 let replacement;
+let followupsFlow;
 try {
     await boot();
     evidence.kernelVersion = await request("/api/system/version");
@@ -266,6 +268,10 @@ try {
         assert.equal(result.failed.length, 0, JSON.stringify(result));
         assert.equal((await exchanges.listPersonExchanges(plugin, first.docId)).length, 1);
     });
+    await verify("原生任务块九条跨日期事项全量对账、修改删除与故障恢复", async () => {
+        followupsFlow = await prepareFollowUpsFlow({ plugin, settings, first, request: envelope });
+        evidence.followUps = followupsFlow.evidence;
+    });
     await stop();
     await boot();
     await verify("真实内核重启后的锚点核验与原人物数据回读", async () => {
@@ -287,6 +293,12 @@ try {
         assert.equal((await loadOrgMembershipStore(plugin)).memberships.length, 2);
         assert.ok((await fetchDocMarkdown(captured.placeDocId)).content.includes(first.docId));
     });
+    if (followupsFlow && !evidence.hostPending) {
+        await verify("原生任务块重启后索引文档首页逐项回读", async () => {
+            await followupsFlow.verifyAfterRestart();
+            evidence.followUps = followupsFlow.evidence;
+        });
+    }
     if (process.env.LVCT_REAL_FRONTEND === "1") {
         evidence.frontend = await verifyRealFrontend({
             workspace, storage, baseURL: `http://127.0.0.1:${port}`, request: envelope, accessAuthCode: accessToken, first, second, captureSourceDocId: captured.sourceDocId, organization: org, settings,

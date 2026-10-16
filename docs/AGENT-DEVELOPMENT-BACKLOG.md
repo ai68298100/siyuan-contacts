@@ -889,10 +889,11 @@ evidence_paths / owner / last_updated / commit
 ### AG-HOST-003 — 原生任务块全量对账
 
 - **状态 / 类型 / 优先级：** `host_pending` / host+e2e / P0 / M2。
+- **2026-10-16 增量认领：** Codex；补至少 6 条跨日期任务的真实产品服务对账、编辑/完成/删除、受控读取失败和内核重启回读；仅操作脚本创建的 UUID 隔离工作区，整卡保留 `host_pending`。
 - **依赖：** `AG-P0-008`。
 - **步骤：** 创建、修改、完成、删除至少 6 条跨日期任务；重启/刷新后检查索引、文档和首页；注入一个受控块读取失败。
 - **验收：** 各侧状态逐项一致或明确未对账；失败不会伪装成功。
-- **当前证据：** 2026-10-16 的 v3.8.7 隔离内核复核已通过任务块创建、扫描、勾选/取消、批量标记、自定义属性保留、删除反查和 ID 分页，详见 [TASK-SPIKE-2026-10-16](verification/TASK-SPIKE-2026-10-16.md)；真实用户工作区全量对账和受控读取失败注入仍待验。
+- **当前证据：** 2026-10-16 的 v3.8.8-alpha.1 隔离真实内核增量已通过 9 条跨日期任务的索引/文档/首页逐项对账、6 条原生完成与历史项重开、文档改标题/日期、原生删块、产品取消、一次受控读取失败（9 项 document=unknown 且索引未变）和重启回读；原始结果见 `output/host-queue-v0516-tasks.json`，既有 API 形状见 [TASK-SPIKE-2026-10-16](verification/TASK-SPIKE-2026-10-16.md)。真实用户工作区、原生编辑器交互和其他任务管理器互读仍待验。
 
 ### AG-HOST-004 — 真机移动、键盘、安全区和系统返回
 
@@ -913,6 +914,7 @@ evidence_paths / owner / last_updated / commit
 ### AG-HOST-006 — 用户五项反馈的真实读写验收
 
 - **状态 / 类型 / 优先级：** `host_pending` / `host+e2e+docs` / P0 / M3。
+- **2026-10-16 增量认领：** Codex；以 v0.5.16 产物复核真实 Chrome browser-desktop，定位此前账本提交超时并记录后续各项可达性；使用独立工作区，保留各项未验边界。
 - **user_outcome / user_scenario：** 生日可持久保存，多人事项四侧双链可核对，账本/别名可重启读取，员工替换保留组织与人员历史。
 - **source_ids / current_evidence：** 用户五项原始反馈；当前已有各项代码，缺真实宿主闭环证据。
 - **depends_on / blocks / parallel_group / preconditions：** AG-P0-003/006/014/015/016/017/018/019、AG-ALIAS-001、AG-QA-004；阻塞五项“全部完成”声明；host-user-feedback；用户允许的隔离思源工作区和版本记录，不默认操作日常库。
@@ -920,7 +922,7 @@ evidence_paths / owner / last_updated / commit
 - **ordered_steps：** 公历/农历/清空/闰日生日保存后回读并重启；多人来源/日记/地点/人物引用和反链核查、重复捕获/局部失败重试；账本建立/结清/重开/备份恢复；别名冲突/泛称/有效人物匹配；同组织员工替换、离职历史和两侧刷新。
 - **test_fixtures / test_commands / acceptance：** 虚构两组织、多位人物、特殊字符、失败注入；相关 spike 与实际操作步骤；每项保存输入/输出/回读/版本/截图，未验项不能用隔离通过替代。
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 局部成功保留事实，只清理本轮受控测试产物；禁外发真实往来与联系人；记录请求数和大库边界，不新增性能承诺。
-- **current_evidence：** 隔离真实产品服务 `9/9` 含重启回读；browser-desktop 已通过生日、账本、别名、跟进、组织 UI/刷新、组织改名/成员职位/归档恢复跨窗口原地刷新、双页面幂等及截图。已实际尝试打开多人事项来源文档进入捕获弹窗，但宿主返回 `Uncaught`，捕获 UI 保持未验；真实用户工作区、组织成员对应人物投影的专门双窗口核对、原生图、真机仍未验。
+- **current_evidence：** 隔离真实产品服务 `11/11` 含 9 条跨日期任务全量对账、一次受控读取失败与重启回读；Chrome browser-desktop 本轮通过插件加载、桥 protocol 2、稳定 ref、工作台、生日编辑保存和账本编辑器定位，但账本提交后的新增文本仍未回读，后续别名/跟进/组织/捕获/跨窗口步骤因超时未执行。此前的 browser-desktop 生日、账本、别名、跟进、组织 UI/刷新、组织改名/成员职位/归档恢复、双页面幂等和截图证据仍保留；真实用户工作区、组织成员对应人物投影专门双窗口核对、原生图、真机仍未验。
 - **2026-10-05 复核：** 真实隔离 browser-desktop `realFrontend=true`，核心用户旅程、页面重载回读和双页面稳定幂等均通过；捕获来源文档打开仍返回 `Uncaught`，因此捕获 UI 保持未验。该证据不替代真实用户工作区、组织双窗口、原生图和真机验收。
 - **evidence_paths / owner / last_updated / commit：** `docs/verification/SERVICE-KERNEL-2026-10-04.json`、`docs/verification/REAL-FRONTEND-2026-10-04.md`；Codex；2026-10-04；未提交。
 
