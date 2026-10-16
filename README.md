@@ -346,7 +346,7 @@ Issue #35 仍等待脱敏的小米 VCF，未宣称 vCard 候选修复已确认�
 
 当前建议通过 GitHub Release 手动安装；集市上架 PR 已合并，但客户端可见性尚未在真实设备核验。
 
-1. 从 [v0.5.14 Release](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.14) 下载最新稳定版 `package.zip`。
+1. 从 [最新稳定版 Release](https://github.com/ai68298100/siyuan-contacts/releases/latest) 下载 `package.zip`。
 2. 将压缩包内容解压到思源工作空间的 `data/plugins/siyuan-contacts/`，确认 `plugin.json` 位于该目录根部。
 3. 重启思源，在“设置 → 集市 → 已安装”中启用“小驴人脉”。
 
