@@ -922,9 +922,9 @@ evidence_paths / owner / last_updated / commit
 - **ordered_steps：** 公历/农历/清空/闰日生日保存后回读并重启；多人来源/日记/地点/人物引用和反链核查、重复捕获/局部失败重试；账本建立/结清/重开/备份恢复；别名冲突/泛称/有效人物匹配；同组织员工替换、离职历史和两侧刷新。
 - **test_fixtures / test_commands / acceptance：** 虚构两组织、多位人物、特殊字符、失败注入；相关 spike 与实际操作步骤；每项保存输入/输出/回读/版本/截图，未验项不能用隔离通过替代。
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 局部成功保留事实，只清理本轮受控测试产物；禁外发真实往来与联系人；记录请求数和大库边界，不新增性能承诺。
-- **current_evidence：** 隔离真实产品服务 `11/11` 含 9 条跨日期任务全量对账、一次受控读取失败与重启回读；Chrome browser-desktop 本轮通过插件加载、桥 protocol 2、稳定 ref、工作台、生日编辑保存和账本编辑器定位，但账本提交后的新增文本仍未回读，后续别名/跟进/组织/捕获/跨窗口步骤因超时未执行。此前的 browser-desktop 生日、账本、别名、跟进、组织 UI/刷新、组织改名/成员职位/归档恢复、双页面幂等和截图证据仍保留；真实用户工作区、组织成员对应人物投影专门双窗口核对、原生图、真机仍未验。
+- **current_evidence：** 隔离真实产品服务 `11/11` 含 9 条跨日期任务全量对账、一次受控读取失败与重启回读；Chrome browser-desktop 复跑已通过插件加载、桥 protocol 2、稳定 ref、工作台、生日编辑保存、账本新建/结清/重开、别名和跟进，随后在组织工作台等待超时。Network 诊断确认写后 `putFile=200`、紧接 `getFile=202` 的宿主时序；账本组件修复已在隔离证据中生效。真实用户工作区、组织成员对应人物投影专门双窗口核对、原生图、真机和捕获 UI 仍未验。
 - **2026-10-05 复核：** 真实隔离 browser-desktop `realFrontend=true`，核心用户旅程、页面重载回读和双页面稳定幂等均通过；捕获来源文档打开仍返回 `Uncaught`，因此捕获 UI 保持未验。该证据不替代真实用户工作区、组织双窗口、原生图和真机验收。
-- **evidence_paths / owner / last_updated / commit：** `docs/verification/SERVICE-KERNEL-2026-10-04.json`、`docs/verification/REAL-FRONTEND-2026-10-04.md`；Codex；2026-10-04；未提交。
+- **evidence_paths / owner / last_updated / commit：** `docs/verification/HOST-QUEUE-2026-10-16.md`、`docs/verification/SERVICE-KERNEL-2026-10-04.json`、`docs/verification/REAL-FRONTEND-2026-10-04.md`；Codex；2026-10-16；未提交。
 
 ## 6. 研究候选（只调研，不直接开发）
 

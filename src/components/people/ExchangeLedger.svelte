@@ -46,6 +46,7 @@
     let requestId = newExchangeRequestId();
     let loadGeneration = 0;
     let personGeneration = 0;
+    let initializedPersonDocId = "";
     let confirmedRecords: ExchangeRecord[] = [];
     let alive = true;
     let kind = $state<ExchangeKind>("money");
@@ -103,6 +104,11 @@
 
     $effect(() => {
         const docId = personDocId;
+        // Parent data-change renders can invalidate the props getter without
+        // changing the person. Preserve an in-flight confirmed write across
+        // those renders; reset only when the displayed person actually changes.
+        if (docId === initializedPersonDocId) return;
+        initializedPersonDocId = docId;
         untrack(() => {
             personGeneration += 1;
             records = [];
@@ -126,6 +132,11 @@
 
     function rememberConfirmedRecord(record: ExchangeRecord): void {
         confirmedRecords = [...confirmedRecords.filter((candidate) => candidate.id !== record.id), record];
+        // Keep the confirmed write visible immediately. A host storage read
+        // can briefly return the previous snapshot, and a data-change refresh
+        // may run between the write response and the follow-up load.
+        records = [...records.filter((candidate) => candidate.id !== record.id), record].sort((left, right) =>
+            right.occurredOn.localeCompare(left.occurredOn) || right.updatedAt - left.updatedAt);
     }
 
     async function submit(): Promise<void> {
@@ -155,6 +166,10 @@
             resetForm();
             await load(docId);
             if (!alive || generation !== personGeneration || docId !== personDocId) return;
+            if (!records.some((record) => record.id === created.id)) {
+                records = [...records, created].sort((left, right) =>
+                    right.occurredOn.localeCompare(left.occurredOn) || right.updatedAt - left.updatedAt);
+            }
             // A confirmed write can become visible to the host storage reader
             // one tick later than the save response. Keep the confirmed record
             // in the list so a stale immediate read cannot make a successful

@@ -85,11 +85,64 @@ async function connectCdpTarget(target) {
     let nextId = 0;
     const pending = new Map();
     const consoleTail = [];
+    const fileRequestUrls = new Map();
+    const fileNetworkEvents = [];
+    const fileApiPath = (url) => {
+        if (typeof url !== "string") return null;
+        if (url.includes("/api/file/getFile")) return "/api/file/getFile";
+        if (url.includes("/api/file/putFile")) return "/api/file/putFile";
+        return null;
+    };
+    const rememberFileNetworkEvent = (event) => {
+        // Keep only request metadata; response bodies are intentionally never
+        // requested or retained by this diagnostic.
+        fileNetworkEvents.push(event);
+        if (fileNetworkEvents.length > 80) fileNetworkEvents.shift();
+    };
     socket.addEventListener("message", ({ data }) => {
         const message = JSON.parse(data);
         if (message.method === "Runtime.consoleAPICalled") {
             consoleTail.push(message.params.args.map((arg) => arg.value ?? arg.description ?? "").join(" "));
             if (consoleTail.length > 30) consoleTail.shift();
+            return;
+        }
+        if (message.method === "Network.requestWillBeSent") {
+            const url = message.params?.request?.url;
+            const path = fileApiPath(url);
+            if (path) fileRequestUrls.set(message.params.requestId, { path, url });
+            return;
+        }
+        if (message.method === "Network.responseReceived") {
+            const response = message.params?.response;
+            const path = fileApiPath(response?.url) ?? fileRequestUrls.get(message.params?.requestId)?.path;
+            if (path) {
+                rememberFileNetworkEvent({
+                    event: "responseReceived",
+                    requestId: message.params?.requestId ?? null,
+                    path,
+                    status: response?.status ?? null,
+                    url: response?.url ?? fileRequestUrls.get(message.params?.requestId)?.url ?? null,
+                    timestamp: message.params?.timestamp ?? null,
+                    observedAt: new Date().toISOString(),
+                });
+            }
+            return;
+        }
+        if (message.method === "Network.loadingFailed") {
+            const request = fileRequestUrls.get(message.params?.requestId);
+            if (request) {
+                rememberFileNetworkEvent({
+                    event: "loadingFailed",
+                    requestId: message.params?.requestId ?? null,
+                    path: request.path,
+                    status: null,
+                    url: request.url,
+                    timestamp: message.params?.timestamp ?? null,
+                    observedAt: new Date().toISOString(),
+                    errorText: message.params?.errorText ?? null,
+                });
+                fileRequestUrls.delete(message.params.requestId);
+            }
             return;
         }
         const resolveMessage = pending.get(message.id);
@@ -105,6 +158,7 @@ async function connectCdpTarget(target) {
         socket.send(JSON.stringify({ id, method, params }));
     });
     await call("Runtime.enable");
+    await call("Network.enable");
     await call("Page.enable");
     const evaluate = async (expression) => {
         const result = await call("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
@@ -119,7 +173,7 @@ async function connectCdpTarget(target) {
         }
         return result.result?.value;
     };
-    return { socket, call, evaluate, consoleTail };
+    return { socket, call, evaluate, consoleTail, fileNetworkEvents };
 }
 
 async function connectBrowser(profile, deadline) {
@@ -254,6 +308,7 @@ export async function verifyRealFrontend({
         failure: null,
         browserUrl: null,
         consoleTail: [],
+        fileNetworkEvents: [],
     };
     const deadline = Date.now() + deadlineMs;
     let browserSession;
@@ -924,6 +979,7 @@ export async function verifyRealFrontend({
     } finally {
         if (browserSession) {
             evidence.consoleTail = [...browserSession.consoleTail];
+            evidence.fileNetworkEvents = [...browserSession.fileNetworkEvents];
             try { await stopIsolatedBrowser(browserSession.browser, { requestClose: () => browserSession.call("Browser.close") }); }
             catch (error) { evidence.failure ??= error instanceof Error ? error.message : String(error); }
             browserSession.socket.close();
