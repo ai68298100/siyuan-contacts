@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.17** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.17) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.18** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.18) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -21,7 +21,18 @@ English | [简体中文](README.md)
 
 Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
 
-## This release: v0.5.17 (2026-10-17)
+## This release: v0.5.18 (2026-10-18)
+
+This patch closes the contact-picker and organization-affiliation workflow gaps.
+
+- Fixed the real-click outside-click race that immediately closed the “Choose contact” empty-state picker; added trusted click, Enter, Escape, outside-close, and focus-return coverage.
+- Unified work, school, and other affiliations into a searchable multi-select with independent category, current/history, department, title, dates, status, and notes.
+- Added a real create-organization path that selects the returned stable document ID; drafts, partial success, and unknown results remain recoverable.
+- Consolidated search, filtering, batch selection, and form-save boundaries, including multiple historical periods for one organization and missing candidates.
+
+Validation: local `pnpm check` (0 errors / 0 warnings), 728 unit tests, Chrome UI 473/473, and the main-branch GitHub Actions CI pass. Daily user workspaces and Android devices remain separate acceptance steps.
+
+## Previous release: v0.5.17 (2026-10-17)
 
 This patch completes the #51/#54 repeated-fields and personal-note workflow.
 
