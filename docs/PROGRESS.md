@@ -1,3 +1,10 @@
+## 2026-10-18 v0.5.18 发布：联系人选择器与组织归属统一多选
+
+- PR #57 的代码改动与 PR #58 的版本提交均通过完整 GitHub Actions CI；主分支合并提交为 `3ef4f43`，annotated tag `v0.5.18` 已推送。
+- GitHub Release 已创建：[下载与安装](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.18)。远端 `package.zip` 下载复核为 **616,803 B**，SHA256 `5b93d0de228fb1c41e0311249736130e8deccfe5335a40a7df640b74c1f83cfe`，与本地候选和 asset digest 一致。
+- 本版本包含真实点击下联系人选择器竞态修复、组织归属统一多选/新建/同组织历史，以及搜索筛选和表单边界收口；本地 check 0/0、单测 728/728、Chrome UI 473/473。
+- 真实日常用户工作区和 Android 真机仍需单独复测；本次未发布 Bazaar/集市。
+
 ## 2026-10-17 组织模板、导入来源筛选与最终工作树门禁（本地未发布）
 
 - QuickFill 文档识别与粘贴识别均支持从预览返回修改原文并重新识别；同日期公历/农历候选按生日与历法成对比较，默认不覆盖，明确选择后成对写入；导入来源筛选可保留稳定来源并在来源变化时要求明确重选。`AG-IMP-001` 定向 UI **7/7**。
@@ -172,4 +179,3 @@
 - 统一按钮、输入、复选框、单选框、加载、禁用和键盘焦点反馈，避免列表页、详情页和设置页出现不同表现。
 
 验证：pnpm check、pnpm test、pnpm test:ui、pnpm test:ui:mobile、pnpm build、pnpm check:release 和 git diff --check 均通过；具体运行数据在发布记录中更新。
-
