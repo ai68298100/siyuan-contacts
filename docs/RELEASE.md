@@ -11,7 +11,7 @@
 - [x] 搜索、筛选、批量选择、缺失候选和表单保存边界回归
 - [x] `pnpm check`、728 项单测、Chrome UI 473/473
 - [x] `pnpm build`、主分支 CI、`pnpm check:release`
-- [ ] 远端 Release 附件下载复核（完成创建 Release 后回填）
+- [x] 远端 Release 附件下载复核：616,803 B，SHA-256 `5b93d0de228fb1c41e0311249736130e8deccfe5335a40a7df640b74c1f83cfe`；[GitHub Release v0.5.18](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.18)
 - [ ] 真实日常用户工作区和 Android 真机复测
 
 > v0.5.17 为 #51/#54 重复资料与个人备注闭环补丁：支持重复条目、两层分组、详情筛选/复制、备注冲突重读，以及旧版拆块备注的安全恢复。Issue #35 仍等待真实脱敏小米 VCF，vCard 候选修复未宣称为已确认根因。
