@@ -1,8 +1,13 @@
+## 2026-10-17 v0.5.17 发布：Issue #51/#54 收口
+
+- `v0.5.17` 已推送并创建 GitHub Release：[下载与安装](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.17)。远端 `package.zip` 下载复核为 601,897 B，SHA256 `472918deacd8aa985e4a8effb9af3796382aa4336cd546bb59db1e4c7317f11d`，与本地候选完全一致。
+- #51、#54 已发布后回复并关闭；#35 仍开放等待原始脱敏小米 VCF。补充资料与个人备注的实现、隔离宿主验收和交付状态已分开记录。
+
 ## 2026-10-17 Issue #51/#54 原始需求生命周期收口
 
 - #51/#54 原始需求已完成开发并在隔离真实 SiYuan Kernel + Chrome 中收口：重复资料、两层分组、改组/解除组、排序、两种删除、清空重建、个人备注冲突重读/草稿选择、旧版拆块备注安全恢复均已通过最终联合轮 `9e8b5db6-5834-42c7-a5ec-fee5b471bd10`。旧版拆块只支持用户确认后解除关联并手动全文重存，不自动拼接或覆盖原文。
 - 最终门禁：`pnpm test` **710/710**，`pnpm check` **0 errors / 0 warnings**，Chrome 桌面/390px/宿主样式 UI 各 **416/416**，E2E 安全与内核 smoke **17/17**，构建和本地包完整性通过。联合轮验证侧 248 次请求及归属核验全部通过，进程、端口和独立 profile 已清理。
-- 本地 0.5.16 开发候选 `package.zip` 为 601,675 B，SHA256 `cd9cfb217ca323f3f78c3e8c23bab8bbe928b73e9afe97c69f71975d4b948549`；尚未提交、推送或发布，线上 v0.5.16 不包含修复。GitHub #51/#54 仍 OPEN，发布和用户场景核对后再回复/关闭。
+- 本地 `v0.5.17` 候选已进入发布流程；版本、远端附件和 issue 关闭状态以本文件顶部发布记录及 [RELEASE](RELEASE.md) 为准。
 - 证据：[原始需求验收](verification/ISSUE-051-054-ACCEPTANCE-2026-10-17.md)、[完整生命周期](verification/PERSON-FIELDS-LIFECYCLE-2026-10-17.md)、[最终真实 UI JSON](verification/PERSON-FIELDS-REAL-UI-9e8b5db6-5834-42c7-a5ec-fee5b471bd10.json)。
 
 ## 2026-10-17 Issue #51/#54 详情使用闭环与真实双页面验收（上一阶段基线）

@@ -108,7 +108,7 @@ evidence_paths / owner / last_updated / commit
 
 #### AG-ISSUE-051-054-CLOSE — 原始需求复核、备注重读恢复与资料生命周期验收
 
-- **status / priority / type / milestone：** `done_isolated` / P1 / fix+acceptance / M4；原始需求和隔离真实宿主验收已收口，尚未提交、发布或关闭 GitHub issue。
+- **status / priority / type / milestone：** `done` / P1 / fix+acceptance / M4；原始需求、隔离真实宿主验收、v0.5.17 发布和 GitHub issue 回复/关闭均已收口。
 - **user_outcome / user_scenario：** 备注保存冲突后可在原地核对最新内容并保留或放弃草稿；受旧Markdown多段写入影响的用户可保留全部原文、核对后解除旧关联并重新输入全文保存；补充资料已保存后可改组、解除组、排序、删除、清空与重新新增，重开保持实际保存结果。
 - **source_ids / current_evidence：** #51/#54最新正文及无评论状态、用户要求核实是否完全解决；最终联合轮 `9e8b5db6-5834-42c7-a5ec-fee5b471bd10` 已覆盖备注重读/冲突/清空、旧版拆块安全恢复和补充资料完整生命周期。
 - **depends_on / blocks / parallel_group / preconditions：** D-0039、DATA-CONTRACT §6A/6B、AG-ISSUE-051-054-USE已完成范围 / 原始issue开发验收结论 / issue-51-54-close / 新UUID隔离工作区、随机回环端口、独立Chrome profile、虚构资料。
@@ -119,7 +119,7 @@ evidence_paths / owner / last_updated / commit
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 失败与取消不丢草稿，重读不自动写；真实请求逐次核验本轮Kernel归属，场景有界，进程/端口/profile清理；只使用虚构数据。
 - **evidence_paths / owner / last_updated / commit：** [原始需求验收](verification/ISSUE-051-054-ACCEPTANCE-2026-10-17.md)、[完整生命周期](verification/PERSON-FIELDS-LIFECYCLE-2026-10-17.md)、`docs/verification/PERSON-FIELDS-REAL-UI-9e8b5db6-5834-42c7-a5ec-fee5b471bd10.json` / Codex / 2026-10-17 / 未提交。
 - **退出边界：** 原始需求已实现且其要求的隔离真实宿主证据齐全即可开发完成；正式发布单列。全局检索、AV投影、vCard往返、原生编辑器CAS、真机和日常用户库不扩张为#51/#54原始需求的隐含前置。
-- **完成回报：** `pnpm test` 710/710、`pnpm check` 0/0、桌面/390px/宿主样式 UI 各416/416、E2E安全与内核 smoke 17/17；最终真实 Chrome 联合轮 248 次验证侧请求及归属核验全部通过。旧版多段备注仅支持用户确认后的安全解除关联和手动全文重存，不自动拼接；发布、issue回复/关闭及日常用户库核对另行处理。
+- **完成回报：** `pnpm test` 710/710、`pnpm check` 0/0、桌面/390px/宿主样式 UI 各416/416、E2E安全与内核 smoke 17/17；最终真实 Chrome 联合轮 248 次验证侧请求及归属核验全部通过。v0.5.17 Release 附件 601,897 B / SHA256 `472918deacd8aa985e4a8effb9af3796382aa4336cd546bb59db1e4c7317f11d` 已下载复核，#51/#54 已回复并关闭。旧版多段备注仅支持用户确认后的安全解除关联和手动全文重存，不自动拼接；全局检索、AV投影、vCard往返、原生编辑器CAS、真机和日常用户库另行处理。
 
 #### AG-HOST-002-RAF — 组织管理后台页帧等待有界化
 
