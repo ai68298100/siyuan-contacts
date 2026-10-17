@@ -58,7 +58,7 @@ export async function saveOrganizationMember(plugin: Plugin, settings: ContactsS
     else {
         invalidateRoster();
         const [organizations, people] = await Promise.all([scanOrganizations(), getRoster(settings)]);
-        if (!organizations.some((entry) => entry.docId === input.orgDocId)
+        if (!organizations.some((entry) => entry.docId === input.orgDocId && !entry.removed)
             || people.filter((person) => person.docId === input.personDocId).length !== 1
             || organizations.some((entry) => entry.docId === input.personDocId)) {
             throw new Error("历史组织归属的组织或人物无法唯一核实，未登记记录");
@@ -99,7 +99,7 @@ export async function moveOrganizationMemberWithProjection(
     invalidateRoster();
     const [organizations, people] = await Promise.all([scanOrganizations(), getRoster(settings)]);
     const target = organizations.find((entry) => entry.docId === targetOrgDocId);
-    if (!target) throw new Error("目标组织不可达，未移动成员");
+    if (!target || target.removed) throw new Error("目标组织不可达或已移除，未移动成员");
     if (current.status === "active" && target.archived) throw new Error("当前成员不能移动到已归档组织，请先标记为已离开或恢复目标组织");
     if (people.filter((person) => person.docId === current.personDocId).length !== 1
         || organizations.some((entry) => entry.docId === current.personDocId)) throw new Error("成员人物无法唯一核实，未移动记录");

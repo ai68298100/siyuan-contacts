@@ -1,0 +1,53 @@
+{
+  "runId": "e40bbea1-9d16-4660-8011-68295d06aa43",
+  "workspace": "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Person-Fields-UI-e40bbea1-9d16-4660-8011-68295d06aa43",
+  "kernel": "D:\\RJ\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe",
+  "port": 7181,
+  "chrome": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "startedAt": "2026-10-17T02:50:35.423Z",
+  "fictionalOnly": true,
+  "actualProductionServices": true,
+  "actualProductionUi": true,
+  "nativeEditorCasVerified": false,
+  "kernelRequests": 22,
+  "listenerOwnershipChecks": 22,
+  "ownKernelPid": 65048,
+  "requestRoutes": [
+    "/api/system/bootProgress",
+    "/api/system/bootProgress",
+    "/api/system/version",
+    "/api/notebook/lsNotebooks",
+    "/api/notebook/lsNotebooks",
+    "/api/notebook/createNotebook",
+    "/api/notebook/lsNotebooks",
+    "/api/filetree/createDocWithMd",
+    "/api/block/insertBlock",
+    "/api/av/renderAttributeView",
+    "/api/av/renderAttributeView",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/transactions",
+    "/api/system/exit"
+  ],
+  "frontend": null,
+  "cleanup": {
+    "ownKernelExited": true,
+    "portReleased": true,
+    "workspaceRetained": true
+  },
+  "dist": {
+    "index.js": "03babeb6c1a53d15749d7cbdea190e9e6bcd7cf0d1d474ad16d9f6744dbaa7ba",
+    "index.css": "12f692af0051f4ab1435b087ffaba0c43aae0bb7f536e299dbc7b4314bef3f82",
+    "plugin.json": "3d89d9fe010e0beab2b5fcf8fa7c6a881b214eaa7ea2b0762575134298025bfe"
+  },
+  "kernelVersion": "3.8.8-alpha.2",
+  "error": "Error: ENOENT: no such file or directory, open 'C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Person-Fields-UI-e40bbea1-9d16-4660-8011-68295d06aa43\\data\\storage\\petal\\lvct-isolated-test\\contacts-settings.json'\n    at Object.writeFileSync (node:fs:2422:20)\n    at Object.saveData (file:///D:/%E6%80%9D%E6%BA%90%E6%8F%92%E4%BB%B6/%E5%B0%8F%E9%A9%B4%E4%BA%BA%E8%84%89/siyuan-contacts/scripts/e2e/person-fields-frontend-flow.mjs:63:164)\n    at saveJsonVerified (file:///D:/%E6%80%9D%E6%BA%90%E6%8F%92%E4%BB%B6/%E5%B0%8F%E9%A9%B4%E4%BA%BA%E8%84%89/siyuan-contacts/src/data/storage.ts:26:22)\n    at persistSettings (file:///D:/%E6%80%9D%E6%BA%90%E6%8F%92%E4%BB%B6/%E5%B0%8F%E9%A9%B4%E4%BA%BA%E8%84%89/siyuan-contacts/src/services/init.ts:333:11)\n    at initializeWorkspace (file:///D:/%E6%80%9D%E6%BA%90%E6%8F%92%E4%BB%B6/%E5%B0%8F%E9%A9%B4%E4%BA%BA%E8%84%89/siyuan-contacts/src/services/init.ts:408:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async runPersonFieldsRealFrontend (file:///D:/%E6%80%9D%E6%BA%90%E6%8F%92%E4%BB%B6/%E5%B0%8F%E9%A9%B4%E4%BA%BA%E8%84%89/siyuan-contacts/scripts/e2e/person-fields-frontend-flow.mjs:93:26)\n    at async file:///D:/%E6%80%9D%E6%BA%90%E6%8F%92%E4%BB%B6/%E5%B0%8F%E9%A9%B4%E4%BA%BA%E8%84%89/siyuan-contacts/scripts/e2e/person-fields-frontend-flow.mjs:123:61",
+  "completedAt": "2026-10-17T02:50:38.424Z"
+}

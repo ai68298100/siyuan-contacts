@@ -212,7 +212,10 @@ try {
         }
     });
     await verify("多人事项来源、当日日记、地点和双方人物投影及重复捕获", async () => {
-        const sourceDocId = await createDocWithMd(settings.notebookId, "/虚构多人会议", "用户原文保留\n");
+        // The real capture UI discovers people from native refs. Ordinary
+        // Markdown siyuan:// links in generated projections do not create refs.
+        const sourceDocId = await createDocWithMd(settings.notebookId, "/虚构多人会议",
+            `用户原文保留\n\n((${first.docId} '虚构服务甲')) 与 ((${second.docId} '虚构服务乙')) 参加虚构会议。\n`);
         const options = { personDocIds: [first.docId, second.docId], newNames: [], date: "2026-10-04", place: "虚构会议室", note: "虚构协作" };
         captured = { ...(await captureFromDoc(plugin, settings, sourceDocId, options)), sourceDocId };
         assert.equal(captured.complete, true, JSON.stringify(captured));
@@ -302,6 +305,7 @@ try {
     if (process.env.LVCT_REAL_FRONTEND === "1") {
         evidence.frontend = await verifyRealFrontend({
             workspace, storage, baseURL: `http://127.0.0.1:${port}`, request: envelope, accessAuthCode: accessToken, first, second, captureSourceDocId: captured.sourceDocId, organization: org, settings,
+            captureProjectionDocIds: { source: captured.sourceDocId, diary: captured.dateDocId, place: captured.placeDocId, firstPerson: first.docId, secondPerson: second.docId },
         });
         evidence.realFrontend = evidence.frontend.ok;
         console.log(`真实 browser-desktop 前端验收：${evidence.frontend.ok ? "PASS" : "LIMITED"}`);

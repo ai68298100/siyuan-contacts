@@ -1,0 +1,3274 @@
+{
+  "isolated": true,
+  "randomPort": true,
+  "uuidWorkspace": true,
+  "actualProductServices": true,
+  "realFrontend": true,
+  "storageAdapter": "controlled files in isolated workspace",
+  "results": [
+    {
+      "name": "实际初始化与稳定人物创建",
+      "ok": true
+    },
+    {
+      "name": "设置补列与四层重绑只读预览及确认回读",
+      "ok": true
+    },
+    {
+      "name": "生日早年、公历农历连续保存与清空回读",
+      "ok": true
+    },
+    {
+      "name": "多人事项来源、当日日记、地点和双方人物投影及重复捕获",
+      "ok": true
+    },
+    {
+      "name": "往来账本稳定请求、结清与重新打开",
+      "ok": true
+    },
+    {
+      "name": "别名唯一核实、重复幂等、泛称拒绝与列表搜索",
+      "ok": true
+    },
+    {
+      "name": "组织员工接替保留旧历史与双方文档投影",
+      "ok": true
+    },
+    {
+      "name": "迁移包新模块覆盖、预览与现状优先重复恢复",
+      "ok": true
+    },
+    {
+      "name": "原生任务块九条跨日期事项全量对账、修改删除与故障恢复",
+      "ok": true
+    },
+    {
+      "name": "真实内核重启后的锚点核验与原人物数据回读",
+      "ok": true
+    },
+    {
+      "name": "原生任务块重启后索引文档首页逐项回读",
+      "ok": true
+    }
+  ],
+  "kernelVersion": "3.8.8-alpha.2",
+  "emptyOptionShape": [
+    {
+      "id": "20261017011854-ekdj2q5",
+      "value": {
+        "id": "20261017011854-ekdj2q5",
+        "keyID": "20261017011854-z9l75pb",
+        "blockID": "20261017011854-uip8kxe",
+        "type": "select",
+        "createdAt": 1792171134000,
+        "updatedAt": 1792171134000
+      },
+      "valueType": "select",
+      "color": "",
+      "bgColor": ""
+    },
+    {
+      "id": "20261017011854-88fax6z",
+      "value": {
+        "id": "20261017011854-88fax6z",
+        "keyID": "20261017011854-1patfri",
+        "blockID": "20261017011854-uip8kxe",
+        "type": "select",
+        "createdAt": 1792171134000,
+        "updatedAt": 1792171134000
+      },
+      "valueType": "select",
+      "color": "",
+      "bgColor": ""
+    },
+    {
+      "id": "20261017011854-7y9awvr",
+      "value": {
+        "id": "20261017011854-7y9awvr",
+        "keyID": "20261017011854-xgsp0ym",
+        "blockID": "20261017011854-uip8kxe",
+        "type": "mSelect",
+        "createdAt": 1792171134000,
+        "updatedAt": 1792171134000
+      },
+      "valueType": "mSelect",
+      "color": "",
+      "bgColor": ""
+    }
+  ],
+  "settingsPreviewRoutes": [
+    "/api/notebook/lsNotebooks",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/av/renderAttributeView",
+    "/api/notebook/lsNotebooks",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/av/renderAttributeView",
+    "/api/av/getAttributeView"
+  ],
+  "cellWriteShape": {
+    "code": 0,
+    "msg": "",
+    "data": {
+      "value": {
+        "id": "20261017011854-pmy09i4",
+        "keyID": "20261017011854-69rc3br",
+        "blockID": "20261017011854-uip8kxe",
+        "type": "date",
+        "createdAt": 1792171134364,
+        "updatedAt": 1792171135364,
+        "date": {
+          "content": -631094400000,
+          "isNotEmpty": true,
+          "hasEndDate": false,
+          "isNotTime": true,
+          "content2": 0,
+          "isNotEmpty2": false,
+          "formattedContent": "January 2, 1950"
+        }
+      }
+    }
+  },
+  "organizationProjection": "# 虚构公司\n**组织**：虚构公司\n**当前成员**：[虚构服务乙](siyuan://blocks/20261017011854-r7bvk0x) · 工作 · 在职 · 新对接人 · 2026-10-04 ~ 至今\n",
+  "followUps": {
+    "isolated": true,
+    "actualProductServices": true,
+    "actualKernel": true,
+    "nativeEditorUi": false,
+    "dashboardServiceOnly": true,
+    "personDocId": "20261017011854-8us4txz",
+    "taskCount": 9,
+    "stages": [
+      {
+        "name": "created-nine-cross-date-tasks",
+        "indexCount": 9,
+        "documentTaskCount": 9,
+        "dashboardCount": 9,
+        "report": [
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ixp3znp",
+            "blockId": "20261017011854-avb6u4e",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-bbc0xya",
+            "blockId": "20261017011854-q9h8f0e",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-09gbttn",
+            "blockId": "20261017011854-rm3bicu",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ojw9lkv",
+            "blockId": "20261017011855-wn1vz8n",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-57cqi07",
+            "blockId": "20261017011855-ek7846i",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-dgca53x",
+            "blockId": "20261017011855-3t04c19",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-us12vly",
+            "blockId": "20261017011855-o32iy0v",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-qeyu5dh",
+            "blockId": "20261017011855-o1h7wri",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-j3j09zj",
+            "blockId": "20261017011855-nj8mny9",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          }
+        ],
+        "index": [
+          {
+            "id": "20261017011854-ixp3znp",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 1",
+            "dueDate": "2026-10-12",
+            "status": "open",
+            "createdAt": 1792171134913,
+            "updatedAt": 1792171134913,
+            "docBlockId": "20261017011854-avb6u4e"
+          },
+          {
+            "id": "20261017011854-bbc0xya",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 2",
+            "dueDate": "2026-10-13",
+            "status": "open",
+            "createdAt": 1792171134946,
+            "updatedAt": 1792171134946,
+            "docBlockId": "20261017011854-q9h8f0e"
+          },
+          {
+            "id": "20261017011854-09gbttn",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 3",
+            "dueDate": "2026-10-14",
+            "status": "open",
+            "createdAt": 1792171134973,
+            "updatedAt": 1792171134973,
+            "docBlockId": "20261017011854-rm3bicu"
+          },
+          {
+            "id": "20261017011854-ojw9lkv",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 4",
+            "dueDate": "2026-10-15",
+            "status": "open",
+            "createdAt": 1792171135002,
+            "updatedAt": 1792171135002,
+            "docBlockId": "20261017011855-wn1vz8n"
+          },
+          {
+            "id": "20261017011855-57cqi07",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 5",
+            "dueDate": "2026-10-16",
+            "status": "open",
+            "createdAt": 1792171135029,
+            "updatedAt": 1792171135029,
+            "docBlockId": "20261017011855-ek7846i"
+          },
+          {
+            "id": "20261017011855-dgca53x",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 6",
+            "dueDate": "2026-10-17",
+            "status": "open",
+            "createdAt": 1792171135057,
+            "updatedAt": 1792171135057,
+            "docBlockId": "20261017011855-3t04c19"
+          },
+          {
+            "id": "20261017011855-us12vly",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 7",
+            "dueDate": "2026-10-18",
+            "status": "open",
+            "createdAt": 1792171135085,
+            "updatedAt": 1792171135085,
+            "docBlockId": "20261017011855-o32iy0v"
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 8",
+            "dueDate": "2026-10-19",
+            "status": "open",
+            "createdAt": 1792171135112,
+            "updatedAt": 1792171135112,
+            "docBlockId": "20261017011855-o1h7wri"
+          },
+          {
+            "id": "20261017011855-j3j09zj",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 9",
+            "dueDate": "2026-10-20",
+            "status": "open",
+            "createdAt": 1792171135140,
+            "updatedAt": 1792171135140,
+            "docBlockId": "20261017011855-nj8mny9"
+          }
+        ],
+        "document": [
+          {
+            "blockId": "20261017011854-avb6u4e",
+            "followUpId": "20261017011854-ixp3znp",
+            "markdown": "- [ ] 虚构全量任务 1 📅2026-10-12"
+          },
+          {
+            "blockId": "20261017011854-q9h8f0e",
+            "followUpId": "20261017011854-bbc0xya",
+            "markdown": "- [ ] 虚构全量任务 2 📅2026-10-13"
+          },
+          {
+            "blockId": "20261017011854-rm3bicu",
+            "followUpId": "20261017011854-09gbttn",
+            "markdown": "- [ ] 虚构全量任务 3 📅2026-10-14"
+          },
+          {
+            "blockId": "20261017011855-3t04c19",
+            "followUpId": "20261017011855-dgca53x",
+            "markdown": "- [ ] 虚构全量任务 6 📅2026-10-17"
+          },
+          {
+            "blockId": "20261017011855-ek7846i",
+            "followUpId": "20261017011855-57cqi07",
+            "markdown": "- [ ] 虚构全量任务 5 📅2026-10-16"
+          },
+          {
+            "blockId": "20261017011855-nj8mny9",
+            "followUpId": "20261017011855-j3j09zj",
+            "markdown": "- [ ] 虚构全量任务 9 📅2026-10-20"
+          },
+          {
+            "blockId": "20261017011855-o1h7wri",
+            "followUpId": "20261017011855-qeyu5dh",
+            "markdown": "- [ ] 虚构全量任务 8 📅2026-10-19"
+          },
+          {
+            "blockId": "20261017011855-o32iy0v",
+            "followUpId": "20261017011855-us12vly",
+            "markdown": "- [ ] 虚构全量任务 7 📅2026-10-18"
+          },
+          {
+            "blockId": "20261017011855-wn1vz8n",
+            "followUpId": "20261017011854-ojw9lkv",
+            "markdown": "- [ ] 虚构全量任务 4 📅2026-10-15"
+          }
+        ],
+        "dashboard": [
+          {
+            "id": "20261017011854-ixp3znp",
+            "bucket": "overdue",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011854-bbc0xya",
+            "bucket": "overdue",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011854-09gbttn",
+            "bucket": "overdue",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011854-ojw9lkv",
+            "bucket": "overdue",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-57cqi07",
+            "bucket": "overdue",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-dgca53x",
+            "bucket": "today",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-us12vly",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-j3j09zj",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          }
+        ]
+      },
+      {
+        "name": "native-completion-six-closed-history",
+        "indexCount": 9,
+        "documentTaskCount": 9,
+        "dashboardCount": 3,
+        "report": [
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ixp3znp",
+            "blockId": "20261017011854-avb6u4e",
+            "action": "reconcile",
+            "changes": [
+              "status"
+            ],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-bbc0xya",
+            "blockId": "20261017011854-q9h8f0e",
+            "action": "reconcile",
+            "changes": [
+              "status"
+            ],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-09gbttn",
+            "blockId": "20261017011854-rm3bicu",
+            "action": "reconcile",
+            "changes": [
+              "status"
+            ],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ojw9lkv",
+            "blockId": "20261017011855-wn1vz8n",
+            "action": "reconcile",
+            "changes": [
+              "status"
+            ],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-57cqi07",
+            "blockId": "20261017011855-ek7846i",
+            "action": "reconcile",
+            "changes": [
+              "status"
+            ],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-dgca53x",
+            "blockId": "20261017011855-3t04c19",
+            "action": "reconcile",
+            "changes": [
+              "status"
+            ],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-us12vly",
+            "blockId": "20261017011855-o32iy0v",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-qeyu5dh",
+            "blockId": "20261017011855-o1h7wri",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-j3j09zj",
+            "blockId": "20261017011855-nj8mny9",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          }
+        ],
+        "index": [
+          {
+            "id": "20261017011854-ixp3znp",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 1",
+            "dueDate": "2026-10-12",
+            "status": "done",
+            "createdAt": 1792171134913,
+            "updatedAt": 1792171135212,
+            "docBlockId": "20261017011854-avb6u4e",
+            "closedAt": 1792171135212
+          },
+          {
+            "id": "20261017011854-bbc0xya",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 2",
+            "dueDate": "2026-10-13",
+            "status": "done",
+            "createdAt": 1792171134946,
+            "updatedAt": 1792171135215,
+            "docBlockId": "20261017011854-q9h8f0e",
+            "closedAt": 1792171135215
+          },
+          {
+            "id": "20261017011854-09gbttn",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 3",
+            "dueDate": "2026-10-14",
+            "status": "done",
+            "createdAt": 1792171134973,
+            "updatedAt": 1792171135218,
+            "docBlockId": "20261017011854-rm3bicu",
+            "closedAt": 1792171135218
+          },
+          {
+            "id": "20261017011854-ojw9lkv",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 4",
+            "dueDate": "2026-10-15",
+            "status": "done",
+            "createdAt": 1792171135002,
+            "updatedAt": 1792171135221,
+            "docBlockId": "20261017011855-wn1vz8n",
+            "closedAt": 1792171135221
+          },
+          {
+            "id": "20261017011855-57cqi07",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 5",
+            "dueDate": "2026-10-16",
+            "status": "done",
+            "createdAt": 1792171135029,
+            "updatedAt": 1792171135224,
+            "docBlockId": "20261017011855-ek7846i",
+            "closedAt": 1792171135224
+          },
+          {
+            "id": "20261017011855-dgca53x",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 6",
+            "dueDate": "2026-10-17",
+            "status": "done",
+            "createdAt": 1792171135057,
+            "updatedAt": 1792171135227,
+            "docBlockId": "20261017011855-3t04c19",
+            "closedAt": 1792171135227
+          },
+          {
+            "id": "20261017011855-us12vly",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 7",
+            "dueDate": "2026-10-18",
+            "status": "open",
+            "createdAt": 1792171135085,
+            "updatedAt": 1792171135085,
+            "docBlockId": "20261017011855-o32iy0v"
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 8",
+            "dueDate": "2026-10-19",
+            "status": "open",
+            "createdAt": 1792171135112,
+            "updatedAt": 1792171135112,
+            "docBlockId": "20261017011855-o1h7wri"
+          },
+          {
+            "id": "20261017011855-j3j09zj",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 9",
+            "dueDate": "2026-10-20",
+            "status": "open",
+            "createdAt": 1792171135140,
+            "updatedAt": 1792171135140,
+            "docBlockId": "20261017011855-nj8mny9"
+          }
+        ],
+        "document": [
+          {
+            "blockId": "20261017011854-avb6u4e",
+            "followUpId": "20261017011854-ixp3znp",
+            "markdown": "- [X] 虚构全量任务 1 📅2026-10-12"
+          },
+          {
+            "blockId": "20261017011854-q9h8f0e",
+            "followUpId": "20261017011854-bbc0xya",
+            "markdown": "- [X] 虚构全量任务 2 📅2026-10-13"
+          },
+          {
+            "blockId": "20261017011854-rm3bicu",
+            "followUpId": "20261017011854-09gbttn",
+            "markdown": "- [X] 虚构全量任务 3 📅2026-10-14"
+          },
+          {
+            "blockId": "20261017011855-3t04c19",
+            "followUpId": "20261017011855-dgca53x",
+            "markdown": "- [X] 虚构全量任务 6 📅2026-10-17"
+          },
+          {
+            "blockId": "20261017011855-ek7846i",
+            "followUpId": "20261017011855-57cqi07",
+            "markdown": "- [X] 虚构全量任务 5 📅2026-10-16"
+          },
+          {
+            "blockId": "20261017011855-nj8mny9",
+            "followUpId": "20261017011855-j3j09zj",
+            "markdown": "- [ ] 虚构全量任务 9 📅2026-10-20"
+          },
+          {
+            "blockId": "20261017011855-o1h7wri",
+            "followUpId": "20261017011855-qeyu5dh",
+            "markdown": "- [ ] 虚构全量任务 8 📅2026-10-19"
+          },
+          {
+            "blockId": "20261017011855-o32iy0v",
+            "followUpId": "20261017011855-us12vly",
+            "markdown": "- [ ] 虚构全量任务 7 📅2026-10-18"
+          },
+          {
+            "blockId": "20261017011855-wn1vz8n",
+            "followUpId": "20261017011854-ojw9lkv",
+            "markdown": "- [X] 虚构全量任务 4 📅2026-10-15"
+          }
+        ],
+        "dashboard": [
+          {
+            "id": "20261017011855-us12vly",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-j3j09zj",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          }
+        ]
+      },
+      {
+        "name": "native-reopen-history-outside-visible-five",
+        "indexCount": 9,
+        "documentTaskCount": 9,
+        "dashboardCount": 4,
+        "report": [
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ixp3znp",
+            "blockId": "20261017011854-avb6u4e",
+            "action": "reconcile",
+            "changes": [
+              "status"
+            ],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-bbc0xya",
+            "blockId": "20261017011854-q9h8f0e",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-09gbttn",
+            "blockId": "20261017011854-rm3bicu",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ojw9lkv",
+            "blockId": "20261017011855-wn1vz8n",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-57cqi07",
+            "blockId": "20261017011855-ek7846i",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-dgca53x",
+            "blockId": "20261017011855-3t04c19",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-us12vly",
+            "blockId": "20261017011855-o32iy0v",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-qeyu5dh",
+            "blockId": "20261017011855-o1h7wri",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-j3j09zj",
+            "blockId": "20261017011855-nj8mny9",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          }
+        ],
+        "index": [
+          {
+            "id": "20261017011854-ixp3znp",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 1",
+            "dueDate": "2026-10-12",
+            "status": "open",
+            "createdAt": 1792171134913,
+            "updatedAt": 1792171135254,
+            "docBlockId": "20261017011854-avb6u4e"
+          },
+          {
+            "id": "20261017011854-bbc0xya",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 2",
+            "dueDate": "2026-10-13",
+            "status": "done",
+            "createdAt": 1792171134946,
+            "updatedAt": 1792171135215,
+            "docBlockId": "20261017011854-q9h8f0e",
+            "closedAt": 1792171135215
+          },
+          {
+            "id": "20261017011854-09gbttn",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 3",
+            "dueDate": "2026-10-14",
+            "status": "done",
+            "createdAt": 1792171134973,
+            "updatedAt": 1792171135218,
+            "docBlockId": "20261017011854-rm3bicu",
+            "closedAt": 1792171135218
+          },
+          {
+            "id": "20261017011854-ojw9lkv",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 4",
+            "dueDate": "2026-10-15",
+            "status": "done",
+            "createdAt": 1792171135002,
+            "updatedAt": 1792171135221,
+            "docBlockId": "20261017011855-wn1vz8n",
+            "closedAt": 1792171135221
+          },
+          {
+            "id": "20261017011855-57cqi07",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 5",
+            "dueDate": "2026-10-16",
+            "status": "done",
+            "createdAt": 1792171135029,
+            "updatedAt": 1792171135224,
+            "docBlockId": "20261017011855-ek7846i",
+            "closedAt": 1792171135224
+          },
+          {
+            "id": "20261017011855-dgca53x",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 6",
+            "dueDate": "2026-10-17",
+            "status": "done",
+            "createdAt": 1792171135057,
+            "updatedAt": 1792171135227,
+            "docBlockId": "20261017011855-3t04c19",
+            "closedAt": 1792171135227
+          },
+          {
+            "id": "20261017011855-us12vly",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 7",
+            "dueDate": "2026-10-18",
+            "status": "open",
+            "createdAt": 1792171135085,
+            "updatedAt": 1792171135085,
+            "docBlockId": "20261017011855-o32iy0v"
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 8",
+            "dueDate": "2026-10-19",
+            "status": "open",
+            "createdAt": 1792171135112,
+            "updatedAt": 1792171135112,
+            "docBlockId": "20261017011855-o1h7wri"
+          },
+          {
+            "id": "20261017011855-j3j09zj",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 9",
+            "dueDate": "2026-10-20",
+            "status": "open",
+            "createdAt": 1792171135140,
+            "updatedAt": 1792171135140,
+            "docBlockId": "20261017011855-nj8mny9"
+          }
+        ],
+        "document": [
+          {
+            "blockId": "20261017011854-avb6u4e",
+            "followUpId": "20261017011854-ixp3znp",
+            "markdown": "- [ ] 虚构全量任务 1 📅2026-10-12"
+          },
+          {
+            "blockId": "20261017011854-q9h8f0e",
+            "followUpId": "20261017011854-bbc0xya",
+            "markdown": "- [X] 虚构全量任务 2 📅2026-10-13"
+          },
+          {
+            "blockId": "20261017011854-rm3bicu",
+            "followUpId": "20261017011854-09gbttn",
+            "markdown": "- [X] 虚构全量任务 3 📅2026-10-14"
+          },
+          {
+            "blockId": "20261017011855-3t04c19",
+            "followUpId": "20261017011855-dgca53x",
+            "markdown": "- [X] 虚构全量任务 6 📅2026-10-17"
+          },
+          {
+            "blockId": "20261017011855-ek7846i",
+            "followUpId": "20261017011855-57cqi07",
+            "markdown": "- [X] 虚构全量任务 5 📅2026-10-16"
+          },
+          {
+            "blockId": "20261017011855-nj8mny9",
+            "followUpId": "20261017011855-j3j09zj",
+            "markdown": "- [ ] 虚构全量任务 9 📅2026-10-20"
+          },
+          {
+            "blockId": "20261017011855-o1h7wri",
+            "followUpId": "20261017011855-qeyu5dh",
+            "markdown": "- [ ] 虚构全量任务 8 📅2026-10-19"
+          },
+          {
+            "blockId": "20261017011855-o32iy0v",
+            "followUpId": "20261017011855-us12vly",
+            "markdown": "- [ ] 虚构全量任务 7 📅2026-10-18"
+          },
+          {
+            "blockId": "20261017011855-wn1vz8n",
+            "followUpId": "20261017011854-ojw9lkv",
+            "markdown": "- [X] 虚构全量任务 4 📅2026-10-15"
+          }
+        ],
+        "dashboard": [
+          {
+            "id": "20261017011854-ixp3znp",
+            "bucket": "overdue",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-us12vly",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-j3j09zj",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          }
+        ]
+      },
+      {
+        "name": "native-reclose-history",
+        "indexCount": 9,
+        "documentTaskCount": 9,
+        "dashboardCount": 3,
+        "report": [
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ixp3znp",
+            "blockId": "20261017011854-avb6u4e",
+            "action": "reconcile",
+            "changes": [
+              "status"
+            ],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-bbc0xya",
+            "blockId": "20261017011854-q9h8f0e",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-09gbttn",
+            "blockId": "20261017011854-rm3bicu",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ojw9lkv",
+            "blockId": "20261017011855-wn1vz8n",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-57cqi07",
+            "blockId": "20261017011855-ek7846i",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-dgca53x",
+            "blockId": "20261017011855-3t04c19",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-us12vly",
+            "blockId": "20261017011855-o32iy0v",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-qeyu5dh",
+            "blockId": "20261017011855-o1h7wri",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-j3j09zj",
+            "blockId": "20261017011855-nj8mny9",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          }
+        ],
+        "index": [
+          {
+            "id": "20261017011854-ixp3znp",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 1",
+            "dueDate": "2026-10-12",
+            "status": "done",
+            "createdAt": 1792171134913,
+            "updatedAt": 1792171135278,
+            "docBlockId": "20261017011854-avb6u4e",
+            "closedAt": 1792171135278
+          },
+          {
+            "id": "20261017011854-bbc0xya",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 2",
+            "dueDate": "2026-10-13",
+            "status": "done",
+            "createdAt": 1792171134946,
+            "updatedAt": 1792171135215,
+            "docBlockId": "20261017011854-q9h8f0e",
+            "closedAt": 1792171135215
+          },
+          {
+            "id": "20261017011854-09gbttn",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 3",
+            "dueDate": "2026-10-14",
+            "status": "done",
+            "createdAt": 1792171134973,
+            "updatedAt": 1792171135218,
+            "docBlockId": "20261017011854-rm3bicu",
+            "closedAt": 1792171135218
+          },
+          {
+            "id": "20261017011854-ojw9lkv",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 4",
+            "dueDate": "2026-10-15",
+            "status": "done",
+            "createdAt": 1792171135002,
+            "updatedAt": 1792171135221,
+            "docBlockId": "20261017011855-wn1vz8n",
+            "closedAt": 1792171135221
+          },
+          {
+            "id": "20261017011855-57cqi07",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 5",
+            "dueDate": "2026-10-16",
+            "status": "done",
+            "createdAt": 1792171135029,
+            "updatedAt": 1792171135224,
+            "docBlockId": "20261017011855-ek7846i",
+            "closedAt": 1792171135224
+          },
+          {
+            "id": "20261017011855-dgca53x",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 6",
+            "dueDate": "2026-10-17",
+            "status": "done",
+            "createdAt": 1792171135057,
+            "updatedAt": 1792171135227,
+            "docBlockId": "20261017011855-3t04c19",
+            "closedAt": 1792171135227
+          },
+          {
+            "id": "20261017011855-us12vly",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 7",
+            "dueDate": "2026-10-18",
+            "status": "open",
+            "createdAt": 1792171135085,
+            "updatedAt": 1792171135085,
+            "docBlockId": "20261017011855-o32iy0v"
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 8",
+            "dueDate": "2026-10-19",
+            "status": "open",
+            "createdAt": 1792171135112,
+            "updatedAt": 1792171135112,
+            "docBlockId": "20261017011855-o1h7wri"
+          },
+          {
+            "id": "20261017011855-j3j09zj",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 9",
+            "dueDate": "2026-10-20",
+            "status": "open",
+            "createdAt": 1792171135140,
+            "updatedAt": 1792171135140,
+            "docBlockId": "20261017011855-nj8mny9"
+          }
+        ],
+        "document": [
+          {
+            "blockId": "20261017011854-avb6u4e",
+            "followUpId": "20261017011854-ixp3znp",
+            "markdown": "- [X] 虚构全量任务 1 📅2026-10-12"
+          },
+          {
+            "blockId": "20261017011854-q9h8f0e",
+            "followUpId": "20261017011854-bbc0xya",
+            "markdown": "- [X] 虚构全量任务 2 📅2026-10-13"
+          },
+          {
+            "blockId": "20261017011854-rm3bicu",
+            "followUpId": "20261017011854-09gbttn",
+            "markdown": "- [X] 虚构全量任务 3 📅2026-10-14"
+          },
+          {
+            "blockId": "20261017011855-3t04c19",
+            "followUpId": "20261017011855-dgca53x",
+            "markdown": "- [X] 虚构全量任务 6 📅2026-10-17"
+          },
+          {
+            "blockId": "20261017011855-ek7846i",
+            "followUpId": "20261017011855-57cqi07",
+            "markdown": "- [X] 虚构全量任务 5 📅2026-10-16"
+          },
+          {
+            "blockId": "20261017011855-nj8mny9",
+            "followUpId": "20261017011855-j3j09zj",
+            "markdown": "- [ ] 虚构全量任务 9 📅2026-10-20"
+          },
+          {
+            "blockId": "20261017011855-o1h7wri",
+            "followUpId": "20261017011855-qeyu5dh",
+            "markdown": "- [ ] 虚构全量任务 8 📅2026-10-19"
+          },
+          {
+            "blockId": "20261017011855-o32iy0v",
+            "followUpId": "20261017011855-us12vly",
+            "markdown": "- [ ] 虚构全量任务 7 📅2026-10-18"
+          },
+          {
+            "blockId": "20261017011855-wn1vz8n",
+            "followUpId": "20261017011854-ojw9lkv",
+            "markdown": "- [X] 虚构全量任务 4 📅2026-10-15"
+          }
+        ],
+        "dashboard": [
+          {
+            "id": "20261017011855-us12vly",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-j3j09zj",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          }
+        ]
+      },
+      {
+        "name": "native-title-date-edit-and-deletion",
+        "indexCount": 9,
+        "documentTaskCount": 8,
+        "dashboardCount": 3,
+        "report": [
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ixp3znp",
+            "blockId": "20261017011854-avb6u4e",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-bbc0xya",
+            "blockId": "20261017011854-q9h8f0e",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-09gbttn",
+            "blockId": "20261017011854-rm3bicu",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ojw9lkv",
+            "blockId": "20261017011855-wn1vz8n",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-57cqi07",
+            "blockId": "20261017011855-ek7846i",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-dgca53x",
+            "blockId": "20261017011855-3t04c19",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-us12vly",
+            "blockId": "20261017011855-o32iy0v",
+            "action": "reconcile",
+            "changes": [
+              "title",
+              "dueDate"
+            ],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-qeyu5dh",
+            "blockId": "20261017011855-o1h7wri",
+            "action": "reconcile",
+            "changes": [
+              "deleted"
+            ],
+            "index": "verified",
+            "document": "missing"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-j3j09zj",
+            "blockId": "20261017011855-nj8mny9",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          }
+        ],
+        "index": [
+          {
+            "id": "20261017011854-ixp3znp",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 1",
+            "dueDate": "2026-10-12",
+            "status": "done",
+            "createdAt": 1792171134913,
+            "updatedAt": 1792171135278,
+            "docBlockId": "20261017011854-avb6u4e",
+            "closedAt": 1792171135278
+          },
+          {
+            "id": "20261017011854-bbc0xya",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 2",
+            "dueDate": "2026-10-13",
+            "status": "done",
+            "createdAt": 1792171134946,
+            "updatedAt": 1792171135215,
+            "docBlockId": "20261017011854-q9h8f0e",
+            "closedAt": 1792171135215
+          },
+          {
+            "id": "20261017011854-09gbttn",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 3",
+            "dueDate": "2026-10-14",
+            "status": "done",
+            "createdAt": 1792171134973,
+            "updatedAt": 1792171135218,
+            "docBlockId": "20261017011854-rm3bicu",
+            "closedAt": 1792171135218
+          },
+          {
+            "id": "20261017011854-ojw9lkv",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 4",
+            "dueDate": "2026-10-15",
+            "status": "done",
+            "createdAt": 1792171135002,
+            "updatedAt": 1792171135221,
+            "docBlockId": "20261017011855-wn1vz8n",
+            "closedAt": 1792171135221
+          },
+          {
+            "id": "20261017011855-57cqi07",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 5",
+            "dueDate": "2026-10-16",
+            "status": "done",
+            "createdAt": 1792171135029,
+            "updatedAt": 1792171135224,
+            "docBlockId": "20261017011855-ek7846i",
+            "closedAt": 1792171135224
+          },
+          {
+            "id": "20261017011855-dgca53x",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 6",
+            "dueDate": "2026-10-17",
+            "status": "done",
+            "createdAt": 1792171135057,
+            "updatedAt": 1792171135227,
+            "docBlockId": "20261017011855-3t04c19",
+            "closedAt": 1792171135227
+          },
+          {
+            "id": "20261017011855-us12vly",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构文档改标题",
+            "dueDate": "2026-10-19",
+            "status": "open",
+            "createdAt": 1792171135085,
+            "updatedAt": 1792171135308,
+            "docBlockId": "20261017011855-o32iy0v"
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 8",
+            "dueDate": "2026-10-19",
+            "status": "open",
+            "createdAt": 1792171135112,
+            "updatedAt": 1792171135311,
+            "docMissing": true
+          },
+          {
+            "id": "20261017011855-j3j09zj",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 9",
+            "dueDate": "2026-10-20",
+            "status": "open",
+            "createdAt": 1792171135140,
+            "updatedAt": 1792171135140,
+            "docBlockId": "20261017011855-nj8mny9"
+          }
+        ],
+        "document": [
+          {
+            "blockId": "20261017011854-avb6u4e",
+            "followUpId": "20261017011854-ixp3znp",
+            "markdown": "- [X] 虚构全量任务 1 📅2026-10-12"
+          },
+          {
+            "blockId": "20261017011854-q9h8f0e",
+            "followUpId": "20261017011854-bbc0xya",
+            "markdown": "- [X] 虚构全量任务 2 📅2026-10-13"
+          },
+          {
+            "blockId": "20261017011854-rm3bicu",
+            "followUpId": "20261017011854-09gbttn",
+            "markdown": "- [X] 虚构全量任务 3 📅2026-10-14"
+          },
+          {
+            "blockId": "20261017011855-3t04c19",
+            "followUpId": "20261017011855-dgca53x",
+            "markdown": "- [X] 虚构全量任务 6 📅2026-10-17"
+          },
+          {
+            "blockId": "20261017011855-ek7846i",
+            "followUpId": "20261017011855-57cqi07",
+            "markdown": "- [X] 虚构全量任务 5 📅2026-10-16"
+          },
+          {
+            "blockId": "20261017011855-nj8mny9",
+            "followUpId": "20261017011855-j3j09zj",
+            "markdown": "- [ ] 虚构全量任务 9 📅2026-10-20"
+          },
+          {
+            "blockId": "20261017011855-o32iy0v",
+            "followUpId": "20261017011855-us12vly",
+            "markdown": "- [ ] 虚构文档改标题 📅2026-10-19"
+          },
+          {
+            "blockId": "20261017011855-wn1vz8n",
+            "followUpId": "20261017011854-ojw9lkv",
+            "markdown": "- [X] 虚构全量任务 4 📅2026-10-15"
+          }
+        ],
+        "dashboard": [
+          {
+            "id": "20261017011855-us12vly",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "bucket": "upcoming",
+            "documentSync": "missing",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-j3j09zj",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          }
+        ]
+      },
+      {
+        "name": "product-cancellation-and-no-deletion-resurrection",
+        "indexCount": 9,
+        "documentTaskCount": 7,
+        "dashboardCount": 2,
+        "report": [
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ixp3znp",
+            "blockId": "20261017011854-avb6u4e",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-bbc0xya",
+            "blockId": "20261017011854-q9h8f0e",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-09gbttn",
+            "blockId": "20261017011854-rm3bicu",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ojw9lkv",
+            "blockId": "20261017011855-wn1vz8n",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-57cqi07",
+            "blockId": "20261017011855-ek7846i",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-dgca53x",
+            "blockId": "20261017011855-3t04c19",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-us12vly",
+            "blockId": "20261017011855-o32iy0v",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-qeyu5dh",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "missing"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-j3j09zj",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          }
+        ],
+        "index": [
+          {
+            "id": "20261017011854-ixp3znp",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 1",
+            "dueDate": "2026-10-12",
+            "status": "done",
+            "createdAt": 1792171134913,
+            "updatedAt": 1792171135278,
+            "docBlockId": "20261017011854-avb6u4e",
+            "closedAt": 1792171135278
+          },
+          {
+            "id": "20261017011854-bbc0xya",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 2",
+            "dueDate": "2026-10-13",
+            "status": "done",
+            "createdAt": 1792171134946,
+            "updatedAt": 1792171135215,
+            "docBlockId": "20261017011854-q9h8f0e",
+            "closedAt": 1792171135215
+          },
+          {
+            "id": "20261017011854-09gbttn",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 3",
+            "dueDate": "2026-10-14",
+            "status": "done",
+            "createdAt": 1792171134973,
+            "updatedAt": 1792171135218,
+            "docBlockId": "20261017011854-rm3bicu",
+            "closedAt": 1792171135218
+          },
+          {
+            "id": "20261017011854-ojw9lkv",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 4",
+            "dueDate": "2026-10-15",
+            "status": "done",
+            "createdAt": 1792171135002,
+            "updatedAt": 1792171135221,
+            "docBlockId": "20261017011855-wn1vz8n",
+            "closedAt": 1792171135221
+          },
+          {
+            "id": "20261017011855-57cqi07",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 5",
+            "dueDate": "2026-10-16",
+            "status": "done",
+            "createdAt": 1792171135029,
+            "updatedAt": 1792171135224,
+            "docBlockId": "20261017011855-ek7846i",
+            "closedAt": 1792171135224
+          },
+          {
+            "id": "20261017011855-dgca53x",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 6",
+            "dueDate": "2026-10-17",
+            "status": "done",
+            "createdAt": 1792171135057,
+            "updatedAt": 1792171135227,
+            "docBlockId": "20261017011855-3t04c19",
+            "closedAt": 1792171135227
+          },
+          {
+            "id": "20261017011855-us12vly",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构文档改标题",
+            "dueDate": "2026-10-19",
+            "status": "open",
+            "createdAt": 1792171135085,
+            "updatedAt": 1792171135308,
+            "docBlockId": "20261017011855-o32iy0v"
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 8",
+            "dueDate": "2026-10-19",
+            "status": "open",
+            "createdAt": 1792171135112,
+            "updatedAt": 1792171135311,
+            "docMissing": true
+          },
+          {
+            "id": "20261017011855-j3j09zj",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 9",
+            "dueDate": "2026-10-20",
+            "status": "cancelled",
+            "createdAt": 1792171135140,
+            "updatedAt": 1792171135325,
+            "closedAt": 1792171135325
+          }
+        ],
+        "document": [
+          {
+            "blockId": "20261017011854-avb6u4e",
+            "followUpId": "20261017011854-ixp3znp",
+            "markdown": "- [X] 虚构全量任务 1 📅2026-10-12"
+          },
+          {
+            "blockId": "20261017011854-q9h8f0e",
+            "followUpId": "20261017011854-bbc0xya",
+            "markdown": "- [X] 虚构全量任务 2 📅2026-10-13"
+          },
+          {
+            "blockId": "20261017011854-rm3bicu",
+            "followUpId": "20261017011854-09gbttn",
+            "markdown": "- [X] 虚构全量任务 3 📅2026-10-14"
+          },
+          {
+            "blockId": "20261017011855-3t04c19",
+            "followUpId": "20261017011855-dgca53x",
+            "markdown": "- [X] 虚构全量任务 6 📅2026-10-17"
+          },
+          {
+            "blockId": "20261017011855-ek7846i",
+            "followUpId": "20261017011855-57cqi07",
+            "markdown": "- [X] 虚构全量任务 5 📅2026-10-16"
+          },
+          {
+            "blockId": "20261017011855-o32iy0v",
+            "followUpId": "20261017011855-us12vly",
+            "markdown": "- [ ] 虚构文档改标题 📅2026-10-19"
+          },
+          {
+            "blockId": "20261017011855-wn1vz8n",
+            "followUpId": "20261017011854-ojw9lkv",
+            "markdown": "- [X] 虚构全量任务 4 📅2026-10-15"
+          }
+        ],
+        "dashboard": [
+          {
+            "id": "20261017011855-us12vly",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "bucket": "upcoming",
+            "documentSync": "missing",
+            "reachable": true
+          }
+        ]
+      },
+      {
+        "name": "read-fault-recovered-real-kernel",
+        "indexCount": 9,
+        "documentTaskCount": 7,
+        "dashboardCount": 2,
+        "report": [
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ixp3znp",
+            "blockId": "20261017011854-avb6u4e",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-bbc0xya",
+            "blockId": "20261017011854-q9h8f0e",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-09gbttn",
+            "blockId": "20261017011854-rm3bicu",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ojw9lkv",
+            "blockId": "20261017011855-wn1vz8n",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-57cqi07",
+            "blockId": "20261017011855-ek7846i",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-dgca53x",
+            "blockId": "20261017011855-3t04c19",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-us12vly",
+            "blockId": "20261017011855-o32iy0v",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-qeyu5dh",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "missing"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-j3j09zj",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          }
+        ],
+        "index": [
+          {
+            "id": "20261017011854-ixp3znp",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 1",
+            "dueDate": "2026-10-12",
+            "status": "done",
+            "createdAt": 1792171134913,
+            "updatedAt": 1792171135278,
+            "docBlockId": "20261017011854-avb6u4e",
+            "closedAt": 1792171135278
+          },
+          {
+            "id": "20261017011854-bbc0xya",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 2",
+            "dueDate": "2026-10-13",
+            "status": "done",
+            "createdAt": 1792171134946,
+            "updatedAt": 1792171135215,
+            "docBlockId": "20261017011854-q9h8f0e",
+            "closedAt": 1792171135215
+          },
+          {
+            "id": "20261017011854-09gbttn",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 3",
+            "dueDate": "2026-10-14",
+            "status": "done",
+            "createdAt": 1792171134973,
+            "updatedAt": 1792171135218,
+            "docBlockId": "20261017011854-rm3bicu",
+            "closedAt": 1792171135218
+          },
+          {
+            "id": "20261017011854-ojw9lkv",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 4",
+            "dueDate": "2026-10-15",
+            "status": "done",
+            "createdAt": 1792171135002,
+            "updatedAt": 1792171135221,
+            "docBlockId": "20261017011855-wn1vz8n",
+            "closedAt": 1792171135221
+          },
+          {
+            "id": "20261017011855-57cqi07",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 5",
+            "dueDate": "2026-10-16",
+            "status": "done",
+            "createdAt": 1792171135029,
+            "updatedAt": 1792171135224,
+            "docBlockId": "20261017011855-ek7846i",
+            "closedAt": 1792171135224
+          },
+          {
+            "id": "20261017011855-dgca53x",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 6",
+            "dueDate": "2026-10-17",
+            "status": "done",
+            "createdAt": 1792171135057,
+            "updatedAt": 1792171135227,
+            "docBlockId": "20261017011855-3t04c19",
+            "closedAt": 1792171135227
+          },
+          {
+            "id": "20261017011855-us12vly",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构文档改标题",
+            "dueDate": "2026-10-19",
+            "status": "open",
+            "createdAt": 1792171135085,
+            "updatedAt": 1792171135308,
+            "docBlockId": "20261017011855-o32iy0v"
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 8",
+            "dueDate": "2026-10-19",
+            "status": "open",
+            "createdAt": 1792171135112,
+            "updatedAt": 1792171135311,
+            "docMissing": true
+          },
+          {
+            "id": "20261017011855-j3j09zj",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 9",
+            "dueDate": "2026-10-20",
+            "status": "cancelled",
+            "createdAt": 1792171135140,
+            "updatedAt": 1792171135325,
+            "closedAt": 1792171135325
+          }
+        ],
+        "document": [
+          {
+            "blockId": "20261017011854-avb6u4e",
+            "followUpId": "20261017011854-ixp3znp",
+            "markdown": "- [X] 虚构全量任务 1 📅2026-10-12"
+          },
+          {
+            "blockId": "20261017011854-q9h8f0e",
+            "followUpId": "20261017011854-bbc0xya",
+            "markdown": "- [X] 虚构全量任务 2 📅2026-10-13"
+          },
+          {
+            "blockId": "20261017011854-rm3bicu",
+            "followUpId": "20261017011854-09gbttn",
+            "markdown": "- [X] 虚构全量任务 3 📅2026-10-14"
+          },
+          {
+            "blockId": "20261017011855-3t04c19",
+            "followUpId": "20261017011855-dgca53x",
+            "markdown": "- [X] 虚构全量任务 6 📅2026-10-17"
+          },
+          {
+            "blockId": "20261017011855-ek7846i",
+            "followUpId": "20261017011855-57cqi07",
+            "markdown": "- [X] 虚构全量任务 5 📅2026-10-16"
+          },
+          {
+            "blockId": "20261017011855-o32iy0v",
+            "followUpId": "20261017011855-us12vly",
+            "markdown": "- [ ] 虚构文档改标题 📅2026-10-19"
+          },
+          {
+            "blockId": "20261017011855-wn1vz8n",
+            "followUpId": "20261017011854-ojw9lkv",
+            "markdown": "- [X] 虚构全量任务 4 📅2026-10-15"
+          }
+        ],
+        "dashboard": [
+          {
+            "id": "20261017011855-us12vly",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "bucket": "upcoming",
+            "documentSync": "missing",
+            "reachable": true
+          }
+        ]
+      },
+      {
+        "name": "kernel-restart-full-reconciliation",
+        "indexCount": 9,
+        "documentTaskCount": 7,
+        "dashboardCount": 2,
+        "report": [
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ixp3znp",
+            "blockId": "20261017011854-avb6u4e",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-bbc0xya",
+            "blockId": "20261017011854-q9h8f0e",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-09gbttn",
+            "blockId": "20261017011854-rm3bicu",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011854-ojw9lkv",
+            "blockId": "20261017011855-wn1vz8n",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-57cqi07",
+            "blockId": "20261017011855-ek7846i",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-dgca53x",
+            "blockId": "20261017011855-3t04c19",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-us12vly",
+            "blockId": "20261017011855-o32iy0v",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-qeyu5dh",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "missing"
+          },
+          {
+            "personDocId": "20261017011854-8us4txz",
+            "followUpId": "20261017011855-j3j09zj",
+            "action": "reconcile",
+            "changes": [],
+            "index": "verified",
+            "document": "verified"
+          }
+        ],
+        "index": [
+          {
+            "id": "20261017011854-ixp3znp",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 1",
+            "dueDate": "2026-10-12",
+            "status": "done",
+            "createdAt": 1792171134913,
+            "updatedAt": 1792171135278,
+            "docBlockId": "20261017011854-avb6u4e",
+            "closedAt": 1792171135278
+          },
+          {
+            "id": "20261017011854-bbc0xya",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 2",
+            "dueDate": "2026-10-13",
+            "status": "done",
+            "createdAt": 1792171134946,
+            "updatedAt": 1792171135215,
+            "docBlockId": "20261017011854-q9h8f0e",
+            "closedAt": 1792171135215
+          },
+          {
+            "id": "20261017011854-09gbttn",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 3",
+            "dueDate": "2026-10-14",
+            "status": "done",
+            "createdAt": 1792171134973,
+            "updatedAt": 1792171135218,
+            "docBlockId": "20261017011854-rm3bicu",
+            "closedAt": 1792171135218
+          },
+          {
+            "id": "20261017011854-ojw9lkv",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 4",
+            "dueDate": "2026-10-15",
+            "status": "done",
+            "createdAt": 1792171135002,
+            "updatedAt": 1792171135221,
+            "docBlockId": "20261017011855-wn1vz8n",
+            "closedAt": 1792171135221
+          },
+          {
+            "id": "20261017011855-57cqi07",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 5",
+            "dueDate": "2026-10-16",
+            "status": "done",
+            "createdAt": 1792171135029,
+            "updatedAt": 1792171135224,
+            "docBlockId": "20261017011855-ek7846i",
+            "closedAt": 1792171135224
+          },
+          {
+            "id": "20261017011855-dgca53x",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 6",
+            "dueDate": "2026-10-17",
+            "status": "done",
+            "createdAt": 1792171135057,
+            "updatedAt": 1792171135227,
+            "docBlockId": "20261017011855-3t04c19",
+            "closedAt": 1792171135227
+          },
+          {
+            "id": "20261017011855-us12vly",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构文档改标题",
+            "dueDate": "2026-10-19",
+            "status": "open",
+            "createdAt": 1792171135085,
+            "updatedAt": 1792171135308,
+            "docBlockId": "20261017011855-o32iy0v"
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 8",
+            "dueDate": "2026-10-19",
+            "status": "open",
+            "createdAt": 1792171135112,
+            "updatedAt": 1792171135311,
+            "docMissing": true
+          },
+          {
+            "id": "20261017011855-j3j09zj",
+            "personDocId": "20261017011854-8us4txz",
+            "title": "虚构全量任务 9",
+            "dueDate": "2026-10-20",
+            "status": "cancelled",
+            "createdAt": 1792171135140,
+            "updatedAt": 1792171135325,
+            "closedAt": 1792171135325
+          }
+        ],
+        "document": [
+          {
+            "blockId": "20261017011854-avb6u4e",
+            "followUpId": "20261017011854-ixp3znp",
+            "markdown": "- [X] 虚构全量任务 1 📅2026-10-12"
+          },
+          {
+            "blockId": "20261017011854-q9h8f0e",
+            "followUpId": "20261017011854-bbc0xya",
+            "markdown": "- [X] 虚构全量任务 2 📅2026-10-13"
+          },
+          {
+            "blockId": "20261017011854-rm3bicu",
+            "followUpId": "20261017011854-09gbttn",
+            "markdown": "- [X] 虚构全量任务 3 📅2026-10-14"
+          },
+          {
+            "blockId": "20261017011855-3t04c19",
+            "followUpId": "20261017011855-dgca53x",
+            "markdown": "- [X] 虚构全量任务 6 📅2026-10-17"
+          },
+          {
+            "blockId": "20261017011855-ek7846i",
+            "followUpId": "20261017011855-57cqi07",
+            "markdown": "- [X] 虚构全量任务 5 📅2026-10-16"
+          },
+          {
+            "blockId": "20261017011855-o32iy0v",
+            "followUpId": "20261017011855-us12vly",
+            "markdown": "- [ ] 虚构文档改标题 📅2026-10-19"
+          },
+          {
+            "blockId": "20261017011855-wn1vz8n",
+            "followUpId": "20261017011854-ojw9lkv",
+            "markdown": "- [X] 虚构全量任务 4 📅2026-10-15"
+          }
+        ],
+        "dashboard": [
+          {
+            "id": "20261017011855-us12vly",
+            "bucket": "upcoming",
+            "documentSync": "verified",
+            "reachable": true
+          },
+          {
+            "id": "20261017011855-qeyu5dh",
+            "bucket": "upcoming",
+            "documentSync": "missing",
+            "reachable": true
+          }
+        ]
+      }
+    ],
+    "faultInjection": {
+      "kind": "test-transport-nonzero-response",
+      "route": "/api/query/sql",
+      "target": "one task-scan SELECT for the controlled person",
+      "injectedResponses": 1,
+      "delegatedRequests": 2,
+      "indexUnchanged": true,
+      "report": [
+        {
+          "personDocId": "20261017011854-8us4txz",
+          "followUpId": "20261017011854-ixp3znp",
+          "blockId": "20261017011854-avb6u4e",
+          "action": "read",
+          "changes": [],
+          "index": "verified",
+          "document": "unknown",
+          "message": "/api/query/sql code=-1 msg=lvct isolated task-read fault injection"
+        },
+        {
+          "personDocId": "20261017011854-8us4txz",
+          "followUpId": "20261017011854-bbc0xya",
+          "blockId": "20261017011854-q9h8f0e",
+          "action": "read",
+          "changes": [],
+          "index": "verified",
+          "document": "unknown",
+          "message": "/api/query/sql code=-1 msg=lvct isolated task-read fault injection"
+        },
+        {
+          "personDocId": "20261017011854-8us4txz",
+          "followUpId": "20261017011854-09gbttn",
+          "blockId": "20261017011854-rm3bicu",
+          "action": "read",
+          "changes": [],
+          "index": "verified",
+          "document": "unknown",
+          "message": "/api/query/sql code=-1 msg=lvct isolated task-read fault injection"
+        },
+        {
+          "personDocId": "20261017011854-8us4txz",
+          "followUpId": "20261017011854-ojw9lkv",
+          "blockId": "20261017011855-wn1vz8n",
+          "action": "read",
+          "changes": [],
+          "index": "verified",
+          "document": "unknown",
+          "message": "/api/query/sql code=-1 msg=lvct isolated task-read fault injection"
+        },
+        {
+          "personDocId": "20261017011854-8us4txz",
+          "followUpId": "20261017011855-57cqi07",
+          "blockId": "20261017011855-ek7846i",
+          "action": "read",
+          "changes": [],
+          "index": "verified",
+          "document": "unknown",
+          "message": "/api/query/sql code=-1 msg=lvct isolated task-read fault injection"
+        },
+        {
+          "personDocId": "20261017011854-8us4txz",
+          "followUpId": "20261017011855-dgca53x",
+          "blockId": "20261017011855-3t04c19",
+          "action": "read",
+          "changes": [],
+          "index": "verified",
+          "document": "unknown",
+          "message": "/api/query/sql code=-1 msg=lvct isolated task-read fault injection"
+        },
+        {
+          "personDocId": "20261017011854-8us4txz",
+          "followUpId": "20261017011855-us12vly",
+          "blockId": "20261017011855-o32iy0v",
+          "action": "read",
+          "changes": [],
+          "index": "verified",
+          "document": "unknown",
+          "message": "/api/query/sql code=-1 msg=lvct isolated task-read fault injection"
+        },
+        {
+          "personDocId": "20261017011854-8us4txz",
+          "followUpId": "20261017011855-qeyu5dh",
+          "action": "read",
+          "changes": [],
+          "index": "verified",
+          "document": "unknown",
+          "message": "/api/query/sql code=-1 msg=lvct isolated task-read fault injection"
+        },
+        {
+          "personDocId": "20261017011854-8us4txz",
+          "followUpId": "20261017011855-j3j09zj",
+          "action": "read",
+          "changes": [],
+          "index": "verified",
+          "document": "unknown",
+          "message": "/api/query/sql code=-1 msg=lvct isolated task-read fault injection"
+        }
+      ]
+    },
+    "restartVerified": true,
+    "limitations": [
+      "真实用户工作区、原生编辑器交互及其他任务管理器互读不由本验收覆盖"
+    ],
+    "historyOutsideFive": "20261017011854-ixp3znp"
+  },
+  "frontend": {
+    "ok": true,
+    "isolated": true,
+    "frontend": "browser-desktop",
+    "workspace": "<isolated-temp-workspace>",
+    "plugin": "siyuan-contacts",
+    "pluginInstalled": true,
+    "pluginLoaded": true,
+    "browserAuthentication": false,
+    "bridgeLoaded": true,
+    "bridgeProtocol": 2,
+    "bridgeGetPerson": true,
+    "replayCreated": true,
+    "replayStable": true,
+    "workbenchTopbar": true,
+    "birthdayEditor": true,
+    "birthdaySaved": true,
+    "ledgerEditor": true,
+    "ledgerCreated": true,
+    "ledgerSettled": true,
+    "ledgerReopened": true,
+    "aliasEditor": true,
+    "aliasSaved": true,
+    "aliasRejected": true,
+    "followUpEditor": true,
+    "followUpCreated": true,
+    "followUpCompleted": true,
+    "followUpKernelVerified": true,
+    "detailCloseDiagnostic": {
+      "present": true,
+      "disabledHeaderActions": [
+        "Previous"
+      ],
+      "loadingStatuses": [
+        "♧ 联系资料还未填写 补充电话、邮箱或标签，方便下次查找。"
+      ],
+      "closeGuardVisible": false
+    },
+    "organizationView": true,
+    "organizationNavigationDiagnostic": {
+      "activeNavigation": "orgs",
+      "requestedNavigation": {
+        "ariaCurrent": "page",
+        "disabled": false
+      },
+      "detailVisible": false,
+      "dialogVisible": false,
+      "closeGuardVisible": false,
+      "organizationViewVisible": true
+    },
+    "organizationRenamed": true,
+    "organizationMemberEdited": true,
+    "organizationArchived": true,
+    "organizationRestored": true,
+    "organizationReloaded": true,
+    "captureSourceDocId": "20261017011854-arajbv2",
+    "captureOpenMode": "openFileByURL",
+    "captureEditorOpen": true,
+    "captureContextMenu": false,
+    "captureCommandPanel": true,
+    "captureDialog": true,
+    "captureCandidateCount": 2,
+    "captureCompleted": true,
+    "captureUiReadback": {
+      "beforeInteractions": 2,
+      "afterInteractions": 2,
+      "originalEventIdsPreserved": true,
+      "projections": [
+        {
+          "kind": "source",
+          "markerCount": 1
+        },
+        {
+          "kind": "diary",
+          "markerCount": 1
+        },
+        {
+          "kind": "place",
+          "markerCount": 1
+        },
+        {
+          "kind": "firstPerson",
+          "markerCount": 1
+        },
+        {
+          "kind": "secondPerson",
+          "markerCount": 1
+        }
+      ]
+    },
+    "captureUiLimitations": [],
+    "uiReloaded": true,
+    "multiWindowStable": true,
+    "multiWindowInteraction": true,
+    "organizationCrossWindow": true,
+    "organizationMemberCrossWindow": true,
+    "organizationArchiveCrossWindow": true,
+    "organizationRestoreCrossWindow": true,
+    "organizationCrossWindowDiagnostics": [
+      {
+        "phase": "rename-first-page-before-write",
+        "state": {
+          "visibilityState": "hidden",
+          "managerPresent": true,
+          "memberCount": 2,
+          "memberEditorPresent": false,
+          "renameInputPresent": false,
+          "knownActions": [
+            {
+              "label": "Rename",
+              "disabled": false
+            },
+            {
+              "label": "Archive org",
+              "disabled": false
+            },
+            {
+              "label": "Edit",
+              "disabled": false
+            },
+            {
+              "label": "Edit",
+              "disabled": false
+            },
+            {
+              "label": "Close",
+              "disabled": false
+            }
+          ],
+          "errorCount": 0,
+          "busyCount": 0,
+          "closeGuardVisible": false,
+          "capturePresent": false
+        }
+      }
+    ],
+    "captureUiDiagnostic": {
+      "rootPresent": true,
+      "stepsPresent": true,
+      "resultPresent": true,
+      "analysisFailed": false,
+      "busy": false,
+      "knownActions": [
+        {
+          "label": "Done",
+          "disabled": false
+        }
+      ],
+      "closeGuardVisible": false
+    },
+    "captureDialogClosed": true,
+    "hostReady": true,
+    "screenshots": [
+      "output/playwright/real-frontend-organization.png",
+      "output/playwright/real-frontend-detail.png"
+    ],
+    "limitations": [],
+    "failure": null,
+    "browserUrl": "http://127.0.0.1:1217/stage/build/desktop/",
+    "consoleTail": [
+      "[lvct] storage data changed"
+    ],
+    "fileNetworkEvents": [
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1306",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112059.962652,
+        "observedAt": "2026-10-16T17:19:31.042Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1313",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112060.005203,
+        "observedAt": "2026-10-16T17:19:31.084Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1315",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112060.054133,
+        "observedAt": "2026-10-16T17:19:31.132Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1318",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112060.070055,
+        "observedAt": "2026-10-16T17:19:31.148Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1319",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112060.070959,
+        "observedAt": "2026-10-16T17:19:31.151Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1316",
+        "path": "/api/file/putFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/putFile",
+        "timestamp": 112060.175511,
+        "observedAt": "2026-10-16T17:19:31.254Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1320",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112060.21329,
+        "observedAt": "2026-10-16T17:19:31.291Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1328",
+        "path": "/api/file/putFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/putFile",
+        "timestamp": 112060.385387,
+        "observedAt": "2026-10-16T17:19:31.464Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1329",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112060.427608,
+        "observedAt": "2026-10-16T17:19:31.506Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1334",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112060.478948,
+        "observedAt": "2026-10-16T17:19:31.557Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1331",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112060.481983,
+        "observedAt": "2026-10-16T17:19:31.56Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1339",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112060.525075,
+        "observedAt": "2026-10-16T17:19:31.603Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1336",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112060.528742,
+        "observedAt": "2026-10-16T17:19:31.607Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1343",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112060.572018,
+        "observedAt": "2026-10-16T17:19:31.65Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1344",
+        "path": "/api/file/putFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/putFile",
+        "timestamp": 112060.721799,
+        "observedAt": "2026-10-16T17:19:31.801Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1345",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112060.763465,
+        "observedAt": "2026-10-16T17:19:31.842Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1353",
+        "path": "/api/file/putFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/putFile",
+        "timestamp": 112060.932393,
+        "observedAt": "2026-10-16T17:19:32.01Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1354",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112060.968372,
+        "observedAt": "2026-10-16T17:19:32.046Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1359",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.011548,
+        "observedAt": "2026-10-16T17:19:32.09Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1356",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.014528,
+        "observedAt": "2026-10-16T17:19:32.094Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1363",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.089508,
+        "observedAt": "2026-10-16T17:19:32.168Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1362",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.091635,
+        "observedAt": "2026-10-16T17:19:32.17Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1367",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.152375,
+        "observedAt": "2026-10-16T17:19:32.231Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1365",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.157755,
+        "observedAt": "2026-10-16T17:19:32.236Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1368",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.196837,
+        "observedAt": "2026-10-16T17:19:32.275Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1375",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.580565,
+        "observedAt": "2026-10-16T17:19:32.659Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1374",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.581946,
+        "observedAt": "2026-10-16T17:19:32.66Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1372",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.59825,
+        "observedAt": "2026-10-16T17:19:32.676Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1369",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.598446,
+        "observedAt": "2026-10-16T17:19:32.676Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1371",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.598565,
+        "observedAt": "2026-10-16T17:19:32.677Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1373",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.598678,
+        "observedAt": "2026-10-16T17:19:32.677Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1377",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.653399,
+        "observedAt": "2026-10-16T17:19:32.731Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1378",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.654505,
+        "observedAt": "2026-10-16T17:19:32.733Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1381",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.758637,
+        "observedAt": "2026-10-16T17:19:32.837Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1380",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.758817,
+        "observedAt": "2026-10-16T17:19:32.837Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1385",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.835015,
+        "observedAt": "2026-10-16T17:19:32.914Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1383",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.84134,
+        "observedAt": "2026-10-16T17:19:32.919Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1398",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.869766,
+        "observedAt": "2026-10-16T17:19:32.948Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1397",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.870267,
+        "observedAt": "2026-10-16T17:19:32.948Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1402",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.930463,
+        "observedAt": "2026-10-16T17:19:33.009Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1400",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112061.937077,
+        "observedAt": "2026-10-16T17:19:33.015Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1414",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112062.114211,
+        "observedAt": "2026-10-16T17:19:33.192Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1415",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112062.114409,
+        "observedAt": "2026-10-16T17:19:33.193Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1419",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112062.173322,
+        "observedAt": "2026-10-16T17:19:33.252Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1417",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112062.178905,
+        "observedAt": "2026-10-16T17:19:33.257Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1420",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112062.333001,
+        "observedAt": "2026-10-16T17:19:33.411Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1422",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112062.368127,
+        "observedAt": "2026-10-16T17:19:33.446Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1425",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112062.414478,
+        "observedAt": "2026-10-16T17:19:33.493Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1426",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112062.415025,
+        "observedAt": "2026-10-16T17:19:33.493Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1424",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112062.422732,
+        "observedAt": "2026-10-16T17:19:33.501Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1428",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112062.464266,
+        "observedAt": "2026-10-16T17:19:33.542Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1429",
+        "path": "/api/file/putFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/putFile",
+        "timestamp": 112062.633638,
+        "observedAt": "2026-10-16T17:19:33.712Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1430",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112062.673906,
+        "observedAt": "2026-10-16T17:19:33.752Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1432",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112062.708848,
+        "observedAt": "2026-10-16T17:19:33.787Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1447",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112062.796445,
+        "observedAt": "2026-10-16T17:19:33.875Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1448",
+        "path": "/api/file/putFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/putFile",
+        "timestamp": 112062.94484,
+        "observedAt": "2026-10-16T17:19:34.023Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1449",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112062.982754,
+        "observedAt": "2026-10-16T17:19:34.061Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1451",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.031843,
+        "observedAt": "2026-10-16T17:19:34.11Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1453",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.079841,
+        "observedAt": "2026-10-16T17:19:34.159Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1457",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.100437,
+        "observedAt": "2026-10-16T17:19:34.179Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1456",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.100671,
+        "observedAt": "2026-10-16T17:19:34.179Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1461",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.106368,
+        "observedAt": "2026-10-16T17:19:34.185Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1460",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.106938,
+        "observedAt": "2026-10-16T17:19:34.185Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1459",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.116193,
+        "observedAt": "2026-10-16T17:19:34.194Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1463",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.158111,
+        "observedAt": "2026-10-16T17:19:34.236Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1464",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.379846,
+        "observedAt": "2026-10-16T17:19:34.458Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1466",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.415719,
+        "observedAt": "2026-10-16T17:19:34.494Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1470",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.470941,
+        "observedAt": "2026-10-16T17:19:34.549Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1469",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.471612,
+        "observedAt": "2026-10-16T17:19:34.55Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1468",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.478471,
+        "observedAt": "2026-10-16T17:19:34.557Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1472",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.519507,
+        "observedAt": "2026-10-16T17:19:34.598Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1475",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.566361,
+        "observedAt": "2026-10-16T17:19:34.644Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1476",
+        "path": "/api/file/putFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/putFile",
+        "timestamp": 112063.726207,
+        "observedAt": "2026-10-16T17:19:34.804Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1477",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.765943,
+        "observedAt": "2026-10-16T17:19:34.844Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1478",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112063.802688,
+        "observedAt": "2026-10-16T17:19:34.881Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1479",
+        "path": "/api/file/putFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/putFile",
+        "timestamp": 112063.962161,
+        "observedAt": "2026-10-16T17:19:35.04Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1480",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112064.003148,
+        "observedAt": "2026-10-16T17:19:35.081Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1481",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112064.041522,
+        "observedAt": "2026-10-16T17:19:35.12Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1482",
+        "path": "/api/file/putFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/putFile",
+        "timestamp": 112064.190319,
+        "observedAt": "2026-10-16T17:19:35.268Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "58664.1483",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:1217/api/file/getFile",
+        "timestamp": 112064.229583,
+        "observedAt": "2026-10-16T17:19:35.308Z"
+      }
+    ],
+    "ledgerBeforeSubmit": [
+      {
+        "type": "text",
+        "value": "Real UI ledger 3f97e4c6"
+      },
+      {
+        "type": "number",
+        "value": "35"
+      },
+      {
+        "type": "text",
+        "value": "CNY"
+      },
+      {
+        "type": "date",
+        "value": "2026-12-26"
+      },
+      {
+        "type": "date",
+        "value": ""
+      },
+      {
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "ledgerSubmitState": {
+      "text": "Exchange ledger（2） Record money, items and favors exchanged. Settling an entry preserves its history.  Type MoneyItemFavor Direction Owed to meI owe them Description  Amount  Currency  Date  Due date (optional)  Note (optional)  Record an exchange 2026-12-26 Real UI ledger 3f97e4c6 · 35 CNY 金钱 · 对方欠我  待处理 结清 取消2026-10-04 虚构借款 · 123 CNY 金钱 · 对方欠我  待处理 结清 取消",
+      "inputs": [
+        {
+          "type": "text",
+          "value": "",
+          "disabled": false
+        },
+        {
+          "type": "number",
+          "value": "",
+          "disabled": false
+        },
+        {
+          "type": "text",
+          "value": "CNY",
+          "disabled": false
+        },
+        {
+          "type": "date",
+          "value": "2026-10-17",
+          "disabled": false
+        },
+        {
+          "type": "date",
+          "value": "",
+          "disabled": false
+        },
+        {
+          "type": "text",
+          "value": "",
+          "disabled": false
+        }
+      ],
+      "alerts": []
+    },
+    "followUpBeforeSubmit": {
+      "inputs": [
+        {
+          "placeholder": "What do you want to ask about? (optional)",
+          "aria": "跟进标题",
+          "value": "Real UI followup a319cc76",
+          "disabled": false
+        },
+        {
+          "placeholder": "",
+          "aria": "Plan date",
+          "value": "2026-12-27",
+          "disabled": false
+        }
+      ],
+      "buttons": [
+        {
+          "text": "Postpone",
+          "disabled": false
+        },
+        {
+          "text": "Complete",
+          "disabled": false
+        },
+        {
+          "text": "Cancel plan",
+          "disabled": false
+        },
+        {
+          "text": "Postpone",
+          "disabled": false
+        },
+        {
+          "text": "Complete",
+          "disabled": false
+        },
+        {
+          "text": "Cancel plan",
+          "disabled": false
+        },
+        {
+          "text": "Add plan",
+          "disabled": false
+        }
+      ]
+    }
+  },
+  "evidenceRound": "2026-10-17 after native-ref fixture and bounded background frame fix",
+  "previousRoundSummary": "HOST-ORG-DUAL-WINDOW-2026-10-17.json"
+}

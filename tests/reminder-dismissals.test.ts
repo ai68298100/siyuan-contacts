@@ -5,6 +5,7 @@ import {
     normalizeDismissalStore,
     dismissalsFor,
 } from "../src/domain/reminder-dismissals.ts";
+import { mergeReminderDismissals } from "../src/data/reminder-dismissals.ts";
 
 const d = (personDocId: string, kind: "birthday" | "stale", until: string) => ({ personDocId, kind, until });
 
@@ -49,4 +50,25 @@ test("dismissalsFor：按人物过滤", () => {
     ];
     assert.equal(dismissalsFor(dismissals, "20260927000000-aaaaaaa").length, 2);
     assert.equal(dismissalsFor(dismissals, "20260927000000-bbbbbbb").length, 1);
+});
+
+test("提醒暂缓合并拒绝非法或重复条目，不静默过滤后部分写入", async () => {
+    const original = { schemaVersion: 1, dismissals: [d("20260927000000-aaaaaaa", "birthday", "")] };
+    const valid = d("20260927000000-bbbbbbb", "stale", "2026-10-16");
+    const invalidBatches = [
+        [valid, d("bad-id", "birthday", "")],
+        [valid, d("20260927000000-ccccccc", "birthday", "2026-02-30")],
+        [valid, { ...valid, until: "" }],
+    ];
+    for (const batch of invalidBatches) {
+        let stored = structuredClone(original);
+        let writes = 0;
+        const plugin = {
+            loadData: async () => structuredClone(stored),
+            saveData: async (_key: string, value: typeof original) => { writes += 1; stored = structuredClone(value); },
+        } as never;
+        await assert.rejects(mergeReminderDismissals(plugin, batch), /损坏|重复/);
+        assert.equal(writes, 0);
+        assert.deepEqual(stored, original);
+    }
 });

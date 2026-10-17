@@ -20,8 +20,9 @@ const hooks = registerHooks({
         return nextLoad(url, context);
     },
 });
-const { createFollowUpRecord } = await import("../src/data/followups.ts");
+const { createFollowUpRecord, mergeFollowUpStore } = await import("../src/data/followups.ts");
 const { FollowUpWriteUnknownError } = await import("../src/domain/followups.ts");
+import type { FollowUpItem } from "../src/domain/followups.ts";
 
 test.after(() => hooks.deregister());
 
@@ -80,4 +81,29 @@ test("跟进写后回读未知：错误保留 requestId，恢复后用原 key �
     state.setReadFailure(false);
     const retried = await createFollowUpRecord(state.plugin, input);
     assert.equal(retried.id, REQUEST);
+});
+
+test("跟进恢复拒绝混合坏条目与重复 ID，校验失败零写入", async () => {
+    const valid: FollowUpItem = { id: REQUEST, personDocId: PERSON, title: "原事项", dueDate: "2026-10-20", status: "open", createdAt: 1, updatedAt: 1 };
+    const invalidBatches = [
+        [valid, { ...valid, id: "other", personDocId: "bad-doc-id" }],
+        [valid, { ...valid, title: "重复 ID 的不同内容" }],
+        [valid, { id: "broken" }],
+    ];
+    for (const batch of invalidBatches) {
+        const state = fixture();
+        await assert.rejects(mergeFollowUpStore(state.plugin, batch as FollowUpItem[]), /损坏|重复|非法人物/);
+        assert.equal(state.writes(), 0);
+    }
+});
+
+test("跟进恢复按已有 ID 跳过，合法新增写后可核实且统计守恒", async () => {
+    const state = fixture();
+    const first = await createFollowUpRecord(state.plugin, { requestId: REQUEST, personDocId: PERSON, title: "原事项", dueDate: "2026-10-20" });
+    const second = { ...first, id: "20261014000000-req0002", title: "新增事项" };
+    const before = state.writes();
+    assert.deepEqual(await mergeFollowUpStore(state.plugin, [first, second]), { added: 1, skipped: 1, personDocIds: [PERSON] });
+    assert.equal(state.writes(), before + 1);
+    assert.deepEqual(await mergeFollowUpStore(state.plugin, [first, second]), { added: 0, skipped: 2, personDocIds: [] });
+    assert.equal(state.writes(), before + 1);
 });

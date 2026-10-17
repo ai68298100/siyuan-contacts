@@ -48,6 +48,21 @@ test("FUNC-01.6-a：null/空串 rawStore 为空快照；未知版本拒绝；裸
         () => parseFollowUpBackup(JSON.stringify({ schemaVersion: 1, rawStore: { schemaVersion: 99, items: ITEMS } })),
         /版本不兼容/,
     );
+    assert.throws(() => parseFollowUpBackup(JSON.stringify({ schemaVersion: 99, rawStore: { schemaVersion: 1, items: ITEMS } })), /版本不兼容/);
+    assert.throws(() => parseFollowUpBackup(JSON.stringify({ schemaVersion: 99, rawStore: null })), /版本不兼容/);
     assert.deepEqual(parseFollowUpBackup(JSON.stringify({ schemaVersion: 1, items: ITEMS })), ITEMS, "无 rawStore 的裸库");
     assert.throws(() => parseFollowUpBackup("not json"), /不是有效的 JSON/);
+});
+
+test("跟进备份含坏条目、重复 ID 或非法人物文档 ID 时整批拒绝，不静默丢弃", () => {
+    const invalidStores = [
+        { schemaVersion: 1, items: [...ITEMS, { id: "broken" }] },
+        { schemaVersion: 1, items: [...ITEMS, { ...ITEMS[0], title: "冲突内容" }] },
+        { schemaVersion: 1, items: [...ITEMS, item({ id: "invalid-person", personDocId: "bad-doc-id" })] },
+    ];
+    for (const store of invalidStores) {
+        assert.throws(() => parseFollowUpBackup(JSON.stringify(store)), /损坏|重复|非法人物/);
+        assert.throws(() => parseFollowUpBackup(JSON.stringify({ schemaVersion: 1, rawStore: store })), /损坏|重复|非法人物/);
+        assert.throws(() => parseFollowUpBackup(JSON.stringify({ schemaVersion: 1, rawStore: JSON.stringify(store) })), /损坏|重复|非法人物/);
+    }
 });

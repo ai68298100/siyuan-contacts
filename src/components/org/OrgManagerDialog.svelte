@@ -70,6 +70,7 @@
     let changesReceived = 0;
     let organizationReadError = $state("");
     let pendingViewport: ReturnType<typeof captureViewport> | undefined;
+    const pendingViewportFrames = new Set<() => void>();
     let handledInitialOrgDocId: string | undefined;
     let alive = true;
     onDestroy(() => {
@@ -77,6 +78,7 @@
         membersRequest += 1;
         organizationsRequest += 1;
         rosterRequest += 1;
+        for (const finish of pendingViewportFrames) finish();
     });
     let roster: ContactSummary[] = $state([]);
     let rosterError = $state("");
@@ -93,6 +95,8 @@
     let recoveryRefreshKey = $state(0);
     /* B13：归档分组展示开关；B13.4 成员行内编辑 */
     let showArchived = $state(false);
+    let showRemoved = $state(false);
+    let removingOrganization = $state(false);
     let editingMemberId = $state("");
     let editDepartment = $state("");
     let editTitle = $state("");
@@ -133,7 +137,7 @@
     const hasDraft = $derived(Boolean(newOrgName.trim() || addPersonId
         || addAffiliationKind !== (draftOrg?.name.trim() === "家庭" ? "family" : "unspecified")
         || addStatus !== (draftOrg?.archived ? "former" : "active")
-        || addStatusLabel.trim() || addDepartment.trim() || addTitle.trim() || addNote.trim() || addJoinedOn || addLeftOn || editingMemberId || replacingMemberId || removingMemberId || movingMemberId || renaming));
+        || addStatusLabel.trim() || addDepartment.trim() || addTitle.trim() || addNote.trim() || addJoinedOn || addLeftOn || editingMemberId || replacingMemberId || removingMemberId || movingMemberId || renaming || removingOrganization));
 
     const guardedClose = useCloseGuard({
         busy: () => loading || busy,
@@ -146,9 +150,10 @@
     });
 
     const currentOrg = $derived(draftOrg);
-    const activeOrgs = $derived(orgs.filter((org) => !org.archived));
-    const archivedOrgs = $derived(orgs.filter((org) => org.archived));
-    const moveTargets = $derived(orgs.filter((org) => org.docId !== currentOrgDocId && (!movingMemberSnapshot || movingMemberSnapshot.status !== "active" || !org.archived)));
+    const activeOrgs = $derived(orgs.filter((org) => !org.archived && !org.removed));
+    const archivedOrgs = $derived(orgs.filter((org) => org.archived && !org.removed));
+    const removedOrgs = $derived(orgs.filter((org) => org.removed));
+    const moveTargets = $derived(orgs.filter((org) => !org.removed && org.docId !== currentOrgDocId && (!movingMemberSnapshot || movingMemberSnapshot.status !== "active" || !org.archived)));
     /* 可添加成员 = 名册中未加入当前组织的人（本人档案也可加入组织：本人可以是某公司员工） */
     const addCandidates = $derived(
         roster.filter((person) => addStatus === "former" || !activeMemberPersonDocIds.includes(person.docId)),
@@ -195,8 +200,23 @@
             const target = snapshot.focus.isConnected ? snapshot.focus : managerElement?.querySelector<HTMLElement>('input[type="search"]');
             target?.focus({ preventScroll: true });
         }
-        /* 浏览器滚动锚定可能在焦点恢复后再次调整父滚动容器，下一帧再收口一次。 */
-        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        /* 浏览器滚动锚定可能在焦点恢复后再次调整父滚动容器，下一帧再收口一次。
+           后台页会暂停 RAF；这只是视口修正，不能阻塞数据读取和写入 busy 收口。 */
+        if (document.visibilityState === "hidden") return;
+        await new Promise<void>((resolve) => {
+            const finish = () => {
+                cancelAnimationFrame(frame);
+                clearTimeout(timer);
+                document.removeEventListener("visibilitychange", onVisibilityChange);
+                pendingViewportFrames.delete(finish);
+                resolve();
+            };
+            const onVisibilityChange = () => { if (document.visibilityState === "hidden") finish(); };
+            const timer = setTimeout(finish, 100);
+            const frame = requestAnimationFrame(finish);
+            pendingViewportFrames.add(finish);
+            document.addEventListener("visibilitychange", onVisibilityChange);
+        });
         if (!alive || !isCurrent()) return;
         applyScroll();
     }
@@ -211,7 +231,7 @@
         let completedMemberLoad = false;
         organizationsRefreshing = true;
         try {
-            const next = await facade.listOrganizations();
+            const next = await facade.listOrganizations({ includeRemoved: true });
             if (!alive || request !== organizationsRequest) return;
             const viewport = previousViewport;
             orgs = next;
@@ -240,6 +260,7 @@
             }
             organizationMissing = false;
             if (orgs.find((org) => org.docId === currentOrgDocId)?.archived) showArchived = true;
+            if (selectedOrg?.removed) showRemoved = true;
             if (!alive || request !== organizationsRequest) return;
             await loadMembers(true, keepSelection, previousViewport);
             completedMemberLoad = true;
@@ -482,6 +503,7 @@
                 movingMemberSnapshot = null;
                 moveTargetOrgId = "";
                 renaming = false;
+                removingOrganization = false;
                 organizationsRequest += 1;
                 organizationsRefreshing = false;
                 currentOrgDocId = docId;
@@ -500,6 +522,7 @@
                     return;
                 }
                 if (orgs.find((org) => org.docId === docId)?.archived) showArchived = true;
+                if (selectedOrg?.removed) showRemoved = true;
                 void loadMembers().catch((error) => { if (alive) errorMessage = requestErrorMessage(error); });
             });
         } finally {
@@ -706,6 +729,18 @@
         }, "恢复中…");
     }
 
+    function removeCurrentOrg(): void {
+        const docId = currentOrgDocId;
+        if (!docId || busy || !facade.removeOrganization) return;
+        void runOrganizationStateTask(async () => {
+            await facade.removeOrganization?.(docId);
+            if (!alive) return;
+            removingOrganization = false;
+            showRemoved = true;
+            await loadOrgs(true);
+        }, "移除中…");
+    }
+
     /** B13.4：组织改名（同名检查与标记块文案同步在服务层） */
     function startRename(): void {
         if (!currentOrg || busy || hasDraft) return;
@@ -797,24 +832,44 @@
                         </ul>
                     {/if}
                 {/if}
+                {#if removedOrgs.length > 0}
+                    <button type="button" class="b3-button b3-button--text" aria-expanded={showRemoved} onclick={() => (showRemoved = !showRemoved)}>
+                        {showRemoved ? "收起已移除" : `已移除（${removedOrgs.length}）`}
+                    </button>
+                    {#if showRemoved}
+                        <ul class="lvct-org-manager__orgs">
+                            {#each removedOrgs as org (org.docId)}
+                                <li><button type="button" class="lvct-org-manager__org-item"
+                                    class:lvct-org-manager__org-item--active={org.docId === currentOrgDocId}
+                                    disabled={busy || loading || selectionGuardBusy} onclick={() => selectOrg(org.docId)}>
+                                    {org.name}<small>（已移除）</small>
+                                </button></li>
+                            {/each}
+                        </ul>
+                    {/if}
+                {/if}
             {/if}
             <div class="lvct-org-manager__create">
                 {#if onCreateOrganization}
                     <button type="button" class="b3-button b3-button--primary" disabled={busy || loading || selectionGuardBusy} onclick={onCreateOrganization}>
                         {text("orgCreateProfile", "新建组织资料")}</button>
+                {:else}
+                    <label class="lvct-org-manager__create-field">
+                        <span>{text("orgCreateLabel", "新建组织名称")}</span>
+                        <input
+                            class="b3-text-field fn__block"
+                            placeholder={text("orgCreatePlaceholder", "组织名称…")}
+                            bind:value={newOrgName}
+                            disabled={busy || loading || selectionGuardBusy}
+                            aria-label={text("orgCreateLabel", "新建组织名称")}
+                        />
+                    </label>
+                    <button class="b3-button b3-button--text"
+                        disabled={busy || loading || selectionGuardBusy || !newOrgName.trim()}
+                        title={busy || loading || selectionGuardBusy ? "组织列表仍在读取或保存，请稍候" : !newOrgName.trim() ? "请输入组织名称后再创建" : undefined}
+                        onclick={createOrg}>
+                        {text("orgCreate", "新建组织")}</button>
                 {/if}
-                <input
-                    class="b3-text-field fn__block"
-                    placeholder={text("orgCreatePlaceholder", "组织名称…")}
-                    bind:value={newOrgName}
-                    disabled={busy || loading || selectionGuardBusy}
-                    aria-label={text("orgCreateLabel", "新建组织名称")}
-                />
-                <button class="b3-button b3-button--text"
-                    disabled={busy || loading || selectionGuardBusy || !newOrgName.trim()}
-                    title={busy || loading || selectionGuardBusy ? "组织列表仍在读取或保存，请稍候" : !newOrgName.trim() ? "请输入组织名称后再创建" : undefined}
-                    onclick={createOrg}>
-                    {text("orgCreate", "新建组织")}</button>
             </div>
         </div>
 
@@ -832,13 +887,14 @@
                     </div>
                 {:else}
                     <div class="fn__flex" style="align-items: center; gap: 8px;">
-                        <b class="fn__flex-1">{currentOrg.name}{currentOrg.archived ? text("orgArchivedTag", "（已归档）") : ""}</b>
-                        {#if onEditOrganization}
+                        <b class="fn__flex-1">{currentOrg.name}{currentOrg.removed ? "（已移除）" : currentOrg.archived ? text("orgArchivedTag", "（已归档）") : ""}</b>
+                        {#if onEditOrganization && !currentOrg.removed}
                             <button type="button" class="b3-button b3-button--text" disabled={busy || organizationsRefreshing || memberLoading || hasDraft}
                                 onclick={() => onEditOrganization?.(currentOrg.docId)}>{text("orgEditProfile", "编辑资料")}</button>
                         {/if}
-                        <button type="button" class="b3-button b3-button--text" disabled={busy || hasDraft}
+                        {#if !currentOrg.removed}<button type="button" class="b3-button b3-button--text" disabled={busy || hasDraft}
                             onclick={startRename}>{text("orgRename", "改名")}</button>
+                        {/if}
                         {#if currentOrg.archived}
                             <button type="button" class="b3-button b3-button--text" disabled={busy || hasDraft}
                                 onclick={restoreCurrentOrg}>{text("orgRestore", "恢复组织")}</button>
@@ -846,8 +902,66 @@
                             <button type="button" class="b3-button b3-button--cancel" disabled={busy || hasDraft}
                                 onclick={archiveCurrentOrg}>{text("orgArchive", "归档组织")}</button>
                         {/if}
+                        {#if facade.removeOrganization && !currentOrg.removed}
+                            <button type="button" class="b3-button b3-button--cancel" disabled={busy || loading || organizationsRefreshing || memberLoading || hasDraft}
+                                onclick={() => { removingOrganization = true; }}>移除组织</button>
+                        {/if}
                     </div>
                 {/if}
+                {#if removingOrganization}
+                    <div class="lvct-org-manager__remove-confirm" role="group" aria-label="移除组织确认">
+                        <b>从插件移除「{currentOrg.name}」？</b>
+                        <p>组织将从日常列表和选组织入口隐藏。原始组织文档、组织资料和全部成员历史均保留；从“已移除”中恢复后，组织会回到活跃状态。</p>
+                        <p>保留文档：<button type="button" class="b3-button b3-button--text" onclick={() => facade.openDoc(currentOrg.docId)}>{currentOrg.name}</button>
+                            · 当前成员 {currentOrg.memberships.filter((entry) => entry.status === "active").length} 条
+                            · 历史成员 {currentOrg.memberships.filter((entry) => entry.status === "former").length} 条</p>
+                        <div class="fn__flex" style="gap: 8px; flex-wrap: wrap;">
+                            <button type="button" class="b3-button b3-button--cancel" disabled={busy} onclick={() => { removingOrganization = false; }}>取消</button>
+                            <button type="button" class="b3-button b3-button--primary" disabled={busy || organizationsRefreshing} onclick={removeCurrentOrg}>确认移除组织</button>
+                        </div>
+                    </div>
+                {/if}
+                {#if currentOrg.removed}
+                    <p class="ft__smaller ft__on-surface" role="status">此组织已从插件移除。组织文档及 {currentOrg.memberships.length} 条成员历史已保留；恢复后组织回到活跃状态，可继续管理。</p>
+                    <button type="button" class="b3-button b3-button--text" onclick={() => facade.openDoc(currentOrg.docId)}>打开保留的组织文档</button>
+                    <div class="lvct-org-manager__members lvct-org-manager__members--removed" aria-busy={memberLoading}>
+                        <div class="fn__flex" style="gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <b>已保留的成员历史</b>
+                            <span class="ft__smaller ft__on-surface">{memberTotal} 条记录 · 只读</span>
+                        </div>
+                        {#if memberError}
+                            <ViewState compact error title={text("orgMembersError", "成员读取失败，结果尚未核实")} description={memberError}>
+                                <button type="button" class="b3-button b3-button--outline" onclick={retryMembers} disabled={busy || memberLoading || organizationsRefreshing || hasDraft || selectionGuardBusy}>{text("commonRetry", "重试")}</button>
+                            </ViewState>
+                        {:else if memberLoading && members.length === 0}
+                            <ViewState compact loading title={text("orgMembersLoading", "正在加载成员…")} />
+                        {:else if members.length === 0}
+                            <p class="ft__smaller ft__on-surface">暂无可显示的成员历史。</p>
+                        {:else}
+                            <ul class="lvct-org-manager__member-list" aria-label="已移除组织的成员历史">
+                                {#each members as member (member.id)}
+                                    <li class="lvct-org-manager__member" data-membership-id={member.id} data-person-doc-id={member.personDocId}>
+                                        <span class="lvct-org-manager__member-name">
+                                            {member.personName} · {affiliationLabel(member.affiliationKind)}{member.title ? ` · ${member.title}` : ""}{member.department ? `（${member.department}）` : ""}
+                                            <span class="lvct-org-manager__member-status">{orgMembershipStatusLabel(member)}</span>
+                                            {#if member.note}<span class="lvct-org-manager__member-note" title={member.note}>💬 {member.note}</span>{/if}
+                                        </span>
+                                        {#if onOpenPerson}
+                                            <button type="button" class="b3-button b3-button--text" disabled={busy || memberLoading || organizationsRefreshing || selectionGuardBusy}
+                                                onclick={() => onOpenPerson?.(member.personDocId, currentOrgDocId)}>{text("orgCommonOpen", "查看详情")}</button>
+                                        {/if}
+                                    </li>
+                                {/each}
+                            </ul>
+                            {#if memberHasMore}
+                                <button type="button" class="b3-button b3-button--outline" onclick={loadMoreMembers}
+                                    disabled={busy || memberLoading || organizationsRefreshing || selectionGuardBusy}>
+                                    {memberLoading ? text("orgMembersLoading", "正在加载成员…") : text("orgMembersLoadMore", "加载更多")}
+                                </button>
+                            {/if}
+                        {/if}
+                    </div>
+                {:else}
                 <div class="lvct-org-manager__members" aria-busy={busy}>
                     <div class="fn__flex" style="gap: 8px; align-items: center; flex-wrap: wrap;">
                         <b>{text("orgMembersTitle", "成员")}</b>
@@ -1077,6 +1191,7 @@
                         {/if}
                     {/if}
                 </div>
+                {/if}
             {:else if organizationReadError && orgs.length === 0}
                 <p class="ft__smaller ft__on-surface" role="status">组织列表读取失败，请先在左侧重新读取后再查看成员。</p>
             {:else}

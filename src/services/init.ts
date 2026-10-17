@@ -547,7 +547,7 @@ export async function initializeWorkspace(
 
     onProgress({ key: "wizardStepFamilyOrganization" });
     try {
-        await ensureDefaultFamilyOrganization(plugin, settings);
+        await ensureDefaultFamilyOrganization(plugin, settings, { allowCreate: true });
     } catch (error) {
         onProgress({ key: "wizardStepFamilyPending", values: { message: errorMessage(error) } });
     }

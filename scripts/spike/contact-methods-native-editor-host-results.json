@@ -1,0 +1,2254 @@
+{
+  "research": "AG-RF-004-N2",
+  "mode": "explicit-isolated-kernel",
+  "gate": "LVCT_RUN_NATIVE_EDITOR_HOST=1",
+  "runEnabled": true,
+  "runId": "4adf7b0d-77f0-46b2-88db-112ba044506f",
+  "workspace": "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Native-Editor-4adf7b0d-77f0-46b2-88db-112ba044506f",
+  "workspaceExists": false,
+  "host": "127.0.0.1",
+  "port": 1529,
+  "randomPortChecked": true,
+  "kernel": "D:\\RJ\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe",
+  "kernelReady": true,
+  "fictionalOnly": true,
+  "format": "n2-single-json-v1",
+  "paths": [
+    "markdown",
+    "dom"
+  ],
+  "scenariosPerPath": 4,
+  "kernelStarted": true,
+  "kernelRequests": 73,
+  "workspaceWrites": 2,
+  "browserCalls": 0,
+  "uiControlChannel": "unavailable",
+  "uiVerified": false,
+  "hostVerified": false,
+  "productionChanges": false,
+  "realPluginFileWrites": 0,
+  "status": "host_pending",
+  "generatedAt": "2026-10-16T19:17:05.171Z",
+  "preflight": {
+    "research": "AG-RF-004-N2",
+    "mode": "explicit-isolated-kernel",
+    "gate": "LVCT_RUN_NATIVE_EDITOR_HOST=1",
+    "runEnabled": true,
+    "runId": "4adf7b0d-77f0-46b2-88db-112ba044506f",
+    "workspace": "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Native-Editor-4adf7b0d-77f0-46b2-88db-112ba044506f",
+    "workspaceExists": false,
+    "host": "127.0.0.1",
+    "port": 1529,
+    "randomPortChecked": true,
+    "kernel": "D:\\RJ\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe",
+    "kernelReady": true,
+    "fictionalOnly": true,
+    "format": "n2-single-json-v1",
+    "paths": [
+      "markdown",
+      "dom"
+    ],
+    "scenariosPerPath": 4,
+    "kernelStarted": false,
+    "kernelRequests": 0,
+    "workspaceWrites": 0,
+    "browserCalls": 0,
+    "uiControlChannel": "unavailable",
+    "uiVerified": false,
+    "hostVerified": false,
+    "productionChanges": false,
+    "realPluginFileWrites": 0,
+    "status": "host_pending"
+  },
+  "isolatedKernelApi": true,
+  "kernelApiWriteReadVerified": true,
+  "kernelCandidateVerified": true,
+  "allCandidatePathsVerified": false,
+  "restartReadbackVerified": true,
+  "observations": [
+    {
+      "transport": "markdown",
+      "fixture": "plain",
+      "docId": "20261017031706-2i746kp",
+      "expected": {
+        "owner": "20261017031706-2i746kp",
+        "sourceKey": "markdown-plain",
+        "id": "method-7fd976dc6f6480aaaa28fd4e",
+        "blockId": "20261016191706-6bd45e7",
+        "type": "phone",
+        "label": "隔离 JSON",
+        "primary": false,
+        "order": 0,
+        "value": "+00 111 / +00 222",
+        "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}"
+      },
+      "inserted": [
+        {
+          "timestamp": 0,
+          "doOperations": [
+            {
+              "action": "insert",
+              "data": "<div data-node-id=\"20261017031706-z52hmo0\" data-node-index=\"1\" data-type=\"NodeParagraph\" class=\"p\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-id=\"method-7fd976dc6f6480aaaa28fd4e\" custom-lvct-contact-method-owner=\"20261017031706-2i746kp\" custom-lvct-contact-method-source=\"markdown-plain\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"0\" updated=\"20261017031706\"><div contenteditable=\"true\" spellcheck=\"false\">联系方式：{&quot;类型&quot;:&quot;电话&quot;,&quot;标签&quot;:&quot;隔离 JSON&quot;,&quot;主值&quot;:false,&quot;值&quot;:&quot;+00 111 / +00 222&quot;}</div><div class=\"protyle-attr\" contenteditable=\"false\">​</div></div>",
+              "id": "20261017031706-z52hmo0",
+              "rootID": "",
+              "parentID": "20261017031706-2i746kp",
+              "previousID": "",
+              "nextID": "",
+              "retData": null,
+              "blockIDs": null,
+              "blockID": "",
+              "deckID": "",
+              "avID": "",
+              "srcIDs": null,
+              "srcs": null,
+              "isDetached": false,
+              "name": "",
+              "type": "",
+              "format": "",
+              "keyID": "",
+              "rowID": "",
+              "isTwoWay": false,
+              "backRelationKeyID": "",
+              "removeDest": false,
+              "layout": "",
+              "groupID": "",
+              "targetGroupID": "",
+              "viewID": "",
+              "ignoreDefaultFill": false,
+              "context": null
+            }
+          ],
+          "undoOperations": null
+        }
+      ],
+      "state": {
+        "rows": [
+          {
+            "content": "N2-markdown-plain",
+            "ial": "{: id=\"20261017031706-2i746kp\" title=\"N2-markdown-plain\" type=\"doc\" updated=\"20261017031706\"}",
+            "id": "20261017031706-2i746kp",
+            "markdown": "",
+            "parent_id": "",
+            "root_id": "20261017031706-2i746kp",
+            "type": "d"
+          },
+          {
+            "content": "Only fictional N2 fixture.",
+            "ial": "{: updated=\"20261017031706\" id=\"20261017031706-2kqhuxr\"}",
+            "id": "20261017031706-2kqhuxr",
+            "markdown": "Only fictional N2 fixture.",
+            "parent_id": "20261017031706-2i746kp",
+            "root_id": "20261017031706-2i746kp",
+            "type": "p"
+          },
+          {
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}",
+            "ial": "{: id=\"20261017031706-z52hmo0\" updated=\"20261017031706\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-owner=\"20261017031706-2i746kp\" custom-lvct-contact-method-source=\"markdown-plain\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-id=\"method-7fd976dc6f6480aaaa28fd4e\" custom-lvct-contact-method-type=\"phone\"}",
+            "id": "20261017031706-z52hmo0",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}",
+            "parent_id": "20261017031706-2i746kp",
+            "root_id": "20261017031706-2i746kp",
+            "type": "p"
+          }
+        ],
+        "children": [
+          {
+            "id": "20261017031706-z52hmo0",
+            "type": "p",
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}"
+          },
+          {
+            "id": "20261017031706-2kqhuxr",
+            "type": "p",
+            "content": "Only fictional N2 fixture.",
+            "markdown": "Only fictional N2 fixture."
+          }
+        ]
+      },
+      "inspection": {
+        "ialDecodedRawBodyParse": {
+          "ok": true,
+          "status": "accepted",
+          "detail": "strict-body",
+          "method": {
+            "id": "method-7fd976dc6f6480aaaa28fd4e",
+            "owner": "20261017031706-2i746kp",
+            "sourceKey": "markdown-plain",
+            "type": "phone",
+            "label": "隔离 JSON",
+            "primary": false,
+            "order": 0,
+            "value": "+00 111 / +00 222",
+            "blockId": "20261017031706-z52hmo0",
+            "parentId": "20261017031706-2i746kp",
+            "format": "n2-single-json-v1"
+          }
+        },
+        "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+        "removedExactTerminalIal": false,
+        "contentMatchesExpected": true,
+        "markdownBodyMatchesContent": true,
+        "parsed": {
+          "ok": true,
+          "status": "accepted",
+          "detail": "strict-body",
+          "method": {
+            "id": "method-7fd976dc6f6480aaaa28fd4e",
+            "owner": "20261017031706-2i746kp",
+            "sourceKey": "markdown-plain",
+            "type": "phone",
+            "label": "隔离 JSON",
+            "primary": false,
+            "order": 0,
+            "value": "+00 111 / +00 222",
+            "blockId": "20261017031706-z52hmo0",
+            "parentId": "20261017031706-2i746kp",
+            "format": "n2-single-json-v1"
+          }
+        },
+        "aggregate": {
+          "complete": true,
+          "writeAllowed": true,
+          "scope": "selected-candidate-method-blocks-only",
+          "scopeDiscoveryVerified": false,
+          "methods": [
+            {
+              "id": "method-7fd976dc6f6480aaaa28fd4e",
+              "owner": "20261017031706-2i746kp",
+              "sourceKey": "markdown-plain",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "+00 111 / +00 222",
+              "blockId": "20261017031706-z52hmo0",
+              "parentId": "20261017031706-2i746kp",
+              "format": "n2-single-json-v1"
+            }
+          ],
+          "diagnosticAcceptedCount": 1,
+          "reports": [],
+          "identityAllocations": 0
+        },
+        "exactValueMatch": true,
+        "candidateVerified": true,
+        "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+      },
+      "afterRestart": {
+        "state": {
+          "rows": [
+            {
+              "content": "N2-markdown-plain",
+              "ial": "{: id=\"20261017031706-2i746kp\" title=\"N2-markdown-plain\" type=\"doc\" updated=\"20261017031706\"}",
+              "id": "20261017031706-2i746kp",
+              "markdown": "",
+              "parent_id": "",
+              "root_id": "20261017031706-2i746kp",
+              "type": "d"
+            },
+            {
+              "content": "Only fictional N2 fixture.",
+              "ial": "{: updated=\"20261017031706\" id=\"20261017031706-2kqhuxr\"}",
+              "id": "20261017031706-2kqhuxr",
+              "markdown": "Only fictional N2 fixture.",
+              "parent_id": "20261017031706-2i746kp",
+              "root_id": "20261017031706-2i746kp",
+              "type": "p"
+            },
+            {
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}",
+              "ial": "{: id=\"20261017031706-z52hmo0\" updated=\"20261017031706\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-owner=\"20261017031706-2i746kp\" custom-lvct-contact-method-source=\"markdown-plain\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-id=\"method-7fd976dc6f6480aaaa28fd4e\" custom-lvct-contact-method-type=\"phone\"}",
+              "id": "20261017031706-z52hmo0",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}",
+              "parent_id": "20261017031706-2i746kp",
+              "root_id": "20261017031706-2i746kp",
+              "type": "p"
+            }
+          ],
+          "children": [
+            {
+              "id": "20261017031706-z52hmo0",
+              "type": "p",
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}"
+            },
+            {
+              "id": "20261017031706-2kqhuxr",
+              "type": "p",
+              "content": "Only fictional N2 fixture.",
+              "markdown": "Only fictional N2 fixture."
+            }
+          ]
+        },
+        "inspection": {
+          "ialDecodedRawBodyParse": {
+            "ok": true,
+            "status": "accepted",
+            "detail": "strict-body",
+            "method": {
+              "id": "method-7fd976dc6f6480aaaa28fd4e",
+              "owner": "20261017031706-2i746kp",
+              "sourceKey": "markdown-plain",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "+00 111 / +00 222",
+              "blockId": "20261017031706-z52hmo0",
+              "parentId": "20261017031706-2i746kp",
+              "format": "n2-single-json-v1"
+            }
+          },
+          "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+          "removedExactTerminalIal": false,
+          "contentMatchesExpected": true,
+          "markdownBodyMatchesContent": true,
+          "parsed": {
+            "ok": true,
+            "status": "accepted",
+            "detail": "strict-body",
+            "method": {
+              "id": "method-7fd976dc6f6480aaaa28fd4e",
+              "owner": "20261017031706-2i746kp",
+              "sourceKey": "markdown-plain",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "+00 111 / +00 222",
+              "blockId": "20261017031706-z52hmo0",
+              "parentId": "20261017031706-2i746kp",
+              "format": "n2-single-json-v1"
+            }
+          },
+          "aggregate": {
+            "complete": true,
+            "writeAllowed": true,
+            "scope": "selected-candidate-method-blocks-only",
+            "scopeDiscoveryVerified": false,
+            "methods": [
+              {
+                "id": "method-7fd976dc6f6480aaaa28fd4e",
+                "owner": "20261017031706-2i746kp",
+                "sourceKey": "markdown-plain",
+                "type": "phone",
+                "label": "隔离 JSON",
+                "primary": false,
+                "order": 0,
+                "value": "+00 111 / +00 222",
+                "blockId": "20261017031706-z52hmo0",
+                "parentId": "20261017031706-2i746kp",
+                "format": "n2-single-json-v1"
+              }
+            ],
+            "diagnosticAcceptedCount": 1,
+            "reports": [],
+            "identityAllocations": 0
+          },
+          "exactValueMatch": true,
+          "candidateVerified": true,
+          "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+        }
+      }
+    },
+    {
+      "transport": "markdown",
+      "fixture": "escapes",
+      "docId": "20261017031706-j1w5j1g",
+      "expected": {
+        "owner": "20261017031706-j1w5j1g",
+        "sourceKey": "markdown-escapes",
+        "id": "method-ab22006093f261ac20fded98",
+        "blockId": "20261016191706-618000a",
+        "type": "phone",
+        "label": "隔离 JSON",
+        "primary": false,
+        "order": 0,
+        "value": "第一行\n第二行\t\"引号\"\\路径\\n字面🙂",
+        "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\\\"引号\\\"\\\\路径\\\\n字面🙂\"}"
+      },
+      "inserted": [
+        {
+          "timestamp": 0,
+          "doOperations": [
+            {
+              "action": "insert",
+              "data": "<div data-node-id=\"20261017031706-cto5s56\" data-node-index=\"1\" data-type=\"NodeParagraph\" class=\"p\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-id=\"method-ab22006093f261ac20fded98\" custom-lvct-contact-method-owner=\"20261017031706-j1w5j1g\" custom-lvct-contact-method-source=\"markdown-escapes\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"0\" updated=\"20261017031706\"><div contenteditable=\"true\" spellcheck=\"false\">联系方式：{&quot;类型&quot;:&quot;电话&quot;,&quot;标签&quot;:&quot;隔离 JSON&quot;,&quot;主值&quot;:false,&quot;值&quot;:&quot;第一行\\n第二行\\t<span data-type=\"backslash\">&quot;</span>引号<span data-type=\"backslash\">&quot;</span><span data-type=\"backslash\">\\</span>路径<span data-type=\"backslash\">\\</span>n字面🙂&quot;}</div><div class=\"protyle-attr\" contenteditable=\"false\">​</div></div>",
+              "id": "20261017031706-cto5s56",
+              "rootID": "",
+              "parentID": "20261017031706-j1w5j1g",
+              "previousID": "",
+              "nextID": "",
+              "retData": null,
+              "blockIDs": null,
+              "blockID": "",
+              "deckID": "",
+              "avID": "",
+              "srcIDs": null,
+              "srcs": null,
+              "isDetached": false,
+              "name": "",
+              "type": "",
+              "format": "",
+              "keyID": "",
+              "rowID": "",
+              "isTwoWay": false,
+              "backRelationKeyID": "",
+              "removeDest": false,
+              "layout": "",
+              "groupID": "",
+              "targetGroupID": "",
+              "viewID": "",
+              "ignoreDefaultFill": false,
+              "context": null
+            }
+          ],
+          "undoOperations": null
+        }
+      ],
+      "state": {
+        "rows": [
+          {
+            "content": "Only fictional N2 fixture.",
+            "ial": "{: id=\"20261017031706-5upckgp\" updated=\"20261017031706\"}",
+            "id": "20261017031706-5upckgp",
+            "markdown": "Only fictional N2 fixture.",
+            "parent_id": "20261017031706-j1w5j1g",
+            "root_id": "20261017031706-j1w5j1g",
+            "type": "p"
+          },
+          {
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\"引号\"\\路径\\n字面🙂\"}",
+            "ial": "{: id=\"20261017031706-cto5s56\" updated=\"20261017031706\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-id=\"method-ab22006093f261ac20fded98\" custom-lvct-contact-method-source=\"markdown-escapes\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-owner=\"20261017031706-j1w5j1g\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method=\"1\"}",
+            "id": "20261017031706-cto5s56",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\\\"引号\\\"\\\\路径\\\\n字面🙂\"}",
+            "parent_id": "20261017031706-j1w5j1g",
+            "root_id": "20261017031706-j1w5j1g",
+            "type": "p"
+          },
+          {
+            "content": "N2-markdown-escapes",
+            "ial": "{: id=\"20261017031706-j1w5j1g\" title=\"N2-markdown-escapes\" type=\"doc\" updated=\"20261017031706\"}",
+            "id": "20261017031706-j1w5j1g",
+            "markdown": "",
+            "parent_id": "",
+            "root_id": "20261017031706-j1w5j1g",
+            "type": "d"
+          }
+        ],
+        "children": [
+          {
+            "id": "20261017031706-cto5s56",
+            "type": "p",
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\"引号\"\\路径\\n字面🙂\"}",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\\\"引号\\\"\\\\路径\\\\n字面🙂\"}"
+          },
+          {
+            "id": "20261017031706-5upckgp",
+            "type": "p",
+            "content": "Only fictional N2 fixture.",
+            "markdown": "Only fictional N2 fixture."
+          }
+        ]
+      },
+      "inspection": {
+        "ialDecodedRawBodyParse": {
+          "ok": false,
+          "status": "unknown",
+          "detail": "block-shape",
+          "blockId": "20261017031706-cto5s56"
+        },
+        "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+        "removedExactTerminalIal": false,
+        "contentMatchesExpected": false,
+        "markdownBodyMatchesContent": false,
+        "parsed": {
+          "ok": false,
+          "status": "unknown",
+          "detail": "block-shape",
+          "blockId": "20261017031706-cto5s56"
+        },
+        "aggregate": {
+          "complete": false,
+          "writeAllowed": false,
+          "scope": "selected-candidate-method-blocks-only",
+          "scopeDiscoveryVerified": false,
+          "methods": [],
+          "diagnosticAcceptedCount": 0,
+          "reports": [
+            {
+              "ok": false,
+              "status": "unknown",
+              "detail": "block-shape",
+              "blockId": "20261017031706-cto5s56"
+            }
+          ],
+          "identityAllocations": 0
+        },
+        "exactValueMatch": false,
+        "candidateVerified": false,
+        "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+      },
+      "afterRestart": {
+        "state": {
+          "rows": [
+            {
+              "content": "Only fictional N2 fixture.",
+              "ial": "{: id=\"20261017031706-5upckgp\" updated=\"20261017031706\"}",
+              "id": "20261017031706-5upckgp",
+              "markdown": "Only fictional N2 fixture.",
+              "parent_id": "20261017031706-j1w5j1g",
+              "root_id": "20261017031706-j1w5j1g",
+              "type": "p"
+            },
+            {
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\"引号\"\\路径\\n字面🙂\"}",
+              "ial": "{: id=\"20261017031706-cto5s56\" updated=\"20261017031706\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-id=\"method-ab22006093f261ac20fded98\" custom-lvct-contact-method-source=\"markdown-escapes\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-owner=\"20261017031706-j1w5j1g\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method=\"1\"}",
+              "id": "20261017031706-cto5s56",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\\\"引号\\\"\\\\路径\\\\n字面🙂\"}",
+              "parent_id": "20261017031706-j1w5j1g",
+              "root_id": "20261017031706-j1w5j1g",
+              "type": "p"
+            },
+            {
+              "content": "N2-markdown-escapes",
+              "ial": "{: id=\"20261017031706-j1w5j1g\" title=\"N2-markdown-escapes\" type=\"doc\" updated=\"20261017031706\"}",
+              "id": "20261017031706-j1w5j1g",
+              "markdown": "",
+              "parent_id": "",
+              "root_id": "20261017031706-j1w5j1g",
+              "type": "d"
+            }
+          ],
+          "children": [
+            {
+              "id": "20261017031706-cto5s56",
+              "type": "p",
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\"引号\"\\路径\\n字面🙂\"}",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\\\"引号\\\"\\\\路径\\\\n字面🙂\"}"
+            },
+            {
+              "id": "20261017031706-5upckgp",
+              "type": "p",
+              "content": "Only fictional N2 fixture.",
+              "markdown": "Only fictional N2 fixture."
+            }
+          ]
+        },
+        "inspection": {
+          "ialDecodedRawBodyParse": {
+            "ok": false,
+            "status": "unknown",
+            "detail": "block-shape",
+            "blockId": "20261017031706-cto5s56"
+          },
+          "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+          "removedExactTerminalIal": false,
+          "contentMatchesExpected": false,
+          "markdownBodyMatchesContent": false,
+          "parsed": {
+            "ok": false,
+            "status": "unknown",
+            "detail": "block-shape",
+            "blockId": "20261017031706-cto5s56"
+          },
+          "aggregate": {
+            "complete": false,
+            "writeAllowed": false,
+            "scope": "selected-candidate-method-blocks-only",
+            "scopeDiscoveryVerified": false,
+            "methods": [],
+            "diagnosticAcceptedCount": 0,
+            "reports": [
+              {
+                "ok": false,
+                "status": "unknown",
+                "detail": "block-shape",
+                "blockId": "20261017031706-cto5s56"
+              }
+            ],
+            "identityAllocations": 0
+          },
+          "exactValueMatch": false,
+          "candidateVerified": false,
+          "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+        }
+      }
+    },
+    {
+      "transport": "markdown",
+      "fixture": "markdown",
+      "docId": "20261017031706-4le29cs",
+      "expected": {
+        "owner": "20261017031706-4le29cs",
+        "sourceKey": "markdown-markdown",
+        "id": "method-607a0c42b8a16f9a824c5cd0",
+        "blockId": "20261016191706-ed501ba",
+        "type": "phone",
+        "label": "隔离 JSON",
+        "primary": false,
+        "order": 0,
+        "value": "**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\"1\"}",
+        "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\\\"1\\\"}\"}"
+      },
+      "inserted": [
+        {
+          "timestamp": 0,
+          "doOperations": [
+            {
+              "action": "insert",
+              "data": "<div data-node-id=\"20261017031706-d2kcp65\" data-node-index=\"1\" data-type=\"NodeParagraph\" class=\"p\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-id=\"method-607a0c42b8a16f9a824c5cd0\" custom-lvct-contact-method-owner=\"20261017031706-4le29cs\" custom-lvct-contact-method-source=\"markdown-markdown\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"0\" updated=\"20261017031706\"><div contenteditable=\"true\" spellcheck=\"false\">联系方式：{&quot;类型&quot;:&quot;电话&quot;,&quot;标签&quot;:&quot;隔离 JSON&quot;,&quot;主值&quot;:false,&quot;值&quot;:&quot;<span data-type=\"strong\">虚构</span> <span data-type=\"em\">文本</span> <span data-type=\"a\" data-href=\"https://example.test\">链接</span> ​<span data-type=\"code\">⁠code</span>​ <span data-type=\"strong\">原文</span> &amp; {: custom-fake=<span data-type=\"backslash\">&quot;</span>1<span data-type=\"backslash\">&quot;</span>}&quot;}</div><div class=\"protyle-attr\" contenteditable=\"false\">​</div></div>",
+              "id": "20261017031706-d2kcp65",
+              "rootID": "",
+              "parentID": "20261017031706-4le29cs",
+              "previousID": "",
+              "nextID": "",
+              "retData": null,
+              "blockIDs": null,
+              "blockID": "",
+              "deckID": "",
+              "avID": "",
+              "srcIDs": null,
+              "srcs": null,
+              "isDetached": false,
+              "name": "",
+              "type": "",
+              "format": "",
+              "keyID": "",
+              "rowID": "",
+              "isTwoWay": false,
+              "backRelationKeyID": "",
+              "removeDest": false,
+              "layout": "",
+              "groupID": "",
+              "targetGroupID": "",
+              "viewID": "",
+              "ignoreDefaultFill": false,
+              "context": null
+            }
+          ],
+          "undoOperations": null
+        }
+      ],
+      "state": {
+        "rows": [
+          {
+            "content": "N2-markdown-markdown",
+            "ial": "{: id=\"20261017031706-4le29cs\" title=\"N2-markdown-markdown\" type=\"doc\" updated=\"20261017031706\"}",
+            "id": "20261017031706-4le29cs",
+            "markdown": "",
+            "parent_id": "",
+            "root_id": "20261017031706-4le29cs",
+            "type": "d"
+          },
+          {
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"虚构 文本 链接 https://example.test code 原文 & {: custom-fake=\"1\"}\"}",
+            "ial": "{: id=\"20261017031706-d2kcp65\" updated=\"20261017031706\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-owner=\"20261017031706-4le29cs\" custom-lvct-contact-method-source=\"markdown-markdown\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-id=\"method-607a0c42b8a16f9a824c5cd0\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-order=\"0\"}",
+            "id": "20261017031706-d2kcp65",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"**虚构** *文本* [链接](https://example.test) `code` **原文** & {: custom-fake=\\\"1\\\"}\"}",
+            "parent_id": "20261017031706-4le29cs",
+            "root_id": "20261017031706-4le29cs",
+            "type": "p"
+          },
+          {
+            "content": "Only fictional N2 fixture.",
+            "ial": "{: id=\"20261017031706-i249re8\" updated=\"20261017031706\"}",
+            "id": "20261017031706-i249re8",
+            "markdown": "Only fictional N2 fixture.",
+            "parent_id": "20261017031706-4le29cs",
+            "root_id": "20261017031706-4le29cs",
+            "type": "p"
+          }
+        ],
+        "children": [
+          {
+            "id": "20261017031706-d2kcp65",
+            "type": "p",
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"虚构 文本 链接 https://example.test code 原文 & {: custom-fake=\"1\"}\"}",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"**虚构** *文本* [链接](https://example.test) `code` **原文** & {: custom-fake=\\\"1\\\"}\"}"
+          },
+          {
+            "id": "20261017031706-i249re8",
+            "type": "p",
+            "content": "Only fictional N2 fixture.",
+            "markdown": "Only fictional N2 fixture."
+          }
+        ]
+      },
+      "inspection": {
+        "ialDecodedRawBodyParse": {
+          "ok": false,
+          "status": "unknown",
+          "detail": "block-shape",
+          "blockId": "20261017031706-d2kcp65"
+        },
+        "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+        "removedExactTerminalIal": false,
+        "contentMatchesExpected": false,
+        "markdownBodyMatchesContent": false,
+        "parsed": {
+          "ok": false,
+          "status": "unknown",
+          "detail": "block-shape",
+          "blockId": "20261017031706-d2kcp65"
+        },
+        "aggregate": {
+          "complete": false,
+          "writeAllowed": false,
+          "scope": "selected-candidate-method-blocks-only",
+          "scopeDiscoveryVerified": false,
+          "methods": [],
+          "diagnosticAcceptedCount": 0,
+          "reports": [
+            {
+              "ok": false,
+              "status": "unknown",
+              "detail": "block-shape",
+              "blockId": "20261017031706-d2kcp65"
+            }
+          ],
+          "identityAllocations": 0
+        },
+        "exactValueMatch": false,
+        "candidateVerified": false,
+        "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+      },
+      "afterRestart": {
+        "state": {
+          "rows": [
+            {
+              "content": "N2-markdown-markdown",
+              "ial": "{: id=\"20261017031706-4le29cs\" title=\"N2-markdown-markdown\" type=\"doc\" updated=\"20261017031706\"}",
+              "id": "20261017031706-4le29cs",
+              "markdown": "",
+              "parent_id": "",
+              "root_id": "20261017031706-4le29cs",
+              "type": "d"
+            },
+            {
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"虚构 文本 链接 https://example.test code 原文 & {: custom-fake=\"1\"}\"}",
+              "ial": "{: id=\"20261017031706-d2kcp65\" updated=\"20261017031706\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-owner=\"20261017031706-4le29cs\" custom-lvct-contact-method-source=\"markdown-markdown\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-id=\"method-607a0c42b8a16f9a824c5cd0\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-order=\"0\"}",
+              "id": "20261017031706-d2kcp65",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"**虚构** *文本* [链接](https://example.test) `code` **原文** & {: custom-fake=\\\"1\\\"}\"}",
+              "parent_id": "20261017031706-4le29cs",
+              "root_id": "20261017031706-4le29cs",
+              "type": "p"
+            },
+            {
+              "content": "Only fictional N2 fixture.",
+              "ial": "{: id=\"20261017031706-i249re8\" updated=\"20261017031706\"}",
+              "id": "20261017031706-i249re8",
+              "markdown": "Only fictional N2 fixture.",
+              "parent_id": "20261017031706-4le29cs",
+              "root_id": "20261017031706-4le29cs",
+              "type": "p"
+            }
+          ],
+          "children": [
+            {
+              "id": "20261017031706-d2kcp65",
+              "type": "p",
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"虚构 文本 链接 https://example.test code 原文 & {: custom-fake=\"1\"}\"}",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"**虚构** *文本* [链接](https://example.test) `code` **原文** & {: custom-fake=\\\"1\\\"}\"}"
+            },
+            {
+              "id": "20261017031706-i249re8",
+              "type": "p",
+              "content": "Only fictional N2 fixture.",
+              "markdown": "Only fictional N2 fixture."
+            }
+          ]
+        },
+        "inspection": {
+          "ialDecodedRawBodyParse": {
+            "ok": false,
+            "status": "unknown",
+            "detail": "block-shape",
+            "blockId": "20261017031706-d2kcp65"
+          },
+          "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+          "removedExactTerminalIal": false,
+          "contentMatchesExpected": false,
+          "markdownBodyMatchesContent": false,
+          "parsed": {
+            "ok": false,
+            "status": "unknown",
+            "detail": "block-shape",
+            "blockId": "20261017031706-d2kcp65"
+          },
+          "aggregate": {
+            "complete": false,
+            "writeAllowed": false,
+            "scope": "selected-candidate-method-blocks-only",
+            "scopeDiscoveryVerified": false,
+            "methods": [],
+            "diagnosticAcceptedCount": 0,
+            "reports": [
+              {
+                "ok": false,
+                "status": "unknown",
+                "detail": "block-shape",
+                "blockId": "20261017031706-d2kcp65"
+              }
+            ],
+            "identityAllocations": 0
+          },
+          "exactValueMatch": false,
+          "candidateVerified": false,
+          "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+        }
+      }
+    },
+    {
+      "transport": "markdown",
+      "fixture": "whitespace-crlf",
+      "docId": "20261017031706-5g8uxpq",
+      "expected": {
+        "owner": "20261017031706-5g8uxpq",
+        "sourceKey": "markdown-whitespace-crlf",
+        "id": "method-923619c28d3225940d2e4d9f",
+        "blockId": "20261016191706-1050db2",
+        "type": "phone",
+        "label": "隔离 JSON",
+        "primary": false,
+        "order": 0,
+        "value": "  虚构首空格\r\n中间\r\n尾空格  ",
+        "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}"
+      },
+      "inserted": [
+        {
+          "timestamp": 0,
+          "doOperations": [
+            {
+              "action": "insert",
+              "data": "<div data-node-id=\"20261017031706-1lpnhow\" data-node-index=\"1\" data-type=\"NodeParagraph\" class=\"p\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-id=\"method-923619c28d3225940d2e4d9f\" custom-lvct-contact-method-owner=\"20261017031706-5g8uxpq\" custom-lvct-contact-method-source=\"markdown-whitespace-crlf\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"0\" updated=\"20261017031706\"><div contenteditable=\"true\" spellcheck=\"false\">联系方式：{&quot;类型&quot;:&quot;电话&quot;,&quot;标签&quot;:&quot;隔离 JSON&quot;,&quot;主值&quot;:false,&quot;值&quot;:&quot;  虚构首空格\\r\\n中间\\r\\n尾空格  &quot;}</div><div class=\"protyle-attr\" contenteditable=\"false\">​</div></div>",
+              "id": "20261017031706-1lpnhow",
+              "rootID": "",
+              "parentID": "20261017031706-5g8uxpq",
+              "previousID": "",
+              "nextID": "",
+              "retData": null,
+              "blockIDs": null,
+              "blockID": "",
+              "deckID": "",
+              "avID": "",
+              "srcIDs": null,
+              "srcs": null,
+              "isDetached": false,
+              "name": "",
+              "type": "",
+              "format": "",
+              "keyID": "",
+              "rowID": "",
+              "isTwoWay": false,
+              "backRelationKeyID": "",
+              "removeDest": false,
+              "layout": "",
+              "groupID": "",
+              "targetGroupID": "",
+              "viewID": "",
+              "ignoreDefaultFill": false,
+              "context": null
+            }
+          ],
+          "undoOperations": null
+        }
+      ],
+      "state": {
+        "rows": [
+          {
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}",
+            "ial": "{: id=\"20261017031706-1lpnhow\" updated=\"20261017031706\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-owner=\"20261017031706-5g8uxpq\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"method-923619c28d3225940d2e4d9f\" custom-lvct-contact-method-source=\"markdown-whitespace-crlf\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-primary=\"0\"}",
+            "id": "20261017031706-1lpnhow",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}",
+            "parent_id": "20261017031706-5g8uxpq",
+            "root_id": "20261017031706-5g8uxpq",
+            "type": "p"
+          },
+          {
+            "content": "N2-markdown-whitespace-crlf",
+            "ial": "{: id=\"20261017031706-5g8uxpq\" title=\"N2-markdown-whitespace-crlf\" type=\"doc\" updated=\"20261017031706\"}",
+            "id": "20261017031706-5g8uxpq",
+            "markdown": "",
+            "parent_id": "",
+            "root_id": "20261017031706-5g8uxpq",
+            "type": "d"
+          },
+          {
+            "content": "Only fictional N2 fixture.",
+            "ial": "{: id=\"20261017031706-ok7r388\" updated=\"20261017031706\"}",
+            "id": "20261017031706-ok7r388",
+            "markdown": "Only fictional N2 fixture.",
+            "parent_id": "20261017031706-5g8uxpq",
+            "root_id": "20261017031706-5g8uxpq",
+            "type": "p"
+          }
+        ],
+        "children": [
+          {
+            "id": "20261017031706-1lpnhow",
+            "type": "p",
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}"
+          },
+          {
+            "id": "20261017031706-ok7r388",
+            "type": "p",
+            "content": "Only fictional N2 fixture.",
+            "markdown": "Only fictional N2 fixture."
+          }
+        ]
+      },
+      "inspection": {
+        "ialDecodedRawBodyParse": {
+          "ok": true,
+          "status": "accepted",
+          "detail": "strict-body",
+          "method": {
+            "id": "method-923619c28d3225940d2e4d9f",
+            "owner": "20261017031706-5g8uxpq",
+            "sourceKey": "markdown-whitespace-crlf",
+            "type": "phone",
+            "label": "隔离 JSON",
+            "primary": false,
+            "order": 0,
+            "value": "  虚构首空格\r\n中间\r\n尾空格  ",
+            "blockId": "20261017031706-1lpnhow",
+            "parentId": "20261017031706-5g8uxpq",
+            "format": "n2-single-json-v1"
+          }
+        },
+        "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+        "removedExactTerminalIal": false,
+        "contentMatchesExpected": true,
+        "markdownBodyMatchesContent": true,
+        "parsed": {
+          "ok": true,
+          "status": "accepted",
+          "detail": "strict-body",
+          "method": {
+            "id": "method-923619c28d3225940d2e4d9f",
+            "owner": "20261017031706-5g8uxpq",
+            "sourceKey": "markdown-whitespace-crlf",
+            "type": "phone",
+            "label": "隔离 JSON",
+            "primary": false,
+            "order": 0,
+            "value": "  虚构首空格\r\n中间\r\n尾空格  ",
+            "blockId": "20261017031706-1lpnhow",
+            "parentId": "20261017031706-5g8uxpq",
+            "format": "n2-single-json-v1"
+          }
+        },
+        "aggregate": {
+          "complete": true,
+          "writeAllowed": true,
+          "scope": "selected-candidate-method-blocks-only",
+          "scopeDiscoveryVerified": false,
+          "methods": [
+            {
+              "id": "method-923619c28d3225940d2e4d9f",
+              "owner": "20261017031706-5g8uxpq",
+              "sourceKey": "markdown-whitespace-crlf",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "  虚构首空格\r\n中间\r\n尾空格  ",
+              "blockId": "20261017031706-1lpnhow",
+              "parentId": "20261017031706-5g8uxpq",
+              "format": "n2-single-json-v1"
+            }
+          ],
+          "diagnosticAcceptedCount": 1,
+          "reports": [],
+          "identityAllocations": 0
+        },
+        "exactValueMatch": true,
+        "candidateVerified": true,
+        "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+      },
+      "afterRestart": {
+        "state": {
+          "rows": [
+            {
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}",
+              "ial": "{: id=\"20261017031706-1lpnhow\" updated=\"20261017031706\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-owner=\"20261017031706-5g8uxpq\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"method-923619c28d3225940d2e4d9f\" custom-lvct-contact-method-source=\"markdown-whitespace-crlf\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-primary=\"0\"}",
+              "id": "20261017031706-1lpnhow",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}",
+              "parent_id": "20261017031706-5g8uxpq",
+              "root_id": "20261017031706-5g8uxpq",
+              "type": "p"
+            },
+            {
+              "content": "N2-markdown-whitespace-crlf",
+              "ial": "{: id=\"20261017031706-5g8uxpq\" title=\"N2-markdown-whitespace-crlf\" type=\"doc\" updated=\"20261017031706\"}",
+              "id": "20261017031706-5g8uxpq",
+              "markdown": "",
+              "parent_id": "",
+              "root_id": "20261017031706-5g8uxpq",
+              "type": "d"
+            },
+            {
+              "content": "Only fictional N2 fixture.",
+              "ial": "{: id=\"20261017031706-ok7r388\" updated=\"20261017031706\"}",
+              "id": "20261017031706-ok7r388",
+              "markdown": "Only fictional N2 fixture.",
+              "parent_id": "20261017031706-5g8uxpq",
+              "root_id": "20261017031706-5g8uxpq",
+              "type": "p"
+            }
+          ],
+          "children": [
+            {
+              "id": "20261017031706-1lpnhow",
+              "type": "p",
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}"
+            },
+            {
+              "id": "20261017031706-ok7r388",
+              "type": "p",
+              "content": "Only fictional N2 fixture.",
+              "markdown": "Only fictional N2 fixture."
+            }
+          ]
+        },
+        "inspection": {
+          "ialDecodedRawBodyParse": {
+            "ok": true,
+            "status": "accepted",
+            "detail": "strict-body",
+            "method": {
+              "id": "method-923619c28d3225940d2e4d9f",
+              "owner": "20261017031706-5g8uxpq",
+              "sourceKey": "markdown-whitespace-crlf",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "  虚构首空格\r\n中间\r\n尾空格  ",
+              "blockId": "20261017031706-1lpnhow",
+              "parentId": "20261017031706-5g8uxpq",
+              "format": "n2-single-json-v1"
+            }
+          },
+          "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+          "removedExactTerminalIal": false,
+          "contentMatchesExpected": true,
+          "markdownBodyMatchesContent": true,
+          "parsed": {
+            "ok": true,
+            "status": "accepted",
+            "detail": "strict-body",
+            "method": {
+              "id": "method-923619c28d3225940d2e4d9f",
+              "owner": "20261017031706-5g8uxpq",
+              "sourceKey": "markdown-whitespace-crlf",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "  虚构首空格\r\n中间\r\n尾空格  ",
+              "blockId": "20261017031706-1lpnhow",
+              "parentId": "20261017031706-5g8uxpq",
+              "format": "n2-single-json-v1"
+            }
+          },
+          "aggregate": {
+            "complete": true,
+            "writeAllowed": true,
+            "scope": "selected-candidate-method-blocks-only",
+            "scopeDiscoveryVerified": false,
+            "methods": [
+              {
+                "id": "method-923619c28d3225940d2e4d9f",
+                "owner": "20261017031706-5g8uxpq",
+                "sourceKey": "markdown-whitespace-crlf",
+                "type": "phone",
+                "label": "隔离 JSON",
+                "primary": false,
+                "order": 0,
+                "value": "  虚构首空格\r\n中间\r\n尾空格  ",
+                "blockId": "20261017031706-1lpnhow",
+                "parentId": "20261017031706-5g8uxpq",
+                "format": "n2-single-json-v1"
+              }
+            ],
+            "diagnosticAcceptedCount": 1,
+            "reports": [],
+            "identityAllocations": 0
+          },
+          "exactValueMatch": true,
+          "candidateVerified": true,
+          "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+        }
+      }
+    },
+    {
+      "transport": "dom",
+      "fixture": "plain",
+      "docId": "20261017031706-ntur7h3",
+      "expected": {
+        "owner": "20261017031706-ntur7h3",
+        "sourceKey": "dom-plain",
+        "id": "method-0145ac1063ccac6403ebc476",
+        "blockId": "20261016191706-4e38fb5",
+        "type": "phone",
+        "label": "隔离 JSON",
+        "primary": false,
+        "order": 0,
+        "value": "+00 111 / +00 222",
+        "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}"
+      },
+      "inserted": [
+        {
+          "timestamp": 0,
+          "doOperations": [
+            {
+              "action": "insert",
+              "data": "<div data-node-id=\"20261016191706-4e38fb5\" data-type=\"NodeParagraph\" class=\"p\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-id=\"method-0145ac1063ccac6403ebc476\" custom-lvct-contact-method-owner=\"20261017031706-ntur7h3\" custom-lvct-contact-method-source=\"dom-plain\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"0\"><div contenteditable=\"true\">联系方式：{&quot;类型&quot;:&quot;电话&quot;,&quot;标签&quot;:&quot;隔离 JSON&quot;,&quot;主值&quot;:false,&quot;值&quot;:&quot;+00 111 / +00 222&quot;}</div></div>",
+              "id": "20261016191706-4e38fb5",
+              "rootID": "",
+              "parentID": "20261017031706-ntur7h3",
+              "previousID": "",
+              "nextID": "",
+              "retData": null,
+              "blockIDs": null,
+              "blockID": "",
+              "deckID": "",
+              "avID": "",
+              "srcIDs": null,
+              "srcs": null,
+              "isDetached": false,
+              "name": "",
+              "type": "",
+              "format": "",
+              "keyID": "",
+              "rowID": "",
+              "isTwoWay": false,
+              "backRelationKeyID": "",
+              "removeDest": false,
+              "layout": "",
+              "groupID": "",
+              "targetGroupID": "",
+              "viewID": "",
+              "ignoreDefaultFill": false,
+              "context": null
+            }
+          ],
+          "undoOperations": null
+        }
+      ],
+      "state": {
+        "rows": [
+          {
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}",
+            "ial": "{: id=\"20261016191706-4e38fb5\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-id=\"method-0145ac1063ccac6403ebc476\" custom-lvct-contact-method-owner=\"20261017031706-ntur7h3\" custom-lvct-contact-method-source=\"dom-plain\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-primary=\"0\" updated=\"20261016191706\"}",
+            "id": "20261016191706-4e38fb5",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}",
+            "parent_id": "20261017031706-ntur7h3",
+            "root_id": "20261017031706-ntur7h3",
+            "type": "p"
+          },
+          {
+            "content": "Only fictional N2 fixture.",
+            "ial": "{: id=\"20261017031706-4yqi5zm\" updated=\"20261017031706\"}",
+            "id": "20261017031706-4yqi5zm",
+            "markdown": "Only fictional N2 fixture.",
+            "parent_id": "20261017031706-ntur7h3",
+            "root_id": "20261017031706-ntur7h3",
+            "type": "p"
+          },
+          {
+            "content": "N2-dom-plain",
+            "ial": "{: title=\"N2-dom-plain\" type=\"doc\" updated=\"20261016191706\" id=\"20261017031706-ntur7h3\"}",
+            "id": "20261017031706-ntur7h3",
+            "markdown": "",
+            "parent_id": "",
+            "root_id": "20261017031706-ntur7h3",
+            "type": "d"
+          }
+        ],
+        "children": [
+          {
+            "id": "20261016191706-4e38fb5",
+            "type": "p",
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}"
+          },
+          {
+            "id": "20261017031706-4yqi5zm",
+            "type": "p",
+            "content": "Only fictional N2 fixture.",
+            "markdown": "Only fictional N2 fixture."
+          }
+        ]
+      },
+      "inspection": {
+        "ialDecodedRawBodyParse": {
+          "ok": true,
+          "status": "accepted",
+          "detail": "strict-body",
+          "method": {
+            "id": "method-0145ac1063ccac6403ebc476",
+            "owner": "20261017031706-ntur7h3",
+            "sourceKey": "dom-plain",
+            "type": "phone",
+            "label": "隔离 JSON",
+            "primary": false,
+            "order": 0,
+            "value": "+00 111 / +00 222",
+            "blockId": "20261016191706-4e38fb5",
+            "parentId": "20261017031706-ntur7h3",
+            "format": "n2-single-json-v1"
+          }
+        },
+        "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+        "removedExactTerminalIal": false,
+        "contentMatchesExpected": true,
+        "markdownBodyMatchesContent": true,
+        "parsed": {
+          "ok": true,
+          "status": "accepted",
+          "detail": "strict-body",
+          "method": {
+            "id": "method-0145ac1063ccac6403ebc476",
+            "owner": "20261017031706-ntur7h3",
+            "sourceKey": "dom-plain",
+            "type": "phone",
+            "label": "隔离 JSON",
+            "primary": false,
+            "order": 0,
+            "value": "+00 111 / +00 222",
+            "blockId": "20261016191706-4e38fb5",
+            "parentId": "20261017031706-ntur7h3",
+            "format": "n2-single-json-v1"
+          }
+        },
+        "aggregate": {
+          "complete": true,
+          "writeAllowed": true,
+          "scope": "selected-candidate-method-blocks-only",
+          "scopeDiscoveryVerified": false,
+          "methods": [
+            {
+              "id": "method-0145ac1063ccac6403ebc476",
+              "owner": "20261017031706-ntur7h3",
+              "sourceKey": "dom-plain",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "+00 111 / +00 222",
+              "blockId": "20261016191706-4e38fb5",
+              "parentId": "20261017031706-ntur7h3",
+              "format": "n2-single-json-v1"
+            }
+          ],
+          "diagnosticAcceptedCount": 1,
+          "reports": [],
+          "identityAllocations": 0
+        },
+        "exactValueMatch": true,
+        "candidateVerified": true,
+        "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+      },
+      "afterRestart": {
+        "state": {
+          "rows": [
+            {
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}",
+              "ial": "{: id=\"20261016191706-4e38fb5\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-id=\"method-0145ac1063ccac6403ebc476\" custom-lvct-contact-method-owner=\"20261017031706-ntur7h3\" custom-lvct-contact-method-source=\"dom-plain\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-primary=\"0\" updated=\"20261016191706\"}",
+              "id": "20261016191706-4e38fb5",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}",
+              "parent_id": "20261017031706-ntur7h3",
+              "root_id": "20261017031706-ntur7h3",
+              "type": "p"
+            },
+            {
+              "content": "Only fictional N2 fixture.",
+              "ial": "{: id=\"20261017031706-4yqi5zm\" updated=\"20261017031706\"}",
+              "id": "20261017031706-4yqi5zm",
+              "markdown": "Only fictional N2 fixture.",
+              "parent_id": "20261017031706-ntur7h3",
+              "root_id": "20261017031706-ntur7h3",
+              "type": "p"
+            },
+            {
+              "content": "N2-dom-plain",
+              "ial": "{: title=\"N2-dom-plain\" type=\"doc\" updated=\"20261016191706\" id=\"20261017031706-ntur7h3\"}",
+              "id": "20261017031706-ntur7h3",
+              "markdown": "",
+              "parent_id": "",
+              "root_id": "20261017031706-ntur7h3",
+              "type": "d"
+            }
+          ],
+          "children": [
+            {
+              "id": "20261016191706-4e38fb5",
+              "type": "p",
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"+00 111 / +00 222\"}"
+            },
+            {
+              "id": "20261017031706-4yqi5zm",
+              "type": "p",
+              "content": "Only fictional N2 fixture.",
+              "markdown": "Only fictional N2 fixture."
+            }
+          ]
+        },
+        "inspection": {
+          "ialDecodedRawBodyParse": {
+            "ok": true,
+            "status": "accepted",
+            "detail": "strict-body",
+            "method": {
+              "id": "method-0145ac1063ccac6403ebc476",
+              "owner": "20261017031706-ntur7h3",
+              "sourceKey": "dom-plain",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "+00 111 / +00 222",
+              "blockId": "20261016191706-4e38fb5",
+              "parentId": "20261017031706-ntur7h3",
+              "format": "n2-single-json-v1"
+            }
+          },
+          "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+          "removedExactTerminalIal": false,
+          "contentMatchesExpected": true,
+          "markdownBodyMatchesContent": true,
+          "parsed": {
+            "ok": true,
+            "status": "accepted",
+            "detail": "strict-body",
+            "method": {
+              "id": "method-0145ac1063ccac6403ebc476",
+              "owner": "20261017031706-ntur7h3",
+              "sourceKey": "dom-plain",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "+00 111 / +00 222",
+              "blockId": "20261016191706-4e38fb5",
+              "parentId": "20261017031706-ntur7h3",
+              "format": "n2-single-json-v1"
+            }
+          },
+          "aggregate": {
+            "complete": true,
+            "writeAllowed": true,
+            "scope": "selected-candidate-method-blocks-only",
+            "scopeDiscoveryVerified": false,
+            "methods": [
+              {
+                "id": "method-0145ac1063ccac6403ebc476",
+                "owner": "20261017031706-ntur7h3",
+                "sourceKey": "dom-plain",
+                "type": "phone",
+                "label": "隔离 JSON",
+                "primary": false,
+                "order": 0,
+                "value": "+00 111 / +00 222",
+                "blockId": "20261016191706-4e38fb5",
+                "parentId": "20261017031706-ntur7h3",
+                "format": "n2-single-json-v1"
+              }
+            ],
+            "diagnosticAcceptedCount": 1,
+            "reports": [],
+            "identityAllocations": 0
+          },
+          "exactValueMatch": true,
+          "candidateVerified": true,
+          "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+        }
+      }
+    },
+    {
+      "transport": "dom",
+      "fixture": "escapes",
+      "docId": "20261017031706-a7s2xbw",
+      "expected": {
+        "owner": "20261017031706-a7s2xbw",
+        "sourceKey": "dom-escapes",
+        "id": "method-94cefbd90715a2ae65282e73",
+        "blockId": "20261016191706-f03d623",
+        "type": "phone",
+        "label": "隔离 JSON",
+        "primary": false,
+        "order": 0,
+        "value": "第一行\n第二行\t\"引号\"\\路径\\n字面🙂",
+        "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\\\"引号\\\"\\\\路径\\\\n字面🙂\"}"
+      },
+      "inserted": [
+        {
+          "timestamp": 0,
+          "doOperations": [
+            {
+              "action": "insert",
+              "data": "<div data-node-id=\"20261016191706-f03d623\" data-type=\"NodeParagraph\" class=\"p\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-id=\"method-94cefbd90715a2ae65282e73\" custom-lvct-contact-method-owner=\"20261017031706-a7s2xbw\" custom-lvct-contact-method-source=\"dom-escapes\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"0\"><div contenteditable=\"true\">联系方式：{&quot;类型&quot;:&quot;电话&quot;,&quot;标签&quot;:&quot;隔离 JSON&quot;,&quot;主值&quot;:false,&quot;值&quot;:&quot;第一行\\n第二行\\t\\&quot;引号\\&quot;\\\\路径\\\\n字面🙂&quot;}</div></div>",
+              "id": "20261016191706-f03d623",
+              "rootID": "",
+              "parentID": "20261017031706-a7s2xbw",
+              "previousID": "",
+              "nextID": "",
+              "retData": null,
+              "blockIDs": null,
+              "blockID": "",
+              "deckID": "",
+              "avID": "",
+              "srcIDs": null,
+              "srcs": null,
+              "isDetached": false,
+              "name": "",
+              "type": "",
+              "format": "",
+              "keyID": "",
+              "rowID": "",
+              "isTwoWay": false,
+              "backRelationKeyID": "",
+              "removeDest": false,
+              "layout": "",
+              "groupID": "",
+              "targetGroupID": "",
+              "viewID": "",
+              "ignoreDefaultFill": false,
+              "context": null
+            }
+          ],
+          "undoOperations": null
+        }
+      ],
+      "state": {
+        "rows": [
+          {
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\\\"引号\\\"\\\\路径\\\\n字面🙂\"}",
+            "ial": "{: id=\"20261016191706-f03d623\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-id=\"method-94cefbd90715a2ae65282e73\" custom-lvct-contact-method-owner=\"20261017031706-a7s2xbw\" custom-lvct-contact-method-source=\"dom-escapes\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method=\"1\" updated=\"20261016191706\"}",
+            "id": "20261016191706-f03d623",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\\\"引号\\\"\\\\路径\\\\n字面🙂\"}",
+            "parent_id": "20261017031706-a7s2xbw",
+            "root_id": "20261017031706-a7s2xbw",
+            "type": "p"
+          },
+          {
+            "content": "N2-dom-escapes",
+            "ial": "{: type=\"doc\" updated=\"20261016191706\" id=\"20261017031706-a7s2xbw\" title=\"N2-dom-escapes\"}",
+            "id": "20261017031706-a7s2xbw",
+            "markdown": "",
+            "parent_id": "",
+            "root_id": "20261017031706-a7s2xbw",
+            "type": "d"
+          },
+          {
+            "content": "Only fictional N2 fixture.",
+            "ial": "{: id=\"20261017031706-qljb1w0\" updated=\"20261017031706\"}",
+            "id": "20261017031706-qljb1w0",
+            "markdown": "Only fictional N2 fixture.",
+            "parent_id": "20261017031706-a7s2xbw",
+            "root_id": "20261017031706-a7s2xbw",
+            "type": "p"
+          }
+        ],
+        "children": [
+          {
+            "id": "20261016191706-f03d623",
+            "type": "p",
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\\\"引号\\\"\\\\路径\\\\n字面🙂\"}",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\\\"引号\\\"\\\\路径\\\\n字面🙂\"}"
+          },
+          {
+            "id": "20261017031706-qljb1w0",
+            "type": "p",
+            "content": "Only fictional N2 fixture.",
+            "markdown": "Only fictional N2 fixture."
+          }
+        ]
+      },
+      "inspection": {
+        "ialDecodedRawBodyParse": {
+          "ok": true,
+          "status": "accepted",
+          "detail": "strict-body",
+          "method": {
+            "id": "method-94cefbd90715a2ae65282e73",
+            "owner": "20261017031706-a7s2xbw",
+            "sourceKey": "dom-escapes",
+            "type": "phone",
+            "label": "隔离 JSON",
+            "primary": false,
+            "order": 0,
+            "value": "第一行\n第二行\t\"引号\"\\路径\\n字面🙂",
+            "blockId": "20261016191706-f03d623",
+            "parentId": "20261017031706-a7s2xbw",
+            "format": "n2-single-json-v1"
+          }
+        },
+        "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+        "removedExactTerminalIal": false,
+        "contentMatchesExpected": true,
+        "markdownBodyMatchesContent": true,
+        "parsed": {
+          "ok": true,
+          "status": "accepted",
+          "detail": "strict-body",
+          "method": {
+            "id": "method-94cefbd90715a2ae65282e73",
+            "owner": "20261017031706-a7s2xbw",
+            "sourceKey": "dom-escapes",
+            "type": "phone",
+            "label": "隔离 JSON",
+            "primary": false,
+            "order": 0,
+            "value": "第一行\n第二行\t\"引号\"\\路径\\n字面🙂",
+            "blockId": "20261016191706-f03d623",
+            "parentId": "20261017031706-a7s2xbw",
+            "format": "n2-single-json-v1"
+          }
+        },
+        "aggregate": {
+          "complete": true,
+          "writeAllowed": true,
+          "scope": "selected-candidate-method-blocks-only",
+          "scopeDiscoveryVerified": false,
+          "methods": [
+            {
+              "id": "method-94cefbd90715a2ae65282e73",
+              "owner": "20261017031706-a7s2xbw",
+              "sourceKey": "dom-escapes",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "第一行\n第二行\t\"引号\"\\路径\\n字面🙂",
+              "blockId": "20261016191706-f03d623",
+              "parentId": "20261017031706-a7s2xbw",
+              "format": "n2-single-json-v1"
+            }
+          ],
+          "diagnosticAcceptedCount": 1,
+          "reports": [],
+          "identityAllocations": 0
+        },
+        "exactValueMatch": true,
+        "candidateVerified": true,
+        "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+      },
+      "afterRestart": {
+        "state": {
+          "rows": [
+            {
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\\\"引号\\\"\\\\路径\\\\n字面🙂\"}",
+              "ial": "{: id=\"20261016191706-f03d623\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-id=\"method-94cefbd90715a2ae65282e73\" custom-lvct-contact-method-owner=\"20261017031706-a7s2xbw\" custom-lvct-contact-method-source=\"dom-escapes\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method=\"1\" updated=\"20261016191706\"}",
+              "id": "20261016191706-f03d623",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\\\"引号\\\"\\\\路径\\\\n字面🙂\"}",
+              "parent_id": "20261017031706-a7s2xbw",
+              "root_id": "20261017031706-a7s2xbw",
+              "type": "p"
+            },
+            {
+              "content": "N2-dom-escapes",
+              "ial": "{: type=\"doc\" updated=\"20261016191706\" id=\"20261017031706-a7s2xbw\" title=\"N2-dom-escapes\"}",
+              "id": "20261017031706-a7s2xbw",
+              "markdown": "",
+              "parent_id": "",
+              "root_id": "20261017031706-a7s2xbw",
+              "type": "d"
+            },
+            {
+              "content": "Only fictional N2 fixture.",
+              "ial": "{: id=\"20261017031706-qljb1w0\" updated=\"20261017031706\"}",
+              "id": "20261017031706-qljb1w0",
+              "markdown": "Only fictional N2 fixture.",
+              "parent_id": "20261017031706-a7s2xbw",
+              "root_id": "20261017031706-a7s2xbw",
+              "type": "p"
+            }
+          ],
+          "children": [
+            {
+              "id": "20261016191706-f03d623",
+              "type": "p",
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\\\"引号\\\"\\\\路径\\\\n字面🙂\"}",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"第一行\\n第二行\\t\\\"引号\\\"\\\\路径\\\\n字面🙂\"}"
+            },
+            {
+              "id": "20261017031706-qljb1w0",
+              "type": "p",
+              "content": "Only fictional N2 fixture.",
+              "markdown": "Only fictional N2 fixture."
+            }
+          ]
+        },
+        "inspection": {
+          "ialDecodedRawBodyParse": {
+            "ok": true,
+            "status": "accepted",
+            "detail": "strict-body",
+            "method": {
+              "id": "method-94cefbd90715a2ae65282e73",
+              "owner": "20261017031706-a7s2xbw",
+              "sourceKey": "dom-escapes",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "第一行\n第二行\t\"引号\"\\路径\\n字面🙂",
+              "blockId": "20261016191706-f03d623",
+              "parentId": "20261017031706-a7s2xbw",
+              "format": "n2-single-json-v1"
+            }
+          },
+          "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+          "removedExactTerminalIal": false,
+          "contentMatchesExpected": true,
+          "markdownBodyMatchesContent": true,
+          "parsed": {
+            "ok": true,
+            "status": "accepted",
+            "detail": "strict-body",
+            "method": {
+              "id": "method-94cefbd90715a2ae65282e73",
+              "owner": "20261017031706-a7s2xbw",
+              "sourceKey": "dom-escapes",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "第一行\n第二行\t\"引号\"\\路径\\n字面🙂",
+              "blockId": "20261016191706-f03d623",
+              "parentId": "20261017031706-a7s2xbw",
+              "format": "n2-single-json-v1"
+            }
+          },
+          "aggregate": {
+            "complete": true,
+            "writeAllowed": true,
+            "scope": "selected-candidate-method-blocks-only",
+            "scopeDiscoveryVerified": false,
+            "methods": [
+              {
+                "id": "method-94cefbd90715a2ae65282e73",
+                "owner": "20261017031706-a7s2xbw",
+                "sourceKey": "dom-escapes",
+                "type": "phone",
+                "label": "隔离 JSON",
+                "primary": false,
+                "order": 0,
+                "value": "第一行\n第二行\t\"引号\"\\路径\\n字面🙂",
+                "blockId": "20261016191706-f03d623",
+                "parentId": "20261017031706-a7s2xbw",
+                "format": "n2-single-json-v1"
+              }
+            ],
+            "diagnosticAcceptedCount": 1,
+            "reports": [],
+            "identityAllocations": 0
+          },
+          "exactValueMatch": true,
+          "candidateVerified": true,
+          "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+        }
+      }
+    },
+    {
+      "transport": "dom",
+      "fixture": "markdown",
+      "docId": "20261017031707-xv35k4r",
+      "expected": {
+        "owner": "20261017031707-xv35k4r",
+        "sourceKey": "dom-markdown",
+        "id": "method-1d6defedcbd4a09b4aaac740",
+        "blockId": "20261016191707-38ae4e0",
+        "type": "phone",
+        "label": "隔离 JSON",
+        "primary": false,
+        "order": 0,
+        "value": "**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\"1\"}",
+        "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\\\"1\\\"}\"}"
+      },
+      "inserted": [
+        {
+          "timestamp": 0,
+          "doOperations": [
+            {
+              "action": "insert",
+              "data": "<div data-node-id=\"20261016191707-38ae4e0\" data-type=\"NodeParagraph\" class=\"p\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-id=\"method-1d6defedcbd4a09b4aaac740\" custom-lvct-contact-method-owner=\"20261017031707-xv35k4r\" custom-lvct-contact-method-source=\"dom-markdown\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"0\"><div contenteditable=\"true\">联系方式：{&quot;类型&quot;:&quot;电话&quot;,&quot;标签&quot;:&quot;隔离 JSON&quot;,&quot;主值&quot;:false,&quot;值&quot;:&quot;**虚构** _文本_ [链接](https://example.test) `code` &lt;b&gt;原文&lt;/b&gt; &amp; {: custom-fake=\\&quot;1\\&quot;}&quot;}</div></div>",
+              "id": "20261016191707-38ae4e0",
+              "rootID": "",
+              "parentID": "20261017031707-xv35k4r",
+              "previousID": "",
+              "nextID": "",
+              "retData": null,
+              "blockIDs": null,
+              "blockID": "",
+              "deckID": "",
+              "avID": "",
+              "srcIDs": null,
+              "srcs": null,
+              "isDetached": false,
+              "name": "",
+              "type": "",
+              "format": "",
+              "keyID": "",
+              "rowID": "",
+              "isTwoWay": false,
+              "backRelationKeyID": "",
+              "removeDest": false,
+              "layout": "",
+              "groupID": "",
+              "targetGroupID": "",
+              "viewID": "",
+              "ignoreDefaultFill": false,
+              "context": null
+            }
+          ],
+          "undoOperations": null
+        }
+      ],
+      "state": {
+        "rows": [
+          {
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\\\"1\\\"}\"}",
+            "ial": "{: id=\"20261016191707-38ae4e0\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"method-1d6defedcbd4a09b4aaac740\" custom-lvct-contact-method-owner=\"20261017031707-xv35k4r\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-source=\"dom-markdown\" custom-lvct-contact-method-primary=\"0\" updated=\"20261016191707\"}",
+            "id": "20261016191707-38ae4e0",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\\\"1\\\"}\"}",
+            "parent_id": "20261017031707-xv35k4r",
+            "root_id": "20261017031707-xv35k4r",
+            "type": "p"
+          },
+          {
+            "content": "Only fictional N2 fixture.",
+            "ial": "{: id=\"20261017031707-lq52fco\" updated=\"20261017031707\"}",
+            "id": "20261017031707-lq52fco",
+            "markdown": "Only fictional N2 fixture.",
+            "parent_id": "20261017031707-xv35k4r",
+            "root_id": "20261017031707-xv35k4r",
+            "type": "p"
+          },
+          {
+            "content": "N2-dom-markdown",
+            "ial": "{: id=\"20261017031707-xv35k4r\" title=\"N2-dom-markdown\" type=\"doc\" updated=\"20261016191707\"}",
+            "id": "20261017031707-xv35k4r",
+            "markdown": "",
+            "parent_id": "",
+            "root_id": "20261017031707-xv35k4r",
+            "type": "d"
+          }
+        ],
+        "children": [
+          {
+            "id": "20261016191707-38ae4e0",
+            "type": "p",
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\\\"1\\\"}\"}",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\\\"1\\\"}\"}"
+          },
+          {
+            "id": "20261017031707-lq52fco",
+            "type": "p",
+            "content": "Only fictional N2 fixture.",
+            "markdown": "Only fictional N2 fixture."
+          }
+        ]
+      },
+      "inspection": {
+        "ialDecodedRawBodyParse": {
+          "ok": true,
+          "status": "accepted",
+          "detail": "strict-body",
+          "method": {
+            "id": "method-1d6defedcbd4a09b4aaac740",
+            "owner": "20261017031707-xv35k4r",
+            "sourceKey": "dom-markdown",
+            "type": "phone",
+            "label": "隔离 JSON",
+            "primary": false,
+            "order": 0,
+            "value": "**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\"1\"}",
+            "blockId": "20261016191707-38ae4e0",
+            "parentId": "20261017031707-xv35k4r",
+            "format": "n2-single-json-v1"
+          }
+        },
+        "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+        "removedExactTerminalIal": false,
+        "contentMatchesExpected": true,
+        "markdownBodyMatchesContent": true,
+        "parsed": {
+          "ok": true,
+          "status": "accepted",
+          "detail": "strict-body",
+          "method": {
+            "id": "method-1d6defedcbd4a09b4aaac740",
+            "owner": "20261017031707-xv35k4r",
+            "sourceKey": "dom-markdown",
+            "type": "phone",
+            "label": "隔离 JSON",
+            "primary": false,
+            "order": 0,
+            "value": "**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\"1\"}",
+            "blockId": "20261016191707-38ae4e0",
+            "parentId": "20261017031707-xv35k4r",
+            "format": "n2-single-json-v1"
+          }
+        },
+        "aggregate": {
+          "complete": true,
+          "writeAllowed": true,
+          "scope": "selected-candidate-method-blocks-only",
+          "scopeDiscoveryVerified": false,
+          "methods": [
+            {
+              "id": "method-1d6defedcbd4a09b4aaac740",
+              "owner": "20261017031707-xv35k4r",
+              "sourceKey": "dom-markdown",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\"1\"}",
+              "blockId": "20261016191707-38ae4e0",
+              "parentId": "20261017031707-xv35k4r",
+              "format": "n2-single-json-v1"
+            }
+          ],
+          "diagnosticAcceptedCount": 1,
+          "reports": [],
+          "identityAllocations": 0
+        },
+        "exactValueMatch": true,
+        "candidateVerified": true,
+        "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+      },
+      "afterRestart": {
+        "state": {
+          "rows": [
+            {
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\\\"1\\\"}\"}",
+              "ial": "{: id=\"20261016191707-38ae4e0\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"method-1d6defedcbd4a09b4aaac740\" custom-lvct-contact-method-owner=\"20261017031707-xv35k4r\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-source=\"dom-markdown\" custom-lvct-contact-method-primary=\"0\" updated=\"20261016191707\"}",
+              "id": "20261016191707-38ae4e0",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\\\"1\\\"}\"}",
+              "parent_id": "20261017031707-xv35k4r",
+              "root_id": "20261017031707-xv35k4r",
+              "type": "p"
+            },
+            {
+              "content": "Only fictional N2 fixture.",
+              "ial": "{: id=\"20261017031707-lq52fco\" updated=\"20261017031707\"}",
+              "id": "20261017031707-lq52fco",
+              "markdown": "Only fictional N2 fixture.",
+              "parent_id": "20261017031707-xv35k4r",
+              "root_id": "20261017031707-xv35k4r",
+              "type": "p"
+            },
+            {
+              "content": "N2-dom-markdown",
+              "ial": "{: id=\"20261017031707-xv35k4r\" title=\"N2-dom-markdown\" type=\"doc\" updated=\"20261016191707\"}",
+              "id": "20261017031707-xv35k4r",
+              "markdown": "",
+              "parent_id": "",
+              "root_id": "20261017031707-xv35k4r",
+              "type": "d"
+            }
+          ],
+          "children": [
+            {
+              "id": "20261016191707-38ae4e0",
+              "type": "p",
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\\\"1\\\"}\"}",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\\\"1\\\"}\"}"
+            },
+            {
+              "id": "20261017031707-lq52fco",
+              "type": "p",
+              "content": "Only fictional N2 fixture.",
+              "markdown": "Only fictional N2 fixture."
+            }
+          ]
+        },
+        "inspection": {
+          "ialDecodedRawBodyParse": {
+            "ok": true,
+            "status": "accepted",
+            "detail": "strict-body",
+            "method": {
+              "id": "method-1d6defedcbd4a09b4aaac740",
+              "owner": "20261017031707-xv35k4r",
+              "sourceKey": "dom-markdown",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\"1\"}",
+              "blockId": "20261016191707-38ae4e0",
+              "parentId": "20261017031707-xv35k4r",
+              "format": "n2-single-json-v1"
+            }
+          },
+          "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+          "removedExactTerminalIal": false,
+          "contentMatchesExpected": true,
+          "markdownBodyMatchesContent": true,
+          "parsed": {
+            "ok": true,
+            "status": "accepted",
+            "detail": "strict-body",
+            "method": {
+              "id": "method-1d6defedcbd4a09b4aaac740",
+              "owner": "20261017031707-xv35k4r",
+              "sourceKey": "dom-markdown",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\"1\"}",
+              "blockId": "20261016191707-38ae4e0",
+              "parentId": "20261017031707-xv35k4r",
+              "format": "n2-single-json-v1"
+            }
+          },
+          "aggregate": {
+            "complete": true,
+            "writeAllowed": true,
+            "scope": "selected-candidate-method-blocks-only",
+            "scopeDiscoveryVerified": false,
+            "methods": [
+              {
+                "id": "method-1d6defedcbd4a09b4aaac740",
+                "owner": "20261017031707-xv35k4r",
+                "sourceKey": "dom-markdown",
+                "type": "phone",
+                "label": "隔离 JSON",
+                "primary": false,
+                "order": 0,
+                "value": "**虚构** _文本_ [链接](https://example.test) `code` <b>原文</b> & {: custom-fake=\"1\"}",
+                "blockId": "20261016191707-38ae4e0",
+                "parentId": "20261017031707-xv35k4r",
+                "format": "n2-single-json-v1"
+              }
+            ],
+            "diagnosticAcceptedCount": 1,
+            "reports": [],
+            "identityAllocations": 0
+          },
+          "exactValueMatch": true,
+          "candidateVerified": true,
+          "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+        }
+      }
+    },
+    {
+      "transport": "dom",
+      "fixture": "whitespace-crlf",
+      "docId": "20261017031707-nn337zm",
+      "expected": {
+        "owner": "20261017031707-nn337zm",
+        "sourceKey": "dom-whitespace-crlf",
+        "id": "method-c287461928b595d44f9c7f4b",
+        "blockId": "20261016191707-0464193",
+        "type": "phone",
+        "label": "隔离 JSON",
+        "primary": false,
+        "order": 0,
+        "value": "  虚构首空格\r\n中间\r\n尾空格  ",
+        "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}"
+      },
+      "inserted": [
+        {
+          "timestamp": 0,
+          "doOperations": [
+            {
+              "action": "insert",
+              "data": "<div data-node-id=\"20261016191707-0464193\" data-type=\"NodeParagraph\" class=\"p\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-id=\"method-c287461928b595d44f9c7f4b\" custom-lvct-contact-method-owner=\"20261017031707-nn337zm\" custom-lvct-contact-method-source=\"dom-whitespace-crlf\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"0\"><div contenteditable=\"true\">联系方式：{&quot;类型&quot;:&quot;电话&quot;,&quot;标签&quot;:&quot;隔离 JSON&quot;,&quot;主值&quot;:false,&quot;值&quot;:&quot;  虚构首空格\\r\\n中间\\r\\n尾空格  &quot;}</div></div>",
+              "id": "20261016191707-0464193",
+              "rootID": "",
+              "parentID": "20261017031707-nn337zm",
+              "previousID": "",
+              "nextID": "",
+              "retData": null,
+              "blockIDs": null,
+              "blockID": "",
+              "deckID": "",
+              "avID": "",
+              "srcIDs": null,
+              "srcs": null,
+              "isDetached": false,
+              "name": "",
+              "type": "",
+              "format": "",
+              "keyID": "",
+              "rowID": "",
+              "isTwoWay": false,
+              "backRelationKeyID": "",
+              "removeDest": false,
+              "layout": "",
+              "groupID": "",
+              "targetGroupID": "",
+              "viewID": "",
+              "ignoreDefaultFill": false,
+              "context": null
+            }
+          ],
+          "undoOperations": null
+        }
+      ],
+      "state": {
+        "rows": [
+          {
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}",
+            "ial": "{: id=\"20261016191707-0464193\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"method-c287461928b595d44f9c7f4b\" custom-lvct-contact-method-owner=\"20261017031707-nn337zm\" custom-lvct-contact-method-source=\"dom-whitespace-crlf\" updated=\"20261016191707\"}",
+            "id": "20261016191707-0464193",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}",
+            "parent_id": "20261017031707-nn337zm",
+            "root_id": "20261017031707-nn337zm",
+            "type": "p"
+          },
+          {
+            "content": "Only fictional N2 fixture.",
+            "ial": "{: id=\"20261017031707-967krsh\" updated=\"20261017031707\"}",
+            "id": "20261017031707-967krsh",
+            "markdown": "Only fictional N2 fixture.",
+            "parent_id": "20261017031707-nn337zm",
+            "root_id": "20261017031707-nn337zm",
+            "type": "p"
+          },
+          {
+            "content": "N2-dom-whitespace-crlf",
+            "ial": "{: title=\"N2-dom-whitespace-crlf\" type=\"doc\" updated=\"20261016191707\" id=\"20261017031707-nn337zm\"}",
+            "id": "20261017031707-nn337zm",
+            "markdown": "",
+            "parent_id": "",
+            "root_id": "20261017031707-nn337zm",
+            "type": "d"
+          }
+        ],
+        "children": [
+          {
+            "id": "20261016191707-0464193",
+            "type": "p",
+            "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}",
+            "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}"
+          },
+          {
+            "id": "20261017031707-967krsh",
+            "type": "p",
+            "content": "Only fictional N2 fixture.",
+            "markdown": "Only fictional N2 fixture."
+          }
+        ]
+      },
+      "inspection": {
+        "ialDecodedRawBodyParse": {
+          "ok": true,
+          "status": "accepted",
+          "detail": "strict-body",
+          "method": {
+            "id": "method-c287461928b595d44f9c7f4b",
+            "owner": "20261017031707-nn337zm",
+            "sourceKey": "dom-whitespace-crlf",
+            "type": "phone",
+            "label": "隔离 JSON",
+            "primary": false,
+            "order": 0,
+            "value": "  虚构首空格\r\n中间\r\n尾空格  ",
+            "blockId": "20261016191707-0464193",
+            "parentId": "20261017031707-nn337zm",
+            "format": "n2-single-json-v1"
+          }
+        },
+        "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+        "removedExactTerminalIal": false,
+        "contentMatchesExpected": true,
+        "markdownBodyMatchesContent": true,
+        "parsed": {
+          "ok": true,
+          "status": "accepted",
+          "detail": "strict-body",
+          "method": {
+            "id": "method-c287461928b595d44f9c7f4b",
+            "owner": "20261017031707-nn337zm",
+            "sourceKey": "dom-whitespace-crlf",
+            "type": "phone",
+            "label": "隔离 JSON",
+            "primary": false,
+            "order": 0,
+            "value": "  虚构首空格\r\n中间\r\n尾空格  ",
+            "blockId": "20261016191707-0464193",
+            "parentId": "20261017031707-nn337zm",
+            "format": "n2-single-json-v1"
+          }
+        },
+        "aggregate": {
+          "complete": true,
+          "writeAllowed": true,
+          "scope": "selected-candidate-method-blocks-only",
+          "scopeDiscoveryVerified": false,
+          "methods": [
+            {
+              "id": "method-c287461928b595d44f9c7f4b",
+              "owner": "20261017031707-nn337zm",
+              "sourceKey": "dom-whitespace-crlf",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "  虚构首空格\r\n中间\r\n尾空格  ",
+              "blockId": "20261016191707-0464193",
+              "parentId": "20261017031707-nn337zm",
+              "format": "n2-single-json-v1"
+            }
+          ],
+          "diagnosticAcceptedCount": 1,
+          "reports": [],
+          "identityAllocations": 0
+        },
+        "exactValueMatch": true,
+        "candidateVerified": true,
+        "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+      },
+      "afterRestart": {
+        "state": {
+          "rows": [
+            {
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}",
+              "ial": "{: id=\"20261016191707-0464193\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-format=\"n2-single-json-v1\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-label=\"隔离 JSON\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"method-c287461928b595d44f9c7f4b\" custom-lvct-contact-method-owner=\"20261017031707-nn337zm\" custom-lvct-contact-method-source=\"dom-whitespace-crlf\" updated=\"20261016191707\"}",
+              "id": "20261016191707-0464193",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}",
+              "parent_id": "20261017031707-nn337zm",
+              "root_id": "20261017031707-nn337zm",
+              "type": "p"
+            },
+            {
+              "content": "Only fictional N2 fixture.",
+              "ial": "{: id=\"20261017031707-967krsh\" updated=\"20261017031707\"}",
+              "id": "20261017031707-967krsh",
+              "markdown": "Only fictional N2 fixture.",
+              "parent_id": "20261017031707-nn337zm",
+              "root_id": "20261017031707-nn337zm",
+              "type": "p"
+            },
+            {
+              "content": "N2-dom-whitespace-crlf",
+              "ial": "{: title=\"N2-dom-whitespace-crlf\" type=\"doc\" updated=\"20261016191707\" id=\"20261017031707-nn337zm\"}",
+              "id": "20261017031707-nn337zm",
+              "markdown": "",
+              "parent_id": "",
+              "root_id": "20261017031707-nn337zm",
+              "type": "d"
+            }
+          ],
+          "children": [
+            {
+              "id": "20261016191707-0464193",
+              "type": "p",
+              "content": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}",
+              "markdown": "联系方式：{\"类型\":\"电话\",\"标签\":\"隔离 JSON\",\"主值\":false,\"值\":\"  虚构首空格\\r\\n中间\\r\\n尾空格  \"}"
+            },
+            {
+              "id": "20261017031707-967krsh",
+              "type": "p",
+              "content": "Only fictional N2 fixture.",
+              "markdown": "Only fictional N2 fixture."
+            }
+          ]
+        },
+        "inspection": {
+          "ialDecodedRawBodyParse": {
+            "ok": true,
+            "status": "accepted",
+            "detail": "strict-body",
+            "method": {
+              "id": "method-c287461928b595d44f9c7f4b",
+              "owner": "20261017031707-nn337zm",
+              "sourceKey": "dom-whitespace-crlf",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "  虚构首空格\r\n中间\r\n尾空格  ",
+              "blockId": "20261016191707-0464193",
+              "parentId": "20261017031707-nn337zm",
+              "format": "n2-single-json-v1"
+            }
+          },
+          "adapter": "IAL-attributes-single-entity-decode; body-identity-or-exact-terminal-IAL-removal-only",
+          "removedExactTerminalIal": false,
+          "contentMatchesExpected": true,
+          "markdownBodyMatchesContent": true,
+          "parsed": {
+            "ok": true,
+            "status": "accepted",
+            "detail": "strict-body",
+            "method": {
+              "id": "method-c287461928b595d44f9c7f4b",
+              "owner": "20261017031707-nn337zm",
+              "sourceKey": "dom-whitespace-crlf",
+              "type": "phone",
+              "label": "隔离 JSON",
+              "primary": false,
+              "order": 0,
+              "value": "  虚构首空格\r\n中间\r\n尾空格  ",
+              "blockId": "20261016191707-0464193",
+              "parentId": "20261017031707-nn337zm",
+              "format": "n2-single-json-v1"
+            }
+          },
+          "aggregate": {
+            "complete": true,
+            "writeAllowed": true,
+            "scope": "selected-candidate-method-blocks-only",
+            "scopeDiscoveryVerified": false,
+            "methods": [
+              {
+                "id": "method-c287461928b595d44f9c7f4b",
+                "owner": "20261017031707-nn337zm",
+                "sourceKey": "dom-whitespace-crlf",
+                "type": "phone",
+                "label": "隔离 JSON",
+                "primary": false,
+                "order": 0,
+                "value": "  虚构首空格\r\n中间\r\n尾空格  ",
+                "blockId": "20261016191707-0464193",
+                "parentId": "20261017031707-nn337zm",
+                "format": "n2-single-json-v1"
+              }
+            ],
+            "diagnosticAcceptedCount": 1,
+            "reports": [],
+            "identityAllocations": 0
+          },
+          "exactValueMatch": true,
+          "candidateVerified": true,
+          "scopeBoundary": "Only this controlled fixture's expected candidate block; production discovery is not implemented"
+        }
+      }
+    }
+  ],
+  "cleanup": {
+    "ownKernelExited": true,
+    "portReleased": true,
+    "workspaceRetained": true
+  },
+  "isolationBoundary": "UUID workspace and owned-child/port checks are detection guards, not OS-level isolation",
+  "ownKernelPids": [
+    58968,
+    33684
+  ],
+  "listenerOwnershipChecks": 73,
+  "version": "3.8.8-alpha.2",
+  "strictCandidateCount": 6,
+  "pureCounters": {
+    "identityAllocations": 0,
+    "automaticRepairs": 0,
+    "nativeWrites": 0,
+    "kernelRequests": 0
+  },
+  "completedAt": "2026-10-16T19:17:11.375Z"
+}

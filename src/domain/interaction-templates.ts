@@ -61,6 +61,19 @@ export function normalizeTemplates(raw: unknown): NoteTemplate[] {
     return result;
 }
 
+/** 写入边界必须完整接受或拒绝，不能把用户草稿静默截断或丢弃。 */
+export function normalizeTemplatesForWrite(raw: unknown): NoteTemplate[] {
+    if (!Array.isArray(raw)) throw new Error("模板列表格式不正确，未保存");
+    if (raw.length > TEMPLATES_LIMIT) throw new Error(`互动备注模板最多 ${TEMPLATES_LIMIT} 条，请先减少条目后重试；未保存`);
+    const seen = new Set<string>();
+    return raw.map((item, index) => {
+        if (!isNoteTemplate(item) || !item.id.trim()) throw new Error(`第 ${index + 1} 条模板的标识、名称或内容格式不正确，未保存`);
+        if (seen.has(item.id)) throw new Error(`第 ${index + 1} 条模板的标识重复，未保存`);
+        seen.add(item.id);
+        return { id: item.id, name: item.name.trim(), content: item.content.trim() };
+    });
+}
+
 /** 新模板 ID（本地生成，存储内唯一性由调用方以 normalize 去重兜底） */
 export function newTemplateId(): string {
     return `tpl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;

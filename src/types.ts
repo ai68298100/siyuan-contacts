@@ -50,6 +50,11 @@ export interface ContactsPluginFacade {
     /** 人物独立备注：写入对应人物文档的 custom-lvct-person-note 标记块，不计入互动统计 */
     loadPersonNote(personDocId: string): Promise<string>;
     savePersonNote(personDocId: string, note: string, expected?: string): Promise<string>;
+    inspectLegacyPersonNote(personDocId: string): Promise<import("./domain/person-note").LegacyPersonNoteSnapshot>;
+    detachLegacyPersonNote(personDocId: string, expected: import("./domain/person-note").LegacyPersonNoteSnapshot): Promise<void>;
+    /** 原生人物文档中的可重复资料条目与两层分组；不投影主联系方式。 */
+    loadPersonFields(personDocId: string): Promise<import("./domain/person-fields").PersonFieldsState>;
+    savePersonFields(personDocId: string, snapshot: import("./domain/person-fields").PersonFieldsSnapshot, expected: import("./domain/person-fields").PersonFieldsState): Promise<import("./domain/person-fields").PersonFieldsState>;
     loadRecentInteractions(): Promise<Record<string, { occurredAt: number; localDate: string }>>;
     /** 个人往来账本：金钱、物品、人情均按人物独立记录 */
     listPersonExchanges(personDocId: string): Promise<ExchangeRecord[]>;
@@ -129,9 +134,9 @@ export interface ContactsPluginFacade {
     /** B11.3：全量名册（设置页本人档案指定用） */
     listContacts(): Promise<import("./domain/person").ContactSummary[]>;
     /** B13.3：组织列举（含成员记录） */
-    listOrganizations(): Promise<import("./services/org").OrganizationWithMembers[]>;
+    listOrganizations(options?: { includeRemoved?: boolean }): Promise<import("./services/org").OrganizationWithMembers[]>;
     /** B13.5c：组织标记 keyset 分页；旧宿主未提供时由组织页回退全量列举 */
-    listOrganizationsPage?(options?: { afterRootId?: string; limit?: number }): Promise<import("./services/org").OrganizationPage>;
+    listOrganizationsPage?(options?: { afterRootId?: string; limit?: number; includeRemoved?: boolean }): Promise<import("./services/org").OrganizationPage>;
     /** B13.3：新建组织（文档 + custom-lvct-org 标记区块；同名拒绝） */
     createOrganization(name: string, profile?: import("./domain/organization-profile").OrganizationProfileDraft): Promise<{ docId: string; profileSaved?: boolean; profileError?: string }>;
     loadOrganizationProfile?(orgDocId: string): Promise<import("./domain/organization-profile").OrganizationProfileDraft | null>;
@@ -154,6 +159,7 @@ export interface ContactsPluginFacade {
     restoreOrganization(orgDocId: string): Promise<void>;
     /** B13.4：组织改名（同名检查；标记块文案同步，归档值保持） */
     renameOrganization(orgDocId: string, name: string): Promise<void>;
+    removeOrganization?(orgDocId: string): Promise<void>;
     listPendingOrganizationOperations?(): Promise<import("./domain/organization-operations").OrganizationOperationReport[]>;
     inspectOrganizationOperation?(requestId: string): Promise<import("./domain/organization-operations").OrganizationOperationReport>;
     resumeOrganizationOperation?(requestId: string): Promise<import("./domain/organization-operations").OrganizationOperationReport>;

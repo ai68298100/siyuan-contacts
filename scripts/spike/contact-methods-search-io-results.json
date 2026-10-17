@@ -1,0 +1,225 @@
+{
+  "generatedAt": "2026-10-17T01:49:25.961Z",
+  "issues": [
+    51,
+    54
+  ],
+  "evidence": "synthetic-json-io-search-research",
+  "syntheticOnly": true,
+  "kernelRequests": 0,
+  "productionChanges": false,
+  "candidateContractAccepted": false,
+  "fixture": {
+    "persons": 10000,
+    "methods": 100000,
+    "methodsPerPerson": 10,
+    "valuesRedacted": true
+  },
+  "invariants": [
+    "stable personDocId deduplicates AV and method hits while itemId changes are conflicts",
+    "cross-person same values remain separate",
+    "index candidates are finally verified",
+    "partial/cancelled/invalid index states never become fake empty complete",
+    "JSON read/write mismatch is unknown",
+    "pagination cancellation is not complete",
+    "related expansion remains separate from own hits"
+  ],
+  "measurements": {
+    "fixturePersons": 10000,
+    "fixtureMethods": 100000,
+    "snapshotCanonicalBytes": 21790126,
+    "indexBuild": {
+      "trials": 3,
+      "medianMs": 397.7738999999999,
+      "p95Ms": 404.3369,
+      "postingCount": 2066622
+    },
+    "searchStatuses": [
+      {
+        "indexState": "valid",
+        "status": "complete",
+        "complete": true,
+        "visited": 10000,
+        "matchCount": 1
+      },
+      {
+        "indexState": "missing",
+        "status": "complete-fallback",
+        "complete": true,
+        "visited": 100000,
+        "matchCount": 1
+      },
+      {
+        "indexState": "stale",
+        "status": "complete-fallback",
+        "complete": true,
+        "visited": 100000,
+        "matchCount": 1
+      },
+      {
+        "indexState": "invalid",
+        "status": "complete-fallback",
+        "complete": true,
+        "visited": 100000,
+        "matchCount": 1
+      },
+      {
+        "indexState": "rebuilding",
+        "status": "partial",
+        "complete": false,
+        "visited": 50,
+        "matchCount": 1
+      },
+      {
+        "indexState": "cancelled",
+        "status": "cancelled",
+        "complete": false,
+        "visited": 0,
+        "matchCount": 0
+      },
+      {
+        "indexState": "missing",
+        "status": "partial",
+        "complete": false,
+        "visited": 500,
+        "matchCount": 1
+      }
+    ],
+    "io": {
+      "small": {
+        "bytes": 8842,
+        "canonicalBytes": 8842,
+        "milliseconds": 2.3310999999998785
+      },
+      "large": {
+        "bytes": 21790126,
+        "canonicalBytes": 21790126,
+        "milliseconds": 251.89779999999996,
+        "serializeMs": 93.6866,
+        "writeMs": 20.22070000000008,
+        "readMs": 12.927799999999934,
+        "parseMs": 100.02269999999999,
+        "rereadSerializeMs": 77.90249999999992
+      },
+      "tamperedStatus": "unknown",
+      "rejectedStatus": "rejected"
+    }
+  },
+  "checks": [
+    {
+      "id": "strict-canonical-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "strict-unknown-field-rejected",
+      "pass": true
+    },
+    {
+      "id": "cross-person-same-value-not-merged",
+      "pass": true
+    },
+    {
+      "id": "same-person-av-and-method-dedup",
+      "pass": true
+    },
+    {
+      "id": "stable-doc-dedup-item-conflict",
+      "pass": true
+    },
+    {
+      "id": "related-kept-separate",
+      "pass": true
+    },
+    {
+      "id": "valid-index-complete",
+      "pass": true
+    },
+    {
+      "id": "missing-index-fallback-complete",
+      "pass": true
+    },
+    {
+      "id": "stale-index-fallback-complete",
+      "pass": true
+    },
+    {
+      "id": "invalid-index-fallback-complete",
+      "pass": true
+    },
+    {
+      "id": "rebuilding-budget-partial",
+      "pass": true
+    },
+    {
+      "id": "cancelled-never-fake-empty",
+      "pass": true
+    },
+    {
+      "id": "budget-partial-never-complete",
+      "pass": true
+    },
+    {
+      "id": "merge-cross-source-summary",
+      "pass": true
+    },
+    {
+      "id": "merge-preserves-method-source",
+      "pass": true
+    },
+    {
+      "id": "merge-same-value-cross-person",
+      "pass": true
+    },
+    {
+      "id": "pagination-complete-pages",
+      "pass": true
+    },
+    {
+      "id": "pagination-cancelled-not-complete",
+      "pass": true
+    },
+    {
+      "id": "io-verified-write-readback",
+      "pass": true
+    },
+    {
+      "id": "io-readback-mismatch-unknown",
+      "pass": true
+    },
+    {
+      "id": "io-write-rejection-separated",
+      "pass": true
+    },
+    {
+      "id": "io-bad-json-rejected",
+      "pass": true
+    },
+    {
+      "id": "io-truncated-rejected",
+      "pass": true
+    },
+    {
+      "id": "io-unknown-field-rejected",
+      "pass": true
+    }
+  ],
+  "summary": {
+    "total": 24,
+    "passed": 24,
+    "failed": 0
+  },
+  "scope": {
+    "noHostIO": true,
+    "noPluginStorage": true,
+    "noNetwork": true,
+    "noProductionFiles": true,
+    "exclusions": [
+      "Plugin loadData/saveData and Web Locks",
+      "SiYuan AV query and UI debounce",
+      "cross-window cache invalidation",
+      "D1 fact-source choice",
+      "production search or migration schema"
+    ]
+  },
+  "ok": true
+}

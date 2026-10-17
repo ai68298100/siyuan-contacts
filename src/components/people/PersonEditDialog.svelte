@@ -239,7 +239,7 @@
             ...(membership.note ? { note: membership.note } : {}) };
     }
     function startEditMembership(membership: import("../../services/org").PersonOrgMembershipView): void {
-        if (profileBusy || profileLoading) return;
+        if (profileBusy || profileLoading || membership.removed) return;
         editingMembershipId = membership.id;
         editingMembershipSnapshot = membershipSnapshot(membership);
         editingOrgDepartment = membership.department;
@@ -530,15 +530,17 @@
                                         <strong>{membership.orgName}</strong>
                                         <span class="ft__smaller ft__on-surface"> · {affiliationLabel(membership.affiliationKind ?? (membership.orgName === "家庭" ? "family" : undefined))}</span>
                                         <span class="lvct-chip {membership.status === "former" ? "lvct-bucket--stale" : "lvct-bucket--today"}">{orgMembershipStatusLabel({ ...membership, affiliationKind: membership.affiliationKind ?? (membership.orgName === "家庭" ? "family" : undefined) })}</span>
-                                        {#if membership.archived}<span class="lvct-chip lvct-bucket--stale">组织已归档</span>{/if}
+                                        {#if membership.removed}<span class="lvct-chip lvct-bucket--stale">组织已移除</span>
+                                        {:else if membership.archived}<span class="lvct-chip lvct-bucket--stale">组织已归档</span>{/if}
                                         {#if membership.reachable === false}<span class="lvct-chip lvct-bucket--stale">组织待核实</span>{/if}
                                         {#if membership.department}<span class="ft__smaller"> · {membership.department}</span>{/if}
                                         {#if membership.title}<span class="ft__smaller"> · {membership.title}</span>{/if}
                                         {#if membership.joinedOn || membership.leftOn}<span class="ft__smaller ft__on-surface"> · {membership.joinedOn || "未知"} – {membership.leftOn || "至今"}</span>{/if}
                                         {#if membership.note}<span class="ft__smaller ft__on-surface" title={membership.note}> · {membership.note}</span>{/if}
                                     </div>
-                                    {#if onUpdateOrgMembership}<button type="button" class="b3-button b3-button--text" onclick={() => startEditMembership(membership)} disabled={profileBusy || profileLoading}>编辑</button>{/if}
-                                    {#if onRemoveOrgMembership}<button type="button" class="b3-button b3-button--cancel" onclick={() => void removeMembership(membership)} disabled={profileBusy || profileLoading}>删除</button>{/if}
+                                    {#if onUpdateOrgMembership}<button type="button" class="b3-button b3-button--text" onclick={() => startEditMembership(membership)} disabled={profileBusy || profileLoading || membership.removed}>编辑</button>{/if}
+                                    {#if onRemoveOrgMembership}<button type="button" class="b3-button b3-button--cancel" onclick={() => void removeMembership(membership)} disabled={profileBusy || profileLoading || membership.removed}>删除</button>{/if}
+                                    {#if membership.removed}<span class="ft__smaller ft__on-surface">组织已移除；恢复组织后才能维护这段经历。</span>{/if}
                                 </div>
                                 {#if editingMembershipId === membership.id}
                                     <div class="lvct-form__grid lvct-person-edit__org-edit">

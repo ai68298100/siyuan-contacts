@@ -6,6 +6,8 @@ import type { Plugin } from "siyuan";
 import { applyPreferencePatch, decodeViewPreferences, diffViewPreferences, rebasePreferenceDraft } from "../src/domain/preferences-concurrency.ts";
 import { createPreferenceRequests, loadViewPreferences, saveViewPreferences } from "../src/services/preferences.ts";
 import { emitDataChanged, LVCT_DATA_CHANGED, subscribeDataChangedDebounced } from "../src/libs/data-events.ts";
+import { SAVED_VIEWS_LIMIT } from "../src/domain/saved-views.ts";
+import { writeViewPreferencePatch } from "../src/data/preferences.ts";
 
 test("视图偏好：空存储回退默认值", () => {
     assert.deepEqual(normalizeViewPreferences(null), DEFAULT_VIEW_PREFERENCES);
@@ -258,6 +260,55 @@ test("P0-009：已写入但回读失败不报告成功，重新核实后同补�
     const retried = await saveViewPreferences(plugin, next, base);
     assert.equal(retried.revision, 1);
     assert.equal(store.writes(), 1);
+});
+
+test("保存视图上限：服务和持久化边界拒绝第 51 条，已满时覆盖原 ID 仍可保存", async () => {
+    const savedViews = Array.from({ length: SAVED_VIEWS_LIMIT }, (_, index) => ({
+        id: `view-${index}`, name: `视图 ${index}`,
+        query: { search: "", group: "", tags: [], tagMatch: "all" as const,
+            recentFrom: "", recentTo: "", neverContacted: false, sort: "name" as const },
+    }));
+    const store = preferenceStore({ ...DEFAULT_VIEW_PREFERENCES, savedViews });
+    const plugin = store.handle();
+    const base = await loadViewPreferences(plugin);
+    const overflow = [...base.savedViews, { ...base.savedViews[0], id: "view-overflow", name: "第 51 条" }];
+    await assert.rejects(saveViewPreferences(plugin, { ...base, savedViews: overflow }, base), /最多保存 50 个视图/);
+    await assert.rejects(writeViewPreferencePatch(plugin, { savedViews: overflow }), /最多保存 50 个视图/);
+    assert.equal(store.writes(), 0);
+    assert.deepEqual(store.value().savedViews, savedViews);
+
+    const replacement = base.savedViews.map((view, index) => index === 0
+        ? { ...view, query: { ...view.query, search: "新的条件" } } : view);
+    const saved = await saveViewPreferences(plugin, { ...base, savedViews: replacement }, base);
+    assert.equal(saved.savedViews.length, SAVED_VIEWS_LIMIT);
+    assert.equal(saved.savedViews[0].id, base.savedViews[0].id);
+    assert.equal(saved.savedViews[0].query.search, "新的条件");
+    assert.equal(store.writes(), 1);
+});
+
+test("保存视图上限：请求协调器不截断后宣称成功，拒绝后不污染下一次合法保存", async () => {
+    const savedViews = Array.from({ length: SAVED_VIEWS_LIMIT + 1 }, (_, index) => ({
+        id: `view-${index}`, name: `视图 ${index}`,
+        query: { search: "", group: "", tags: [], tagMatch: "all" as const,
+            recentFrom: "", recentTo: "", neverContacted: false, sort: "name" as const },
+    }));
+    const written: ViewPreferences[] = [];
+    const applied: ViewPreferences[] = [];
+    const published: ViewPreferences[] = [];
+    const requests = createPreferenceRequests({
+        load: async () => DEFAULT_VIEW_PREFERENCES,
+        save: async (next) => { written.push(next); return next; },
+        apply: (next) => applied.push(next),
+        saved: (next) => published.push(next),
+    });
+    await assert.rejects(requests.save({ ...DEFAULT_VIEW_PREFERENCES, savedViews }, DEFAULT_VIEW_PREFERENCES), /最多保存 50 个视图/);
+    assert.equal(written.length, 0);
+    assert.equal(applied.length, 0);
+    assert.equal(published.length, 0);
+    await requests.save({ ...DEFAULT_VIEW_PREFERENCES, peopleView: "table" }, DEFAULT_VIEW_PREFERENCES);
+    assert.equal(written.length, 1);
+    assert.equal(written[0].savedViews.length, 0);
+    assert.equal(published.length, 1);
 });
 
 test("P0-009：提交快照不可被之后的编辑改写；刷新与旧提交响应都保留新草稿", async () => {

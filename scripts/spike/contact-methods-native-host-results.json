@@ -1,0 +1,562 @@
+{
+  "research": "AG-RF-004-N1",
+  "generatedAt": "2026-10-16T18:28:13.168Z",
+  "syntheticOnly": false,
+  "isolatedHost": true,
+  "productionChanges": false,
+  "candidateContractAccepted": false,
+  "kernelRequests": 51,
+  "realPluginFileWrites": 1,
+  "workspace": "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Contact-Native-36a235a6-2160-41de-b969-d421bd09ae23",
+  "kernel": "D:/RJ/SiYuan/resources/kernel/SiYuan-Kernel.exe",
+  "port": 8347,
+  "hostVerified": true,
+  "observations": [
+    {
+      "phase": "首次写入",
+      "docId": "20261017022813-7p5nl7b",
+      "rows": [
+        {
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "ial": "{: custom-lvct-contact-method-label=\"共享邮箱\" custom-lvct-contact-method-source=\"email-shared\" custom-lvct-contact-method-type=\"email\" id=\"20261017022813-olf6k8r\" updated=\"20261017022813\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-id=\"method-5f366fa99a04134a40827d3e\" custom-lvct-contact-method-order=\"1\" custom-lvct-contact-method-owner=\"20261017022813-7p5nl7b\" custom-lvct-contact-method-primary=\"1\"}",
+          "id": "20261017022813-olf6k8r",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "parent_id": "20261017022813-7p5nl7b",
+          "type": "p"
+        },
+        {
+          "content": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n+00 111 / +00 222\n分机：7 | 备注：<保留> & 🙂",
+          "ial": "{: custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-owner=\"20261017022813-7p5nl7b\" custom-lvct-contact-method-primary=\"1\" custom-lvct-contact-method-source=\"phone-primary\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-id=\"method-f2cce9841c963c2dfb733f7d\" custom-lvct-contact-method-label=\"工作 / 主线\" custom-lvct-contact-method-type=\"phone\" id=\"20261017022813-w105xzd\" updated=\"20261017022813\"}",
+          "id": "20261017022813-w105xzd",
+          "markdown": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n+00 111 / +00 222\n分机：7 | 备注：<保留> & 🙂",
+          "parent_id": "20261017022813-7p5nl7b",
+          "type": "p"
+        },
+        {
+          "content": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行",
+          "ial": "{: id=\"20261017022813-xadq0z7\" updated=\"20261017022813\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"2\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"method-24061927e035299e60c05e5e\" custom-lvct-contact-method-owner=\"20261017022813-7p5nl7b\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-source=\"wechat-secondary\" custom-lvct-contact-method-type=\"wechat\" custom-lvct-contact-method-label=\"私用🙂\"}",
+          "id": "20261017022813-xadq0z7",
+          "markdown": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行",
+          "parent_id": "20261017022813-7p5nl7b",
+          "type": "p"
+        }
+      ],
+      "children": [
+        {
+          "id": "20261017022813-xadq0z7",
+          "type": "p",
+          "content": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行",
+          "markdown": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行"
+        },
+        {
+          "id": "20261017022813-olf6k8r",
+          "type": "p",
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test"
+        },
+        {
+          "id": "20261017022813-w105xzd",
+          "type": "p",
+          "content": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n+00 111 / +00 222\n分机：7 | 备注：<保留> & 🙂",
+          "markdown": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n+00 111 / +00 222\n分机：7 | 备注：<保留> & 🙂"
+        },
+        {
+          "id": "20261017022813-ga5r1f5",
+          "type": "h",
+          "subType": "h1",
+          "content": "虚构人物甲",
+          "markdown": "# 虚构人物甲"
+        },
+        {
+          "id": "20261017022813-mz4tu2w",
+          "type": "p",
+          "content": "原生人物文档：虚构人物甲",
+          "markdown": "原生人物文档：虚构人物甲"
+        }
+      ]
+    },
+    {
+      "phase": "首次写入",
+      "docId": "20261017022813-stn79yv",
+      "rows": [
+        {
+          "content": "联系方式：自定义\n标签：旧资料\n主值：否\n值：\n旧 slash 原文 / 不拆分",
+          "ial": "{: id=\"20261017022813-272tcer\" updated=\"20261017022813\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-id=\"method-82f0987e611aa173666316d3\" custom-lvct-contact-method-owner=\"20261017022813-stn79yv\" custom-lvct-contact-method-source=\"custom-legacy\" custom-lvct-contact-method-label=\"旧资料\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"2\" custom-lvct-contact-method-type=\"custom\"}",
+          "id": "20261017022813-272tcer",
+          "markdown": "联系方式：自定义\n标签：旧资料\n主值：否\n值：\n旧 slash 原文 / 不拆分",
+          "parent_id": "20261017022813-stn79yv",
+          "type": "p"
+        },
+        {
+          "content": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value",
+          "ial": "{: custom-lvct-contact-method-label=\"工作\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-primary=\"1\" custom-lvct-contact-method-source=\"phone-primary\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-owner=\"20261017022813-stn79yv\" custom-lvct-contact-method-type=\"phone\" id=\"20261017022813-7lme76h\" updated=\"20261017022813\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-id=\"method-8fbf2648a69dfeab923029d4\"}",
+          "id": "20261017022813-7lme76h",
+          "markdown": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value",
+          "parent_id": "20261017022813-stn79yv",
+          "type": "p"
+        },
+        {
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "ial": "{: custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"method-a41828b11b557bdba14fd228\" custom-lvct-contact-method-owner=\"20261017022813-stn79yv\" custom-lvct-contact-method-primary=\"1\" id=\"20261017022813-rbxiowh\" updated=\"20261017022813\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-label=\"共享邮箱\" custom-lvct-contact-method-order=\"1\" custom-lvct-contact-method-source=\"email-shared\" custom-lvct-contact-method-type=\"email\"}",
+          "id": "20261017022813-rbxiowh",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "parent_id": "20261017022813-stn79yv",
+          "type": "p"
+        }
+      ],
+      "children": [
+        {
+          "id": "20261017022813-272tcer",
+          "type": "p",
+          "content": "联系方式：自定义\n标签：旧资料\n主值：否\n值：\n旧 slash 原文 / 不拆分",
+          "markdown": "联系方式：自定义\n标签：旧资料\n主值：否\n值：\n旧 slash 原文 / 不拆分"
+        },
+        {
+          "id": "20261017022813-rbxiowh",
+          "type": "p",
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test"
+        },
+        {
+          "id": "20261017022813-7lme76h",
+          "type": "p",
+          "content": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value",
+          "markdown": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value"
+        },
+        {
+          "id": "20261017022813-ppcawqq",
+          "type": "h",
+          "subType": "h1",
+          "content": "虚构人物乙",
+          "markdown": "# 虚构人物乙"
+        },
+        {
+          "id": "20261017022813-pufpfua",
+          "type": "p",
+          "content": "原生人物文档：虚构人物乙",
+          "markdown": "原生人物文档：虚构人物乙"
+        }
+      ]
+    },
+    {
+      "phase": "内核 API 改值后",
+      "docId": "20261017022813-7p5nl7b",
+      "rows": [
+        {
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "ial": "{: custom-lvct-contact-method-label=\"共享邮箱\" custom-lvct-contact-method-source=\"email-shared\" custom-lvct-contact-method-type=\"email\" id=\"20261017022813-olf6k8r\" updated=\"20261017022813\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-id=\"method-5f366fa99a04134a40827d3e\" custom-lvct-contact-method-order=\"1\" custom-lvct-contact-method-owner=\"20261017022813-7p5nl7b\" custom-lvct-contact-method-primary=\"1\"}",
+          "id": "20261017022813-olf6k8r",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "parent_id": "20261017022813-7p5nl7b",
+          "type": "p"
+        },
+        {
+          "content": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n改过的值 / 仍保留换行\n下一行",
+          "ial": "{: id=\"20261017022813-w105xzd\" updated=\"20261017022813\" custom-lvct-contact-method-label=\"工作 / 主线\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-id=\"method-f2cce9841c963c2dfb733f7d\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-primary=\"1\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-owner=\"20261017022813-7p5nl7b\" custom-lvct-contact-method-source=\"phone-primary\"}",
+          "id": "20261017022813-w105xzd",
+          "markdown": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n改过的值 / 仍保留换行\n下一行",
+          "parent_id": "20261017022813-7p5nl7b",
+          "type": "p"
+        },
+        {
+          "content": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行",
+          "ial": "{: id=\"20261017022813-xadq0z7\" updated=\"20261017022813\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"2\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"method-24061927e035299e60c05e5e\" custom-lvct-contact-method-owner=\"20261017022813-7p5nl7b\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-source=\"wechat-secondary\" custom-lvct-contact-method-type=\"wechat\" custom-lvct-contact-method-label=\"私用🙂\"}",
+          "id": "20261017022813-xadq0z7",
+          "markdown": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行",
+          "parent_id": "20261017022813-7p5nl7b",
+          "type": "p"
+        }
+      ],
+      "children": [
+        {
+          "id": "20261017022813-xadq0z7",
+          "type": "p",
+          "content": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行",
+          "markdown": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行"
+        },
+        {
+          "id": "20261017022813-olf6k8r",
+          "type": "p",
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test"
+        },
+        {
+          "id": "20261017022813-w105xzd",
+          "type": "p",
+          "content": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n改过的值 / 仍保留换行\n下一行",
+          "markdown": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n改过的值 / 仍保留换行\n下一行"
+        },
+        {
+          "id": "20261017022813-ga5r1f5",
+          "type": "h",
+          "subType": "h1",
+          "content": "虚构人物甲",
+          "markdown": "# 虚构人物甲"
+        },
+        {
+          "id": "20261017022813-mz4tu2w",
+          "type": "p",
+          "content": "原生人物文档：虚构人物甲",
+          "markdown": "原生人物文档：虚构人物甲"
+        }
+      ]
+    },
+    {
+      "phase": "内核 API 删块后",
+      "docId": "20261017022813-stn79yv",
+      "rows": [
+        {
+          "content": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value",
+          "ial": "{: custom-lvct-contact-method-label=\"工作\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-primary=\"1\" custom-lvct-contact-method-source=\"phone-primary\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-owner=\"20261017022813-stn79yv\" custom-lvct-contact-method-type=\"phone\" id=\"20261017022813-7lme76h\" updated=\"20261017022813\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-id=\"method-8fbf2648a69dfeab923029d4\"}",
+          "id": "20261017022813-7lme76h",
+          "markdown": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value",
+          "parent_id": "20261017022813-stn79yv",
+          "type": "p"
+        },
+        {
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "ial": "{: custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"method-a41828b11b557bdba14fd228\" custom-lvct-contact-method-owner=\"20261017022813-stn79yv\" custom-lvct-contact-method-primary=\"1\" id=\"20261017022813-rbxiowh\" updated=\"20261017022813\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-label=\"共享邮箱\" custom-lvct-contact-method-order=\"1\" custom-lvct-contact-method-source=\"email-shared\" custom-lvct-contact-method-type=\"email\"}",
+          "id": "20261017022813-rbxiowh",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "parent_id": "20261017022813-stn79yv",
+          "type": "p"
+        }
+      ],
+      "children": [
+        {
+          "id": "20261017022813-rbxiowh",
+          "type": "p",
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test"
+        },
+        {
+          "id": "20261017022813-7lme76h",
+          "type": "p",
+          "content": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value",
+          "markdown": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value"
+        },
+        {
+          "id": "20261017022813-ppcawqq",
+          "type": "h",
+          "subType": "h1",
+          "content": "虚构人物乙",
+          "markdown": "# 虚构人物乙"
+        },
+        {
+          "id": "20261017022813-pufpfua",
+          "type": "p",
+          "content": "原生人物文档：虚构人物乙",
+          "markdown": "原生人物文档：虚构人物乙"
+        }
+      ]
+    },
+    {
+      "phase": "内核重启后",
+      "docId": "20261017022813-7p5nl7b",
+      "rows": [
+        {
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "ial": "{: custom-lvct-contact-method-label=\"共享邮箱\" custom-lvct-contact-method-source=\"email-shared\" custom-lvct-contact-method-type=\"email\" id=\"20261017022813-olf6k8r\" updated=\"20261017022813\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-id=\"method-5f366fa99a04134a40827d3e\" custom-lvct-contact-method-order=\"1\" custom-lvct-contact-method-owner=\"20261017022813-7p5nl7b\" custom-lvct-contact-method-primary=\"1\"}",
+          "id": "20261017022813-olf6k8r",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "parent_id": "20261017022813-7p5nl7b",
+          "type": "p"
+        },
+        {
+          "content": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n改过的值 / 仍保留换行\n下一行",
+          "ial": "{: id=\"20261017022813-w105xzd\" updated=\"20261017022813\" custom-lvct-contact-method-label=\"工作 / 主线\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-id=\"method-f2cce9841c963c2dfb733f7d\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-primary=\"1\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-owner=\"20261017022813-7p5nl7b\" custom-lvct-contact-method-source=\"phone-primary\"}",
+          "id": "20261017022813-w105xzd",
+          "markdown": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n改过的值 / 仍保留换行\n下一行",
+          "parent_id": "20261017022813-7p5nl7b",
+          "type": "p"
+        },
+        {
+          "content": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行",
+          "ial": "{: id=\"20261017022813-xadq0z7\" updated=\"20261017022813\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"2\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"method-24061927e035299e60c05e5e\" custom-lvct-contact-method-owner=\"20261017022813-7p5nl7b\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-source=\"wechat-secondary\" custom-lvct-contact-method-type=\"wechat\" custom-lvct-contact-method-label=\"私用🙂\"}",
+          "id": "20261017022813-xadq0z7",
+          "markdown": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行",
+          "parent_id": "20261017022813-7p5nl7b",
+          "type": "p"
+        }
+      ],
+      "children": [
+        {
+          "id": "20261017022813-xadq0z7",
+          "type": "p",
+          "content": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行",
+          "markdown": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行"
+        },
+        {
+          "id": "20261017022813-olf6k8r",
+          "type": "p",
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test"
+        },
+        {
+          "id": "20261017022813-w105xzd",
+          "type": "p",
+          "content": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n改过的值 / 仍保留换行\n下一行",
+          "markdown": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n改过的值 / 仍保留换行\n下一行"
+        },
+        {
+          "id": "20261017022813-ga5r1f5",
+          "type": "h",
+          "subType": "h1",
+          "content": "虚构人物甲",
+          "markdown": "# 虚构人物甲"
+        },
+        {
+          "id": "20261017022813-mz4tu2w",
+          "type": "p",
+          "content": "原生人物文档：虚构人物甲",
+          "markdown": "原生人物文档：虚构人物甲"
+        }
+      ]
+    },
+    {
+      "phase": "内核重启后",
+      "docId": "20261017022813-stn79yv",
+      "rows": [
+        {
+          "content": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value",
+          "ial": "{: custom-lvct-contact-method-label=\"工作\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-primary=\"1\" custom-lvct-contact-method-source=\"phone-primary\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-owner=\"20261017022813-stn79yv\" custom-lvct-contact-method-type=\"phone\" id=\"20261017022813-7lme76h\" updated=\"20261017022813\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-id=\"method-8fbf2648a69dfeab923029d4\"}",
+          "id": "20261017022813-7lme76h",
+          "markdown": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value",
+          "parent_id": "20261017022813-stn79yv",
+          "type": "p"
+        },
+        {
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "ial": "{: custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"method-a41828b11b557bdba14fd228\" custom-lvct-contact-method-owner=\"20261017022813-stn79yv\" custom-lvct-contact-method-primary=\"1\" id=\"20261017022813-rbxiowh\" updated=\"20261017022813\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-label=\"共享邮箱\" custom-lvct-contact-method-order=\"1\" custom-lvct-contact-method-source=\"email-shared\" custom-lvct-contact-method-type=\"email\"}",
+          "id": "20261017022813-rbxiowh",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "parent_id": "20261017022813-stn79yv",
+          "type": "p"
+        }
+      ],
+      "children": [
+        {
+          "id": "20261017022813-rbxiowh",
+          "type": "p",
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test"
+        },
+        {
+          "id": "20261017022813-7lme76h",
+          "type": "p",
+          "content": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value",
+          "markdown": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value"
+        },
+        {
+          "id": "20261017022813-ppcawqq",
+          "type": "h",
+          "subType": "h1",
+          "content": "虚构人物乙",
+          "markdown": "# 虚构人物乙"
+        },
+        {
+          "id": "20261017022813-pufpfua",
+          "type": "p",
+          "content": "原生人物文档：虚构人物乙",
+          "markdown": "原生人物文档：虚构人物乙"
+        }
+      ]
+    },
+    {
+      "phase": "清理插件缓存后",
+      "docId": "20261017022813-7p5nl7b",
+      "rows": [
+        {
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "ial": "{: custom-lvct-contact-method-label=\"共享邮箱\" custom-lvct-contact-method-source=\"email-shared\" custom-lvct-contact-method-type=\"email\" id=\"20261017022813-olf6k8r\" updated=\"20261017022813\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-id=\"method-5f366fa99a04134a40827d3e\" custom-lvct-contact-method-order=\"1\" custom-lvct-contact-method-owner=\"20261017022813-7p5nl7b\" custom-lvct-contact-method-primary=\"1\"}",
+          "id": "20261017022813-olf6k8r",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "parent_id": "20261017022813-7p5nl7b",
+          "type": "p"
+        },
+        {
+          "content": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n改过的值 / 仍保留换行\n下一行",
+          "ial": "{: id=\"20261017022813-w105xzd\" updated=\"20261017022813\" custom-lvct-contact-method-label=\"工作 / 主线\" custom-lvct-contact-method-type=\"phone\" custom-lvct-contact-method-id=\"method-f2cce9841c963c2dfb733f7d\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-primary=\"1\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-owner=\"20261017022813-7p5nl7b\" custom-lvct-contact-method-source=\"phone-primary\"}",
+          "id": "20261017022813-w105xzd",
+          "markdown": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n改过的值 / 仍保留换行\n下一行",
+          "parent_id": "20261017022813-7p5nl7b",
+          "type": "p"
+        },
+        {
+          "content": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行",
+          "ial": "{: id=\"20261017022813-xadq0z7\" updated=\"20261017022813\" custom-lvct-contact-method-primary=\"0\" custom-lvct-contact-method-order=\"2\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"method-24061927e035299e60c05e5e\" custom-lvct-contact-method-owner=\"20261017022813-7p5nl7b\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-source=\"wechat-secondary\" custom-lvct-contact-method-type=\"wechat\" custom-lvct-contact-method-label=\"私用🙂\"}",
+          "id": "20261017022813-xadq0z7",
+          "markdown": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行",
+          "parent_id": "20261017022813-7p5nl7b",
+          "type": "p"
+        }
+      ],
+      "children": [
+        {
+          "id": "20261017022813-xadq0z7",
+          "type": "p",
+          "content": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行",
+          "markdown": "联系方式：微信\n标签：私用🙂\n主值：否\n值：\n微信_甲\n第二行"
+        },
+        {
+          "id": "20261017022813-olf6k8r",
+          "type": "p",
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test"
+        },
+        {
+          "id": "20261017022813-w105xzd",
+          "type": "p",
+          "content": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n改过的值 / 仍保留换行\n下一行",
+          "markdown": "联系方式：电话\n标签：工作 / 主线\n主值：是\n值：\n改过的值 / 仍保留换行\n下一行"
+        },
+        {
+          "id": "20261017022813-ga5r1f5",
+          "type": "h",
+          "subType": "h1",
+          "content": "虚构人物甲",
+          "markdown": "# 虚构人物甲"
+        },
+        {
+          "id": "20261017022813-mz4tu2w",
+          "type": "p",
+          "content": "原生人物文档：虚构人物甲",
+          "markdown": "原生人物文档：虚构人物甲"
+        }
+      ]
+    },
+    {
+      "phase": "清理插件缓存后",
+      "docId": "20261017022813-stn79yv",
+      "rows": [
+        {
+          "content": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value",
+          "ial": "{: custom-lvct-contact-method-label=\"工作\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-primary=\"1\" custom-lvct-contact-method-source=\"phone-primary\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-owner=\"20261017022813-stn79yv\" custom-lvct-contact-method-type=\"phone\" id=\"20261017022813-7lme76h\" updated=\"20261017022813\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-id=\"method-8fbf2648a69dfeab923029d4\"}",
+          "id": "20261017022813-7lme76h",
+          "markdown": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value",
+          "parent_id": "20261017022813-stn79yv",
+          "type": "p"
+        },
+        {
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "ial": "{: custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"method-a41828b11b557bdba14fd228\" custom-lvct-contact-method-owner=\"20261017022813-stn79yv\" custom-lvct-contact-method-primary=\"1\" id=\"20261017022813-rbxiowh\" updated=\"20261017022813\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-label=\"共享邮箱\" custom-lvct-contact-method-order=\"1\" custom-lvct-contact-method-source=\"email-shared\" custom-lvct-contact-method-type=\"email\"}",
+          "id": "20261017022813-rbxiowh",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "parent_id": "20261017022813-stn79yv",
+          "type": "p"
+        }
+      ],
+      "children": [
+        {
+          "id": "20261017022813-rbxiowh",
+          "type": "p",
+          "content": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test",
+          "markdown": "联系方式：邮箱\n标签：共享邮箱\n主值：是\n值：\nsame@example.test"
+        },
+        {
+          "id": "20261017022813-7lme76h",
+          "type": "p",
+          "content": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value",
+          "markdown": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value"
+        },
+        {
+          "id": "20261017022813-ppcawqq",
+          "type": "h",
+          "subType": "h1",
+          "content": "虚构人物乙",
+          "markdown": "# 虚构人物乙"
+        },
+        {
+          "id": "20261017022813-pufpfua",
+          "type": "p",
+          "content": "原生人物文档：虚构人物乙",
+          "markdown": "原生人物文档：虚构人物乙"
+        }
+      ]
+    }
+  ],
+  "version": "3.8.8-alpha.2",
+  "nativeWriteRead": {
+    "docs": [
+      {
+        "name": "虚构人物甲",
+        "docId": "20261017022813-7p5nl7b",
+        "methods": [
+          {
+            "sourceKey": "phone-primary",
+            "type": "phone",
+            "typeLabel": "电话",
+            "label": "工作 / 主线",
+            "primary": true,
+            "order": 0,
+            "value": "改过的值 / 仍保留换行\n下一行"
+          },
+          {
+            "sourceKey": "email-shared",
+            "type": "email",
+            "typeLabel": "邮箱",
+            "label": "共享邮箱",
+            "primary": true,
+            "order": 1,
+            "value": "same@example.test"
+          },
+          {
+            "sourceKey": "wechat-secondary",
+            "type": "wechat",
+            "typeLabel": "微信",
+            "label": "私用🙂",
+            "primary": false,
+            "order": 2,
+            "value": "微信_甲\n第二行"
+          }
+        ]
+      },
+      {
+        "name": "虚构人物乙",
+        "docId": "20261017022813-stn79yv",
+        "methods": [
+          {
+            "sourceKey": "phone-primary",
+            "type": "phone",
+            "typeLabel": "电话",
+            "label": "工作",
+            "primary": true,
+            "order": 0,
+            "value": "same-value"
+          },
+          {
+            "sourceKey": "email-shared",
+            "type": "email",
+            "typeLabel": "邮箱",
+            "label": "共享邮箱",
+            "primary": true,
+            "order": 1,
+            "value": "same@example.test"
+          },
+          {
+            "sourceKey": "custom-legacy",
+            "type": "custom",
+            "typeLabel": "自定义",
+            "label": "旧资料",
+            "primary": false,
+            "order": 2,
+            "value": "旧 slash 原文 / 不拆分"
+          }
+        ]
+      }
+    ]
+  },
+  "nativeApiEditDelete": {
+    "editedSourceKey": "phone-primary",
+    "editedValue": "改过的值 / 仍保留换行\n下一行",
+    "deletedSourceKey": "custom-legacy",
+    "deletedBlockId": "20261017022813-272tcer"
+  },
+  "restartReadback": true,
+  "pluginCacheClear": {
+    "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Contact-Native-36a235a6-2160-41de-b969-d421bd09ae23\\data\\storage\\petal\\siyuan-contacts",
+    "removed": true,
+    "fictionalOnly": true
+  },
+  "afterPluginCacheClear": true
+}

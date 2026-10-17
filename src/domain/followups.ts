@@ -167,6 +167,9 @@ export function normalizeFollowUpStoreForWrite(raw: unknown): FollowUpStore {
     if (!Array.isArray(record.items) || !record.items.every(isFollowUpItem)) {
         throw new Error("跟进事项存储内容损坏，操作已停止；请先备份并检查原文件");
     }
+    if (new Set(record.items.map((item) => item.id)).size !== record.items.length) {
+        throw new Error("跟进事项存储存在重复 ID，操作已停止；请先备份并检查原文件");
+    }
     return normalizeFollowUpStore(raw);
 }
 

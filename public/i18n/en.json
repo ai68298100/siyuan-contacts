@@ -470,6 +470,7 @@
   "tplContentAria": "Template {n} content",
   "tplContentPlaceholder": "Note content; placeholders {{姓名}} {{日期}} {{上次互动}} available",
   "tplManagerAdd": "＋ Add template",
+  "tplManagerLimit": "Save up to {limit} templates. Delete one to add another.",
   "tplManagerClose": "Close",
   "tplManagerSaving": "Saving…",
   "tplManagerSave": "Save templates",

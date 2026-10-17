@@ -104,6 +104,87 @@ export function configureVcardKernel(kernel, settings) {
 }
 
 export async function runVcardRegression({ test, assert, kernel, settings, fixture, until, button }) {
+    await test("vCard 多联系方式预览选择主值后按单值写入，未知重试沿用已选草稿", async () => {
+        const state = configureVcardKernel(kernel, settings);
+        state.failField = true;
+        const app = mount(VCardDialog, { target: fixture, props: { settings, onImported() {}, onClose() {} } });
+        try {
+            const fileInput = fixture.querySelector('input[type="file"]');
+            const transfer = new DataTransfer();
+            transfer.items.add(new File(["BEGIN:VCARD\nVERSION:3.0\nFN:主值选择样例\nTEL:11001\nTEL:11002\nEMAIL:first@example.test\nEMAIL:second@example.test\nURL:https://first.example.test\nURL:https://second.example.test\nEND:VCARD"], "primary.vcf", { type: "text/vcard" }));
+            fileInput.files = transfer.files;
+            fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+            await until(() => fixture.querySelector('select[aria-label="第 1 张卡片的电话主值"]'), "多联系方式主值选择未显示");
+            const phone = fixture.querySelector('select[aria-label="第 1 张卡片的电话主值"]');
+            assert(phone.value === "-1" && phone.options[0].textContent.includes("11001 / 11002"), "默认兼容合并值发生变化");
+            const selected = fixture.querySelector('.lvct-import__row:not(.lvct-import__row--head) input[type="checkbox"]');
+            assert(selected?.checked, "非同名卡片未默认勾选");
+            for (const field of ["电话", "邮箱", "网址"]) {
+                const select = fixture.querySelector(`select[aria-label="第 1 张卡片的${field}主值"]`);
+                select.click();
+                assert(selected.checked, "点击主值选择框切换了卡片勾选");
+                select.value = "1";
+                select.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+            await until(() => fixture.textContent.includes("TEL → phone：11002"), "映射预览未更新为已选主值");
+            assert(fixture.textContent.includes("EMAIL → email：second@example.test") && fixture.textContent.includes("URL → website：https://second.example.test"), "邮箱或网址映射仍展示旧主值");
+            selected.click();
+            await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent.trim() === "导入为联系人（0）" && node.disabled), "取消卡片勾选后仍可导入");
+            selected.click();
+            await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent.trim() === "导入为联系人（1）" && !node.disabled), "重新勾选卡片未保留选择");
+            assert(phone.value === "1", "取消并重选卡片丢失本卡片主值");
+            button("导入为联系人（1）").click();
+            await until(() => fixture.textContent.includes("? 待核对（1）"), "字段失败未保留原请求");
+            assert(fixture.textContent.includes("未写入 TEL #1：11001") && fixture.textContent.includes("未写入 EMAIL #1：first@example.test") && fixture.textContent.includes("未写入 URL #1：https://first.example.test"), "导入报告未保留未写入联系方式");
+            assert(state.writes.some((write) => write.value.phone?.content === "11002") && state.writes.some((write) => write.value.email?.content === "second@example.test") && state.writes.some((write) => write.value.url?.content === "https://second.example.test"), "导入仍写入旧合并值或首项");
+            state.failField = false;
+            [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("核对名册并重试")).click();
+            await until(() => fixture.textContent.includes("✓ 成功（1）"), "已选主值未通过原请求重试");
+            assert(fixture.textContent.includes("未写入 TEL #1：11001") && fixture.textContent.includes("未写入 EMAIL #1：first@example.test") && fixture.textContent.includes("未写入 URL #1：https://first.example.test"), "成功重试后丢失原未写入项说明");
+            assert(state.creates.length === 1 && state.writes.every((write) => !JSON.stringify(write).includes("11001 / 11002") && !JSON.stringify(write).includes("first@example.test")), "重试丢失主值选择或重复建档");
+        } finally {
+            await unmount(app);
+            fixture.replaceChildren();
+        }
+    });
+    await test("vCard 多联系方式默认保留合并电话，切换文件后重置主值选择", async () => {
+        const state = configureVcardKernel(kernel, settings);
+        const app = mount(VCardDialog, { target: fixture, props: { settings, onImported() {}, onClose() {} } });
+        const source = (name, prefix) => `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nTEL:${prefix}001\nTEL:${prefix}002\nEMAIL:first-${prefix}@example.test\nEMAIL:second-${prefix}@example.test\nURL:https://first-${prefix}.example.test\nURL:https://second-${prefix}.example.test\nEND:VCARD`;
+        const upload = (text) => {
+            const fileInput = fixture.querySelector('input[type="file"]');
+            const transfer = new DataTransfer();
+            transfer.items.add(new File([text], "replace.vcf", { type: "text/vcard" }));
+            fileInput.files = transfer.files;
+            fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+        };
+        try {
+            upload(source("文件甲", "120"));
+            await until(() => fixture.querySelector('select[aria-label="第 1 张卡片的电话主值"]'), "第一文件多值计划未就绪");
+            const firstPhone = fixture.querySelector('select[aria-label="第 1 张卡片的电话主值"]');
+            firstPhone.value = "1";
+            firstPhone.dispatchEvent(new Event("change", { bubbles: true }));
+            await until(() => fixture.textContent.includes("TEL → phone：120002"), "第一文件选择未更新");
+            // 调用真实文件 change 路径，确认同下标的新文件不会复用旧文件选择。
+            upload(source("文件乙", "130"));
+            await until(() => fixture.textContent.includes("文件乙") && !fixture.textContent.includes("文件甲"), "切换文件后旧计划仍显示");
+            const phone = fixture.querySelector('select[aria-label="第 1 张卡片的电话主值"]');
+            const email = fixture.querySelector('select[aria-label="第 1 张卡片的邮箱主值"]');
+            const website = fixture.querySelector('select[aria-label="第 1 张卡片的网址主值"]');
+            assert(phone.value === "-1" && email.value === "0" && website.value === "0", `新文件复用了旧主值下标：${phone.value}/${email.value}/${website.value}`);
+            assert(fixture.textContent.includes("TEL → phone：130001 / 130002"), "默认合并电话映射已退化");
+            button("导入为联系人（1）").click();
+            await until(() => fixture.textContent.includes("✓ 成功（1）"), "新文件默认值未导入");
+            assert(fixture.textContent.includes("多个电话合并为一个文本字段") && fixture.textContent.includes("未写入 EMAIL #2：second-130@example.test") && fixture.textContent.includes("未写入 URL #2：https://second-130.example.test"), "默认导入报告未说明合并电话与未写入邮箱/网址");
+            assert(state.creates.length === 1 && state.creates[0].path.endsWith("/文件乙"), "旧文件被意外创建");
+            assert(state.writes.some((write) => write.value.phone?.content === "130001 / 130002"), "默认多电话未按原兼容值写入");
+            assert(state.writes.some((write) => write.value.email?.content === "first-130@example.test") && state.writes.some((write) => write.value.url?.content === "https://first-130.example.test"), "默认邮箱或网址主值错误");
+            assert(state.writes.every((write) => !JSON.stringify(write).includes("120")), "新文件导入串入旧文件值");
+        } finally {
+            await unmount(app);
+            fixture.replaceChildren();
+        }
+    });
     await test("AG-P0-014 vCard 创建响应丢失，按请求标记核实原文档", async () => {
         const state = configureVcardKernel(kernel, settings);
         state.loseCreate = true;

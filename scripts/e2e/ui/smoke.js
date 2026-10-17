@@ -72,6 +72,7 @@ import { runGraphQueryRegression } from "./graph-query-regression.js";
 import { runGraphLayoutRegression } from "./graph-layout-regression.js";
 import { runAiPreflightRegression } from "./ai-preflight-regression.js";
 import { runImportRegression } from "./import-regression.js";
+import { runPersonFieldsRegression } from "./person-fields-regression.js";
 
 import { runAliasRegression } from "./alias-regression.js";
 import { runOrganizationContextRegression } from "./organization-context-regression.js";
@@ -214,6 +215,15 @@ function resetKernel() {
 function configureOccasionKernel() {
     const sourceSectionId = "20260927000000-sect001";
     const sections = new Map();
+    const diaryDocId = "20260927000000-diary01";
+    const sectionIds = new Map([
+        [settings.hostDocId, sourceSectionId],
+        [diaryDocId, "20260927000000-sect002"],
+        [person.docId, "20260927000000-sect003"],
+    ]);
+    const documents = new Map([
+        [settings.hostDocId, "虚构捕获来源"], [diaryDocId, "2026-09-27"], [person.docId, person.name],
+    ]);
     kernel.handler = async (route, payload) => {
         if (route === "/api/sqlite/flushTransaction") return null;
         if (route === "/api/av/renderAttributeView") return renderResult();
@@ -221,21 +231,37 @@ function configureOccasionKernel() {
             const stmt = payload.stmt;
             if (stmt.startsWith("SELECT content FROM blocks WHERE id =")) {
                 const docId = /id = '([^']+)'/.exec(stmt)?.[1];
-                if (docId === person.docId) return [{ content: person.name }];
-                if (docId === settings.hostDocId) return [{ content: "虚构捕获来源" }];
-                return [];
+                return documents.has(docId) ? [{ content: documents.get(docId) }] : [];
             }
-            if (stmt.includes("type='d'")) return [{
-                id: "20260927000000-diary01", content: "2026-09-27",
+            if (stmt.startsWith("SELECT id, content, hpath")) return [{
+                id: diaryDocId, content: "2026-09-27",
                 hpath: `/${settings.notebookName}/日记/2026-09-27`,
             }];
+            if (stmt.includes("type = 'd'")) {
+                const docId = /id = '([^']+)'/.exec(stmt)?.[1];
+                return documents.has(docId) ? [{ id: docId }] : [];
+            }
             const rootDocId = /root_id = '([^']+)'/.exec(stmt)?.[1];
-            if (rootDocId === settings.hostDocId) return [{ id: sourceSectionId }];
-            if (rootDocId === "20260927000000-diary01") return [{ id: "20260927000000-sect002" }];
-            if (rootDocId === person.docId) return [{ id: "20260927000000-sect003" }];
+            if (sectionIds.has(rootDocId)) {
+                const id = sectionIds.get(rootDocId);
+                const attr = /ial LIKE '%(custom-[a-z0-9-]+)="/.exec(stmt)?.[1];
+                const markdown = sections.get(id);
+                if (!markdown || !attr || !markdown.includes(`${attr}="`)) return [];
+                return stmt.startsWith("SELECT id, markdown") ? [{ id, markdown }] : [{ id }];
+            }
             throw new Error(`捕获 fixture 未声明 SQL：${stmt}`);
         }
-        if (route === "/api/block/updateBlock") { sections.set(payload.id, payload.data); return null; }
+        if (route === "/api/block/insertBlock") {
+            const id = sectionIds.get(payload.parentID);
+            assert(id && !sections.has(id), "捕获 fixture 不允许未知目标或重复插入标记块");
+            sections.set(id, payload.data);
+            return [{ doOperations: [{ id, action: "insert" }] }];
+        }
+        if (route === "/api/block/updateBlock") {
+            assert(sections.has(payload.id), "捕获 fixture 不允许更新尚未插入的标记块");
+            sections.set(payload.id, payload.data);
+            return null;
+        }
         throw new Error(`捕获 fixture 不允许请求 ${route}`);
     };
     return { sections, sourceSectionId };
@@ -844,6 +870,7 @@ await test("相关人选择走可搜索选人器：电话关键词筛选、空�
     await until(() => fixture.querySelector(".lvct-picker__panel"), "空态选择联系人按钮未打开选人浮层");
     fixture.querySelector(".lvct-picker__search").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
     await until(() => !fixture.querySelector(".lvct-picker__panel"), "空态选择联系人浮层无法关闭");
+    await until(() => fixture.querySelector(".lvct-picker__trigger:not([disabled])"), "选人浮层触发器未就绪");
     fixture.querySelector(".lvct-picker__trigger").click();
     await until(() => fixture.querySelector(".lvct-picker__panel"), "选人浮层未打开");
     const search = fixture.querySelector(".lvct-picker__search");
@@ -1174,11 +1201,13 @@ await test("迁移恢复单模块失败可见、不阻断其他模块且不污�
         saveData: async (key, value) => { files.set(key, value); },
     };
     kernel.handler = async () => ({ code: 0 });
-    /* 预置未知版本的模板库：模板模块恢复必须显式失败，其他模块照常合并，坏库不被覆盖 */
-    files.set("interaction-templates.json", { schemaVersion: 2, templates: [] });
+    /* 先用合法模板库导出完整包，再把当前库替换成未知版本；这样验证的是
+     * 恢复时单模块失败可见且不污染坏库，而不是让导出阶段提前失败。 */
+    files.set("interaction-templates.json", { schemaVersion: 1, templates: [] });
     await recordInteraction(plugin, { personDocId: "20260927000000-person1", source: "manual", note: "恢复前互动" });
 
     const bundleText = await exportMigrationBundle(plugin);
+    files.set("interaction-templates.json", { schemaVersion: 2, templates: [] });
     const bundle = JSON.parse(bundleText);
     bundle.modules.templates = { schemaVersion: 1, templates: [{ id: "tpl-new", name: "包内模板", content: "y" }] };
     /* 向包内注入一条库中没有的互动：证明失败模块之外照常发生真实合并 */
@@ -1983,6 +2012,39 @@ await test("B13.4/B13 组织成员字段编辑与归档恢复（facade 全链路
     button("恢复组织").click();
     await until(() => restoreCalls === 1, "恢复未走 facade");
     await until(() => !fixture.textContent.includes("收起已归档"), "恢复后归档分组未消失");
+});
+
+await test("组织移除后仍可查看成员历史，编辑入口保持只读", async () => {
+    const member = {
+        id: "20261016000000-mem0001", orgDocId: "20261016000000-org0001",
+        personDocId: "20261016000000-per0001", personName: "历史成员",
+        department: "研发部", title: "顾问", joinedOn: "2024-01-01", leftOn: "2025-06-01", status: "former",
+        note: "保留历史", affiliationKind: "work",
+    };
+    let openedPerson = "";
+    const facade = {
+        settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        listContacts: async () => [{ docId: member.personDocId, itemId: "row-history", name: member.personName, isSelf: false }],
+        listOrganizations: async () => [{
+            docId: member.orgDocId, name: "已移除组织", hpath: "/已移除组织", notebookId: settings.notebookId,
+            archived: true, removed: true, memberships: [member],
+        }],
+        listOrganizationMembers: async () => [{ ...member }],
+        openDoc: () => {},
+    };
+    mounted = mount(OrgManagerDialog, { target: fixture, props: {
+        facade, i18n: undefined, onClose() {}, onOpenPerson: (docId) => { openedPerson = docId; },
+    } });
+    try {
+        await until(() => fixture.textContent.includes("此组织已从插件移除"), "移除组织状态未显示");
+        await until(() => fixture.textContent.includes("历史成员") && fixture.textContent.includes("保留历史"), "移除组织的成员历史未显示");
+        assert(![...fixture.querySelectorAll("button")].some((node) => node.textContent.trim() === "编辑"), "移除组织不应出现成员编辑入口");
+        button("查看详情").click();
+        assert(openedPerson === member.personDocId, "移除组织成员历史无法打开人物详情");
+    } finally {
+        await unmount(mounted);
+        mounted = undefined;
+    }
 });
 
 await test("B13.4 组织改名：renameOrganization 全链路 + 同名拒绝显示错误", async () => {
@@ -4566,6 +4628,56 @@ await test("保存视图：命名保存与应用、重名覆盖确认、改名�
     }
 });
 
+await test("保存视图达到 50 条：新增明确拒绝且保留当前视图，同名覆盖仍沿用原 ID", async () => {
+    const savedViews = Array.from({ length: 50 }, (_, index) => ({
+        id: `limit-view-${index}`, name: `已有视图 ${index}`,
+        query: { search: "", group: "", tags: [], tagMatch: "all", recentFrom: "", recentTo: "",
+            neverContacted: false, profileGap: "", sort: "name" },
+    }));
+    const originalPrompt = window.prompt;
+    const originalConfirm = window.confirm;
+    let requestedName = "未保存的新视图";
+    let saved = null;
+    let saves = 0;
+    kernel.handler = async (route) => {
+        if (route === "/api/av/renderAttributeView") return { view: {
+            columns: FIELD_SPECS.map((field) => ({ id: field.key, name: field.nameZh, type: field.type })), rows: [],
+        } };
+        throw new Error(`保存视图上限回归不允许请求 ${route}`);
+    };
+    mounted = mount(PeopleView, { target: fixture, props: {
+        settings, preferences: { ...DEFAULT_VIEW_PREFERENCES, savedViews },
+        loadRecentInteractions: async () => ({}), revision: 0, initialSort: "name", onOpenDetail() {},
+        onPreferencesChange: async (next) => { saves += 1; saved = next; return next; },
+    } });
+    try {
+        window.prompt = () => requestedName;
+        window.confirm = () => true;
+        const viewsButton = () => fixture.querySelector('button[aria-label="视图"]');
+        viewsButton().click();
+        await until(() => fixture.querySelectorAll(".lvct-people__viewsmenu-apply").length === 50, "未显示 50 条既有视图");
+        fixture.querySelector(".lvct-people__viewsmenu-apply").click();
+        await until(() => fixture.querySelector(".lvct-people__conditions")?.textContent.includes("视图：已有视图 0"), "既有视图未激活");
+        viewsButton().click();
+        await tick();
+        button("保存当前筛选为视图").click();
+        await until(() => fixture.querySelector(".lvct-people__viewhint")?.textContent.includes("最多保存 50 个视图"), "第 51 条未显示上限提示");
+        assert(saves === 0 && saved === null, "第 51 条仍进入保存通道");
+        assert(fixture.querySelectorAll(".lvct-people__viewsmenu-apply").length === 50, "拒绝新增后既有视图被截断或移除");
+        assert(fixture.querySelector(".lvct-people__conditions")?.textContent.includes("视图：已有视图 0"), "拒绝新增后当前视图标记被覆盖");
+        assert(!fixture.querySelector(".lvct-people__conditions")?.textContent.includes("未保存的新视图"), "未保存视图被标记为当前");
+
+        requestedName = "已有视图 0";
+        button("保存当前筛选为视图").click();
+        await until(() => saves === 1 && saved?.savedViews?.length === 50, "满额后同名覆盖被错误阻断");
+        assert(saved.savedViews[0].id === savedViews[0].id && saved.savedViews.every((view, index) => view.id === savedViews[index].id), "同名覆盖更换原 ID 或丢失其他视图");
+        await until(() => !fixture.querySelector(".lvct-people__viewhint"), "同名覆盖成功后仍显示上限错误");
+    } finally {
+        window.prompt = originalPrompt;
+        window.confirm = originalConfirm;
+    }
+});
+
 await test("首页待办跟进：分桶展示，处理仅限可达人物，推迟与跳过更新状态", async () => {
     const pad = (value) => String(value).padStart(2, "0");
     const now = new Date();
@@ -5065,7 +5177,7 @@ await test("打开摘要：开关与当日忽略抑制、次日恢复、空清�
     fixture.replaceChildren();
 });
 
-await test("备注模板：空存储回退内置默认，增改删落盘且重开恢复，非法条目归一化", async () => {
+await test("备注模板：空存储回退内置默认，增改删落盘且重开恢复，非法条目明确拒绝", async () => {
     let saved = "";
     let writes = 0;
     const plugin = {
@@ -5085,9 +5197,12 @@ await test("备注模板：空存储回退内置默认，增改删落盘且重�
     assert(JSON.stringify(savedList.map((item) => item.name)) === JSON.stringify(["见面", "周一直呼"]), "保存内容错误");
     // 重开恢复（存储为准，内置默认不再出现）
     assert(JSON.stringify((await listTemplates(plugin)).map((item) => item.id)) === JSON.stringify(["tpl-meet", "tpl-call-2"]), "重开未按存储恢复");
-    // 非法条目归一化丢弃
-    const cleaned = await saveTemplates(plugin, [...next, { id: "", name: "坏" }, { id: "x", name: "  ", content: "c" }]);
-    assert(JSON.stringify(cleaned.map((item) => item.id)) === JSON.stringify(["tpl-meet", "tpl-call-2"]), "非法条目未归一化丢弃");
+    // 保存不能通过静默丢弃非法条目报告成功。
+    let rejected = false;
+    try { await saveTemplates(plugin, [...next, { id: "", name: "坏" }, { id: "x", name: "  ", content: "c" }]); }
+    catch { rejected = true; }
+    assert(rejected && writes === 1, "非法条目未在写入前明确拒绝");
+    assert(JSON.stringify((await listTemplates(plugin)).map((item) => item.id)) === JSON.stringify(["tpl-meet", "tpl-call-2"]), "非法保存修改了原模板");
 });
 
 await test("Peek 备注模板：选用填入备注且变量替换，已有草稿需确认覆盖，管理弹窗增删保存", async () => {
@@ -5177,6 +5292,62 @@ await test("管理模板弹窗：删除与新增保存落盘，取消不写入",
         assert(templates.length === 1 && templates[0].name === "约球", "新增保存结果错误");
         await until(() => fixture.textContent.includes("模板已保存"), "保存成功提示未显示");
     } finally {
+        window.confirm = originalConfirm;
+    }
+});
+
+await test("管理模板弹窗：50 条上限说明与禁新增，删除后可新增且备注完整保存", async () => {
+    const TemplateManager = (await import("../../../src/components/people/TemplateManager.svelte")).default;
+    const templates = Array.from({ length: 50 }, (_, index) => ({ id: `tpl-${index}`, name: `模板${index}`, content: `原备注${index}` }));
+    let saved;
+    const originalConfirm = window.confirm;
+    window.confirm = () => true;
+    try {
+        mounted = mount(TemplateManager, { target: fixture, props: { templates,
+            onSave: async (list) => { saved = JSON.parse(JSON.stringify(list)); return list; }, onClose() {},
+        } });
+        const add = [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "＋ 新增模板");
+        await until(() => add?.disabled && fixture.textContent.includes("最多保存 50 条模板"), "达到上限未说明或未禁止新增");
+        add.click();
+        assert(fixture.querySelectorAll("textarea").length === 50, "禁用按钮仍新增了第 51 条");
+        fixture.querySelector('button[title^="删除模板"]').click();
+        await until(() => !add.disabled, "删除一条后不能新增");
+        add.click();
+        await until(() => fixture.querySelector('input[aria-label="模板 50 名称"]')?.value === "", "新增行未显示");
+        input(fixture.querySelector('input[aria-label="模板 50 名称"]'), "新多行模板");
+        input(fixture.querySelector('textarea[aria-label="模板 50 内容"]'), "第一行 *Markdown*\n\n第二段备注");
+        [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "保存模板").click();
+        await until(() => saved?.length === 50, "50 条模板未完整保存");
+        assert(saved[0].content === "原备注1" && saved[49].content === "第一行 *Markdown*\n\n第二段备注", "模板备注被丢弃或破坏");
+    } finally { window.confirm = originalConfirm; }
+});
+
+await test("管理模板弹窗：保存并离开失败保留草稿，取消丢弃空名模板也不关闭", async () => {
+    const TemplateManager = (await import("../../../src/components/people/TemplateManager.svelte")).default;
+    let closed = 0;
+    let saveCalls = 0;
+    const originalConfirm = window.confirm;
+    window.confirm = () => false;
+    try {
+        mounted = mount(TemplateManager, { target: fixture, props: {
+            templates: [{ id: "original", name: "模板", content: "旧内容" }],
+            onSave: async () => { saveCalls += 1; throw new Error("模拟存储失败"); }, onClose() { closed += 1; },
+        } });
+        const content = fixture.querySelector("textarea");
+        input(content, "未保存的多行备注\n第二行");
+        [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "关闭").click();
+        await until(() => document.querySelector('.lvct-closeguard [data-choice="save"]'), "保存并离开守卫未出现");
+        document.querySelector('.lvct-closeguard [data-choice="save"]').click();
+        await until(() => fixture.textContent.includes("模拟存储失败"), "保存失败未显示");
+        assert(closed === 0 && saveCalls === 1 && content.value === "未保存的多行备注\n第二行", "保存失败后关闭或丢失草稿");
+        input(fixture.querySelector('input[aria-label="模板 1 名称"]'), "");
+        [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "关闭").click();
+        await until(() => document.querySelector('.lvct-closeguard [data-choice="save"]'), "第二次守卫未出现");
+        document.querySelector('.lvct-closeguard [data-choice="save"]').click();
+        await pause(30);
+        assert(closed === 0 && saveCalls === 1 && content.value === "未保存的多行备注\n第二行", "取消移除无名模板后仍关闭或写入");
+    } finally {
+        document.querySelector('.lvct-closeguard [data-choice="cancel"]')?.click();
         window.confirm = originalConfirm;
     }
 });
@@ -5749,14 +5920,16 @@ await test("人物档案条会前简报展示真实互动事实", async () => {
     element.innerHTML = '<div class="protyle-title"></div>';
     fixture.append(element);
     const protyle = { element, block: { rootID: person.docId } };
-    const context = { settings, plugin: { loadData: async () => ({
+    const context = { settings, plugin: { loadData: async (key) => key === "follow-ups.json" ? {
+        schemaVersion: 1, items: [],
+    } : {
         schemaVersion: 1,
         events: [{
             id: "event-briefing", personDocId: person.docId, occurredAt: Date.now(),
             localDate: "2026-09-27", source: "manual", note: "确认下周合作安排",
         }],
         tombstones: [],
-    }) } };
+    } } };
     handleProtyleEvent(context, { detail: { protyle } });
     await until(() => element.querySelector(".lvct-strip__briefing-list"), "会前简报未渲染事实条目");
     const briefing = element.querySelector(".lvct-strip__briefing");
@@ -5856,9 +6029,11 @@ await test("笔记捕获去重参与人员，重复捕获返回零新增", async
     const first = await captureFromDoc(plugin, settings, settings.hostDocId, options);
     assert(first.interactions === 1, "重复选择人员导致新增计数错误");
     assert(sections.get(sourceSectionId).split(`siyuan://blocks/${person.docId}`).length - 1 === 1, "参与人员区块重复列出同一人");
-    assert(first.occasionLinkFailures.length === 0 && sections.size === 3, "来源、日记与人物投影未全部完成");
+    assert(first.complete && first.occasionLinkFailures.length === 0 && sections.size === 3,
+        `来源、日记与人物投影未全部完成：${JSON.stringify(first.occasionLinkFailures)}`);
     const repeat = await captureFromDoc(plugin, settings, settings.hostDocId, options);
     assert(repeat.interactions === 0, "重复捕获误报新增");
+    assert(repeat.complete && sections.size === 3, "重复捕获未核实原标记块或重复插入投影");
 });
 
 await test("互动日期严格校验，非法日期在创建人物和写入前被拒绝", async () => {
@@ -5910,7 +6085,8 @@ await test("按名捕获复用已有联系人，不漏记互动或误报新建",
     const options = { personDocIds: [], newNames: [person.name, ` ${person.name} `, ""], date: "2026-09-27" };
     const first = await captureFromDoc(plugin, settings, settings.hostDocId, options);
     assert(first.createdNames.length === 0 && first.createdDocIds.length === 0, "已有联系人被误报为新建");
-    assert(first.interactions === 1 && first.attendeeBlockWritten, "已有姓名未被纳入参与者");
+    assert(first.interactions === 1 && first.attendeeBlockWritten,
+        `已有姓名未被纳入参与者：${JSON.stringify(first.occasionLinkFailures)}`);
     assert(sections.get(sourceSectionId).split(`siyuan://blocks/${person.docId}`).length - 1 === 1, "同名参与者未去重");
     const store = await loadInteractionStore(plugin);
     assert(store.events.length === 1 && store.events[0].personDocId === person.docId, "没有复用正确的人物文档");
@@ -6943,6 +7119,7 @@ await runHealthAuditRegression({ test, assert, fixture, until, button });
 await runLifecycleRegression({ test, assert, fixture, until, settings });
 await runTextEncodingRegression({ test, assert, kernel, settings });
 await runVcardRegression({ test, assert, kernel, settings, fixture, until, button });
+await runPersonFieldsRegression({ test, assert, settings, fixture, until, button });
 await runSelfIdentityRegression({ test, assert, kernel, settings, fixture, until, button });
 await runOrganizationHealthRegression({ test, assert, kernel, settings, fixture, until, button });
 await runPersonIdentityRegression({ test, assert, kernel, settings, fixture, until, button });

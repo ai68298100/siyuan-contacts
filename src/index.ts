@@ -23,14 +23,17 @@ import { initializeWorkspace, inspectWorkspace, readSettingsState, scanAnchorCan
 import { configureCloseGuardI18n } from "./components/close-guard";
 import type { InitProgressStep, WorkspaceSnapshot } from "./services/init";
 import { loadDashboard, DEFAULT_DASHBOARD_OPTIONS } from "./services/dashboard";
-import { deleteInteraction, recordInteraction, loadInteractionStore } from "./data/interactions";
+import { deleteInteraction, recordInteraction, loadInteractionStoreStrict } from "./data/interactions";
 import { captureFromDoc, previewCapture, resolveRecognizeTarget } from "./services/capture";
 import { extractFromDoc, prepareAiExtraction } from "./services/ai-extract";
 import type { AiExtractionConfirmation } from "./services/ai-extract";
 import { AiExtractionError } from "./domain/ai-preflight";
 import type { AiPreflightOptions } from "./domain/ai-preflight";
 import { loadPersonInsights } from "./services/insights";
-import { loadPersonNote, savePersonNote } from "./services/person-note";
+import { detachLegacyPersonNote, inspectLegacyPersonNote, loadPersonNote, savePersonNote } from "./services/person-note";
+import type { LegacyPersonNoteSnapshot } from "./domain/person-note";
+import { loadPersonFields, savePersonFields } from "./services/person-fields";
+import type { PersonFieldsSnapshot, PersonFieldsState } from "./domain/person-fields";
 import { checkSettingsHealth, previewMissingFields, previewRebindSettings, probeSettingsAnchor, rebuildMissingFields, rebindSettings, repairFieldMap } from "./services/settings-health";
 import type { FieldRebuildPreview, SettingsRebindPreview } from "./services/settings-health";
 import { auditWorkspaceData, auditWorkspaceDataReport, retryFailedHealthAuditModules } from "./services/health-audit";
@@ -46,6 +49,7 @@ import {
     listOrganizationMembersPage,
     archiveOrganization,
     restoreOrganization,
+    removeOrganization,
     renameOrganization,
     removeOrgLinkBlocks,
     listPersonOrgMemberships,
@@ -75,7 +79,7 @@ import {
 } from "./services/followups";
 import type { SnoozeOption } from "./domain/followups";
 import { loadPersonCadence, savePersonCadence } from "./data/cadences";
-import { dismissReminder, resumeReminder, loadReminderDismissals } from "./data/reminder-dismissals";
+import { dismissReminder, resumeReminder, loadReminderDismissalsStrict } from "./data/reminder-dismissals";
 import type { ReminderKind } from "./data/reminder-dismissals";
 import type { PersonCadence } from "./domain/cadence";
 import { listTemplates, saveTemplates } from "./services/templates";
@@ -986,12 +990,12 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     /** B13.3：组织列举（含成员记录） */
-    async listOrganizations() {
-        return listOrganizationsWithMembers(this);
+    async listOrganizations(options?: { includeRemoved?: boolean }) {
+        return listOrganizationsWithMembers(this, options);
     }
 
     /** B13.5c：组织标记 keyset 分页 */
-    async listOrganizationsPage(options?: { afterRootId?: string; limit?: number }) {
+    async listOrganizationsPage(options?: { afterRootId?: string; limit?: number; includeRemoved?: boolean }) {
         return listOrganizationsPage(this, options);
     }
 
@@ -1083,6 +1087,14 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     async restoreOrganization(orgDocId: string) {
         const token = this.lifecycleToken;
         await restoreOrganization(orgDocId);
+        emitDataChanged({ topics: ["organizations", "memberships"], docIds: [orgDocId] }, token);
+    }
+
+    /** 从插件移除，原生组织文档和成员记录保留，可从组织管理恢复。 */
+    async removeOrganization(orgDocId: string) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        const token = this.lifecycleToken;
+        await removeOrganization(orgDocId);
         emitDataChanged({ topics: ["organizations", "memberships"], docIds: [orgDocId] }, token);
     }
 
@@ -1202,7 +1214,9 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     async loadRecentInteractions() {
-        const store = await loadInteractionStore(this);
+        /* 人物列表的最近互动排序是严格展示读；读取失败必须让 UI
+         * 进入 recentError 重试态，不能伪装成所有联系人从未互动。 */
+        const store = await loadInteractionStoreStrict(this);
         const latest: Record<string, { occurredAt: number; localDate: string }> = {};
         for (const event of store.events) {
             const current = latest[event.personDocId];
@@ -1290,6 +1304,27 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         return loadPersonNote(personDocId);
     }
 
+    async inspectLegacyPersonNote(personDocId: string) {
+        return inspectLegacyPersonNote(personDocId);
+    }
+
+    async detachLegacyPersonNote(personDocId: string, expected: LegacyPersonNoteSnapshot) {
+        const token = this.lifecycleToken;
+        await detachLegacyPersonNote(personDocId, expected);
+        emitDataChanged({ topics: ["people"], docIds: [personDocId] }, token);
+    }
+
+    async loadPersonFields(personDocId: string) {
+        return loadPersonFields(personDocId);
+    }
+
+    async savePersonFields(personDocId: string, snapshot: PersonFieldsSnapshot, expected: PersonFieldsState) {
+        const token = this.lifecycleToken;
+        const saved = await savePersonFields(personDocId, snapshot, expected);
+        emitDataChanged({ topics: ["people"], docIds: [personDocId] }, token);
+        return saved;
+    }
+
     async savePersonNote(personDocId: string, note: string, expected?: string) {
         const saved = await savePersonNote(personDocId, note, expected);
         emitDataChanged({ topics: ["people"], docIds: [personDocId] });
@@ -1354,7 +1389,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     }
 
     async loadReminderDismissals() {
-        return loadReminderDismissals(this);
+        return loadReminderDismissalsStrict(this);
     }
 
     async listTemplates() {

@@ -1,0 +1,100 @@
+{
+  "researchFormat": 1,
+  "syntheticOnly": true,
+  "kernelRequests": 0,
+  "productionChanges": false,
+  "productionGuardImplemented": false,
+  "D1Adopted": false,
+  "writeAllowed": false,
+  "tombstoneAllowed": false,
+  "projectionWrites": 0,
+  "candidateContractAccepted": false,
+  "redacted": true,
+  "identityRules": [
+    "docId",
+    "methodId",
+    "sourceKey",
+    "itemID"
+  ],
+  "unknownPolicy": "missing-or-incomplete-observation-is-unknown-not-delete",
+  "forbiddenAssumptions": [
+    "name/value ownership",
+    "deleteDoc",
+    "moveDoc",
+    "persistent tombstone",
+    "CAS",
+    "durable unbind history"
+  ],
+  "boundary": "Synthetic identity gate only; no user deletion or document move was executed.",
+  "summary": {
+    "total": 16,
+    "passed": 16,
+    "failed": 0,
+    "checks": [
+      {
+        "id": "baseline-doc-source-roster-identity",
+        "pass": true
+      },
+      {
+        "id": "same-name-new-doc-does-not-transfer-methods",
+        "pass": true
+      },
+      {
+        "id": "same-value-cross-person-keeps-distinct-method-ids",
+        "pass": true
+      },
+      {
+        "id": "same-name-new-doc-cannot-freeze-old-source",
+        "pass": true
+      },
+      {
+        "id": "same-item-reuse-after-unbind-refuses-old-plan",
+        "pass": true
+      },
+      {
+        "id": "unreachable-old-doc-is-unknown-not-delete",
+        "pass": true
+      },
+      {
+        "id": "unreachable-source-owner-unknown-stays-empty",
+        "pass": true
+      },
+      {
+        "id": "location-change-is-not-delete-proof",
+        "pass": true
+      },
+      {
+        "id": "owner-mismatch-does-not-rewrite-method-id",
+        "pass": true
+      },
+      {
+        "id": "duplicate-method-id-refuses-set",
+        "pass": true
+      },
+      {
+        "id": "missing-known-row-is-unknown-not-delete",
+        "pass": true
+      },
+      {
+        "id": "truncated-range-is-not-complete",
+        "pass": true
+      },
+      {
+        "id": "new-item-rebind-refuses-old-target",
+        "pass": true
+      },
+      {
+        "id": "official-native-mapping-disagreement-refuses",
+        "pass": true
+      },
+      {
+        "id": "reloaded-observation-keeps-reasons-stable",
+        "pass": true
+      },
+      {
+        "id": "all-unknown-paths-never-enable-write",
+        "pass": true
+      }
+    ]
+  }
+}

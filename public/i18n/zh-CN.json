@@ -470,6 +470,7 @@
   "tplContentAria": "模板 {n} 内容",
   "tplContentPlaceholder": "备注内容，可用 {{姓名}} {{日期}} {{上次互动}} 占位",
   "tplManagerAdd": "＋ 新增模板",
+  "tplManagerLimit": "最多保存 {limit} 条模板；删除一条后可继续新增。",
   "tplManagerClose": "关闭",
   "tplManagerSaving": "保存中…",
   "tplManagerSave": "保存模板",

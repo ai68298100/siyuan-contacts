@@ -1,0 +1,389 @@
+{
+  "date": "2026-10-17",
+  "isolation": {
+    "uuidWorkspace": true,
+    "randomPort": true,
+    "actualKernel": true,
+    "frontend": "browser-desktop",
+    "data": "synthetic fixture only",
+    "dailyWorkspace": false
+  },
+  "scope": "Incremental organization dual-page evidence; remains host_pending for person projection, daily workspace, native host and mobile requirements.",
+  "rounds": [
+    {
+      "stage": "before-driver-repair",
+      "actualServicesPassed": 11,
+      "actualServicesTotal": 11,
+      "realFrontend": true,
+      "kernelVersion": "3.8.8-alpha.2",
+      "captureDialog": false,
+      "captureCompleted": false,
+      "captureDialogClosed": null,
+      "captureUiDiagnostic": null,
+      "organizationCrossWindow": true,
+      "organizationMemberCrossWindow": false,
+      "organizationArchiveCrossWindow": false,
+      "limitations": [
+        "真实捕获 UI 未完成：真实捕获弹窗超时",
+        "组织成员跨窗口刷新仍未核实：第一页面组织成员编辑入口超时",
+        "组织成员跨窗口清理未完成：第一页面组织管理关闭按钮不可定位",
+        "组织归档跨窗口刷新仍未核实：第二页面组织管理弹窗超时",
+        "组织归档跨窗口清理未完成：第一页面组织管理关闭按钮不可定位"
+      ],
+      "organizationCrossWindowDiagnostics": null,
+      "failure": null
+    },
+    {
+      "stage": "after-driver-repair-before-background-frame-fix",
+      "actualServicesPassed": 11,
+      "actualServicesTotal": 11,
+      "realFrontend": true,
+      "kernelVersion": "3.8.8-alpha.2",
+      "captureDialog": true,
+      "captureCompleted": false,
+      "captureDialogClosed": true,
+      "captureUiDiagnostic": {
+        "rootPresent": true,
+        "stepsPresent": true,
+        "resultPresent": false,
+        "analysisFailed": false,
+        "busy": false,
+        "knownActions": [
+          {
+            "label": "Cancel",
+            "disabled": false
+          }
+        ],
+        "closeGuardVisible": false
+      },
+      "organizationCrossWindow": true,
+      "organizationMemberCrossWindow": false,
+      "organizationArchiveCrossWindow": false,
+      "limitations": [
+        "跨窗口测试清理未完成：跨窗口组织改名完成超时",
+        "组织成员跨窗口刷新仍未核实：第一页面组织成员编辑入口超时",
+        "组织成员跨窗口清理未完成：第一页面组织管理可关闭超时",
+        "组织归档跨窗口刷新仍未核实：第一页面组织成员编辑入口超时",
+        "组织归档跨窗口清理未完成：第一页面组织管理可关闭超时"
+      ],
+      "organizationCrossWindowDiagnostics": [
+        {
+          "phase": "rename-cleanup-failed",
+          "state": {
+            "managerPresent": true,
+            "memberCount": 2,
+            "memberEditorPresent": false,
+            "renameInputPresent": false,
+            "knownActions": [
+              {
+                "label": "Rename",
+                "disabled": true
+              },
+              {
+                "label": "Archive org",
+                "disabled": true
+              },
+              {
+                "label": "Edit",
+                "disabled": true
+              },
+              {
+                "label": "Edit",
+                "disabled": true
+              },
+              {
+                "label": "Close",
+                "disabled": true
+              }
+            ],
+            "errorCount": 0,
+            "busyCount": 1,
+            "closeGuardVisible": false,
+            "capturePresent": false
+          }
+        },
+        {
+          "phase": "member-first-page-failed",
+          "state": {
+            "managerPresent": true,
+            "memberCount": 2,
+            "memberEditorPresent": false,
+            "renameInputPresent": false,
+            "knownActions": [
+              {
+                "label": "Rename",
+                "disabled": true
+              },
+              {
+                "label": "Archive org",
+                "disabled": true
+              },
+              {
+                "label": "Edit",
+                "disabled": true
+              },
+              {
+                "label": "Edit",
+                "disabled": true
+              },
+              {
+                "label": "Close",
+                "disabled": true
+              }
+            ],
+            "errorCount": 0,
+            "busyCount": 1,
+            "closeGuardVisible": false,
+            "capturePresent": false
+          }
+        },
+        {
+          "phase": "member-second-page-failed",
+          "state": {
+            "managerPresent": true,
+            "memberCount": 2,
+            "memberEditorPresent": false,
+            "renameInputPresent": false,
+            "knownActions": [
+              {
+                "label": "Rename",
+                "disabled": false
+              },
+              {
+                "label": "Archive org",
+                "disabled": false
+              },
+              {
+                "label": "Edit",
+                "disabled": false
+              },
+              {
+                "label": "Edit",
+                "disabled": false
+              },
+              {
+                "label": "Close",
+                "disabled": false
+              }
+            ],
+            "errorCount": 0,
+            "busyCount": 0,
+            "closeGuardVisible": false,
+            "capturePresent": false
+          }
+        },
+        {
+          "phase": "member-cleanup-failed",
+          "state": {
+            "managerPresent": true,
+            "memberCount": 2,
+            "memberEditorPresent": false,
+            "renameInputPresent": false,
+            "knownActions": [
+              {
+                "label": "Rename",
+                "disabled": true
+              },
+              {
+                "label": "Archive org",
+                "disabled": true
+              },
+              {
+                "label": "Edit",
+                "disabled": true
+              },
+              {
+                "label": "Edit",
+                "disabled": true
+              },
+              {
+                "label": "Close",
+                "disabled": true
+              }
+            ],
+            "errorCount": 0,
+            "busyCount": 1,
+            "closeGuardVisible": false,
+            "capturePresent": false
+          }
+        },
+        {
+          "phase": "archive-first-page-failed",
+          "state": {
+            "managerPresent": true,
+            "memberCount": 2,
+            "memberEditorPresent": false,
+            "renameInputPresent": false,
+            "knownActions": [
+              {
+                "label": "Rename",
+                "disabled": true
+              },
+              {
+                "label": "Archive org",
+                "disabled": true
+              },
+              {
+                "label": "Edit",
+                "disabled": true
+              },
+              {
+                "label": "Edit",
+                "disabled": true
+              },
+              {
+                "label": "Close",
+                "disabled": true
+              }
+            ],
+            "errorCount": 0,
+            "busyCount": 1,
+            "closeGuardVisible": false,
+            "capturePresent": false
+          }
+        },
+        {
+          "phase": "archive-second-page-failed",
+          "state": {
+            "managerPresent": true,
+            "memberCount": 2,
+            "memberEditorPresent": false,
+            "renameInputPresent": false,
+            "knownActions": [
+              {
+                "label": "Rename",
+                "disabled": false
+              },
+              {
+                "label": "Archive org",
+                "disabled": false
+              },
+              {
+                "label": "Edit",
+                "disabled": false
+              },
+              {
+                "label": "Edit",
+                "disabled": false
+              },
+              {
+                "label": "Close",
+                "disabled": false
+              }
+            ],
+            "errorCount": 0,
+            "busyCount": 0,
+            "closeGuardVisible": false,
+            "capturePresent": false
+          }
+        }
+      ],
+      "failure": null
+    },
+    {
+      "stage": "after-native-ref-fixture-and-background-frame-fix",
+      "recordedAt": "2026-10-17T01:20:40.5861395+08:00",
+      "actualServicesPassed": 11,
+      "actualServicesTotal": 11,
+      "realFrontend": true,
+      "kernelVersion": "3.8.8-alpha.2",
+      "browser": "Google Chrome",
+      "captureDialog": true,
+      "captureCandidateCount": 2,
+      "captureCompleted": true,
+      "captureUiReadback": {
+        "beforeInteractions": 2,
+        "afterInteractions": 2,
+        "originalEventIdsPreserved": true,
+        "projections": [
+          {
+            "kind": "source",
+            "markerCount": 1
+          },
+          {
+            "kind": "diary",
+            "markerCount": 1
+          },
+          {
+            "kind": "place",
+            "markerCount": 1
+          },
+          {
+            "kind": "firstPerson",
+            "markerCount": 1
+          },
+          {
+            "kind": "secondPerson",
+            "markerCount": 1
+          }
+        ]
+      },
+      "captureDialogClosed": true,
+      "captureUiDiagnostic": {
+        "rootPresent": true,
+        "stepsPresent": true,
+        "resultPresent": true,
+        "analysisFailed": false,
+        "busy": false,
+        "knownActions": [
+          {
+            "label": "Done",
+            "disabled": false
+          }
+        ],
+        "closeGuardVisible": false
+      },
+      "organizationCrossWindow": true,
+      "organizationMemberCrossWindow": true,
+      "organizationArchiveCrossWindow": true,
+      "organizationRestoreCrossWindow": true,
+      "limitations": [],
+      "organizationCrossWindowDiagnostics": [
+        {
+          "phase": "rename-first-page-before-write",
+          "state": {
+            "visibilityState": "hidden",
+            "managerPresent": true,
+            "memberCount": 2,
+            "memberEditorPresent": false,
+            "renameInputPresent": false,
+            "knownActions": [
+              {
+                "label": "Rename",
+                "disabled": false
+              },
+              {
+                "label": "Archive org",
+                "disabled": false
+              },
+              {
+                "label": "Edit",
+                "disabled": false
+              },
+              {
+                "label": "Edit",
+                "disabled": false
+              },
+              {
+                "label": "Close",
+                "disabled": false
+              }
+            ],
+            "errorCount": 0,
+            "busyCount": 0,
+            "closeGuardVisible": false,
+            "capturePresent": false
+          }
+        }
+      ],
+      "failure": null
+    }
+  ],
+  "findings": [
+    "The capture harness previously waited for a Workbench panel rather than the native svelteDialog root; its next/submit expressions did not explicitly execute a button click.",
+    "Code review found the original synthetic source had no native refs. Markdown siyuan://blocks projection links do not create refs. The fixture now includes two explicit native block references, and the UI requires exactly two candidates.",
+    "After cross-page rename, the hidden first page previously kept all organization actions busy while awaiting an unbounded animation frame. The final round uses the bounded production fix and verifies the first page is hidden before writing.",
+    "The final capture UI repeats the service fixture capture on the original date/place, preserves both existing interaction IDs, and retains one marker on each of source, diary, place and both person documents."
+  ],
+  "finalServiceEvidence": "SERVICE-KERNEL-2026-10-17.json"
+}

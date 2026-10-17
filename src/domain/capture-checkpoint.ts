@@ -110,6 +110,19 @@ export function shouldWriteCaptureProjection(previous: CaptureProjectionCheckpoi
     return !previous || !captureStageComplete(previous) || previous.markdown !== markdown;
 }
 
+/**
+ * 判断投影标记块是否已经收敛到本次捕获的预期内容。
+ * 思源的 markdown 字段末尾可能包含独占一行的 IAL，比较时应忽略该行；
+ * 空预期必须确认标记块已经完全删除，不能把“仍残留旧块”当作成功。
+ */
+export function captureProjectionMatches(markdown: string, existing: readonly { markdown: string }[]): boolean {
+    const stripTrailingIal = (value: string): string => value.replace(/\r\n/g, "\n").trim()
+        .replace(/\n\s*\{:[^\n]*\}\s*$/, "").trim();
+    return markdown.length > 0
+        ? existing.length === 1 && stripTrailingIal(existing[0].markdown) === markdown
+        : existing.length === 0;
+}
+
 export function captureDiagnosticSummary(checkpoint: CaptureCheckpoint): string {
     return JSON.stringify({
         requestId: checkpoint.requestId, generation: checkpoint.generation, sourceDocId: checkpoint.sourceDocId,

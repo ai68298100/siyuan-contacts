@@ -1,5 +1,20 @@
 # 发布清单（RELEASE）
 
+> v0.5.17 为 #51/#54 重复资料与个人备注闭环补丁：支持重复条目、两层分组、详情筛选/复制、备注冲突重读，以及旧版拆块备注的安全恢复。Issue #35 仍等待真实脱敏小米 VCF，vCard 候选修复未宣称为已确认根因。
+
+## v0.5.17 发布状态
+
+- [x] `package.json` 与 `plugin.json` 版本统一为 0.5.17
+- [x] 重复资料、两层分组、改组/解除组、排序、删除、清空重建和完整回读
+- [x] 个人备注冲突重读、草稿选择、清空重开及旧版拆块备注安全恢复
+- [x] `pnpm check`、`pnpm test` 710/710、桌面/390px/宿主样式 UI 各 416/416
+- [x] E2E 安全与 Kernel smoke 17/17；真实隔离 Chrome 联合轮通过
+- [x] `pnpm build`、`pnpm check:release`、`git diff --check`
+- [x] annotated tag `v0.5.17` 已推送；[GitHub Release v0.5.17](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.17) 已创建
+- [x] Release 附件下载复核一致：`package.zip` 601,897 B，SHA-256 `472918deacd8aa985e4a8effb9af3796382aa4336cd546bb59db1e4c7317f11d`
+- [x] Issue #51/#54 已回复并关闭；#35 仍保持开放等待原始小米 VCF
+- [ ] Issue #35 原始小米 VCF 未提供，不能确认 vCard 候选修复命中根因
+
 > v0.5.16 为图谱组织成员生命周期补丁：当前单位只投影 active 成员，图谱统一表达 active/former/mixed。Issue #35 仍等待真实脱敏小米 VCF，vCard 候选修复未宣称为已确认根因。
 
 ## v0.5.16 发布状态

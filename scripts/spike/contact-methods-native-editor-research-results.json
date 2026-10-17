@@ -1,0 +1,556 @@
+{
+  "research": "AG-RF-004-N2",
+  "generatedAt": "2026-10-17",
+  "syntheticOnly": true,
+  "candidateContractAccepted": false,
+  "productionChanges": false,
+  "hostVerified": false,
+  "status": "host_pending",
+  "kernelRequests": 0,
+  "realPluginFileWrites": 0,
+  "actualNativeWrites": 0,
+  "browserCalls": 0,
+  "uiControlChannel": "unavailable-for-this-research",
+  "checks": [
+    {
+      "name": "n2-single-json-v1:exact-value-1",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:physical-single-line-1",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:exact-value-2",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:physical-single-line-2",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:exact-value-3",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:physical-single-line-3",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:exact-value-4",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:physical-single-line-4",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:exact-value-5",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:physical-single-line-5",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:exact-value-6",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:physical-single-line-6",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:exact-value-7",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:physical-single-line-7",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:exact-value-8",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:physical-single-line-8",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:exact-value-9",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:physical-single-line-9",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:empty-value-visible-refusal",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:control-value-visible-refusal",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:lone-surrogate-visible-refusal",
+      "pass": true
+    },
+    {
+      "name": "n2-single-json-v1:modeled-newline-collapse",
+      "pass": true
+    },
+    {
+      "name": "n2-editor-multiline-v1:exact-value-1",
+      "pass": true
+    },
+    {
+      "name": "n2-editor-multiline-v1:exact-value-2",
+      "pass": true
+    },
+    {
+      "name": "n2-editor-multiline-v1:exact-value-3",
+      "pass": true
+    },
+    {
+      "name": "n2-editor-multiline-v1:exact-value-4",
+      "pass": true
+    },
+    {
+      "name": "n2-editor-multiline-v1:exact-value-5",
+      "pass": true
+    },
+    {
+      "name": "n2-editor-multiline-v1:exact-value-6",
+      "pass": true
+    },
+    {
+      "name": "n2-editor-multiline-v1:exact-value-7",
+      "pass": true
+    },
+    {
+      "name": "n2-editor-multiline-v1:exact-value-8",
+      "pass": true
+    },
+    {
+      "name": "n2-editor-multiline-v1:exact-value-9",
+      "pass": true
+    },
+    {
+      "name": "n2-editor-multiline-v1:empty-value-visible-refusal",
+      "pass": true
+    },
+    {
+      "name": "n2-editor-multiline-v1:control-value-visible-refusal",
+      "pass": true
+    },
+    {
+      "name": "n2-editor-multiline-v1:lone-surrogate-visible-refusal",
+      "pass": true
+    },
+    {
+      "name": "n2-editor-multiline-v1:modeled-newline-collapse",
+      "pass": true
+    },
+    {
+      "name": "n2-sealed-multiline-v1:exact-value-1",
+      "pass": true
+    },
+    {
+      "name": "n2-sealed-multiline-v1:exact-value-2",
+      "pass": true
+    },
+    {
+      "name": "n2-sealed-multiline-v1:exact-value-3",
+      "pass": true
+    },
+    {
+      "name": "n2-sealed-multiline-v1:exact-value-4",
+      "pass": true
+    },
+    {
+      "name": "n2-sealed-multiline-v1:exact-value-5",
+      "pass": true
+    },
+    {
+      "name": "n2-sealed-multiline-v1:exact-value-6",
+      "pass": true
+    },
+    {
+      "name": "n2-sealed-multiline-v1:exact-value-7",
+      "pass": true
+    },
+    {
+      "name": "n2-sealed-multiline-v1:exact-value-8",
+      "pass": true
+    },
+    {
+      "name": "n2-sealed-multiline-v1:exact-value-9",
+      "pass": true
+    },
+    {
+      "name": "n2-sealed-multiline-v1:empty-value-visible-refusal",
+      "pass": true
+    },
+    {
+      "name": "n2-sealed-multiline-v1:control-value-visible-refusal",
+      "pass": true
+    },
+    {
+      "name": "n2-sealed-multiline-v1:lone-surrogate-visible-refusal",
+      "pass": true
+    },
+    {
+      "name": "n2-sealed-multiline-v1:modeled-newline-collapse",
+      "pass": true
+    },
+    {
+      "name": "single-json-readable-type-label-primary-and-value",
+      "pass": true
+    },
+    {
+      "name": "double-escape-is-literal-not-recursively-decoded",
+      "pass": true
+    },
+    {
+      "name": "json-duplicate-key-cannot-silently-discard-first-value",
+      "pass": true
+    },
+    {
+      "name": "json-unknown-field-refused",
+      "pass": true
+    },
+    {
+      "name": "json-wrong-value-type-refused",
+      "pass": true
+    },
+    {
+      "name": "json-malformed-escape-refused",
+      "pass": true
+    },
+    {
+      "name": "body-attribute-meaning-mismatch-refused",
+      "pass": true
+    },
+    {
+      "name": "legacy-ui-fixture-does-not-pass-strict-method-hash",
+      "pass": true
+    },
+    {
+      "name": "same-person-raw-copy-preserves-identity-and-is-duplicate",
+      "pass": true
+    },
+    {
+      "name": "cross-person-raw-copy-original-owner-is-conflict",
+      "pass": true
+    },
+    {
+      "name": "cross-person-rewritten-owner-old-id-is-unknown",
+      "pass": true
+    },
+    {
+      "name": "rewritten-source-old-id-is-unknown",
+      "pass": true
+    },
+    {
+      "name": "unknown-with-valid-subset-never-complete-or-writable",
+      "pass": true
+    },
+    {
+      "name": "duplicate-with-valid-subset-never-complete-or-writable",
+      "pass": true
+    },
+    {
+      "name": "conflict-with-valid-subset-never-complete-or-writable",
+      "pass": true
+    },
+    {
+      "name": "unknown-method-attribute-blocks-entire-read",
+      "pass": true
+    },
+    {
+      "name": "method-scope-missing-marker-not-skipped-as-irrelevant",
+      "pass": true
+    },
+    {
+      "name": "incomplete-enumeration-cannot-infer-deletion",
+      "pass": true
+    },
+    {
+      "name": "missing-enumeration-proof-is-unknown",
+      "pass": true
+    },
+    {
+      "name": "empty-verified-scope-is-complete-without-auto-tombstones",
+      "pass": true
+    },
+    {
+      "name": "bounded-block-count-refused",
+      "pass": true
+    },
+    {
+      "name": "malformed-document-is-unknown-not-thrown",
+      "pass": true
+    },
+    {
+      "name": "malformed-block-is-unknown-not-thrown",
+      "pass": true
+    },
+    {
+      "name": "markdown-content-divergence-is-unknown",
+      "pass": true
+    },
+    {
+      "name": "different-methods-same-block-id-is-duplicate",
+      "pass": true
+    },
+    {
+      "name": "multiple-primary-blocks-entire-read",
+      "pass": true
+    },
+    {
+      "name": "unsafe-order-refused",
+      "pass": true
+    },
+    {
+      "name": "unknown-type-refused",
+      "pass": true
+    },
+    {
+      "name": "coercible-nonstring-type-refused",
+      "pass": true
+    },
+    {
+      "name": "coercible-nonstring-document-id-refused",
+      "pass": true
+    },
+    {
+      "name": "bounded-value-size-refused",
+      "pass": true
+    },
+    {
+      "name": "read-and-refresh-zero-identity-allocation-and-mutation",
+      "pass": true
+    },
+    {
+      "name": "dedicated-editor-proposal-retains-id-and-exact-value",
+      "pass": true
+    },
+    {
+      "name": "dedicated-editor-stale-full-snapshot-refused",
+      "pass": true
+    },
+    {
+      "name": "dedicated-editor-incomplete-snapshot-refused",
+      "pass": true
+    },
+    {
+      "name": "dedicated-editor-cancel-and-empty-value-zero-repair",
+      "pass": true
+    },
+    {
+      "name": "sealed-multiline-raw-free-edit-is-refused",
+      "pass": true
+    },
+    {
+      "name": "sealed-multiline-parse-does-not-reseal-or-repair",
+      "pass": true
+    },
+    {
+      "name": "dedicated-edit-never-allocates-identity",
+      "pass": true
+    },
+    {
+      "name": "adoption-preview-zero-allocation",
+      "pass": true
+    },
+    {
+      "name": "adoption:cancelled:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:missing-confirmation-binding:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:changed-source-after-confirmation:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:unknown-source-format:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:source-owner-not-parent:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:incomplete-target-before:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:unknown-target-now:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:duplicate-target-now:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:incomplete-target-now:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:target-third-value:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:target-deletion-race:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:target-owner-changed:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:invalid-new-source:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:source-key-already-exists:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:block-id-already-exists:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:unknown-new-format:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption:unknown-write-with-no-prior-identity:zero-allocation-no-proposal-or-mutation",
+      "pass": true
+    },
+    {
+      "name": "adoption-primary-collision-refused-before-allocation",
+      "pass": true
+    },
+    {
+      "name": "explicit-same-person-adoption-new-id-source-and-exact-value",
+      "pass": true
+    },
+    {
+      "name": "same-request-retains-identity-without-reissuing-proposal",
+      "pass": true
+    },
+    {
+      "name": "unknown-write-retains-original-request-identity-zero-new-proposal",
+      "pass": true
+    },
+    {
+      "name": "same-request-cannot-change-source-to-create-another-identity",
+      "pass": true
+    },
+    {
+      "name": "explicit-cross-person-adoption-rewrites-owner-source-and-id",
+      "pass": true
+    },
+    {
+      "name": "read-adopted-proposal-does-not-allocate-again",
+      "pass": true
+    },
+    {
+      "name": "adoption-existing-source-not-reallocated-on-retry",
+      "pass": true
+    },
+    {
+      "name": "different-request-stale-target-same-owner-source-refused",
+      "pass": true
+    },
+    {
+      "name": "different-request-stale-target-same-block-refused",
+      "pass": true
+    },
+    {
+      "name": "different-owner-same-proposed-block-id-refused",
+      "pass": true
+    },
+    {
+      "name": "already-full-target-refused-in-preview-before-allocation",
+      "pass": true
+    },
+    {
+      "name": "last-target-slot-proposal-has-complete-prospective-set",
+      "pass": true
+    },
+    {
+      "name": "unobserved-session-proposal-consumes-target-capacity",
+      "pass": true
+    },
+    {
+      "name": "first-session-primary-valid-proposal",
+      "pass": true
+    },
+    {
+      "name": "unobserved-session-primary-participates-in-conflict-check",
+      "pass": true
+    },
+    {
+      "name": "same-type-primary-is-allowed-for-different-owner",
+      "pass": true
+    },
+    {
+      "name": "all-research-paths-zero-automatic-repair-native-write-network",
+      "pass": true
+    }
+  ],
+  "candidateSummary": [
+    {
+      "format": "n2-single-json-v1",
+      "syntheticRoundtrip": true,
+      "modeledNewlineCollapse": "unchanged-canonical-body",
+      "hostVerified": false
+    },
+    {
+      "format": "n2-editor-multiline-v1",
+      "syntheticRoundtrip": true,
+      "modeledNewlineCollapse": "refused-unknown",
+      "hostVerified": false
+    },
+    {
+      "format": "n2-sealed-multiline-v1",
+      "syntheticRoundtrip": true,
+      "modeledNewlineCollapse": "refused-unknown",
+      "hostVerified": false
+    }
+  ],
+  "counters": {
+    "identityAllocations": 5,
+    "automaticRepairs": 0,
+    "nativeWrites": 0,
+    "kernelRequests": 0
+  },
+  "bounds": {
+    "maxMethodsPerFixture": 128,
+    "maxValueUtf16Units": 8192,
+    "maxLabelUtf16Units": 256,
+    "specialValues": 9
+  },
+  "summary": {
+    "total": 123,
+    "passed": 123,
+    "failed": 0
+  },
+  "limitations": [
+    "All editor transformations are explicit in-memory models; no real editor stability has been proved for any N2 format.",
+    "readDocument reads only already-selected candidate method blocks, never an entire person document. complete/writeAllowed refer only to that synthetic scope. Scope discovery/filtering is not implemented.",
+    "enumerationComplete=true is a synthetic verified-full-scope premise; production host enumeration, missing-marker discovery and concurrent revalidation remain unproved.",
+    "A SHA256 seal detects accidental changes, is not an authorization signature, and may be recomputed by an external writer.",
+    "Adoption and dedicated editing return proposals only; native write atomicity, CAS, delayed writes and post-write reread are not implemented.",
+    "The bounded same-process proposal memo retains request identity, refuses caller-declared unknown-write reissuance and blocks owner/source or block collisions in that session. It is not persistent recovery or proof against changing both source and request IDs, or restarting.",
+    "The full-snapshot comparison does not provide a lock or prevent a write after the final reread.",
+    "Legacy UI ui-* IDs do not pass strict method-hash identity checks and cannot prove N1/N2 parsing.",
+    "No production facts, AV projections, migration, vCard mapping, large-library search or marketplace release is changed."
+  ]
+}

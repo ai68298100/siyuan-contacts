@@ -5,7 +5,7 @@
  */
 import type { Plugin } from "siyuan";
 import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage";
-import { normalizeTemplates } from "../domain/interaction-templates";
+import { normalizeTemplates, normalizeTemplatesForWrite } from "../domain/interaction-templates";
 import type { NoteTemplate } from "../domain/interaction-templates";
 
 export const TEMPLATES_STORAGE_KEY = "interaction-templates.json";
@@ -24,11 +24,17 @@ export async function loadTemplatesStore(plugin: Plugin): Promise<TemplatesStore
     return { schemaVersion: 1, templates };
 }
 
+/** 严格读取：只有未建立存储才返回 null；读取失败或坏库不能伪装成空模板。 */
+export async function loadTemplatesStoreStrict(plugin: Plugin): Promise<TemplatesStore | null> {
+    return parseTemplatesStoreStrict(await loadJsonStrict(plugin, TEMPLATES_STORAGE_KEY));
+}
+
 /** 全量保存（增改删统一走这里）：锁内严格读取，损坏当前库拒绝覆盖；写后回读验证 */
 export async function saveTemplatesStore(plugin: Plugin, templates: readonly NoteTemplate[]): Promise<void> {
+    const normalized = normalizeTemplatesForWrite(templates);
     return withStoreLock(TEMPLATES_STORAGE_KEY, async () => {
-        normalizeTemplatesStrictForWrite(await loadJsonStrict(plugin, TEMPLATES_STORAGE_KEY));
-        await saveJsonVerified(plugin, TEMPLATES_STORAGE_KEY, { schemaVersion: 1, templates: [...templates] });
+        parseTemplatesStoreStrict(await loadJsonStrict(plugin, TEMPLATES_STORAGE_KEY));
+        await saveJsonVerified(plugin, TEMPLATES_STORAGE_KEY, { schemaVersion: 1, templates: normalized });
     });
 }
 
@@ -37,28 +43,30 @@ export async function saveTemplatesStore(plugin: Plugin, templates: readonly Not
  * 两窗口并发恢复不丢模板；损坏当前库拒绝合并（错误上抛交由调用方逐模块报告）。返回新增数。
  */
 export async function mergeTemplatesStore(plugin: Plugin, incoming: readonly NoteTemplate[]): Promise<number> {
+    const normalizedIncoming = normalizeTemplatesForWrite(incoming);
     return withStoreLock(TEMPLATES_STORAGE_KEY, async () => {
-        const raw = await loadJsonStrict(plugin, TEMPLATES_STORAGE_KEY);
-        normalizeTemplatesStrictForWrite(raw);
-        const existing = normalizeTemplates((raw as Partial<TemplatesStore> | null)?.templates);
+        const store = parseTemplatesStoreStrict(await loadJsonStrict(plugin, TEMPLATES_STORAGE_KEY));
+        const existing = store?.templates ?? [];
         const byId = new Map(existing.map((template) => [template.id, template]));
         let added = 0;
-        for (const template of incoming) {
+        for (const template of normalizedIncoming) {
             if (byId.has(template.id)) continue;
             byId.set(template.id, template);
             added += 1;
         }
         if (added > 0) {
-            await saveJsonVerified(plugin, TEMPLATES_STORAGE_KEY, { schemaVersion: 1, templates: [...byId.values()].slice(0, 50) });
+            const templates = normalizeTemplatesForWrite([...byId.values()]);
+            await saveJsonVerified(plugin, TEMPLATES_STORAGE_KEY, { schemaVersion: 1, templates });
         }
         return added;
     });
 }
 
 /** 写前包络检查：已存在的存储若损坏/版本不兼容则拒绝保存（避免覆盖），不存在（null/空串）放行 */
-function normalizeTemplatesStrictForWrite(raw: unknown): void {
-    if (raw == null || raw === "") return;
-    if (typeof raw !== "object" || (raw as Partial<TemplatesStore>).schemaVersion !== 1) {
+function parseTemplatesStoreStrict(raw: unknown): TemplatesStore | null {
+    if (raw == null || raw === "") return null;
+    if (typeof raw !== "object" || Array.isArray(raw) || (raw as Partial<TemplatesStore>).schemaVersion !== 1) {
         throw new Error("模板存储格式或版本不兼容，操作已停止；请先备份并检查原文件");
     }
+    return { schemaVersion: 1, templates: normalizeTemplatesForWrite((raw as Partial<TemplatesStore>).templates) };
 }

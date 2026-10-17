@@ -1,0 +1,50 @@
+{
+  "research": "AG-RF-004-N1",
+  "recordedAt": "2026-10-16T18:58:34.622Z",
+  "evidenceTier": "isolated-kernel-final-readback",
+  "kernel": "3.8.8-alpha.2",
+  "workspace": "C:/Users/Admin/AppData/Local/Temp/SiYuan-Lvct-Contact-UI-612246be-cda2-42d0-83a4-1acad3f72d1b",
+  "kernelPort": 12081,
+  "owner": "20261017025209-s0zjhng",
+  "syntheticOnly": true,
+  "productionChanges": false,
+  "candidateContractAccepted": false,
+  "strictCandidateReaderVerified": false,
+  "sqlReadback": [
+    {
+      "content": "联系方式：邮箱标签：共享邮箱主值：是值：same@example.test",
+      "ial": "{: id=\"20261017025209-4m6y6kg\" updated=\"20261017025349\" custom-lvct-contact-method-type=\"email\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-id=\"ui-s0zjhng-email-shared\" custom-lvct-contact-method-primary=\"1\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-order=\"1\" custom-lvct-contact-method-label=\"共享邮箱\" custom-lvct-contact-method-owner=\"20261017025209-s0zjhng\" custom-lvct-contact-method-source=\"email-shared\"}",
+      "id": "20261017025209-4m6y6kg",
+      "markdown": "联系方式：邮箱标签：共享邮箱主值：是值：same@example.test",
+      "parent_id": "20261017025209-s0zjhng",
+      "root_id": "20261017025209-s0zjhng"
+    },
+    {
+      "content": "联系方式：自定义\n标签：旧资料\n主值：否\n值：\n旧 slash 原文 / 不拆分",
+      "ial": "{: id=\"20261017025209-hpft4jk\" updated=\"20261017025209\" custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-id=\"ui-s0zjhng-custom-legacy\" custom-lvct-contact-method-source=\"custom-legacy\" custom-lvct-contact-method-type=\"custom\" custom-lvct-contact-method-order=\"2\" custom-lvct-contact-method=\"1\" custom-lvct-contact-method-owner=\"20261017025209-s0zjhng\" custom-lvct-contact-method-label=\"旧资料\" custom-lvct-contact-method-primary=\"0\"}",
+      "id": "20261017025209-hpft4jk",
+      "markdown": "联系方式：自定义\n标签：旧资料\n主值：否\n值：\n旧 slash 原文 / 不拆分",
+      "parent_id": "20261017025209-s0zjhng",
+      "root_id": "20261017025209-s0zjhng"
+    },
+    {
+      "content": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value",
+      "ial": "{: custom-lvct-contact-method-format=\"1\" custom-lvct-contact-method-order=\"0\" custom-lvct-contact-method-source=\"phone-primary\" custom-lvct-contact-method-type=\"phone\" id=\"20261017025209-vou0iq5\" updated=\"20261017025209\" custom-lvct-contact-method-id=\"ui-s0zjhng-phone-primary\" custom-lvct-contact-method-label=\"工作\" custom-lvct-contact-method-owner=\"20261017025209-s0zjhng\" custom-lvct-contact-method-primary=\"1\" custom-lvct-contact-method=\"1\"}",
+      "id": "20261017025209-vou0iq5",
+      "markdown": "联系方式：电话\n标签：工作\n主值：是\n值：\nsame-value",
+      "parent_id": "20261017025209-s0zjhng",
+      "root_id": "20261017025209-s0zjhng"
+    }
+  ],
+  "summary": {
+    "markedBlocks": 3,
+    "emailValueRestored": true,
+    "emailBodyStillCollapsed": true
+  },
+  "limitations": [
+    "Only this final SQL readback was performed in the current continuation.",
+    "Live update and second-page reload were observed in the preceding probe; they are recorded separately in the Markdown report.",
+    "UI fixture ui-* identities are not valid N1 method-hash identities.",
+    "No simultaneous write, deletion race, clipboard payload, or native desktop-window coverage."
+  ]
+}

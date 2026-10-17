@@ -5,9 +5,9 @@
  * 本模块是 protyle DOM 与组件层之间的 glue，位于 panels/（视图层之上）。
  */
 import { getRoster, invalidateRoster } from "../services/roster";
-import { loadInteractionStore } from "../data/interactions";
+import { loadInteractionStoreStrict } from "../data/interactions";
 import type { InteractionEvent } from "../domain/interactions";
-import { loadFollowUpStore } from "../data/followups";
+import { loadFollowUpStoreStrict } from "../data/followups";
 import { lastInteractionByPerson } from "../domain/interactions";
 import { buildMeetingBriefing } from "../domain/briefing";
 import type { MeetingBriefingItem } from "../domain/briefing";
@@ -109,8 +109,10 @@ async function updateStrip(context: PanelContext, protyle: ProtyleLike, rootId: 
             return;
         }
         const [interactionStore, followUpStore] = await Promise.all([
-            loadInteractionStore(context.plugin),
-            loadFollowUpStore(context.plugin),
+            /* 档案条是人物详情的展示读：坏库/读取失败必须进入错误态，
+             * 不能把互动与跟进静默归一为空而显示“尚未互动/无待办”。 */
+            loadInteractionStoreStrict(context.plugin),
+            loadFollowUpStoreStrict(context.plugin),
         ]);
         if (!isCurrent()) return;
         const lastInteraction = lastInteractionByPerson(interactionStore, [person]).get(person.docId);

@@ -1,6 +1,6 @@
 <script lang="ts">
     /** 互动备注模板管理（F09）：本地草稿编辑，保存时全量落盘；失败保留输入可重试 */
-    import { newTemplateId } from "../../domain/interaction-templates";
+    import { newTemplateId, TEMPLATES_LIMIT } from "../../domain/interaction-templates";
     import type { NoteTemplate } from "../../domain/interaction-templates";
     import StatusNotice from "../StatusNotice.svelte";
     import { useCloseGuard } from "../close-guard";
@@ -37,10 +37,11 @@
         busy: () => busy,
         dirty: isDirty,
         changes: () => [text("tplManagerUnsaved", "互动备注模板修改尚未保存")],
-        save,
+        save: () => save(true),
     });
 
     function addTemplate() {
+        if (busy || draft.length >= TEMPLATES_LIMIT) return;
         draft = [...draft, { id: newTemplateId(), name: "", content: "" }];
     }
 
@@ -50,12 +51,15 @@
         savedMessage = "";
     }
 
-    async function save() {
+    async function save(rethrowOnFailure = false) {
         if (busy) return;
         const cleaned = draft
             .map((item) => ({ ...item, name: item.name.trim(), content: item.content.trim() }))
             .filter((item) => item.name.length > 0);
-        if (cleaned.length !== draft.length && !window.confirm(text("tplManagerDropEmptyConfirm", "名称为空的模板会被丢弃，继续保存吗？"))) return;
+        if (cleaned.length !== draft.length && !window.confirm(text("tplManagerDropEmptyConfirm", "名称为空的模板会被丢弃，继续保存吗？"))) {
+            if (rethrowOnFailure) throw new Error("模板保存已取消");
+            return;
+        }
         busy = true;
         errorText = "";
         try {
@@ -64,6 +68,7 @@
             savedMessage = text("tplManagerSaved", "模板已保存");
         } catch (error) {
             errorText = requestErrorMessage(error);
+            if (rethrowOnFailure) throw error;
         } finally {
             busy = false;
         }
@@ -85,11 +90,12 @@
         </div>
     {/each}
     <div class="lvct-form__actions">
-        <button class="b3-button b3-button--outline" onclick={addTemplate} disabled={busy}>{text("tplManagerAdd", "＋ 新增模板")}</button>
+        <button class="b3-button b3-button--outline" onclick={addTemplate} disabled={busy || draft.length >= TEMPLATES_LIMIT}>{text("tplManagerAdd", "＋ 新增模板")}</button>
         <span style="flex:1"></span>
         <button class="b3-button b3-button--cancel" onclick={() => void guardedClose(onClose)} disabled={busy}>{text("tplManagerClose", "关闭")}</button>
-        <button class="b3-button b3-button--text" onclick={save} disabled={busy}>{busy ? text("tplManagerSaving", "保存中…") : text("tplManagerSave", "保存模板")}</button>
+        <button class="b3-button b3-button--text" onclick={() => void save()} disabled={busy}>{busy ? text("tplManagerSaving", "保存中…") : text("tplManagerSave", "保存模板")}</button>
     </div>
+    {#if draft.length >= TEMPLATES_LIMIT}<p class="ft__smaller ft__on-surface" role="status">{text("tplManagerLimit", "最多保存 {limit} 条模板；删除一条后可继续新增。", { limit: TEMPLATES_LIMIT })}</p>{/if}
     <StatusNotice message={savedMessage} onDismiss={() => (savedMessage = "")} />
     {#if errorText}<div class="lvct-form__error" role="alert">{text("tplManagerSaveFail", "保存失败：{msg}", { msg: errorText })}</div>{/if}
 </div>

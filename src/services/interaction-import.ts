@@ -1,6 +1,6 @@
 import type { Plugin } from "siyuan";
 import { INTERACTION_STORAGE_KEY } from "../data/interactions";
-import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "../data/storage";
+import { loadJsonStrict, saveJsonVerified, withStoreLock } from "../data/storage";
 import { normalizeInteractionStoreForWrite } from "../domain/interactions";
 import { mergeInteractionBackup, parseInteractionBackup } from "../domain/interaction-backup";
 import type { InteractionImportSummary } from "../domain/interaction-backup";
@@ -31,7 +31,7 @@ export function importInteractionJson(plugin: Plugin, text: string): Promise<Int
 
 /**
  * 差异明细预览（F15）：按人物/日期展开将新增、将跳过与删除标记影响；
- * 只读（宽容读取），零写入；确认合并仍走 importInteractionJson 的锁内严格重读。
+ * 只读且严格读取当前库，零写入；确认合并仍走 importInteractionJson 的锁内严格重读。
  */
 export async function previewInteractionImportDiff(
     plugin: Plugin,
@@ -39,7 +39,7 @@ export async function previewInteractionImportDiff(
     text: string,
 ): Promise<InteractionImportDiff> {
     const incoming = parseInteractionBackup(text);
-    const current = normalizeInteractionStoreForWrite(await loadJson(plugin, INTERACTION_STORAGE_KEY));
+    const current = normalizeInteractionStoreForWrite(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY));
     const roster = await getRoster(settings);
     const nameByDoc = new Map(roster.map((person) => [person.docId, person.name]));
     return diffInteractionImport(current, incoming, nameByDoc);

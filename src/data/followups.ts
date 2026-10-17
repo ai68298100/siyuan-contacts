@@ -149,12 +149,14 @@ export async function readFollowUpStoreStrictInLock(plugin: Plugin): Promise<{ r
 
 /** 锁内合并写入（恢复用）：现状优先按 id，新增条目追加；写后回读验证；返回受影响人物供任务同步 */
 export async function mergeFollowUpStore(plugin: Plugin, incoming: readonly FollowUpItem[]): Promise<{ added: number; skipped: number; personDocIds: string[] }> {
+    const checkedIncoming = normalizeFollowUpStoreForWrite({ schemaVersion: 1, items: incoming }).items;
+    for (const item of checkedIncoming) {
+        if (!isPersonDocId(item.personDocId)) throw new Error("跟进导入内容包含非法人物文档 ID，拒绝写入");
+    }
     return withStoreLock(FOLLOW_UP_STORAGE_KEY, async () => {
         const store = normalizeFollowUpStoreForWrite(await loadJsonStrict(plugin, FOLLOW_UP_STORAGE_KEY));
         const existingIds = new Set(store.items.map((item) => item.id));
-        /* 备份条目结构已归一化，但人物 ID 仍需按文档契约核实，避免导入后产生永远不可达的跟进。 */
-        const validIncoming = incoming.filter((item) => isPersonDocId(item.personDocId));
-        const additions = validIncoming.filter((item) => !existingIds.has(item.id));
+        const additions = checkedIncoming.filter((item) => !existingIds.has(item.id));
         if (additions.length === 0) return { added: 0, skipped: incoming.length, personDocIds: [] };
         let merged = store;
         for (const item of additions) merged = appendFollowUp(merged, item);

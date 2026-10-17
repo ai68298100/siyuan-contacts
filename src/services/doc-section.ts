@@ -5,6 +5,7 @@
  * 防递归：只在 services 层关系写操作后调用（我们不监听 protyle 内容变化），不存在回环。
  */
 import { readMarkedBlocks, upsertMarkedBlock } from "../api/blocks";
+import { KernelPermissionError, KernelResponseError } from "../api/client";
 import type { ContactSummary } from "../domain/person";
 import { escapeMarkdown } from "../domain/briefing-export";
 
@@ -18,7 +19,8 @@ function sectionMarkdown(related: readonly ContactSummary[]): string {
 export class RelatedProjectionUnknownError extends Error {}
 
 function contentWithoutIal(markdown: string): string {
-    return markdown.replace(/\r\n/g, "\n").replace(/^\s*\{:[^\n]*\}\s*$/gm, "").trim();
+    return markdown.replace(/\r\n/g, "\n").trim()
+        .replace(/\n\s*\{:[^\n]*\}\s*$/, "").trim();
 }
 
 /** 同步某人物文档的相关人物区块（related 为解析好姓名的对方联系人） */
@@ -28,7 +30,14 @@ export async function syncRelatedSection(person: ContactSummary, related: readon
     const markdown = related.length > 0 ? sectionMarkdown(related) : "";
     if (existing.length === 0 && !markdown
         || existing.length === 1 && contentWithoutIal(existing[0].markdown) === markdown) return;
-    await upsertMarkedBlock(person.docId, RELATED_SECTION_ATTR, markdown, existing[0]?.id);
+    try {
+        await upsertMarkedBlock(person.docId, RELATED_SECTION_ATTR, markdown, existing[0]?.id);
+    } catch (cause) {
+        const writeRejected = (cause instanceof KernelPermissionError || cause instanceof KernelResponseError)
+            && ["/api/block/insertBlock", "/api/block/updateBlock", "/api/block/deleteBlock"].includes(cause.route);
+        if (writeRejected) throw cause;
+        throw new RelatedProjectionUnknownError("关系投影请求已发出，但写入或回读结果尚未核实", { cause });
+    }
     let verified: Array<{ id: string; markdown: string }>;
     try {
         verified = await readMarkedBlocks(person.docId, RELATED_SECTION_ATTR);

@@ -95,6 +95,7 @@ test("归一化：坏条目容错过滤、按 id 去重；写前严格模式抛�
     assert.deepEqual(store.items.map((entry) => entry.id), ["a"]);
     assert.throws(() => normalizeFollowUpStoreForWrite({ schemaVersion: 99, items: [] }));
     assert.throws(() => normalizeFollowUpStoreForWrite({ schemaVersion: 1, items: [{ id: "x" }] }));
+    assert.throws(() => normalizeFollowUpStoreForWrite({ schemaVersion: 1, items: [item({ id: "a" }), item({ id: "a", title: "另一条" })] }), /重复 ID/);
     assert.deepEqual(normalizeFollowUpStoreForWrite(""), emptyFollowUpStore());
     assert.deepEqual(normalizeFollowUpStoreForWrite(null), emptyFollowUpStore());
 });

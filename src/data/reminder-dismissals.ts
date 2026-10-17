@@ -4,14 +4,14 @@
  * 只屏蔽提醒呈现；统计与名单口径不受影响（D-0020）。
  */
 import type { Plugin } from "siyuan";
-import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage";
+import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage.ts";
 import {
     normalizeDismissalStore,
     normalizeDismissalStoreForWrite,
-} from "../domain/reminder-dismissals";
-import { isPersonDocId } from "../domain/cadence";
-import { isValidDateKey } from "../domain/date-key";
-import type { ReminderDismissal, ReminderDismissalStore, ReminderKind } from "../domain/reminder-dismissals";
+} from "../domain/reminder-dismissals.ts";
+import { isPersonDocId } from "../domain/cadence.ts";
+import { isValidDateKey } from "../domain/date-key.ts";
+import type { ReminderDismissal, ReminderDismissalStore, ReminderKind } from "../domain/reminder-dismissals.ts";
 
 export const REMINDER_DISMISSALS_STORAGE_KEY = "reminder-dismissals.json";
 
@@ -71,7 +71,7 @@ export async function mergeReminderDismissals(
     plugin: Plugin,
     incoming: readonly ReminderDismissal[],
 ): Promise<number> {
-    const safeIncoming = normalizeDismissalStore({ schemaVersion: 1, dismissals: incoming }).dismissals;
+    const safeIncoming = normalizeDismissalStoreForWrite({ schemaVersion: 1, dismissals: incoming }).dismissals;
     return withStoreLock(REMINDER_DISMISSALS_STORAGE_KEY, async () => {
         const store = await readStoreStrict(plugin);
         const byKey = new Map(store.dismissals.map((entry) => [`${entry.personDocId}|${entry.kind}`, entry]));

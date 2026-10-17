@@ -62,7 +62,7 @@ export interface OrgProjectionTarget {
 export function orgProjectionSourceSnapshot(source: OrgProjectionSource): string {
     return JSON.stringify({
         organizations: [...source.organizations].sort((left, right) => left.docId.localeCompare(right.docId))
-            .map((org) => ({ docId: org.docId, name: org.name, archived: org.archived })),
+            .map((org) => ({ docId: org.docId, name: org.name, archived: org.archived, ...(org.removed ? { removed: true } : {}) })),
         memberships: [...source.memberships].sort((left, right) => left.id.localeCompare(right.id)),
         people: [...source.people].sort((left, right) => left.docId.localeCompare(right.docId) || left.name.localeCompare(right.name)),
     });
@@ -78,8 +78,9 @@ export function buildOrgProjectionTargets(source: OrgProjectionSource): OrgProje
     const organizations = new Map(source.organizations.map((org) => [org.docId, org]));
     const people = new Map<string, OrgProjectionPerson[]>();
     for (const person of source.people) people.set(person.docId, [...(people.get(person.docId) ?? []), person]);
+    const visibleOrganizations = source.organizations.filter((org) => !org.removed);
     const targets: OrgProjectionTarget[] = [
-        ...source.organizations.map((org): OrgProjectionTarget => ({
+        ...visibleOrganizations.map((org): OrgProjectionTarget => ({
             docId: org.docId, name: org.name, kind: "organization", attrName: ORGANIZATION_MEMBERS_ATTR,
             markdown: "", retryKey: `org-projection:organization:${org.docId}`, blockers: [],
         })),
@@ -97,7 +98,7 @@ export function buildOrgProjectionTargets(source: OrgProjectionSource): OrgProje
     for (const membership of sortOrgMemberships(source.memberships)) {
         if (membership.status !== "active") continue;
         const organization = organizations.get(membership.orgDocId);
-        if (organization?.archived) continue;
+        if (organization?.archived || organization?.removed) continue;
         const candidates = people.get(membership.personDocId) ?? [];
         const orgTarget = byKey.get(`org-projection:organization:${membership.orgDocId}`);
         const personTarget = byKey.get(`org-projection:person:${membership.personDocId}`);
@@ -128,5 +129,6 @@ export function buildOrgProjectionTargets(source: OrgProjectionSource): OrgProje
 }
 
 export function stripProjectionIal(markdown: string): string {
-    return markdown.replace(/\r\n/g, "\n").replace(/^\s*\{:[^\n]*\}\s*$/gm, "").trim();
+    return markdown.replace(/\r\n/g, "\n").trim()
+        .replace(/\n\s*\{:[^\n]*\}\s*$/, "").trim();
 }

@@ -1,0 +1,947 @@
+{
+  "generatedAt": "2026-10-16T17:15:23.614Z",
+  "syntheticOnly": true,
+  "kernelRequests": 0,
+  "pluginWrites": 0,
+  "productionChanges": false,
+  "candidateContractAccepted": false,
+  "evidence": "synthetic-candidate-adapter",
+  "identityScope": "frozen-confirmed-source-request-only; not stable across independent files/reordering",
+  "supported": [
+    "ordinary UTF-8 TEL/EMAIL/URL",
+    "TYPE/PREF raw parameters",
+    "grouped X-ABLabel",
+    "logical-line semantic roundtrip"
+  ],
+  "limitations": [
+    "No production codec/storage/migration/UI integration",
+    "No external address-book interoperability",
+    "Unknown encodings/parameter codecs remain opaque",
+    "No byte-identical folding or property editing beyond mapped values",
+    "No new method creation/deletion or group-label editing",
+    "Unmapped re-export requires explicit opt-in"
+  ],
+  "summary": {
+    "total": 60,
+    "passed": 60,
+    "failed": 0,
+    "inputBytes": 1652,
+    "elapsedMs": 5.85
+  },
+  "checks": [
+    {
+      "id": "v3-multi-parameters-group-label:mapped-count",
+      "pass": true
+    },
+    {
+      "id": "v3-multi-parameters-group-label:semantic-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "v3-multi-parameters-group-label:explicit-retention",
+      "pass": true
+    },
+    {
+      "id": "v4-pref-uri:mapped-count",
+      "pass": true
+    },
+    {
+      "id": "v4-pref-uri:semantic-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "v4-pref-uri:explicit-retention",
+      "pass": true
+    },
+    {
+      "id": "duplicate-values-remain-separate:mapped-count",
+      "pass": true
+    },
+    {
+      "id": "duplicate-values-remain-separate:semantic-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "duplicate-values-remain-separate:explicit-retention",
+      "pass": true
+    },
+    {
+      "id": "equal-values-across-cards:mapped-count",
+      "pass": true
+    },
+    {
+      "id": "equal-values-across-cards:semantic-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "equal-values-across-cards:explicit-retention",
+      "pass": true
+    },
+    {
+      "id": "escaped-unicode-folds:mapped-count",
+      "pass": true
+    },
+    {
+      "id": "escaped-unicode-folds:semantic-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "escaped-unicode-folds:explicit-retention",
+      "pass": true
+    },
+    {
+      "id": "unknown-properties-private-by-default:mapped-count",
+      "pass": true
+    },
+    {
+      "id": "unknown-properties-private-by-default:semantic-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "unknown-properties-private-by-default:explicit-retention",
+      "pass": true
+    },
+    {
+      "id": "qp-retained-unmapped:mapped-count",
+      "pass": true
+    },
+    {
+      "id": "qp-retained-unmapped:semantic-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "qp-retained-unmapped:explicit-retention",
+      "pass": true
+    },
+    {
+      "id": "empty-value-retained-unmapped:mapped-count",
+      "pass": true
+    },
+    {
+      "id": "empty-value-retained-unmapped:semantic-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "empty-value-retained-unmapped:explicit-retention",
+      "pass": true
+    },
+    {
+      "id": "parameter-codec-retained-unmapped:mapped-count",
+      "pass": true
+    },
+    {
+      "id": "parameter-codec-retained-unmapped:semantic-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "parameter-codec-retained-unmapped:explicit-retention",
+      "pass": true
+    },
+    {
+      "id": "invalid-pref-visible:mapped-count",
+      "pass": true
+    },
+    {
+      "id": "invalid-pref-visible:semantic-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "invalid-pref-visible:explicit-retention",
+      "pass": true
+    },
+    {
+      "id": "legacy-single-value:mapped-count",
+      "pass": true
+    },
+    {
+      "id": "legacy-single-value:semantic-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "legacy-single-value:explicit-retention",
+      "pass": true
+    },
+    {
+      "id": "unknown-value-type:mapped-count",
+      "pass": true
+    },
+    {
+      "id": "unknown-value-type:semantic-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "unknown-value-type:explicit-retention",
+      "pass": true
+    },
+    {
+      "id": "encoded-and-orphan-labels:mapped-count",
+      "pass": true
+    },
+    {
+      "id": "encoded-and-orphan-labels:semantic-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "encoded-and-orphan-labels:explicit-retention",
+      "pass": true
+    },
+    {
+      "id": "quoted-parameter-and-type-label-separation",
+      "pass": true
+    },
+    {
+      "id": "identity-not-value-or-person-name",
+      "pass": true
+    },
+    {
+      "id": "no-implicit-private-extension-export",
+      "pass": true
+    },
+    {
+      "id": "uri-output-matches-independent-literal-expectation",
+      "pass": true
+    },
+    {
+      "id": "unknown-parameter-also-requires-opt-in",
+      "pass": true
+    },
+    {
+      "id": "encoded-label-is-not-text-and-orphan-label-is-reported",
+      "pass": true
+    },
+    {
+      "id": "legacy-phone-separator-not-split",
+      "pass": true
+    },
+    {
+      "id": "retry-uses-frozen-source-and-original-identities",
+      "pass": true
+    },
+    {
+      "id": "exact-report:v3-multi-parameters-group-label",
+      "pass": true
+    },
+    {
+      "id": "exact-report:unknown-properties-private-by-default",
+      "pass": true
+    },
+    {
+      "id": "exact-report:qp-retained-unmapped",
+      "pass": true
+    },
+    {
+      "id": "exact-report:empty-value-retained-unmapped",
+      "pass": true
+    },
+    {
+      "id": "exact-report:parameter-codec-retained-unmapped",
+      "pass": true
+    },
+    {
+      "id": "exact-report:invalid-pref-visible",
+      "pass": true
+    },
+    {
+      "id": "exact-report:unknown-value-type",
+      "pass": true
+    },
+    {
+      "id": "production-compatibility-unchanged",
+      "pass": true
+    },
+    {
+      "id": "reject:nested",
+      "pass": true
+    },
+    {
+      "id": "reject:truncated",
+      "pass": true
+    },
+    {
+      "id": "reject:bad-property",
+      "pass": true
+    },
+    {
+      "id": "reject:bad-quotes",
+      "pass": true
+    },
+    {
+      "id": "diagnostics-do-not-contain-values-labels-or-source-lines",
+      "pass": true
+    }
+  ],
+  "cases": [
+    {
+      "id": "v3-multi-parameters-group-label",
+      "methodCounts": [
+        6
+      ],
+      "candidateMethods": [
+        [
+          {
+            "id": "request-v3-multi-parameters-group-label/card/1/property/3",
+            "type": "phone",
+            "propertyIndex": 2,
+            "value": "+00 111",
+            "valueKind": "text",
+            "group": "item1",
+            "typeTokens": [
+              "WORK",
+              "CELL",
+              "VOICE"
+            ],
+            "preference": [],
+            "labels": [
+              "工作,主线"
+            ],
+            "parameters": [
+              {
+                "name": "TYPE",
+                "value": "WORK,CELL",
+                "raw": "TYPE=WORK,CELL"
+              },
+              {
+                "name": "TYPE",
+                "value": "VOICE",
+                "raw": "TYPE=VOICE"
+              },
+              {
+                "name": "X-PRIVATE",
+                "value": "a;b:c",
+                "raw": "X-PRIVATE=\"a;b:c\""
+              }
+            ]
+          },
+          {
+            "id": "request-v3-multi-parameters-group-label/card/1/property/5",
+            "type": "phone",
+            "propertyIndex": 4,
+            "value": "+00 222",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [
+              "HOME"
+            ],
+            "preference": [],
+            "labels": [],
+            "parameters": [
+              {
+                "name": "TYPE",
+                "value": "HOME",
+                "raw": "TYPE=HOME"
+              }
+            ]
+          },
+          {
+            "id": "request-v3-multi-parameters-group-label/card/1/property/6",
+            "type": "email",
+            "propertyIndex": 5,
+            "value": "work@example.test",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [
+              "WORK"
+            ],
+            "preference": [],
+            "labels": [],
+            "parameters": [
+              {
+                "name": "TYPE",
+                "value": "WORK",
+                "raw": "TYPE=WORK"
+              }
+            ]
+          },
+          {
+            "id": "request-v3-multi-parameters-group-label/card/1/property/7",
+            "type": "email",
+            "propertyIndex": 6,
+            "value": "private@example.test",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [
+              "HOME"
+            ],
+            "preference": [],
+            "labels": [],
+            "parameters": [
+              {
+                "name": "TYPE",
+                "value": "HOME",
+                "raw": "TYPE=HOME"
+              }
+            ]
+          },
+          {
+            "id": "request-v3-multi-parameters-group-label/card/1/property/8",
+            "type": "url",
+            "propertyIndex": 7,
+            "value": "https://example.test/primary",
+            "valueKind": "uri",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          },
+          {
+            "id": "request-v3-multi-parameters-group-label/card/1/property/9",
+            "type": "url",
+            "propertyIndex": 8,
+            "value": "https://example.test/secondary",
+            "valueKind": "uri",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          }
+        ]
+      ],
+      "importReports": [
+        {
+          "card": 1,
+          "property": 3,
+          "category": "retained_unknown_parameter"
+        }
+      ],
+      "defaultExportReports": [
+        {
+          "card": 1,
+          "property": 3,
+          "category": "excluded_unknown_parameter_by_default"
+        }
+      ]
+    },
+    {
+      "id": "v4-pref-uri",
+      "methodCounts": [
+        4
+      ],
+      "candidateMethods": [
+        [
+          {
+            "id": "request-v4-pref-uri/card/1/property/3",
+            "type": "phone",
+            "propertyIndex": 2,
+            "value": "tel:+00-111;ext=123",
+            "valueKind": "uri",
+            "group": "",
+            "typeTokens": [],
+            "preference": [
+              "1"
+            ],
+            "labels": [],
+            "parameters": [
+              {
+                "name": "VALUE",
+                "value": "uri",
+                "raw": "VALUE=uri"
+              },
+              {
+                "name": "PREF",
+                "value": "1",
+                "raw": "PREF=1"
+              }
+            ]
+          },
+          {
+            "id": "request-v4-pref-uri/card/1/property/4",
+            "type": "phone",
+            "propertyIndex": 3,
+            "value": "+00 222",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [],
+            "preference": [
+              "2"
+            ],
+            "labels": [],
+            "parameters": [
+              {
+                "name": "PREF",
+                "value": "2",
+                "raw": "PREF=2"
+              }
+            ]
+          },
+          {
+            "id": "request-v4-pref-uri/card/1/property/5",
+            "type": "email",
+            "propertyIndex": 4,
+            "value": "work@example.test",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [
+              "work",
+              "voice"
+            ],
+            "preference": [
+              "1"
+            ],
+            "labels": [],
+            "parameters": [
+              {
+                "name": "TYPE",
+                "value": "work,voice",
+                "raw": "TYPE=\"work,voice\""
+              },
+              {
+                "name": "PREF",
+                "value": "1",
+                "raw": "PREF=1"
+              }
+            ]
+          },
+          {
+            "id": "request-v4-pref-uri/card/1/property/6",
+            "type": "url",
+            "propertyIndex": 5,
+            "value": "https://example.test/a;b?q=x,y",
+            "valueKind": "uri",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          }
+        ]
+      ],
+      "importReports": [],
+      "defaultExportReports": []
+    },
+    {
+      "id": "duplicate-values-remain-separate",
+      "methodCounts": [
+        2
+      ],
+      "candidateMethods": [
+        [
+          {
+            "id": "request-duplicate-values-remain-separate/card/1/property/3",
+            "type": "phone",
+            "propertyIndex": 2,
+            "value": "+00 111",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          },
+          {
+            "id": "request-duplicate-values-remain-separate/card/1/property/4",
+            "type": "phone",
+            "propertyIndex": 3,
+            "value": "+00 111",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          }
+        ]
+      ],
+      "importReports": [],
+      "defaultExportReports": []
+    },
+    {
+      "id": "equal-values-across-cards",
+      "methodCounts": [
+        1,
+        1
+      ],
+      "candidateMethods": [
+        [
+          {
+            "id": "request-equal-values-across-cards/card/1/property/2",
+            "type": "phone",
+            "propertyIndex": 1,
+            "value": "+00 111",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          }
+        ],
+        [
+          {
+            "id": "request-equal-values-across-cards/card/2/property/2",
+            "type": "phone",
+            "propertyIndex": 1,
+            "value": "+00 111",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          }
+        ]
+      ],
+      "importReports": [],
+      "defaultExportReports": []
+    },
+    {
+      "id": "escaped-unicode-folds",
+      "methodCounts": [
+        2
+      ],
+      "candidateMethods": [
+        [
+          {
+            "id": "request-escaped-unicode-folds/card/1/property/3",
+            "type": "phone",
+            "propertyIndex": 2,
+            "value": "+00,111;ext\\尾",
+            "valueKind": "text",
+            "group": "item1",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [
+              "很长的标签"
+            ],
+            "parameters": []
+          },
+          {
+            "id": "request-escaped-unicode-folds/card/1/property/5",
+            "type": "url",
+            "propertyIndex": 4,
+            "value": "https://example.test/a,b",
+            "valueKind": "uri",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          }
+        ]
+      ],
+      "importReports": [],
+      "defaultExportReports": []
+    },
+    {
+      "id": "unknown-properties-private-by-default",
+      "methodCounts": [
+        1
+      ],
+      "candidateMethods": [
+        [
+          {
+            "id": "request-unknown-properties-private-by-default/card/1/property/3",
+            "type": "phone",
+            "propertyIndex": 2,
+            "value": "+00 111",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          }
+        ]
+      ],
+      "importReports": [
+        {
+          "card": 1,
+          "property": 4,
+          "category": "retained_unmapped_property"
+        },
+        {
+          "card": 1,
+          "property": 5,
+          "category": "retained_unmapped_property"
+        },
+        {
+          "card": 1,
+          "property": 6,
+          "category": "retained_unmapped_property"
+        }
+      ],
+      "defaultExportReports": [
+        {
+          "card": 1,
+          "property": 4,
+          "category": "excluded_by_default"
+        },
+        {
+          "card": 1,
+          "property": 5,
+          "category": "excluded_by_default"
+        },
+        {
+          "card": 1,
+          "property": 6,
+          "category": "excluded_by_default"
+        }
+      ]
+    },
+    {
+      "id": "qp-retained-unmapped",
+      "methodCounts": [
+        1
+      ],
+      "candidateMethods": [
+        [
+          {
+            "id": "request-qp-retained-unmapped/card/1/property/4",
+            "type": "email",
+            "propertyIndex": 3,
+            "value": "sample@example.test",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          }
+        ]
+      ],
+      "importReports": [
+        {
+          "card": 1,
+          "property": 3,
+          "category": "retained_unmapped_encoding"
+        }
+      ],
+      "defaultExportReports": [
+        {
+          "card": 1,
+          "property": 3,
+          "category": "excluded_by_default"
+        }
+      ]
+    },
+    {
+      "id": "empty-value-retained-unmapped",
+      "methodCounts": [
+        1
+      ],
+      "candidateMethods": [
+        [
+          {
+            "id": "request-empty-value-retained-unmapped/card/1/property/3",
+            "type": "email",
+            "propertyIndex": 2,
+            "value": "sample@example.test",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          }
+        ]
+      ],
+      "importReports": [
+        {
+          "card": 1,
+          "property": 2,
+          "category": "retained_unmapped_empty_value"
+        }
+      ],
+      "defaultExportReports": [
+        {
+          "card": 1,
+          "property": 2,
+          "category": "excluded_by_default"
+        }
+      ]
+    },
+    {
+      "id": "parameter-codec-retained-unmapped",
+      "methodCounts": [
+        1
+      ],
+      "candidateMethods": [
+        [
+          {
+            "id": "request-parameter-codec-retained-unmapped/card/1/property/3",
+            "type": "email",
+            "propertyIndex": 2,
+            "value": "sample@example.test",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          }
+        ]
+      ],
+      "importReports": [
+        {
+          "card": 1,
+          "property": 2,
+          "category": "retained_unmapped_parameter_codec"
+        }
+      ],
+      "defaultExportReports": [
+        {
+          "card": 1,
+          "property": 2,
+          "category": "excluded_by_default"
+        }
+      ]
+    },
+    {
+      "id": "invalid-pref-visible",
+      "methodCounts": [
+        1
+      ],
+      "candidateMethods": [
+        [
+          {
+            "id": "request-invalid-pref-visible/card/1/property/3",
+            "type": "phone",
+            "propertyIndex": 2,
+            "value": "+00 111",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [],
+            "preference": [
+              "0"
+            ],
+            "labels": [],
+            "parameters": [
+              {
+                "name": "PREF",
+                "value": "0",
+                "raw": "PREF=0"
+              }
+            ]
+          }
+        ]
+      ],
+      "importReports": [
+        {
+          "card": 1,
+          "property": 3,
+          "category": "preference_needs_review"
+        }
+      ],
+      "defaultExportReports": []
+    },
+    {
+      "id": "legacy-single-value",
+      "methodCounts": [
+        2
+      ],
+      "candidateMethods": [
+        [
+          {
+            "id": "request-legacy-single-value/card/1/property/3",
+            "type": "phone",
+            "propertyIndex": 2,
+            "value": "+00 111 / +00 222",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          },
+          {
+            "id": "request-legacy-single-value/card/1/property/4",
+            "type": "email",
+            "propertyIndex": 3,
+            "value": "sample@example.test",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          }
+        ]
+      ],
+      "importReports": [],
+      "defaultExportReports": []
+    },
+    {
+      "id": "unknown-value-type",
+      "methodCounts": [
+        1
+      ],
+      "candidateMethods": [
+        [
+          {
+            "id": "request-unknown-value-type/card/1/property/3",
+            "type": "email",
+            "propertyIndex": 2,
+            "value": "sample@example.test",
+            "valueKind": "text",
+            "group": "",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          }
+        ]
+      ],
+      "importReports": [
+        {
+          "card": 1,
+          "property": 2,
+          "category": "retained_unmapped_value_type"
+        }
+      ],
+      "defaultExportReports": [
+        {
+          "card": 1,
+          "property": 2,
+          "category": "excluded_by_default"
+        }
+      ]
+    },
+    {
+      "id": "encoded-and-orphan-labels",
+      "methodCounts": [
+        1
+      ],
+      "candidateMethods": [
+        [
+          {
+            "id": "request-encoded-and-orphan-labels/card/1/property/2",
+            "type": "phone",
+            "propertyIndex": 1,
+            "value": "+00 111",
+            "valueKind": "text",
+            "group": "item1",
+            "typeTokens": [],
+            "preference": [],
+            "labels": [],
+            "parameters": []
+          }
+        ]
+      ],
+      "importReports": [
+        {
+          "card": 1,
+          "property": 3,
+          "category": "retained_unmapped_label_parameters"
+        },
+        {
+          "card": 1,
+          "property": 4,
+          "category": "retained_unmapped_orphan_label"
+        }
+      ],
+      "defaultExportReports": [
+        {
+          "card": 1,
+          "property": 3,
+          "category": "excluded_by_default"
+        },
+        {
+          "card": 1,
+          "property": 4,
+          "category": "excluded_by_default"
+        }
+      ]
+    }
+  ]
+}
