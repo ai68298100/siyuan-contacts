@@ -240,6 +240,114 @@ function json(value) {
     return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
+/** Real input dispatch is required: HTMLElement.click() hides listener/microtask races. */
+async function verifyRelationPickerScene({ browserSession, first, second, settings, deadline, evidence, workspace }) {
+    const { listContacts } = await import("../../src/services/contacts.ts");
+    const { invalidateRoster } = await import("../../src/services/roster.ts");
+    const { renderView } = await import("../../src/api/av.ts");
+    const { rosterFromRender } = await import("../../src/domain/roster.ts");
+    const scope = "#lvct-detail-panel-relations";
+    const outcome = evidence.relationPicker = { actualProductionUi: true, trustedInput: true, emptyCtaOpened: false, searchFocused: false, escapeClosed: false, outsideClosed: false, reopened: false, searched: false, selected: false, serviceAndAvVerified: false, detailReopened: false, newDocumentVerified: false, persistedAfterReload: false, completed: false, clicks: [] };
+    await browserSession.evaluate(`(()=>{
+        window.__lvctRelationPickerClicks=[];
+        window.__lvctRelationPickerClickHandler=(event)=>window.__lvctRelationPickerClicks.push({trusted:event.isTrusted,target:event.target?.closest('button')?.className??event.target?.tagName,id:event.target?.closest('button')?.id??event.target?.id,text:event.target?.closest('button')?.textContent?.trim()??event.target?.textContent?.trim(),matched:!!document.querySelector(window.__lvctRelationPickerClickSelector)?.contains(event.target)});
+        document.addEventListener('click',window.__lvctRelationPickerClickHandler,true);
+    })()`);
+    const click = async (selector, label, scroll = true) => {
+        const point = await browserSession.evaluate(`(async()=>{
+            const node=document.querySelector(${json(selector)});if(!node||node.disabled)return null;
+            if(${scroll})node.scrollIntoView({behavior:'instant',block:'center',inline:'nearest'});
+            await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+            const rect=node.getBoundingClientRect();const x=rect.left+rect.width/2,y=rect.top+rect.height/2;
+            if(rect.width<=0||rect.height<=0||!node.contains(document.elementFromPoint(x,y)))return null;
+            return {x,y};
+        })()`);
+        if (!point) throw new Error(`真实关系选择器${label}不可点击`);
+        await browserSession.evaluate(`window.__lvctRelationPickerClickSelector=${json(selector)}`);
+        const count = await browserSession.evaluate("window.__lvctRelationPickerClicks.length");
+        await browserSession.call("Input.dispatchMouseEvent", { type: "mouseMoved", ...point });
+        await browserSession.call("Input.dispatchMouseEvent", { type: "mousePressed", ...point, button: "left", buttons: 1, clickCount: 1 });
+        await browserSession.call("Input.dispatchMouseEvent", { type: "mouseReleased", ...point, button: "left", buttons: 0, clickCount: 1 });
+        const observed = await browserSession.evaluate(`window.__lvctRelationPickerClicks.slice(${count})`);
+        if (observed.length !== 1 || !observed[0].trusted || !observed[0].matched) throw new Error(`真实关系选择器${label}没有命中目标并产生唯一可信点击：${JSON.stringify(observed)}`);
+        outcome.clicks.push({ label, ...observed[0] });
+    };
+    const openRelationsTab = async () => {
+        // Opening details starts guarded reads; an early tab request can be
+        // refused while those reads are busy, so retry after they settle.
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`(()=>{if(document.querySelector('${scope}')&&document.querySelector('#lvct-detail-tab-relations')?.getAttribute('aria-selected')==='true')return true;document.querySelector('#lvct-detail-tab-relations')?.click();return false})()`)), "真实相关人Tab就绪");
+    };
+    const openFromEmpty = async () => {
+        await click(`${scope} .lvct-empty__actions button`, "空态选择联系人");
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`document.querySelector('${scope} .lvct-picker__panel')`)), "真实空态选择器打开");
+        // Check after another task, so a transient panel cannot count as success.
+        await browserSession.evaluate("new Promise(resolve=>setTimeout(resolve,250))");
+        const state = await browserSession.evaluate(`(()=>({open:!!document.querySelector('${scope} .lvct-picker__panel'),expanded:document.querySelector('${scope} .lvct-picker__trigger')?.getAttribute('aria-expanded'),focused:document.activeElement===document.querySelector('${scope} .lvct-picker__search')}))()`);
+        if (!state.open || state.expanded !== "true" || !state.focused) throw new Error("真实空态点击后选人器消失或搜索框未获焦");
+        outcome.searchFocused = true;
+    };
+    const readFact = async () => {
+        invalidateRoster();
+        const service = await listContacts(settings);
+        const av = rosterFromRender(await renderView(settings.avId, settings.dbBlockId), settings.fieldMap);
+        const select = (people) => people.filter(person => [first.itemId, second.itemId].includes(person.itemId)).map(person => ({ docId: person.docId, itemId: person.itemId, relatedItemIds: person.relatedItemIds }));
+        const servicePeople = select(service), avPeople = select(av);
+        if (servicePeople.length !== 2 || avPeople.length !== 2
+            || !servicePeople.find(person => person.itemId === first.itemId)?.relatedItemIds.includes(second.itemId)
+            || !avPeople.find(person => person.itemId === first.itemId)?.relatedItemIds.includes(second.itemId)) throw new Error("真实选人保存后生产服务或AV缺少目标关系事实");
+        return { servicePeople, avPeople };
+    };
+    const artifactDir = process.env.LVCT_E2E_ARTIFACT_DIR ? path.resolve(process.env.LVCT_E2E_ARTIFACT_DIR) : path.join(workspace, "relation-picker-ui-artifacts");
+    try {
+        await openRelationsTab();
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`document.querySelector('${scope} .lvct-empty__actions button')?.textContent?.trim()==='选择联系人'&&!document.querySelector('${scope} .lvct-picker__trigger')?.disabled`)), "真实空态关系入口就绪");
+        await openFromEmpty(); outcome.emptyCtaOpened = true;
+        await browserSession.call("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+        await browserSession.call("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`!document.querySelector('${scope} .lvct-picker__panel')`)), "真实选择器Escape关闭");
+        outcome.escapeClosed = true;
+        await openFromEmpty(); outcome.reopened = true;
+        await click(".lvct-dialog-panel__title", "浮层外部窗口标题", false);
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`!document.querySelector('${scope} .lvct-picker__panel')`)), "真实选择器外部点击关闭");
+        outcome.outsideClosed = true;
+        await openFromEmpty();
+        await browserSession.call("Input.insertText", { text: second.name });
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`document.querySelector('${scope} .lvct-picker__search')?.value===${json(second.name)}&&document.querySelectorAll('${scope} .lvct-picker__option').length===1&&document.querySelector('${scope} .lvct-picker__option')?.textContent?.includes(${json(second.name)})`)), "真实选人器按姓名搜索");
+        outcome.searched = true;
+        fs.mkdirSync(artifactDir, { recursive: true });
+        const shot = await browserSession.call("Page.captureScreenshot", { format: "png" });
+        const screenshot = path.join(artifactDir, "relation-picker-trusted-empty-cta.png");
+        fs.writeFileSync(screenshot, Buffer.from(shot.data, "base64")); evidence.screenshots.push(screenshot);
+        await click(`${scope} .lvct-picker__option`, "搜索候选联系人");
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`!document.querySelector('${scope} .lvct-picker__panel')&&[...document.querySelectorAll('${scope} .lvct-detail__relation-name')].some(node=>node.textContent?.trim()===${json(second.name)})&&!document.querySelector('${scope} .lvct-detail__relation-remove')?.disabled`)), "真实选人器关系保存回读");
+        outcome.selected = true; outcome.savedFact = await readFact(); outcome.serviceAndAvVerified = true;
+        if (!await browserSession.evaluate("(()=>{const node=document.querySelector('.lvct-detail .lvct-form__actions button:first-child');if(!node||node.disabled)return false;node.click();return true})()")) throw new Error("真实关系详情关闭按钮不可用");
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("!document.querySelector('.lvct-detail')")), "真实关系人物详情关闭");
+        if (!await browserSession.evaluate(`(()=>{const node=document.querySelector('[data-person-item-id="${first.itemId}"]');if(!node)return false;node.click();return true})()`)) throw new Error("真实关系原人物重开入口不可用");
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('#lvct-detail-tab-relations')")), "真实关系人物详情重开");
+        await openRelationsTab();
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`[...document.querySelectorAll('${scope} .lvct-detail__relation-name')].some(node=>node.textContent?.trim()===${json(second.name)})`)), "真实人物重开关系回读");
+        outcome.detailReopened = true;
+        const reloadNonce = randomUUID();
+        await browserSession.evaluate(`window.__lvctRelationPickerReloadNonce=${json(reloadNonce)}`);
+        await browserSession.call("Page.reload", { ignoreCache: true });
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`window.__lvctRelationPickerReloadNonce!==${json(reloadNonce)}&&document.readyState==='complete'&&window.LvContacts?.protocol===2`).catch(() => false)), "真实关系新document重载插件");
+        outcome.newDocumentVerified = true;
+        if (!await browserSession.evaluate("(()=>{const node=[...document.querySelectorAll('[title],[aria-label],button,.b3-tooltips')].find(item=>/小驴人脉|Lv Contacts/.test(item.getAttribute('title')||item.getAttribute('aria-label')||item.textContent||''));if(!node)return false;node.click();return true})()")) throw new Error("关系重载后工作台入口不可用");
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('[data-navigation-view=people]')")), "关系重载后工作台");
+        await browserSession.evaluate("document.querySelector('[data-navigation-view=people]').click()");
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`document.querySelector('[data-person-item-id="${first.itemId}"]')`)), "关系重载后原人物入口");
+        await browserSession.evaluate(`document.querySelector('[data-person-item-id="${first.itemId}"]').click()`);
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('#lvct-detail-tab-relations')")), "关系重载后原人物详情");
+        await openRelationsTab();
+        await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`[...document.querySelectorAll('${scope} .lvct-detail__relation-name')].some(node=>node.textContent?.trim()===${json(second.name)})`)), "关系重载后UI持久化回读");
+        outcome.reloadedFact = await readFact(); outcome.persistedAfterReload = true;
+        outcome.completed = true;
+    } finally {
+        await browserSession.evaluate("document.removeEventListener('click',window.__lvctRelationPickerClickHandler,true);delete window.__lvctRelationPickerClickHandler;delete window.__lvctRelationPickerClicks;delete window.__lvctRelationPickerClickSelector").catch(() => {});
+    }
+}
+
 /** Bounded production UI -> service -> SQL check; no component/mock replacement. */
 async function verifyPersonFieldsScene({ browserSession, request, first, second, deadline, evidence, workspace, targetURL, authHeaders, personFieldsMultiWindow, personFieldsFilterCopy, personFieldsLifecycle, personNoteLegacyRecovery }) {
     const { loadPersonFields } = await import("../../src/services/person-fields.ts");
@@ -811,6 +919,8 @@ export async function verifyRealFrontend({
     captureProjectionDocIds,
     organization,
     settings,
+    relationPickerOnly = false,
+    personOrganizations,
     personFieldsOnly = false,
     personFieldsMultiWindow = false,
     personFieldsFilterCopy = false,
@@ -976,6 +1086,17 @@ export async function verifyRealFrontend({
             row.click();return {clicked:true,expected,count:candidates.length};})()`);
         if (!firstRow?.clicked) throw new Error(`工作台未找到首人物稳定姓名入口：${JSON.stringify(firstRow)}`);
         await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('.lvct-detail')")), "人物详情");
+        if (relationPickerOnly) {
+            await verifyRelationPickerScene({ browserSession, first, second, settings, deadline, evidence, workspace });
+            evidence.ok = true;
+            return evidence;
+        }
+        if (personOrganizations) {
+            const { verifyPersonOrganizationsScene } = await import("./person-organizations-frontend-scene.mjs");
+            await verifyPersonOrganizationsScene({ browserSession, first, organizations: personOrganizations, deadline, evidence, workspace, request, targetURL, settings });
+            evidence.ok = true;
+            return evidence;
+        }
         if (personFieldsOnly) {
             await verifyPersonFieldsScene({ browserSession, request, first, second, deadline, evidence, workspace, targetURL, authHeaders, personFieldsMultiWindow, personFieldsFilterCopy, personFieldsLifecycle, personNoteLegacyRecovery });
             evidence.ok = true;

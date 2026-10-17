@@ -28,8 +28,9 @@ const hooks = registerHooks({
     },
 });
 
-const { updateContactFields, retryContactFields, batchUpdateContacts, writeDraftCells, listContactPage } = await import("../src/services/contacts.ts");
+const { updateContactFields, retryContactFields, batchUpdateContacts, writeDraftCells, listContactPage, createContactListProjection } = await import("../src/services/contacts.ts");
 const { bindPeopleProfileStorage, loadPersonRelationshipLabels, savePersonRelationshipLabels } = await import("../src/services/people-profiles.ts");
+const { bindContactAliasStorage } = await import("../src/services/contact-aliases.ts");
 const { withStoreLock } = await import("../src/data/storage.ts");
 const { loadRelationshipLabelStore, RELATIONSHIP_LABEL_STORAGE_KEY } = await import("../src/data/person-relationship-labels.ts");
 const { exportMigrationBundle, importMigrationBundle, previewMigrationImport, MIGRATION_BUNDLE_STORAGE_KEY, MIGRATION_COVERAGE } = await import("../src/services/migration-bundle.ts");
@@ -83,7 +84,7 @@ const selfDocId = "20261004000000-self001";
 const selfItemId = "20261004000000-srow001";
 let fixtureNumber = 0;
 
-function fixture(options: { wrappedSetterResponse?: boolean } = {}) {
+function fixture(options: { wrappedSetterResponse?: boolean; pageCap?: number; unknownRowCount?: boolean; reportedRowCount?: number } = {}) {
     fixtureNumber += 1;
     invalidateRoster();
     const fieldMap = Object.fromEntries(FIELD_SPECS.map((field) => [field.key, field.key])) as ContactsSettings["fieldMap"];
@@ -107,6 +108,7 @@ function fixture(options: { wrappedSetterResponse?: boolean } = {}) {
         mappingOverrides: new Map<string, string>(),
         outcomes: new Map<string, "reject" | "permission" | "transport" | "accepted_stale" | "bad_response">(),
         writes: [] as { itemId: string; field: string; value: unknown }[], jsonWrites: 0, renders: 0, queries: [] as string[],
+        jsonReads: new Map<string, number>(), sqlReads: 0, failStorageKeys: new Set<string>(),
         failRender: false, failDocuments: false, failReadback: false, dropLabels: false,
         lastLabels: undefined as unknown,
         onJsonSave: undefined as (() => void) | undefined,
@@ -117,6 +119,8 @@ function fixture(options: { wrappedSetterResponse?: boolean } = {}) {
     state.store.set("self-identity.json", { schemaVersion: 1, selfDocId, selfItemId, createdAt: "2026-10-04" });
     const plugin = {
         async loadData(key: string) {
+            state.jsonReads.set(key, (state.jsonReads.get(key) ?? 0) + 1);
+            if (state.failStorageKeys.has(key)) throw new Error("隔离夹具存储读取失败");
             if (key === RELATIONSHIP_LABEL_STORAGE_KEY) state.onLabelRead?.();
             if (state.failReadback && state.jsonWrites && key === RELATIONSHIP_LABEL_STORAGE_KEY) throw new Error("回读断开");
             return structuredClone(state.store.get(key) ?? null);
@@ -140,13 +144,14 @@ function fixture(options: { wrappedSetterResponse?: boolean } = {}) {
             const sourceRows = query
                 ? state.rows.filter((row) => row.cells.some((cell) => cell.value.block?.content?.includes(query)))
                 : state.rows;
-            const rows = page !== undefined && pageSize !== undefined
-                ? sourceRows.slice((page - 1) * pageSize, page * pageSize)
+            const effectiveSize = pageSize === undefined ? undefined : Math.min(pageSize, options.pageCap ?? pageSize);
+            const rows = page !== undefined && effectiveSize !== undefined
+                ? sourceRows.slice((page - 1) * effectiveSize, page * effectiveSize)
                 : sourceRows;
             return accepted({ view: {
                 columns: state.columns,
                 rows: structuredClone(rows),
-                ...(page !== undefined ? { rowCount: sourceRows.length } : {}),
+                ...(page !== undefined && !options.unknownRowCount ? { rowCount: options.reportedRowCount ?? sourceRows.length } : {}),
             } });
         }
         if (route === "/api/av/getAttributeViewItemIDsByBoundIDs") {
@@ -173,6 +178,7 @@ function fixture(options: { wrappedSetterResponse?: boolean } = {}) {
         }
         if (route === "/api/sqlite/flushTransaction") return accepted();
         if (route === "/api/query/sql") {
+            state.sqlReads += 1;
             if (state.failDocuments) throw new Error("文档事实读取断开");
             if (body.stmt.includes("root_id")) return accepted([]);
             const docId = body.stmt.match(/id\s*=\s*'([^']+)'/)?.[1];
@@ -994,6 +1000,135 @@ test("联系人关键词下推到 AV 分页并按过滤后总数结束读取", a
     assert.equal(result.hasMore, false);
     assert.equal(state.queries.at(-1), "人物 4");
     assert.ok(result.people.every((person) => person.name.includes("人物 4")));
+});
+
+test("联系人列表投影：同轮跨页只读一次扩展快照，完整名册重算本人称谓不再读取", async () => {
+    const { state, settings, plugin } = fixture();
+    state.store.set(RELATIONSHIP_LABEL_STORAGE_KEY, { schemaVersion: 1, labels: [labelRecord(["可靠称谓"])] });
+    const aliasKey = "person-aliases.json";
+    const aliases = (alias: string) => ({ schemaVersion: 1, aliases: [{
+        id: "20261004000000-alias01", personDocId, alias, createdAt: 1, updatedAt: 1,
+    }] });
+    state.store.set(aliasKey, aliases("旧别名"));
+    const disposeProfiles = bindPeopleProfileStorage(plugin);
+    const disposeAliases = bindContactAliasStorage(plugin);
+    try {
+        const project = createContactListProjection();
+        assert.equal(state.jsonReads.size, 0, "创建会话本身不读取存储");
+        const first = await listContactPage(settings, 1, 1, "", { project });
+        const second = await listContactPage(settings, 2, 1, "", { project });
+        assert.equal(first.people[0].profile?.relationship.state, "unknown", "单页没有本人时不冒认已核实参照");
+        const before = new Map(state.jsonReads);
+        const rendersBefore = state.renders;
+        const all = await project([...first.people, ...second.people]);
+        assert.deepEqual(all[0].profile?.relationship, { state: "known", labels: ["可靠称谓"], recordId: labelRecord().id, updatedAt: 1 });
+        assert.equal(all[1].profile?.relationship.state, "self");
+        assert.equal(all[1].isSelf, true);
+        assert.deepEqual(all[0].aliasProfile, { state: "known", values: ["旧别名"] });
+        for (const key of ["org-membership.json", "self-identity.json", RELATIONSHIP_LABEL_STORAGE_KEY, aliasKey]) {
+            assert.equal(state.jsonReads.get(key), 1, `同轮只读取一次 ${key}`);
+        }
+        assert.equal(state.sqlReads, 1, "无组织的同轮只扫描一次组织标记");
+        assert.equal(state.renders, rendersBefore, "全量重投影不重读 AV");
+        assert.deepEqual(state.jsonReads, before);
+        state.store.set(aliasKey, aliases("新别名"));
+        assert.deepEqual((await project(all))[0].aliasProfile, { state: "known", values: ["旧别名"] }, "旧会话保持同轮快照");
+        assert.deepEqual((await createContactListProjection()(all))[0].aliasProfile, { state: "known", values: ["新别名"] }, "新会话重新核实资料");
+        assert.equal(state.sqlReads, 2);
+        assert.equal(state.jsonWrites, 0);
+    } finally { disposeProfiles(); disposeAliases(); }
+});
+
+test("联系人列表投影：显式未知跨页保持，修复后只有新会话重新读取", async () => {
+    const { state, settings, plugin } = fixture();
+    state.failStorageKeys.add("org-membership.json");
+    state.failStorageKeys.add(RELATIONSHIP_LABEL_STORAGE_KEY);
+    state.failStorageKeys.add("person-aliases.json");
+    const disposeProfiles = bindPeopleProfileStorage(plugin);
+    const disposeAliases = bindContactAliasStorage(plugin);
+    try {
+        const project = createContactListProjection();
+        const first = await listContactPage(settings, 1, 1, "", { project });
+        const second = await listContactPage(settings, 2, 1, "", { project });
+        const all = await project([...first.people, ...second.people]);
+        assert.ok(all.every((person) => person.profile?.affiliations.state === "unknown"
+            && person.profile.relationship.state === "unknown" && person.aliasProfile?.state === "unknown"));
+        assert.equal(state.jsonReads.get("person-aliases.json"), 1);
+        state.failStorageKeys.clear();
+        assert.equal((await project(all))[0].aliasProfile?.state, "unknown");
+        const recovered = await createContactListProjection()(all);
+        assert.equal(recovered[0].profile?.affiliations.state, "known");
+        assert.equal(recovered[0].profile?.relationship.state, "known");
+        assert.equal(recovered[0].aliasProfile?.state, "known");
+        assert.equal(state.jsonReads.get("person-aliases.json"), 2);
+        assert.equal(state.jsonWrites, 0);
+    } finally { disposeProfiles(); disposeAliases(); }
+});
+
+test("联系人分页：取消发生在请求前时不调用自定义投影", async () => {
+    const { state, settings } = fixture();
+    let projects = 0;
+    const controller = new AbortController(); controller.abort();
+    await assert.rejects(listContactPage(settings, 1, 200, "", {
+        signal: controller.signal, project: async (people) => { projects += 1; return people; },
+    }), (error: unknown) => error instanceof Error && error.name === "AsyncAbortError");
+    assert.equal(state.renders, 0);
+    assert.equal(projects, 0);
+});
+
+test("联系人分页：内核首屏限制小页时报告有效大小，调用方沿用后覆盖全量", async () => {
+    const { state, settings } = fixture({ pageCap: 50 });
+    bindPeopleProfileStorage(undefined);
+    const template = state.rows[0];
+    state.rows = Array.from({ length: 201 }, (_, index) => ({ ...structuredClone(template),
+        id: `20261005000000-${index.toString(36).padStart(7, "0")}`,
+    }));
+    const first = await listContactPage(settings, 1, 200);
+    assert.equal(first.totalKnown, true);
+    assert.equal(first.pageSize, 50);
+    assert.equal(first.hasMore, true);
+    const ids = first.people.map((person) => person.itemId);
+    let next = first;
+    while (next.hasMore) {
+        next = await listContactPage(settings, next.page + 1, next.pageSize);
+        ids.push(...next.people.map((person) => person.itemId));
+    }
+    assert.equal(next.page, 5);
+    assert.equal(next.pageSize, 50);
+    assert.equal(new Set(ids).size, 201);
+    assert.equal(state.renders, 5);
+});
+
+test("联系人分页：权威总数尚有后续的空页或中间短页不能标为完整", async () => {
+    const empty = fixture({ reportedRowCount: 201 });
+    empty.state.rows = [];
+    bindPeopleProfileStorage(undefined);
+    await assert.rejects(listContactPage(empty.settings, 1, 200), /空页/);
+    const short = fixture({ pageCap: 25, reportedRowCount: 100 });
+    const template = short.state.rows[0];
+    short.state.rows = Array.from({ length: 100 }, (_, index) => ({ ...structuredClone(template), id: `item-${index}` }));
+    await assert.rejects(listContactPage(short.settings, 2, 50), /短页|分页大小/);
+});
+
+test("联系人分页：超过权威总数的页码直接拒绝，避免把过期页当空页", async () => {
+    const { settings } = fixture({ reportedRowCount: 1 });
+    bindPeopleProfileStorage(undefined);
+    await assert.rejects(listContactPage(settings, 2, 200), /超过权威总数/);
+});
+
+test("联系人分页：未知总数只按满页保留后续，短页不伪造已知总数", async () => {
+    const { state, settings } = fixture({ unknownRowCount: true });
+    bindPeopleProfileStorage(undefined);
+    const first = await listContactPage(settings, 1, 1);
+    const second = await listContactPage(settings, 2, 1);
+    const end = await listContactPage(settings, 3, 1);
+    assert.equal(first.totalKnown, false);
+    assert.equal(first.hasMore, true);
+    assert.equal(second.totalKnown, false);
+    assert.equal(second.hasMore, true);
+    assert.equal(end.totalKnown, false);
+    assert.equal(end.hasMore, false);
+    assert.equal(state.renders, 3);
 });
 
 test("称谓绑定释放阻止排队编辑与恢复，旧释放函数不能清除新生命周期", async () => {

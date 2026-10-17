@@ -10,6 +10,22 @@ export interface OrganizationSummary {
     removed?: boolean;
 }
 
+/**
+ * 组织选择器的稳定显示文案。同名组织必须带可读位置和稳定文档 ID，
+ * 避免转移成员时只凭名称误选目标。
+ */
+export function organizationOptionLabel<T extends Pick<OrganizationSummary, "docId" | "name" | "hpath" | "notebookId">>(
+    organization: T,
+    siblings: readonly T[],
+): string {
+    const name = organization.name.trim();
+    const sameName = siblings.filter((item) => item.docId !== organization.docId
+        && item.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
+    if (sameName.length === 0) return name;
+    const location = organization.hpath.trim() || organization.notebookId.trim();
+    return `${name} · ${location || "位置待核实"} · ${organization.docId}`;
+}
+
 export type OrganizationStatusFilter = "all" | "active" | "archived" | "removed";
 
 /** 组织视图的纯筛选规则；不改变输入顺序或对象，便于分页结果增量展示。 */

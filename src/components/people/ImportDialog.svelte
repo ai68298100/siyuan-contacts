@@ -18,11 +18,14 @@
     let {
         settings,
         i18n,
+        availableGroups = [],
         onImported,
         onClose,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
+        /** 当前名册中已使用的自定义分组；导入时可直接复用。 */
+        availableGroups?: readonly string[];
         onImported: (count: number) => void;
         onClose: () => void;
     } = $props();
@@ -78,6 +81,9 @@
 
     async function loadNotebooks() {
         if (!alive) return;
+        clearTimeout(searchTimer);
+        searchVersion += 1;
+        const previousNotebookId = notebookId;
         loading = true;
         errorText = "";
         loaded = false;
@@ -85,10 +91,24 @@
             const result = await listImportNotebooks(settings);
             if (!alive) return;
             notebooks = result;
-            if (notebooks.length > 0) {
+            const retainedNotebook = previousNotebookId && notebooks.some((notebook) => notebook.id === previousNotebookId);
+            if (retainedNotebook) {
+                notebookId = previousNotebookId;
+                await search();
+            } else if (previousNotebookId) {
+                /* 刷新后原来源已消失时停在明确重选状态，不把第一本笔记本误当成原来源。 */
+                notebookId = "";
+                candidates = [];
+                scan = null;
+                errorText = "原来源笔记本已不可用，请重新选择来源后再继续。";
+                loaded = true;
+            } else if (notebooks.length > 0) {
                 notebookId = notebooks[0].id;
                 await search();
             } else {
+                notebookId = "";
+                candidates = [];
+                scan = null;
                 loaded = true;
             }
         } catch (error) {
@@ -141,6 +161,16 @@
         searchTimer = setTimeout(() => search(), 400);
     }
 
+    function clearKeyword(): void {
+        keyword = "";
+        if (notebookId) void search();
+    }
+
+    function clearFolderPrefix(): void {
+        folderPrefix = "";
+        if (notebookId) void search();
+    }
+
     function toggleAll(on: boolean) {
         const next: Record<string, boolean> = { ...selected };
         for (const candidate of candidates) next[candidate.docId] = on;
@@ -148,7 +178,7 @@
     }
 
     async function runImport() {
-        if (!alive || importing || loading || errorText || importedCount !== null || selectedIds.length === 0) return;
+        if (!alive || importing || loading || errorText || importedCount !== null || !notebookId || selectedIds.length === 0) return;
         if (!groupValid) return;
         try {
             queue = snapshotImportQueue(importAnchor(settings), notebookId,
@@ -224,6 +254,7 @@
     {#if importedCount === null}
     <div class="lvct-people__toolbar lvct-people__control-surface fn__flex">
         <select class="b3-select" aria-label={text("importPickNotebook", "选择待收编文档的笔记本")} bind:value={notebookId} onchange={() => search()} disabled={importing || !loaded}>
+            <option value="" disabled>{text("importPickNotebook", "选择待收编文档的笔记本")}</option>
             {#each notebooks as notebook (notebook.id)}
                 <option value={notebook.id}>{notebook.name}</option>
             {/each}
@@ -273,9 +304,12 @@
         <ViewState compact loading title={text("importScanning", "正在扫描可收编的文档")} />
     {:else if candidates.length === 0}
         <ViewState compact title={notebooks.length === 0 ? text("importNoNotebooks", "没有可扫描的笔记本") : text("importNoDocs", "没有可收编的文档")}
-            description={keyword ? text("importNoMatchDesc", "当前关键词没有匹配文档，可以清除关键词后再试。") : text("importNoDocsDesc", "可以换一本笔记本，或先创建人物文档，再回来扫描。")}>
+            description={keyword || folderPrefix ? text("importNoMatchDesc", "当前筛选没有匹配文档，可以清除筛选后再试。") : text("importNoDocsDesc", "可以换一本笔记本，或先创建人物文档，再回来扫描。")}>
             {#if keyword}
-                <button class="b3-button b3-button--outline" onclick={() => { keyword = ""; void search(); }}>{text("importClearKeyword", "清除关键词")}</button>
+                <button class="b3-button b3-button--outline" onclick={clearKeyword}>{text("importClearKeyword", "清除关键词")}</button>
+            {/if}
+            {#if folderPrefix}
+                <button class="b3-button b3-button--outline" onclick={clearFolderPrefix}>{text("importClearFolder", "清除路径筛选")}</button>
             {/if}
             <button class="b3-button b3-button--outline" onclick={loadNotebooks}>{text("importRefreshNotebooks", "刷新笔记本")}</button>
         </ViewState>
@@ -299,7 +333,7 @@
             {/each}
         </div>
         <div class="lvct-form__grid lvct-import__options">
-            <GroupField {i18n} value={importGroup} onValueChange={(value) => (importGroup = value)} onValidityChange={(valid) => (groupValid = valid)} label={text("importGroupLabel", "收编后分组（可选）")} ungroupedLabel={text("importNoGroup", "不设置分组")} disabled={importing} />
+            <GroupField {i18n} value={importGroup} onValueChange={(value) => (importGroup = value)} onValidityChange={(valid) => (groupValid = valid)} label={text("importGroupLabel", "收编后分组（可选）")} ungroupedLabel={text("importNoGroup", "不设置分组")} {availableGroups} disabled={importing} />
             <label class="lvct-form__item">
                 <span>{text("importTagsLabel", "收编后标签（可选）")}</span>
                 <input class="b3-text-field fn__block" type="text" bind:value={importTagsText} placeholder={text("importTagsPlaceholder", "客户 重点")} disabled={importing} />
@@ -312,7 +346,7 @@
             <button class="b3-button b3-button--text" onclick={onClose}>{text("importDone", "完成")}</button>
         {:else}
             <button class="b3-button b3-button--cancel" onclick={() => guardedClose(onClose)} disabled={importing}>{text("importCancel", "取消")}</button>
-            <button class="b3-button b3-button--text" onclick={runImport} disabled={importing || loading || !!errorText || !groupValid || selectedIds.length === 0}>
+            <button class="b3-button b3-button--text" onclick={runImport} disabled={importing || loading || !!errorText || !groupValid || !notebookId || selectedIds.length === 0}>
                 {importing ? text("importAdopting", "收编中…") : text("importAdoptAs", "收编为联系人（{n}）", { n: selectedIds.length })}
             </button>
         {/if}

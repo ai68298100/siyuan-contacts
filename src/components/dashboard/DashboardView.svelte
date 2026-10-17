@@ -414,14 +414,25 @@
         }
     }
 
-    const greetingKey = (() => {
+    // 工作台可能跨午夜持续打开；定期推进时钟依赖，让问候、日期和“今日不再展示”
+    // 在同一实例中自动切换，而不需要用户离开再回来。
+    let clockTick = $state(0);
+    $effect(() => {
+        const timer = window.setInterval(() => { clockTick += 1; }, 30_000);
+        return () => window.clearInterval(timer);
+    });
+    const greetingKey = $derived.by(() => {
+        clockTick;
         const hour = new Date().getHours();
         if (hour < 6) return "dashGreetingNight";
         if (hour < 12) return "dashGreetingMorning";
         if (hour < 18) return "dashGreetingAfternoon";
         return "dashGreetingEvening";
-    })();
-    const todayLabel = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(new Date());
+    });
+    const todayLabel = $derived.by(() => {
+        clockTick;
+        return new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(new Date());
+    });
     const todayBirthdays = $derived.by(() => data?.birthdays.filter((item) => item.bucket === "today") ?? []);
 
     async function refresh() {
@@ -670,6 +681,7 @@
     let onboardingSaving = $state(false);
     let onboardingError = $state("");
     const localTodayKey = $derived.by(() => {
+        clockTick;
         const now = new Date();
         const pad = (value: number) => String(value).padStart(2, "0");
         return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;

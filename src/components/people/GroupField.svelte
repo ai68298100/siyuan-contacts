@@ -51,6 +51,13 @@
             || PRESET_GROUPS.includes(group as typeof PRESET_GROUPS[number]);
     }
 
+    /** 候选来自全量名册时可能包含重复值或历史内部标记；选择器只展示可写的人类分组。 */
+    function customGroups(): string[] {
+        return [...new Set(availableGroups.map((group) => group.trim()).filter((group) => group
+            && !PRESET_GROUPS.includes(group as typeof PRESET_GROUPS[number])
+            && !group.startsWith("__lvct_group_option__:")))].sort((a, b) => a.localeCompare(b, "zh-CN"));
+    }
+
     const initialValue = untrack(() => value);
     const initialCustomMode = !isListedOption(initialValue);
     let customMode = $state(initialCustomMode);
@@ -118,7 +125,7 @@
         {#if allowClear}<option value={GROUP_CLEAR_OPTION}>{text("groupClear", "清空分组")}</option>{/if}
         {#if allowUngrouped}<option value="">{ungroupedLabel}</option>{/if}
         {#each PRESET_GROUPS as group (group)}<option value={group}>{group}</option>{/each}
-        {#each availableGroups.filter((group) => !PRESET_GROUPS.includes(group as typeof PRESET_GROUPS[number])) as group (group)}
+        {#each customGroups() as group (group)}
             <option value={group}>{group}</option>
         {/each}
         <option value={GROUP_CUSTOM_OPTION}>{text("groupCustom", "自定义…（随后输入）")}</option>

@@ -19,6 +19,7 @@
     import PersonPicker from "../people/PersonPicker.svelte";
     import type { PickerItem } from "../people/PersonPicker.svelte";
     import { subscribeDataChanged } from "../../libs/data-events";
+    import { organizationOptionLabel } from "../../domain/organization-scan";
 
     let {
         facade,
@@ -1094,7 +1095,7 @@
                                                 <select class="b3-select fn__block" bind:value={moveTargetOrgId} disabled={busy} aria-label={text("orgMemberMoveTarget", "移动到组织")}>
                                                     <option value="">{text("orgMemberMoveTargetPlaceholder", "选择目标组织…")}</option>
                                                     {#each moveTargets as target (target.docId)}
-                                                        <option value={target.docId}>{target.name}{target.archived ? `（${text("orgArchivedTag", "已归档")}）` : ""}</option>
+                                                        <option value={target.docId} title={organizationOptionLabel(target, orgs)}>{organizationOptionLabel(target, orgs)}{target.archived ? `（${text("orgArchivedTag", "已归档")}）` : ""}</option>
                                                     {/each}
                                                 </select>
                                             </label>

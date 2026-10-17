@@ -14,6 +14,7 @@ import {
     sortOrgMemberships,
     projectPersonAffiliations,
     orgMembershipStatusLabel,
+    filterOrganizationMembershipCandidates,
 } from "../src/domain/org-membership.ts";
 import type { OrgMembership } from "../src/domain/org-membership.ts";
 import { buildOrgProjectionTargets, orgProjectionSourceSnapshot, parseOrgProjectionOperationStore } from "../src/domain/org-projections.ts";
@@ -21,6 +22,16 @@ import { mergeOrgMembershipBackup } from "../src/domain/migration-records.ts";
 import { validateContactExtendedDraft } from "../src/domain/contact-create.ts";
 
 const ID = /^\d{14}-[0-9a-z]{7}$/;
+
+test("组织归属候选：当前归属去重，补录历史允许同组织新增期间", () => {
+    const organizations = [
+        { docId: "20261004000000-org0001", name: "当前组织" },
+        { docId: "20261004000000-org0002", name: "其他组织" },
+    ];
+    const memberships = [{ orgDocId: organizations[0].docId, status: "active" as const }];
+    assert.deepEqual(filterOrganizationMembershipCandidates(organizations, memberships, "active"), [organizations[1]]);
+    assert.deepEqual(filterOrganizationMembershipCandidates(organizations, memberships, "former"), organizations);
+});
 
 test("B13 成员删除标记：旧库兼容、删除原子登记、坏标记整体拒绝", () => {
     const original = membership({ id: "20261004000000-m000001" });

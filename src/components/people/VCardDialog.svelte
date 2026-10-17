@@ -71,6 +71,10 @@
         if (!plans) return 0;
         return plans.filter((plan) => plan.duplicate).length;
     });
+    const bulkSelectableIndexes = $derived.by((): number[] => {
+        if (!plans) return [];
+        return plans.flatMap((plan, index) => !plan.duplicate && !plan.unresolvedDocIds?.length ? [index] : []);
+    });
     const previewStats = $derived.by(() => {
         if (!plans) return { cards: 0, mapped: 0, ignored: 0, review: 0 };
         return plans.reduce((stats, plan, index) => {
@@ -128,10 +132,8 @@
 
     function toggleAll(on: boolean) {
         if (!plans) return;
-        const next: Record<number, boolean> = {};
-        plans.forEach((plan, index) => {
-            if (!plan.duplicate && !plan.unresolvedDocIds?.length && on) next[index] = true;
-        });
+        const next = { ...selected };
+        for (const index of bulkSelectableIndexes) next[index] = on;
         selected = next;
     }
 
@@ -474,8 +476,8 @@
                 <input
                     class="b3-switch"
                     type="checkbox"
-                    checked={plans.some((plan) => !plan.duplicate) && plans.every((plan, index) => plan.duplicate || selected[index])}
-                    disabled={!plans.some((plan) => !plan.duplicate)}
+                    checked={bulkSelectableIndexes.length > 0 && bulkSelectableIndexes.every((index) => selected[index])}
+                    disabled={bulkSelectableIndexes.length === 0}
                     onchange={(event) => toggleAll((event.currentTarget as HTMLInputElement).checked)}
                 />
                 <span>{text("vcardSelectNonDuplicate", "批量选择非同名项（已选 {selected}/{total}；{duplicates} 项同名需逐项确认）", { selected: selectedCount, total: plans.length, duplicates: duplicateCount })}</span>

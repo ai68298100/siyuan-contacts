@@ -90,6 +90,10 @@ try {
             browserConsole.push(reply.params.args.map((arg) => arg.value ?? arg.description ?? "").join(" "));
             return;
         }
+        if (reply.method === "Runtime.bindingCalled" && reply.params.name === "__lvctTrustedClick") {
+            void handleTrustedClick(reply.params);
+            return;
+        }
         const complete = pending.get(reply.id);
         if (complete) { pending.delete(reply.id); complete(reply); }
     });
@@ -98,9 +102,119 @@ try {
         pending.set(id, (reply) => reply.error ? rejectCall(new Error(reply.error.message)) : resolveCall(reply.result));
         debuggerSocket.send(JSON.stringify({ id, method, params }));
     });
+    // Only fixed fixture targets are accepted; the page cannot request arbitrary
+    // CDP methods or JavaScript. Input events are trusted, unlike element.click().
+    // A checkbox toggle can synchronously update the parent Svelte tree and
+    // replace the focused input before the next real key request is handled.
+    // Keep recovery scoped to the same picker panel and aria identity; never
+    // guess a different option or bypass disabled-state checks.
+    const handleTrustedClick = async ({ payload }) => {
+        let requestId;
+        let error;
+        try {
+            const request = JSON.parse(payload);
+            requestId = request.requestId;
+            const targets = {
+                "relation-empty-cta": "#fixture #lvct-detail-panel-relations .lvct-empty__actions button",
+                "relation-heading": "#fixture #lvct-detail-panel-relations h4",
+                "org-search": '#fixture .lvct-person-edit__profile input[aria-label="搜索组织"]',
+                "org-focused-option": '#fixture .lvct-person-edit__profile .lvct-org-multi__option input[type="checkbox"]:focus',
+            };
+            const selector = Object.hasOwn(targets, request.target) ? targets[request.target] : undefined;
+            const actions = {
+                "relation-empty-cta": ["click", "enter"], "relation-heading": ["click"],
+                "org-search": ["enter", "arrowdown", "arrowup", "home", "end"],
+                "org-focused-option": ["enter", "space", "arrowdown", "arrowup", "home", "end"],
+            };
+            const action = request.action ?? "click";
+            if (!/^[a-z0-9-]{1,60}$/.test(requestId ?? "") || !selector
+                || !actions[request.target].includes(action)) {
+                throw new Error("真实输入请求不属于允许的 UI 回归入口");
+            }
+            const point = await call("Runtime.evaluate", {
+                expression: `(async () => {
+                    const directTarget = document.querySelector(${JSON.stringify(selector)});
+                    const panel = document.querySelector('#fixture .lvct-org-multi__panel');
+                    const previous = window.__lvctTrustedOrgOption;
+                    const fallbackTarget = !directTarget && ${JSON.stringify(request.target)} === "org-focused-option"
+                        && panel && previous?.panelId === panel.id
+                        ? [...panel.querySelectorAll('input[type="checkbox"]')].find((input) => input.getAttribute('aria-label') === previous.label)
+                        : null;
+                    const target = directTarget || fallbackTarget;
+                    if (!target) throw new Error('真实输入入口不可交互：目标已消失 ' + JSON.stringify({
+                        active: document.activeElement?.outerHTML?.slice(0, 320) ?? null,
+                        activeConnected: document.activeElement?.isConnected ?? false,
+                        panel: Boolean(document.querySelector('#fixture .lvct-org-multi__panel')),
+                    }));
+                    if (target.disabled) throw new Error('真实输入入口不可交互：目标已禁用 ' + JSON.stringify({
+                        active: document.activeElement?.outerHTML?.slice(0, 320) ?? null,
+                        panel: Boolean(document.querySelector('#fixture .lvct-org-multi__panel')),
+                    }));
+                    if (${JSON.stringify(request.target)} === "org-focused-option") {
+                        const owner = target.closest('.lvct-org-multi__panel');
+                        if (!owner?.id || !target.getAttribute('aria-label')) throw new Error('真实输入入口不可交互：组织候选缺少稳定身份');
+                        window.__lvctTrustedOrgOption = { panelId: owner.id, label: target.getAttribute('aria-label') };
+                        if (target !== document.activeElement) target.focus({ preventScroll: true });
+                    }
+                    // The harness report precedes #fixture and grows after each
+                    // case. Host body styles can prevent scrolling past it.
+                    document.querySelector('#results').hidden = true;
+                    // Picker panels own their scroll container. Scrolling an
+                    // option into view through the page can emit an outer
+                    // scroll event and legitimately close the popover before
+                    // the trusted key is dispatched.
+                    if (!target.closest('.lvct-picker__panel, .lvct-org-multi__panel')) {
+                        target.scrollIntoView({ block: 'center', behavior: 'instant' });
+                    }
+                    const frame = () => new Promise((done) => requestAnimationFrame(done));
+                    let rect = target.getBoundingClientRect();
+                    let stable = false;
+                    for (let attempt = 0; attempt < 10; attempt++) {
+                        await frame();
+                        const next = target.getBoundingClientRect();
+                        stable = ['x', 'y', 'width', 'height'].every((key) => Math.abs(next[key] - rect[key]) < 0.5);
+                        rect = next;
+                        if (stable) break;
+                    }
+                    if (!stable) throw new Error('真实输入目标尚未稳定');
+                    ${action !== "click" ? "target.focus({ preventScroll: true });" : ""}
+                    const point = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+                    const hit = document.elementFromPoint(point.x, point.y);
+                    if (!hit || !target.contains(hit)) {
+                        throw new Error('真实输入未命中目标: ' + JSON.stringify({ rect: rect.toJSON(), hit: hit?.tagName, text: hit?.textContent?.slice(0, 80) }));
+                    }
+                    return point;
+                })()`,
+                awaitPromise: true, returnByValue: true,
+            });
+            if (point.exceptionDetails) throw new Error(point.exceptionDetails.exception?.description ?? "无法定位真实输入入口");
+            if (action !== "click") {
+                const key = {
+                    enter: { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13, text: "\r", unmodifiedText: "\r" },
+                    space: { key: " ", code: "Space", windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32, text: " ", unmodifiedText: " " },
+                    arrowdown: { key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40, nativeVirtualKeyCode: 40 },
+                    arrowup: { key: "ArrowUp", code: "ArrowUp", windowsVirtualKeyCode: 38, nativeVirtualKeyCode: 38 },
+                    home: { key: "Home", code: "Home", windowsVirtualKeyCode: 36, nativeVirtualKeyCode: 36 },
+                    end: { key: "End", code: "End", windowsVirtualKeyCode: 35, nativeVirtualKeyCode: 35 },
+                }[action];
+                await call("Input.dispatchKeyEvent", { type: "keyDown", ...key });
+                await call("Input.dispatchKeyEvent", { type: "keyUp", key: key.key, code: key.code,
+                    windowsVirtualKeyCode: key.windowsVirtualKeyCode, nativeVirtualKeyCode: key.nativeVirtualKeyCode });
+            } else {
+                await call("Input.dispatchMouseEvent", { type: "mousePressed", ...point.result.value, button: "left", clickCount: 1 });
+                await call("Input.dispatchMouseEvent", { type: "mouseReleased", ...point.result.value, button: "left", clickCount: 1 });
+            }
+        } catch (cause) {
+            error = cause instanceof Error ? cause.message : String(cause);
+        }
+        await call("Runtime.evaluate", {
+            expression: `window.dispatchEvent(new CustomEvent('lvct:trusted-click-done', { detail: ${JSON.stringify({ requestId, error })} }))`,
+        });
+    };
     requestBrowserClose = () => call("Browser.close");
     const mobile = process.env.LVCT_UI_MOBILE === "1";
     await call("Runtime.enable");
+    await call("Runtime.addBinding", { name: "__lvctTrustedClick" });
     await call("Emulation.setDeviceMetricsOverride", { width: mobile ? 390 : 1280, height: mobile ? 844 : 900, deviceScaleFactor: 1, mobile });
     const parameters = new URLSearchParams();
     if (mobile) parameters.set("mobile", "1");

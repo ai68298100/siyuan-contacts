@@ -17,6 +17,8 @@ const VIEWPORT_MARGIN = 8;
 const ANCHOR_GAP = 4;
 
 export interface PopoverOptions {
+    /** 定位锚点可以小于外部点击边界，例如带已选标签的选择器。 */
+    anchor?: HTMLElement;
     /** 默认滚动时关闭；输入法引起的 viewport 变化可改为重新定位。 */
     closeOnScroll?: boolean;
     /** 默认窗口尺寸变化时关闭；移动端软键盘打开会触发 resize。 */
@@ -30,7 +32,7 @@ export function attachPopover(
     options: PopoverOptions = {},
 ): () => void {
     const place = () => {
-        const anchorRect = wrap.getBoundingClientRect();
+        const anchorRect = (options.anchor ?? wrap).getBoundingClientRect();
         // 先定到左上角测量自然尺寸，避免旧位置影响测量
         const previous = { left: panel.style.left, top: panel.style.top, visibility: panel.style.visibility };
         panel.style.visibility = "hidden";

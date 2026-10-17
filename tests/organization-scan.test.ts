@@ -1,11 +1,28 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { filterOrganizations, organizationMarkerStates, organizationsFromDocs } from "../src/domain/organization-scan.ts";
+import { filterOrganizations, organizationMarkerStates, organizationOptionLabel, organizationsFromDocs } from "../src/domain/organization-scan.ts";
 
 const orgDocId = "20261004000000-org0001";
 const notebookId = "20261004000000-book001";
 const marker = { root_id: orgDocId, ial: '{: custom-lvct-org="1"}', markerCount: 1 };
 const doc = { id: orgDocId, content: "组织", hpath: "/组织", box: notebookId };
+
+test("组织选择标签：同名组织显示位置，位置仍相同再带稳定文档 ID", () => {
+    const organizations = [
+        { docId: "20261004000000-org0001", name: "同名组织", hpath: "/工作/同名组织", notebookId: "20261004000000-book001" },
+        { docId: "20261004000000-org0002", name: "同名组织", hpath: "/学习/同名组织", notebookId: "20261004000000-book001" },
+        { docId: "20261004000000-org0003", name: "同名组织", hpath: "/工作/同名组织", notebookId: "20261004000000-book002" },
+        { docId: "20261004000000-org0004", name: "唯一组织", hpath: "/唯一组织", notebookId: "20261004000000-book001" },
+    ];
+    const first = organizationOptionLabel(organizations[0], organizations);
+    const second = organizationOptionLabel(organizations[1], organizations);
+    const third = organizationOptionLabel(organizations[2], organizations);
+    assert.notEqual(first, second, "同名不同路径仍需可区分");
+    assert.match(first, /\/工作\/同名组织/);
+    assert.match(first, /20261004000000-org0001$/, "同名需显示稳定文档 ID");
+    assert.match(third, /20261004000000-org0003$/, "同位置同名需显示稳定文档 ID");
+    assert.equal(organizationOptionLabel(organizations[3], organizations), "唯一组织");
+});
 
 test("组织扫描：合法空库、活跃、归档与稳定文档身份分别核实", () => {
     assert.equal(organizationMarkerStates([]).size, 0);

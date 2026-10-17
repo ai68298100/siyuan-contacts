@@ -5,6 +5,7 @@
     import { onDestroy, tick } from "svelte";
     import { getFrontend } from "siyuan";
     import { attachPopover } from "../../libs/popover";
+    import { registerDialogEscapeScope } from "../../libs/dialog-escape-scope";
     import { translateText } from "../../domain/translation";
     import { loadContactAliasIndex } from "../../services/contact-aliases";
     import { X } from "@lucide/svelte";
@@ -62,8 +63,12 @@
     let aliasLoading = $state(false);
     let aliasError = $state(false);
     let aliasRequest = 0;
+    let openTimer: ReturnType<typeof setTimeout> | undefined;
     const listboxId = `lvct-picker-${Math.random().toString(36).slice(2)}`;
-    onDestroy(() => { aliasRequest += 1; });
+    onDestroy(() => {
+        aliasRequest += 1;
+        clearTimeout(openTimer);
+    });
 
     async function loadAliases(): Promise<void> {
         const request = ++aliasRequest;
@@ -103,22 +108,42 @@
         if (!open || !wrap || !panel) return;
         // 移动端聚焦搜索框会唤起输入法并触发 viewport resize/scroll；
         // 这些变化不代表用户要关闭选人器，否则浮层会在键盘出现后立即消失。
-        return attachPopover(panel, wrap, () => (open = false), keepOpenOnViewportChange ? {
+        return attachPopover(panel, wrap, closeAndFocus, keepOpenOnViewportChange ? {
             closeOnScroll: false,
             closeOnResize: false,
         } : undefined);
     });
 
-    // 浮层由全局 Escape 监听关闭时，把焦点还给触发按钮，避免键盘用户落到页面随机位置。
     $effect(() => {
-        if (!open) return;
-        const onEscape = (event: KeyboardEvent) => {
-            if (event.key !== "Escape") return;
-            void tick().then(() => triggerEl?.focus());
-        };
-        window.addEventListener("keydown", onEscape);
-        return () => window.removeEventListener("keydown", onEscape);
+        if (!disabled) return;
+        clearTimeout(openTimer);
+        aliasRequest += 1;
+        if (open) closeAndFocus();
     });
+
+    $effect(() => {
+        const length = filtered.length;
+        if (length === 0) {
+            if (highlight !== 0) highlight = 0;
+        } else if (highlight >= length) {
+            highlight = length - 1;
+        }
+    });
+
+    $effect(() => {
+        if (open && wrap) return registerDialogEscapeScope(wrap, closeAndFocus);
+    });
+
+    function closeAndFocus(): void {
+        open = false;
+        void tick().then(() => triggerEl?.isConnected && triggerEl.focus({ preventScroll: true }));
+    }
+    function onPickerKeydown(event: KeyboardEvent): void {
+        if (!open || event.key !== "Escape") return;
+        event.preventDefault();
+        event.stopPropagation();
+        closeAndFocus();
+    }
 
     export function openPicker(): void {
         if (disabled) return;
@@ -126,31 +151,36 @@
          * The empty-state CTA lives outside this component's wrapper. If it
          * opens the picker synchronously, attachPopover installs its global
          * click listener before the original click finishes bubbling and
-         * immediately treats that same click as an outside click. Defer the
-         * programmatic open until the event has finished propagating; the
-         * picker trigger itself still opens synchronously.
+         * immediately treats that same click as an outside click. Native
+         * events can run microtasks between listeners, so queueMicrotask is
+         * not enough. A new task waits for the whole click to finish.
          */
-        queueMicrotask(() => {
+        clearTimeout(openTimer);
+        openTimer = setTimeout(() => {
+            openTimer = undefined;
             if (!disabled) void show();
-        });
+        }, 0);
     }
 
     async function show(): Promise<void> {
+        if (disabled) return;
         query = "";
         highlight = 0;
         open = true;
         void loadAliases();
         await tick();
+        if (disabled || !open) return;
         // 已按触发器定位浮层，避免自动聚焦滚动父窗口而触发关闭。
         inputEl?.focus({ preventScroll: true });
     }
     function choose(item: PickerItem): void {
+        if (disabled) return;
         open = false;
         onSelect(item.id);
         void tick().then(() => triggerEl?.focus());
     }
     function clearSelection(): void {
-        if (disabled || !selected) return;
+        if (disabled || !value) return;
         open = false;
         query = "";
         onSelect("");
@@ -172,9 +202,7 @@
             const item = filtered[highlight];
             if (item) choose(item);
         } else if (event.key === "Escape") {
-            event.preventDefault();
-            open = false;
-            void tick().then(() => triggerEl?.focus());
+            onPickerKeydown(event);
         }
     }
 </script>
@@ -190,14 +218,15 @@
             aria-expanded={open}
             aria-label={ariaLabel}
             disabled={disabled}
+            onkeydown={onPickerKeydown}
             onclick={() => (open ? (open = false) : void show())}
         >
-            <span class="lvct-picker__value" class:lvct-picker__placeholder={!selected}>
-                {selected ? `${selected.label}${ambiguousLabels.has(selected.label) ? ` · ${selected.docId ?? selected.id}` : ""}` : placeholder}
+            <span class="lvct-picker__value" class:lvct-picker__placeholder={!selected && !value}>
+                {selected ? `${selected.label}${ambiguousLabels.has(selected.label) ? ` · ${selected.docId ?? selected.id}` : ""}` : value ? `${text("pickerMissing", "人物待核实")} · ${value}` : placeholder}
             </span>
             <span class="lvct-picker__caret" aria-hidden="true">▾</span>
         </button>
-        {#if selected && clearable}
+        {#if value && clearable}
             <button type="button" class="lvct-picker__clear" aria-label={clearLabel || text("pickerClear", "清除选择")} title={clearLabel || text("pickerClear", "清除选择")} disabled={disabled} onclick={clearSelection}>
                 <X size={14} aria-hidden="true" />
             </button>
@@ -222,7 +251,7 @@
                 aria-autocomplete="list"
                 aria-expanded="true"
                 aria-controls={listboxId}
-                aria-activedescendant={filtered.length > 0 ? `${listboxId}-option-${highlight}` : undefined}
+                aria-activedescendant={filtered.length > 0 && highlight < filtered.length ? `${listboxId}-option-${highlight}` : undefined}
                 onkeydown={onSearchKeydown}
                 oninput={() => { highlight = 0; if (listEl) listEl.scrollTop = 0; }}
             />
@@ -243,6 +272,7 @@
                             class="lvct-picker__option"
                             class:lvct-picker__option--active={index === highlight}
                             onmouseenter={() => (highlight = index)}
+                            onkeydown={onPickerKeydown}
                             onclick={() => choose(item)}
                         >
                             <span class="lvct-picker__label">{item.label}</span>
