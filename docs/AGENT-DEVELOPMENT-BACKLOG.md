@@ -66,13 +66,343 @@ evidence_paths / owner / last_updated / commit
 
 > **v0.5.16 发布与契约复评（2026-10-16）：** PR #42 普通合并后，annotated tag `v0.5.16` 指向 `4372593`；Release 附件下载复核为 582,401 B，SHA-256 `91c2d4bece34509a2a72468a7d097af4d1bd566ceadfcb2a392fc4331cd731b8`。发布前本地 `pnpm check`、597/597 单测、三套 UI 各 381/381、构建与发布门禁通过；发布后 CI 与未验收边界见 [RELEASE](RELEASE.md)。AG-B13-007 现有模型契约已完成复评（D-0037/0038），无需新增 schema，整卡仍为 `partial`。
 
-> **v0.5.16 后执行顺序：** ① Issue [#35 无法导入联系人](https://github.com/ai68298100/siyuan-contacts/issues/35) 继续保持开放，取得保留首卡属性结构的脱敏 VCF 后再确认候选修复是否命中根因；② 若具备隔离的真实思源测试环境，优先推进 P0 `AG-HOST-003`（任务块全量对账）和 `AG-HOST-006`（用户反馈真实读写验收）；③ AG-B13-007 的现有契约、当前投影与 member 边生命周期隔离实现已收口，不重复安排契约评审，继续补真实宿主、多窗口、迁移、真机和规模证据；④ `AG-SCALE-001` 保持 P2/partial，R54 视觉迁移先补成有依赖和验收条件的原子任务卡。
+> **v0.5.16 后执行顺序：** ① Issue [#35 无法导入联系人](https://github.com/ai68298100/siyuan-contacts/issues/35) 继续保持开放，取得保留首卡属性结构的脱敏 VCF 后再确认候选修复是否命中根因；② 若具备隔离的真实思源测试环境，优先推进 P0 `AG-HOST-003`（任务块全量对账）和 `AG-HOST-006`（用户反馈真实读写验收）；③ AG-B13-007 的现有契约、当前投影与 member 边生命周期隔离实现已收口，不重复安排契约评审，继续补真实宿主、多窗口、迁移、真机和规模证据；④ `AG-SCALE-001` 保持 P2/partial，R54 视觉迁移先补成有依赖和验收条件的原子任务卡。2026-10-17 已按重复工单关闭 #46、#48；对应宿主余项仍留在 Host Queue。
 
 依赖开放口径：`done_isolated` / `host_pending` 仅开放不依赖真实宿主结论的隔离开发；真实端点、真机与多窗口结论仍由 Host Queue 守门。`ready` 必须满足所有实现前置；`partial` 表示已有代码，不代表剩余步骤的依赖已满足。
 
 ### Ready / Partial Queue（当前）
 
-当前没有已登记且可直接认领的运行时代码实现卡。Issue #35 等脱敏样本确认；C03 移动夹具已按真实抽屉路径覆盖且全量通过。AG-B13-007 现有模型契约复评、影响矩阵、当前单位投影修复和 member 边状态标注隔离实现已完成并随 v0.5.16 发布（实现提交 `ce51bbb`，发布提交 `4372593`）；有隔离真实思源环境时优先推进 Host Queue 的 `AG-HOST-003/006`。B13-003/005/006、B12-001/002/003、P0-011/014/020、B11-001～004、B13-001/002、B14-001/003/004、AI、IMP、UX-003/004 有隔离证据；不要重复实现，剩余宿主证据继续留在 Host Queue。
+2026-10-16 新反馈已授权修复；以下相关卡已完成隔离收口，真实宿主仍由 Host Queue 验收。2026-10-17 已按 D-0039 直接实现 #51/#54 的重复条目与两层分组，采用人物文档独立“补充资料”快照，详见下方 `AG-ISSUE-051-054-FIELDS`，不再等待完整联系方式模型的全部研究项。Issue #35 仍等脱敏样本确认；#46、#48 已于 2026-10-17 按重复工单回复并关闭，历史成员和组织生命周期的宿主余项不因关闭重复工单而改变。AG-B13-007 现有契约及隔离实现已完成，真实宿主余项继续由 Host Queue 验收。
+
+2026-10-16 未解决 Issue 研究筛选保留为历史：#35 的三处合成解析缺口已修复并通过 17/17 矩阵，但不等于小米根因已确认；#51/#54 的完整联系方式投影、搜索与迁移研究继续保留为后续候选。重复资料与两层分组已有独立生产契约和实现，不再沿用“母子条目排在完整联系方式契约之后”的旧顺序。历史研究来源见 [OPEN-ISSUE-RESEARCH-PLAN-2026-10-16](verification/OPEN-ISSUE-RESEARCH-PLAN-2026-10-16.md)，当前交付范围见 [首版实现](verification/MULTI-CONTACT-MINIMAL-PATH-2026-10-17.md)。
+
+#### AG-ISSUE-051-054-FIELDS — 重复资料与两层分组首版
+
+- **status / priority / type / milestone：** `host_pending` / P1 / feature+regression / M4；生产实现和隔离内核服务验证完成，界面与真实宿主证据分别记录，未提交、未发布。
+- **user_outcome / user_scenario：** 人物详情可维护多个电话、微信、邮箱等同名或同值条目，并可放入“联系方式”等顶层分组；个人备注继续独立保存。
+- **source_ids / current_evidence：** Issue #51/#54、D-0039；域、API/服务、编辑器、facade 与人物详情已接通。隔离真实内核创建/更新/清空、冲突零覆盖、未知只读核实、错 owner 拒绝及重启回读通过；139次请求逐次核验 PID 归属，5次生产服务写入。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §6A、现有 DOM 块写读实证 / 本首版交付与 issue 验收 / person-fields / UUID 隔离工作区、虚构资料；完整 contactMethods 研究不是本卡前置。
+- **allowed_files / forbidden_files：** person-fields 域/API/service/测试、PersonFieldsEditor、facade/详情接线、样式、UI/host 回归及相关契约/说明 / 版本、CHANGELOG、真实用户库和其他任务的已有改动。
+- **contract_change / host_or_spike_required：** 人物原生单块 schema1 完整可见快照，独立 marker 和 ownerDocId；无插件 JSON、无 AV 投影。真实隔离 Kernel 生产服务已验证；真实原生前端交互与多窗口等边界另记。
+- **ordered_steps：** 冻结 D-0039/§6A → 域/API/service → 编辑器和详情接线 → 单测/隔离 UI/构建 → UUID 内核重启与冲突/未知验证 → 真实详情入口回归 → 交付并核对用户场景。
+- **test_fixtures / test_commands / acceptance：** 同名同值、两层分组、特殊字符/多行/空值、分组删除的两种选择、草稿关闭、迟到响应、失败重试、HTTP UUID fallback、390px；`pnpm check`、`pnpm test`、三套 UI、`pnpm build`、`pnpm check:release` 与专门 spike。成功必须同块完整回读；未知不重发；失败保留草稿，坏格式不按空库覆盖。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 原块 ID 和完整基线冲突则停止；未知请求在当前窗口只读核实，非原生 CAS；仅虚构数据验收。每人最多100项、标签80字符、值2000字符、JSON100000字符；加载只查目标文档，候选上限2用于歧义检测。
+- **evidence_paths / owner / last_updated / commit：** [首版范围](verification/MULTI-CONTACT-MINIMAL-PATH-2026-10-17.md)、[真实内核验证](verification/PERSON-FIELDS-2026-10-17.md)、`scripts/e2e/ui/person-fields-regression.js`、`scripts/spike/person-fields-results-b3986e47-2fdd-47df-9709-eb06f79027d0.json` / Codex / 2026-10-17 / 未提交。
+- **退出边界：** 补充资料随人物文档备份，未进入基础主字段、全局搜索、快捷联系、AI、桥、vCard 或插件迁移包。原生编辑器竞争、真机和日常用户工作区不以隔离回归替代。#51/#54 在发布与用户场景核对前保持开放。
+- **完成回报：** `pnpm check` 0/0、完整单测689/689，Chrome桌面/390px/宿主样式 UI 各403/403，构建与本地包完整性门禁通过；定向补充资料UI桌面/390px各13/13。真实隔离Chrome人物详情新增分组与两个同名多行电话、保存、关闭重开，与生产service及SQL完整核对通过，见[真实前端](verification/PERSON-FIELDS-REAL-UI-2026-10-17.md)。整卡保留 `host_pending`，仅剩声明中的真实环境边界和交付验收，不重复安排已完成的实现与研究。
+
+#### AG-ISSUE-051-054-USE — 补充资料详情查找、复制与双页面冲突验收
+
+- **status / priority / type / milestone：** `done` / P1 / feature+e2e / M4；本卡要求的隔离真实Chrome范围已验收，未提交、未发布；父卡的其他环境边界仍分别保留。
+- **user_outcome / user_scenario：** 在人物详情内从多条资料中筛选所需号码/微信/邮箱，复制完整多行内容；另一页面已修改时，当前草稿不会覆盖新资料。
+- **source_ids / current_evidence：** #51/#54、用户继续开发指令、D-0039；详情筛选、完整复制和跨详情实例在途互斥已实现，真实隔离Chrome联合验收通过，见本轮报告。
+- **depends_on / blocks / parallel_group / preconditions：** AG-ISSUE-051-054-FIELDS 的已完成实现、DATA-CONTRACT §6A 展示约定 / 详情使用闭环交付 / person-fields-use / 仅当前已确认快照，本地筛选不发请求。
+- **allowed_files / forbidden_files：** person-fields域/测试、PersonFieldsEditor、shared/clipboard、对应UI与真实前端runner、样式及相关说明 / 既有AV/主值写入、版本、CHANGELOG、其他任务的未提交改动、真实用户库。
+- **contract_change / host_or_spike_required：** 无存储/schema变化，§6A补充展示筛选和显式复制约定；真实隔离Chrome页面与同源双页面验证。
+- **ordered_steps：** 冻结展示约定 → 纯筛选与剪贴板helper → 阅读态控件和反馈 → 失败/迟到/全量编辑UI回归 → 重建 → 真实筛选复制与双页面冲突/恢复、同名人物隔离。
+- **test_fixtures / test_commands / acceptance：** 分组/名称/完整多行值、同名同值、空组/无命中、筛选后完整编辑保存、剪贴板拒绝/HTTP fallback、切人迟到结果、390px；域与clipboard测试、`pnpm check/test`、三套UI、构建、真实前端runner；筛选不写资料，复制完整原值，冲突零覆盖。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 复制失败明确提示手动选择，不改保存状态；迟到反馈丢弃；只读筛选清空即复原。查询和值不新增日志或持久索引，剪贴板只在点击时写入；每人最多100项，本地线性筛选。
+- **evidence_paths / owner / last_updated / commit：** [本轮报告](verification/PERSON-FIELDS-USE-2026-10-17.md)、[真实双页面联合](verification/PERSON-FIELDS-MULTIWINDOW-2026-10-17.md)、`tests/person-fields.test.ts`、`tests/clipboard.test.ts`、`scripts/e2e/ui/person-fields-regression.js` / Codex / 2026-10-17 / 未提交。
+- **退出边界：** 详情内筛选不等于联系人全局搜索。双页面按先后顺序验证旧基线冲突，不宣称原生编辑器或内核CAS；真机与日常用户库仍单列。
+- **完成回报：** check 0/0、单测701/701、桌面/390px/宿主样式各412/412，补充资料定向各22/22，构建、本地包完整性与E2E保护17/17通过。真实Chrome最终构建run `a4340d07-454b-47a7-86d7-360098f37c60`通过备注和补充资料保存重开、标准复制/DOM fallback、筛选后全量保存、双页面旧基线冲突零块写、放弃重读后恢复、同名人物独立保存；125次验证侧请求逐次核验监听归属，进程/端口/profile清理完成。共享复制锁覆盖真实Workbench卸载/重挂载；Windows剪贴板换行规范化单列，不trim内容。#51/#54待发布与用户场景核对，本卡不因此重新标为开发中。
+
+#### AG-ISSUE-051-054-CLOSE — 原始需求复核、备注重读恢复与资料生命周期验收
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / fix+acceptance / M4；原始需求和隔离真实宿主验收已收口，尚未提交、发布或关闭 GitHub issue。
+- **user_outcome / user_scenario：** 备注保存冲突后可在原地核对最新内容并保留或放弃草稿；受旧Markdown多段写入影响的用户可保留全部原文、核对后解除旧关联并重新输入全文保存；补充资料已保存后可改组、解除组、排序、删除、清空与重新新增，重开保持实际保存结果。
+- **source_ids / current_evidence：** #51/#54最新正文及无评论状态、用户要求核实是否完全解决；最终联合轮 `9e8b5db6-5834-42c7-a5ec-fee5b471bd10` 已覆盖备注重读/冲突/清空、旧版拆块安全恢复和补充资料完整生命周期。
+- **depends_on / blocks / parallel_group / preconditions：** D-0039、DATA-CONTRACT §6A/6B、AG-ISSUE-051-054-USE已完成范围 / 原始issue开发验收结论 / issue-51-54-close / 新UUID隔离工作区、随机回环端口、独立Chrome profile、虚构资料。
+- **allowed_files / forbidden_files：** PersonDetail及facade接线、person-note域/API/service及测试、profile-card回归、person-fields真实frontend runner、隔离旧备注属性spike、相关契约与验收文档 / 版本、CHANGELOG、真实用户库、其他任务既有改动。
+- **contract_change / host_or_spike_required：** §6B明确个人备注重读的草稿选择与迟到保护、旧版分段备注显式解除关联，原生块新增detached归档属性但不新增JSON/schema；属性空值移除语义须先隔离内核实证；最终构建的真实隔离Chrome生命周期与旧版恢复增量。
+- **ordered_steps：** 按issue逐项核对 → 备注错误恢复就地实现/回归 → 已存资料生命周期真实runner → check/test/三套UI/build → 最终隔离真实联合 → 原始需求验收矩阵与交付边界收口。
+- **test_fixtures / test_commands / acceptance：** 备注冲突/取消/保留/放弃/读取失败/切人迟到及其他区域草稿；旧多段读取失败→核对→显式解除旧关联→原文全保留→人工全文保存重开；多label重复、改组、解除组、排序、两种删组、清空后重开与再新增；保存逐次核对完整snapshot和原块。check/test/UI、真实runner；不为验证擅自发布。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 失败与取消不丢草稿，重读不自动写；真实请求逐次核验本轮Kernel归属，场景有界，进程/端口/profile清理；只使用虚构数据。
+- **evidence_paths / owner / last_updated / commit：** [原始需求验收](verification/ISSUE-051-054-ACCEPTANCE-2026-10-17.md)、[完整生命周期](verification/PERSON-FIELDS-LIFECYCLE-2026-10-17.md)、`docs/verification/PERSON-FIELDS-REAL-UI-9e8b5db6-5834-42c7-a5ec-fee5b471bd10.json` / Codex / 2026-10-17 / 未提交。
+- **退出边界：** 原始需求已实现且其要求的隔离真实宿主证据齐全即可开发完成；正式发布单列。全局检索、AV投影、vCard往返、原生编辑器CAS、真机和日常用户库不扩张为#51/#54原始需求的隐含前置。
+- **完成回报：** `pnpm test` 710/710、`pnpm check` 0/0、桌面/390px/宿主样式 UI 各416/416、E2E安全与内核 smoke 17/17；最终真实 Chrome 联合轮 248 次验证侧请求及归属核验全部通过。旧版多段备注仅支持用户确认后的安全解除关联和手动全文重存，不自动拼接；发布、issue回复/关闭及日常用户库核对另行处理。
+
+#### AG-HOST-002-RAF — 组织管理后台页帧等待有界化
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / UI+regression / M3；已补隔离真实内核 Chrome 双页面证据，父卡 `AG-HOST-002` 仍为 `host_pending`。
+- **user_outcome / user_scenario：** 打开第二个浏览器页面后，后台组织管理仍能完成成员写入和刷新，回到原页可继续编辑、归档和关闭。
+- **source_ids / current_evidence：** `AG-HOST-002`；2026-10-17 Chrome 同源双页面真实复现：`restoreViewport` 无界等待后台暂停的 RAF，导致 `formBusy` 一直不解除。
+- **depends_on / blocks / parallel_group / preconditions：** 现有组织契约和请求代次守卫 / 组织成员与归档双页面验收 / organization-background-raf / 仅操作受控 UI 夹具和独立宿主工作区。
+- **allowed_files / forbidden_files：** `src/components/org/OrgManagerDialog.svelte`、`scripts/e2e/ui/organization-context-regression.js`、本卡及专门证据 / `frontend-flow`、其他 Agent 文件、版本、CHANGELOG、README 徽章、PROGRESS。
+- **contract_change / host_or_spike_required：** 无数据/存储契约变更；暂停 RAF 的真实 DOM 回归，完成后交宿主 Agent 重建并复跑双页面。
+- **ordered_steps：** 固定无帧回调回归 → 给视口恢复加有界退出与清理 → 核对草稿/滚动/焦点与迟到回调 → 定向 UI 和 check → 宿主复跑。
+- **test_fixtures / test_commands / acceptance：** 暂停 RAF、成员保存、外部刷新、草稿、滚动焦点；定向组织上下文 UI、`pnpm check`；无帧回调也解除 busy，操作只写一次，滚动与草稿保留，清理后的回调不再干预当前界面。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 保留现有错误与只读重试，不自动重写；仅虚构组织和成员；每次视口恢复至多一次 RAF 加有界计时器，无轮询。
+- **evidence_paths / owner / last_updated / commit：** [ORG-BACKGROUND-RAF-2026-10-17](verification/ORG-BACKGROUND-RAF-2026-10-17.md)、`scripts/e2e/ui/organization-context-regression.js` / `org_background_raf_fix` / 2026-10-17 / 未提交。
+- **完成回报：** 保留其他既有未提交变更。后台直接跳过第二帧、可见页 100 ms 回退，visibilitychange/卸载清理等待。`pnpm check` 0 errors / 0 warnings；桌面和 390px 定向组织 UI 各 13/13，完整桌面 UI 389/389。覆盖暂停 RAF、等待中转后台、忙态解除、草稿/滚动/焦点与迟到回调。重建后隔离真实内核 Chrome 双页面的改名、成员编辑、归档和恢复均通过，写入前第一页为 hidden 且无残留 busy；见 [HOST-ORG-DUAL-WINDOW-2026-10-17](verification/HOST-ORG-DUAL-WINDOW-2026-10-17.json)。主 Host Queue 仍保留人物文档投影专门双页、原生多窗口、日常工作区和真机等边界。未提交、未发布。
+
+#### AG-RF-004-N1 — 原生人物文档全量联系方式可读性实验
+
+- **status / priority / type / milestone：** `host_pending` / P2 / contract+research+spike / M4；纯格式、隔离真实内核与部分编辑器旅程已有证据，严格候选 UI 读取、复制与并发仍待验，父卡保持 `candidate`。
+- **user_outcome / user_scenario：** 用户停用插件或只删除插件数据后，仍能在人物原生文档中阅读全部联系方式和值的含义，不仅剩 AV 主值。
+- **source_ids / current_evidence：** Issue #51/#54；`MULTI-CONTACT-OWNERSHIP-2026-10-17.md`、`MULTI-CONTACT-NATIVE-2026-10-17.md`、`MULTI-CONTACT-NATIVE-HOST-2026-10-17.md`、`MULTI-CONTACT-NATIVE-UI-2026-10-17.md`、`MULTI-CONTACT-NATIVE-MULTIWINDOW-2026-10-17.md/json`、研究与宿主 spike results；纯内存候选矩阵 31/31，隔离真实内核两人物六方法写读/重启/实验缓存清理回读通过，编辑器正文读取/改值/删除/重载回读及同人物双页面实时刷新已有观察；UI 使用 `ui-*` 身份夹具，没有证明 N1 严格解析通过。复制载荷、并发与真实用户工作区仍待验证。
+- **depends_on / blocks / parallel_group / preconditions：** 现有 block DOM/属性/SQL/AV 契约与原生备注实证，不依赖采纳生产方法库 / D1 事实源选择 / contact-native-research / 先冻结研究格式和拒绝规则，再用 UUID 隔离工作区与随机端口验证；不读日常库。
+- **allowed_files / forbidden_files：** 新增 `scripts/spike/contact-methods-native-research.mjs`、`scripts/spike/contact-methods-native-host-spike.mjs`、两者 results 和研究证据文档、本卡 / 生产 DATA-CONTRACT、API、types、services、组件、真实用户插件存储、版本、CHANGELOG、README 徽章及 PROGRESS。
+- **contract_change / host_or_spike_required：** 无生产契约变更；现有端点可只在独立 spike 复用。先用纯函数比较有界可读格式，明确值、ID、类型、主值、标签和顺序的解析边界，再验证原生块形状，不从 UI 直接接入。
+- **ordered_steps：** 候选格式与拒绝表、纯编码/解析反例、UUID 临时工作区真实原生写读/重启/实验缓存清理回读、内核 API 改值/删块已完成 → 编辑器正文读取/改值/删除/重载及双页面刷新已观察 → N2 正文格式与聚合完整性研究 → 有效候选身份夹具的 UI 严格读取、复制/粘贴身份核验与同时写/删块竞争 → 记录 D1 取舍和未验边界。
+- **test_fixtures / test_commands / acceptance：** 普通与特殊字符、旧 ` / ` 原文、同值跨人、同序稳定 ID、固定来源键、重复标记/块、原生改值/删块、未知格式、坏文档/块形状、控制字符、删除实验插件缓存；`node --check scripts/spike/contact-methods-native-research.mjs`、`node scripts/spike/contact-methods-native-research.mjs` 输出 31/31；`node --check scripts/spike/contact-methods-native-host-spike.mjs`、`node scripts/spike/contact-methods-native-host-spike.mjs` 输出 `hostVerified=true`。隔离真实内核已回读六条完整值、`ial`、`content`、`markdown`、`parent_id`，并通过内核 API 改值/删块；Chrome 编辑器正文操作及同人物双页面刷新已观察，多行被折叠为单行，最终邮箱恢复值 SQL 回读通过；复制载荷、严格候选读取与并发仍待补。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 每条写读独立报告，未知不自动重发；仅删除本脚本创建且已验证归属的临时资源；全虚构、无联网外发、无真实联系方式。仅小样本能力验证，不承诺大库搜索/扫描成本。
+- **evidence_paths / owner / last_updated / commit：** `docs/verification/MULTI-CONTACT-OWNERSHIP-2026-10-17.md`、`docs/verification/MULTI-CONTACT-NATIVE-2026-10-17.md`、`docs/verification/MULTI-CONTACT-NATIVE-HOST-2026-10-17.md`、`docs/verification/MULTI-CONTACT-NATIVE-UI-2026-10-17.md`、`docs/verification/MULTI-CONTACT-NATIVE-MULTIWINDOW-2026-10-17.md/json`、`scripts/spike/contact-methods-native-research.mjs`、`scripts/spike/contact-methods-native-research-results.json`、`scripts/spike/contact-methods-native-host-spike.mjs`、`scripts/spike/contact-methods-native-host-results.json` / Codex + contact_native_review / 2026-10-17 / 未提交。
+- **明确退出边界：** 已证明内存格式边界、隔离真实内核原生块写读/重启/实验缓存清理回读；编辑器正文手工改值/删块及同人物双页面刷新已有观察。UI 夹具身份不同且正文折行，不能升级为严格候选全量读取成功；两窗口原生竞争、复制身份、真实用户插件数据删除、全量搜索和备份协议仍未证明。同人复制旧 ID 应报告 duplicate，跨人旧 owner/ID 应报告 conflict/unknown，读取与刷新不得自动重写身份；仅显式采纳新方法才讨论分配新身份。任何不完整读取不得回填或覆盖集合，转 N2 研究；S2 假 Plugin/假 AV 不替代宿主证据。
+
+#### AG-RF-004-N2 — 编辑器稳定正文与复制身份边界
+
+- **status / priority / type / milestone：** `done_isolated` / P2 / research+spike / M4；纯研究阶段已收口，后续 UUID 宿主阶段单列证据，整张研究方向仍不能因隔离通过变为生产 ready，父卡保持 `candidate`。
+- **user_outcome / user_scenario：** 停用插件后仍可读完整联系方式；原生编辑、复制与重载后，能够区分有效方法、重复、冲突和不完整读取，避免把解析失败误当删除。
+- **source_ids / current_evidence：** Issue #51/#54、N1 31/31 与隔离宿主证据；真实编辑器会折叠多行正文，严格四行头在有效研究身份夹具中返回 `body-header`。UI 夹具使用独立 `ui-*` ID，只证明编辑器行为，没有通过 N1 严格身份解析。
+- **depends_on / blocks / parallel_group / preconditions：** N1 的纯格式及编辑器观察，不依赖采纳 D1 / D1/D4 与生产原生方法读写 / contact-native-editor / 先比较格式和拒绝语义，真实 UI 结果必须单列；只使用虚构数据。
+- **allowed_files / forbidden_files：** 本轮新增 `scripts/spike/contact-methods-native-editor-research.mjs`、其 results、`docs/verification/MULTI-CONTACT-NATIVE-EDITOR-2026-10-17.md` 及本卡；后续宿主阶段仅允许新增 `scripts/spike/contact-methods-native-editor-host-spike.mjs`、其 results 与独立宿主报告 / N1 原脚本与所有生产模型、DATA-CONTRACT、API、AV、存储、服务、组件、迁移、vCard、版本与发布文件。
+- **contract_change / host_or_spike_required：** 无生产契约变更；比较单行可读编码、专门编辑器多行格式、保留多行但拒绝自由改写三种候选。纯函数与真实 UI 证据不能互相替代；宿主阶段只复用 N1 已实证端点，须操作前后严格读取有效候选身份夹具。
+- **ordered_steps：** 固定候选与拒绝表 → 纯域编码/解析及不完整读取反例 → 同人/跨人复制与显式采纳身份实验 → 独立复核 → 有可用 Chrome 控制通道时补 UUID 隔离宿主 UI 回读 → 记录可采纳与待验边界。
+- **test_fixtures / test_commands / acceptance：** 空/特殊/多行值、引号/反斜杠/Markdown、头部碰撞、未知格式、重复 ID、跨人 owner/source/ID 冲突、取消与未核实采纳；`node --check scripts/spike/contact-methods-native-editor-research.mjs`、`node scripts/spike/contact-methods-native-editor-research.mjs`。值无静默丢失；任何未知/重复/冲突使聚合读取 `complete=false`、`writeAllowed=false`；解析/刷新零身份分配，只有显式确认采纳且身份目标已核实才生成新身份，未知/取消零自动修复。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 失败返回非零；本轮纯研究不写真实插件存储或内核、不重试未知写；后续宿主阶段只写 UUID 隔离工作区且核实归属后清理；仅虚构数据，无联网外发；有界矩阵，不承诺大库或真实编辑器稳定性。
+- **evidence_paths / owner / last_updated / commit：** `scripts/spike/contact-methods-native-editor-research.mjs`、其 results、`docs/verification/MULTI-CONTACT-NATIVE-EDITOR-2026-10-17.md` / Codex + native_editor_research / 2026-10-17 / 未提交；纯研究矩阵 123/123；宿主内核阶段已独立开展，结果与剩余 UI 边界见下一张 N2-HOST，本纯研究卡不承担宿主验收。
+
+#### AG-RF-004-N2-HOST — 有效候选身份的隔离宿主写读
+
+- **status / priority / type / milestone：** `host_pending` / P2 / host+spike / M4；隔离真实内核传输、严格读取与重启回读已完成；Chrome 编辑器操作、真正复制/粘贴和并发仍待验。
+- **user_outcome / user_scenario：** 原生文档中的完整联系方式经过保存、重启后仍能精确回读；编码或宿主转换不兼容时可见拒绝，不把可读文本误报为可解析全量。
+- **source_ids / current_evidence：** Issue #51/#54、N2 123/123；N1 UI 夹具为 `ui-*`，未通过严格身份解析，且编辑器会折叠多行。本卡使用有效 `method-{hash}` 的单行 JSON 候选：四组值 × Markdown/DOM 两路径，DOM 4/4、Markdown 2/4 通过原样严格解析及重启回读；Markdown 转义/富文本两组被宿主改写并拒绝。当前 CUA 仅 IAB/MCP Apps，无 Chrome 控制面，`uiVerified=false`。
+- **depends_on / blocks / parallel_group / preconditions：** N2 纯研究 `done_isolated`、现有 insertBlock/SQL/getChildBlocks 与 DOM 文本端点实证 / N1/N2 完整宿主验收、D1/D4 / contact-native-editor-host / UUID 临时工作区、随机回环端口、已验证内核路径，所有数据虚构；不得连接日常库或通过外部 CDP 操作 UI。
+- **allowed_files / forbidden_files：** 新增 `scripts/spike/contact-methods-native-editor-host-spike.mjs`、其 results、`docs/verification/MULTI-CONTACT-NATIVE-EDITOR-HOST-2026-10-17.md` 及本卡；只读复用 N2 纯函数与 kernel-safety / N1/N2 原脚本及全部生产模型、DATA-CONTRACT、API、AV、存储、服务、组件、迁移、vCard、版本和发布文件。
+- **contract_change / host_or_spike_required：** 无生产契约变更；本卡是候选写入传输与严格回读实证，不直接把宿主 Markdown 映射成纯文本或修改候选解析器以掩盖差异。
+- **ordered_steps：** 核对安全边界 → 审阅可复跑脚本和 dry-run → UUID 隔离内核写入有效 `method-{hash}` 夹具 → SQL/content/markdown/ial/parent 回读并运行严格读取器 → 重启回读 → 停止临时进程并记录已验与待验项；Chrome 可用后另补改值、真正 Copy/Paste 和竞争。
+- **test_fixtures / test_commands / acceptance：** 普通值、真实换行、字面反斜杠、引号、HTML/Markdown、首尾空白、同值跨人；`node --check scripts/spike/contact-methods-native-editor-host-spike.mjs`、默认 dry-run、`LVCT_RUN_NATIVE_EDITOR_HOST=1` 的隔离内核运行。所有宿主原始字段保留，任何不匹配显式报告；`uiVerified=false` 直到真实 UI 证据齐全，不因 Kernel API 通过将整卡标 done。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 未知写不自动重发；仅结束本轮持有的临时进程，核实退出；保留虚构工作区和证据，不递归删除未知目录；不安装插件或访问真实联系方式，无联网外发；小样本能力探针，不承诺大库搜索或并发隔离。
+- **evidence_paths / owner / last_updated / commit：** `scripts/spike/contact-methods-native-editor-host-spike.mjs`、`scripts/spike/contact-methods-native-editor-host-results.json`、`docs/verification/MULTI-CONTACT-NATIVE-EDITOR-HOST-2026-10-17.md` / Codex + native_editor_host_spike / 2026-10-17 / 未提交；Kernel `3.8.8-alpha.2`、73 次请求及对应 PID 归属核实，八组块原始字段在重启后保持；两次本轮内核进程均已退出、端口释放。语法与 dry-run 通过；候选未采纳，未修改生产或发布文件。
+
+#### AG-RF-004-N2-HOST-UI-COPY — 有效候选的原生编辑器与完整块复制边界
+
+- **status / priority / type / milestone：** `host_pending` / P2 / host+research / M4；续接 N2-HOST 的真实 UI 子阶段。本轮仅登记可执行范围，尚未执行有效候选的真实编辑器和 Copy/Paste，不因 API、静态 bundle 或纯函数结果升级。
+- **user_outcome / user_scenario：** 用户在原生人物文档编辑或复制完整联系方式块后，能够看见实际保留的值和身份；重复、跨人旧归属与未知格式不能被静默认作新方法，避免刷新时覆盖或删除其他事实。
+- **source_ids / current_evidence：** Issue #51/#54；N2 纯研究 123/123；N2-HOST DOM4/4、Markdown2/4 严格原值回读及重启已完成，`uiVerified=false`；`MULTI-CONTACT-NATIVE-COPY-2026-10-17.md` 只读定位了完整块 Copy 的内层菜单和原生载荷路径，未执行真实 Copy/Paste。N1 旧 UI 的 `ui-*` 身份与多行正文不能替代本卡有效 `method-{hash}` 夹具。
+- **depends_on / blocks / parallel_group / preconditions：** N2-HOST 已实证 DOM 传输、原样 N2 读取器及已验证 SQL/直接子块端点 / N1/N2 完整宿主验收与 D1/D4 比较 / contact-native-editor-ui / 必须先确认有可操作的 Chrome 控制面；仅 IAB/MCP Apps 或 Chrome unavailable 时保持 `host_pending`，不得用外部 CDP、手工构造 ClipboardEvent、直接 DOM/Kernel 插块代替原生旅程。使用新 UUID 隔离工作区、随机回环端口、逐请求 ownPID 和全虚构数据，不连接日常库。
+- **allowed_files / forbidden_files：** 后续仅新增独立 UI 旅程脚本、原始回读 results、截图与 `docs/verification/MULTI-CONTACT-NATIVE-EDITOR-UI-COPY-2026-10-17.md`，及本卡状态；只读复用既有 N2/parser、端点与隔离安全工具 / 不修改 N1/N2/A1/A2/S3 既有实验以掩盖差异，不改生产 DATA-CONTRACT、模型、API、AV、存储、服务、组件、迁移、vCard、版本或发布文件。
+- **contract_change / host_or_spike_required：** 无生产契约变更；必须有实际可见的 Chrome 原生编辑器操作和持久化回读。先用有效 `method-{hash(owner:sourceKey)}`、合法 owner/source 和单行 DOM 候选建立严格接受基线；保留原始 `content` 与 `markdown`，不互相代填、重编码或放松读取器来追求通过。
+- **ordered_steps：** 核对 Chrome/工作区/PID 归属 → 两虚构人物及有效候选基线 → 原生正文改值后严格回读 → 从目标普通块菜单展开父 Copy 并触发内层完整块 Copy → 同人普通 Paste → 跨人物普通 Paste → 重开文档/重载后的 SQL 与严格读取复核 → 独立审查与停止本轮进程。粘贴后先由 UI 确认新块出现，再回读新旧块及完整受控人物范围；不得只查询仍带 marker 的块。
+- **test_fixtures / test_commands / acceptance：** 普通值、实际换行/反斜杠/引号、Markdown/HTML、同值跨人；基线、改正文、同人复制、跨人复制、属性丢失/改写和重载逐项保存 UI 事实以及原始 `id/root_id/parent_id/type/content/markdown/ial`、直接子块与原样 N2 报告。同人若保留方法 ID 且正文有效，必须可见 `duplicate/method-id`；跨人若保留旧 owner/ID 且正文有效，必须可见 `conflict/owner-or-parent`；正文折行、属性改写/丢失或值不一致按实际输入进入 `unknown`，不能按姓名/值重连或自动改 owner/source/ID。任何未知、重复、冲突或不完整范围均 `complete=false`、`writeAllowed=false`、`methods=[]`；只有明确受控枚举范围可作本次判定，不能推广为历史全集。刷新后事实与拒绝报告保持一致，零自动身份分配/修复/墓碑/投影写入。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** UI 或写入结果未知先只读核实，不自动重发粘贴；仅保存虚构夹具与本轮页面证据，不读系统无关剪贴板。原生 clipboard 载荷若可被动观察，只作补充且不改变默认事件，不能替代持久回读；不能观察时如实单列。只关闭本轮创建页面并停止持有进程，核实端口释放，保留虚构工作区；小样本研究不承诺大库或并发隔离。
+- **evidence_paths / owner / last_updated / commit：** `docs/verification/MULTI-CONTACT-NATIVE-EDITOR-UI-COPY-2026-10-17.md`（准备协议）、`docs/verification/MULTI-CONTACT-NATIVE-EDITOR-HOST-2026-10-17.md`、`docs/verification/MULTI-CONTACT-NATIVE-COPY-2026-10-17.md` 与 N2-HOST 既有 results；本卡真实 UI 证据尚无 / Codex + next_research_scope / 2026-10-17 / 未提交。
+- **明确退出边界：** 实际原生操作可因候选被宿主改写而得到可见拒绝，不能把“值可见”宣称为严格候选可读。无真实 UI、未出现新持久块或只完成菜单可达均不得标完成；两页面同时写/删块竞争、桌面原生多窗口、人物生命周期、卸载/全配置删除、完整搜索和数据出口另列后续验收。即使本卡收口，D1 仍须综合比较，#51/#54 保持开放。
+
+#### AG-RF-004-N3 — 原生候选范围发现与丢标记反例
+
+- **status / priority / type / milestone：** `done_isolated` / P2 / research+host-spike / M4；候选发现与丢标记反例已隔离实证，不采纳生产范围/删除/恢复协议。
+- **user_outcome / user_scenario：** 联系方式源块丢属性、正文变成普通文本或被删除时，刷新不能把漏读当完整空集合并清空其他位置的数据。
+- **source_ids / current_evidence：** Issue #51/#54；N2 的 readDocument 只读已选方法块，scopeDiscoveryVerified=false；N2-HOST DOM4/4，S3-A0 已证明写后值相等不保证无覆盖；Chrome 当前仍不可用。
+- **depends_on / blocks / parallel_group / preconditions：** N2 纯函数、现有 SQL/getChildBlocks/insertBlock/updateBlock/setBlockAttrs/deleteBlock 端点实证 / 原生文档方案 D1/D4 与全量发现/删除规则 / contact-native-scope / 全部虚构、新 UUID 临时工作区、随机回环端口及逐请求 ownPID；不使用未实证 moveBlock。
+- **allowed_files / forbidden_files：** 新增 `scripts/spike/contact-methods-native-scope-spike.mjs`、其 results、`docs/verification/MULTI-CONTACT-NATIVE-SCOPE-2026-10-17.md`，本卡及契约复评研究状态 / N1/N2/S3 原脚本、生产 DATA-CONTRACT、模型、API、AV、存储、服务、组件、迁移、vCard、版本和发布文件。
+- **contract_change / host_or_spike_required：** 无生产契约变更；直接复用既有端点及原样 N2 parser；真实内核只能证明已返回行的观察，不能授予原生方法全集或用户删除意图。
+- **ordered_steps：** 固定 marker-only/可疑特征/已知基线三种诊断比较 → 安全 dry-run → 两文档有效候选基线及普通正文 → 去主 marker、去全部方法属性、再改为普通正文 → 比较冷读与有已知块 ID 的回读 → 删除已知块/人为截断范围反例 → 原始 SQL/子块证据与独立复核 → 停止本轮内核。
+- **test_fixtures / test_commands / acceptance：** 有效 hash 身份、两条方法、普通笔记、同前缀普通正文、缺主 marker/全方法属性/正文提示、已知块删除、读取预算截断；`node --check scripts/spike/contact-methods-native-scope-spike.mjs`、默认 dry-run、`LVCT_RUN_NATIVE_SCOPE=1`。marker-only 对照可暴露虚假的 complete，但不得用作可写结果；保守诊断对已知异常返回不完整/零可写方法，任何范围均不产生删除墓碑/业务修复/身份分配。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 请求未知不自动重发，失败非零；只停止本轮持有子进程，保留虚构工作区，不递归删除；所有修改仅实验夹具，不读取日常库；固定小样本/有界 SQL，不承诺大库或强一致扫描。
+- **evidence_paths / owner / last_updated / commit：** `scripts/spike/contact-methods-native-scope-spike.mjs`、`scripts/spike/contact-methods-native-scope-results.json`、[MULTI-CONTACT-NATIVE-SCOPE-2026-10-17](verification/MULTI-CONTACT-NATIVE-SCOPE-2026-10-17.md) / Codex + native_scope_spike + next_scope_review / 2026-10-17 / 未提交。
+- **收口检查：** `pnpm check` 0 errors / 0 warnings，`pnpm test` 656/656，语法/dry-run 与 `git diff --check` 通过；独立只读复核 14 份原始快照及诊断重算一致，另有 8 个坏形状反例通过。
+- **完成回报：** 纯检查 22/22；Kernel `3.8.8-alpha.2`、59 HTTP 及 59 次 ownPID 核实，7 阶段/14 组原始 SQL 与直接子块回读。实际去主 marker 后 marker-only 漏掉电话却仍 complete；全部属性与正文提示消失后，特征冷读也漏掉电话却仍 complete，实验已知 ID 才能揭示 unknown。已知块删除保持当前行观察完整，但只报 `unknown-not-delete`，零墓碑/业务修复/AV 写/身份分配。预算 1+额外 1 行真实截断、重启只读比对通过，两次本轮进程已退出、端口释放。完整性仅限本卡直接段落与有界顺序观察，不含一般嵌套父链闭包或原子性；历史验证及外层写权限始终 false。后续A1/A2已补独立方法AV行读取与研究锚点冷发现证据，仍未作D1选择；N2真正编辑器/复制/并发仍待验，无生产变更或发布。
+
+#### AG-RF-004-A1 — 原生方法 AV detached 行与完整读取能力
+
+- **status / priority / type / milestone：** `done_isolated` / P2 / research+host-spike / M4；仅完成受控候选行能力，不采纳 D1 或生产 schema。
+- **user_outcome / user_scenario：** 同一人物多电话等完整值留在原生数据中，删除插件实验缓存后仍可回读；缺身份、归属冲突或不完整分页不得被当空集合清空其他数据。
+- **source_ids / current_evidence：** Issue #51/#54；N3 已证 marker/特征查询漏读；M0 appendDetached 只有 code0、无严格回读。B13 detached 分类假定没有 block 型主键，与 orgRows=2 摘要存在疑点，不能当作路径已可用或不可用的最终证据；跨库 relation 已有负证据，不使用。
+- **depends_on / blocks / parallel_group / preconditions：** 既有 DOM 建库/建列、appendAttributeViewDetachedBlocksWithValues、renderAttributeView page/pageSize、setAttributeViewBlockAttr、removeAttributeViewBlocks 和文档 SQL 端点 / D1 候选比较 / contact-methods-av-rows / 全虚构、新 UUID 临时目录、随机回环端口及逐请求 ownPID，先冻结规范。detached 实际渲染和删除语义本身待验，失败保留负证据，不暗换绑定行方案。
+- **allowed_files / forbidden_files：** 新增 `scripts/spike/contact-methods-av-rows-spike.mjs`、其 results、`docs/verification/MULTI-CONTACT-AV-ROWS-2026-10-17.md`，本卡及契约复评研究状态 / 既有 spike、生产 DATA-CONTRACT、模型、API、AV、存储、服务、组件、迁移、vCard、版本与发布文件。
+- **contract_change / host_or_spike_required：** 无生产契约变化；研究列全部 text（methodId/ownerDocId/sourceKey/type/label/value/primary/order），宿主自建 block 主键保持原样；ownerDocId 只是待核实引用，不冒充外键/relation/反链。itemID、方法 ID、人物 docId 分开记录。
+- **ordered_steps：** 冻结范围和严格读取规则 → 语法/纯反例/dry-run 安全审查 → 两虚构人物、十方法单批 append 原始响应及独立分页回读 → 实验 API 改值/标签/顺序保持身份 → 清空 ID、重复 ID、改归属反例及显式恢复夹具 → 移除已知行/缺失未知 → 删除本轮已核实实验缓存、重启只读核实 → 独立复核及结束本轮进程。
+- **test_fixtures / test_commands / acceptance：** 每人两电话、一邮箱、一微信、一网址，同值跨人、特殊字符/真实换行、pageSize2 真正跨多非空页、额外空页、缺/坏 cell、重复/漏页、rowCount 变化、页预算耗尽、非法 owner、空/重复 methodId、删行及重启；`node --check scripts/spike/contact-methods-av-rows-spike.mjs`、默认/显式 dry-run、`LVCT_RUN_AV_ROWS=1`。可用能力必须按原始回读证明，不依赖主键分类猜测；全新无过滤默认视图的当前观察与历史全集、语义集合完整性分开，外层 writeAllowed=false，零自动重发/身份修复/墓碑/主库投影。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 写未知不重发；每页正数2、固定小样本/最多8页及额外空页，不使用 pageSize:-1 充当全量；只删除本轮创建且内容/路径核实的单个实验缓存文件，不递归删除，不访问日常库或安装插件；只停止持有的本轮子进程。失败原始证据保留；检测守卫不是 OS 级隔离。
+- **evidence_paths / owner / last_updated / commit：** 上述新脚本、results 与研究报告 / Codex + native_scope_spike + av_probe_review + next_scope_review / 2026-10-17 / 未提交。
+- **2026-10-17 追加前置校准：** 两次 text-only 单批追加均 code0，但包括读前 flush 的第二轮仍回读空表；各自 UUID 原始失败证据保留。第二轮磁盘只读核实 8 个 text 列各保存10值、宿主 block 主键无值。匹配版本 tag `v3.8.8-alpha.2` 的 commit `2b31367098736be09e27edd3e8044518dd3919e8` 源码显示 append 仅保存传入值，渲染会排除缺 block 主键值的行。先冻结 `source-backed-primary` 变体：取新 AV schema 唯一真实 block 列 keyID，每行显式追加 `{keyID,block:{content:虚构显示标签}}` 加原8 text值；省略自造 itemID、block.id、人物绑定及时间戳，由内核分配。只在第三个新 UUID/new AV 验证，旧 AV 零重发；仍用原严格分页/故障/重启验收，不放松诊断。版本字符串匹配不是安装二进制源码溯源证明；若失败即保留现场，无绑定行替代。
+- **2026-10-17 比较前置校准：** 第三轮10方法已分5页回读，8text/block值完全一致，但默认空Select渲染生成不同value.id，严格原始比较失败，现场保留。固定源码解释该缺值生成路径。先冻结 `empty-host-select-generated-id-v1`：仅schema非方法的默认空Select精确六字段shape且合法id/blockID=row.id时，比较归一该value.id，其他字段逐一相同；mSelect/未知字段/非法或缺失id不适用，text/block ID不忽略。先补反例和独立复核，再第四个新UUID同payload验全序列；没有重发任何旧AV，未放松方法身份/内容/行数/分页/冲突规则。
+- **完成回报：** 纯检查58/58、独立补充检查85/85；Kernel `3.8.8-alpha.2`，第四轮UUID `60ac7452-0fb1-4fb7-91fe-5142dabc4c7b`，135 HTTP/135次ownPID、26夹具修改、11完整快照。两人十方法真实5页回读；API改值/标签/顺序保持身份，空ID、同人有效hash/source重复及可达人物归属变化均拒绝整个语义集合，显式恢复夹具后可读。移除非主值行后9个存活itemID不变，缺失仅unknown-not-delete；精确实验缓存删除与内核重启后9方法保持。逐快照保存默认空Select未持久化证据、全部raw与仅value.id归一路径；前三轮失败文件不覆盖。两个本轮PID已退出/端口释放，原用户内核启动时间未变。`pnpm check` 0 errors / 0 warnings、`pnpm test` 656/656；既有74项文件状态校验一致。真实UI/原生编辑/跨窗口/历史全集/真实卸载后发现仍未验，外层writeAllowed=false；#51/#54开放。后续A2已完成研究锚点丢失的独立冷发现隔离轮，仍不证明真实卸载恢复；无生产变更、提交或发版。
+
+#### AG-RF-004-A2 — 方法 AV 锚点丢失后的只读冷发现与歧义边界
+
+- **2026-10-17 增量收口：** av_probe_review 补齐父broker的maxRequests硬预算、AV小页上界及500行对照仅首页，新增7项独立纯反例与合法读取序列兼容检查；主代理补实际初始provenance断言并新UUID重验通过，已同步results/报告。纯检查reader33/33、broker17/17，`pnpm check` 0 errors / 0 warnings、`pnpm test` 656/656；同AV多carrier的配对许可仅有纯broker证据，真实多carrier宿主回读仍未验。
+- **status / priority / type / milestone：** `done_isolated` / P2 / research+host-spike / M4；A1全序列及独立复核已完成，A2冷发现已完成隔离真实内核轮，不是生产ready。
+- **user_outcome / user_scenario：** 方法锚点配置丢失后能列出原生候选与歧义；找不到、不完整和未知不能触发清空、自动重绑或新建第二套库。
+- **source_ids / current_evidence：** Issue #51/#54、D1数据主权门槛、N3冷读漏行反例、A1已知AV当前观察；A1缓存删除/重启仍持有AV/载体/列/人物ID，不能证明无配置发现。现有init候选扫描按联系人总表标题/主库字段评分，不是方法AV恢复证据。
+- **depends_on / blocks / parallel_group / preconditions：** A1全序列、已实证笔记本/文档SQL/原生AV载体和schema读取 / D1锚点恢复与数据主权结论 / contact-methods-av-discovery / 新UUID、全虚构、随机回环端口、逐请求ownPID；先登记规则与拒绝表，不猜新端点。
+- **allowed_files / forbidden_files：** 新增`scripts/spike/contact-methods-av-cold-spike.mjs`、独立`contact-methods-av-cold-reader.mjs`、`contact-methods-av-cold-results.json`、`docs/verification/MULTI-CONTACT-AV-DISCOVERY-2026-10-17.md`，本卡/父卡及契约复评研究状态 / 既有spike、生产DATA-CONTRACT、模型、API、存储、服务、组件、迁移、vCard、版本和发布文件。
+- **contract_change / host_or_spike_required：** 无生产契约变化；字段匹配仅产生候选，不证明所有权；唯一候选也不自动选定/保存配置。不以标题、姓名、同值或已知ID绕过冷读。
+- **ordered_steps：** 冻结有界读取/拒绝与冷进程协议 → 纯反例/dry-run → 新UUID原生夹具与完整研究锚点配置 → 停止创建进程 → 按manifest核实路径/摘要后逐个删除本轮研究配置文件 → 全新读取进程冷发现 → 独立oracle对照 → 停止本轮内核并复核证据。
+- **cold_reader_boundary：** 冷进程只得到安全连接上下文，不得得到notebook/doc/AV/key/item/method ID、列映射或已知集合；oracle在独立复核侧，不经报告、模块导入、磁盘AV文件或环境变量回传读取器。恢复阶段只经已实证只读API观察。
+- **test_fixtures / test_commands / acceptance：** 两人物十方法、任意标题直接AV载体、无关AV、第二同schema且同内容候选、同schema空AV、缺一方法列/坏页/预算截断；`node --check`两新脚本、默认/`--dry-run`、`LVCT_RUN_AV_COLD=1`。候选有原生证据，可与独立oracle对照；不同AV同schema/同内容/同方法ID不合并，空匹配AV也保留。同AV多载体保留全部来源并核对方法集合；同AV任一载体unknown/unrelated而另一载体matching时，整体unknown，不能静默排除。坏页/坏列/预算返回unknown/truncated；唯一候选仅unique_unowned，零候选仅not_found_in_observed_scope。零恢复事实写/配置保存/自动选择/新建/身份修复/墓碑。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 未知不重发；只处理manifest中本轮精确且路径/内容核实的文件，不递归删除；失败原证据保留，只结束持有进程；全虚构、正数分页与硬预算，仅有界顺序观察，不承诺原子全库扫描。
+- **evidence_paths / owner / last_updated / commit：** 上述A2独立script/results/report（修复后最终 runUUID `934f6213-fb65-4576-96e1-50bfb0173f1d`，151 HTTP、47 fixture mutations、reader33/33、broker17/17、ownKernelExited=true、portReleased=true、productionChanges=false），A1与D1研究报告 / Codex + native_scope_spike + next_scope_review + av_probe_review / 2026-10-17 / 已完成隔离、未提交。
+- **运行前冻结：** SQL只扫当前索引可见`type='av'`载体，`SELECT id, root_id, parent_id, box, type, markdown FROM blocks WHERE type='av' [AND id > '<cursor>'] ORDER BY id LIMIT pageSize+1`，默认pageSize2/max8页；严格递增/唯一/字段/游标/lookahead，游标取最后处理行而非sentinel，耗尽后另验空页。该全库组合在本卡首次隔离实证。严格解析SQL markdown唯一NodeAttributeView/data-av-id，不加DOM/attrs路由，不按标题/marker/已知ID筛选；非直接载体、坏语法和部分方法schema均unknown。根文档/owner只用本次原生响应得到的ID作SQL核实，可达不等于联系人身份/所有权。
+- **冷协议与比较边界：** 独立reader不import旧spike/fixture/oracle/FS/HTTP/child_process，启动仅协议版本与数值预算；env/argv无实验路径/IDs/token/canary，父broker的per-reader来源集合初始为空，只由该reader已收原始响应登记。IPC单pending/递增seq/精确SELECT模板及render参数白名单/硬字节请求数超时；父只加安全鉴权、逐请求ownPID，原样代发及返回，不注入/过滤/修正数据。render query空/createIfNotExist=false/pageSize2最多8页+额外空页+500对照，验证AV/view稳定、无实质filters/group/context/mirror；比较rowID及8方法text值，宿主其他cell形状校验/raw保留，但不承诺其跨请求原始身份相等，不移植A1磁盘证明归一。历史/所有权/写/重绑/新库/墓碑权限恒false。
+- **冻结场景编排：** 单一新UUID先空索引冷读负例；独立producer1建两人物十方法及无关AV/研究配置后退出，逐文件核实manifest/摘要并删除，再freshreader唯一候选；freshreader预算1与一次broker读前拒绝分别truncated/unknown（拒绝是受控传输注入，不称内核故障）。producer2建同内容第二AV和空同schema AV后退出/删其配置，freshreader歧义；producer3建缺一方法列AV后退出/删其配置，freshreaderunknown。每次冷读是新进程，oracle仅在父审计侧、冷进程退出后对照；不存在删除原生事实来制造空库。
+- **明确退出边界：** 最多形成“研究锚点配置全失”的done_isolated；真实卸载/全部插件配置删除、原生表可读性、原生编辑/复制和未完成请求恢复仍需独立宿主证据，不能因A2通过提前关闭#51/#54。A2后已补编辑器/复制准备、L1/L2人物生命周期身份研究；D6旧值迁移/备份/版本出口纯研究已收口为`done_isolated`，其正式契约、生产迁移/备份实现和宿主回读仍需独立门禁；正式/剩余D3/D4与D7数据出口继续按顺序评审。
+
+#### AG-RF-004-L1 — 方法 AV 与人物解绑、主方法缺失的联合生命周期
+
+- **status / priority / type / milestone：** `done_isolated` / P2 / research+host-spike / M4；34/34纯检查、76次隔离真实内核请求及独立raw复核通过，不替代N2-HOST-UI-COPY或采纳D1。
+- **user_outcome / user_scenario：** 删除某条主联系方式或将人物移出名册后，完整方法和主表标量的实际保留情况可核对；同一人物重新绑定时，旧请求不能借新名册行继续写入。
+- **source_ids / current_evidence：** Issue #51/#54、D3/D4；A1只验证非主方法行删除，S3-A0只验证标量目标解绑/重绑，S2是假存储模拟；L1 已补齐双 AV 联合生命周期的 76 次隔离真实内核观察，L2 又补齐同名替换、旧源不可达/位置变化和 owner/itemID 冲突的 16/16 纯身份矩阵，正式/剩余 D3/D4 仍未采纳。
+- **depends_on / blocks / parallel_group / preconditions：** A1显式block主键的detached方法追加与完整读取、S3-A0绑定/解绑/映射/标量端点实证 / D3/D4生命周期比较 / contact-methods-lifecycle / 新UUID、随机回环端口、逐请求ownPID、全虚构数据；先冻结本卡规则再写脚本，不依赖D1选择。
+- **allowed_files / forbidden_files：** 新增`scripts/spike/contact-methods-lifecycle-spike.mjs`、其results、`docs/verification/MULTI-CONTACT-LIFECYCLE-2026-10-17.md`，本卡与相关研究状态 / 既有spike、全部生产模型/DATA-CONTRACT/API/存储/服务/组件/迁移/vCard、版本与发布文件。
+- **contract_change / host_or_spike_required：** 无生产契约变更；primary只是研究text字段，不是宿主内建主值语义。仅复用已实证创建文档/AV、追加方法、绑定/解绑、标量赋值、映射、SQL、flush、render、version/boot/exit端点；不试删除/移动人物文档的新端点。
+- **ordered_steps：** 冻结研究输入与拒绝表 → 纯反例/dry-run与独立安全复核 → 两虚构人物各主/次电话及主表主值 → 删除甲已知主方法并回读双AV → 解绑甲主名册并核实doc可达/方法仍在 → 同doc重绑并记录itemID → 内核重启只读复核 → 独立核对原始证据与清理。
+- **test_fixtures / test_commands / acceptance：** 两人物四方法、同值跨人、合法hash/source与显式0/1主值；`node --check`、默认/`--dry-run`零文件写/HTTP/端口/子进程、显式`LVCT_RUN_CONTACT_LIFECYCLE=1`。方法AV小页2/额外空页/500行对照、稳定schema/view、逐行身份与原文严格相等；主AV唯一绑定、官方映射与phone typed-content独立核实。删甲主方法后记录甲次方法primary与主表旧值的实际结果，乙不变；解绑后分列源集合读取、doc可达与名册资格；重绑沿用docId不假定itemID必换，方法ID/owner/source/值不变。旧冻结目标不自动续写；重启阶段零夹具写。缺失/未知范围不返回可写集合，不按姓名/值转移方法。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 未知写零自动重发，失败保留完整证据；物理缺行只报unknown-not-delete，不推断用户删除意图、不晋升/清空/投影/墓碑/恢复。所有赋值和移除仅显式实验夹具操作，自动业务写恒0；只结束持有进程，核实端口释放，保留虚构工作区。小样本有界读取，不承诺CAS、历史全集或全库性能；token不进入证据。
+- **evidence_paths / owner / last_updated / commit：** [联合生命周期证据](verification/MULTI-CONTACT-LIFECYCLE-2026-10-17.md)、`scripts/spike/contact-methods-lifecycle-spike.mjs`、`scripts/spike/contact-methods-lifecycle-results.json`及本轮UUID副本 / Codex + lifecycle_probe + lifecycle_contract_review / 2026-10-17 / 已完成隔离、未提交。
+- **完成回报：** runUUID `329a34fa-cb9b-43eb-a6c4-c404ac906f52`，Kernel `3.8.8-alpha.2`；方法4→3、名册2→1→2的联合五阶段均独立回读。甲主方法移除后主表旧phone保留、次方法primary文本为0；解绑后甲文档与剩余方法仍可达但无名册资格；本轮同doc重绑实际换itemID且phone为空，方法身份/归属/原文不变。乙全程不变；重启按实际重绑事实只读比对通过。76 HTTP/ownPID76，fixture23且仅初始化scalar2，重启后修改0，projection/replay/墓碑0；两个持有PID退出、端口释放。三份raw逐字节相等、token未入证据；独立审计从原始载荷/响应重建事实通过。纯34/34包含完整源下换itemID及曾解绑后复用同itemID拒绝；旧目标拒绝只是研究诊断，未实现生产guard/CAS/持久恢复。默认/import/dry-run零副作用、语法与diff检查通过，未改生产实现或发布。
+- **明确退出边界：** 最多done_isolated；D1Adopted、历史全集、外层writeAllowed/tombstoneAllowed、UI与并发验证始终false。重绑只覆盖同docId；同名新doc、人物删文档/移动、真实卸载、生产恢复与完整备份出口未验。#51/#54保持开放。
+
+#### AG-RF-004-D3D4-P — 主值删除、零主值投影与解绑差异纯研究
+
+ - **status / priority / type / milestone：** `done_isolated` / P2 / contract+research+spike / M4；21/21 纯检查通过，补齐 D3/D4 主值投影交叉边界，不开放生产写入。
+ - **user_outcome / user_scenario：** 删除主联系方式、切换主联系方式或解绑人物时，用户能区分“方法被显式删除”“人物暂不投影”和“AV 已被外部改动”，避免自动晋升、误清空或旧值复活。
+ - **source_ids / current_evidence：** Issue #51/#54、D3/D4；S2 已覆盖通用墓碑/陈旧确认，L1 已观察主方法缺失和解绑，L2 已覆盖人物身份门禁；本卡补纯状态机中零主值、显式删除/解绑差异、墓碑和陈旧 AV 投影冲突。
+ - **depends_on / blocks / parallel_group / preconditions：** 仅依赖 S2/L1/L2 的脱敏规则和已有 AV 标量观察；不依赖 D1 选择，不调用 delete/move 或任何 Kernel/Plugin 端点；纯 Node、全虚构、零生产存储 IO。
+ - **allowed_files / forbidden_files：** 新增 `scripts/spike/contact-methods-primary-projection-research.mjs`、其结果、`docs/verification/MULTI-CONTACT-PRIMARY-PROJECTION-2026-10-17.md`，并同步本卡/契约复评/下一计划 / 禁改生产模型、`DATA-CONTRACT.md`、API、存储、服务、组件、迁移、vCard、版本和发布文件。
+ - **contract_change / host_or_spike_required：** 无生产契约变化；只冻结研究状态和拒绝语义。零主值的期望投影为空但必须新鲜基线与显式确认；陈旧 AV 一律冲突零写；解绑保留方法且不生成墓碑；同方法 ID 的墓碑禁止活跃复现。
+ - **ordered_steps：** 冻结主值/删除/解绑/投影规则 → 纯反例与 dry-run → 主值切换及跨人物隔离 → 删除主值并核对零主值/墓碑 → 解绑并核对方法保留/投影阻断 → 注入 AV 外部改值、未知基线、重复主值/墓碑 → 独立复核和脱敏。
+ - **test_fixtures / test_commands / acceptance：** 两人物、同类型主/次方法、主值删除、显式切换、零主值、解绑、同 ID 墓碑、AV 外部改值；`node --check scripts/spike/contact-methods-primary-projection-research.mjs`、默认、`--dry-run`、`--import`。21/21 通过；未知/冲突/解绑均 `writeAllowed=false`、`tombstoneAllowed=false`、`projectionWrites=0`。
+ - **failure_retry_rollback / privacy_boundary / performance_budget：** 纯检查失败非零；不重试未知、不执行 AV/JSON 写；结果只含固定虚构 ID、状态和计数，不含真实联系方式；小样本不外推宿主性能或并发能力。
+ - **evidence_paths / owner / last_updated / commit：** [主值投影研究](verification/MULTI-CONTACT-PRIMARY-PROJECTION-2026-10-17.md)、`scripts/spike/contact-methods-primary-projection-research.mjs`、`scripts/spike/contact-methods-primary-projection-results.json` / Codex + d3_d4_contract_spike / 2026-10-17 / 未提交。
+ - **完成回报：** 21/21；删除主值不自动晋升，零主值只生成空投影计划；显式删除产生墓碑，解绑保留方法且无墓碑；AV 基线变化、未知基线和身份缺失均零写拒绝。默认、`--dry-run`、`--import` 与语法检查通过，`syntheticOnly=true`、`kernelRequests=0`、`productionChanges=false`、`candidateContractAccepted=false`、`D1Adopted=false`。
+ - **明确退出边界：** 未证明真实 AV/原生文档编辑、删除/移动、持久墓碑、跨窗口 CAS、卸载恢复、用户确认 UI 或并发；正式 D3/D4 仍保持 candidate，#51/#54 开放。
+
+#### AG-RF-004-S3-A0 — 既有 AV 标量与冲突能力探针
+
+- **status / priority / type / milestone：** `done_isolated` / P2 / research+host-spike / M4；已核实既有端点能力与不安全交错反例，不提前开放依赖 D1/D4/D5 的完整 S3 或生产投影。
+- **user_outcome / user_scenario：** 在选择多联系方式事实源前，明确 AV 主值保存、清空、未知响应和外部改动的真实边界，避免把“写后读到目标值”误当成没有覆盖他人的修改。
+- **source_ids / current_evidence：** Issue #51/#54、S2 模拟恢复、N2 真实内核传输；现有 DATA-CONTRACT §1.3–1.5 与 M0 AV spike；Chrome 连接再次不可用，N2 真正编辑器改值/复制保持待验。
+- **depends_on / blocks / parallel_group / preconditions：** 仅依赖已实证 AV 标量端点和隔离内核安全模式，不依赖采纳 D1 / 为 D4/D5 与完整 S3 提供能力证据 / contact-av-capability / 新 UUID 临时目录、随机回环端口、逐请求核实本轮持有子进程，全部虚构。
+- **allowed_files / forbidden_files：** 新增 `scripts/spike/contact-methods-av-capability-spike.mjs`、其 results、`docs/verification/MULTI-CONTACT-AV-CAPABILITY-2026-10-17.md`，本卡与契约复评的研究状态 / 所有生产模型、DATA-CONTRACT、API、AV schema、插件存储、服务、组件、迁移、vCard、版本和发布文件；N1/N2 原脚本。
+- **contract_change / host_or_spike_required：** 无生产契约变化；只用已有 createDoc/insertBlock、AV 建列/绑定/映射/渲染/标量写/解绑和内核启停端点。不会猜测 CAS 参数；实验请求断点仅存 UUID 工作区研究文件，不是方法事实库或生产恢复格式。
+- **ordered_steps：** 固定能力断言与注入边界 → dry-run 安全复核 → 两虚构人及四标量写/清空回读 → 第三值重读零写保护与先检查后覆盖反例 → 本地丢响应后的只读核实/内核重启 → issued-before-send 断点的基线歧义 → 解绑/重绑核实旧目标拒绝 → 独立复核与停止本轮进程。
+- **test_fixtures / test_commands / acceptance：** phone/email/url/text、baseline/desired/third/empty、受控两个 API writer 顺序交错、丢弃已收到响应、内核重启、已记 issued 未发送、解绑与重绑；`node --check scripts/spike/contact-methods-av-capability-spike.mjs`、默认 dry-run、`LVCT_RUN_AV_CAPABILITY=1` 显式运行。原始响应保留、未知不重发、目标改变零写，反例准确标记为受控交错，不宣称 UI 或真实双窗口并发。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 任一失败非零退出、未知写不自动重试；只结束持有的本轮子进程，保留虚构工作区而不递归删除；不安装插件或读取日常库；有界小样本，不形成大库性能承诺。
+- **evidence_paths / owner / last_updated / commit：** [MULTI-CONTACT-AV-CAPABILITY-2026-10-17](verification/MULTI-CONTACT-AV-CAPABILITY-2026-10-17.md)、`scripts/spike/contact-methods-av-capability-spike.mjs`、`scripts/spike/contact-methods-av-capability-results.json` / Codex + n2_ui_review + av_probe_review / 2026-10-17 / 未提交。
+- **完成回报：** Kernel `3.8.8-alpha.2`；两人四标量共 32 次赋值/独立回读通过，fresh 第三值保护零计划写入；受控 API 写者交错复现 X 被旧目标 T 覆盖。丢弃已收到响应与 issued-before-send 的两份磁盘研究断点在内核重启后仅只读核实，分别读到目标/applied 与基线/unknown，恢复赋值/自动重发为 0。解绑空映射与独立缺行双证据阻止旧计划；本轮重绑 itemID 改变，未自动续写。成功轮 148 请求及 148 次 ownPID 检测、38 实际标量写、43 snapshot，两次本轮子进程已退出、端口释放；首次空字符串映射导致的探针失败及窄修正证据保留。语法/dry-run 与独立坏单元格/映射反例通过。`hostVerified/uiVerified/multiWindowVerified/D1Adopted=false`，完整 S3 和 #51/#54 仍未完成，无生产代码/版本/发布变更。
+
+#### AG-RF-004-S2 — 严格快照与持久恢复候选实验
+
+- **status / priority / type / milestone：** `done_isolated` / P2 / research+spike / M4；候选矩阵 60/60、独立反例 21/21，不采纳生产 schema，父卡保持 `candidate`。
+- **user_outcome / user_scenario：** 在多联系方式保存、投影或备份恢复出现坏数据、响应丢失和并发时，能够辨别已保存、待核实和冲突，避免旧备份复活删除条目或未知请求被重复发送。
+- **source_ids / current_evidence：** Issue #51/#54、AG-RF-004 D2/D3/D5/D6；S1 已完成有限 vCard 映射；现有方法快照只做内存浅层检查，未验证持久恢复。
+- **depends_on / blocks / parallel_group / preconditions：** 只依赖现有 storage 纪律及本实验规范，不依赖采纳 D1 事实源 / 正式方法库和恢复契约 / contact-recovery-research / 假 Plugin 内存存储与虚构 AV 适配器，真实内核请求和真实插件文件写入均为 0。
+- **allowed_files / forbidden_files：** 新增 `scripts/spike/contact-methods-recovery-research.mjs`、其 results、`docs/verification/MULTI-CONTACT-RECOVERY-2026-10-17.md` 及本卡；只读复用 `src/data/storage.ts` / 所有生产类型、存储、API、服务、组件、迁移包、DATA-CONTRACT、版本、CHANGELOG、README 徽章及 PROGRESS。
+- **contract_change / host_or_spike_required：** 无生产契约变更；候选规则先记研究规范后写实验。零网络，假 Plugin 仅通过现有 storage 帮助函数读写内存；不把模拟锁当跨窗口实证。
+- **ordered_steps：** 固定严格字段/身份/墓碑/主值/备份和投影状态规则 → 反例复核 → 实现有界候选 → 读写/响应丢失/重启/竞争故障注入 → 独立审查 → 明确可采纳证据与生产缺口。
+- **test_fixtures / test_commands / acceptance：** 未知版本/字段、坏值、重复身份/主值、墓碑、同 ID 冲突、坏库/读取失败、保存已应用但丢响应、读取不收敛、并发、AV 目标变化和未知写后重启；`node scripts/spike/contact-methods-recovery-research.mjs`，定向 `node --test tests/storage.test.ts`。解析零业务写、事实未核实零 AV 写、issued/unknown 只读核实，旧请求不能换 ID 绕过；输出只含固定场景类别和数量。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 实验失败返回非零，不改生产或真实用户文件；仅脚本内虚构值；未知写保留原请求并显式暴露首次写后缺断点、无 CAS 和迟到写边界；有界夹具，无新大库性能承诺。
+- **evidence_paths / owner / last_updated / commit：** `docs/verification/MULTI-CONTACT-RECOVERY-2026-10-17.md`、`scripts/spike/contact-methods-recovery-research.mjs`、`scripts/spike/contact-methods-recovery-research-results.json` / Codex + contact_recovery_spike / 2026-10-17 / 未提交；语法检查通过，存储测试 15/15，零真实内核请求/插件文件写入。真实多窗口、CAS、迟到宿主写及首次断点缺失后的全局恢复仍不在证据内。
+
+#### AG-RF-004-S1 — 纯 vCard 多值、参数与损失报告 spike
+
+- **status / priority / type / milestone：** `done_isolated` / P2 / research+spike / M4；仅有限 UTF-8 方法/标签合成适配器收口，父卡 `AG-RF-004` 保持 `candidate`。
+- **user_outcome / user_scenario：** 导入包含多个电话、邮箱和网站的通讯录前，能够判断哪些值/标签/参数可保留、哪些未映射，避免把首值或拼接值误当作完整资料。
+- **source_ids / current_evidence：** Issue #51/#54；`AG-RF-004`；`docs/verification/MULTI-CONTACT-CONTRACT-REVIEW-2026-10-17.md`。既有搜索/身份研究 28/28、临时预算 7/7；S1 合成适配器 60/60，独立只读反例复核 5/5。候选未采纳，无生产接入或外部地址簿互操作实证。
+- **depends_on / blocks / parallel_group / preconditions：** 依赖现有逻辑行展开与生产兼容基线，不依赖采纳方法库 schema；阻塞多值 vCard 正式契约 D7；`contact-vcard-research`；全部虚构夹具、零内核与插件存储 IO。
+- **allowed_files / forbidden_files：** 新增 `scripts/spike/contact-methods-vcard-research.mjs`、`scripts/spike/contact-methods-vcard-research-results.json`、对应研究证据文档和本卡；可只读复用 `src/domain/vcard.ts` 已导出函数 / 禁改任何生产 parser/serializer、AV、types、data、services、迁移包、桥、组件与生产 DATA-CONTRACT，禁止版本、CHANGELOG、README 徽章和 PROGRESS。
+- **contract_change / host_or_spike_required：** 无生产契约变更；仅 researchFormat 候选中间结构。必须有可复跑纯 Node spike；本卡无需宿主，结果不能替代真实 vCard 应用或跨窗口验收。
+- **ordered_steps：** ①固定受支持普通 UTF-8 TEL/EMAIL/URL 的候选映射及语义比较规则；②覆盖多值、TYPE（含重复/逗号）、PREF、分组 X-ABLabel、转义/折行、未知属性/参数；③已支持项往返并比较值/来源/标签/参数；④未支持编码（含 QP）等列为 retained_unmapped，保存原逻辑行，不能猜值；⑤记录生产兼容基线与精确 loss report；⑥判定 D7 可采纳项与剩余缺口，父卡继续候选。
+- **test_fixtures / test_commands / acceptance：** 两个 TEL/EMAIL/URL、同值跨卡、重复值、旧单值、TYPE=WORK,CELL、PREF、item1.X-ABLabel、含逗号/分号/反斜杠与 Unicode 折行、未知参数/属性、QP、空值及损坏输入；`node scripts/spike/contact-methods-vcard-research.mjs`、`node --test tests/vcard.test.ts`。输出包含 syntheticOnly/kernelRequests/productionChanges/candidateContractAccepted、逐夹具候选方法与 retained_unmapped/loss 报告、roundtrip 比较与生产基线；支持项语义不丢，未支持项逐项可见，不能按姓名或值静默合并。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯转换零业务写；损坏/不支持输入拒绝映射或保留待核对，禁止容错后伪成功；脚本失败保留可读原因与非零退出；仅虚构联系值、不加载真实文件、无网络。使用有界夹具并记录输入字节/耗时，不新增大库性能承诺。
+- **evidence_paths / owner / last_updated / commit：** `scripts/spike/contact-methods-vcard-research.mjs`、`scripts/spike/contact-methods-vcard-research-results.json`、`docs/verification/MULTI-CONTACT-VCARD-2026-10-17.md`、`docs/verification/MULTI-CONTACT-CONTRACT-REVIEW-2026-10-17.md` / Codex；独立复核 `multi_contact_contract_next` / 2026-10-17 / 未提交；脚本语法检查、生产 vCard 21/21 与 S1 60/60 通过，独立探针 5/5 通过。
+
+#### AG-RF-004-S1-LIFE — vCard 方法生命周期与来源身份研究
+
+- **status / priority / type / milestone：** `done_isolated` / P2 / contract+research+spike / M4；18/18 纯检查通过，补 D7 的纯生命周期缺口，不替代 N2-HOST-UI-COPY 或正式 vCard codec。
+- **user_outcome / user_scenario：** 用户编辑、删除、增加或重新排序多联系方式后，导出再导入仍能区分原方法、已删除方法、新方法、重复值和未知属性，不按姓名或当前值静默合并。
+- **source_ids / current_evidence：** Issue #51/#54、AG-RF-004-S1、D7；S1 已覆盖有限 UTF-8 候选映射与 loss report，但未覆盖方法增删改排、来源 lineage、重复值导出再导入及显式保留未知属性。
+- **depends_on / blocks / parallel_group / preconditions：** 依赖 S1 的候选属性映射、现有生产 vCard 解析/序列化兼容基线和稳定人物身份研究；阻塞 D7 正式往返契约，不决定 D1 事实源；纯 Node、全虚构、零内核与插件存储 IO。
+- **allowed_files / forbidden_files：** 新增 `scripts/spike/contact-methods-vcard-lifecycle-research.mjs`、其 results、`docs/verification/MULTI-CONTACT-VCARD-LIFECYCLE-2026-10-17.md`、本卡及相关研究状态 / 禁改生产 parser/serializer、types、storage、AV、services、UI、迁移包、DATA-CONTRACT、版本、CHANGELOG、README 徽章和 `docs/PROGRESS.md`。
+- **contract_change / host_or_spike_required：** 无生产契约变化；仅冻结研究格式、来源摘要和损失报告字段。语义回环不等于原始 vCard 字节回环，也不证明外部地址簿兼容或 UI/宿主行为。
+- **ordered_steps：** 固定两张虚构卡和 3 个 TEL/EMAIL/URL → 记录属性逻辑行与 source lineage → 执行编辑值/标签、删除一条、新增一条、重排、重复值与未知属性 → 默认导出和 `includeUnmapped` 导出 → 再导入并按卡片摘要、属性序号、来源摘要比较 → 对 unknown/duplicate/deleted/新增身份和 loss report 做独立纯断言 → 复核零生产 IO。
+- **test_fixtures / test_commands / acceptance：** 多值 TEL/EMAIL/URL、TYPE/PREF/分组标签、同值跨卡、改值、删值、新值、重排、重复值、空值、未知参数/属性、未知 VALUE 和损坏逻辑行；`node --check scripts/spike/contact-methods-vcard-lifecycle-research.mjs`、默认运行、`--dry-run`。原方法编辑保留 lineage；删除进入显式 loss/deleted；新增身份不与旧 ID 冲突；重排/重复值逐条可见；未知项默认 `retained_unmapped`，显式导出仍保留原逻辑行；未知/非法项不自动合并；`candidateContractAccepted=false`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯转换失败非零且保留可审计结果；不自动修复未知/重复/删除，不发送真实数据；结果只含虚构值的摘要、哈希和类别，不输出完整联系方式；固定小样本和输入字节预算，不外推生产性能。
+- **evidence_paths / owner / last_updated / commit：** [vCard 生命周期证据](verification/MULTI-CONTACT-VCARD-LIFECYCLE-2026-10-17.md)、`scripts/spike/contact-methods-vcard-lifecycle-research.mjs`、`scripts/spike/contact-methods-vcard-lifecycle-research-results.json` / Codex / 2026-10-17 / 已完成隔离、未提交。
+- **完成回报：** 18/18 纯检查；编辑保留方法 ID/来源属性与序号，删除进入显式 loss，新方法生成新 ID，重排不改身份，同值跨卡和同卡重复值均不合并；默认导出/导入保留支持方法和来源卡片 lineage，`includeUnmapped` 保留未知原逻辑行。默认、`--dry-run` 与 import 均无内核/生产 IO；结果只含摘要/哈希/类别，`syntheticOnly=true`、`kernelRequests=0`、`productionChanges=false`、`candidateContractAccepted=false`。未证明字节回环、外部互操作、生产 schema、UI 或并发。
+
+#### AG-RF-004-L2 — 人物生命周期身份门禁纯研究
+
+- **status / priority / type / milestone：** `done_isolated` / P2 / contract+research+spike / M4；16/16 纯检查通过，补 D3/D4 的同名替换、旧源不可达与重绑身份门禁，不调用删除/移动 API。
+- **user_outcome / user_scenario：** 同名新人物、旧文档不可达或位置变化时，方法不会按姓名/值自动转移；解绑后的旧目标不会借新名册行继续写入。
+- **source_ids / current_evidence：** Issue #51/#54、D3/D4、AG-RF-004-L1；L1 已完成双 AV 联合生命周期的隔离内核观察，但未覆盖同名新 doc、旧源不可达/位置变化和方法 owner 冲突的纯身份矩阵。
+- **depends_on / blocks / parallel_group / preconditions：** 仅依赖 L1 的冻结目标、方法/名册身份字段和当前未知拒绝语义；不依赖 D1 选择，不调用未经实证的 `deleteDoc`、`moveDoc` 或 `moveBlock`；纯 Node、全虚构、零 Kernel/插件存储 IO。
+- **allowed_files / forbidden_files：** 新增 `scripts/spike/contact-methods-lifecycle-identity-research.mjs`、其 results、`docs/verification/MULTI-CONTACT-LIFECYCLE-IDENTITY-2026-10-17.md`、本卡及相关研究状态 / 禁改生产模型、DATA-CONTRACT、API、存储、服务、组件、迁移、vCard、版本、CHANGELOG、README 徽章和 `docs/PROGRESS.md`。
+- **contract_change / host_or_spike_required：** 无生产契约变化；只冻结纯身份门禁输出。缺失 SQL 行、位置变化、owner 缺失和分页不完整均为 unknown 或冲突，不推断用户删除，不生成墓碑或修复身份。
+- **ordered_steps：** 固定旧 A/同名新 B 及方法源 → 检查完整基线 → 替换名册绑定 → 复用旧 itemID 与新 itemID 重绑 → 省略旧文档行/改父块位置 → 注入 owner 冲突、重复 ID、缺页 → 重算诊断并核对拒绝原因稳定。
+- **test_fixtures / test_commands / acceptance：** 同名不同 docId、同值跨人、旧源仍在/owner unknown、位置变化、旧 itemID 复用、官方映射冲突、重复 methodId、缺页和已知行缺失；`node --check scripts/spike/contact-methods-lifecycle-identity-research.mjs`、默认、`--dry-run`、`--import`。至少 14 个纯断言；unknown/duplicate/conflict/不完整均返回空方法集合且 `writeAllowed=false`、`tombstoneAllowed=false`、`projectionWrites=0`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯检查失败非零；不执行删除/移动、不重试未知写；结果只含固定虚构 ID、状态和原因，不输出联系方式值；无内核、端口、子进程、插件存储或生产 IO。
+- **evidence_paths / owner / last_updated / commit：** [身份门禁证据](verification/MULTI-CONTACT-LIFECYCLE-IDENTITY-2026-10-17.md)、`scripts/spike/contact-methods-lifecycle-identity-research.mjs`、`scripts/spike/contact-methods-lifecycle-identity-results.json` / Codex + next_spike_design / 2026-10-17 / 未提交。
+- **完成回报：** 16/16 纯检查；同名新文档不继承旧方法，同值跨人不合并；旧源不可达只报 `unknown-not-delete`，位置变化不视为删除；owner 冲突、重复身份、官方映射不一致、缺页和重绑旧目标均拒绝。默认运行仅写本轮结果 JSON；默认、`--dry-run`、`--import` 与模块导入均无 Kernel/插件存储/生产 IO，`kernelRequests=0`、`productionChanges=false`、`D1Adopted=false`。未证明真实文档删除/移动、持久墓碑/CAS、卸载恢复、UI 或并发。
+
+#### AG-RF-004-S4 — 纯 JSON IO、方法搜索合并与索引状态研究
+
+- **status / priority / type / milestone：** `done_isolated` / P2 / research+spike / M4；纯 Node 文件 IO、候选搜索合并和索引失效矩阵已收口，本卡不采纳生产数据源或 D8 契约。
+- **user_outcome / user_scenario：** 联系人主 AV 已有命中时，次要联系方式命中仍能进入同一人物且不重复；方法库文件读取、解析、序列化、写后核实和索引缺失/失效/取消时不会把部分结果伪装成完整空结果。
+- **source_ids / current_evidence：** Issue #51/#54、D1/D2/D5/D6/D8；`MULTI-CONTACT-METHODS-RESEARCH-2026-10-16.md` 的 10,000 人/100,000 方法仅为内存基线，并明确排除 JSON 磁盘读写、AV 合并、UI 取消与索引失效；本卡已补齐 24/24 纯检查、大快照 JSON IO、稳定 `personDocId` 去重、分页取消和索引状态回退，详见 `MULTI-CONTACT-SEARCH-IO-2026-10-17.md`。
+- **depends_on / blocks / parallel_group / preconditions：** 依赖 S1-LIFE/S2 的稳定身份、严格输入与 loss/unknown 语义以及现有 AV 搜索分页形状；为 D8 搜索、D5/D6 出口提供隔离证据，不依赖采纳 D1 或修改生产 `storage`/`contacts`；`contact-methods-search-io`，全虚构值、随机临时目录、无内核/插件 API。
+- **allowed_files / forbidden_files：** 新增 `scripts/spike/contact-methods-search-io-research.mjs`、结果 JSON、`docs/verification/MULTI-CONTACT-SEARCH-IO-2026-10-17.md` 及本卡和研究状态文档 / 禁改生产模型、`src/data/storage.ts`、AV/API、services、components、迁移包、vCard、`DATA-CONTRACT.md` 正式契约、版本、CHANGELOG、README 徽章和 `docs/PROGRESS.md`。
+- **contract_change / host_or_spike_required：** 无生产契约变更；研究格式只在脚本中定义。文件阶段必须区分 read/parse/serialize/write/read-back mismatch/unknown；索引是可重建派生物，不是事实源。纯 Node `fs`/临时文件不能证明 Plugin `loadData/saveData`、Web Lock、CAS、跨窗口或宿主持久化。
+- **ordered_steps：** ①登记并冻结输入/状态机；②生成有界 10,000/100,000 虚构方法快照及 AV 主值命中、次值命中和同人双命中夹具；③临时文件冷读→严格 parse→canonical serialize→临时写→写后回读并摘要核对，记录体积/耗时；④按 stable personDocId 合并去重，保留 `hitSources`/method 身份并把 itemId 变化标记为冲突；⑤验证分页、valid/missing/invalid/stale/rebuilding/cancelled 索引及分块扫描降级；⑥对取消、预算耗尽、坏 JSON、版本/revision/AV 锚点变化、改值/删值注入反例；⑦独立只读复核、结果脱敏和 diff 检查。
+- **test_fixtures / test_commands / acceptance：** 10,000 人/100,000 方法，主值/次值/AV 直接命中交叉、同值跨人、重复 method hit、空结果、坏 JSON、未知 schema、截断文件、索引缺失/坏版本/旧 revision、扫描取消/预算耗尽；`node --check scripts/spike/contact-methods-search-io-research.mjs`、默认运行、`node scripts/spike/contact-methods-search-io-research.mjs --dry-run`。通过标准：同人多来源只一条且保留来源集合，跨人同值不合并；索引候选逐条最终验证；missing/invalid/stale/rebuilding/cancelled 或未扫完整均非 `complete`，不得产出假空成功；写后摘要不一致为 `unknown`，输入零业务写，结果不输出完整值。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 任何 read/parse/serialize/write/read-back 异常保留阶段与摘要，未知不自动重写；临时文件只在路径核实后清理，失败现场可保留；仅虚构值、日志只含 hash/计数/状态，不输出姓名、电话、邮箱或标签。记录 JSON 字节数、一次大快照各阶段耗时、分块扫描访问量和索引构建中位/p95，均为本机纯 IO 研究预算，不外推真实插件/宿主性能。
+- **evidence_paths / owner / last_updated / commit：** `scripts/spike/contact-methods-search-io-research.mjs`、其 results、`docs/verification/MULTI-CONTACT-SEARCH-IO-2026-10-17.md`、`docs/verification/MULTI-CONTACT-CONTRACT-REVIEW-2026-10-17.md` / Codex + s4_io_design / 2026-10-17 / 未提交。
+- **完成回报：** `node --check`、默认运行与 `--dry-run` 均通过，纯检查 24/24；10,000 人/100,000 方法快照实际完成 JSON 序列化、临时写入、读取、严格解析、回读再序列化，21,790,126 B；写后摘要不一致为 `unknown`，坏 JSON/截断/未知字段为拒绝。AV+方法命中按稳定 `personDocId` 去重，`itemId` 变化标记冲突，分页取消和 related 均单独保留；valid/missing/invalid/stale/rebuilding/cancelled 与 partial/cancelled 均不伪造 complete。`kernelRequests=0`、`productionChanges=false`、`candidateContractAccepted=false`；真实 Plugin storage、跨窗口、UI、Host IO 与 D1/D8 正式契约仍未验证。
+
+#### AG-RF-004-D6 — 旧值迁移、备份与版本出口纯研究
+
+- **status / priority / type / milestone：** `done_isolated` / P2 / contract+research+spike / M4；20/20 纯检查通过，形成 D6 契约草案，不进入生产迁移或备份实现。
+- **user_outcome / user_scenario：** 旧单值联系人升级、备份恢复或跨版本导入时，用户能看到拆分建议、冲突、未知和未覆盖模块；当前事实不会被坏包、墓碑复活或不可达人物姓名猜测覆盖。
+- **source_ids / current_evidence：** Issue #51/#54、D5/D6、C-19/C-24/C-31、`MULTI-CONTACT-CONTRACT-REVIEW-2026-10-17.md`；[D6 研究证据](verification/MULTI-CONTACT-MIGRATION-EXIT-2026-10-17.md)与纯脚本结果已收口。
+- **depends_on / blocks / parallel_group / preconditions：** 依赖 S2 严格恢复语义、L2 稳定人物身份和现有迁移包覆盖；阻塞 D6 正式 `DATA-CONTRACT`/codec、备份 UI 与生产升级卡；纯 Node、全虚构、无 Kernel/插件存储/端口，候选契约仍未采纳。
+- **allowed_files / forbidden_files：** 新增 `scripts/spike/contact-methods-migration-exit-research.mjs`、结果 JSON、`docs/verification/MULTI-CONTACT-MIGRATION-EXIT-2026-10-17.md`、本卡和研究状态 / 禁改 `src/services/migration-bundle.ts`、`src/data/storage.ts`、生产 schema、DATA-CONTRACT 正式章节、API、UI、版本、CHANGELOG、README 徽章和 `docs/PROGRESS.md`。
+- **contract_change / host_or_spike_required：** 无生产契约变更；研究规则为旧值保留一条、` / ` 仅拆分提示且确认前零写，未知版本/坏库/重复身份整批拒绝，缺模块保留现状，同 ID 冲突现状优先并报告，确认前重算基线，墓碑不复活，不按姓名恢复不可达人物，projection/operation/bridge/repair/self checkpoint 不进业务备份。
+- **ordered_steps：** 解析明确 bundle/module 版本 → 严格识别缺模块/坏库/重复身份 → 生成旧值拆分预览 → 冻结基线并模拟确认前变化 → 计算当前优先/墓碑/不可达人物结果 → 核对备份覆盖与 checkpoint 排除 → 独立重跑、脱敏审计、diff 检查。
+- **test_fixtures / test_commands / acceptance：** 旧单值与分隔符、多模块缺省、未知版本、坏 JSON/坏库、重复 ID、同 ID 内容冲突、预览后当前变化、墓碑记录、不可达人物同名值、checkpoint 列表；`node --check scripts/spike/contact-methods-migration-exit-research.mjs`、默认、`--dry-run`、`--import`。20/20 通过；默认仅写 spike 结果 JSON，dry-run/import 不写文件；`syntheticOnly=true`、`kernelRequests=0`、`productionChanges=false`、`candidateContractAccepted=false`、`writeAllowed=false`、`checkpointWrites=0`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 所有解析/基线/身份不确定性均零写并保留原因；未知请求不重放；只用虚构数据和固定 ID，不按姓名/值合并；小样本纯函数预算，不宣称真实 Plugin storage、锁、跨窗口、压缩或宿主 IO 性能。
+- **evidence_paths / owner / last_updated / commit：** [D6 旧值迁移/备份/版本出口](verification/MULTI-CONTACT-MIGRATION-EXIT-2026-10-17.md)、`scripts/spike/contact-methods-migration-exit-research.mjs`、`scripts/spike/contact-methods-migration-exit-results.json` / d6_migration_spike / 2026-10-17 / 未提交。
+- **明确退出边界：** 纯研究完成不等于生产 codec、备份入口或版本兼容已实现；真实 `loadData/saveData`、Web Lock、跨窗口快照、跨工作空间 ID 映射、UI 确认和 D1 事实源仍未验。Issue #51/#54 继续开放。
+
+#### AG-ISSUE-035 — VCF QP 折行与跨卡安全审查
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / domain+test+evidence / 维护线。
+- **user_outcome / user_scenario：** 导入含 QP 属性头折行、普通值中的编码文本、非法 QP 或相邻卡片的 VCF 时，不误吞属性/卡片边界，损坏项有明确拒绝结果。
+- **source_ids / current_evidence：** Issue #35；`docs/verification/OPEN-ISSUE-RESEARCH-PLAN-2026-10-16.md`；既有纯域矩阵 17/17，尚无小米脱敏首卡。
+- **depends_on / blocks / parallel_group / preconditions：** 无 / 关闭 #35 的根因确认 / vcard-compat / 仅使用虚构值和纯域解析。
+- **allowed_files / forbidden_files：** `src/domain/vcard.ts`、`tests/vcard.test.ts`、本卡证据文档和合成 spike / 版本、CHANGELOG、README 徽章、生产存储或导入契约。
+- **contract_change / host_or_spike_required：** 无生产契约变更；仅需纯域合成回归与 `pnpm check`，真实宿主不作为本卡替代证据。
+- **ordered_steps：** 复核代理报告四类边界 → 增补最小回归/修复 → 重跑相关测试与检查 → 记录证据和未确认根因。
+- **test_fixtures / test_commands / acceptance：** QP 属性头 RFC 折行、普通值编码文本、非法等号/半字节、QP 软行与下一卡边界；`node --test tests/vcard.test.ts`、`pnpm check`；合成场景不吞独立属性/卡片，非法输入拒绝，正常矩阵不退化。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 解析失败整批拒绝且不进入导入计划；仅虚构姓名/号码；线性扫描，禁止扩大容错到静默部分导入。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/vcard.ts`、`tests/vcard.test.ts`、`scripts/spike/vcard-compat-research.mjs`、`docs/verification/VCARD-QP-SAFETY-AUDIT-2026-10-17.md` / vcf_safety_followup / 2026-10-17 / 未提交；纯域与服务回归已通过，Issue #35 仍因缺小米脱敏样本保持开放。
+
+#### AG-ISSUE-052 — 个人备注保存与自由文本持久化排查
+
+- **status / priority / type / milestone：** `done_isolated` / P0 / api+service+ui+test / 维护线。
+- **user_outcome / user_scenario：** 个人备注可保存、重新打开回读；同类自定义和备注字段不丢失文本。
+- **source_ids / current_evidence：** Issue #52/#53；人物备注采用 Markdown 标记块，需核对内核分块与回读形状。
+- **depends_on / blocks / parallel_group / preconditions：** 无 / 备注修复声明 / note-persistence / 仅使用隔离测试库。
+- **allowed_files / forbidden_files：** person-note domain/service、api/blocks、相应组件与测试 / 版本、CHANGELOG、README 徽章、其他并行实现文件。
+- **contract_change / host_or_spike_required：** 先补 DATA-CONTRACT 的备注块读写规则；涉及内核分块需实证 / 隔离真实内核。
+- **ordered_steps：** 复现 → 契约 → 最小修复 → 服务故障与 UI 回归 → 回读证据。
+- **test_fixtures / test_commands / acceptance：** 多行、Markdown、清空、重复提交、读写失败、冲突；check/test/相关 UI 与内核回读；成功与未知区分，失败保留草稿。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 不覆盖未知块、不重复插入；只用虚构文本；有界回读。
+- **evidence_paths / owner / last_updated / commit：** `scripts/spike/person-note-spike.mjs`、`scripts/spike/person-note-results.json`、`docs/verification/ISSUE-TEXT-SUGGESTIONS-2026-10-16.md` / note_fix + Codex / 2026-10-16 / 未提交；隔离测试已收口，真实用户工作区仍待 Host Queue。
+
+#### AG-ISSUE-048 — 默认家庭生命周期与组织移除
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / contract+service+ui+test / 维护线。
+- **user_outcome / user_scenario：** 家庭改名不再重建；用户可明确移除组织，理解文档与历史成员影响。
+- **source_ids / current_evidence：** Issue #48；启动时按名称保证家庭存在，改名不补种，移除可恢复且保留原文档/成员历史；Workbench 只显示资料编辑器新建入口，旧宿主路径保留带可见标签的快捷创建兼容。
+- **depends_on / blocks / parallel_group / preconditions：** 无 / 组织修复声明 / org-lifecycle / 使用已有端点和受控标记。
+- **allowed_files / forbidden_files：** org/init/index/types、组织 UI、数据模块及专门测试 / 版本、CHANGELOG、README 徽章、person-note 实现。
+- **contract_change / host_or_spike_required：** 先明确一次性种子与可恢复移除、文档/成员保留规则 / 无新端点；真宿主另记。
+- **ordered_steps：** 契约 → 稳定种子 → 影响预览及移除恢复 → 排版复核 → 失败回归。
+- **test_fixtures / test_commands / acceptance：** 改名、归档、移除、重启、并发、成员历史、读写失败；check/test/组织 UI；不靠显示名称识别种子，不删除用户原文或历史。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 未核实不重建，失败可重试；虚构组织；复用分页扫描。
+- **evidence_paths / owner / last_updated / commit：** `tests/organization-scan.test.ts`、`tests/organization-writes.test.ts`、`docs/DATA-CONTRACT.md`、`scripts/e2e/ui/smoke.js`、`scripts/e2e/ui/organization-context-regression.js` / org_fix + Codex / 2026-10-16 / 未提交；组织隔离 UI 16/16，完整 Chrome UI 387/387，真实宿主与双窗口仍待 Host Queue。
 
 执行边界：`AG-P0-010` 桥 v2 能力边界已有隔离证据；新端点仍须实证。涉及存储并发的隔离开发可使用 AG-P0-019 已保存证据，真实多窗口完成声明仍需宿主验收。
 
@@ -82,7 +412,7 @@ evidence_paths / owner / last_updated / commit
 
 无。原依赖队列已按本轮隔离验收关闭；不存在的 `AG-B14-006` / `AG-AI-004` 不再出现在队列。
 
-已有隔离证据，不重做原实现：`AG-P0-002`、`AG-QA-004`；`AG-P0-003` 仅补写后核实与服务故障回归。宿主待验与增量回归：`AG-P0-001/005/006/019`、`AG-B14-002/005`。
+已有隔离证据，不重做原实现：`AG-P0-002`、`AG-QA-004`；`AG-P0-003` 仅补写后核实与服务故障回归。宿主待验与增量回归：`AG-P0-001/005/006/019`、`AG-B14-002/005`。多联系方式 L2 身份门禁与 D6 旧值迁移/备份/版本出口纯研究已完成；生产迁移/备份实现仍需正式契约和宿主证据。
 
 ### Host Queue（隔离实现不能直接标 done）
 
@@ -96,9 +426,28 @@ evidence_paths / owner / last_updated / commit
 
 2026-10-05 真实隔离前端复核：`services-flow` 的实际服务链保持 `9/9`，`browser-desktop` 真实前端 `realFrontend=true`；生日、账本新增/结清/重开、别名、跟进任务块、组织改名/成员编辑/归档/恢复、页面重载回读、组织改名/成员职位/归档恢复跨窗口原地刷新、双页面人物 ref 和互动 ref 幂等均通过。捕获来源文档仍因宿主 `openFileByURL` 返回 `Uncaught` 未打开，捕获 UI 不标完成；组织成员对应人物投影、真实用户库、原生图面板和真机仍由 Host Queue 验收。
 
+2026-10-17 增量收口：实际服务 11/11；修复组织后台页 RAF 等待后，真实隔离 Chrome browser-desktop 的改名、成员编辑、归档、恢复双页面原地刷新全部通过。捕获使用原生 refs 识别 2 位候选，完成重复提交和正常关闭；原 2 条互动 ID 保留，来源/日记/地点/双方人物的 5 侧标记均各 1。完整桌面 UI 389/389；详见 [HOST-QUEUE-2026-10-17](verification/HOST-QUEUE-2026-10-17.md)。以上不替代组织人物投影专门双页、真实用户工作区、原生图和真机验收。
+
 ### Deferred / Candidate Queue
 
 类型化关系库、纪念日/礼物/周回顾、地图/日历、OCR/二维码、嵌套组织、Agent 自动行动、复杂推荐和任何尚未完成隐私/契约评估的候选只能进入 `AG-RF-*`，不得从原型按钮直接开发。
+
+#### AG-RF-004 — Issue #51/#54 多联系方式与两层自定义条目
+
+- **status / priority / type / milestone：** `candidate` / P2 / contract+research+spike / M4；2026-10-17 只读契约复评已完成，生产候选未采纳。
+- **user_outcome / user_scenario：** 同一联系人可保留多个电话、邮箱、微信等联系方式，并能在明确边界内记录少量有层级的自定义条目；主值、标签、顺序和导出结果可解释、可恢复。
+- **source_ids / current_evidence：** Issue #51/#54；`docs/verification/ISSUE-TEXT-SUGGESTIONS-2026-10-16.md`、`docs/verification/MULTI-CONTACT-NATIVE-2026-10-17.md`、`docs/verification/MULTI-CONTACT-RECOVERY-2026-10-17.md`。当前 AV 仍是单值投影，vCard 多 `TEL` 会拼接、多个 `EMAIL` 只取首个；N1 纯内存候选 31/31，但不能当作真实多值契约。
+- **depends_on / blocks / parallel_group / preconditions：** 依赖现有联系人写入、迁移、vCard 契约和稳定人物 ID；阻塞多联系方式 UI、搜索、批量编辑及导入导出扩展；`contact-model`；先完成字段身份、兼容投影、删除/冲突和隐私决策。
+- **allowed_files / forbidden_files：** 研究文档、`src/domain` 纯函数、脱敏 `scripts/spike`、对应测试和 UI 原型；未决策前禁止直接改生产联系人 AV、迁移包和 vCard 写入，禁止版本、CHANGELOG、README 徽章、`docs/PROGRESS.md`。
+- **contract_change / host_or_spike_required：** 待定义 `contactMethods[{id,type,value,label,isPrimary,order,...}]` 与两层 `customFields[{id,label,value,parentId,order}]`；必须用脱敏多 `TEL/EMAIL`、旧单值联系人、重复值和往返导入导出 spike 验证，真实宿主再验 AV/编辑器兼容。
+- **ordered_steps：** ①定义稳定 ID、类型、标签、主值、排序和空值规则；②保留旧 AV 主值兼容读写并做迁移预览；③定义 vCard 多值映射、重复/冲突和导出保真；④定义 `customFields` 两层、父项删除影响和搜索/备份边界；⑤做规模、隐私和 UI 入口 spike；⑥明确采纳、延期或拆分正式实现卡。
+- **本轮研究门槛：** 先比较 AV 全量、人物原生文档全量 + AV 主值、插件列表全量 + AV 主值的数据主权与可读性，暂不采纳 JSON 唯一全量事实；明确原生主值编辑冲突及跨位置投影失败恢复。旧电话 ` / ` 默认保留原文，拆分需预览确认；次要联系方式必须有不受 AV query 漏检的搜索方案与实测预算。联系方式方案通过后再研究两层 `customFields`，候选结构尚未采纳为生产契约。
+- **2026-10-17 复评出口：** 事实源若由 AV 改为插件列表，次要值的数据主权与备份说明必须先决策；原生人物文档全量已加入并列候选。方法身份/主值删除/原生冲突/持久投影/迁移版本/搜索完备性仍是生产前门禁。`AG-RF-004-S1` 已 `done_isolated`，有限合成适配器 60/60、独立只读复核 5/5；新增 `AG-RF-004-S1-LIFE` 已 `done_isolated`，vCard 方法编辑/删除/新增/重排/重复/未知属性 18/18；新增 `AG-RF-004-L2` 已 `done_isolated`，人物生命周期身份门禁 16/16；`AG-RF-004-S2` 已 `done_isolated`，恢复矩阵 60/60、独立反例 21/21，不决定 D1；`AG-RF-004-N1` 保持 `host_pending`，纯内存候选 31/31，隔离内核六方法写读/重启/缓存清理及 API 改值/删块通过，Chrome 正文操作与同人物双页面刷新已有观察，严格候选 UI 读取、复制和并发仍待验。UI 正文折行且身份夹具不同，不能升级为解析成功；`AG-RF-004-N2` 独立研究编辑器格式、复制采纳和不完整读取屏障。完整 D7 与方法库主流程未采纳，尚不具备把生产存储、投影或 UI 标 ready 的条件。
+ - **后续能力证据与顺序：** N2 纯研究 123/123、N2-HOST 的 DOM4/4 与 Markdown2/4/重启回读已单列，UI 仍待验；S1-LIFE 已补 vCard 方法 lineage/loss 18/18，但不证明字节回环或外部互操作；L2 已补同名新文档、旧源不可达/位置变化、重绑和 owner 冲突的身份门禁 16/16，不证明真实 delete/move 或持久 tombstone；新增 D3/D4-P 已补主值删除、显式切换、零主值、解绑差异、墓碑和陈旧投影冲突 21/21，仍不证明真实宿主写入。S3-A0 已复现既有 AV 赋值在新鲜检查后仍可覆盖中间值。N3 已完成22/22纯反例和59次隔离真实内核请求，确认marker-only与全部特征消失后的冷读会漏方法而子集仍complete；已知ID只能揭示unknown，不授权墓碑或清空。[范围发现证据](verification/MULTI-CONTACT-NATIVE-SCOPE-2026-10-17.md)后，A1已完成58/58纯检查和135次隔离真实内核请求：显式真实block主键+8text方法列可分页回读，故障拒绝/删行/缓存清理/重启通过，见[AV行能力证据](verification/MULTI-CONTACT-AV-ROWS-2026-10-17.md)。A2已完成独立冷进程发现与歧义协议及修复后151次隔离真实内核请求，见[无锚点冷发现证据](verification/MULTI-CONTACT-AV-DISCOVERY-2026-10-17.md)；唯一候选仅为unique_unowned，未知/截断撤回唯一判断，不证明所有权、历史全集或真实卸载恢复。下一步续接 `AG-RF-004-N2-HOST-UI-COPY` 的有效候选原生编辑/完整块复制；Chrome不可用时保留host_pending。L2 收口后，D6旧值迁移/备份/版本出口纯研究已完成`done_isolated`，不再作为待补研究；其正式契约、生产迁移/备份实现和宿主回读仍待独立门禁。随后补正式/剩余D3/D4人物生命周期、D7数据出口及完整搜索测量，再综合D1比较，父卡继续candidate。
+- **联合生命周期增量：** `AG-RF-004-L1` 已done_isolated，34/34纯检查、76次隔离真实内核请求和独立raw审计，见[双AV联合生命周期](verification/MULTI-CONTACT-LIFECYCLE-2026-10-17.md)。主方法缺失仍留旧主表值，名册解绑不消除剩余方法或人物文档；本轮同doc重绑换itemID且phone为空，重启只读保持。L2 已补同名新doc、旧源不可达/位置变化与 owner/itemID 冲突的16/16纯身份矩阵。已观察到的缺行/解绑只供研究诊断，零晋升/清空/墓碑/投影；正式D3/D4、人物删文档/移动、UI或同时竞争仍待验，父卡继续candidate。
+- **test_fixtures / test_commands / acceptance：** 多电话/邮箱/微信、主值切换、重复值、空值、旧数据、未知类型、父项/子项删除、循环/悬空父项、导入导出往返、备份恢复；运行对应 domain/spike、`pnpm check`、`pnpm test`。通过标准是旧数据无损可读、稳定 ID 不因改名变化、最多两层且无循环、vCard 往返边界可见、失败不覆盖本地事实。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 迁移和导入先预览，逐条报告成功/冲突/失败/未知；不按姓名或值静默合并、不因父项删除级联抹掉子项；默认不外发私密联系方式，导出逐项确认；在 1 万联系人和 10 万条目样本下记录索引、搜索和迁移成本，超预算分页或延后。
+- **evidence_paths / owner / last_updated / commit：** `docs/verification/ISSUE-TEXT-SUGGESTIONS-2026-10-16.md`、`docs/verification/MULTI-CONTACT-METHODS-RESEARCH-2026-10-16.md`、`docs/verification/MULTI-CONTACT-CONTRACT-REVIEW-2026-10-17.md`、`docs/verification/MULTI-CONTACT-VCARD-2026-10-17.md`、`docs/verification/MULTI-CONTACT-OWNERSHIP-2026-10-17.md`、`docs/verification/MULTI-CONTACT-NATIVE-2026-10-17.md`、`docs/verification/MULTI-CONTACT-NATIVE-HOST-2026-10-17.md`、`docs/verification/MULTI-CONTACT-RECOVERY-2026-10-17.md`、`scripts/spike/contact-methods-research.mjs`、`scripts/spike/contact-methods-research-results.json`、`scripts/spike/contact-methods-vcard-research.mjs`、`scripts/spike/contact-methods-vcard-research-results.json`、`scripts/spike/contact-methods-native-research.mjs`、`scripts/spike/contact-methods-native-research-results.json`、`scripts/spike/contact-methods-native-host-spike.mjs`、`scripts/spike/contact-methods-native-host-results.json`、`scripts/spike/contact-methods-recovery-research.mjs`、`scripts/spike/contact-methods-recovery-research-results.json` / Codex + research agents / 2026-10-17 / 未提交。
 
 ## 4. 任务 DAG 和原子任务卡
 
@@ -800,6 +1149,7 @@ evidence_paths / owner / last_updated / commit
 - **步骤：** 定义数据量和等待预算；测量首屏/筛选/切页/图谱；采用已验证分页/分段；显示进度和取消。
 - **已完成子范围（2026-10-04/05）：** v3.8.6 隔离内核实证 `renderAttributeView` 的 `page/pageSize/query` 与 `rowCount`；联系人卡片/表格首屏走 `listContactPage`，后续页逐页追加，行重复/空页矛盾会停止并报错，支持停止、继续和失败重试；组织标记按 `root_id` keyset 分页，`COUNT/MIN/MAX` 聚合阻断重复标记漏过游标，文档 ID 批量回读后再展示，组织卡片也支持后台续读；名册未完整时禁用“选择全部筛选”。新增合成 1k/10k 基线：联系人首屏/全量投影、客户端搜索/分组筛选、组织首屏/全量投影共 `12/12` 达到隔离预算。证据：`scripts/spike/av-pagination-spike.mjs`、`scripts/spike/av-pagination-results.json`、`scripts/spike/organization-pagination-spike.mjs`、`scripts/spike/organization-pagination-results.json`、`scripts/spike/scale-baseline-spike.mjs`、`scripts/spike/scale-baseline-results.json`、`docs/verification/SCALE-BASELINE-2026-10-05.md`、`src/api/organization.ts`、`src/services/contacts.ts`、`src/services/org.ts`、`src/components/people/PeopleView.svelte`、`src/components/org/OrgsView.svelte`。
 - **已完成子范围（2026-10-05 增补）：** 联系人搜索词经 `listContactPage` 下推到已验证的 AV `query` 参数；PeopleView 对搜索变化做 250ms 防抖，并取消旧分页代际，后续页复用同一搜索快照，避免 10k 名册先全量读完再客户端过滤。服务夹具验证 400 条名册中 `人物 4` 过滤后返回 12 条，权威 `rowCount` 与 `hasMore` 一致。证据：`src/services/contacts.ts`、`src/components/people/PeopleView.svelte`、`tests/contact-write-services.test.ts`。
+- **2026-10-16 关系搜索补齐：** 工作台搜索在直接命中结果规模不超过一页且存在 `relatedItemIds` 时，按稳定 itemID 补读未过滤分页，收回双向/单向关系邻居；关系扩展仍受分组、标签和资料筛选约束，外部桥接搜索保持直接字段匹配。超过一页的直接命中继续只走 AV 下推，避免把万级搜索退化成每次全量扫描。证据：`src/domain/contact-search.ts`、`src/components/people/PeopleView.svelte`、`tests/contact-search.test.ts`。
 - **已完成子范围（2026-10-05 组织卡片筛选）：** 组织卡片在后台分页续读的同时支持按名称搜索和活跃/归档状态筛选；无匹配结果显示独立空态并可清除筛选，组织总量与当前显示数分开表达，筛选不会改变稳定 `docId` 或分页游标。纯函数规则与 UI 回归覆盖大小写/空白查询、状态筛选、清除恢复和分页首屏续读。证据：`src/domain/organization-scan.ts`、`src/components/org/OrgsView.svelte`、`tests/organization-scan.test.ts`、`scripts/e2e/ui/organization-page-regression.js`。
 - **已完成子范围（2026-10-05 取消闭环）：** 分页读取的 `AbortSignal` 从 `PeopleView` 贯穿 `listContactPage`、`renderViewPage` 与内核超时包装；搜索切换、停止续读、组件销毁会中止当前待读请求，取消不显示为失败，明确失败仍保留继续读取入口。已取消请求在发出内核调用前即拒绝，迟到响应不会落位。`tests/contact-write-services.test.ts` 新增取消零读取回归；定向 48/48、全量 512/512、`pnpm check` 0 errors / 0 warnings。
 - **剩余范围：** 10k 真实数据耗时/内存、AV 搜索在真实用户大库与复杂条件下的预算、分页 SQL 在真实用户大库的预算、移动端软键盘与长列表锚点预算尚未验证；不得将隔离夹具和小型参数 spike 当成规模验收。
@@ -884,7 +1234,7 @@ evidence_paths / owner / last_updated / commit
 - **依赖：** `AG-B13-003/004/006`。
 - **步骤：** 两窗口同时改组织名、成员状态、归档和人物投影；关闭一个窗口后触发延迟事件；核对图谱和首页。
 - **验收：** 最终值一致；无旧实例回调；失败/未知清楚显示。
-- **当前证据：** 真实隔离 browser-desktop 已通过组织单页改名、成员编辑、归档、恢复、刷新；同源双页面中组织改名、成员职位、归档/恢复均已原地回读，人物/互动 ref 幂等也已通过。组织成员对应人物文档投影的专门双窗口核对、真实用户工作区和真机仍未验。
+- **当前证据：** 2026-10-17 修复后台页 RAF 等待后，真实隔离 Chrome browser-desktop 的组织改名、成员编辑、归档和恢复在同源双页面均原地刷新通过，写入前第一页 hidden 且无残留 busy；人物/互动 ref 双页面幂等亦通过。证据见 [HOST-ORG-DUAL-WINDOW-2026-10-17](verification/HOST-ORG-DUAL-WINDOW-2026-10-17.json)。组织成员对应人物文档投影的专门双页、原生思源多窗口、真实用户工作区和真机仍未验。
 
 ### AG-HOST-003 — 原生任务块全量对账
 
@@ -893,7 +1243,7 @@ evidence_paths / owner / last_updated / commit
 - **依赖：** `AG-P0-008`。
 - **步骤：** 创建、修改、完成、删除至少 6 条跨日期任务；重启/刷新后检查索引、文档和首页；注入一个受控块读取失败。
 - **验收：** 各侧状态逐项一致或明确未对账；失败不会伪装成功。
-- **当前证据：** 2026-10-16 的 v3.8.8-alpha.1 隔离真实内核增量已通过 9 条跨日期任务的索引/文档/首页逐项对账、6 条原生完成与历史项重开、文档改标题/日期、原生删块、产品取消、一次受控读取失败（9 项 document=unknown 且索引未变）和重启回读；原始结果见 `output/host-queue-v0516-tasks.json`，既有 API 形状见 [TASK-SPIKE-2026-10-16](verification/TASK-SPIKE-2026-10-16.md)。真实用户工作区、原生编辑器交互和其他任务管理器互读仍待验。
+- **当前证据：** 2026-10-17 的 v3.8.8-alpha.2 隔离真实内核通过 11/11，包含 9 条跨日期任务的索引/文档/首页逐项对账、编辑/完成/删除、受控读取失败和两次重启回读；证据见 [HOST-QUEUE-2026-10-17](verification/HOST-QUEUE-2026-10-17.md) 与 [SERVICE-KERNEL-2026-10-17](verification/SERVICE-KERNEL-2026-10-17.json)。真实用户工作区、原生编辑器交互和其他任务管理器互读仍待验。
 
 ### AG-HOST-004 — 真机移动、键盘、安全区和系统返回
 
@@ -922,9 +1272,9 @@ evidence_paths / owner / last_updated / commit
 - **ordered_steps：** 公历/农历/清空/闰日生日保存后回读并重启；多人来源/日记/地点/人物引用和反链核查、重复捕获/局部失败重试；账本建立/结清/重开/备份恢复；别名冲突/泛称/有效人物匹配；同组织员工替换、离职历史和两侧刷新。
 - **test_fixtures / test_commands / acceptance：** 虚构两组织、多位人物、特殊字符、失败注入；相关 spike 与实际操作步骤；每项保存输入/输出/回读/版本/截图，未验项不能用隔离通过替代。
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 局部成功保留事实，只清理本轮受控测试产物；禁外发真实往来与联系人；记录请求数和大库边界，不新增性能承诺。
-- **current_evidence：** 隔离真实产品服务 `11/11` 含 9 条跨日期任务全量对账、一次受控读取失败与重启回读；最新 Chrome browser-desktop 复跑 `realFrontend=true`，插件加载、桥 protocol 2、稳定 ref、工作台、生日编辑保存、账本新建/结清/重开、别名、跟进、组织工作台、组织改名/成员编辑/归档/恢复、页面重载和同源双页面组织改名均通过。组织导航前的详情关闭时序已在 `scripts/e2e/frontend-flow.mjs` 中收口；Network 诊断确认写后 `putFile=200`、紧接 `getFile=202` 的宿主时序。真实用户工作区、组织成员对应人物投影专门双窗口核对、原生图、真机和捕获 UI 仍未验。
+- **current_evidence：** 2026-10-17 隔离真实产品服务 `11/11`，真实 browser-desktop `realFrontend=true`，插件加载、桥 protocol 2、稳定 ref、工作台、生日、账本、别名、跟进、组织工作台、组织改名/成员编辑/归档/恢复、页面重载和人物/互动双页面幂等均通过；捕获来源文档、命令和原生弹窗可达，2 位候选重复提交完成，原 2 条互动 ID 保留，来源/日记/地点/双方人物 5 侧标记均各 1，弹窗正常关闭；组织改名/成员编辑/归档/恢复双页面均通过。真实用户工作区、组织人物投影专门双页、原生图和真机仍未验。
 - **2026-10-05 复核：** 真实隔离 browser-desktop `realFrontend=true`，核心用户旅程、页面重载回读和双页面稳定幂等均通过；捕获来源文档打开仍返回 `Uncaught`，因此捕获 UI 保持未验。该证据不替代真实用户工作区、组织双窗口、原生图和真机验收。
-- **evidence_paths / owner / last_updated / commit：** `docs/verification/HOST-QUEUE-2026-10-16.md`、`output/host-queue-v0516-frontend-after-close-fix3.json`、`docs/verification/SERVICE-KERNEL-2026-10-04.json`、`docs/verification/REAL-FRONTEND-2026-10-04.md`；Codex；2026-10-16；待提交。
+- **evidence_paths / owner / last_updated / commit：** `docs/verification/HOST-QUEUE-2026-10-17.md`、`docs/verification/SERVICE-KERNEL-2026-10-17.json`、`docs/verification/HOST-QUEUE-2026-10-16.md`、`docs/verification/REAL-FRONTEND-2026-10-04.md`；Codex；2026-10-17；待提交。
 
 ## 6. 研究候选（只调研，不直接开发）
 

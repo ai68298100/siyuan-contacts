@@ -5309,6 +5309,78 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
 
 /* ---------- vCard 导入导出 ---------- */
 
+.lvct-vcard__card {
+    flex-direction: column;
+    align-items: stretch;
+    cursor: default;
+    overflow-wrap: anywhere;
+    .lvct-import__path { white-space: normal; }
+}
+
+.lvct-vcard__card-heading {
+    display: flex;
+    align-items: center;
+    gap: var(--lvct-sp-2);
+    cursor: pointer;
+}
+
+.lvct-vcard__multi-choice {
+    min-width: 0;
+    padding: var(--lvct-sp-2);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-sm);
+    label { display: flex; flex-direction: column; gap: var(--lvct-sp-1); }
+    select { max-width: 100%; min-width: 0; }
+    ul { margin: var(--lvct-sp-1) 0; padding-left: var(--lvct-sp-4); }
+}
+
+.lvct-vcard__loss-report { overflow-wrap: anywhere; }
+
+.lvct-person-fields {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    h4, h5, p { margin-top: 0; }
+    h5 { margin-bottom: var(--lvct-sp-2); font-size: var(--lvct-fs-body); }
+    .lvct-field__row { display: flex; flex-direction: column; gap: var(--lvct-sp-1); min-width: 0; }
+    input, textarea, select { min-width: 0; max-width: 100%; box-sizing: border-box; }
+    textarea { resize: vertical; width: 100%; }
+    [aria-invalid="true"] { border-color: var(--lvct-danger); }
+    &__heading, &__item-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--lvct-sp-2); }
+    &__heading h4 { margin-bottom: 0; }
+    &__editor, &__list { display: flex; flex-direction: column; gap: var(--lvct-sp-3); }
+    &__item, &__group { min-width: 0; padding: var(--lvct-sp-3); border: 1px solid var(--lvct-border-subtle); border-radius: var(--lvct-r-md); }
+    &__item { display: flex; flex-direction: column; gap: var(--lvct-sp-2); }
+    &__item[data-field-kind="group"] { background: var(--lvct-bg-app); }
+    &__item-actions, &__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lvct-sp-2); }
+    &__actions { margin-top: var(--lvct-sp-2); }
+    &__actions button, &__item-actions button { white-space: normal; min-height: var(--lvct-control-h-compact); }
+    &__values { margin: 0; }
+    &__value { display: grid; grid-template-columns: minmax(4em, 1fr) minmax(0, 3fr); gap: var(--lvct-sp-2); margin-bottom: var(--lvct-sp-2); }
+    &__value:last-child { margin-bottom: 0; }
+    &__value dt { color: var(--lvct-text-2); }
+    &__value dd { margin: 0; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    &__filter { display: flex; flex-direction: column; gap: var(--lvct-sp-2); margin-block: var(--lvct-sp-3); min-width: 0; }
+    &__filter label { display: flex; flex-direction: column; gap: var(--lvct-sp-1); min-width: 0; }
+    &__filter input { width: 100%; }
+    &__filter-actions, &__copy-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lvct-sp-2); }
+    &__filter-actions { justify-content: space-between; }
+    &__filter-actions p { margin: 0; }
+    &__copy-actions { margin-top: var(--lvct-sp-1); }
+    &__copy-actions button, &__filter-actions button { min-height: var(--lvct-control-h-compact); white-space: normal; }
+    &__content { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+    &__copy-error { color: var(--lvct-danger); }
+    &__copy-status { color: var(--lvct-success); }
+    &__confirm, &__notice { padding: var(--lvct-sp-2); background: var(--lvct-bg-app); border: 1px solid var(--lvct-border-subtle); border-radius: var(--lvct-r-sm); }
+    &__result { color: var(--lvct-success); }
+    &__recovery { border-top: 1px solid var(--lvct-border-subtle); padding-top: var(--lvct-sp-2); }
+    @media (max-width: 640px) {
+        &__value { grid-template-columns: minmax(0, 1fr); }
+        &__item { padding: var(--lvct-sp-2); }
+        &__item-actions button, &__actions button { min-height: 44px; }
+        &__copy-actions button, &__filter-actions button { min-height: 44px; }
+    }
+}
+
 .lvct-vcard__export {
     display: flex;
     flex-direction: column;
@@ -5960,6 +6032,15 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
     gap: var(--lvct-sp-2);
     margin-top: auto;
 
+    &-field {
+        display: flex;
+        flex-direction: column;
+        gap: var(--lvct-sp-1);
+        color: var(--lvct-text-2);
+        font-size: var(--lvct-fs-caption);
+        line-height: var(--lvct-lh-body);
+    }
+
     > .b3-button:disabled {
         border: 1px solid var(--lvct-border-subtle);
         border-radius: var(--lvct-r-sm);
@@ -6022,6 +6103,18 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
     background: var(--lvct-accent-soft);
     color: var(--lvct-text-1);
     font-size: var(--lvct-fs-caption);
+}
+
+.lvct-org-manager__remove-confirm {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-2);
+    padding: var(--lvct-sp-3);
+    border-left: 3px solid var(--lvct-danger);
+    border-radius: var(--lvct-r-sm);
+    background: var(--lvct-bg-surface);
+
+    p { margin: 0; overflow-wrap: anywhere; }
 }
 
 .lvct-org-manager__member-list {
@@ -6484,7 +6577,8 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
         align-items: stretch;
         margin-top: 0;
 
-        .b3-text-field { flex: 1 1 auto; width: 0; min-width: 0; }
+        &-field { flex: 1 1 auto; min-width: 0; }
+        &-field .b3-text-field { width: 100%; min-width: 0; }
         .b3-button { flex: 0 0 auto; min-height: var(--lvct-touch-min-mobile); white-space: nowrap; }
     }
 
@@ -7981,8 +8075,8 @@ html[data-theme-mode="dark"] .lvct-org-profile-editor__section {
     }
 }
 
-/* Issue #38：联系人卡片的标题/副标题保留稳定的文本基线；长姓名不会把
-   同一行的生日信息上下推移。移动端仍允许卡片按内容收缩。 */
+/* Issue #38/#48：常见一至两行姓名预留相同高度，副标题保持稳定；
+   更长姓名自然换行，避免行数截断隐藏联系人识别信息。 */
 @media (min-width: 641px) {
     .lvct-person-card__main {
         display: flex;
@@ -7992,10 +8086,7 @@ html[data-theme-mode="dark"] .lvct-org-profile-editor__section {
 
     .lvct-person-card__name {
         min-height: 2.7em;
-        display: -webkit-box;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        overflow: hidden;
+        display: block;
     }
 }
 

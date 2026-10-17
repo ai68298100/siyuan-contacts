@@ -807,6 +807,10 @@
             onLoadInsights={(docId) => facade.loadPersonInsights(docId)}
             onLoadPersonNote={(docId) => facade.loadPersonNote(docId)}
             onSavePersonNote={(docId, note, expected) => facade.savePersonNote(docId, note, expected)}
+            onInspectLegacyPersonNote={facade.inspectLegacyPersonNote ? (docId) => facade.inspectLegacyPersonNote(docId) : undefined}
+            onDetachLegacyPersonNote={facade.detachLegacyPersonNote ? (docId, expected) => facade.detachLegacyPersonNote(docId, expected) : undefined}
+            onLoadPersonFields={facade.loadPersonFields ? (docId) => facade.loadPersonFields(docId) : undefined}
+            onSavePersonFields={facade.savePersonFields ? (docId, snapshot, expected) => facade.savePersonFields(docId, snapshot, expected) : undefined}
             onLoadExchanges={(docId) => facade.listPersonExchanges(docId)}
             onCreateExchange={(input) => facade.createPersonExchange(input)}
             onChangeExchangeStatus={(id, status, settledOn, expected) => facade.changePersonExchangeStatus(id, status, settledOn, expected)}

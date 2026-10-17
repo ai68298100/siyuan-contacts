@@ -9,7 +9,7 @@ import type { ContactSummary } from "../domain/person";
 import { createDocWithMd, KernelResponseError, KernelPermissionError, newNodeId } from "../api/client";
 import { documentHPath, markdownHeading } from "../domain/format";
 import { bindDocsAsRows, mapBoundDocIds } from "../api/av";
-import { findBlockIdByCustomAttr, findOutgoingLinkRoots, getBlockContent, listNotebookDocs, upsertMarkedBlock } from "../api/blocks";
+import { findBlockIdByCustomAttr, findOutgoingLinkRoots, getBlockContent, listNotebookDocs, readMarkedBlocks, upsertMarkedBlock } from "../api/blocks";
 import {
     buildOccasionMarkdown,
     normalizeOccasionPlace,
@@ -23,7 +23,7 @@ import { INTERACTION_STORAGE_KEY } from "../data/interactions";
 import { loadPersonAliasStore } from "../data/person-aliases";
 import { resolvePersonAlias, resolvePersonIdentity } from "../domain/person-aliases";
 import { appendEvent, normalizeInteractionStoreForWrite } from "../domain/interactions";
-import { beginCaptureCheckpoint, captureCheckpointComplete, captureStageComplete, shouldWriteCaptureProjection } from "../domain/capture-checkpoint";
+import { beginCaptureCheckpoint, captureCheckpointComplete, captureProjectionMatches, captureStageComplete, shouldWriteCaptureProjection } from "../domain/capture-checkpoint";
 import type { CaptureCheckpoint, CapturePersonCheckpoint, CaptureProjectionCheckpoint } from "../domain/capture-checkpoint";
 import { loadJsonStrict, saveJsonVerified, withStoreLock } from "../data/storage";
 import type { Plugin } from "siyuan";
@@ -201,6 +201,10 @@ async function resolveCapturePerson(
         person.name = found.name;
         person.contact = { status: person.created ? "applied" : "skipped" };
     } catch (error) {
+        if (previous.status === "unknown" && !creating && !binding) {
+            person.contact = { ...previous, message: `原请求结果仍未知；本次核实失败：${captureFailureMessage(error)}` };
+            return;
+        }
         person.contact = {
             status: creating ? definitelyRejected(error) ? "failed" : "unknown" : binding ? "unknown" : "failed",
             code: creating ? definitelyRejected(error) ? "create_rejected" : "create_unknown" : binding ? "bind_failed" : "read_failed",
@@ -283,7 +287,9 @@ export async function captureFromDoc(
             roster = await getRoster(settings);
         } catch (error) {
             for (const person of checkpoint.people) {
-                person.contact = { status: "unknown", code: "read_failed", message: captureFailureMessage(error) };
+                person.contact = person.contact.status === "unknown"
+                    ? { ...person.contact, message: `原请求结果仍未知；名册核实失败：${captureFailureMessage(error)}` }
+                    : { status: "unknown", code: "read_failed", message: captureFailureMessage(error) };
             }
             return {
                 checkpoint, complete: false, createdNames: [], createdDocIds: [], interactions: 0,
@@ -399,6 +405,7 @@ export async function captureFromDoc(
                 const previous = checkpoint.projections.find((entry) => entry.key === key);
                 if (!shouldWriteCaptureProjection(previous, markdown)) return;
                 let sent = false;
+                let accepted = false;
                 try {
                     const existingId = await findBlockIdByCustomAttr(rootId, attrName);
                     if (previous?.status === "unknown" && !existingId) {
@@ -408,10 +415,15 @@ export async function captureFromDoc(
                     }
                     sent = true;
                     await upsertMarkedBlock(rootId, attrName, markdown, existingId);
+                    accepted = true;
+                    const verified = await readMarkedBlocks(rootId, attrName);
+                    if (!captureProjectionMatches(markdown, verified)) {
+                        throw new Error("事项投影请求已接受，但标记块回读尚未收敛到预期内容");
+                    }
                     occasionLinksWritten += 1;
                     saveProjection({ key, target, rootId, markdown, status: "applied" });
                 } catch (error) {
-                    const unknown = previous?.status === "unknown" || sent && !definitelyRejected(error);
+                    const unknown = previous?.status === "unknown" || accepted || sent && !definitelyRejected(error);
                     saveProjection({ key, target, rootId, markdown, status: unknown ? "unknown" : "failed",
                         code: unknown ? "projection_unknown" : "projection_failed", message: captureFailureMessage(error) });
                 }

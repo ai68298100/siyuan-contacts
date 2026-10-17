@@ -1,0 +1,829 @@
+{
+  "generatedAt": "2026-10-16T17:03:16.369Z",
+  "issues": [
+    51,
+    54
+  ],
+  "evidence": "synthetic-in-memory-research",
+  "syntheticOnly": true,
+  "kernelRequests": 0,
+  "productionChanges": false,
+  "candidateContractAccepted": false,
+  "environment": {
+    "nodeVersion": "v24.16.0",
+    "platform": "win32/x64",
+    "cpu": "Intel(R) Core(TM) i5-14600KF",
+    "totalMemoryBytes": 68543606784,
+    "gcExposedInWorkers": true
+  },
+  "scope": {
+    "persons": 10000,
+    "methods": 100000,
+    "methodsPerPerson": 10,
+    "indexedFields": [
+      "method.value"
+    ],
+    "noHostIO": true,
+    "noRealContactData": true,
+    "matching": "NFKC + lowercase + literal substring; per-person results deduplicated by stable identity",
+    "scanChunkMethods": 2000,
+    "exclusions": [
+      "SiYuan read/write and AV query",
+      "UI rendering, debounce and cancellation wiring",
+      "JSON disk read/parse/write",
+      "cross-window cache invalidation",
+      "real vCard multi-value parser/serializer",
+      "legacy-row inference from names or values"
+    ]
+  },
+  "memoryMethod": "Fresh process per strategy. Heap growth is sampled immediately after each operation; retained growth is sampled after explicit GC. maxRSS is the worker-process lifetime high-water mark including fixture, runtime and repeated trials, not incremental index memory or exact JS transient allocation.",
+  "provisionalBudgets": {
+    "acceptedForProduction": false,
+    "indexBuildP95Ms": 2000,
+    "normalizedScanBuildP95Ms": 1000,
+    "fullScanQueryP95Ms": 250,
+    "indexedSelectiveQueryP95Ms": 50,
+    "snapshotPreviewP95Ms": 1000,
+    "legacyPreviewP95Ms": 1000,
+    "indexRetainedHeapGrowthBytes": 134217728
+  },
+  "budgetChecks": [
+    {
+      "id": "normalized-scan-build",
+      "value": 19.279500000000013,
+      "limit": 1000,
+      "withinProvisionalBudget": true
+    },
+    {
+      "id": "index-build",
+      "value": 374.66049999999996,
+      "limit": 2000,
+      "withinProvisionalBudget": true
+    },
+    {
+      "id": "scan-all-query-probes",
+      "value": 2.7670999999999992,
+      "limit": 250,
+      "withinProvisionalBudget": true
+    },
+    {
+      "id": "index-selective-query-probes",
+      "value": 0.13800000000014734,
+      "limit": 50,
+      "withinProvisionalBudget": true
+    },
+    {
+      "id": "index-retained-heap-growth",
+      "value": 27639664,
+      "limit": 134217728,
+      "withinProvisionalBudget": true
+    },
+    {
+      "id": "strict-snapshot-preview",
+      "value": 22.047300000000007,
+      "limit": 1000,
+      "withinProvisionalBudget": true
+    },
+    {
+      "id": "legacy-migration-preview",
+      "value": 37.48719999999997,
+      "limit": 1000,
+      "withinProvisionalBudget": true
+    }
+  ],
+  "measurements": [
+    {
+      "strategy": "scan",
+      "fixturePersonCount": 10000,
+      "fixtureMethodCount": 100000,
+      "build": {
+        "trials": 5,
+        "medianMs": 9.834000000000003,
+        "p95Ms": 19.279500000000013,
+        "maxObservedHeapGrowthBytes": 18400752,
+        "maxRetainedHeapGrowthBytes": 9801208,
+        "samples": [
+          {
+            "milliseconds": 19.279500000000013,
+            "observedHeapGrowthBytes": 18400752,
+            "retainedHeapGrowthBytes": 9801208,
+            "observedRssBytes": 137408512
+          },
+          {
+            "milliseconds": 9.818000000000012,
+            "observedHeapGrowthBytes": 15049104,
+            "retainedHeapGrowthBytes": 8515960,
+            "observedRssBytes": 145768448
+          },
+          {
+            "milliseconds": 10.336899999999986,
+            "observedHeapGrowthBytes": 15041928,
+            "retainedHeapGrowthBytes": 8516088,
+            "observedRssBytes": 145797120
+          },
+          {
+            "milliseconds": 9.834000000000003,
+            "observedHeapGrowthBytes": 15067872,
+            "retainedHeapGrowthBytes": 8516072,
+            "observedRssBytes": 145874944
+          },
+          {
+            "milliseconds": 9.728499999999997,
+            "observedHeapGrowthBytes": 15071896,
+            "retainedHeapGrowthBytes": 8515944,
+            "observedRssBytes": 146677760
+          }
+        ]
+      },
+      "queries": [
+        {
+          "id": "primary-phone-exact",
+          "trials": 7,
+          "medianMs": 1.2339999999999804,
+          "p95Ms": 2.7670999999999992,
+          "count": 1,
+          "expectedCount": 1,
+          "complete": true,
+          "visitedMethods": 100000,
+          "usedFallback": true,
+          "samples": [
+            2.7670999999999992,
+            1.5612000000000137,
+            1.2461000000000126,
+            1.199100000000044,
+            1.2339999999999804,
+            1.17349999999999,
+            1.009900000000016
+          ]
+        },
+        {
+          "id": "secondary-phone-exact",
+          "trials": 7,
+          "medianMs": 0.9916000000000054,
+          "p95Ms": 1.4172000000000367,
+          "count": 1,
+          "expectedCount": 1,
+          "complete": true,
+          "visitedMethods": 100000,
+          "usedFallback": true,
+          "samples": [
+            0.9736000000000331,
+            0.9990000000000236,
+            0.9771999999999821,
+            1.0207000000000335,
+            0.9779000000000337,
+            0.9916000000000054,
+            1.4172000000000367
+          ]
+        },
+        {
+          "id": "secondary-email-case-insensitive",
+          "trials": 7,
+          "medianMs": 0.6795999999999935,
+          "p95Ms": 0.9954000000000178,
+          "count": 1,
+          "expectedCount": 1,
+          "complete": true,
+          "visitedMethods": 100000,
+          "usedFallback": true,
+          "samples": [
+            0.9954000000000178,
+            0.7420999999999935,
+            0.6779999999999973,
+            0.6767999999999574,
+            0.6795999999999935,
+            0.6843000000000075,
+            0.6625999999999976
+          ]
+        },
+        {
+          "id": "secondary-wechat-substring",
+          "trials": 7,
+          "medianMs": 1.126800000000003,
+          "p95Ms": 1.136700000000019,
+          "count": 1,
+          "expectedCount": 1,
+          "complete": true,
+          "visitedMethods": 100000,
+          "usedFallback": true,
+          "samples": [
+            1.136700000000019,
+            1.130899999999997,
+            1.126800000000003,
+            1.1281000000000176,
+            1.1193999999999846,
+            1.1154000000000224,
+            1.1175000000000068
+          ]
+        },
+        {
+          "id": "secondary-url-exact",
+          "trials": 7,
+          "medianMs": 0.6056000000000381,
+          "p95Ms": 0.720299999999952,
+          "count": 1,
+          "expectedCount": 1,
+          "complete": true,
+          "visitedMethods": 100000,
+          "usedFallback": true,
+          "samples": [
+            0.5137000000000285,
+            0.5027000000000044,
+            0.6440000000000055,
+            0.720299999999952,
+            0.6713999999999487,
+            0.6056000000000381,
+            0.5525000000000091
+          ]
+        },
+        {
+          "id": "unicode-value",
+          "trials": 7,
+          "medianMs": 1.035599999999988,
+          "p95Ms": 1.0785999999999945,
+          "count": 1,
+          "expectedCount": 1,
+          "complete": true,
+          "visitedMethods": 100000,
+          "usedFallback": true,
+          "samples": [
+            1.0785999999999945,
+            1.0615999999999985,
+            1.035599999999988,
+            1.0645000000000095,
+            1.0348000000000184,
+            1.0242000000000075,
+            1.0231999999999744
+          ]
+        },
+        {
+          "id": "broad-email-substring",
+          "trials": 7,
+          "medianMs": 1.362099999999998,
+          "p95Ms": 1.5801999999999907,
+          "count": 10000,
+          "expectedCount": 10000,
+          "complete": true,
+          "visitedMethods": 100000,
+          "usedFallback": true,
+          "samples": [
+            1.3582999999999856,
+            1.362099999999998,
+            1.3537999999999784,
+            1.3371000000000208,
+            1.4649,
+            1.5801999999999907,
+            1.496500000000026
+          ]
+        },
+        {
+          "id": "short-unicode-fallback",
+          "trials": 7,
+          "medianMs": 1.3856000000000108,
+          "p95Ms": 1.4664999999999964,
+          "count": 10000,
+          "expectedCount": 10000,
+          "complete": true,
+          "visitedMethods": 100000,
+          "usedFallback": true,
+          "samples": [
+            1.4664999999999964,
+            1.38209999999998,
+            1.3865000000000123,
+            1.3856000000000108,
+            1.3806999999999903,
+            1.4157999999999902,
+            1.3684999999999832
+          ]
+        },
+        {
+          "id": "absent-value",
+          "trials": 7,
+          "medianMs": 0.8249999999999886,
+          "p95Ms": 0.9553999999999974,
+          "count": 0,
+          "expectedCount": 0,
+          "complete": true,
+          "visitedMethods": 100000,
+          "usedFallback": true,
+          "samples": [
+            0.7386000000000195,
+            0.9553999999999974,
+            0.8249999999999886,
+            0.789100000000019,
+            0.7857999999999947,
+            0.8295999999999708,
+            0.82650000000001
+          ]
+        }
+      ],
+      "baseline": {
+        "rss": 119197696,
+        "heapTotal": 103280640,
+        "heapUsed": 35224728,
+        "external": 9129359,
+        "arrayBuffers": 28935
+      },
+      "finalMemory": {
+        "rss": 152489984,
+        "heapTotal": 123252736,
+        "heapUsed": 58849544,
+        "external": 9129399,
+        "arrayBuffers": 28935
+      },
+      "processPeakRssBytes": 152502272
+    },
+    {
+      "strategy": "index",
+      "fixturePersonCount": 10000,
+      "fixtureMethodCount": 100000,
+      "build": {
+        "trials": 5,
+        "medianMs": 336.36659999999995,
+        "p95Ms": 374.66049999999996,
+        "maxObservedHeapGrowthBytes": 101746416,
+        "maxRetainedHeapGrowthBytes": 27639664,
+        "samples": [
+          {
+            "milliseconds": 374.66049999999996,
+            "observedHeapGrowthBytes": 55229304,
+            "retainedHeapGrowthBytes": 27639664,
+            "observedRssBytes": 284856320
+          },
+          {
+            "milliseconds": 336.36659999999995,
+            "observedHeapGrowthBytes": 101746416,
+            "retainedHeapGrowthBytes": 8515704,
+            "observedRssBytes": 302080000
+          },
+          {
+            "milliseconds": 334.39150000000006,
+            "observedHeapGrowthBytes": 100980240,
+            "retainedHeapGrowthBytes": 8515704,
+            "observedRssBytes": 302477312
+          },
+          {
+            "milliseconds": 338.12149999999997,
+            "observedHeapGrowthBytes": 101022104,
+            "retainedHeapGrowthBytes": 26342344,
+            "observedRssBytes": 290877440
+          },
+          {
+            "milliseconds": 333.06960000000004,
+            "observedHeapGrowthBytes": 100370608,
+            "retainedHeapGrowthBytes": 26342608,
+            "observedRssBytes": 291090432
+          }
+        ]
+      },
+      "queries": [
+        {
+          "id": "primary-phone-exact",
+          "trials": 7,
+          "medianMs": 0.011999999999943611,
+          "p95Ms": 0.13800000000014734,
+          "count": 1,
+          "expectedCount": 1,
+          "complete": true,
+          "visitedMethods": 200,
+          "usedFallback": false,
+          "samples": [
+            0.13800000000014734,
+            0.01880000000005566,
+            0.03149999999982356,
+            0.011999999999943611,
+            0.011700000000018917,
+            0.011899999999968713,
+            0.011799999999993815
+          ]
+        },
+        {
+          "id": "secondary-phone-exact",
+          "trials": 7,
+          "medianMs": 0.011899999999968713,
+          "p95Ms": 0.013200000000097134,
+          "count": 1,
+          "expectedCount": 1,
+          "complete": true,
+          "visitedMethods": 200,
+          "usedFallback": false,
+          "samples": [
+            0.013200000000097134,
+            0.011899999999968713,
+            0.01160000000004402,
+            0.011900000000196087,
+            0.011700000000018917,
+            0.01160000000004402,
+            0.012399999999843203
+          ]
+        },
+        {
+          "id": "secondary-email-case-insensitive",
+          "trials": 7,
+          "medianMs": 0.014400000000023283,
+          "p95Ms": 0.02589999999986503,
+          "count": 1,
+          "expectedCount": 1,
+          "complete": true,
+          "visitedMethods": 200,
+          "usedFallback": false,
+          "samples": [
+            0.02589999999986503,
+            0.014600000000200453,
+            0.014400000000023283,
+            0.013999999999896318,
+            0.014800000000150249,
+            0.01410000000009859,
+            0.01389999999992142
+          ]
+        },
+        {
+          "id": "secondary-wechat-substring",
+          "trials": 7,
+          "medianMs": 0.011899999999968713,
+          "p95Ms": 0.013999999999896318,
+          "count": 1,
+          "expectedCount": 1,
+          "complete": true,
+          "visitedMethods": 200,
+          "usedFallback": false,
+          "samples": [
+            0.013999999999896318,
+            0.011900000000196087,
+            0.01209999999991851,
+            0.011899999999968713,
+            0.011799999999993815,
+            0.011899999999968713,
+            0.011700000000018917
+          ]
+        },
+        {
+          "id": "secondary-url-exact",
+          "trials": 7,
+          "medianMs": 0.01749999999992724,
+          "p95Ms": 0.022400000000061482,
+          "count": 1,
+          "expectedCount": 1,
+          "complete": true,
+          "visitedMethods": 200,
+          "usedFallback": false,
+          "samples": [
+            0.019900000000006912,
+            0.01770000000010441,
+            0.022400000000061482,
+            0.01749999999992724,
+            0.01630000000000109,
+            0.016099999999823922,
+            0.01630000000000109
+          ]
+        },
+        {
+          "id": "unicode-value",
+          "trials": 7,
+          "medianMs": 0.012200000000120781,
+          "p95Ms": 0.017900000000054206,
+          "count": 1,
+          "expectedCount": 1,
+          "complete": true,
+          "visitedMethods": 200,
+          "usedFallback": false,
+          "samples": [
+            0.017900000000054206,
+            0.012300000000095679,
+            0.012200000000120781,
+            0.011500000000069122,
+            0.01389999999992142,
+            0.011300000000119326,
+            0.01139999999986685
+          ]
+        },
+        {
+          "id": "broad-email-substring",
+          "trials": 7,
+          "medianMs": 0.901700000000119,
+          "p95Ms": 1.661299999999983,
+          "count": 10000,
+          "expectedCount": 10000,
+          "complete": true,
+          "visitedMethods": 20000,
+          "usedFallback": false,
+          "samples": [
+            1.6241999999999734,
+            0.901700000000119,
+            0.824100000000044,
+            0.7919999999999163,
+            0.8389999999999418,
+            1.661299999999983,
+            1.3929000000000542
+          ]
+        },
+        {
+          "id": "short-unicode-fallback",
+          "trials": 7,
+          "medianMs": 1.9155000000000655,
+          "p95Ms": 2.9549000000001797,
+          "count": 10000,
+          "expectedCount": 10000,
+          "complete": true,
+          "visitedMethods": 100000,
+          "usedFallback": true,
+          "samples": [
+            2.9549000000001797,
+            2.4109000000000833,
+            1.9155000000000655,
+            2.0235000000000127,
+            1.564300000000003,
+            1.4711999999999534,
+            1.6189999999999145
+          ]
+        },
+        {
+          "id": "absent-value",
+          "trials": 7,
+          "medianMs": 0.003300000000081127,
+          "p95Ms": 0.029199999999946158,
+          "count": 0,
+          "expectedCount": 0,
+          "complete": true,
+          "visitedMethods": 0,
+          "usedFallback": false,
+          "samples": [
+            0.029199999999946158,
+            0.004599999999982174,
+            0.003300000000081127,
+            0.003300000000081127,
+            0.0031999999998788553,
+            0.0030999999999039574,
+            0.003200000000106229
+          ]
+        }
+      ],
+      "trigramCount": 1447,
+      "postingCount": 1899561,
+      "baseline": {
+        "rss": 119197696,
+        "heapTotal": 103280640,
+        "heapUsed": 35224728,
+        "external": 9129359,
+        "arrayBuffers": 28935
+      },
+      "finalMemory": {
+        "rss": 293793792,
+        "heapTotal": 212361216,
+        "heapUsed": 80248520,
+        "external": 9129399,
+        "arrayBuffers": 28935
+      },
+      "processPeakRssBytes": 302911488
+    },
+    {
+      "strategy": "migration",
+      "fixturePersonCount": 10000,
+      "fixtureMethodCount": 100000,
+      "strictSnapshotPreview100kMethods": {
+        "trials": 5,
+        "medianMs": 11.631399999999985,
+        "p95Ms": 22.047300000000007,
+        "maxObservedHeapGrowthBytes": 24947920,
+        "maxRetainedHeapGrowthBytes": 10409208,
+        "samples": [
+          {
+            "milliseconds": 22.047300000000007,
+            "observedHeapGrowthBytes": 24947920,
+            "retainedHeapGrowthBytes": 10409208,
+            "observedRssBytes": 144060416
+          },
+          {
+            "milliseconds": 11.797499999999985,
+            "observedHeapGrowthBytes": 21516000,
+            "retainedHeapGrowthBytes": 9120280,
+            "observedRssBytes": 156303360
+          },
+          {
+            "milliseconds": 11.491199999999992,
+            "observedHeapGrowthBytes": 21516000,
+            "retainedHeapGrowthBytes": 9120512,
+            "observedRssBytes": 169013248
+          },
+          {
+            "milliseconds": 11.123999999999995,
+            "observedHeapGrowthBytes": 21516112,
+            "retainedHeapGrowthBytes": 9120568,
+            "observedRssBytes": 168538112
+          },
+          {
+            "milliseconds": 11.631399999999985,
+            "observedHeapGrowthBytes": 21516160,
+            "retainedHeapGrowthBytes": 9120296,
+            "observedRssBytes": 170872832
+          }
+        ]
+      },
+      "legacyPreview10kPeople40kMethods": {
+        "trials": 5,
+        "medianMs": 33.90100000000001,
+        "p95Ms": 37.48719999999997,
+        "maxObservedHeapGrowthBytes": 33922768,
+        "maxRetainedHeapGrowthBytes": 12257416,
+        "samples": [
+          {
+            "milliseconds": 37.48719999999997,
+            "observedHeapGrowthBytes": 33922768,
+            "retainedHeapGrowthBytes": 11817632,
+            "observedRssBytes": 203223040
+          },
+          {
+            "milliseconds": 36.87179999999995,
+            "observedHeapGrowthBytes": 33296752,
+            "retainedHeapGrowthBytes": 12255880,
+            "observedRssBytes": 211025920
+          },
+          {
+            "milliseconds": 33.90100000000001,
+            "observedHeapGrowthBytes": 32640680,
+            "retainedHeapGrowthBytes": 12257416,
+            "observedRssBytes": 217219072
+          },
+          {
+            "milliseconds": 33.24539999999996,
+            "observedHeapGrowthBytes": 32704016,
+            "retainedHeapGrowthBytes": 12256056,
+            "observedRssBytes": 217407488
+          },
+          {
+            "milliseconds": 32.665800000000104,
+            "observedHeapGrowthBytes": 32627064,
+            "retainedHeapGrowthBytes": 12256624,
+            "observedRssBytes": 217423872
+          }
+        ]
+      },
+      "baseline": {
+        "rss": 119775232,
+        "heapTotal": 103542784,
+        "heapUsed": 35224744,
+        "external": 9129359,
+        "arrayBuffers": 28935
+      },
+      "finalMemory": {
+        "rss": 203292672,
+        "heapTotal": 191623168,
+        "heapUsed": 53235040,
+        "external": 9129399,
+        "arrayBuffers": 28935
+      },
+      "processPeakRssBytes": 220504064
+    }
+  ],
+  "verification": {
+    "checks": [
+      {
+        "id": "fixture-counts",
+        "pass": true
+      },
+      {
+        "id": "search-equivalence:primary-phone-exact",
+        "pass": true,
+        "detail": "expected=1, scanned=1, indexed=1"
+      },
+      {
+        "id": "search-equivalence:secondary-phone-exact",
+        "pass": true,
+        "detail": "expected=1, scanned=1, indexed=1"
+      },
+      {
+        "id": "search-equivalence:secondary-email-case-insensitive",
+        "pass": true,
+        "detail": "expected=1, scanned=1, indexed=1"
+      },
+      {
+        "id": "search-equivalence:secondary-wechat-substring",
+        "pass": true,
+        "detail": "expected=1, scanned=1, indexed=1"
+      },
+      {
+        "id": "search-equivalence:secondary-url-exact",
+        "pass": true,
+        "detail": "expected=1, scanned=1, indexed=1"
+      },
+      {
+        "id": "search-equivalence:unicode-value",
+        "pass": true,
+        "detail": "expected=1, scanned=1, indexed=1"
+      },
+      {
+        "id": "search-equivalence:broad-email-substring",
+        "pass": true,
+        "detail": "expected=10000, scanned=10000, indexed=10000"
+      },
+      {
+        "id": "search-equivalence:short-unicode-fallback",
+        "pass": true,
+        "detail": "expected=10000, scanned=10000, indexed=10000"
+      },
+      {
+        "id": "search-equivalence:absent-value",
+        "pass": true,
+        "detail": "expected=0, scanned=0, indexed=0"
+      },
+      {
+        "id": "secondary-email-not-in-av-primary",
+        "pass": true
+      },
+      {
+        "id": "bounded-scan-is-explicitly-incomplete",
+        "pass": true
+      },
+      {
+        "id": "cancelled-scan-is-not-empty-success",
+        "pass": true
+      },
+      {
+        "id": "identity-survives-rename-value-label-order",
+        "pass": true
+      },
+      {
+        "id": "legacy-delimiter-preserved-not-split",
+        "pass": true
+      },
+      {
+        "id": "legacy-slot-identity-not-derived-from-value",
+        "pass": true
+      },
+      {
+        "id": "same-value-different-person-is-not-same-identity",
+        "pass": true
+      },
+      {
+        "id": "unknown-format-rejected",
+        "pass": true
+      },
+      {
+        "id": "unknown-type-rejected",
+        "pass": true
+      },
+      {
+        "id": "duplicate-method-id-rejected",
+        "pass": true
+      },
+      {
+        "id": "multiple-primary-rejected",
+        "pass": true
+      },
+      {
+        "id": "old-backup-does-not-resurrect-tombstoned-id",
+        "pass": true
+      },
+      {
+        "id": "same-id-backup-conflict-preserves-current",
+        "pass": true
+      },
+      {
+        "id": "projection-response-loss-readback-verifies",
+        "pass": true
+      },
+      {
+        "id": "projection-unconfirmed-does-not-replay",
+        "pass": true
+      },
+      {
+        "id": "native-edit-becomes-conflict",
+        "pass": true
+      },
+      {
+        "id": "target-rebinding-stops-projection",
+        "pass": true
+      },
+      {
+        "id": "production-vcard-limit-observed",
+        "pass": true
+      }
+    ],
+    "summary": {
+      "total": 28,
+      "passed": 28,
+      "failed": 0
+    },
+    "vcardObservation": {
+      "input": {
+        "TEL": 2,
+        "EMAIL": 2,
+        "URL": 2
+      },
+      "currentOutput": {
+        "phone": "+00 111 / +00 222",
+        "email": "work@example.test",
+        "website": "https://example.test/work"
+      },
+      "tested": "Existing pure parser only; candidate full vCard parser/serializer and arbitrary labels are not implemented."
+    },
+    "legacyObservation": {
+      "input": "+00 100 00000 / +00 200 00000",
+      "migratedValue": "+00 100 00000 / +00 200 00000",
+      "methodCount": 4,
+      "stableMethodId": "legacy-87be924ba314dd63656a738c"
+    }
+  },
+  "interpretation": "A rebuildable normalized-value/trigram index is a candidate for repeated selective searches. Short queries use a bounded scan; broad matches retain O(candidate count) work. Performance budgets and storage/search integration remain research proposals requiring real-host measurement.",
+  "ok": true
+}

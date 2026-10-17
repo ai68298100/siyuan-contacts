@@ -1,4 +1,25 @@
-# 下一阶段开发计划（历史规划与需求来源）
+# 下一阶段开发计划（当前入口与历史来源）
+
+> **2026-10-17 #51/#54 已完成原始需求收口：** 重复资料与两层分组的完整生命周期、个人备注冲突重读/草稿选择、旧版拆块备注安全恢复已通过最终隔离真实宿主联合验收；单测710/710，三套 UI 各416/416，联合轮 `9e8b5db6-5834-42c7-a5ec-fee5b471bd10` 通过。当前不再把这两个 issue 的原始需求作为开发中任务；下一步是发布候选审查和用户场景核对。全局检索、AV 投影、vCard 往返、原生编辑器 CAS、真机和日常用户库仍按独立任务规划。
+
+> **2026-10-17 #51/#54 详情使用闭环上一阶段基线：** D-0039 与 DATA-CONTRACT §6A 的重复条目、两层分组、排序、删除选择、草稿守卫和严格保存已实现；详情筛选、完整内容复制、跨详情实例复制互斥及双页面冲突恢复已通过 `a4340d07...`。最终生命周期、备注旧版恢复与 710/710 门禁结果见上方最新条目；无需重复安排这些已完成的研究或隔离验收。
+
+> **后续顺序：** 先收口本地候选的交付与issue场景核对，再按反馈挑选联系人全局搜索、快捷联系或vCard/迁移联动；详情内筛选已经完成。若推进全局检索，须先解决既有基础字段与扩展字段混合命中、超过一页联系人的覆盖问题，并按文档批量读取预算验收，不能逐人增加flush/SQL循环。完整 `contactMethods` 的主值投影、旧值迁移、跨存储生命周期与原生编辑器同时竞争仍属独立后续契约，不阻塞本首版。实际执行卡以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准。
+
+## 前期研究记录（历史参考）
+
+以下记录保留各候选模型的已验范围和未决项，其中“下一步”属于当时的研究顺序；当前实现与执行顺序以上方 D-0039 首版为准。候选 `method-{hash}` 块的 UI-COPY、投影、搜索等门禁仍约束完整联系方式模型，不应重新解释为本首版的全部前置。
+
+> **Chrome 不可用时的独立增量已收口：** `AG-RF-004-L1` 已done_isolated，34/34纯检查、76次隔离真实内核请求及独立raw复核通过，见[联合生命周期证据](verification/MULTI-CONTACT-LIFECYCLE-2026-10-17.md)。甲主方法移除后主表旧phone保留，次方法primary文本仍为0；名册解绑后人物文档与剩余方法仍可达；本轮同doc重绑实际换itemID且phone为空，乙不变，重启只读保持。观察完整、文档可达、名册资格分别报告；旧计划拒绝只为研究诊断。D1未采纳，正式删除确认/墓碑/投影恢复仍未实现；下一阶段继续UI-COPY、原生编辑及同时竞争，Chrome不可用时保持host_pending。
+> **D7 的独立增量已收口：** 因 Chrome 控制面仍不可用，`AG-RF-004-S1-LIFE` 已 `done_isolated`，18/18 纯检查补齐 vCard 方法编辑、删除、新增、重排、重复和未知属性的来源身份与 loss report 研究。它只验证纯转换的候选语义，不改生产 parser/serializer，不替代 N2-HOST-UI-COPY、D1 事实源或外部地址簿互操作；正式往返契约仍未开放，下一步回到 Chrome 恢复后的 UI-COPY。
+
+> **D8/S4 的独立增量已收口：** `AG-RF-004-S4` 已 `done_isolated`，24/24 纯检查；实际对 10,000 人/100,000 方法快照完成临时 JSON 序列化、写入、读取、严格解析和写后回读摘要核对，AV 主命中与次要方法命中按稳定 `personDocId` 去重，`itemId` 变化标记冲突，分页取消、related 单独保留；missing/invalid/stale/rebuilding/cancelled 索引及分块取消/预算不足均保持 partial/cancelled/unknown 语义。结果见 [S4 IO/搜索证据](verification/MULTI-CONTACT-SEARCH-IO-2026-10-17.md)。这只验证纯候选状态机和本机文件体积，不决定 D1、不改生产 storage/search/migration，不替代真实 Plugin/Host/UI IO 或跨窗口预算；D8 与 #51/#54 继续开放。
+
+> **D3/D4 身份门禁增量已收口：** `AG-RF-004-L2` 已 `done_isolated`，16/16 纯检查覆盖同名新文档、旧源不可达/位置变化、解绑重绑、owner 冲突、重复身份和缺页。该卡只用合成观察，不调用 delete/move API；未知或冲突不按姓名/值认领，不清空、不生成墓碑、不投影，结果保持 `writeAllowed=false`。证据见[人物生命周期身份门禁](verification/MULTI-CONTACT-LIFECYCLE-IDENTITY-2026-10-17.md)。真实文档删除/移动、持久解绑历史、CAS、卸载恢复和 UI/并发仍未验证，D3/D4 正式契约与 #51/#54 继续开放。
+
+> **D6 旧值迁移、备份与版本出口研究已收口：** `AG-RF-004-D6` 为 `done_isolated`，20/20 纯检查，覆盖未知版本、坏库、缺模块、重复身份、同 ID 冲突、旧值拆分预览、确认前重算、现状优先、墓碑不复活、不可达人物不按姓名恢复及 checkpoint 排除。证据见 [D6 研究](verification/MULTI-CONTACT-MIGRATION-EXIT-2026-10-17.md)。结果固定 `syntheticOnly=true`、`kernelRequests=0`、`productionChanges=false`、`candidateContractAccepted=false`；默认仅写 spike 结果 JSON，`--dry-run`/`--import` 不写文件。D6 草案尚未进入 `DATA-CONTRACT.md`、生产 migration/backup 或版本兼容实现；Chrome 恢复后仍优先 N2-HOST-UI-COPY，`host_pending` 保持不变。
+
+> **D3/D4 主值投影增量已收口：** `AG-RF-004-D3D4-P` 为 `done_isolated`，21/21 纯检查补齐主值删除、显式切换、零主值投影、显式删除与解绑差异、墓碑不复活和陈旧 AV 投影冲突。删除主值不自动晋升次方法；解绑保留方法但阻断投影；零主值清空只在新鲜基线和显式确认下形成计划，AV 外部改值或未知基线均零写冲突。证据见[主值投影研究](verification/MULTI-CONTACT-PRIMARY-PROJECTION-2026-10-17.md)。本卡不调用宿主端点、不改生产契约，未证明真实删除/移动、持久墓碑、CAS、UI 或并发；正式 D3/D4 与 #51/#54 继续开放。
 
 > **2026-10-16 计划校准：** 当前稳定发布为 v0.5.16，发布包与附件校验见 [RELEASE](RELEASE.md) 和 [UI-REGRESSION](UI-REGRESSION.md)；往来账本陈旧回读竞态已修复并完成创建、连续写入和状态变更回归。任务状态和依赖以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准。Issue [#35](https://github.com/ai68298100/siyuan-contacts/issues/35) 仍无脱敏 VCF，vCard 无名卡片候选修复是否命中小米导出根因未知，保持开放；#36–#40 已完成并关闭。C03 移动夹具问题已解决，发布前本地桌面/移动/宿主样式 UI 均为 381/381，发布后 CI 另见 RELEASE。active/former 现有模型契约已复评（D-0037/0038），当前单位投影和图谱 member 边状态隔离实现已发布，整卡仍为 partial；有真实宿主时推进 `AG-HOST-003/006`，真实双窗口、迁移、原生图、真机与 1 万段规模证据仍待补。`AG-SCALE-001` 保持 P2/partial；R54 视觉迁移先拆出带依赖和验收条件的原子任务卡。下方按日期记录的计划和功能矩阵保留为需求来源与历史快照，不代表当前认领队列。
 

@@ -2,6 +2,7 @@ import type { Plugin } from "siyuan";
 import {
     DEFAULT_VIEW_PREFERENCES,
     normalizeViewPreferences,
+    normalizeViewPreferencesForWrite,
     type ViewPreferences,
 } from "../domain/preferences.ts";
 import { readViewPreferences, writeViewPreferencePatch } from "../data/preferences.ts";
@@ -35,9 +36,9 @@ export async function loadViewPreferences(plugin: Plugin): Promise<ViewPreferenc
     return value;
 }
 
-export function saveViewPreferences(plugin: Plugin, preferences: ViewPreferences, baseline?: ViewPreferences): Promise<ViewPreferences> {
+export async function saveViewPreferences(plugin: Plugin, preferences: ViewPreferences, baseline?: ViewPreferences): Promise<ViewPreferences> {
     const state = stateFor(plugin);
-    const submitted = normalizeViewPreferences(preferences);
+    const submitted = normalizeViewPreferencesForWrite(preferences);
     const base = baseline ? normalizeViewPreferences(baseline) : state.latest && normalizeViewPreferences(state.latest);
     const task = state.queue.then(async () => {
         const previous = base ?? await readViewPreferences(plugin);
@@ -106,8 +107,8 @@ export function createPreferenceRequests(operations: {
                 throw error;
             });
         },
-        save: (preferences: ViewPreferences, baseline: ViewPreferences) => {
-            const submitted = normalizeViewPreferences(preferences);
+        save: async (preferences: ViewPreferences, baseline: ViewPreferences) => {
+            const submitted = normalizeViewPreferencesForWrite(preferences);
             const callerBase = normalizeViewPreferences(baseline);
             const patch = diffViewPreferences(callerBase, submitted);
             const base = pendingIntent ?? callerBase;

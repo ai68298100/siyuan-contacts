@@ -1,0 +1,288 @@
+{
+  "runId": "581c1be1-6b75-478b-b8ee-6cdf1ffb7481",
+  "workspace": "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Note-Detach-581c1be1-6b75-478b-b8ee-6cdf1ffb7481",
+  "kernel": "D:/RJ/SiYuan/resources/kernel/SiYuan-Kernel.exe",
+  "port": 4805,
+  "fictionalOnly": true,
+  "startedAt": "2026-10-17T03:38:31.183Z",
+  "version": "3.8.8-alpha.2",
+  "attributeProbe": {
+    "docId": "20261017113831-72g2741",
+    "before": [
+      {
+        "content": "保留正文",
+        "ial": "{: id=\"20261017113831-301sqpq\" updated=\"20261017113831\"}",
+        "id": "20261017113831-301sqpq",
+        "markdown": "保留正文",
+        "parent_id": "20261017113831-72g2741",
+        "root_id": "20261017113831-72g2741",
+        "type": "p"
+      },
+      {
+        "content": "legacy-split",
+        "ial": "{: updated=\"20261017113831\" id=\"20261017113831-72g2741\" title=\"legacy-split\" type=\"doc\"}",
+        "id": "20261017113831-72g2741",
+        "markdown": "",
+        "parent_id": "",
+        "root_id": "20261017113831-72g2741",
+        "type": "d"
+      },
+      {
+        "content": "第一段",
+        "ial": "{: id=\"20261017113831-tr2ep6m\" updated=\"20261017113831\"}",
+        "id": "20261017113831-tr2ep6m",
+        "markdown": "第一段",
+        "parent_id": "20261017113831-72g2741",
+        "root_id": "20261017113831-72g2741",
+        "type": "p"
+      },
+      {
+        "content": "末段",
+        "ial": "{: id=\"20261017113831-vpwl7bs\" updated=\"20261017113831\" custom-user-proof=\"保留\" custom-lvct-person-note=\"1\"}",
+        "id": "20261017113831-vpwl7bs",
+        "markdown": "末段",
+        "parent_id": "20261017113831-72g2741",
+        "root_id": "20261017113831-72g2741",
+        "type": "p"
+      },
+      {
+        "content": "人物备注",
+        "ial": "{: id=\"20261017113831-ycmoztn\" updated=\"20261017113831\"}",
+        "id": "20261017113831-ycmoztn",
+        "markdown": "**人物备注**",
+        "parent_id": "20261017113831-72g2741",
+        "root_id": "20261017113831-72g2741",
+        "type": "p"
+      }
+    ],
+    "after": [
+      {
+        "content": "保留正文",
+        "ial": "{: id=\"20261017113831-301sqpq\" updated=\"20261017113831\"}",
+        "id": "20261017113831-301sqpq",
+        "markdown": "保留正文",
+        "parent_id": "20261017113831-72g2741",
+        "root_id": "20261017113831-72g2741",
+        "type": "p"
+      },
+      {
+        "content": "legacy-split",
+        "ial": "{: updated=\"20261017113831\" id=\"20261017113831-72g2741\" title=\"legacy-split\" type=\"doc\"}",
+        "id": "20261017113831-72g2741",
+        "markdown": "",
+        "parent_id": "",
+        "root_id": "20261017113831-72g2741",
+        "type": "d"
+      },
+      {
+        "content": "第一段",
+        "ial": "{: id=\"20261017113831-tr2ep6m\" updated=\"20261017113831\"}",
+        "id": "20261017113831-tr2ep6m",
+        "markdown": "第一段",
+        "parent_id": "20261017113831-72g2741",
+        "root_id": "20261017113831-72g2741",
+        "type": "p"
+      },
+      {
+        "content": "末段",
+        "ial": "{: updated=\"20261017113831\" custom-lvct-person-note-detached=\"1\" custom-user-proof=\"保留\" id=\"20261017113831-vpwl7bs\"}",
+        "id": "20261017113831-vpwl7bs",
+        "markdown": "末段",
+        "parent_id": "20261017113831-72g2741",
+        "root_id": "20261017113831-72g2741",
+        "type": "p"
+      },
+      {
+        "content": "人物备注",
+        "ial": "{: id=\"20261017113831-ycmoztn\" updated=\"20261017113831\"}",
+        "id": "20261017113831-ycmoztn",
+        "markdown": "**人物备注**",
+        "parent_id": "20261017113831-72g2741",
+        "root_id": "20261017113831-72g2741",
+        "type": "p"
+      }
+    ],
+    "emptyValueRemovesMarker": true,
+    "detachedMarkerPresent": true,
+    "unrelatedAttributePreserved": true,
+    "allTextAndBlocksPreserved": true
+  },
+  "serviceProbe": {
+    "docId": "20261017113831-9dxxezc",
+    "snapshot": {
+      "blockId": "20261017113831-1edd5tv",
+      "content": "末段",
+      "markdown": "末段"
+    },
+    "before": [
+      {
+        "content": "末段",
+        "ial": "{: id=\"20261017113831-1edd5tv\" updated=\"20261017113831\" custom-lvct-person-note=\"1\" custom-user-proof=\"保留\"}",
+        "id": "20261017113831-1edd5tv",
+        "markdown": "末段",
+        "parent_id": "20261017113831-9dxxezc",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "p"
+      },
+      {
+        "content": "第一段",
+        "ial": "{: id=\"20261017113831-1puvwm4\" updated=\"20261017113831\"}",
+        "id": "20261017113831-1puvwm4",
+        "markdown": "第一段",
+        "parent_id": "20261017113831-9dxxezc",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "p"
+      },
+      {
+        "content": "人物备注",
+        "ial": "{: id=\"20261017113831-7omf7un\" updated=\"20261017113831\"}",
+        "id": "20261017113831-7omf7un",
+        "markdown": "**人物备注**",
+        "parent_id": "20261017113831-9dxxezc",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "p"
+      },
+      {
+        "content": "service-legacy-split",
+        "ial": "{: id=\"20261017113831-9dxxezc\" title=\"service-legacy-split\" updated=\"20261017113831\" type=\"doc\"}",
+        "id": "20261017113831-9dxxezc",
+        "markdown": "",
+        "parent_id": "",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "d"
+      },
+      {
+        "content": "保留正文",
+        "ial": "{: id=\"20261017113831-tdher03\" updated=\"20261017113831\"}",
+        "id": "20261017113831-tdher03",
+        "markdown": "保留正文",
+        "parent_id": "20261017113831-9dxxezc",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "p"
+      }
+    ],
+    "detached": [
+      {
+        "content": "末段",
+        "ial": "{: custom-user-proof=\"保留\" id=\"20261017113831-1edd5tv\" updated=\"20261017113831\" custom-lvct-person-note-detached=\"1\"}",
+        "id": "20261017113831-1edd5tv",
+        "markdown": "末段",
+        "parent_id": "20261017113831-9dxxezc",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "p"
+      },
+      {
+        "content": "第一段",
+        "ial": "{: id=\"20261017113831-1puvwm4\" updated=\"20261017113831\"}",
+        "id": "20261017113831-1puvwm4",
+        "markdown": "第一段",
+        "parent_id": "20261017113831-9dxxezc",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "p"
+      },
+      {
+        "content": "人物备注",
+        "ial": "{: id=\"20261017113831-7omf7un\" updated=\"20261017113831\"}",
+        "id": "20261017113831-7omf7un",
+        "markdown": "**人物备注**",
+        "parent_id": "20261017113831-9dxxezc",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "p"
+      },
+      {
+        "content": "service-legacy-split",
+        "ial": "{: id=\"20261017113831-9dxxezc\" title=\"service-legacy-split\" updated=\"20261017113831\" type=\"doc\"}",
+        "id": "20261017113831-9dxxezc",
+        "markdown": "",
+        "parent_id": "",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "d"
+      },
+      {
+        "content": "保留正文",
+        "ial": "{: id=\"20261017113831-tdher03\" updated=\"20261017113831\"}",
+        "id": "20261017113831-tdher03",
+        "markdown": "保留正文",
+        "parent_id": "20261017113831-9dxxezc",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "p"
+      }
+    ],
+    "after": [
+      {
+        "content": "末段",
+        "ial": "{: custom-user-proof=\"保留\" id=\"20261017113831-1edd5tv\" updated=\"20261017113831\" custom-lvct-person-note-detached=\"1\"}",
+        "id": "20261017113831-1edd5tv",
+        "markdown": "末段",
+        "parent_id": "20261017113831-9dxxezc",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "p"
+      },
+      {
+        "content": "第一段",
+        "ial": "{: id=\"20261017113831-1puvwm4\" updated=\"20261017113831\"}",
+        "id": "20261017113831-1puvwm4",
+        "markdown": "第一段",
+        "parent_id": "20261017113831-9dxxezc",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "p"
+      },
+      {
+        "content": "人物备注",
+        "ial": "{: id=\"20261017113831-7omf7un\" updated=\"20261017113831\"}",
+        "id": "20261017113831-7omf7un",
+        "markdown": "**人物备注**",
+        "parent_id": "20261017113831-9dxxezc",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "p"
+      },
+      {
+        "content": "service-legacy-split",
+        "ial": "{: id=\"20261017113831-9dxxezc\" title=\"service-legacy-split\" type=\"doc\" updated=\"20261017113832\"}",
+        "id": "20261017113831-9dxxezc",
+        "markdown": "",
+        "parent_id": "",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "d"
+      },
+      {
+        "content": "保留正文",
+        "ial": "{: id=\"20261017113831-tdher03\" updated=\"20261017113831\"}",
+        "id": "20261017113831-tdher03",
+        "markdown": "保留正文",
+        "parent_id": "20261017113831-9dxxezc",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "p"
+      },
+      {
+        "content": "人物备注\n第一段\n\n末段",
+        "ial": "{: id=\"20261017113832-tyxsvno\" custom-lvct-person-note=\"1\" custom-lvct-person-note-format=\"2\" updated=\"20261017113832\"}",
+        "id": "20261017113832-tyxsvno",
+        "markdown": "**人物备注**\n第一段\n\n末段",
+        "parent_id": "20261017113831-9dxxezc",
+        "root_id": "20261017113831-9dxxezc",
+        "type": "p"
+      }
+    ],
+    "unreadableLegacyBlocked": true,
+    "inspectionReadOnly": true,
+    "appliedResponseLost": true,
+    "sameRequestRetryVerifiedWithoutResend": true,
+    "detachRequestCount": 1,
+    "allOldTextAndBlocksPreserved": true,
+    "unrelatedAttributePreserved": true,
+    "emptyBaselineReread": true,
+    "completeNoteSavedAndLoaded": true
+  },
+  "passed": true,
+  "cleanup": {
+    "pid": 65204,
+    "exitRequested": true,
+    "forcedTermination": false,
+    "exited": true,
+    "portReleased": true,
+    "exitCode": 0,
+    "signalCode": null
+  },
+  "finishedAt": "2026-10-17T03:38:33.312Z"
+}

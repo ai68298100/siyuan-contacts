@@ -9,7 +9,7 @@
 
 **Manage people and relationships in SiYuan: person records are documents backed by a native SiYuan database.**
 
-**Latest stable release: v0.5.16** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.16) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
+**Latest stable release: v0.5.17** · [Download and install](https://github.com/ai68298100/siyuan-contacts/releases/tag/v0.5.17) · [Open an issue](https://github.com/ai68298100/siyuan-contacts/issues)
 
 English | [简体中文](README.md)
 
@@ -21,16 +21,16 @@ English | [简体中文](README.md)
 
 Lv Contacts keeps people, relationships and shared experiences in your SiYuan workspace. Each person is a regular SiYuan document; structured profile fields live in a native database bound to that document, alongside SiYuan search, backlinks and sync.
 
-## This release: v0.5.16 (2026-10-16)
+## This release: v0.5.17 (2026-10-17)
 
-This patch completes lifecycle-aware organization membership edges in the relationship graph and fixes the current-organization projection.
+This patch completes the #51/#54 repeated-fields and personal-note workflow.
 
-- The current-organization projection uses only `active` memberships in non-archived organizations; historical `former` memberships are no longer shown as current.
-- Multiple membership periods for the same person and organization merge into one edge labeled `active`, `former`, or `mixed`.
-- Text view, Markdown export, canvas styles, and the legend expose membership lifecycle; `related` queries still use explicit person relationships only.
-- `orderGraph` now orders member edges by lifecycle state and has regression coverage.
+- Person details support repeated phone, WeChat, email, and other entries, two-level groups, regrouping, ungrouping, ordering, deletion, clearing, and recreation with stable entry identity and full values.
+- Read-only details support local filtering and full-content copying; entering edit mode after filtering still saves the complete snapshot.
+- Personal-note conflicts can be reread with an explicit keep/discard draft choice; legacy notes split by blank lines can be reviewed, safely detached, and manually restored without overwriting the original text.
+- Reopen, same-name isolation, and two-page conflict behavior were verified against an isolated SiYuan Kernel and Chrome.
 
-Validation: `pnpm check`, 597 unit tests, and desktop/mobile/host-style UI 381/381 pass.
+Validation: `pnpm check`, 710 unit tests, desktop/390px/host-style UI 416/416, and E2E safety and Kernel smoke 17/17 pass.
 Issue #35 still awaits a redacted Xiaomi VCF; the candidate vCard fix is not claimed as a confirmed root-cause fix.
 
 ## Previous release: v0.5.14 (2026-10-16)

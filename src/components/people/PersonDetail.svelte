@@ -29,6 +29,9 @@ import StatusNotice from "../StatusNotice.svelte";
     import PersonAliases from "./PersonAliases.svelte";
     import RelationshipLabels from "./RelationshipLabels.svelte";
     import PersonProfileSummary from "./PersonProfileSummary.svelte";
+    import PersonFieldsEditor from "./PersonFieldsEditor.svelte";
+    import type { PersonFieldsSnapshot, PersonFieldsState } from "../../domain/person-fields";
+    import type { LegacyPersonNoteSnapshot } from "../../domain/person-note";
     import { buildBriefingMarkdown } from "../../domain/briefing-export";
     import { addReviewDays, groupByMonth, inDateRange, onThisDay } from "../../domain/date-review";
     import { toLocalDateKey } from "../../domain/interactions";
@@ -57,6 +60,10 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadInsights,
         onLoadPersonNote,
         onSavePersonNote,
+        onInspectLegacyPersonNote,
+        onDetachLegacyPersonNote,
+        onLoadPersonFields,
+        onSavePersonFields,
         onOpenPersonDoc,
         onNavigate,
         onNavigateDocId,
@@ -93,6 +100,10 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadInsights: (docId: string) => Promise<import("../../services/insights").PersonInsights>;
         onLoadPersonNote?: (docId: string) => Promise<string>;
         onSavePersonNote?: (docId: string, note: string, expected?: string) => Promise<string>;
+        onInspectLegacyPersonNote?: (docId: string) => Promise<LegacyPersonNoteSnapshot>;
+        onDetachLegacyPersonNote?: (docId: string, expected: LegacyPersonNoteSnapshot) => Promise<void>;
+        onLoadPersonFields?: (docId: string) => Promise<PersonFieldsState>;
+        onSavePersonFields?: (docId: string, snapshot: PersonFieldsSnapshot, expected: PersonFieldsState) => Promise<PersonFieldsState>;
         /** B12：组织归属投影（可选：未接线时隐藏该区） */
         onLoadOrgMemberships?: (docId: string) => Promise<import("../../services/org").PersonOrgMembershipView[]>;
         /** B13.5 双向编辑（可选）：打开组织管理弹窗维护归属；未接线时隐藏按钮 */
@@ -154,6 +165,7 @@ import StatusNotice from "../StatusNotice.svelte";
         othersRequest += 1;
         insightsRequest += 1;
         personNoteRequest += 1;
+        personNoteLegacyRequest += 1;
         followUpRequest += 1;
     });
     /* B03 可搜索选人器：候选（排除本人与已关联）→ 选中即建关系，写入语义不变 */
@@ -176,6 +188,15 @@ import StatusNotice from "../StatusNotice.svelte";
     let personNoteError = $state("");
     let personNoteErrorKind: "load" | "save" | "" = $state("");
     let personNoteSaved = $state(false);
+    let personNoteReloadConfirm = $state(false);
+    let personNoteReloadTarget = "";
+    let personNoteLatestVisible = $state(false);
+    let personNoteLegacySnapshot: LegacyPersonNoteSnapshot | null = $state(null);
+    let personNoteLegacyBusy = $state(false);
+    let personNoteLegacyError = $state("");
+    let personNoteLegacyDetached = $state(false);
+    let personNoteLegacyRequest = 0;
+    let personNoteLegacyTarget = "";
     // 联系节奏草稿与已保存基线必须在关闭守卫注册前建立，避免守卫首次读取时引用未初始化状态。
     let cadenceMode: "global" | "custom" | "paused" = $state("global");
     let cadenceDays = $state(14);
@@ -200,6 +221,107 @@ import StatusNotice from "../StatusNotice.svelte";
         recorded = true;
         noteText = "";
         await loadInsights();
+    }
+
+    function requestPersonNoteReload(): void {
+        if (!onLoadPersonNote || personNoteLoading || personNoteSaving || personNoteLegacyBusy) return;
+        personNoteLegacySnapshot = null;
+        personNoteLegacyError = "";
+        personNoteReloadTarget = `${current.docId}/${current.itemId}`;
+        if (personNoteDraft !== personNote) personNoteReloadConfirm = true;
+        else void reloadPersonNote(false);
+    }
+
+    /** 仅处理个人备注；读取失败前不放弃草稿，也不处理其他区域的未保存修改。 */
+    async function reloadPersonNote(keepDraft: boolean): Promise<void> {
+        if (!onLoadPersonNote || personNoteLoading || personNoteSaving || personNoteLegacyBusy
+            || personNoteReloadTarget !== `${current.docId}/${current.itemId}`) return;
+        const request = ++personNoteRequest;
+        const targetDocId = current.docId;
+        const targetItemId = current.itemId;
+        const draftRevision = personNoteDraftRevision;
+        personNoteReloadConfirm = false;
+        personNoteLoading = true;
+        personNoteError = "";
+        personNoteErrorKind = "";
+        personNoteSaved = false;
+        try {
+            const loaded = await onLoadPersonNote(targetDocId);
+            if (!detailAlive || request !== personNoteRequest || current.docId !== targetDocId
+                || current.itemId !== targetItemId || personNoteDraftRevision !== draftRevision) return;
+            personNote = loaded;
+            if (!keepDraft) personNoteDraft = loaded;
+            personNoteLatestVisible = keepDraft;
+        } catch (error) {
+            if (detailAlive && request === personNoteRequest && current.docId === targetDocId
+                && current.itemId === targetItemId && personNoteDraftRevision === draftRevision) {
+                personNoteError = requestErrorMessage(error);
+                personNoteErrorKind = "load";
+            }
+        } finally {
+            if (detailAlive && request === personNoteRequest) personNoteLoading = false;
+        }
+    }
+
+    /** 只读核对带旧标记的单一末段；不推测相邻正文属于备注。 */
+    async function inspectPersonNoteLegacy(): Promise<void> {
+        if (!onInspectLegacyPersonNote || !onDetachLegacyPersonNote || personNoteLoading || personNoteSaving || personNoteLegacyBusy) return;
+        const request = ++personNoteLegacyRequest;
+        const targetDocId = current.docId;
+        const targetItemId = current.itemId;
+        personNoteLegacyTarget = `${targetDocId}/${targetItemId}`;
+        personNoteLegacyBusy = true;
+        personNoteLegacyError = "";
+        personNoteLegacySnapshot = null;
+        try {
+            const snapshot = await onInspectLegacyPersonNote(targetDocId);
+            if (!detailAlive || request !== personNoteLegacyRequest || current.docId !== targetDocId || current.itemId !== targetItemId) return;
+            personNoteLegacySnapshot = snapshot;
+        } catch (error) {
+            if (detailAlive && request === personNoteLegacyRequest && current.docId === targetDocId && current.itemId === targetItemId) {
+                personNoteLegacyError = `未能确认可恢复的旧备注，原文未操作：${requestErrorMessage(error)}`;
+            }
+        } finally {
+            if (detailAlive && request === personNoteLegacyRequest) personNoteLegacyBusy = false;
+        }
+    }
+
+    /** 只解除已核对旧块的关联；成功后保留当前草稿并重新读取基线。 */
+    async function detachPersonNoteLegacy(): Promise<void> {
+        if (!onDetachLegacyPersonNote || !onLoadPersonNote || !personNoteLegacySnapshot || personNoteLoading || personNoteSaving || personNoteLegacyBusy
+            || personNoteLegacyTarget !== `${current.docId}/${current.itemId}`) return;
+        const request = ++personNoteLegacyRequest;
+        const targetDocId = current.docId;
+        const targetItemId = current.itemId;
+        const expected = personNoteLegacySnapshot;
+        personNoteLegacyBusy = true;
+        personNoteLegacyError = "";
+        try {
+            await onDetachLegacyPersonNote(targetDocId, expected);
+            if (!detailAlive || request !== personNoteLegacyRequest || current.docId !== targetDocId || current.itemId !== targetItemId) return;
+            personNoteLegacyDetached = true;
+            personNoteLegacySnapshot = null;
+            try {
+                const loaded = await onLoadPersonNote(targetDocId);
+                if (!detailAlive || request !== personNoteLegacyRequest || current.docId !== targetDocId || current.itemId !== targetItemId) return;
+                personNote = loaded;
+                personNoteError = "";
+                personNoteErrorKind = "";
+                personNoteSaved = false;
+                personNoteLatestVisible = personNoteDraft !== loaded;
+            } catch (error) {
+                if (detailAlive && request === personNoteLegacyRequest && current.docId === targetDocId && current.itemId === targetItemId) {
+                    personNoteError = requestErrorMessage(error);
+                    personNoteErrorKind = "load";
+                }
+            }
+        } catch (error) {
+            if (detailAlive && request === personNoteLegacyRequest && current.docId === targetDocId && current.itemId === targetItemId) {
+                personNoteLegacyError = `旧备注关联尚未确认解除，当前草稿已保留。可重试核实或重新读取：${requestErrorMessage(error)}`;
+            }
+        } finally {
+            if (detailAlive && request === personNoteLegacyRequest) personNoteLegacyBusy = false;
+        }
     }
 
     async function loadPersonNoteState(preserveSaved = false): Promise<void> {
@@ -229,26 +351,34 @@ import StatusNotice from "../StatusNotice.svelte";
 
     async function savePersonNoteState(rethrowOnFailure = false): Promise<void> {
         if (!onSavePersonNote || personNoteSaving) return;
+        const targetDocId = current.docId;
+        const targetItemId = current.itemId;
+        const draftRevision = personNoteDraftRevision;
+        const draft = personNoteDraft;
+        const expected = personNote;
         personNoteSaving = true;
         personNoteError = "";
         personNoteErrorKind = "";
         personNoteSaved = false;
         try {
-            const saved = await onSavePersonNote(current.docId, personNoteDraft, personNote);
+            const saved = await onSavePersonNote(targetDocId, draft, expected);
+            if (!detailAlive || current.docId !== targetDocId || current.itemId !== targetItemId || personNoteDraftRevision !== draftRevision) return;
             personNote = saved;
             personNoteDraft = saved;
             personNoteSaved = true;
             onChanged();
         } catch (error) {
-            personNoteError = requestErrorMessage(error);
-            personNoteErrorKind = "save";
+            if (detailAlive && current.docId === targetDocId && current.itemId === targetItemId && personNoteDraftRevision === draftRevision) {
+                personNoteError = requestErrorMessage(error);
+                personNoteErrorKind = "save";
+            }
             if (rethrowOnFailure) throw error;
         } finally {
             personNoteSaving = false;
         }
     }
     useCloseGuard({
-        busy: () => busy || deleting || personNoteSaving || personNoteLoading || followUpBusy || cadenceSaving,
+        busy: () => busy || deleting || personNoteSaving || personNoteLoading || personNoteLegacyBusy || followUpBusy || cadenceSaving,
         dirty: () => noteText.trim().length > 0 || personNoteDraft !== personNote || cadenceDirty,
         changes: () => [
             ...(noteText.trim() ? [text("guardNoteDraft", "互动备注尚未记录：{text}", { text: noteText.trim() })] : []),
@@ -801,7 +931,7 @@ import StatusNotice from "../StatusNotice.svelte";
     }
 
     function startEditOrgMembership(membership: import("../../services/org").PersonOrgMembershipView): void {
-        if (addOrgBusy || orgLoading || orgReadError) return;
+        if (addOrgBusy || orgLoading || orgReadError || membership.removed) return;
         editingOrgMembershipId = membership.id;
         editingOrgSnapshot = orgMembershipSnapshot(membership);
         editOrgDepartment = membership.department;
@@ -900,7 +1030,7 @@ import StatusNotice from "../StatusNotice.svelte";
             refreshPending = true;
             orgRefreshPending = true;
         }
-        if (busy || followUpBusy || personNoteSaving || cadenceSaving || personNoteDraft !== personNote) return;
+        if (busy || followUpBusy || personNoteSaving || personNoteLegacyBusy || cadenceSaving || personNoteDraft !== personNote) return;
         if (refreshPending) {
             refreshPending = false;
             void loadOthers();
@@ -1181,24 +1311,64 @@ import StatusNotice from "../StatusNotice.svelte";
                     placeholder="例如：偏好安静的环境，下次见面前提醒准备资料"
                     bind:value={personNoteDraft}
                     oninput={() => { personNoteDraftRevision += 1; personNoteSaved = false; personNoteError = ""; personNoteErrorKind = ""; }}
-                    disabled={personNoteSaving}
+                    disabled={personNoteSaving || personNoteLegacyBusy}
                 ></textarea>
                 <div class="lvct-detail__person-note-actions">
                     <span class="ft__smaller ft__on-surface">{personNoteDraft.length} / 5000</span>
-                    <button type="button" class="b3-button b3-button--text" disabled={personNoteSaving || personNoteDraft === personNote} onclick={() => void savePersonNoteState()}>
+                    <button type="button" class="b3-button b3-button--text" disabled={personNoteSaving || personNoteLegacyBusy || Boolean(personNoteLegacySnapshot) || personNoteReloadConfirm || personNoteDraft === personNote} onclick={() => void savePersonNoteState()}>
                         {personNoteSaving ? "保存中…" : "保存备注"}
                     </button>
+                    <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving || personNoteLegacyBusy || personNoteReloadConfirm} onclick={requestPersonNoteReload}>重新读取</button>
+                </div>
+            {/if}
+            {#if personNoteReloadConfirm}
+                <div class="lvct-person-fields__confirm" role="group" aria-label="重新读取个人备注前确认草稿">
+                    <p>个人备注有未保存的草稿。重新读取最新备注时如何处理？其他区域的草稿会保留。</p>
+                    <div class="lvct-person-fields__actions">
+                        <button type="button" class="b3-button b3-button--outline" onclick={() => void reloadPersonNote(true)}>保留草稿并读取最新</button>
+                        <button type="button" class="b3-button b3-button--cancel" onclick={() => void reloadPersonNote(false)}>放弃草稿并读取最新</button>
+                        <button type="button" class="b3-button b3-button--text" onclick={() => (personNoteReloadConfirm = false)}>取消</button>
+                    </div>
+                </div>
+            {/if}
+            {#if personNoteLatestVisible && personNoteDraft !== personNote}
+                <div class="lvct-detail__person-note-latest">
+                    <p class="ft__smaller" role="status">已读取最新备注，当前草稿已保留，尚未合并。请核对下方已存内容；再次保存会用当前草稿替换这些内容。</p>
+                    <strong>最新已存备注</strong>
+                    <pre style="white-space:pre-wrap;overflow-wrap:anywhere;margin:var(--lvct-sp-2) 0" aria-label="最新已存个人备注">{personNote || "（空）"}</pre>
                 </div>
             {/if}
             {#if personNoteError}
-                <div class="lvct-form__error" role="alert">个人备注保存失败：{personNoteError}</div>
+                <div class="lvct-form__error" role="alert">个人备注{personNoteErrorKind === "load" ? "读取" : "保存"}失败：{personNoteError}</div>
                 {#if personNoteErrorKind === "save"}
-                    <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving} onclick={() => void savePersonNoteState()}>重试保存</button>
-                {:else}
-                    <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving} onclick={() => void loadPersonNoteState()}>重新读取</button>
+                    <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving || personNoteLegacyBusy || Boolean(personNoteLegacySnapshot) || personNoteReloadConfirm} onclick={() => void savePersonNoteState()}>重试保存</button>
                 {/if}
             {/if}
+            {#if onInspectLegacyPersonNote && onDetachLegacyPersonNote && personNoteErrorKind === "load" && !personNoteLegacyDetached}
+                <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving || personNoteLegacyBusy || personNoteReloadConfirm} onclick={() => void inspectPersonNoteLegacy()}>核对旧备注</button>
+            {/if}
+            {#if personNoteLegacyBusy}<p class="ft__smaller ft__on-surface" role="status">正在核对旧备注关联，请稍候…</p>{/if}
+            {#if personNoteLegacySnapshot}
+                <div class="lvct-person-fields__confirm lvct-detail__person-note-legacy" role="group" aria-label="核对旧备注关联">
+                    <p>这里只显示带旧标记的末段，不能代表整份备注。请打开人物文档，核对并复制完整备注。解除关联会保留全部原文，不会自动拼接、删除或覆盖原块。</p>
+                    <strong>带旧标记的末段原文</strong>
+                    <pre style="white-space:pre-wrap;overflow-wrap:anywhere;margin:var(--lvct-sp-2) 0" aria-label="旧备注末段原文">{personNoteLegacySnapshot.content || "（空段落）"}</pre>
+                    <div class="lvct-person-fields__actions">
+                        <button type="button" class="b3-button b3-button--outline" disabled={personNoteLegacyBusy} onclick={() => onOpenPersonDoc(current.docId)}>打开人物文档核对</button>
+                        <button type="button" class="b3-button b3-button--outline" disabled={personNoteLegacyBusy} onclick={() => void detachPersonNoteLegacy()}>保留原文并解除旧备注关联</button>
+                        <button type="button" class="b3-button b3-button--text" disabled={personNoteLegacyBusy} onclick={() => { personNoteLegacySnapshot = null; personNoteLegacyError = ""; }}>取消核对</button>
+                    </div>
+                </div>
+            {/if}
+            {#if personNoteLegacyError}<p class="lvct-form__error" role="alert">{personNoteLegacyError}</p>{/if}
+            {#if personNoteLegacyDetached}
+                <p class="ft__smaller lvct-detail__person-note-legacy-detached" role="status">已解除旧备注关联，全部原文仍在人物文档中，当前草稿已保留。请核对并将完整备注粘贴到上方后保存。</p>
+            {/if}
         </section>
+    {/if}
+
+    {#if onLoadPersonFields && onSavePersonFields}
+        <PersonFieldsEditor personDocId={current.docId} {revision} onLoad={onLoadPersonFields} onSave={onSavePersonFields} onOpenDocument={onOpenPersonDoc ? () => onOpenPersonDoc?.(current.docId) : undefined} />
     {/if}
 
     <div class="lvct-detail__briefing-row">
@@ -1276,7 +1446,8 @@ import StatusNotice from "../StatusNotice.svelte";
                             {#if membership.title}<span class="ft__smaller"> · {membership.title}</span>{/if}
                         </span>
                         <span class="lvct-chip {membership.status === "former" ? "lvct-bucket--stale" : "lvct-bucket--today"}">{orgMembershipStatusLabel(membership)}</span>
-                        {#if membership.archived}<span class="lvct-chip lvct-bucket--stale">{text("orgMembershipArchived", "组织已归档")}</span>{/if}
+                        {#if membership.removed}<span class="lvct-chip lvct-bucket--stale">组织已移除</span>
+                        {:else if membership.archived}<span class="lvct-chip lvct-bucket--stale">{text("orgMembershipArchived", "组织已归档")}</span>{/if}
                         {#if membership.reachable === false}<span class="lvct-chip lvct-bucket--stale">{text("orgMembershipUnreachable", "组织待核实")}</span>{/if}
                         {#if membership.joinedOn || membership.leftOn}
                             <span class="ft__on-surface">{membership.joinedOn || "?"}{membership.leftOn ? ` – ${membership.leftOn}` : " –"}</span>
@@ -1285,15 +1456,16 @@ import StatusNotice from "../StatusNotice.svelte";
                         {#if orgRemoveSupported || onUpdateOrgMembership}
                             <span class="lvct-detail__org-actions">
                                 {#if orgRemoveSupported}
-                                    <button type="button" class="b3-button b3-button--cancel" disabled={addOrgBusy}
+                                    <button type="button" class="b3-button b3-button--cancel" disabled={addOrgBusy || membership.removed}
                                         aria-label={text("orgMembershipRemoveLabel", "移除归属 {name}", { name: membership.orgName })}
                                         onclick={() => { removingOrgMembershipId = membership.id; removingOrgSnapshot = orgMembershipSnapshot(membership); }}>{text("orgMembershipRemove", "移除")}</button>
                                 {/if}
                                 {#if onUpdateOrgMembership}
-                                    <button class="b3-button b3-button--text" disabled={addOrgBusy} onclick={() => startEditOrgMembership(membership)}>{text("orgMemberEdit", "编辑")}</button>
+                                    <button class="b3-button b3-button--text" disabled={addOrgBusy || membership.removed} onclick={() => startEditOrgMembership(membership)}>{text("orgMemberEdit", "编辑")}</button>
                                 {/if}
                             </span>
                         {/if}
+                        {#if membership.removed}<span class="ft__smaller ft__on-surface">组织已移除；恢复组织后才能维护这段经历。</span>{/if}
                         {#if editingOrgMembershipId === membership.id}
                             <div class="lvct-org-add">
                                 <input class="b3-text-field" bind:value={editOrgDepartment} disabled={addOrgBusy} aria-label={text("orgMemberDeptLabel", "部门")} />

@@ -113,10 +113,11 @@ export function parseExtraction(reply: string): ExtractionResult | null {
             const name = rawName.trim();
             if (seen.has(name)) continue;
             if (!name || name.length > 20 || /^\d+$/.test(name) || names.length >= MAX_NAMES) { rejectedNames += 1; continue; }
+            const evidence = readEvidence(entry?.evidence);
+            if (evidence.rejected) { rejectedNames += 1; continue; }
             seen.add(name);
             names.push(name);
-            const evidence = readEvidence(entry?.evidence);
-            if (evidence) peopleEvidence[name] = evidence;
+            if (evidence.value) peopleEvidence[name] = evidence.value;
         }
     }
     const result: ExtractionResult = {
@@ -128,21 +129,22 @@ export function parseExtraction(reply: string): ExtractionResult | null {
     };
     if (Object.keys(peopleEvidence).length) result.peopleEvidence = peopleEvidence;
     const occasionEvidence = readEvidence(record.occasionEvidence);
-    if (occasionEvidence) result.occasionEvidence = occasionEvidence;
+    if (occasionEvidence.rejected) result.rejected += 1;
+    if (occasionEvidence.value) result.occasionEvidence = occasionEvidence.value;
     if (typeof record.date === "string" && isValidDateKey(record.date)) {
         result.date = record.date;
     } else if (record.date !== undefined && record.date !== null) {
         result.rejected += 1;
     }
-    if (typeof record.place === "string" && record.place.trim()) {
-        result.place = record.place.trim().slice(0, VALUE_LIMIT);
-    }
-    if (typeof record.occasion === "string" && record.occasion.trim()) {
-        result.occasion = record.occasion.trim().slice(0, VALUE_LIMIT);
-    }
-    if (typeof record.note === "string" && record.note.trim()) {
-        result.note = record.note.trim().slice(0, 200);
-    }
+    const place = boundedText(record.place, VALUE_LIMIT);
+    if (place.rejected) result.rejected += 1;
+    else if (place.value) result.place = place.value;
+    const occasion = boundedText(record.occasion, VALUE_LIMIT);
+    if (occasion.rejected) result.rejected += 1;
+    else if (occasion.value) result.occasion = occasion.value;
+    const note = boundedText(record.note, 200);
+    if (note.rejected) result.rejected += 1;
+    else if (note.value) result.note = note.value;
     /* FAST-01.4：结构化候选解析——严格校验，非法/超限丢弃并计数，未知字段忽略 */
     if (Array.isArray(record.profileCandidates)) {
         for (const entry of record.profileCandidates) {
@@ -161,7 +163,8 @@ export function parseExtraction(reply: string): ExtractionResult | null {
             if (field === "birthday" && !isValidDateKey(value)) { result.rejected += 1; continue; }
             if (field === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) { result.rejected += 1; continue; }
             const evidence = readEvidence(candidate.evidence);
-            result.profileCandidates.push({ person, field: field as ProfileField, value, ...(evidence ? { evidence } : {}) });
+            if (evidence.rejected) { result.rejected += 1; continue; }
+            result.profileCandidates.push({ person, field: field as ProfileField, value, ...(evidence.value ? { evidence: evidence.value } : {}) });
         }
     }
     if (Array.isArray(record.followUpCandidates)) {
@@ -170,11 +173,12 @@ export function parseExtraction(reply: string): ExtractionResult | null {
             const candidate = candidateRecord(entry);
             if (!candidate) { result.rejected += 1; continue; }
             const person = typeof candidate.person === "string" ? candidate.person.trim() : "";
-            const title = typeof candidate.title === "string" ? candidate.title.trim().slice(0, 40) : "";
+            const title = boundedText(candidate.title, 40);
             const dueDate = typeof candidate.dueDate === "string" && isValidDateKey(candidate.dueDate) ? candidate.dueDate : "";
-            if (!person || person.length > 20 || !dueDate) { result.rejected += 1; continue; }
+            if (!person || person.length > 20 || !dueDate || title.rejected) { result.rejected += 1; continue; }
             const evidence = readEvidence(candidate.evidence);
-            result.followUpCandidates.push({ person, title, dueDate, ...(evidence ? { evidence } : {}) });
+            if (evidence.rejected) { result.rejected += 1; continue; }
+            result.followUpCandidates.push({ person, title: title.value ?? "", dueDate, ...(evidence.value ? { evidence: evidence.value } : {}) });
         }
     }
     if (Array.isArray(record.relationCandidates)) {
@@ -184,10 +188,11 @@ export function parseExtraction(reply: string): ExtractionResult | null {
             if (!candidate) { result.rejected += 1; continue; }
             const a = typeof candidate.personA === "string" ? candidate.personA.trim() : "";
             const b = typeof candidate.personB === "string" ? candidate.personB.trim() : "";
-            const relation = typeof candidate.relation === "string" ? candidate.relation.trim().slice(0, 20) : "";
-            if (!a || !b || a.length > 20 || b.length > 20 || a === b || !relation) { result.rejected += 1; continue; }
+            const relation = boundedText(candidate.relation, 20);
+            if (!a || !b || a.length > 20 || b.length > 20 || a === b || !relation.value || relation.rejected) { result.rejected += 1; continue; }
             const evidence = readEvidence(candidate.evidence);
-            result.relationCandidates.push({ personA: a, personB: b, relation, ...(evidence ? { evidence } : {}) });
+            if (evidence.rejected) { result.rejected += 1; continue; }
+            result.relationCandidates.push({ personA: a, personB: b, relation: relation.value, ...(evidence.value ? { evidence: evidence.value } : {}) });
         }
     }
     return result;
@@ -197,6 +202,12 @@ function candidateRecord(value: unknown): Record<string, unknown> | null {
     return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 
-function readEvidence(value: unknown): string | undefined {
-    return typeof value === "string" && value.trim() ? value.trim().slice(0, 400) : undefined;
+function boundedText(value: unknown, limit: number): { value?: string; rejected: boolean } {
+    if (typeof value !== "string" || !value.trim()) return { rejected: false };
+    const trimmed = value.trim();
+    return trimmed.length > limit ? { rejected: true } : { value: trimmed, rejected: false };
+}
+
+function readEvidence(value: unknown): { value?: string; rejected: boolean } {
+    return boundedText(value, 400);
 }

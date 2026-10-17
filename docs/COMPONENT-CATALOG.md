@@ -1,6 +1,6 @@
 # 组件目录
 
-本文按 `src/components/` 当前 37 个 Svelte 文件整理。入口组件负责组合页面；页面组件通过显式 props/callback 接入 facade 和服务；可复用组件接收值并通过 callback 通知调用方。精确的 TypeScript 签名以各文件 `<script lang="ts">` 为准，本目录列出主要可变参数，避免复制一份容易过期的完整类型定义。
+本文按 `src/components/` 当前 38 个 Svelte 文件整理。入口组件负责组合页面；页面组件通过显式 props/callback 接入 facade 和服务；可复用组件接收值并通过 callback 通知调用方。精确的 TypeScript 签名以各文件 `<script lang="ts">` 为准，本目录列出主要可变参数，避免复制一份容易过期的完整类型定义。
 
 ## 全局行为约定
 
@@ -34,7 +34,7 @@
 | [`dashboard/DashboardView.svelte`](../src/components/dashboard/DashboardView.svelte) | 首页统计、今日行动、生日/联系提醒、跟进与快捷操作 | `facade`、`settings`、`preferences`、`revision`、`onOpenDetail`、名册/图谱/设置/导入/创建回调 | 数据加载与读取错误、无联系人引导、摘要折叠、快捷操作忙碌/成功/失败、提醒撤销/重试。 |
 | [`dashboard/QuickStartPanel.svelte`](../src/components/dashboard/QuickStartPanel.svelte) | 首次使用入口 | `saving`、创建/导入/组织/图谱/设置/关闭回调 | 保存期间锁定关闭/重复动作；关闭结果由偏好保存回调确认。 |
 | [`dashboard/ReviewReportDialog.svelte`](../src/components/dashboard/ReviewReportDialog.svelte) | 交往回顾和数据健康报告 | `buildReport`、`buildAuditReport`、`retryFailedAuditModules`、`onOpenPeople` | 报表加载/失败/空结果、审计部分失败及按失败模块重试。 |
-| [`graph/RelationGraph.svelte`](../src/components/graph/RelationGraph.svelte) | 人物/组织关系图、只读思源引用投影、同源文本和范围查询 | `settings`、`preferences`、`revision`、`facade`、`onPreferencesChange`、人物详情/名册回调、携带选中 `orgDocId` 的组织回调 | 全端默认大画布（桌面 `clamp(520px, 68dvh, 880px)`；移动 `clamp(400px, 58dvh, 640px)`）与展开/收起，六项画布工具；筛选默认折叠、紧凑计数、图后关系探索/来源诊断；加载/失败重试/空结果、偏好保存失败和导出反馈。来源打开请求期间锁定重复触发，派发完成后提示“已请求打开来源文档”，失败说明原因并允许重试；移动端宿主 API 为同步派发，不能据此确认最终页面已切换。文本与信息卡经 `facade.openDoc` 发起对应来源的打开请求。ref 点线是无向投影，无方向箭头。`former` 历史成员保留连线仍待契约升级，直接打开宿主原生图未承诺。 |
+| [`graph/RelationGraph.svelte`](../src/components/graph/RelationGraph.svelte) | 人物/组织关系图、只读思源引用投影、同源文本和范围查询 | `settings`、`preferences`、`revision`、`facade`、`onPreferencesChange`、人物详情/名册回调、携带选中 `orgDocId` 的组织回调 | 全端默认大画布（桌面 `clamp(520px, 68dvh, 880px)`；移动 `clamp(400px, 58dvh, 640px)`）与展开/收起，六项画布工具；筛选默认折叠、紧凑计数、图后关系探索/来源诊断；加载/失败重试/空结果、偏好保存失败和导出反馈。来源打开请求期间锁定重复触发，派发完成后提示“已请求打开来源文档”，失败说明原因并允许重试；移动端宿主 API 为同步派发，不能据此确认最终页面已切换。文本与信息卡经 `facade.openDoc` 发起对应来源的打开请求。成员边按 active/former/mixed 生命周期显示当前、历史或混合状态；former 不进入 related 查询。ref 点线是无向投影，无方向箭头；直接打开宿主原生图未承诺。 |
 | [`graph/RelationGraphLoader.svelte`](../src/components/graph/RelationGraphLoader.svelte) | 图谱页面的宿主装配适配器，向图谱组件传递 facade、导航与偏好能力 | `facade`、`settings`、`preferences`、`revision`、详情/名册/组织回调 | 静态装配以满足思源单入口 CJS 约束；图谱数据自身仍有加载/错误/空结果与重试状态。 |
 | [`org/OrgsView.svelte`](../src/components/org/OrgsView.svelte) | 组织列表、搜索、活跃/归档状态和新建/编辑入口 | `facade`、`revision`、`onOpenOrgManager`、`onCreateOrganization`、`onEditOrganization` | 读取中、错误重试、空组织引导、列表和筛选结果。 |
 | [`org/OrgManagerDialog.svelte`](../src/components/org/OrgManagerDialog.svelte) | 组织成员增删改、移动、历史关系和组织状态管理 | `facade`、`initialOrgDocId`、`onOpenPerson`、新建/编辑组织回调、`hostCloseChannel` | 组织/成员加载、逐项写入结果、失败恢复、关闭守卫；成员状态改变不删除历史关系。 |
@@ -49,13 +49,14 @@
 |---|---|---|---|
 | [`people/PeopleView.svelte`](../src/components/people/PeopleView.svelte) | 联系人卡片/表格、搜索筛选、保存视图、批量选择与补录 | `facade`、`settings`、`preferences`、`revision`、`activePersonId`、`isMobile`、数据与导航回调 | 分页加载、读取失败、零联系人/零筛选结果、批量忙碌/逐项结果、移动端工具收纳。 |
 | [`people/PersonCard.svelte`](../src/components/people/PersonCard.svelte) | 名册人物卡片及选择/打开入口 | `person`、`selected`、`active`、`recent`、`orgLine`、`onOpen`、选择/文档回调 | 选中/当前状态；姓名、联系方式、组织摘要可安全换行，缺失头像回退首字。 |
-| [`people/PersonDetail.svelte`](../src/components/people/PersonDetail.svelte) | 人物详情概览、互动、相关人、组织、跟进和来源操作 | `person`、`settings`、`facade`、详情子区读取/写入 callbacks、`onClose` | Tab 切换；资料/关系/互动等模块独立加载或失败，保留重试；按调用能力隐藏不可用区块。 |
+| [`people/PersonDetail.svelte`](../src/components/people/PersonDetail.svelte) | 人物详情概览、互动、相关人、组织、跟进和来源操作 | `person`、`settings`、`facade`、详情子区读取/写入 callbacks、旧备注检查/解除关联 callbacks、`onClose` | Tab 切换；模块独立加载或失败、保留重试；备注就地重读、保留/放弃/取消与最新原文核对；旧分段备注显式解除关联并保留全部原文；按调用能力隐藏不可用区块。 |
 | [`people/PersonEditDialog.svelte`](../src/components/people/PersonEditDialog.svelte) | 编辑人物基础资料、组织经历和与本人关系 | `person`、`settings`、扩展资料/关系/成员 callbacks、`onSaved`、`onClose`、宿主关闭通道 | 字段校验定位、加载候选、提交锁、错误保留草稿、未保存关闭守卫。 |
 | [`people/AddPersonDialog.svelte`](../src/components/people/AddPersonDialog.svelte) | 新建联系人与可选的组织、本人关系、别名和备注 | `settings`、`initial`、组织/本人候选 callbacks、`onValidateExtended`、`onSaveExtended`、`onCreated`、`onClose` | 姓名/分组校验、补充区折叠、候选读取错误、创建忙碌、保存扩展资料失败提示和草稿保护。 |
 | [`people/PersonPicker.svelte`](../src/components/people/PersonPicker.svelte) | 可搜索人物选择器，供本人改绑、关联、跟进等流程复用 | `items`、`value`、`placeholder`、`emptyText`、`searchText`、`clearable`、`disabled`、`onSelect` | 空候选、搜索零结果、选中/清空、禁用；移动输入法场景由外层弹窗焦点管理配合。 |
 | [`people/PersonProfileSummary.svelte`](../src/components/people/PersonProfileSummary.svelte) | 资料摘要行 | `profile`、`compact`、`hideEmpty` | 缺资料、完整摘要、紧凑展示；空值可隐藏。 |
 | [`people/BirthdayField.svelte`](../src/components/people/BirthdayField.svelte) | 公历/农历生日输入和历法选择 | `value`、`isLunar`、`disabled`、`label`、`onValueChange`、`onModeChange` | 空值/非法日期/可用日期；历法模式直接可选，年份和日期按规则校验。 |
 | [`people/GroupField.svelte`](../src/components/people/GroupField.svelte) | 联系人分组选择及自定义分组合法性反馈 | `value`、`availableGroups`、`disabled`、`allowKeep`、`allowClear`、`allowUngrouped`、值/合法性回调 | 预设、自定义、未分组、保留原值、清空和无效值状态。 |
+| [`people/PersonFieldsEditor.svelte`](../src/components/people/PersonFieldsEditor.svelte) | 人物原生补充资料：可重复条目、两层分组与独立保存 | `personDocId`、`revision`、`onLoad`、`onSave`、`onOpenDocument` | 严格加载/错误保留、编辑与删除影响预览、保存/未知重试、草稿关闭守卫、外部变化提示；阅读态本地筛选、完整内容复制及独立成功/失败反馈；未接回调时详情隐藏。 |
 | [`people/PersonAliases.svelte`](../src/components/people/PersonAliases.svelte) | 别名加载、新增和移除 | `personDocId`、`onLoad`、`onAdd`、`onRemove`、`onChanged` | 加载/失败/空别名和保存忙碌；删除先展示含具体别名与影响说明的可取消确认，确认期间锁定重复操作，失败后保留确认项供重试。 |
 | [`people/RelationshipLabels.svelte`](../src/components/people/RelationshipLabels.svelte) | 维护人物与“我”的关系称谓 | `personDocId`、`revision`、`onLoad`、`onSave`、`onChanged` | 读取/失败、编辑草稿、冲突核对、保存结果与关闭守卫。 |
 | [`people/ExchangeLedger.svelte`](../src/components/people/ExchangeLedger.svelte) | 往来账本条目及结清状态 | `personDocId`、`onLoad`、`onCreate`、`onChangeStatus` | 列表加载/错误/空结果、录入忙碌、金额/日期校验和状态更新结果；创建输入含 requestId。 |

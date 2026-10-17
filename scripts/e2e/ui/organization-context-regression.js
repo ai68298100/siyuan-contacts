@@ -90,7 +90,13 @@ function input(node, value) {
 
 function ready(root) {
     const name = root.querySelector('[aria-label="新建组织名称"]');
-    return name && !name.disabled;
+    if (name) return !name.disabled;
+    /* Workbench supplies the profile-creation callback, so the manager
+       intentionally renders a “新建组织资料” button instead of the legacy
+       inline name field.  An enabled organization item is the equivalent
+       loaded-state signal for that host entry point. */
+    const item = root.querySelector(".lvct-org-manager__org-item");
+    return Boolean(item && !item.disabled);
 }
 
 function memberIds(root) {
@@ -256,6 +262,90 @@ export async function runOrganizationContextRegression({ test, assert, kernel, s
             await unmount(instance);
         }
     });
+
+    for (const mode of ["可见页暂停 RAF", "刷新中转入后台"]) {
+        await test(`组织上下文：${mode}仍完成刷新和成员保存，保留草稿、滚动与焦点`, async () => {
+            const state = contextFixture();
+            const scrollHost = document.createElement("div");
+            scrollHost.style.height = "240px";
+            scrollHost.style.overflow = "auto";
+            fixture.append(scrollHost);
+            const instance = mount(OrgManagerDialog, { target: scrollHost, props: {
+                facade: state.facade, initialOrgDocId: state.orgB, onClose() {}, onEditOrganization() {},
+            } });
+            const originalRaf = window.requestAnimationFrame;
+            const originalCancelRaf = window.cancelAnimationFrame;
+            const visibilityDescriptor = Object.getOwnPropertyDescriptor(document, "visibilityState");
+            const pendingFrames = new Map();
+            const deliveredFrames = [];
+            let nextFrame = 0;
+            let visibility = "visible";
+            try {
+                await filterAndExpand({ root: scrollHost, until, button }, 200);
+                const manager = scrollHost.querySelector(".lvct-org-manager");
+                const search = scrollHost.querySelector('input[type="search"]');
+                const ids = memberIds(scrollHost);
+                search.focus({ preventScroll: true });
+                scrollHost.scrollTop = 173;
+                const scrollTop = scrollHost.scrollTop;
+                assert(scrollTop > 0, "暂停帧回归夹具没有真实滚动窗口");
+                window.requestAnimationFrame = (callback) => {
+                    const id = ++nextFrame;
+                    pendingFrames.set(id, callback);
+                    deliveredFrames.push(callback);
+                    return id;
+                };
+                window.cancelAnimationFrame = (id) => pendingFrames.delete(id);
+                Object.defineProperty(document, "visibilityState", { configurable: true, get: () => visibility });
+                const reads = state.orgReads;
+                emitDataChanged({ topics: ["organizations"], docIds: [state.orgB] });
+                await until(() => nextFrame > 0, "刷新没有进入可见页视口修正");
+                if (mode === "刷新中转入后台") {
+                    visibility = "hidden";
+                    document.dispatchEvent(new Event("visibilitychange"));
+                }
+                await until(() => state.orgReads === reads + 1 && !button("编辑资料", scrollHost).disabled,
+                    "无 RAF 回调时只读刷新仍处于忙态");
+                assert(pendingFrames.size === 0, "帧等待结束后未取消悬挂 RAF");
+                assert(memberIds(scrollHost) === ids && search.value === "研发"
+                    && scrollHost.querySelector('[aria-label="成员状态"]').value === "active"
+                    && scrollHost.scrollTop === scrollTop && document.activeElement === search,
+                "无帧刷新丢失成员窗口、筛选、滚动或焦点");
+                const row = scrollHost.querySelector(".lvct-org-manager__member");
+                button("编辑", row).click();
+                await until(() => row.querySelector('[aria-label="职位"]'), "成员编辑未打开");
+                input(row.querySelector('[aria-label="职位"]'), "后台保存职位");
+                emitDataChanged({ topics: ["memberships"], docIds: [state.orgB] });
+                await tick();
+                assert(state.orgReads === reads + 1 && row.querySelector('[aria-label="职位"]').value === "后台保存职位",
+                    "后台事件刷新覆盖未保存草稿");
+                button("保存", row).click();
+                await until(() => state.writes.length === 1 && manager.getAttribute("aria-busy") === "false"
+                    && !button("编辑资料", scrollHost).disabled, "无 RAF 回调时成员保存后 busy 没有解除");
+                assert(state.writes[0].patch.title === "后台保存职位" && state.writes[0].expected.title === "成员"
+                    && row.textContent.includes("后台保存职位") && memberIds(scrollHost) === ids,
+                "成员保存未回读、重复写入或丢失编辑基线和窗口");
+                assert(!button("改名", scrollHost).disabled && !button("归档组织", scrollHost).disabled
+                    && !button("关闭", scrollHost).disabled && pendingFrames.size === 0,
+                "无帧保存完成后组织操作仍不可用或遗留帧回调");
+                const afterSaveScroll = Math.min(scrollHost.scrollTop + 31, scrollHost.scrollHeight - scrollHost.clientHeight);
+                scrollHost.scrollTop = afterSaveScroll;
+                const anotherFocus = scrollHost.querySelector('[aria-label="新建组织名称"]');
+                anotherFocus.focus({ preventScroll: true });
+                for (const callback of deliveredFrames) callback(performance.now());
+                await tick();
+                assert(scrollHost.scrollTop === afterSaveScroll && document.activeElement === anotherFocus,
+                    "迟到帧回调覆盖用户后续滚动或焦点");
+            } finally {
+                window.requestAnimationFrame = originalRaf;
+                window.cancelAnimationFrame = originalCancelRaf;
+                if (visibilityDescriptor) Object.defineProperty(document, "visibilityState", visibilityDescriptor);
+                else delete document.visibilityState;
+                await unmount(instance);
+                scrollHost.remove();
+            }
+        });
+    }
 
     for (const mode of ["分页 facade", "全量 facade 兼容"]) {
         await test(`组织上下文：${mode}刷新保留 600 条窗口、搜索、状态、滚动和焦点，故障与失联不跳组织`, async () => {

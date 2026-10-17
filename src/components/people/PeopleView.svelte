@@ -1,6 +1,7 @@
 <script lang="ts">
     /** 联系人视图：关键词下推后渐进读取，其他条件客户端过滤/分页；详情弹窗由 Workbench 统一承载 */
-    import { batchUpdateContacts, filterContacts, listContactPage, PAGE_SIZE, removeContacts } from "../../services/contacts";
+    import { batchUpdateContacts, listContactPage, PAGE_SIZE, removeContacts } from "../../services/contacts";
+    import { filterContactSearch } from "../../domain/contact-search";
     import { GROUP_CLEAR_OPTION, GROUP_KEEP_OPTION } from "../../domain/contact-group";
     import { profileText } from "../../domain/people-profiles";
     import { onDestroy, tick } from "svelte";
@@ -16,7 +17,7 @@
     import type { PeopleFilterState } from "../../domain/people-filters";
     import { DUPLICATE_PAIRS_LIMIT, findDuplicatePairs } from "../../domain/duplicate-check";
     import type { DuplicatePair } from "../../domain/duplicate-check";
-    import { findSavedViewByName, missingTags, normalizeSavedViews } from "../../domain/saved-views";
+    import { findSavedViewByName, missingTags, normalizeSavedViews, SAVED_VIEWS_LIMIT } from "../../domain/saved-views";
     import type { SavedView, SavedViewQuery } from "../../domain/saved-views";
     import { attachPopover } from "../../libs/popover";
     import PersonCard from "./PersonCard.svelte";
@@ -471,7 +472,7 @@
 
     const filtered = $derived.by(() => {
         const focus = new Set(focusIds);
-        const result = filterContacts(people, searchText, groupFilter)
+        const result = filterContactSearch(people, searchText, groupFilter)
             .filter((person) => !focusLabel || focus.has(person.itemId))
             .filter((person) => matchTags(person, tagFilter, extraFilter.tagMatch));
         // 最近互动读取失败时，不能把空快照解释成“从未联系”；暂时暂停受影响条件，
@@ -863,6 +864,10 @@
             return;
         }
         const existing = findSavedViewByName(localViews, name);
+        if (!existing && localViews.length >= SAVED_VIEWS_LIMIT) {
+            viewHint = `最多保存 ${SAVED_VIEWS_LIMIT} 个视图；请覆盖已有同名视图，或删除一个后再新增。`;
+            return;
+        }
         if (existing && !window.confirm(`已存在同名视图「${name}」，覆盖它吗？`)) return;
         const nextView: SavedView = {
             id: existing?.id ?? `view-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
@@ -962,7 +967,7 @@
             rosterHasMore = next.hasMore;
             loading = false;
             void loadRemainingRosterPages(request, pageGeneration, query, abortController);
-            if (!next.hasMore) rosterRefreshing = false;
+            if (!next.hasMore && !query) rosterRefreshing = false;
         } catch (error) {
             if (request !== refreshGeneration) return;
             /* 刷新失败保留旧列表内容，仅以横幅提示（可再次刷新重试） */
@@ -974,13 +979,70 @@
         }
     }
 
+    /**
+     * AV 的 query 只返回关键词命中的行，relation 单元格不会把关联端展开。
+     * 关键词命中且当前结果已有关系时，补读未过滤名册，收回关系的另一端；
+     * 结果仍受 PeopleView 后续的分组、标签和其它筛选约束。
+     */
+    async function loadRelatedSearchNeighbors(
+        request: number,
+        expectedGeneration: number,
+        query: string,
+        abortController: AbortController,
+    ): Promise<void> {
+        if (!query.trim() || people.length > PAGE_SIZE) return;
+        const directIds = new Set(people.map((person) => person.itemId));
+        const relatedIds = new Set(people.flatMap((person) => person.relatedItemIds));
+        const neighbors = new Map<string, ContactSummary>();
+        const allPeople: ContactSummary[] = [];
+        let page = 1;
+        try {
+            while (request === refreshGeneration && expectedGeneration === rosterLoadGeneration && peopleAlive) {
+                const next = await listContactPage(settings, page, PAGE_SIZE, "", { signal: abortController.signal });
+                if (request !== refreshGeneration || expectedGeneration !== rosterLoadGeneration || !peopleAlive) return;
+                allPeople.push(...next.people);
+                for (const person of next.people) {
+                    if (directIds.has(person.itemId)) continue;
+                    if (relatedIds.has(person.itemId) || person.relatedItemIds.some((itemId) => directIds.has(itemId))) {
+                        neighbors.set(person.itemId, person);
+                    }
+                }
+                if (!next.hasMore) break;
+                page = next.page + 1;
+            }
+            if (request !== refreshGeneration || expectedGeneration !== rosterLoadGeneration || !peopleAlive) return;
+            const known = new Set(people.map((person) => person.itemId));
+            const additions = [...neighbors.values()].filter((person) => !known.has(person.itemId));
+            if (additions.length > 0) {
+                people = [...people, ...additions];
+                selectedPeopleCache = { ...selectedPeopleCache, ...Object.fromEntries(additions.map((person) => [person.itemId, person])) };
+                rosterTotal = Math.max(rosterTotal, people.length);
+            } else if (people.length === 0 && allPeople.length > 0) {
+                // AV 查询只覆盖原始属性列；别名、组织称谓等扩展资料命中时，
+                // 服务器可能返回空页。用完整投影做一次本地收口，避免误报空结果。
+                const fallback = filterContactSearch(allPeople, query, groupFilter);
+                if (fallback.length > 0) {
+                    people = fallback;
+                    selectedPeopleCache = { ...selectedPeopleCache, ...Object.fromEntries(fallback.map((person) => [person.itemId, person])) };
+                    rosterTotal = fallback.length;
+                    rosterHasMore = false;
+                }
+            }
+        } catch (error) {
+            if (request === refreshGeneration && expectedGeneration === rosterLoadGeneration && !isAbortError(error)) {
+                // 关联补读失败不抹掉已经显示的直接命中；给用户保留可恢复的提示。
+                rosterLoadError = requestErrorMessage(error);
+            }
+        }
+    }
+
     async function loadRemainingRosterPages(
         request: number,
         expectedGeneration = rosterLoadGeneration,
         query = searchText.trim(),
         abortController = rosterAbortController ?? new AbortController(),
     ) {
-        if (!rosterHasMore || expectedGeneration !== rosterLoadGeneration) return;
+        if ((!rosterHasMore && !query.trim()) || expectedGeneration !== rosterLoadGeneration) return;
         rosterLoadingMore = true;
         rosterLoadError = "";
         try {
@@ -996,6 +1058,9 @@
                 rosterPage = next.page;
                 rosterTotal = Math.max(rosterTotal, next.total);
                 rosterHasMore = next.hasMore;
+            }
+            if (query.trim() && request === refreshGeneration && expectedGeneration === rosterLoadGeneration && peopleAlive) {
+                await loadRelatedSearchNeighbors(request, expectedGeneration, query, abortController);
             }
             if (!query && !rosterHasMore) {
                 const completeIds = new Set(people.map((person) => person.itemId));

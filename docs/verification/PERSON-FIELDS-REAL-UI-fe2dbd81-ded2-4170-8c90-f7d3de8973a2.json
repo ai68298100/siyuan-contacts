@@ -1,0 +1,1271 @@
+{
+  "runId": "fe2dbd81-ded2-4170-8c90-f7d3de8973a2",
+  "workspace": "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Person-Fields-UI-fe2dbd81-ded2-4170-8c90-f7d3de8973a2",
+  "kernel": "D:\\RJ\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe",
+  "port": 9196,
+  "chrome": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "startedAt": "2026-10-17T03:03:31.092Z",
+  "fictionalOnly": true,
+  "actualProductionServices": true,
+  "actualProductionUi": true,
+  "nativeEditorCasVerified": false,
+  "kernelRequests": 122,
+  "listenerOwnershipChecks": 122,
+  "ownKernelPid": 59776,
+  "requestRoutes": [
+    "/api/system/bootProgress",
+    "/api/system/bootProgress",
+    "/api/system/version",
+    "/api/notebook/lsNotebooks",
+    "/api/notebook/lsNotebooks",
+    "/api/notebook/createNotebook",
+    "/api/notebook/lsNotebooks",
+    "/api/filetree/createDocWithMd",
+    "/api/block/insertBlock",
+    "/api/av/renderAttributeView",
+    "/api/av/renderAttributeView",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/av/addAttributeViewKey",
+    "/api/transactions",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/filetree/createDocWithMd",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/av/renderAttributeView",
+    "/api/av/renderAttributeView",
+    "/api/query/sql",
+    "/api/filetree/createDocWithMd",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/av/getAttributeViewItemIDsByBoundIDs",
+    "/api/av/addAttributeViewBlocks",
+    "/api/av/getAttributeViewItemIDsByBoundIDs",
+    "/api/av/renderAttributeView",
+    "/api/av/getAttributeViewItemIDsByBoundIDs",
+    "/api/av/renderAttributeView",
+    "/api/av/renderAttributeView",
+    "/api/av/renderAttributeView",
+    "/api/query/sql",
+    "/api/av/getAttributeViewItemIDsByBoundIDs",
+    "/api/filetree/createDocWithMd",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/av/getAttributeViewItemIDsByBoundIDs",
+    "/api/av/addAttributeViewBlocks",
+    "/api/av/getAttributeViewItemIDsByBoundIDs",
+    "/api/av/renderAttributeView",
+    "/api/av/getAttributeViewItemIDsByBoundIDs",
+    "/api/av/renderAttributeView",
+    "/api/setting/setBazaar",
+    "/api/petal/setPetalEnabled",
+    "/api/petal/loadPetals",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/query/sql",
+    "/api/sqlite/flushTransaction",
+    "/api/query/sql",
+    "/api/system/exit"
+  ],
+  "frontend": {
+    "ok": true,
+    "isolated": true,
+    "frontend": "browser-desktop",
+    "workspace": "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Person-Fields-UI-fe2dbd81-ded2-4170-8c90-f7d3de8973a2",
+    "plugin": "siyuan-contacts",
+    "pluginInstalled": true,
+    "pluginLoaded": true,
+    "browserAuthentication": false,
+    "bridgeLoaded": true,
+    "bridgeProtocol": 2,
+    "bridgeGetPerson": true,
+    "replayCreated": true,
+    "replayStable": true,
+    "workbenchTopbar": true,
+    "birthdayEditor": false,
+    "birthdaySaved": false,
+    "ledgerEditor": false,
+    "ledgerCreated": false,
+    "ledgerSettled": false,
+    "ledgerReopened": false,
+    "aliasEditor": false,
+    "aliasSaved": false,
+    "aliasRejected": false,
+    "followUpEditor": false,
+    "followUpCreated": false,
+    "followUpCompleted": false,
+    "followUpKernelVerified": false,
+    "detailCloseDiagnostic": null,
+    "organizationView": false,
+    "organizationNavigationDiagnostic": null,
+    "organizationRenamed": false,
+    "organizationMemberEdited": false,
+    "organizationArchived": false,
+    "organizationRestored": false,
+    "organizationReloaded": false,
+    "captureSourceDocId": null,
+    "captureOpenMode": null,
+    "captureEditorOpen": false,
+    "captureContextMenu": false,
+    "captureCommandPanel": false,
+    "captureDialog": false,
+    "captureCandidateCount": 0,
+    "captureCompleted": false,
+    "captureUiReadback": null,
+    "captureUiLimitations": [],
+    "uiReloaded": false,
+    "multiWindowStable": false,
+    "multiWindowInteraction": false,
+    "organizationCrossWindow": false,
+    "organizationMemberCrossWindow": false,
+    "organizationArchiveCrossWindow": false,
+    "organizationRestoreCrossWindow": false,
+    "organizationCrossWindowDiagnostics": [],
+    "captureUiDiagnostic": null,
+    "captureDialogClosed": false,
+    "hostReady": false,
+    "screenshots": [
+      "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Person-Fields-UI-fe2dbd81-ded2-4170-8c90-f7d3de8973a2\\person-fields-ui-artifacts\\person-note-detail-reopened.png",
+      "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Person-Fields-UI-fe2dbd81-ded2-4170-8c90-f7d3de8973a2\\person-fields-ui-artifacts\\person-fields-detail-reopened.png",
+      "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Person-Fields-UI-fe2dbd81-ded2-4170-8c90-f7d3de8973a2\\person-fields-ui-artifacts\\person-fields-stale-baseline-conflict.png",
+      "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Person-Fields-UI-fe2dbd81-ded2-4170-8c90-f7d3de8973a2\\person-fields-ui-artifacts\\person-fields-same-name-independent-person.png",
+      "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Lvct-Person-Fields-UI-fe2dbd81-ded2-4170-8c90-f7d3de8973a2\\person-fields-ui-artifacts\\person-fields-conflict-recovered.png"
+    ],
+    "limitations": [],
+    "failure": null,
+    "browserUrl": "http://127.0.0.1:9196/stage/build/desktop/",
+    "consoleTail": [],
+    "fileNetworkEvents": [
+      {
+        "event": "responseReceived",
+        "requestId": "65400.355",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147102.78421,
+        "observedAt": "2026-10-17T03:03:39.062Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.358",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147102.78431,
+        "observedAt": "2026-10-17T03:03:39.062Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.356",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147102.791085,
+        "observedAt": "2026-10-17T03:03:39.069Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.359",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147102.807138,
+        "observedAt": "2026-10-17T03:03:39.087Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.360",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147102.814265,
+        "observedAt": "2026-10-17T03:03:39.092Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.361",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147102.814711,
+        "observedAt": "2026-10-17T03:03:39.092Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.365",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147102.828705,
+        "observedAt": "2026-10-17T03:03:39.107Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.366",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147102.838867,
+        "observedAt": "2026-10-17T03:03:39.117Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.375",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.391022,
+        "observedAt": "2026-10-17T03:03:39.669Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.374",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.39116,
+        "observedAt": "2026-10-17T03:03:39.669Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.380",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.391799,
+        "observedAt": "2026-10-17T03:03:39.670Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.379",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.393106,
+        "observedAt": "2026-10-17T03:03:39.671Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.378",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.393194,
+        "observedAt": "2026-10-17T03:03:39.671Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.382",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.410522,
+        "observedAt": "2026-10-17T03:03:39.688Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.386",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.570903,
+        "observedAt": "2026-10-17T03:03:39.849Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.389",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.571437,
+        "observedAt": "2026-10-17T03:03:39.849Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.383",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.573811,
+        "observedAt": "2026-10-17T03:03:39.852Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.387",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.577922,
+        "observedAt": "2026-10-17T03:03:39.856Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.391",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.578053,
+        "observedAt": "2026-10-17T03:03:39.856Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.390",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.589808,
+        "observedAt": "2026-10-17T03:03:39.868Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.392",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.635073,
+        "observedAt": "2026-10-17T03:03:39.913Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.395",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.636254,
+        "observedAt": "2026-10-17T03:03:39.914Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.394",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.636544,
+        "observedAt": "2026-10-17T03:03:39.915Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.396",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.64226,
+        "observedAt": "2026-10-17T03:03:39.920Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.397",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.642764,
+        "observedAt": "2026-10-17T03:03:39.920Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.398",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.647944,
+        "observedAt": "2026-10-17T03:03:39.926Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.405",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.689827,
+        "observedAt": "2026-10-17T03:03:39.968Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.410",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.702923,
+        "observedAt": "2026-10-17T03:03:39.981Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.409",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.706955,
+        "observedAt": "2026-10-17T03:03:39.985Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.407",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.707527,
+        "observedAt": "2026-10-17T03:03:39.986Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.408",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.709309,
+        "observedAt": "2026-10-17T03:03:39.987Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.404",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.712049,
+        "observedAt": "2026-10-17T03:03:39.990Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.411",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.73285,
+        "observedAt": "2026-10-17T03:03:40.011Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.412",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.736973,
+        "observedAt": "2026-10-17T03:03:40.015Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.414",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.741896,
+        "observedAt": "2026-10-17T03:03:40.020Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.418",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.748819,
+        "observedAt": "2026-10-17T03:03:40.027Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.419",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.759349,
+        "observedAt": "2026-10-17T03:03:40.037Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.420",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.784892,
+        "observedAt": "2026-10-17T03:03:40.063Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.421",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.785999,
+        "observedAt": "2026-10-17T03:03:40.064Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.422",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147103.807141,
+        "observedAt": "2026-10-17T03:03:40.135Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.431",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.581177,
+        "observedAt": "2026-10-17T03:03:42.859Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.435",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.582264,
+        "observedAt": "2026-10-17T03:03:42.860Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.433",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.583004,
+        "observedAt": "2026-10-17T03:03:42.861Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.436",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.58838,
+        "observedAt": "2026-10-17T03:03:42.866Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.438",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.612846,
+        "observedAt": "2026-10-17T03:03:42.891Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.439",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.6378,
+        "observedAt": "2026-10-17T03:03:42.916Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.440",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.64681,
+        "observedAt": "2026-10-17T03:03:42.925Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.441",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.646957,
+        "observedAt": "2026-10-17T03:03:42.925Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.443",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.651226,
+        "observedAt": "2026-10-17T03:03:42.929Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.444",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.652199,
+        "observedAt": "2026-10-17T03:03:42.930Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.445",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.671741,
+        "observedAt": "2026-10-17T03:03:42.950Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.450",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.713452,
+        "observedAt": "2026-10-17T03:03:42.991Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.449",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.715315,
+        "observedAt": "2026-10-17T03:03:42.993Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.451",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.718959,
+        "observedAt": "2026-10-17T03:03:42.997Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.454",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.719584,
+        "observedAt": "2026-10-17T03:03:42.997Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.455",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.762136,
+        "observedAt": "2026-10-17T03:03:43.040Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.458",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.764748,
+        "observedAt": "2026-10-17T03:03:43.043Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.459",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.77561,
+        "observedAt": "2026-10-17T03:03:43.053Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.460",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.781999,
+        "observedAt": "2026-10-17T03:03:43.060Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.461",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.782881,
+        "observedAt": "2026-10-17T03:03:43.061Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.462",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.782952,
+        "observedAt": "2026-10-17T03:03:43.061Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.463",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.812167,
+        "observedAt": "2026-10-17T03:03:43.090Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.465",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.812712,
+        "observedAt": "2026-10-17T03:03:43.091Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.467",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.82821,
+        "observedAt": "2026-10-17T03:03:43.106Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.470",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.828564,
+        "observedAt": "2026-10-17T03:03:43.106Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.471",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.8528,
+        "observedAt": "2026-10-17T03:03:43.131Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.475",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.86034,
+        "observedAt": "2026-10-17T03:03:43.138Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.480",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.87784,
+        "observedAt": "2026-10-17T03:03:43.156Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.481",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147106.897615,
+        "observedAt": "2026-10-17T03:03:43.175Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.482",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147108.581516,
+        "observedAt": "2026-10-17T03:03:44.859Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.485",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147108.581622,
+        "observedAt": "2026-10-17T03:03:44.860Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.488",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147108.581944,
+        "observedAt": "2026-10-17T03:03:44.860Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.487",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147108.582588,
+        "observedAt": "2026-10-17T03:03:44.860Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.490",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147108.587989,
+        "observedAt": "2026-10-17T03:03:44.866Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.493",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147108.627798,
+        "observedAt": "2026-10-17T03:03:44.906Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.495",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147108.63139,
+        "observedAt": "2026-10-17T03:03:44.909Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.492",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147108.631572,
+        "observedAt": "2026-10-17T03:03:44.909Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.497",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147108.6341,
+        "observedAt": "2026-10-17T03:03:44.912Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.500",
+        "path": "/api/file/getFile",
+        "status": 202,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147108.636658,
+        "observedAt": "2026-10-17T03:03:44.958Z"
+      },
+      {
+        "event": "responseReceived",
+        "requestId": "65400.491",
+        "path": "/api/file/getFile",
+        "status": 200,
+        "url": "http://127.0.0.1:9196/api/file/getFile",
+        "timestamp": 147108.641161,
+        "observedAt": "2026-10-17T03:03:44.997Z"
+      }
+    ],
+    "browserProcess": {
+      "pid": 49000,
+      "profile": "C:\\Users\\Admin\\AppData\\Local\\Temp\\lvct-ui-GstjPs",
+      "exited": true,
+      "profileRemoved": true
+    },
+    "personFields": {
+      "actualProductionUi": true,
+      "saved": true,
+      "detailReopened": true,
+      "serviceAndSqlVerified": true,
+      "nativeEditorCasVerified": false,
+      "expected": {
+        "schemaVersion": 1,
+        "ownerDocId": "20261017110333-tz43v3s",
+        "items": [
+          {
+            "id": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d",
+            "kind": "group",
+            "label": "真实UI联系方式 6d992e52"
+          },
+          {
+            "id": "a1e30d18-7128-473e-9e6e-90d7c7722f70",
+            "kind": "entry",
+            "label": "电话",
+            "value": "+00 111 001",
+            "parentId": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d"
+          },
+          {
+            "id": "8c046a23-5f81-41bf-93b1-a893313af70b",
+            "kind": "entry",
+            "label": "电话",
+            "value": "+00 111 002\n仅工作日联系",
+            "parentId": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d"
+          }
+        ]
+      },
+      "blockId": "20261017110339-pau5agj",
+      "savedServiceState": {
+        "blockId": "20261017110339-pau5agj",
+        "snapshot": {
+          "schemaVersion": 1,
+          "ownerDocId": "20261017110333-tz43v3s",
+          "items": [
+            {
+              "id": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d",
+              "kind": "group",
+              "label": "真实UI联系方式 6d992e52"
+            },
+            {
+              "id": "a1e30d18-7128-473e-9e6e-90d7c7722f70",
+              "kind": "entry",
+              "label": "电话",
+              "value": "+00 111 001",
+              "parentId": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d"
+            },
+            {
+              "id": "8c046a23-5f81-41bf-93b1-a893313af70b",
+              "kind": "entry",
+              "label": "电话",
+              "value": "+00 111 002\n仅工作日联系",
+              "parentId": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d"
+            }
+          ]
+        }
+      },
+      "savedUiValues": [
+        {
+          "label": "电话",
+          "value": "+00 111 001"
+        },
+        {
+          "label": "电话",
+          "value": "+00 111 002\n仅工作日联系"
+        }
+      ],
+      "detailClosed": true,
+      "reopenedUiValues": [
+        {
+          "label": "电话",
+          "value": "+00 111 001"
+        },
+        {
+          "label": "电话",
+          "value": "+00 111 002\n仅工作日联系"
+        }
+      ],
+      "reopenedServiceState": {
+        "blockId": "20261017110339-pau5agj",
+        "snapshot": {
+          "schemaVersion": 1,
+          "ownerDocId": "20261017110333-tz43v3s",
+          "items": [
+            {
+              "id": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d",
+              "kind": "group",
+              "label": "真实UI联系方式 6d992e52"
+            },
+            {
+              "id": "a1e30d18-7128-473e-9e6e-90d7c7722f70",
+              "kind": "entry",
+              "label": "电话",
+              "value": "+00 111 001",
+              "parentId": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d"
+            },
+            {
+              "id": "8c046a23-5f81-41bf-93b1-a893313af70b",
+              "kind": "entry",
+              "label": "电话",
+              "value": "+00 111 002\n仅工作日联系",
+              "parentId": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d"
+            }
+          ]
+        }
+      },
+      "sqlRows": [
+        {
+          "content": "虚构补充资料UI甲",
+          "ial": "{: id=\"20261017110333-gfikcb5\" updated=\"20261017110333\" custom-lvct-contact-draft=\"20261017110333-mpg5wh5\"}",
+          "id": "20261017110333-gfikcb5",
+          "markdown": "# 虚构补充资料UI甲",
+          "parent_id": "20261017110333-tz43v3s",
+          "root_id": "20261017110333-tz43v3s",
+          "type": "h"
+        },
+        {
+          "content": "虚构补充资料UI甲",
+          "ial": "{: title=\"虚构补充资料UI甲\" type=\"doc\" updated=\"20261017110339\" custom-avs=\"20261017110332-ey16wyg\" id=\"20261017110333-tz43v3s\"}",
+          "id": "20261017110333-tz43v3s",
+          "markdown": "",
+          "parent_id": "",
+          "root_id": "20261017110333-tz43v3s",
+          "type": "d"
+        },
+        {
+          "content": "人物备注\n真实UI备注：<b>纯文本</b> &amp; \"引号\" '单引号' \\路径\\n字面\n第二行：偏好安静 😀\n{: custom-fake=\"1\"}\n- [ ] 保留任务形似文本",
+          "ial": "{: id=\"20261017110337-qa6pctr\" custom-lvct-person-note=\"1\" custom-lvct-person-note-format=\"2\" updated=\"20261017110337\"}",
+          "id": "20261017110337-qa6pctr",
+          "markdown": "**人物备注**\n真实UI备注：<b>纯文本</b> &amp; \"引号\" '单引号' \\路径\\n字面\n第二行：偏好安静 😀\n{: custom-fake=\"1\"}\n- [ ] 保留任务形似文本",
+          "parent_id": "20261017110333-tz43v3s",
+          "root_id": "20261017110333-tz43v3s",
+          "type": "p"
+        },
+        {
+          "content": "补充资料\n{\"schemaVersion\":1,\"ownerDocId\":\"20261017110333-tz43v3s\",\"items\":[{\"id\":\"b263ac5e-5b0b-4763-aa0d-f8243a1f845d\",\"kind\":\"group\",\"label\":\"真实UI联系方式 6d992e52\"},{\"id\":\"a1e30d18-7128-473e-9e6e-90d7c7722f70\",\"kind\":\"entry\",\"label\":\"电话\",\"value\":\"+00 111 001\",\"parentId\":\"b263ac5e-5b0b-4763-aa0d-f8243a1f845d\"},{\"id\":\"8c046a23-5f81-41bf-93b1-a893313af70b\",\"kind\":\"entry\",\"label\":\"电话\",\"value\":\"+00 111 002\\n仅工作日联系\",\"parentId\":\"b263ac5e-5b0b-4763-aa0d-f8243a1f845d\"}]}",
+          "ial": "{: id=\"20261017110339-pau5agj\" custom-lvct-person-fields=\"1\" custom-lvct-person-fields-format=\"1\" updated=\"20261017110339\"}",
+          "id": "20261017110339-pau5agj",
+          "markdown": "**补充资料**\n{\"schemaVersion\":1,\"ownerDocId\":\"20261017110333-tz43v3s\",\"items\":[{\"id\":\"b263ac5e-5b0b-4763-aa0d-f8243a1f845d\",\"kind\":\"group\",\"label\":\"真实UI联系方式 6d992e52\"},{\"id\":\"a1e30d18-7128-473e-9e6e-90d7c7722f70\",\"kind\":\"entry\",\"label\":\"电话\",\"value\":\"+00 111 001\",\"parentId\":\"b263ac5e-5b0b-4763-aa0d-f8243a1f845d\"},{\"id\":\"8c046a23-5f81-41bf-93b1-a893313af70b\",\"kind\":\"entry\",\"label\":\"电话\",\"value\":\"+00 111 002\\n仅工作日联系\",\"parentId\":\"b263ac5e-5b0b-4763-aa0d-f8243a1f845d\"}]}",
+          "parent_id": "20261017110333-tz43v3s",
+          "root_id": "20261017110333-tz43v3s",
+          "type": "p"
+        }
+      ],
+      "originalNativeBodiesPreserved": true
+    },
+    "personNote": {
+      "actualProductionUi": true,
+      "saved": true,
+      "sameBlockUpdate": true,
+      "detailReopened": true,
+      "serviceAndSqlVerified": true,
+      "blockId": "20261017110337-qa6pctr",
+      "expectedText": "真实UI备注：<b>纯文本</b> &amp; \"引号\" '单引号' \\路径\\n字面\n第二行：偏好安静 😀\n{: custom-fake=\"1\"}\n- [ ] 保留任务形似文本",
+      "updatedSqlRow": {
+        "content": "人物备注\n真实UI备注：<b>纯文本</b> &amp; \"引号\" '单引号' \\路径\\n字面\n第二行：偏好安静 😀\n{: custom-fake=\"1\"}\n- [ ] 保留任务形似文本",
+        "ial": "{: id=\"20261017110337-qa6pctr\" custom-lvct-person-note=\"1\" custom-lvct-person-note-format=\"2\" updated=\"20261017110337\"}",
+        "id": "20261017110337-qa6pctr",
+        "markdown": "**人物备注**\n真实UI备注：<b>纯文本</b> &amp; \"引号\" '单引号' \\路径\\n字面\n第二行：偏好安静 😀\n{: custom-fake=\"1\"}\n- [ ] 保留任务形似文本",
+        "parent_id": "20261017110333-tz43v3s",
+        "root_id": "20261017110333-tz43v3s",
+        "type": "p"
+      },
+      "reopenedUiText": "真实UI备注：<b>纯文本</b> &amp; \"引号\" '单引号' \\路径\\n字面\n第二行：偏好安静 😀\n{: custom-fake=\"1\"}\n- [ ] 保留任务形似文本",
+      "reopenedSqlRow": {
+        "content": "人物备注\n真实UI备注：<b>纯文本</b> &amp; \"引号\" '单引号' \\路径\\n字面\n第二行：偏好安静 😀\n{: custom-fake=\"1\"}\n- [ ] 保留任务形似文本",
+        "ial": "{: id=\"20261017110337-qa6pctr\" custom-lvct-person-note=\"1\" custom-lvct-person-note-format=\"2\" updated=\"20261017110337\"}",
+        "id": "20261017110337-qa6pctr",
+        "markdown": "**人物备注**\n真实UI备注：<b>纯文本</b> &amp; \"引号\" '单引号' \\路径\\n字面\n第二行：偏好安静 😀\n{: custom-fake=\"1\"}\n- [ ] 保留任务形似文本",
+        "parent_id": "20261017110333-tz43v3s",
+        "root_id": "20261017110333-tz43v3s",
+        "type": "p"
+      }
+    },
+    "personFieldsMultiWindow": {
+      "actualProductionUi": true,
+      "nativeEditorCasVerified": false,
+      "conflictDraftPreserved": true,
+      "conflictZeroBlockWrites": true,
+      "discardRereadRecovered": true,
+      "freshBaselineSaveSucceeded": true,
+      "sameNamePeopleIsolated": true,
+      "secondPageClosed": true,
+      "secondPageTargetId": "995CAA4D766683C1E3A079042B978B82",
+      "secondPageSavedState": {
+        "blockId": "20261017110339-pau5agj",
+        "snapshot": {
+          "schemaVersion": 1,
+          "ownerDocId": "20261017110333-tz43v3s",
+          "items": [
+            {
+              "id": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d",
+              "kind": "group",
+              "label": "真实UI联系方式 6d992e52"
+            },
+            {
+              "id": "a1e30d18-7128-473e-9e6e-90d7c7722f70",
+              "kind": "entry",
+              "label": "电话",
+              "value": "乙页已保存值",
+              "parentId": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d"
+            },
+            {
+              "id": "8c046a23-5f81-41bf-93b1-a893313af70b",
+              "kind": "entry",
+              "label": "电话",
+              "value": "+00 111 002\n仅工作日联系",
+              "parentId": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d"
+            }
+          ]
+        }
+      },
+      "conflictMessage": "补充资料已在其他窗口变化，请重新读取后再保存  草稿已保留。可修改后再次保存，或重新读取核对；重新读取前可选择保存或放弃草稿。",
+      "conflictBlockWriteDelta": 0,
+      "recoveredState": {
+        "blockId": "20261017110339-pau5agj",
+        "snapshot": {
+          "schemaVersion": 1,
+          "ownerDocId": "20261017110333-tz43v3s",
+          "items": [
+            {
+              "id": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d",
+              "kind": "group",
+              "label": "真实UI联系方式 6d992e52"
+            },
+            {
+              "id": "a1e30d18-7128-473e-9e6e-90d7c7722f70",
+              "kind": "entry",
+              "label": "电话",
+              "value": "甲页重读后保存值",
+              "parentId": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d"
+            },
+            {
+              "id": "8c046a23-5f81-41bf-93b1-a893313af70b",
+              "kind": "entry",
+              "label": "电话",
+              "value": "+00 111 002\n仅工作日联系",
+              "parentId": "b263ac5e-5b0b-4763-aa0d-f8243a1f845d"
+            }
+          ]
+        }
+      },
+      "independentPersonState": {
+        "blockId": "20261017110344-secbyqb",
+        "snapshot": {
+          "schemaVersion": 1,
+          "ownerDocId": "20261017110333-xyry8sk",
+          "items": [
+            {
+              "id": "fe6f582c-ad4f-43da-8982-2d6bdbb527cb",
+              "kind": "entry",
+              "label": "电话",
+              "value": "同名人物独立值"
+            }
+          ]
+        }
+      },
+      "finalSqlRows": [
+        {
+          "content": "补充资料\n{\"schemaVersion\":1,\"ownerDocId\":\"20261017110333-tz43v3s\",\"items\":[{\"id\":\"b263ac5e-5b0b-4763-aa0d-f8243a1f845d\",\"kind\":\"group\",\"label\":\"真实UI联系方式 6d992e52\"},{\"id\":\"a1e30d18-7128-473e-9e6e-90d7c7722f70\",\"kind\":\"entry\",\"label\":\"电话\",\"value\":\"甲页重读后保存值\",\"parentId\":\"b263ac5e-5b0b-4763-aa0d-f8243a1f845d\"},{\"id\":\"8c046a23-5f81-41bf-93b1-a893313af70b\",\"kind\":\"entry\",\"label\":\"电话\",\"value\":\"+00 111 002\\n仅工作日联系\",\"parentId\":\"b263ac5e-5b0b-4763-aa0d-f8243a1f845d\"}]}",
+          "ial": "{: id=\"20261017110339-pau5agj\" custom-lvct-person-fields=\"1\" custom-lvct-person-fields-format=\"1\" updated=\"20261017110339\"}",
+          "id": "20261017110339-pau5agj",
+          "parent_id": "20261017110333-tz43v3s",
+          "root_id": "20261017110333-tz43v3s"
+        },
+        {
+          "content": "补充资料\n{\"schemaVersion\":1,\"ownerDocId\":\"20261017110333-xyry8sk\",\"items\":[{\"id\":\"fe6f582c-ad4f-43da-8982-2d6bdbb527cb\",\"kind\":\"entry\",\"label\":\"电话\",\"value\":\"同名人物独立值\"}]}",
+          "ial": "{: id=\"20261017110344-secbyqb\" custom-lvct-person-fields=\"1\" custom-lvct-person-fields-format=\"1\" updated=\"20261017110344\"}",
+          "id": "20261017110344-secbyqb",
+          "parent_id": "20261017110333-xyry8sk",
+          "root_id": "20261017110333-xyry8sk"
+        }
+      ],
+      "firstPageBlockWriteRequests": [
+        {
+          "requestId": "65400.185",
+          "route": "/api/block/insertBlock",
+          "observedAt": "2026-10-17T03:03:37.549Z"
+        },
+        {
+          "requestId": "65400.280",
+          "route": "/api/block/updateBlock",
+          "observedAt": "2026-10-17T03:03:38.336Z"
+        },
+        {
+          "requestId": "65400.370",
+          "route": "/api/block/insertBlock",
+          "observedAt": "2026-10-17T03:03:39.203Z"
+        },
+        {
+          "requestId": "65400.476",
+          "route": "/api/block/updateBlock",
+          "observedAt": "2026-10-17T03:03:43.108Z"
+        }
+      ],
+      "secondPageBlockWriteRequests": [
+        {
+          "requestId": "64324.118",
+          "route": "/api/block/updateBlock",
+          "observedAt": "2026-10-17T03:03:42.073Z"
+        },
+        {
+          "requestId": "64324.219",
+          "route": "/api/block/insertBlock",
+          "observedAt": "2026-10-17T03:03:44.085Z"
+        }
+      ]
+    }
+  },
+  "cleanup": {
+    "ownKernelExited": true,
+    "portReleased": true,
+    "workspaceRetained": true
+  },
+  "dist": {
+    "index.js": "03babeb6c1a53d15749d7cbdea190e9e6bcd7cf0d1d474ad16d9f6744dbaa7ba",
+    "index.css": "12f692af0051f4ab1435b087ffaba0c43aae0bb7f536e299dbc7b4314bef3f82",
+    "plugin.json": "3d89d9fe010e0beab2b5fcf8fa7c6a881b214eaa7ea2b0762575134298025bfe"
+  },
+  "kernelVersion": "3.8.8-alpha.2",
+  "people": {
+    "first": {
+      "docId": "20261017110333-tz43v3s",
+      "itemId": "20261017110333-tjpm3aq",
+      "name": "虚构补充资料UI甲"
+    },
+    "second": {
+      "docId": "20261017110333-xyry8sk",
+      "itemId": "20261017110333-3qn84hw",
+      "name": "虚构补充资料UI甲"
+    }
+  },
+  "completedAt": "2026-10-17T03:03:46.567Z"
+}

@@ -12,6 +12,31 @@ function pendingReport(state = "pending") {
 }
 
 export async function runOrganizationOperationsRegression({ test, assert, fixture, until, button }) {
+    await test("组织管理：宿主提供资料编辑器时只显示一个新建入口", async () => {
+        let createRequested = 0;
+        const facade = {
+            listContacts: async () => [],
+            listOrganizations: async () => [],
+            listOrganizationMembers: async () => [],
+        };
+        const instance = mount(OrgManagerDialog, { target: fixture, props: {
+            facade,
+            onClose() {},
+            onCreateOrganization: () => { createRequested += 1; },
+        } });
+        try {
+            await until(() => {
+                const create = fixture.querySelector(".lvct-org-manager__create button");
+                return create && !create.disabled && fixture.textContent.includes("新建组织资料");
+            }, "资料新建入口未加载");
+            assert(!fixture.querySelector(".lvct-org-manager__create input"), "资料编辑器入口下仍显示旧的快捷名称输入框");
+            const create = [...fixture.querySelectorAll(".lvct-org-manager__create button")].find((entry) => entry.textContent.trim() === "新建组织资料");
+            assert(create, "资料新建按钮缺失");
+            create.click();
+            assert(createRequested === 1, "资料新建入口未通知宿主");
+        } finally { await unmount(instance); }
+    });
+
     await test("组织新建 UI 按返回 docId 选中，不按同名第一项定位", async () => {
         const firstId = "20261004000000-org0001";
         const createdId = "20261004000000-org0002";

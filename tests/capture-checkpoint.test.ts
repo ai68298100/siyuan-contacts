@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
     beginCaptureCheckpoint,
+    captureProjectionMatches,
     captureCheckpointComplete,
     captureDiagnosticSummary,
     capturePersonStatus,
@@ -54,4 +55,16 @@ test("成功投影内容不再写入，相同内容的失败或未知投影可�
     assert.equal(shouldWriteCaptureProjection({ key: "source", status: "failed", markdown: "same" }, "same"), true);
     assert.equal(shouldWriteCaptureProjection({ key: "source", status: "unknown", markdown: "same" }, "same"), true);
     assert.equal(shouldWriteCaptureProjection(undefined, "same"), true);
+});
+
+test("捕获投影必须写后回读收敛，残留旧块或重复块都不能报成功", () => {
+    assert.equal(captureProjectionMatches("正文", [{ markdown: "正文\n{: custom-lvct-attendees=\"1\"}" }]), true);
+    assert.equal(captureProjectionMatches("正文\n{: 用户原文}", [{ markdown: "正文\n{: 用户原文}\n{: custom-lvct-attendees=\"1\"}" }]), true);
+    assert.equal(captureProjectionMatches("正文", [{ markdown: "旧正文\n{: custom-lvct-attendees=\"1\"}" }]), false);
+    assert.equal(captureProjectionMatches("正文", [
+        { markdown: "正文\n{: custom-lvct-attendees=\"1\"}" },
+        { markdown: "正文\n{: custom-lvct-attendees=\"1\"}" },
+    ]), false);
+    assert.equal(captureProjectionMatches("", []), true);
+    assert.equal(captureProjectionMatches("", [{ markdown: "旧正文\n{: custom-lvct-attendees=\"1\"}" }]), false);
 });

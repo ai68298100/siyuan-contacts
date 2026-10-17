@@ -32,7 +32,10 @@ const { updateContactFields, retryContactFields, batchUpdateContacts, writeDraft
 const { bindPeopleProfileStorage, loadPersonRelationshipLabels, savePersonRelationshipLabels } = await import("../src/services/people-profiles.ts");
 const { withStoreLock } = await import("../src/data/storage.ts");
 const { loadRelationshipLabelStore, RELATIONSHIP_LABEL_STORAGE_KEY } = await import("../src/data/person-relationship-labels.ts");
-const { importMigrationBundle, MIGRATION_BUNDLE_STORAGE_KEY, MIGRATION_COVERAGE } = await import("../src/services/migration-bundle.ts");
+const { exportMigrationBundle, importMigrationBundle, previewMigrationImport, MIGRATION_BUNDLE_STORAGE_KEY, MIGRATION_COVERAGE } = await import("../src/services/migration-bundle.ts");
+const { TEMPLATES_STORAGE_KEY } = await import("../src/data/templates.ts");
+const { previewInteractionImportDiff } = await import("../src/services/interaction-import.ts");
+const { loadReminderDismissalsStrict } = await import("../src/data/reminder-dismissals.ts");
 const { invalidateRoster } = await import("../src/services/roster.ts");
 const { runDocumentImportQueue, writeImportFields } = await import("../src/services/import.ts");
 const { importAnchor } = await import("../src/domain/import.ts");
@@ -41,6 +44,38 @@ const { emptyDraft } = await import("../src/domain/person.ts");
 const { changedContactWriteFields } = await import("../src/domain/contact-write.ts");
 const { MigrationWriteUnknownError } = await import("../src/domain/migration-records.ts");
 test.after(() => hooks.deregister());
+
+test("互动差异预览读取失败时不按空库虚报新增，损坏当前库零写入", async () => {
+    const { state, settings, plugin } = fixture();
+    const backup = JSON.stringify({ schemaVersion: 1, events: [{
+        id: "20261016000000-event01", personDocId, occurredAt: 1,
+        localDate: "2026-10-16", source: "manual", note: "不能误报新增",
+    }], tombstones: [] });
+    const failing = { ...plugin, async loadData() { throw new Error("磁盘断开"); } } as Plugin;
+    await assert.rejects(previewInteractionImportDiff(failing, settings, backup), /存储读取失败.*interaction-events\.json/);
+    assert.equal(state.renders, 0, "当前库未核实前不能读取名册并产出差异");
+    const invalid = { schemaVersion: 1, events: [{ id: "坏条目" }], tombstones: [] };
+    state.store.set("interaction-events.json", invalid);
+    await assert.rejects(previewInteractionImportDiff(plugin, settings, backup), /互动存储内容损坏/);
+    assert.deepEqual(state.store.get("interaction-events.json"), invalid);
+    assert.equal(state.jsonWrites, 0);
+    state.store.delete("interaction-events.json");
+    assert.equal((await previewInteractionImportDiff(plugin, settings, backup)).added.length, 1, "不存在的库仍是合法空态");
+    assert.equal(state.jsonWrites, 0);
+});
+
+test("提醒恢复列表和撤销快照的严格读区分故障、损坏与正常空库", async () => {
+    const { state, plugin } = fixture();
+    const failing = { ...plugin, async loadData() { throw new Error("磁盘断开"); } } as Plugin;
+    await assert.rejects(loadReminderDismissalsStrict(failing), /存储读取失败.*reminder-dismissals\.json/);
+    const invalid = { schemaVersion: 1, dismissals: [{ personDocId, kind: "stale", until: "坏日期" }] };
+    state.store.set("reminder-dismissals.json", invalid);
+    await assert.rejects(loadReminderDismissalsStrict(plugin), /提醒暂缓存储内容损坏/);
+    assert.deepEqual(state.store.get("reminder-dismissals.json"), invalid);
+    state.store.delete("reminder-dismissals.json");
+    assert.deepEqual(await loadReminderDismissalsStrict(plugin), []);
+    assert.equal(state.jsonWrites, 0);
+});
 
 const personDocId = "20261004000000-person1";
 const personItemId = "20261004000000-prow001";
@@ -589,6 +624,98 @@ function labelRecord(labels = ["同学"]): PersonRelationshipLabels {
 function bundle(records: PersonRelationshipLabels[]) {
     return JSON.stringify({ schemaVersion: 1, storageKey: MIGRATION_BUNDLE_STORAGE_KEY, modules: { relationshipLabels: { schemaVersion: 1, labels: records } } });
 }
+
+function migrationBundle(modules: Record<string, unknown>) {
+    return JSON.stringify({ schemaVersion: 1, storageKey: MIGRATION_BUNDLE_STORAGE_KEY, modules });
+}
+
+test("迁移包跟进人物 ID 非法时整包预检拒绝，不先写入合法互动模块", async () => {
+    const { state, plugin } = fixture();
+    const text = migrationBundle({
+        interactions: { schemaVersion: 1, events: [{
+            id: "20261016000000-event01", personDocId, occurredAt: 1,
+            localDate: "2026-10-16", source: "manual", note: "必须保持零写入",
+        }], tombstones: [] },
+        followUps: { schemaVersion: 1, items: [{
+            id: "20261016000000-follow1", personDocId: "bad-doc-id", title: "坏引用",
+            dueDate: "2026-10-20", status: "open", createdAt: 1, updatedAt: 1,
+        }] },
+    });
+    assert.throws(() => previewMigrationImport(text), /跟进模块包含非法人物文档 ID/);
+    await assert.rejects(importMigrationBundle(plugin, text), /跟进模块包含非法人物文档 ID/);
+    assert.equal(state.jsonWrites, 0, "包内错误必须先拒绝，不能先导入互动再报告跟进失败");
+    assert.equal(state.store.has("interaction-events.json"), false);
+});
+
+test("迁移包严格拒绝会被容错归一化丢失的模板数据", async () => {
+    const { state, plugin } = fixture();
+    const valid = { id: "tpl-1", name: "模板", content: "正文" };
+    const cases = [
+        Array.from({ length: 51 }, (_, index) => ({ ...valid, id: `tpl-${index + 1}` })),
+        [valid, { ...valid }],
+        [{ ...valid, name: "" }],
+    ];
+    for (const templates of cases) {
+        const text = migrationBundle({ templates: { schemaVersion: 1, templates } });
+        assert.throws(() => previewMigrationImport(text), /模板|格式|重复|最多/);
+        await assert.rejects(importMigrationBundle(plugin, text), /模板|格式|重复|最多/);
+    }
+    assert.equal(state.jsonWrites, 0, "非法迁移包不得写入任何模块");
+});
+
+test("迁移导出模板读取失败时拒绝生成空模板备份", async () => {
+    const { state, plugin } = fixture();
+    const loadData = plugin.loadData.bind(plugin);
+    plugin.loadData = async (key: string) => {
+        if (key === TEMPLATES_STORAGE_KEY) throw new Error("模板读取断开");
+        return loadData(key);
+    };
+
+    await assert.rejects(exportMigrationBundle(plugin), /存储读取失败.*interaction-templates\.json/);
+    assert.equal(state.jsonWrites, 0);
+});
+
+test("迁移导出拒绝坏模板库，不以容错过滤后的部分数据生成备份", async () => {
+    const valid = { id: "tpl-1", name: "模板", content: "正文" };
+    const cases = [
+        { schemaVersion: 2, templates: [] },
+        { schemaVersion: 1, templates: "损坏列表" },
+        { schemaVersion: 1, templates: [valid, { ...valid, id: "tpl-bad", name: "" }] },
+        { schemaVersion: 1, templates: [valid, { ...valid }] },
+        { schemaVersion: 1, templates: Array.from({ length: 51 }, (_, index) => ({ ...valid, id: `tpl-${index + 1}` })) },
+    ];
+    for (const store of cases) {
+        const { state, plugin } = fixture();
+        state.store.set(TEMPLATES_STORAGE_KEY, store);
+        await assert.rejects(exportMigrationBundle(plugin), /模板|格式|重复|最多/);
+        assert.equal(state.jsonWrites, 0);
+        assert.deepEqual(state.store.get(TEMPLATES_STORAGE_KEY), store, "导出拒绝后保留损坏原库供检查");
+    }
+});
+
+test("迁移导出不存在与合法空模板库均生成明确空列表", async () => {
+    for (const store of [null, "", { schemaVersion: 1, templates: [] }]) {
+        const { state, plugin } = fixture();
+        state.store.set(TEMPLATES_STORAGE_KEY, store);
+        const exported = JSON.parse(await exportMigrationBundle(plugin));
+
+        assert.deepEqual(exported.modules.templates, { schemaVersion: 1, templates: [] });
+        assert.equal(state.jsonWrites, 0, "导出不得把内置默认模板落盘");
+    }
+});
+
+test("迁移导出完整保留模板多行正文、空行与 IAL 字面量", async () => {
+    const { state, plugin } = fixture();
+    const template = {
+        id: "tpl-multiline", name: "多行模板",
+        content: "与{{姓名}}见面\n\n{: custom-lvct-note=\"正文而非属性\"}\n第二段\n  保留缩进",
+    };
+    state.store.set(TEMPLATES_STORAGE_KEY, { schemaVersion: 1, templates: [template] });
+
+    const exported = JSON.parse(await exportMigrationBundle(plugin));
+    assert.deepEqual(exported.modules.templates, { schemaVersion: 1, templates: [template] });
+    assert.equal(state.jsonWrites, 0);
+});
 
 test("称谓未知清空：记录缺失不能当空墓碑核实，原记录回读后才收敛", async () => {
     const { state, plugin, settings } = fixture();

@@ -1,0 +1,746 @@
+{
+  "task": "AG-RF-004-S2",
+  "syntheticOnly": true,
+  "candidateContractAccepted": false,
+  "productionChanges": false,
+  "kernelRequests": 0,
+  "realPluginFileWrites": 0,
+  "isolation": "same-runtime memory queues and fake AV only",
+  "summary": {
+    "total": 60,
+    "passed": 60,
+    "failed": 0
+  },
+  "scenarios": [
+    {
+      "category": "strict_unknown_version",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_unknown_field",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_missing_field",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_bad_revision",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_duplicate_person",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_duplicate_method",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_bad_type",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_empty_value",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_control_value",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_unicode_control_value",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_unicode_control_label",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_long_value",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_long_label",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_bad_order",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_multiple_primary",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_bad_tombstone",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_future_tombstone",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_live_tombstone_collision",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_method_count_limit",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_string_envelope_rejected",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_independent_clone_stable_order_limits",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "backup_old_empty_preserves_current",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "backup_current_content_and_tombstones_win",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "backup_tombstone_rebase_persists_second_restore_barrier",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "backup_incoming_tombstone_cannot_delete_current",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "backup_primary_conflict_rejects_affected_type",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "backup_unresolved_no_name_matching_and_no_requests",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "missing_or_corrupt_store_and_read_error_zero_business_writes",
+      "passed": true,
+      "counts": {
+        "storageReads": 4,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "explicit_initialization_only",
+      "passed": true,
+      "counts": {
+        "storageReads": 3,
+        "storageWrites": 1,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "confirm_primary_mismatch_and_type_change_zero_writes",
+      "passed": true,
+      "counts": {
+        "storageReads": 1,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "deletion_tombstone_no_auto_primary_and_empty_projection",
+      "passed": true,
+      "counts": {
+        "storageReads": 5,
+        "storageWrites": 3,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 1,
+        "avReads": 2,
+        "avWrites": 1
+      }
+    },
+    {
+      "category": "confirmed_delete_requires_removed_live_id_and_current_generation",
+      "passed": true,
+      "counts": {
+        "storageReads": 2,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "prepared_recovery_read_only_then_explicit_projection",
+      "passed": true,
+      "counts": {
+        "storageReads": 7,
+        "storageWrites": 3,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 1,
+        "avReads": 3,
+        "avWrites": 1
+      }
+    },
+    {
+      "category": "same_request_repeated_no_fact_rewrite_and_payload_conflict",
+      "passed": true,
+      "counts": {
+        "storageReads": 5,
+        "storageWrites": 1,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 0,
+        "avReads": 1,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "same_runtime_lock_revision_contention_one_fact_commit",
+      "passed": true,
+      "counts": {
+        "storageReads": 3,
+        "storageWrites": 1,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "freeze_before_async_lock_does_not_follow_mutated_input",
+      "passed": true,
+      "counts": {
+        "storageReads": 2,
+        "storageWrites": 1,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "queued_mutable_expected_revision_cannot_bypass_stale_preview",
+      "passed": true,
+      "counts": {
+        "storageReads": 2,
+        "storageWrites": 1,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_pending_snapshot_and_backup_cannot_change_frozen_scope",
+      "passed": true,
+      "counts": {
+        "storageReads": 2,
+        "storageWrites": 1,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "strict_request_identity_target_state_and_digest_reject",
+      "passed": true,
+      "counts": {
+        "storageReads": 2,
+        "storageWrites": 1,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "fact_save_apply_throw_zero_av_unknown_not_replayed",
+      "passed": true,
+      "counts": {
+        "storageReads": 4,
+        "storageWrites": 1,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 0,
+        "avReads": 2,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "fact_save_read_throw_zero_av_unknown_not_replayed",
+      "passed": true,
+      "counts": {
+        "storageReads": 5,
+        "storageWrites": 1,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 0,
+        "avReads": 2,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "fact_save_throw_before_zero_av_unknown_not_replayed",
+      "passed": true,
+      "counts": {
+        "storageReads": 3,
+        "storageWrites": 1,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "fact_save_nonconvergence_exactly_two_attempts_zero_av",
+      "passed": true,
+      "counts": {
+        "storageReads": 4,
+        "storageWrites": 2,
+        "factSaveAttempts": 2,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "missing_unknown_request_id_cannot_be_reassigned_to_other_scope",
+      "passed": true,
+      "counts": {
+        "storageReads": 2,
+        "storageWrites": 1,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "fact_readback_mismatch_can_converge_on_second_identical_save",
+      "passed": true,
+      "counts": {
+        "storageReads": 3,
+        "storageWrites": 2,
+        "factSaveAttempts": 2,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "issued_save_apply_throw_zero_av_and_restart_no_replay",
+      "passed": true,
+      "counts": {
+        "storageReads": 6,
+        "storageWrites": 2,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 1,
+        "avReads": 4,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "issued_save_read_throw_zero_av_and_restart_no_replay",
+      "passed": true,
+      "counts": {
+        "storageReads": 7,
+        "storageWrites": 2,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 1,
+        "avReads": 4,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "issued_save_throw_before_zero_av_and_restart_no_replay",
+      "passed": true,
+      "counts": {
+        "storageReads": 5,
+        "storageWrites": 2,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 1,
+        "avReads": 3,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "target_changes_all_frozen_dimensions_stop_projection",
+      "passed": true,
+      "counts": {
+        "storageReads": 24,
+        "storageWrites": 8,
+        "factSaveAttempts": 8,
+        "issuedSaveAttempts": 0,
+        "avReads": 8,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "already_desired_read_only_close",
+      "passed": true,
+      "counts": {
+        "storageReads": 4,
+        "storageWrites": 2,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 0,
+        "avReads": 1,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "transport_unknown_baseline_and_restart_never_replay",
+      "passed": true,
+      "counts": {
+        "storageReads": 8,
+        "storageWrites": 3,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 1,
+        "avReads": 3,
+        "avWrites": 1
+      }
+    },
+    {
+      "category": "transport_applied_response_lost_read_only_restart_verifies",
+      "passed": true,
+      "counts": {
+        "storageReads": 7,
+        "storageWrites": 4,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 1,
+        "avReads": 2,
+        "avWrites": 1
+      }
+    },
+    {
+      "category": "native_read_failure_after_write_keeps_issued_not_rejected",
+      "passed": true,
+      "counts": {
+        "storageReads": 6,
+        "storageWrites": 3,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 1,
+        "avReads": 3,
+        "avWrites": 1
+      }
+    },
+    {
+      "category": "native_preflight_read_failure_no_write_or_rejected",
+      "passed": true,
+      "counts": {
+        "storageReads": 3,
+        "storageWrites": 1,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 0,
+        "avReads": 1,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "native_recovery_read_failure_never_replays_issued",
+      "passed": true,
+      "counts": {
+        "storageReads": 7,
+        "storageWrites": 3,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 1,
+        "avReads": 4,
+        "avWrites": 1
+      }
+    },
+    {
+      "category": "verified_save_apply_throw_recovery_releases_only_matching_barrier",
+      "passed": true,
+      "counts": {
+        "storageReads": 8,
+        "storageWrites": 4,
+        "factSaveAttempts": 2,
+        "issuedSaveAttempts": 1,
+        "avReads": 2,
+        "avWrites": 1
+      }
+    },
+    {
+      "category": "verified_save_read_throw_recovery_releases_only_matching_barrier",
+      "passed": true,
+      "counts": {
+        "storageReads": 9,
+        "storageWrites": 4,
+        "factSaveAttempts": 2,
+        "issuedSaveAttempts": 1,
+        "avReads": 2,
+        "avWrites": 1
+      }
+    },
+    {
+      "category": "definite_rejection_requires_explicit_fresh_retry_original",
+      "passed": true,
+      "counts": {
+        "storageReads": 9,
+        "storageWrites": 5,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 2,
+        "avReads": 4,
+        "avWrites": 2
+      }
+    },
+    {
+      "category": "missing_unknown_checkpoint_restart_boundary_is_explicit",
+      "passed": true,
+      "counts": {
+        "storageReads": 3,
+        "storageWrites": 1,
+        "factSaveAttempts": 1,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    },
+    {
+      "category": "caller_timeout_does_not_release_underlying_store_lock",
+      "passed": true,
+      "counts": {
+        "storageReads": 0,
+        "storageWrites": 0,
+        "factSaveAttempts": 0,
+        "issuedSaveAttempts": 0,
+        "avReads": 0,
+        "avWrites": 0
+      }
+    }
+  ],
+  "limits": [
+    "no CAS or native atomic JSON/AV transaction",
+    "no true cross-window or cross-process lock proof",
+    "no delayed-host-write guarantee",
+    "missing first checkpoint barrier survives only in current session",
+    "backup is zero-write preview only",
+    "confirmed facts source remains undecided",
+    "bounded synthetic fixtures, no large-store budget claim"
+  ],
+  "elapsedMs": 40.984
+}

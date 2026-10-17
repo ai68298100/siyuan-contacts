@@ -1,5 +1,5 @@
 /** 工作台视图偏好：仅影响界面默认行为，不改变联系人数据库。 */
-import { normalizeSavedViews } from "./saved-views.ts";
+import { assertSavedViewsLimit, normalizeSavedViews } from "./saved-views.ts";
 import type { SavedView } from "./saved-views";
 
 export const VIEW_PREFERENCES_STORAGE_KEY = "view-preferences.json";
@@ -171,6 +171,12 @@ export function normalizeViewPreferences(raw: unknown): ViewPreferences {
         brandAvatar: normalizeBrandAvatarText(record.brandAvatar),
         brandAvatarImage: isValidBrandAvatarImage(record.brandAvatarImage) ? record.brandAvatarImage as string : "",
     };
+}
+
+/** 写入候选不可静默截断保存视图；旧文件的读取仍沿用容错归一化。 */
+export function normalizeViewPreferencesForWrite(raw: ViewPreferences): ViewPreferences {
+    assertSavedViewsLimit(raw.savedViews);
+    return normalizeViewPreferences(raw);
 }
 
 /** C02：宽限期 0–365 天，非法/缺省回退 14 */

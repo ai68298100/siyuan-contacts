@@ -1,0 +1,171 @@
+{
+  "research": "AG-RF-004-N1",
+  "generatedAt": "2026-10-17",
+  "syntheticOnly": true,
+  "candidateContractAccepted": false,
+  "productionChanges": false,
+  "kernelRequests": 0,
+  "realPluginFileWrites": 0,
+  "candidate": {
+    "name": "readable-native-contact-method-v1",
+    "body": "正文逐方法可读：类型、标签、主值和‘值：’之后的完整原文；换行属于值内容",
+    "machineBoundary": "custom-lvct-contact-method-* attrs",
+    "identity": "method-{sha256(personDocId + ':' + stableSourceKey)[0:24]}; owner/source attrs are checked; research-only",
+    "ordering": "order ascending, then method ID for deterministic ties",
+    "legacyRule": "旧 AV slash 原文保留为一个值，不静默拆分"
+  },
+  "checks": [
+    {
+      "id": "fixture-two-persons-three-methods",
+      "pass": true
+    },
+    {
+      "id": "readable-body-keeps-type-label-primary-and-value",
+      "pass": true
+    },
+    {
+      "id": "embedded-newline-and-markdown-punctuation-roundtrip",
+      "pass": true
+    },
+    {
+      "id": "legacy-slash-value-stays-one-method",
+      "pass": true
+    },
+    {
+      "id": "same-value-across-people-has-scoped-identities",
+      "pass": true
+    },
+    {
+      "id": "machine-id-is-in-explicit-attrs-boundary",
+      "pass": true
+    },
+    {
+      "id": "block-order-does-not-change-stable-ids",
+      "pass": true
+    },
+    {
+      "id": "same-order-is-deterministic-by-id",
+      "pass": true
+    },
+    {
+      "id": "native-body-edit-preserves-method-id",
+      "pass": true
+    },
+    {
+      "id": "native-block-delete-is-observable",
+      "pass": true
+    },
+    {
+      "id": "copied-marker-is-duplicate-not-silent-new-method",
+      "pass": true
+    },
+    {
+      "id": "unknown-format-is-reported",
+      "pass": true
+    },
+    {
+      "id": "unknown-type-is-reported",
+      "pass": true
+    },
+    {
+      "id": "rebound-block-is-conflict",
+      "pass": true
+    },
+    {
+      "id": "rebound-owner-cannot-reuse-old-id",
+      "pass": true
+    },
+    {
+      "id": "multiple-primary-is-conflict",
+      "pass": true
+    },
+    {
+      "id": "delete-does-not-drift-following-method-id",
+      "pass": true
+    },
+    {
+      "id": "insert-does-not-drift-existing-method-ids",
+      "pass": true
+    },
+    {
+      "id": "malformed-document-is-reported-not-thrown",
+      "pass": true
+    },
+    {
+      "id": "malformed-block-parent-is-reported",
+      "pass": true
+    },
+    {
+      "id": "malformed-block-id-is-reported",
+      "pass": true
+    },
+    {
+      "id": "markdown-content-mismatch-is-reported",
+      "pass": true
+    },
+    {
+      "id": "unicode-line-separator-label-is-rejected",
+      "pass": true
+    },
+    {
+      "id": "control-character-value-is-rejected",
+      "pass": true
+    },
+    {
+      "id": "unsafe-order-is-rejected",
+      "pass": true
+    },
+    {
+      "id": "clearing-experimental-plugin-cache-keeps-native-facts",
+      "pass": true
+    },
+    {
+      "id": "cache-clear-does-not-rebind-same-value",
+      "pass": true
+    },
+    {
+      "id": "newline-label-rejected-to-protect-boundary",
+      "pass": true
+    },
+    {
+      "id": "empty-value-rejected",
+      "pass": true
+    },
+    {
+      "id": "control-character-value-rejected-on-encode",
+      "pass": true
+    },
+    {
+      "id": "all-source-ids-unique-within-person-scope",
+      "pass": true
+    }
+  ],
+  "summary": {
+    "total": 31,
+    "passed": 31,
+    "failed": 0
+  },
+  "fixture": {
+    "persons": 2,
+    "methodsPerPerson": 3,
+    "values": "fictional only",
+    "sourceDocuments": [
+      "20261017000000-000p001",
+      "20261017000000-000p002"
+    ],
+    "specialValuePreview": "+00 111 / +00 222\\n分机：7 | 备注：<保留> & 🙂"
+  },
+  "observations": [
+    "可读正文保留所有值和含义；机器 ID、类型、标签、主值和排序位于显式属性边界。",
+    "同值跨人物不合并；固定来源键、owner 重写、复制标记、未知格式、未知类型和错误父文档均报告。",
+    "原生改值和删块可被识别；本实验不自动生成删除墓碑，也不把缺块升级为确认删除。",
+    "清除实验插件缓存后仍可从人物文档回读全部方法；这是内存模型证据，不是实际宿主持久化。"
+  ],
+  "limitations": [
+    "没有访问真实 SiYuan 内核、编辑器、原生工作区或插件存储。",
+    "没有证明块写入、重启、多窗口并发、原生手工编辑后的持久性。",
+    "正文格式、属性命名、方法 ID 和 stable source key 只是候选研究格式，不是生产数据契约。",
+    "未知格式、删除和冲突只报告，不自动修复、不按姓名或值重连。",
+    "没有验证全文搜索、备份迁移、AV 主值投影、vCard 往返或大规模 IO 预算。"
+  ]
+}

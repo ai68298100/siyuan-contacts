@@ -15,6 +15,8 @@ import {
 } from "./client";
 import { organizationIalAttributes, sameOrganizationIal, ORGANIZATION_ATTR, ORGANIZATION_DRAFT_ATTR } from "../domain/organization-operations.ts";
 import type { OrganizationFact } from "../domain/organization-operations.ts";
+import { buildPersonNoteDom, PERSON_NOTE_ATTR, PERSON_NOTE_DETACHED_ATTR, PERSON_NOTE_FORMAT_ATTR } from "../domain/person-note.ts";
+import type { PersonNoteBlock } from "../domain/person-note.ts";
 
 export class OrganizationWriteNotSentError extends Error {}
 
@@ -195,6 +197,127 @@ export async function readMarkedBlocks(rootId: string, attrName: string): Promis
     });
 }
 
+/** 去掉目标属性对应的末尾 IAL 行，保留正文作为写后核验事实。 */
+function markedBlockContent(markdown: string, attrName?: string): string {
+    const normalized = markdown.replace(/\r\n/g, "\n").trim();
+    // The marker is appended as the final line by upsertMarkedBlock. Keep
+    // IAL-looking lines in the body: they may be literal user text.
+    if (!attrName) return normalized;
+    const escapedAttr = attrName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const marker = new RegExp(`\\n\\s*\\{:[^\\n]*\\b${escapedAttr}="[^"\\n]*"[^}\\n]*\\}\\s*$`);
+    return normalized.replace(marker, "").trim();
+}
+
+/** 回读拒绝不能作为原写请求被拒绝的证据。 */
+export class MarkedBlockWriteUnknownError extends Error {
+    readonly cause: unknown;
+
+    constructor(cause: unknown) {
+        super("标记区块写入请求已接受，但回读未核实预期内容");
+        this.name = "MarkedBlockWriteUnknownError";
+        this.cause = cause;
+    }
+}
+
+/** 写入后必须重新读取唯一标记块；响应成功只代表请求被接受，不能代表正文已收敛。 */
+async function verifyMarkedBlockWrite(rootId: string, attrName: string, expectedMarkdown: string): Promise<void> {
+    try {
+        const verified = await readMarkedBlocks(rootId, attrName);
+        const matches = expectedMarkdown
+            ? verified.length === 1 && markedBlockContent(verified[0].markdown, attrName) === markedBlockContent(expectedMarkdown)
+            : verified.length === 0;
+        if (!matches) {
+            throw new KernelProtocolError("/api/query/sql", "标记区块回读未核实预期内容");
+        }
+    } catch (error) {
+        throw new MarkedBlockWriteUnknownError(error);
+    }
+}
+
+/** 个人备注按单段落 content 回读；Markdown 会丢失软换行/空白，不能作文本事实源。 */
+export async function readPersonNoteBlocks(rootId: string): Promise<PersonNoteBlock[]> {
+    assertNodeId(rootId, "人物文档 ID");
+    await flushBlockIndex();
+    const roots = await querySql<unknown>(`SELECT id FROM blocks WHERE id = '${rootId}' AND type = 'd' LIMIT 1`, { dedupe: false });
+    if (roots.length !== 1 || assertKernelRecord("/api/query/sql", roots[0]).id !== rootId) {
+        throw new Error("目标文档不可达，人物备注尚未核实");
+    }
+    const rows = await querySql<unknown>(`SELECT id, root_id, parent_id, type, content, markdown, ial FROM blocks WHERE root_id = '${rootId}' AND ial LIKE '%${PERSON_NOTE_ATTR}="%' ORDER BY id LIMIT 2`, { dedupe: false });
+    const blocks = rows.map((raw): PersonNoteBlock => {
+        const row = assertKernelRecord("/api/query/sql", raw);
+        if (typeof row.id !== "string" || !NODE_ID.test(row.id) || row.id === rootId || row.root_id !== rootId
+            || typeof row.parent_id !== "string" || row.parent_id !== rootId
+            || typeof row.type !== "string" || typeof row.content !== "string" || typeof row.markdown !== "string"
+            || typeof row.ial !== "string") throw new KernelProtocolError("/api/query/sql", "人物备注块回读形状异常");
+        const attrs = organizationIalAttributes(row.ial);
+        if (attrs[PERSON_NOTE_ATTR] !== "1" || attrs.id !== undefined && attrs.id !== row.id) {
+            throw new KernelProtocolError("/api/query/sql", "人物备注标记值或块身份未知");
+        }
+        return { id: row.id, parentId: row.parent_id, type: row.type, content: row.content, markdown: row.markdown, format: attrs[PERSON_NOTE_FORMAT_ATTR] };
+    });
+    if (blocks.length !== 1 || blocks[0].format !== undefined || blocks[0].type !== "p") return blocks;
+    // 旧实现只给末段打标记。仅紧邻前置标题能证明它是完整的单段备注。
+    const data = await kernelPost<unknown>("/api/block/getChildBlocks", { id: rootId });
+    if (!Array.isArray(data)) throw new KernelProtocolError("/api/block/getChildBlocks", "人物文档子块回读形状异常");
+    const children = data.map((raw) => {
+        const child = assertKernelRecord("/api/block/getChildBlocks", raw);
+        if (typeof child.id !== "string" || !NODE_ID.test(child.id) || typeof child.type !== "string" || typeof child.markdown !== "string") {
+            throw new KernelProtocolError("/api/block/getChildBlocks", "人物文档子块身份未知");
+        }
+        return child;
+    });
+    const index = children.findIndex((child) => child.id === blocks[0].id);
+    const previous = index > 0 ? children[index - 1] : undefined;
+    blocks[0].legacyTitleBefore = previous?.type === "p" && previous.markdown === "**人物备注**";
+    return blocks;
+}
+
+export interface PersonNoteSourceBlock extends PersonNoteBlock {
+    marker?: string;
+    detached?: string;
+}
+
+/** 按已确认的块 ID 回读，解除标记后仍能核实原文和直接归属。 */
+export async function readPersonNoteSourceBlock(rootId: string, blockId: string): Promise<PersonNoteSourceBlock> {
+    assertNodeId(rootId, "人物文档 ID");
+    assertNodeId(blockId, "旧备注块 ID");
+    if (blockId === rootId) throw new Error("旧备注块不能替代人物文档");
+    await flushBlockIndex();
+    const roots = await querySql<unknown>(`SELECT id FROM blocks WHERE id = '${rootId}' AND type = 'd' LIMIT 1`, { dedupe: false });
+    if (roots.length !== 1 || assertKernelRecord("/api/query/sql", roots[0]).id !== rootId) throw new KernelProtocolError("/api/query/sql", "目标文档不可达，旧备注解除结果尚未核实");
+    const rows = await querySql<unknown>(`SELECT id, root_id, parent_id, type, content, markdown, ial FROM blocks WHERE id = '${blockId}' LIMIT 2`, { dedupe: false });
+    if (rows.length !== 1) throw new KernelProtocolError("/api/query/sql", "旧备注原块不存在或身份不唯一，解除结果尚未核实");
+    const row = assertKernelRecord("/api/query/sql", rows[0]);
+    if (row.id !== blockId || row.root_id !== rootId || row.parent_id !== rootId || row.type !== "p"
+        || typeof row.content !== "string" || typeof row.markdown !== "string" || typeof row.ial !== "string") {
+        throw new KernelProtocolError("/api/query/sql", "旧备注原块正文、类型或直接归属尚未核实");
+    }
+    const attrs = organizationIalAttributes(row.ial);
+    if (attrs.id !== undefined && attrs.id !== blockId) throw new KernelProtocolError("/api/query/sql", "旧备注原块属性身份不一致");
+    return { id: blockId, parentId: rootId, type: "p", content: row.content, markdown: row.markdown,
+        format: attrs[PERSON_NOTE_FORMAT_ATTR], marker: attrs[PERSON_NOTE_ATTR], detached: attrs[PERSON_NOTE_DETACHED_ATTR] };
+}
+
+/** DOM 在同一次块写入中携带标记，保证空行和用户输入不会拆成多个块。 */
+export async function upsertPersonNoteBlock(rootId: string, note: string, existingId?: string): Promise<void> {
+    assertNodeId(rootId, "人物文档 ID");
+    if (existingId !== undefined) assertNodeId(existingId);
+    if (!note) {
+        if (existingId) await deleteBlock(existingId);
+        return;
+    }
+    const id = existingId ?? newNodeId();
+    const dom = buildPersonNoteDom(note, id);
+    if (existingId) {
+        await kernelPost("/api/block/updateBlock", { id, dataType: "dom", data: dom });
+    } else {
+        const data = await kernelPost("/api/block/insertBlock", { parentID: rootId, dataType: "dom", data: dom }, {
+            decode: (value) => decodeInsertBlockData("/api/block/insertBlock", value),
+        });
+        if (firstOperationId(data) !== id) throw new KernelProtocolError("/api/block/insertBlock", "人物备注新块 ID 未核实");
+    }
+}
+
 /**
  * 文档内所有出链指向的文档 ID（去重）——"从笔记捕获人脉"的确定性识别来源：
  * 笔记里链接了谁（siyuan://blocks 双链/块引），refs 索引里就有谁。
@@ -297,6 +420,7 @@ export async function upsertMarkedBlock(
     const marked = markdown.length > 0 ? `${markdown}\n{: ${attrName}="${attrValue}"}` : "";
     if (!marked) {
         if (existingId) await deleteBlock(existingId);
+        await verifyMarkedBlockWrite(rootId, attrName, "");
         return;
     }
     const id = existingId ?? (await findBlockIdByCustomAttr(rootId, attrName));
@@ -305,6 +429,7 @@ export async function upsertMarkedBlock(
     } else {
         await appendBlockMd(rootId, marked);
     }
+    await verifyMarkedBlockWrite(rootId, attrName, markdown);
 }
 
 export { newNodeId };

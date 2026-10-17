@@ -8,6 +8,8 @@
     import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
     import { formatBirthdayDisplay } from "../../domain/occasions";
+    import { draftImportMappings } from "../../domain/import";
+    import type { VCardMethodPreview } from "../../domain/vcard";
     import { onDestroy } from "svelte";
     import { requestErrorMessage } from "../../shared/error-presenter";
 
@@ -39,6 +41,9 @@
     let report: VcfImportReport | null = $state(null);
     let fileInput: HTMLInputElement | undefined = $state();
     let lastChosen: { planIndex: number; plan: VcfImportPlan }[] = $state([]);
+    /** 多值 vCard 仍只映射到现有单值 AV 字段；这里保存本次导入的显式主值选择。 */
+    let primaryChoices: Record<string, number> = $state({});
+    let submittedChoices: Record<string, number> = $state({});
     let pauseRequested = $state(false);
     // 文件解析、队列写入和导出均可能跨越弹窗卸载；迟到结果不得回写已销毁实例。
     let alive = true;
@@ -71,9 +76,10 @@
         return plans.reduce((stats, plan, index) => {
             if (!selected[index]) return stats;
             stats.cards += 1;
-            stats.mapped += (plan.mappings ?? []).filter((mapping) => mapping.state === "mapped").length;
-            stats.ignored += plan.contact.unsupportedProperties?.length ?? 0;
-            stats.review += plan.contact.needsReview?.length ?? 0;
+            const mappings = selectedPlan(plan, index).mappings ?? [];
+            stats.mapped += mappings.filter((mapping) => mapping.state === "mapped").length;
+            stats.ignored += mappings.filter((mapping) => mapping.state === "ignored").length;
+            stats.review += mappings.filter((mapping) => mapping.state === "review").length;
             return stats;
         }, { cards: 0, mapped: 0, ignored: 0, review: 0 });
     });
@@ -86,6 +92,9 @@
         parsing = true;
         plans = null;
         selected = {};
+        primaryChoices = {};
+        submittedChoices = {};
+        lastChosen = [];
         errorText = "";
         statusText = "";
         report = null;
@@ -126,6 +135,81 @@
         selected = next;
     }
 
+    type MultiValueField = "phone" | "email" | "website";
+    const multiFields = [
+        { field: "phone", property: "TEL", label: "电话" },
+        { field: "email", property: "EMAIL", label: "邮箱" },
+        { field: "website", property: "URL", label: "网址" },
+    ] as const;
+    function multiCandidates(plan: VcfImportPlan, field: MultiValueField): VCardMethodPreview[] {
+        const preview = plan.contact.methodPreview?.filter((candidate) => candidate.field === field);
+        if (preview?.length) return preview;
+        const values = field === "phone" ? plan.contact.phoneValues : field === "email" ? plan.contact.emailValues : plan.contact.websiteValues;
+        const all = values?.length ? values : plan.contact[field] ? [plan.contact[field]] : [];
+        const property = multiFields.find((item) => item.field === field)!.property;
+        return all.map((value, index) => ({ field, property, sourceIndex: index + 1, types: [], value, disabled: !value }));
+    }
+
+    function primaryIndex(planIndex: number, field: MultiValueField): number {
+        const explicit = primaryChoices[`${planIndex}:${field}`];
+        if (explicit !== undefined) return explicit;
+        if (field === "phone") return -1;
+        return plans ? multiCandidates(plans[planIndex], field).findIndex((candidate) => !candidate.disabled) : 0;
+    }
+
+    function primaryValue(plan: VcfImportPlan, planIndex: number, field: MultiValueField): string {
+        const candidates = multiCandidates(plan, field);
+        const index = primaryIndex(planIndex, field);
+        if (field === "phone" && index === -1) return plan.contact.phone;
+        return candidates[index]?.value ?? plan.contact[field];
+    }
+
+    function choosePrimary(planIndex: number, field: MultiValueField, valueIndex: number): void {
+        if (!plans || !Number.isSafeInteger(valueIndex)) return;
+        if (!(field === "phone" && valueIndex === -1) && !multiCandidates(plans[planIndex], field)[valueIndex]?.value) return;
+        primaryChoices[`${planIndex}:${field}`] = valueIndex;
+    }
+
+    function ignoredProperties(plan: VcfImportPlan): string[] {
+        return (plan.contact.unsupportedProperties ?? []).filter((value) => value !== "EMAIL（第 2 项起）" && value !== "URL（第 2 项起）");
+    }
+
+    function reviewProperties(plan: VcfImportPlan, planIndex: number): string[] {
+        return (plan.contact.needsReview ?? []).filter((value) => value !== "TEL（多项已合并到电话字段）" || primaryIndex(planIndex, "phone") === -1);
+    }
+
+    function candidateOutcome(planIndex: number, candidate: VCardMethodPreview, candidateIndex: number): string {
+        if (candidate.disabled) return "空值，跳过";
+        if (candidate.field === "phone" && primaryIndex(planIndex, "phone") === -1) return "合并到电话文本";
+        return primaryIndex(planIndex, candidate.field) === candidateIndex ? "本次写入" : "未写入";
+    }
+
+    function selectedPlan(plan: VcfImportPlan, planIndex: number): VcfImportPlan {
+        const draft = {
+            ...plan.draft,
+            phone: primaryValue(plan, planIndex, "phone"),
+            email: primaryValue(plan, planIndex, "email"),
+            website: primaryValue(plan, planIndex, "website"),
+            tags: [...plan.draft.tags],
+        };
+        return {
+            ...plan,
+            contact: plan.contact,
+            draft,
+            mappings: draftImportMappings("vcard", draft, ignoredProperties(plan), reviewProperties(plan, planIndex)),
+        };
+    }
+
+    const methodReport = $derived(lastChosen.flatMap(({ plan, planIndex }) => multiFields.flatMap(({ field, label }) => {
+        const candidates = multiCandidates(plan, field);
+        if (candidates.length < 2) return [];
+        const choice = submittedChoices[`${planIndex}:${field}`];
+        const compatibility = field === "phone" && choice === -1;
+        return [{ planIndex, name: plan.draft.name, label, value: plan.draft[field], compatibility,
+            omitted: candidates.filter((candidate, index) => candidate.disabled || !compatibility && index !== choice),
+        }];
+    })));
+
     async function runImport() {
         if (!alive || importing || parsing || exporting || errorText || report || !plans || selectedCount === 0) return;
         importing = true;
@@ -135,9 +219,8 @@
             const chosenEntries = plans
                 .map((plan, planIndex) => ({ plan, planIndex }))
                 .filter(({ planIndex }) => selected[planIndex]);
-            lastChosen = chosenEntries.map(({ planIndex, plan }) => ({ planIndex, plan: {
-                ...plan, draft: { ...plan.draft, tags: [...plan.draft.tags] },
-            } }));
+            submittedChoices = Object.fromEntries(chosenEntries.flatMap(({ planIndex }) => multiFields.map(({ field }) => [`${planIndex}:${field}`, primaryIndex(planIndex, field)])));
+            lastChosen = chosenEntries.map(({ planIndex, plan }) => ({ planIndex, plan: selectedPlan(plan, planIndex) }));
             pauseRequested = false;
             const result = await runVcfImportQueue(settings, lastChosen, null, {
                 shouldPause: () => pauseRequested,
@@ -258,7 +341,7 @@
             </div>
             <div>
                 <b>导入限制</b>
-                <p>当前联系人模型为单电话/邮箱/网站字段；多个电话会合并显示，多个邮箱和网站只取首项。ORG、ADR、NOTE、PHOTO、UID 等会标记为忽略或待核对。</p>
+                <p>当前联系人模型为单电话/邮箱/网站字段；默认将多个电话合并为文本、邮箱和网址取首项，也可在预览中明确选择本次主值。未选值不会作为独立条目保存。ORG、ADR、NOTE、PHOTO、UID 等会标记为忽略或待核对。</p>
             </div>
             <div>
                 <b>在线同步状态</b>
@@ -323,6 +406,18 @@
         </ViewState>
 
         <div class="lvct-vcard__report">
+            {#if methodReport.length}
+                <details open class="lvct-vcard__loss-report">
+                    <summary>联系方式写入范围（未写入项保留在本窗口）</summary>
+                    <p class="ft__smaller ft__on-surface">以下是本次确认的字段选择。联系人是否保存成功，以上方逐项结果为准；未写入值未保存在联系人中，请保留源文件。</p>
+                    <ul>{#each methodReport as item}
+                        <li>卡片 {item.planIndex + 1} · {item.name} · {item.label}：{item.value || "（留空）"}
+                            {#if item.compatibility}<p>多个电话合并为一个文本字段；类型标签和独立条目不会保存。</p>{/if}
+                            {#if item.omitted.length}<ul>{#each item.omitted as candidate}<li>未写入 {candidate.property} #{candidate.sourceIndex}{candidate.types.length ? ` · ${candidate.types.join(", ")}` : ""}：{candidate.value || "（空值）"}</li>{/each}</ul>{/if}
+                        </li>
+                    {/each}</ul>
+                </details>
+            {/if}
             {#if reportPending.length}<details open><summary>未执行（{reportPending.length}）</summary><ul>{#each reportPending as item (item.planIndex)}<li>卡片 {item.planIndex + 1} · {item.name} · 保留原队列</li>{/each}</ul></details>{/if}
             {#if retryable}
                 <p class="ft__smaller ft__on-surface">{text("vcardCheckpointWarning", "未完成项的重试断点只保留在本窗口。关闭或更换文件前请保存诊断信息；重新导入不会恢复这些断点。")}</p>
@@ -368,6 +463,7 @@
         </div>
     {:else if plans}
         <p role="status">来源：vCard 文件；已选择 {selectedCount} 项，目标为逐卡独立请求文档。同名须按下列稳定 ID 核对，勾选同名项表示另建独立人物。</p>
+        <p class="ft__smaller ft__on-surface">电话、邮箱、网址各写入一个现有字段；多值可在下方选择。未选值不会保存，请保留源文件。类型标签只用于核对。</p>
         <div class="lvct-vcard__preview-summary" role="status" aria-label="导入映射摘要">
             <span>已选 {previewStats.cards} 张卡片 · 将写入字段 {previewStats.mapped} 项</span>
             <span>将忽略属性 {previewStats.ignored} 项</span>
@@ -385,7 +481,8 @@
                 <span>{text("vcardSelectNonDuplicate", "批量选择非同名项（已选 {selected}/{total}；{duplicates} 项同名需逐项确认）", { selected: selectedCount, total: plans.length, duplicates: duplicateCount })}</span>
             </label>
             {#each plans as plan, index (index)}
-                <label class="lvct-import__row" class:lvct-import__row--dup={plan.duplicate}>
+                <div class="lvct-import__row lvct-vcard__card" class:lvct-import__row--dup={plan.duplicate}>
+                    <label class="lvct-vcard__card-heading">
                     <input
                         class="b3-switch"
                         type="checkbox"
@@ -394,15 +491,36 @@
                         onchange={(event) => selectPlan(index, (event.currentTarget as HTMLInputElement).checked)}
                     />
                     <span class="lvct-import__name">{index + 1} · <b>{plan.contact.name}</b></span>
+                    </label>
                     <span class="ft__smaller ft__on-surface lvct-import__path">
-                        {plan.contact.phone || "—"}{plan.contact.birthday ? ` · ${formatBirthdayDisplay(plan.contact.birthday, plan.contact.isLunar)}` : ""}
+                        {primaryValue(plan, index, "phone") || "—"}{plan.contact.birthday ? ` · ${formatBirthdayDisplay(plan.contact.birthday, plan.contact.isLunar)}` : ""}
                     </span>
-                    <span class="ft__smaller">{(plan.mappings ?? []).filter((mapping) => mapping.state === "mapped").map((mapping) => `${mapping.sourceField} → ${mapping.targetField}：${mapping.value}`).join("；")}</span>
-                    {#if (plan.contact.unsupportedProperties?.length ?? 0) > 0}
-                        <span class="ft__smaller ft__on-surface">{text("vcardIgnoredProperties", "已忽略：{properties}", { properties: plan.contact.unsupportedProperties?.join("、") ?? "" })}</span>
+                    {#each multiFields as spec}
+                        {@const candidates = multiCandidates(plan, spec.field)}
+                        {#if candidates.length > 1}
+                        <div class="lvct-vcard__multi-choice">
+                            <label>
+                                <span>{spec.label} {candidates.length} 项 · 本次写入值</span>
+                                <select class="b3-select" aria-label={`第 ${index + 1} 张卡片的${spec.label}主值`} value={String(primaryIndex(index, spec.field))} disabled={!selected[index]} onchange={(event) => choosePrimary(index, spec.field, Number((event.currentTarget as HTMLSelectElement).value))}>
+                                    {#if spec.field === "phone"}<option value="-1">沿用兼容合并值：{plan.contact.phone}</option>{/if}
+                                    {#each candidates as candidate, valueIndex}<option value={String(valueIndex)} disabled={candidate.disabled}>#{candidate.sourceIndex}{candidate.types.length ? ` · ${candidate.types.join(", ")}` : ""} · {candidate.value || "（空值）"}</option>{/each}
+                                </select>
+                            </label>
+                            <ul aria-label={`第 ${index + 1} 张卡片的${spec.label}候选`}>
+                                {#each candidates as candidate, candidateIndex}
+                                    <li>#{candidate.sourceIndex}{candidate.types.length ? ` · ${candidate.types.join(", ")}` : ""} · {candidate.value || "（空值）"} <b>（{candidateOutcome(index, candidate, candidateIndex)}）</b></li>
+                                {/each}
+                            </ul>
+                            {#if spec.field === "phone" && primaryIndex(index, "phone") === -1}<span class="ft__smaller ft__on-surface">多个电话会成为一个文本字段，不会形成独立条目。</span>{/if}
+                        </div>
+                        {/if}
+                    {/each}
+                    <span class="ft__smaller">{(selectedPlan(plan, index).mappings ?? []).filter((mapping) => mapping.state === "mapped").map((mapping) => `${mapping.sourceField} → ${mapping.targetField}：${mapping.value}`).join("；")}</span>
+                    {#if ignoredProperties(plan).length > 0}
+                        <span class="ft__smaller ft__on-surface">{text("vcardIgnoredProperties", "已忽略：{properties}", { properties: ignoredProperties(plan).join("、") })}</span>
                     {/if}
-                    {#if (plan.contact.needsReview?.length ?? 0) > 0}
-                        <span class="ft__smaller lvct-text-danger">{text("vcardNeedsReview", "需人工核对：{properties}", { properties: plan.contact.needsReview?.join("、") ?? "" })}</span>
+                    {#if reviewProperties(plan, index).length > 0}
+                        <span class="ft__smaller lvct-text-danger">{text("vcardNeedsReview", "需人工核对：{properties}", { properties: reviewProperties(plan, index).join("、") })}</span>
                     {/if}
                     {#if plan.duplicate}
                         <span class="ft__smaller ft__on-surface">{text("vcardConfirmDistinct", "同名默认跳过；勾选表示确认作为独立人物导入")}</span>
@@ -412,7 +530,7 @@
                         {#if plan.sameNameInBatch}<span class="ft__smaller">{text("vcardBatchSameName", "本文件中有同名卡片，请核对卡片序号和资料")}</span>{/if}
                     {/if}
                     {#if plan.unresolvedDocIds?.length}<span class="ft__smaller lvct-text-danger">未绑定同名文档尚未核实，已停止新建：{plan.unresolvedDocIds.join("、")}；请在文档收编中按 ID 核对。</span>{/if}
-                </label>
+                </div>
             {/each}
         </div>
     {:else}

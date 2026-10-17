@@ -1,4 +1,4 @@
-import { DEFAULT_VIEW_PREFERENCES, normalizeViewPreferences, VIEW_PREFERENCES_VERSION } from "./preferences.ts";
+import { DEFAULT_VIEW_PREFERENCES, normalizeViewPreferences, normalizeViewPreferencesForWrite, VIEW_PREFERENCES_VERSION } from "./preferences.ts";
 import type { ViewPreferences } from "./preferences";
 
 export type PreferencePatch = Partial<Omit<ViewPreferences, "schemaVersion" | "revision">>;
@@ -32,7 +32,7 @@ export function rebasePreferenceDraft(latest: ViewPreferences, draft: ViewPrefer
 }
 
 export function applyPreferencePatch(latest: ViewPreferences, patch: PreferencePatch): ViewPreferences {
-    const merged = normalizeViewPreferences({ ...latest, ...patch });
+    const merged = normalizeViewPreferencesForWrite({ ...latest, ...patch });
     if (Object.keys(diffViewPreferences(latest, merged)).length === 0) return latest;
     if (latest.revision === Number.MAX_SAFE_INTEGER) throw new Error("偏好 revision 已达上限，操作已停止");
     return { ...merged, revision: latest.revision + 1 };

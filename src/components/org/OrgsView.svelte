@@ -88,7 +88,7 @@
                 && version === refreshVersion && generation === organizationLoadGeneration) {
                 const page = await facade.listOrganizationsPage({ afterRootId: organizationCursor, limit: 200 });
                 if (!alive || version !== refreshVersion || generation !== organizationLoadGeneration) return;
-                if (page.organizations.length === 0 && page.hasMore) throw new Error("组织分页返回空页但仍有后续数据，已停止继续读取");
+                if (page.organizations.length === 0 && page.hasMore && !page.scannedRootCount) throw new Error("组织分页返回空页但仍有后续数据，已停止继续读取");
                 const known = new Set(orgs.map((org) => org.docId));
                 const duplicate = page.organizations.find((org) => known.has(org.docId));
                 if (duplicate) throw new Error(`组织分页出现重复文档「${duplicate.name}」，已停止继续读取`);

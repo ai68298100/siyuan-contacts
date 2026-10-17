@@ -14,6 +14,7 @@ import { discoverAllImportCandidates } from "./import-scan";
 import { getRoster, invalidateRoster } from "./roster";
 import { enrichContactProfiles } from "./people-profiles";
 import { enrichContactAliases } from "./contact-aliases";
+import { filterContactSearch } from "../domain/contact-search";
 import { profileText } from "../domain/people-profiles";
 import { rosterFromRender, rosterPageState } from "../domain/roster";
 import type { ContactsSettings } from "../domain/model";
@@ -283,26 +284,29 @@ export async function listContacts(settings: ContactsSettings): Promise<ContactS
         : person);
 }
 
-/** 客户端过滤：搜索词匹配姓名/电话/微信/邮箱/标签 */
+/** 客户端过滤：桥接与旧调用只匹配人物自身字段；关系扩展只属于工作台搜索。 */
 export function filterContacts(people: readonly ContactSummary[], query: string, group: string = ""): ContactSummary[] {
     const keyword = query.trim().toLowerCase();
     return people.filter((person) => {
         if (group && person.group !== group) return false;
         if (!keyword) return true;
-        return (
+        return Boolean(
             person.name.toLowerCase().includes(keyword) ||
             person.aliasProfile?.state === "known" && person.aliasProfile.values.some((alias) => alias.toLowerCase().includes(keyword)) ||
             person.phone.includes(keyword) ||
             person.wechat.toLowerCase().includes(keyword) ||
             person.email.toLowerCase().includes(keyword) ||
             person.tags.some((tag) => tag.toLowerCase().includes(keyword)) ||
-            person.profile && ["family", "work", "education", "relationship"].some((field) =>
+            (person.profile ? ["family", "work", "education", "relationship"].some((field) =>
                 (field === "relationship" ? person.profile?.relationship.state === "known" && person.profile.relationship.labels.length > 0
                     : person.profile?.affiliations.state === "known" && person.profile.affiliations.value[field as "family" | "work" | "education"].length > 0)
-                && profileText(person.profile, field as "family" | "work" | "education" | "relationship").toLowerCase().includes(keyword))
+                && profileText(person.profile, field as "family" | "work" | "education" | "relationship").toLowerCase().includes(keyword)) : false),
         );
     });
 }
+
+/** 联系人工作台搜索：在自身命中基础上保留显式关系两端。 */
+export { filterContactSearch };
 
 export interface ContactCreationPreview {
     name: string;

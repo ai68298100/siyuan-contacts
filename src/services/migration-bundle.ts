@@ -4,11 +4,10 @@ import { exportFollowUpsJson } from "./followups";
 import { loadCadenceMapStrict, mergeCadenceMap } from "../data/cadences";
 import { loadReminderDismissalsStrict, mergeReminderDismissals } from "../data/reminder-dismissals";
 import { loadRegistryStrict, mergeRegistryEntries } from "../data/registry";
-import { loadTemplatesStore, mergeTemplatesStore } from "../data/templates";
-import { normalizeTemplates } from "../domain/interaction-templates";
+import { loadTemplatesStoreStrict, mergeTemplatesStore, TEMPLATES_STORAGE_KEY } from "../data/templates";
+import { normalizeTemplatesForWrite } from "../domain/interaction-templates";
 import { importInteractionJson } from "./interaction-import";
 import { mergeFollowUpStore } from "../data/followups";
-import { normalizeFollowUpStore } from "../domain/followups";
 import { syncFollowUpTasksToDoc } from "./followup-sync";
 import { EXCHANGE_STORAGE_KEY, loadExchangeStore, mergeExchangeStore } from "../data/exchanges";
 import { PERSON_ALIAS_STORAGE_KEY, loadPersonAliasStore, mergePersonAliasStore } from "../data/person-aliases";
@@ -20,6 +19,11 @@ import type { PersonAliasStore } from "../domain/person-aliases";
 import { MigrationWriteUnknownError } from "../domain/migration-records";
 import type { MigrationRecordIssue, MigrationRecordSummary } from "../domain/migration-records";
 import { normalizeSettings, SETTINGS_STORAGE_KEY } from "../domain/model";
+import { normalizeInteractionStoreForWrite } from "../domain/interactions";
+import { normalizeFollowUpStoreForWrite } from "../domain/followups";
+import { isPersonDocId, normalizeCadenceMapForWrite } from "../domain/cadence";
+import { normalizeDismissalStoreForWrite } from "../domain/reminder-dismissals";
+import { normalizeRegistryStoreForWrite } from "../domain/registry";
 import { getRoster, invalidateRoster } from "./roster";
 import { loadSelfIdentity, mergeSelfIdentity, SELF_IDENTITY_STORAGE_KEY } from "../data/self-identity";
 import { parseSelfIdentity } from "../domain/self-identity.ts";
@@ -117,26 +121,35 @@ function validateBundleModules(value: unknown): asserts value is BundleModules {
         if (!Array.isArray(module.events) || !Array.isArray(module.tombstones)) {
             throw new Error("互动模块字段损坏，拒绝导入");
         }
+        normalizeInteractionStoreForWrite({ schemaVersion: 1, events: module.events, tombstones: module.tombstones });
     }
     if (value.followUps !== undefined) {
         const module = requireModuleEnvelope(value.followUps, "跟进");
         if (!Array.isArray(module.items)) throw new Error("跟进模块字段损坏，拒绝导入");
+        const items = normalizeFollowUpStoreForWrite({ schemaVersion: 1, items: module.items }).items;
+        if (items.some((item) => !isPersonDocId(item.personDocId))) {
+            throw new Error("跟进模块包含非法人物文档 ID，拒绝导入");
+        }
     }
     if (value.cadences !== undefined) {
         const module = requireModuleEnvelope(value.cadences, "联系节奏");
         if (!isRecord(module.cadences)) throw new Error("联系节奏模块字段损坏，拒绝导入");
+        normalizeCadenceMapForWrite({ schemaVersion: 1, cadences: module.cadences });
     }
     if (value.reminderDismissals !== undefined) {
         const module = requireModuleEnvelope(value.reminderDismissals, "提醒暂缓");
         if (!Array.isArray(module.dismissals)) throw new Error("提醒暂缓模块字段损坏，拒绝导入");
+        normalizeDismissalStoreForWrite({ schemaVersion: 1, dismissals: module.dismissals });
     }
     if (value.registry !== undefined) {
         const module = requireModuleEnvelope(value.registry, "收编时间索引");
         if (!isRecord(module.registeredAt)) throw new Error("收编时间索引模块字段损坏，拒绝导入");
+        normalizeRegistryStoreForWrite({ schemaVersion: 1, registeredAt: module.registeredAt });
     }
     if (value.templates !== undefined) {
         const module = requireModuleEnvelope(value.templates, "备注模板");
         if (!Array.isArray(module.templates)) throw new Error("备注模板模块字段损坏，拒绝导入");
+        normalizeTemplatesForWrite(module.templates);
     }
     if (value.exchanges !== undefined) parseExchangeStore(requireModuleEnvelope(value.exchanges, "往来账本"));
     if (value.aliases !== undefined) parsePersonAliasStore(requireModuleEnvelope(value.aliases, "人物别名"));
@@ -184,7 +197,7 @@ export async function exportMigrationBundle(plugin: Plugin): Promise<string> {
         loadCadenceMapStrict(plugin),
         loadReminderDismissalsStrict(plugin),
         loadRegistryStrict(plugin),
-        loadTemplatesStore(plugin),
+        withStoreLock(TEMPLATES_STORAGE_KEY, () => loadTemplatesStoreStrict(plugin)),
         withStoreLock(EXCHANGE_STORAGE_KEY, () => loadExchangeStore(plugin)),
         withStoreLock(PERSON_ALIAS_STORAGE_KEY, () => loadPersonAliasStore(plugin)),
         withStoreLock(SELF_IDENTITY_STORAGE_KEY, () => loadSelfIdentity(plugin)),
@@ -290,10 +303,9 @@ export async function importMigrationBundle(plugin: Plugin, text: string): Promi
     }
     if (Array.isArray(modules.followUps?.items)) {
         await runModule("followUps", "跟进事项", async () => {
-            const incoming = normalizeFollowUpStore({
+            const incoming = normalizeFollowUpStoreForWrite({
                 schemaVersion: 1,
                 items: modules.followUps!.items,
-                tombstones: [],
             });
             const summary = await mergeFollowUpStore(plugin, incoming.items);
             result.modules.push({ key: "followUps", label: "跟进事项", merged: summary.added });
@@ -324,7 +336,7 @@ export async function importMigrationBundle(plugin: Plugin, text: string): Promi
     }
     if (Array.isArray(modules.templates?.templates)) {
         await runModule("templates", "备注模板", async () => {
-            const incoming = normalizeTemplates(modules.templates!.templates);
+            const incoming = normalizeTemplatesForWrite(modules.templates!.templates);
             if (incoming.length > 0) {
                 /* FUNC-01.6-c：读取、合并、保存同一存储锁临界区（并发恢复不丢模板） */
                 const added = await mergeTemplatesStore(plugin, incoming);

@@ -163,6 +163,15 @@
         if (name.length > 80) { await showFieldError("name", "组织名称不能超过 80 个字符"); return; }
         if (!validUrl(draft.qccUrl)) { await showFieldError("qccUrl", "企查查链接格式不正确，请填写 http(s) 地址"); return; }
         if (!validUrl(draft.logoUrl)) { await showFieldError("logoUrl", "Logo 链接格式不正确，请填写 http(s) 地址"); return; }
+        if (draft.departments.some((item) => !item.name.trim() && (item.description.trim() || item.parentId?.trim()
+            || draft.departments.some((child) => child.parentId === item.id && (child.name.trim() || child.description.trim()))))) {
+            await showSummaryError("已有内容或下级部门的部门必须填写名称，请补全后再保存");
+            return;
+        }
+        if (draft.customFields.some((item) => !item.label.trim() && item.value.trim())) {
+            await showSummaryError("已有内容的自定义项必须填写名称，请补全后再保存");
+            return;
+        }
         const normalized: OrganizationProfileDraft = { ...draft, name, shortName: draft.shortName.trim(), qccUrl: draft.qccUrl.trim(), logoUrl: draft.logoUrl.trim(), description: draft.description.trim(), departments: draft.departments.map((item) => ({ ...item, name: item.name.trim(), description: item.description.trim(), parentId: item.parentId?.trim() || null })).filter((item) => item.name), customFields: draft.customFields.map((item) => ({ ...item, label: item.label.trim(), value: item.value.trim() })).filter((item) => item.label) };
         const checked = validateOrganizationProfile(normalized);
         if (!checked.valid) {

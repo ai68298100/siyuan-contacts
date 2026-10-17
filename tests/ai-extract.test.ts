@@ -86,3 +86,24 @@ test("FAST-01.4：旧格式（无候选字段）兼容解析，生日日期非�
     assert.deepEqual(bad?.profileCandidates, [], "生日日期无法解析时应丢弃候选");
     assert.equal(bad?.rejected, 1);
 });
+
+test("AI 长文本不会静默截断，超限字段按拒绝计数", () => {
+    const result = parseExtraction(JSON.stringify({
+        people: [{ name: "张三", evidence: "证据".repeat(401) }],
+        place: "地".repeat(81),
+        occasion: "场".repeat(81),
+        note: "备注".repeat(101),
+        profileCandidates: [{ person: "张三", field: "wechat", value: "wx", evidence: "证据".repeat(401) }],
+        followUpCandidates: [{ person: "张三", title: "跟进".repeat(21), dueDate: "2026-10-01" }],
+        relationCandidates: [{ personA: "张三", personB: "李四", relation: "关系".repeat(11) }],
+    }));
+    assert.ok(result);
+    assert.equal(result.place, undefined);
+    assert.equal(result.occasion, undefined);
+    assert.equal(result.note, undefined);
+    assert.equal(result.peopleEvidence, undefined);
+    assert.deepEqual(result.profileCandidates, []);
+    assert.deepEqual(result.followUpCandidates, []);
+    assert.deepEqual(result.relationCandidates, []);
+    assert.equal(result.rejected, 7);
+});

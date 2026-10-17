@@ -1333,7 +1333,7 @@
                   <label class="lvct-inline" data-graph-relations-control><input type="checkbox" id="lvct-graph-isolated-only" data-graph-filter>仅无关系人物（<span id="lvct-graph-isolated-count">1</span>）</label>
                   <label class="lvct-inline" data-graph-relations-control><input type="checkbox" id="lvct-graph-show-orgs" data-graph-filter checked>显示组织</label>
                   <div class="lvct-graph-legend"><span class="lvct-inline"><i class="lvct-legend-mark"></i>已记录的人物关联</span><span class="lvct-inline"><i class="lvct-legend-mark lvct-legend-mark--dashed"></i>当前组织成员</span></div>
-                  <p class="lvct-small lvct-muted" data-graph-relations-control>只有人物关联参与关系查询；当前成员边仅来自 active 记录。离职、毕业等 former 历史成员保留连线仍待后续统一关系契约，原型不将其标为已实现。</p>
+                  <p class="lvct-small lvct-muted" data-graph-relations-control>只有人物关联参与关系查询；成员边按 active/former/mixed 生命周期显示当前、历史或混合状态。离职、毕业等 former 历史成员保留连线，但不参与 related 查询。</p>
                   <p class="lvct-small lvct-muted" data-graph-native-control hidden>接入思源内核的文档引用与回链数据，在本插件画布绘制。仅展示本人、已登记联系人和组织文档，按组织收窄保留组织与成员交集；这里不会打开思源原生图面板。需要查看原生图或反链时，先“打开来源文档”，再从思源文档菜单进入；原型只展示操作说明。</p>
                 </div>
               </details>
@@ -2542,7 +2542,7 @@
       const id = event.target.closest("[data-node-id]").dataset.nodeId;
       const node = graphSnapshot.nodes.find((item) => item.id === id);
       if (!node) return;
-        modalViews["graph-organization"] = [node.label + " · 组织管理（演示）", `<div class="lvct-callout lvct-small"><strong>已定位组织：</strong>${node.label}。实际插件携带当前节点对应的组织文档 ID 打开该组织的管理弹窗；原型只模拟此组织，不跳往其他组织或组织列表。</div><div class="lvct-row"><div class="lvct-row-main"><span class="lvct-row-title">我自己</span><span class="lvct-row-meta">在职 · 当前成员</span></div></div><div class="lvct-row"><div class="lvct-row-main"><span class="lvct-row-title">陈予安</span><span class="lvct-row-meta">在职 · 当前成员</span></div></div><p class="lvct-row-meta">当前为只读示例，未读取或写入真实组织资料。历史成员信息可在组织中保留，但 former 成员图谱连线仍待后续关系契约升级。</p>`];
+        modalViews["graph-organization"] = [node.label + " · 组织管理（演示）", `<div class="lvct-callout lvct-small"><strong>已定位组织：</strong>${node.label}。实际插件携带当前节点对应的组织文档 ID 打开该组织的管理弹窗；原型只模拟此组织，不跳往其他组织或组织列表。</div><div class="lvct-row"><div class="lvct-row-main"><span class="lvct-row-title">我自己</span><span class="lvct-row-meta">在职 · 当前成员</span></div></div><div class="lvct-row"><div class="lvct-row-main"><span class="lvct-row-title">陈予安</span><span class="lvct-row-meta">在职 · 当前成员</span></div></div><p class="lvct-row-meta">当前为只读示例，未读取或写入真实组织资料。历史成员信息可在组织中保留；正式图谱按 active/former/mixed 生命周期显示成员边，former 不参与 related 查询。真实组织资料和宿主原生图仍需在宿主与真机环境核验。</p>`];
         openModal("graph-organization");
       return;
     }

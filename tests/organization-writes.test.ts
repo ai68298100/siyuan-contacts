@@ -27,7 +27,8 @@ const hooks = registerHooks({
     },
 });
 const { startOrganizationCreate, startOrganizationRename, inspectOrganizationOperation, listPendingOrganizationOperations, resumeOrganizationOperation } = await import("../src/services/organization-writes.ts");
-const { archiveOrganization, createOrganization, renameOrganization, scanOrganizations, invalidateOrganizationScan } = await import("../src/services/org.ts");
+const { archiveOrganization, restoreOrganization, removeOrganization, ensureDefaultFamilyOrganization, listOrganizationsWithMembers, createOrganization, renameOrganization, scanOrganizations, invalidateOrganizationScan, removeOrgLinkBlocks } = await import("../src/services/org.ts");
+const { ORGANIZATION_DEFAULT_SEEDS_STORAGE_KEY, loadDefaultOrganizationSeeds } = await import("../src/data/organization-default-seeds.ts");
 const { ORGANIZATION_OPERATIONS_STORAGE_KEY, saveOrganizationOperation, loadOrganizationOperations } = await import("../src/data/organization-operations.ts");
 const { kernelConfig } = await import("../src/api/client.ts");
 test.after(() => hooks.deregister());
@@ -45,6 +46,7 @@ function fixture() {
         failStorageReadback: false, failFacts: false, failFactsAfterWrite: false,
         loseCreateResponse: false, skipCreate: false, rejectCreate: false,
         loseTitleResponse: false, rejectTitle: false, loseMarkerResponse: false, rejectMarker: false,
+        orgLinkBlocks: new Map<string, { root_id: string; id: string }>(), orgLinkDeleteStale: false,
         onJsonSave: undefined as (() => void) | undefined,
         queryStatements: [] as string[],
         queryGates: [] as Promise<void>[],
@@ -76,6 +78,7 @@ function fixture() {
             }
             if (statement.includes("GROUP BY root_id")) return accepted([...state.markers.values()].map((marker) => ({ root_id: marker.root_id, ial: marker.ial, markerCount: 1 })));
             if (statement.includes("id IN")) return accepted([...state.docs.values()]);
+            if (statement.includes("custom-lvct-org-links")) return accepted([...state.orgLinkBlocks.values()]);
             if (statement.includes("custom-lvct-org-draft=")) {
                 const requestId = statement.match(/custom-lvct-org-draft="([^"]+)"/)![1];
                 return accepted([...state.markers.values()].filter((marker) => organizationIalAttributes(marker.ial)["custom-lvct-org-draft"] === requestId));
@@ -116,6 +119,13 @@ function fixture() {
             state.markers.get(body.id)!.ial = body.data.split("\n").at(-1)!;
             return state.loseMarkerResponse ? undefined : accepted();
         }
+        if (route === "/api/block/deleteBlock") {
+            state.writes.push("delete");
+            if (!state.orgLinkDeleteStale) {
+                for (const [rootId, entry] of state.orgLinkBlocks) if (entry.id === body.id) state.orgLinkBlocks.delete(rootId);
+            }
+            return accepted();
+        }
         throw new Error(`未配置测试端点 ${route}`);
     };
     (globalThis as unknown as { __lvctOrgTestRequest: typeof handler }).__lvctOrgTestRequest = handler;
@@ -124,6 +134,20 @@ function fixture() {
         state.markers.set(markerId, { id: markerId, root_id: docId, box: notebookId, type: "p", markdown: organizationMarkerMarkdown("原组织"), ial: `{: id="${markerId}" custom-lvct-org="1" custom-user-note="keep"}` });
     } };
 }
+
+test("组织链接清理必须回读删除结果，响应成功但残留时报告失败", async () => {
+    const { state } = fixture();
+    const blockId = "20261004000000-link001";
+    state.orgLinkBlocks.set("20261004000000-person1", { root_id: "20261004000000-person1", id: blockId });
+    assert.deepEqual(await removeOrgLinkBlocks([blockId]), []);
+    assert.deepEqual(state.writes, ["delete"]);
+
+    state.orgLinkBlocks.set("20261004000000-person1", { root_id: "20261004000000-person1", id: blockId });
+    state.orgLinkDeleteStale = true;
+    const failures = await removeOrgLinkBlocks([blockId]);
+    assert.equal(failures.length, 1);
+    assert.match(failures[0].message, /回读仍存在/);
+});
 
 async function shortTimeout(action: () => Promise<void>) {
     const previous = kernelConfig.timeoutMs;
@@ -428,4 +452,113 @@ test("组织归档写后失效：核验读取不复用写前仍在途的扫描",
     assert.equal(state.queryStatements.filter((stmt) => stmt.includes("GROUP BY root_id")).length, 3);
     releaseStaleScan();
     await Promise.all([archiving, staleScan]);
+});
+
+test("家庭种子：并发首次领取仅创建一次，改名、归档、移除、删除后重启都不补种", async () => {
+    const { state, plugin } = fixture();
+    const results = await Promise.all([
+        ensureDefaultFamilyOrganization(plugin, settings, { allowCreate: true }),
+        ensureDefaultFamilyOrganization(plugin, settings, { allowCreate: true }),
+    ]);
+    assert.equal(results.filter((result) => result.created).length, 1);
+    assert.deepEqual(state.writes, ["create"]);
+    const seed = (await loadDefaultOrganizationSeeds(plugin)).seeds[notebookId];
+    assert.equal(seed.state, "created");
+    assert.equal(seed.docId, docId);
+    assert.ok(seed.requestId);
+    await renameOrganization(docId, "我的家", plugin);
+    await ensureDefaultFamilyOrganization(plugin, settings, { allowCreate: true });
+    await archiveOrganization(docId);
+    await ensureDefaultFamilyOrganization(plugin, settings, { allowCreate: true });
+    await removeOrganization(docId);
+    await ensureDefaultFamilyOrganization(plugin, settings, { allowCreate: true });
+    state.docs.clear();
+    state.markers.clear();
+    const restarted = { loadData: plugin.loadData.bind(plugin), saveData: plugin.saveData.bind(plugin) } as Plugin;
+    await ensureDefaultFamilyOrganization(restarted, settings, { allowCreate: true });
+    assert.equal(state.writes.filter((entry) => entry === "create").length, 1);
+});
+
+test("家庭种子：旧工作空间启动仅登记迁移，已有改名组织和空库都不按名称补种", async () => {
+    for (const existing of [false, true]) {
+        const { state, plugin, addOrganization } = fixture();
+        if (existing) addOrganization();
+        await ensureDefaultFamilyOrganization(plugin, settings);
+        await ensureDefaultFamilyOrganization(plugin, settings, { allowCreate: true });
+        assert.equal((await loadDefaultOrganizationSeeds(plugin)).seeds[notebookId].state, "skipped");
+        assert.deepEqual(state.writes, []);
+    }
+});
+
+test("家庭种子：创建被拒绝或未知保留原请求，存储损坏和领取回读失败时零创建", async () => {
+    await shortTimeout(async () => {
+        for (const rejected of [true, false]) {
+            const { state, plugin } = fixture();
+            state.rejectCreate = rejected;
+            state.skipCreate = !rejected;
+            state.loseCreateResponse = !rejected;
+            await assert.rejects(ensureDefaultFamilyOrganization(plugin, settings, { allowCreate: true }), /原请求/);
+            const seed = (await loadDefaultOrganizationSeeds(plugin)).seeds[notebookId];
+            assert.equal(seed.state, rejected ? "failed" : "unknown");
+            assert.ok(seed.requestId);
+            await ensureDefaultFamilyOrganization(plugin, settings, { allowCreate: true });
+            assert.deepEqual(state.writes, ["create"]);
+            if (rejected) {
+                state.rejectCreate = false;
+                assert.equal((await resumeOrganizationOperation(plugin, settings, seed.requestId)).status, "complete");
+                assert.equal((await ensureDefaultFamilyOrganization(plugin, settings, { allowCreate: true })).docId, docId);
+                assert.equal((await loadDefaultOrganizationSeeds(plugin)).seeds[notebookId].state, "created");
+            }
+        }
+    });
+    for (const corrupt of [true, false]) {
+        const { state, plugin } = fixture();
+        if (corrupt) state.store.set(ORGANIZATION_DEFAULT_SEEDS_STORAGE_KEY, { schemaVersion: 2, seeds: {} });
+        else state.failStorageReadback = true;
+        await assert.rejects(ensureDefaultFamilyOrganization(plugin, settings, { allowCreate: true }));
+        assert.deepEqual(state.writes, []);
+    }
+});
+
+test("组织移除和恢复：文档、成员及自定义属性保留，默认列表隐藏且可原身份恢复", async () => {
+    const { state, plugin, addOrganization } = fixture();
+    addOrganization();
+    const membershipStore = { schemaVersion: 1, memberships: [] };
+    state.store.set("org-membership.json", membershipStore);
+    await removeOrganization(docId);
+    const [removed] = await scanOrganizations();
+    assert.equal(removed.removed, true);
+    assert.equal(removed.archived, true);
+    assert.equal(state.docs.size, 1);
+    assert.equal(organizationIalAttributes(state.markers.get(markerId)!.ial)["custom-user-note"], "keep");
+    assert.deepEqual(await listOrganizationsWithMembers(plugin), []);
+    assert.equal((await listOrganizationsWithMembers(plugin, { includeRemoved: true }))[0].docId, docId);
+    await assert.rejects(renameOrganization(docId, "新名称", plugin), /先恢复/);
+    await removeOrganization(docId);
+    assert.deepEqual(state.writes, ["marker"]);
+    await restoreOrganization(docId);
+    const [restored] = await listOrganizationsWithMembers(plugin);
+    assert.equal(restored.docId, docId);
+    assert.equal(restored.archived, false);
+    assert.equal(restored.removed, undefined);
+    assert.equal(organizationIalAttributes(state.markers.get(markerId)!.ial)["custom-lvct-org-removed"], undefined);
+    assert.equal(organizationIalAttributes(state.markers.get(markerId)!.ial)["custom-user-note"], "keep");
+    assert.deepEqual(state.store.get("org-membership.json"), membershipStore);
+    assert.equal(state.userBody, "原用户正文与链接");
+});
+
+test("组织移除：响应丢失核实实际状态，回读失败保持未知而非虚报成功", async () => {
+    await shortTimeout(async () => {
+        const { state, addOrganization } = fixture();
+        addOrganization();
+        state.loseMarkerResponse = true;
+        await removeOrganization(docId);
+        assert.equal((await scanOrganizations())[0].removed, true);
+        assert.deepEqual(state.writes, ["marker"]);
+    });
+    const { state, addOrganization } = fixture();
+    addOrganization();
+    state.failFactsAfterWrite = true;
+    await assert.rejects(removeOrganization(docId), /结果未核实/);
+    assert.deepEqual(state.writes, ["marker"]);
 });

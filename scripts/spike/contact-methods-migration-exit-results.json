@@ -1,0 +1,134 @@
+{
+  "researchFormat": 1,
+  "syntheticOnly": true,
+  "kernelRequests": 0,
+  "productionChanges": false,
+  "candidateContractAccepted": false,
+  "productionGuardImplemented": false,
+  "D1Adopted": false,
+  "redacted": true,
+  "backupPolicy": {
+    "included": [
+      "people",
+      "methods",
+      "interactions",
+      "tombstones"
+    ],
+    "excluded": [
+      "org-projection-checkpoints.json",
+      "organization-operations.json",
+      "bridge-requests.json",
+      "settings-repair-checkpoint.json",
+      "self-profile-checkpoint.json"
+    ],
+    "checkpointWrites": 0
+  },
+  "migrationPolicy": {
+    "oldValue": "keep-one-value; delimiter-only-suggestion; explicit-confirm-required",
+    "unknownVersion": "reject-before-preview",
+    "missingModule": "omitted-preserves-current",
+    "corruptStore": "block-zero-write",
+    "conflict": "current-wins-and-report",
+    "stalePreview": "recompute-before-confirm-zero-write",
+    "tombstone": "never-resurrect",
+    "unreachablePerson": "no-name-based-recovery"
+  },
+  "forbiddenAssumptions": [
+    "name/value identity",
+    "checkpoint replay",
+    "automatic split",
+    "tombstone resurrection",
+    "silent filtering",
+    "cross-workspace ID guessing"
+  ],
+  "summary": {
+    "total": 20,
+    "passed": 20,
+    "failed": 0,
+    "checks": [
+      {
+        "id": "legacy-delimiter-is-preview-only",
+        "pass": true
+      },
+      {
+        "id": "legacy-single-value-remains-one-value",
+        "pass": true
+      },
+      {
+        "id": "unknown-bundle-version-rejected",
+        "pass": true
+      },
+      {
+        "id": "unknown-module-rejected",
+        "pass": true
+      },
+      {
+        "id": "missing-module-is-omitted-not-empty",
+        "pass": true
+      },
+      {
+        "id": "corrupt-current-blocks-zero-write",
+        "pass": true
+      },
+      {
+        "id": "duplicate-incoming-identity-rejected",
+        "pass": true
+      },
+      {
+        "id": "same-id-content-conflict-current-wins",
+        "pass": true
+      },
+      {
+        "id": "same-id-same-content-is-idempotent",
+        "pass": true
+      },
+      {
+        "id": "preview-zero-write",
+        "pass": true
+      },
+      {
+        "id": "confirm-recomputes-baseline-before-apply",
+        "pass": true
+      },
+      {
+        "id": "tombstone-prevents-resurrection",
+        "pass": true
+      },
+      {
+        "id": "unreachable-person-is-not-restored-by-name",
+        "pass": true
+      },
+      {
+        "id": "current-state-priority-with-new-record",
+        "pass": true
+      },
+      {
+        "id": "checkpoint-excluded-from-backup",
+        "pass": true
+      },
+      {
+        "id": "old-package-explicit-envelope",
+        "pass": true
+      },
+      {
+        "id": "invalid-module-version-is-rejected",
+        "pass": true
+      },
+      {
+        "id": "invalid-record-is-rejected",
+        "pass": true
+      },
+      {
+        "id": "unknown-person-target-stays-blocked",
+        "pass": true
+      },
+      {
+        "id": "retry-plan-is-deterministic",
+        "pass": true
+      }
+    ]
+  },
+  "writeAllowed": false,
+  "checkpointWrites": 0,
+  "tombstoneResurrection": false
+}

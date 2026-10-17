@@ -6,14 +6,35 @@
  */
 import { birthdayToMs } from "./person.ts";
 
+/** 源卡片中的联系方式候选；只供本次导入预览，不是持久条目身份。 */
+export interface VCardMethodPreview {
+    field: "phone" | "email" | "website";
+    property: "TEL" | "EMAIL" | "URL";
+    /** 同名属性在本卡中的 1-based 序号，包括前序空值。 */
+    sourceIndex: number;
+    /** TYPE 参数及 vCard 2.1 裸类型，按源顺序保留，不参与编码解码。 */
+    types: string[];
+    value: string;
+    /** 空值仍可供核对来源，但不能作为本次单值导入候选。 */
+    disabled: boolean;
+}
+
 export interface VCardContact {
     name: string;
     /** 多号码以 " / " 连接（电话是单值文本字段，保留数据优先） */
     phone: string;
+    /** 解析阶段保留全部 TEL，供导入预览显示；不属于联系人持久化字段。 */
+    phoneValues?: string[];
     /** 取首个（邮箱字段有格式校验，不做多值拼接） */
     email: string;
+    /** 解析阶段保留全部 EMAIL，供导入预览显示；当前只写入首项。 */
+    emailValues?: string[];
     /** 取首个 */
     website: string;
+    /** 解析阶段保留全部 URL，供导入预览显示；当前只写入首项。 */
+    websiteValues?: string[];
+    /** 原卡含重复 TEL/EMAIL/URL 时保留全部候选；只在解析内存中使用。 */
+    methodPreview?: VCardMethodPreview[];
     /** YYYY-MM-DD；无法表示的（无年份、文本形式）为空串 */
     birthday: string;
     /** 仅当读入 X-LVCT-BDAY-LUNAR（本插件导出的农历回写）时为 true；外部 vCard 一律公历 */
@@ -44,6 +65,8 @@ interface VCardProperty {
     name: string;
     /** 参数名(大写) → 参数值 */
     params: Record<string, string>;
+    /** 独立收集类型标签，避免重复 TYPE 覆盖或裸参数影响编码参数。 */
+    types: string[];
     /** 已做 QP 解码、未做转义还原的值 */
     value: string;
 }
@@ -57,18 +80,34 @@ export function unfoldVcfLines(text: string): string[] {
     const raw = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
     const unfolded: string[] = [];
     for (const line of raw) {
-        const isContinuation = (line.startsWith(" ") || line.startsWith("\t")) && unfolded.length > 0;
+        // A marker with accidental leading folding whitespace must retain its
+        // card boundary. Otherwise tolerant parsing can append `BEGIN:VCARD`
+        // or `END:VCARD` to a preceding QP value and silently lose a card.
+        const marker = line.trim().toUpperCase();
+        const isCardMarker = marker === "BEGIN:VCARD" || marker === "END:VCARD";
+        const isContinuation = !isCardMarker && (line.startsWith(" ") || line.startsWith("\t")) && unfolded.length > 0;
         if (isContinuation) {
-            unfolded[unfolded.length - 1] += line.slice(1);
+            const previous = unfolded[unfolded.length - 1];
+            // Some exporters combine a QP soft break (`=`) with RFC 6350's
+            // leading-space continuation. The soft-break marker is removed
+            // before the RFC continuation whitespace so it is not doubled.
+            unfolded[unfolded.length - 1] = hasQuotedPrintableEncoding(previous) && previous.endsWith("=")
+                ? previous.slice(0, -1) + line.slice(1)
+                : previous + line.slice(1);
             continue;
         }
         unfolded.push(line);
     }
-    // 含 QUOTED-PRINTABLE 的行以 = 结尾时并接下一行（大量导出器的 QP 软换行不走 RFC 折行）
+    // 含 QP 编码参数的属性行以 = 结尾时并接下一逻辑行（大量导出器的
+    // QP 软换行不走 RFC 折行）。只根据属性头判断，不能因为普通值里出现
+    // "QUOTED-PRINTABLE" 就吞掉下一属性；BEGIN/END 和可识别属性头也必须保留。
     const merged: string[] = [];
     for (let i = 0; i < unfolded.length; i++) {
         let line = unfolded[i];
-        while (/QUOTED-PRINTABLE/i.test(line) && line.endsWith("=") && i + 1 < unfolded.length) {
+        while (hasQuotedPrintableEncoding(line) && line.endsWith("=") && i + 1 < unfolded.length) {
+            const next = unfolded[i + 1];
+            const marker = next.trim().toUpperCase();
+            if (!next.trim() || marker === "BEGIN:VCARD" || marker === "END:VCARD" || looksLikePropertyLine(next)) break;
             i += 1;
             line = line.slice(0, -1) + unfolded[i];
         }
@@ -140,16 +179,17 @@ function contactFromCard(lines: string[]): VCardContact | null {
         const prop = parsePropertyLine(line);
         if (prop) props.push(prop);
     }
-    const first = (name: string) => {
+    const rawFirst = (name: string) => {
         const hit = props.find((prop) => prop.name === name);
-        return hit ? unescapeVcf(hit.value) : "";
+        return hit ? hit.value : "";
     };
+    const first = (name: string) => unescapeVcf(rawFirst(name));
     const all = (name: string) => props.filter((prop) => prop.name === name).map((prop) => prop.value);
 
     // Empty or whitespace-only FN values are not usable names; allow a valid
     // structured N value to serve as the fallback in that case.
     const fn = first("FN").trim();
-    const name = fn || structuredName(first("N")).trim();
+    const name = fn || structuredName(rawFirst("N")).trim();
     if (!name) return null;
 
     const phones = all("TEL")
@@ -180,11 +220,23 @@ function contactFromCard(lines: string[]): VCardContact | null {
     if (first("BDAY") && !bday) needsReview.push("BDAY");
     if (first("X-LVCT-BDAY-LUNAR") && !isLunar && !birthday) needsReview.push("X-LVCT-BDAY-LUNAR");
 
+    // Keep source order and duplicate values for the import preview. The
+    // legacy scalar phone field still de-duplicates before joining, so this
+    // does not change the existing AV-compatible value.
+    const uniquePhones = [...new Set(phones)];
+    const emails = all("EMAIL").map((value) => unescapeVcf(value).trim()).filter((value) => value.length > 0);
+    const websites = all("URL").map((value) => unescapeVcf(value).trim()).filter((value) => value.length > 0);
+    const methodPreview = contactMethodPreview(props);
+    if (phones.length > 1) needsReview.push("TEL（多项已合并到电话字段）");
     return {
         name,
-        phone: [...new Set(phones)].join(" / "),
-        email: first("EMAIL").trim(),
-        website: first("URL").trim(),
+        phone: uniquePhones.join(" / "),
+        ...(phones.length > 1 ? { phoneValues: phones } : {}),
+        email: emails[0] ?? "",
+        ...(emails.length > 1 ? { emailValues: emails } : {}),
+        website: websites[0] ?? "",
+        ...(websites.length > 1 ? { websiteValues: websites } : {}),
+        ...(methodPreview ? { methodPreview } : {}),
         birthday,
         isLunar,
         tags,
@@ -193,18 +245,26 @@ function contactFromCard(lines: string[]): VCardContact | null {
     };
 }
 
+function contactMethodPreview(props: readonly VCardProperty[]): VCardMethodPreview[] | undefined {
+    const fields = { TEL: "phone", EMAIL: "email", URL: "website" } as const;
+    const sourceIndexes = { TEL: 0, EMAIL: 0, URL: 0 };
+    const candidates: VCardMethodPreview[] = [];
+    for (const prop of props) {
+        if (prop.name !== "TEL" && prop.name !== "EMAIL" && prop.name !== "URL") continue;
+        const value = unescapeVcf(prop.value).trim();
+        candidates.push({
+            field: fields[prop.name], property: prop.name, sourceIndex: ++sourceIndexes[prop.name],
+            types: [...prop.types], value, disabled: value.length === 0,
+        });
+    }
+    // Preserve the single-value parse/serialize shape. Source cardinality,
+    // including empty properties, decides whether the richer preview is needed.
+    return Object.values(sourceIndexes).some((count) => count > 1) ? candidates : undefined;
+}
+
 /** 属性行 → 名称/参数/值；值与名称以第一个不在引号内的冒号为界 */
 function parsePropertyLine(line: string): VCardProperty | null {
-    let inQuotes = false;
-    let colon = -1;
-    for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === '"') inQuotes = !inQuotes;
-        else if (ch === ":" && !inQuotes) {
-            colon = i;
-            break;
-        }
-    }
+    const colon = findValueColon(line);
     if (colon <= 0) return null;
     const segments = line.slice(0, colon).split(";");
     let name = segments[0].trim().toUpperCase();
@@ -213,20 +273,75 @@ function parsePropertyLine(line: string): VCardProperty | null {
     if (!name) return null;
 
     const params: Record<string, string> = {};
+    const types: string[] = [];
     for (const segment of segments.slice(1)) {
         const eq = segment.indexOf("=");
-        if (eq < 0) continue;
+        if (eq < 0) {
+            types.push(...splitPreviewTypes(segment));
+            continue;
+        }
         const key = segment.slice(0, eq).trim().toUpperCase();
         const value = segment.slice(eq + 1).replace(/^"|"$/g, "");
+        if (key === "TYPE") types.push(...splitPreviewTypes(value));
         if (key) params[key] = value;
     }
 
     let value = line.slice(colon + 1);
     const encoding = (params.ENCODING ?? "").toUpperCase();
     if (encoding === "QUOTED-PRINTABLE" || encoding === "QP") {
+        if (!isValidQuotedPrintable(value)) return null;
         value = decodeQuotedPrintable(value, params.CHARSET ?? "");
     }
-    return { name, params, value };
+    return { name, params, types, value };
+}
+
+function splitPreviewTypes(value: string): string[] {
+    return value.trim().replace(/^"|"$/g, "").split(",")
+        .map((type) => type.trim().replace(/^"|"$/g, ""))
+        .filter((type) => type.length > 0);
+}
+
+function findValueColon(line: string): number {
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') inQuotes = !inQuotes;
+        else if (ch === ":" && !inQuotes) return i;
+    }
+    return -1;
+}
+
+function hasQuotedPrintableEncoding(line: string): boolean {
+    const colon = findValueColon(line);
+    if (colon <= 0) return false;
+    const segments = line.slice(0, colon).split(";");
+    for (const segment of segments.slice(1)) {
+        const eq = segment.indexOf("=");
+        if (eq < 0) continue;
+        const key = segment.slice(0, eq).trim().toUpperCase();
+        const value = segment.slice(eq + 1).trim().replace(/^"|"$/g, "").toUpperCase();
+        if (key === "ENCODING" && (value === "QP" || value === "QUOTED-PRINTABLE")) return true;
+    }
+    return false;
+}
+
+function looksLikePropertyLine(line: string): boolean {
+    const colon = findValueColon(line);
+    if (colon <= 0) return false;
+    const head = line.slice(0, colon).trim();
+    // RFC property/group tokens and parameter text. A QP data continuation
+    // normally starts with '=', so this intentionally treats alphabetic
+    // `name:value` as an independent (possibly unknown) property.
+    return /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?(?:;[^\r\n:]*)*$/.test(head);
+}
+
+function isValidQuotedPrintable(value: string): boolean {
+    for (let i = 0; i < value.length; i++) {
+        if (value[i] !== "=") continue;
+        if (!/^[0-9a-fA-F]{2}$/.test(value.slice(i + 1, i + 3))) return false;
+        i += 2;
+    }
+    return true;
 }
 
 /** N 结构名（姓;名;…）→ 全名；中文姓名惯例姓+名连写 */

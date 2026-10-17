@@ -33,6 +33,13 @@ export interface SavedView {
 /** 保存视图数量上限：防止偏好文件无界增长 */
 export const SAVED_VIEWS_LIMIT = 50;
 
+/** 写入先校验数量；读取容错的截断规则不能用来确认写入成功。 */
+export function assertSavedViewsLimit(raw: unknown): void {
+    if (Array.isArray(raw) && raw.length > SAVED_VIEWS_LIMIT) {
+        throw new Error(`最多保存 ${SAVED_VIEWS_LIMIT} 个视图；请覆盖已有同名视图，或删除一个后再新增。`);
+    }
+}
+
 function isTagMatchMode(value: unknown): value is TagMatchMode {
     return value === "all" || value === "any";
 }

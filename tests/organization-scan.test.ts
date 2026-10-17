@@ -30,6 +30,23 @@ test("组织扫描：不可达、不完整、额外与重复文档拒绝完整�
     }
 });
 
+test("组织移除：稳定文档和归档事实保留，日常列表隐藏且独立恢复分组可找回", () => {
+    const removed = { ...marker, ial: '{: custom-lvct-org="archived" custom-lvct-org-removed="1"}' };
+    const [organization] = organizationsFromDocs(organizationMarkerStates([removed]), [doc]);
+    assert.equal(organization.docId, orgDocId);
+    assert.equal(organization.archived, true);
+    assert.equal(organization.removed, true);
+    assert.deepEqual(filterOrganizations([organization]), []);
+    assert.deepEqual(filterOrganizations([organization], { status: "archived" }), []);
+    assert.deepEqual(filterOrganizations([organization], { status: "removed" }), [organization]);
+    for (const ial of [
+        '{: custom-lvct-org="1" custom-lvct-org-removed="1"}',
+        '{: custom-lvct-org="archived" custom-lvct-org-removed="future"}',
+        '{: custom-lvct-org="archived" custom-lvct-org-removed="1" custom-lvct-org-removed="1"}',
+        '{: custom-lvct-org="archived" custom-lvct-org-removed=1}',
+    ]) assert.throws(() => organizationMarkerStates([{ ...marker, ial }]), /组织状态未核实/);
+});
+
 test("组织筛选：名称查询忽略首尾空白与大小写，状态筛选不改变输入顺序", () => {
     const organizations = [
         { name: "Alpha School", archived: false },

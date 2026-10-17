@@ -101,6 +101,38 @@ test("大批量 vCard 导入按兼容批次绑定并完整核实，不丢失第 
     assert.equal(state.rows.size, 101);
 });
 
+test("多联系方式解析预览不进入单值 AV，导入只写显式选择的标量草稿且重试保持原值", async () => {
+    const { state } = fixture();
+    const [plan] = await buildVcfImportPlan(settings, [
+        "BEGIN:VCARD", "VERSION:3.0", "FN:多联系方式服务样例",
+        "TEL:11001", "TEL:11002", "EMAIL:first@example.test", "EMAIL:second@example.test",
+        "URL:https://first.example.test", "URL:https://second.example.test", "END:VCARD",
+    ].join("\r\n"));
+    assert.equal(plan.draft.phone, "11001 / 11002", "服务预览继续保留历史电话合并值");
+    assert.deepEqual(plan.contact.phoneValues, ["11001", "11002"]);
+    assert.deepEqual(plan.contact.emailValues, ["first@example.test", "second@example.test"]);
+    assert.deepEqual(plan.contact.websiteValues, ["https://first.example.test", "https://second.example.test"]);
+    // UI 冻结本次选择后的 plan；服务只消费现有标量草稿，预览候选不参与写入。
+    const chosen = [{ planIndex: 0, plan: { ...plan, draft: { ...plan.draft,
+        phone: "11002", email: "second@example.test", website: "https://second.example.test" } } }];
+    state.failField = true;
+    const report = await importVcfContacts(settings, chosen);
+    assert.equal(report.unknown.length, 1);
+    const original = { ...chosen[0].plan.checkpoint! };
+    assert.deepEqual(state.writes.map((write) => write.keyID).sort(), ["email", "phone", "website"]);
+    assert.ok(state.writes.every((write) => !JSON.stringify(write).includes("11001") && !JSON.stringify(write).includes("first.example.test") && !JSON.stringify(write).includes("first@example.test")));
+    state.failField = false;
+    const retry = await retryVcfContacts(settings, [{ ...chosen[0], failedFields: report.results[0].failedFields }]);
+    assert.equal(retry[0].status, "imported");
+    assert.equal(state.creates.length, 1);
+    assert.equal(chosen[0].plan.checkpoint!.requestId, original.requestId);
+    assert.equal(chosen[0].plan.checkpoint!.docId, original.docId);
+    const row = state.rows.get(chosen[0].plan.checkpoint!.itemId!);
+    assert.equal(row?.cells.find((cell) => cell.value.keyID === "phone")?.value.phone.content, "11002");
+    assert.equal(row?.cells.find((cell) => cell.value.keyID === "email")?.value.email.content, "second@example.test");
+    assert.equal(row?.cells.find((cell) => cell.value.keyID === "website")?.value.url.content, "https://second.example.test");
+});
+
 test("未明确确认的名册同名项默认跳过，零建档/绑定/资料写入", async () => {
     const { state } = fixture();
     state.sameName(name);

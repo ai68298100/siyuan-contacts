@@ -31,6 +31,91 @@ test("unfoldVcfLines：RFC 折行（空格续行）与 QP 软换行（无空格�
     assert.deepEqual(unfoldVcfLines(qp), ["N;ENCODING=QUOTED-PRINTABLE;CHARSET=UTF-8:=E5=B0=8F=E9=A9=B4"]);
 });
 
+test("QP 全名/别名的软换行与空格、Tab、无空白续行组合均保真", () => {
+    for (const encoding of ["QUOTED-PRINTABLE", "QP", '"qp"']) {
+        for (const prefix of ["", " ", "\t"]) {
+            const vcf = ["BEGIN:VCARD", "VERSION:2.1",
+                `FN;CHARSET=UTF-8;ENCODING=${encoding}:=E5=BC=A0=\r\n${prefix}=E4=B8=89`,
+                "TEL:00000000000", "END:VCARD"].join("\r\n");
+            for (const parse of [parseVcf, parseVcfForImport]) {
+                const [contact] = parse(vcf);
+                assert.equal(contact.name, "张三", `${encoding}, ${JSON.stringify(prefix)}`);
+                assert.equal(contact.phone, "00000000000");
+            }
+        }
+    }
+});
+
+test("QP 属性头可先 RFC 折行，后续带冒号的数据仍正常续接", () => {
+    const vcf = ["BEGIN:VCARD", "FN;ENCODING=\r\n QP;CHARSET=UTF-8:=E5=BC=A0=",
+        "=E4=B8=89:sample=3D", "END:VCARD"].join("\r\n");
+    assert.equal(parseVcfForImport(vcf)[0].name, "张三:sample=");
+});
+
+test("普通字段值中的编码名称不触发 QP 合并", () => {
+    const vcf = "BEGIN:VCARD\r\nFN:QUOTED-PRINTABLE=\r\nTEL:00000000000\r\nEND:VCARD";
+    const [contact] = parseVcfForImport(vcf);
+    assert.equal(contact.name, "QUOTED-PRINTABLE=");
+    assert.equal(contact.phone, "00000000000");
+});
+
+test("未完成 QP 软行不能吞掉下一独立属性，含未知、分组和折行属性头", () => {
+    for (const property of ["TEL:00000000000", "X-EXAMPLE:value", "item1.EMAIL:sample@example.com",
+        "TEL;\r\n TYPE=CELL:00000000000", "ambiguous:continuation"]) {
+        const vcf = ["BEGIN:VCARD", "FN;ENCODING=QUOTED-PRINTABLE:=E5=BC=A0=",
+            property, "END:VCARD"].join("\r\n");
+        assert.throws(() => parseVcfForImport(vcf), /第 1 张卡片.*损坏属性行/, property);
+        assert.ok(unfoldVcfLines(vcf).includes("FN;ENCODING=QUOTED-PRINTABLE:=E5=BC=A0="));
+    }
+});
+
+test("未完成 QP 在卡片标记、空行或 EOF 前拒绝，不能返回前面已解析的卡片", () => {
+    const valid = "BEGIN:VCARD\r\nFN:前卡\r\nEND:VCARD\r\n";
+    for (const next of ["END:VCARD", "BEGIN:VCARD\r\nFN:后卡\r\nEND:VCARD", "", "\r\nEND:VCARD",
+        " END:VCARD"]) {
+        const vcf = valid + "BEGIN:VCARD\r\nFN;ENCODING=QP:=E5=BC=A0=\r\n" + next;
+        assert.throws(() => parseVcfForImport(vcf), /第 2 张卡片(未结束|含损坏属性行)/);
+        assert.doesNotThrow(() => parseVcf(vcf), "容错入口仍不抛错");
+    }
+});
+
+test("带前导空格的卡片标记不被上一行 QP 吞掉，容错解析仍保留后继卡", () => {
+    const vcf = [
+        "BEGIN:VCARD",
+        "FN;ENCODING=QP:=E5=BC=A0=",
+        " BEGIN:VCARD",
+        "FN:后卡",
+        "END:VCARD",
+        "END:VCARD",
+    ].join("\r\n");
+    assert.deepEqual(parseVcf(vcf).map((contact) => contact.name), ["后卡"]);
+    assert.throws(() => parseVcfForImport(vcf), /第 1 张卡片(含损坏属性行|缺少 END:VCARD)/);
+});
+
+test("严格导入拒绝 QP 半个字节与非法等号，编码后的等号正常保留", () => {
+    for (const value of ["=E5=BC=A0=E", "=E5=BC=A0=ZZ"]) {
+        const vcf = `BEGIN:VCARD\r\nFN;ENCODING=QP:${value}\r\nEND:VCARD`;
+        assert.throws(() => parseVcfForImport(vcf), /损坏属性行/);
+    }
+    const valid = "BEGIN:VCARD\r\nFN;ENCODING=QP:sample=3D\r\nEND:VCARD";
+    assert.equal(parseVcfForImport(valid)[0].name, "sample=");
+});
+
+test("N 结构名先分列后反转义，分号、逗号与反斜杠不丢失", () => {
+    const cases = [
+        ["张\\;氏;三;;;", "张;氏三"],
+        ["Back\\\\;Given\\;name;;;", "Back\\Given;name"],
+        ["Family\\,X;Given\\\\end;;;", "Family,XGiven\\end"],
+    ];
+    for (const [raw, expected] of cases) {
+        const vcf = `BEGIN:VCARD\r\nFN:   \r\nN:${raw}\r\nEND:VCARD`;
+        for (const parse of [parseVcf, parseVcfForImport]) assert.equal(parse(vcf)[0].name, expected);
+    }
+    const fallback = serializeVcf([base({ name: "张;三,记\\号" })]).split("\r\n")
+        .filter((line) => !line.startsWith("FN:")).join("\r\n");
+    assert.equal(parseVcfForImport(fallback)[0].name, "张;三,记\\号");
+});
+
 test("parseVcf：vCard 3.0 基本卡片，多 TEL 以 ' / ' 连接、EMAIL/URL 取首个、CATEGORIES 进标签", () => {
     const vcf = [
         "BEGIN:VCARD",
@@ -39,6 +124,7 @@ test("parseVcf：vCard 3.0 基本卡片，多 TEL 以 ' / ' 连接、EMAIL/URL �
         "FN:张三",
         "TEL;TYPE=CELL:13800138000",
         "TEL;TYPE=WORK:021-12345678",
+        "TEL;TYPE=HOME:13800138000",
         "EMAIL;TYPE=INTERNET:zhang@example.com",
         "EMAIL;TYPE=HOME:zhang2@example.com",
         "URL:https://zhang.example.com",
@@ -53,6 +139,107 @@ test("parseVcf：vCard 3.0 基本卡片，多 TEL 以 ' / ' 连接、EMAIL/URL �
     assert.equal(contact.website, "https://zhang.example.com");
     assert.deepEqual(contact.tags, ["球友", "重点"]);
     assert.equal(contact.isLunar, false);
+});
+
+test("parseVcf：多联系方式在兼容主值之外保留预览值，并明确提示有损映射", () => {
+    const vcf = [
+        "BEGIN:VCARD",
+        "FN:多联系方式",
+        "TEL;TYPE=CELL:13800138000",
+        "TEL;TYPE=WORK:021-12345678",
+        "TEL;TYPE=HOME:13800138000",
+        "EMAIL;TYPE=INTERNET:first@example.com",
+        "EMAIL;TYPE=HOME:second@example.com",
+        "URL:https://first.example.com",
+        "URL:https://second.example.com",
+        "END:VCARD",
+    ].join("\r\n");
+    const [contact] = parseVcfForImport(vcf);
+    assert.equal(contact.phone, "13800138000 / 021-12345678");
+    assert.deepEqual(contact.phoneValues, ["13800138000", "021-12345678", "13800138000"]);
+    assert.deepEqual(contact.emailValues, ["first@example.com", "second@example.com"]);
+    assert.deepEqual(contact.websiteValues, ["https://first.example.com", "https://second.example.com"]);
+    assert.ok(contact.needsReview?.includes("TEL（多项已合并到电话字段）"));
+    assert.ok(contact.unsupportedProperties?.includes("EMAIL（第 2 项起）"));
+    assert.ok(contact.unsupportedProperties?.includes("URL（第 2 项起）"));
+});
+
+test("多值预览保留源顺序、重复项和空项，同属性序号包含空项", () => {
+    const vcf = [
+        "BEGIN:VCARD", "FN:预览候选",
+        "TEL;TYPE=HOME:",
+        "EMAIL;TYPE=WORK:first@example.test",
+        "item1.TEL;TYPE=CELL:+00 111",
+        "URL;TYPE=WORK:https://work.example.test",
+        "TEL;TYPE=WORK:+00 111",
+        "EMAIL;TYPE=HOME:   ",
+        "URL:https://personal.example.test",
+        "EMAIL;TYPE=OTHER:second@example.test",
+        "END:VCARD",
+    ].join("\r\n");
+    for (const parse of [parseVcf, parseVcfForImport]) {
+        const [contact] = parse(vcf);
+        assert.deepEqual(contact.methodPreview, [
+            { field: "phone", property: "TEL", sourceIndex: 1, types: ["HOME"], value: "", disabled: true },
+            { field: "email", property: "EMAIL", sourceIndex: 1, types: ["WORK"], value: "first@example.test", disabled: false },
+            { field: "phone", property: "TEL", sourceIndex: 2, types: ["CELL"], value: "+00 111", disabled: false },
+            { field: "website", property: "URL", sourceIndex: 1, types: ["WORK"], value: "https://work.example.test", disabled: false },
+            { field: "phone", property: "TEL", sourceIndex: 3, types: ["WORK"], value: "+00 111", disabled: false },
+            { field: "email", property: "EMAIL", sourceIndex: 2, types: ["HOME"], value: "", disabled: true },
+            { field: "website", property: "URL", sourceIndex: 2, types: [], value: "https://personal.example.test", disabled: false },
+            { field: "email", property: "EMAIL", sourceIndex: 3, types: ["OTHER"], value: "second@example.test", disabled: false },
+        ]);
+        assert.equal(contact.phone, "+00 111", "兼容电话仍去重后拼接");
+        assert.deepEqual(contact.phoneValues, ["+00 111", "+00 111"], "现有预览数组保留重复非空值");
+        assert.equal(contact.email, "first@example.test");
+        assert.equal(contact.website, "https://work.example.test");
+    }
+    const [single] = parseVcfForImport("BEGIN:VCARD\r\nFN:单值\r\nTEL:+00 222\r\nEMAIL:single@example.test\r\nURL:https://single.example.test\r\nEND:VCARD");
+    assert.equal(Object.hasOwn(single, "methodPreview"), false, "单值卡片不增加预览元数据");
+});
+
+test("预览 TYPE 汇集 2.1 裸参数、重复 TYPE 和逗号列表，不改变 QP 解码", () => {
+    const vcf = [
+        "BEGIN:VCARD", "VERSION:2.1", "FN:类型候选",
+        'TEL;HOME;VOICE;TYPE=WORK,VOICE;type="CELL,pref";ENCODING=QP;CHARSET=UTF-8:=2B00=20111',
+        "TEL;TYPE=OTHER:+00 222",
+        'EMAIL;TYPE="WORK,INTERNET";TYPE=HOME:first@example.test',
+        "EMAIL;HOME;INTERNET:second@example.test",
+        "END:VCARD",
+    ].join("\r\n");
+    const [contact] = parseVcfForImport(vcf);
+    assert.deepEqual(contact.methodPreview?.map(({ types, value }) => ({ types, value })), [
+        { types: ["HOME", "VOICE", "WORK", "VOICE", "CELL", "pref"], value: "+00 111" },
+        { types: ["OTHER"], value: "+00 222" },
+        { types: ["WORK", "INTERNET", "HOME"], value: "first@example.test" },
+        { types: ["HOME", "INTERNET"], value: "second@example.test" },
+    ]);
+    assert.equal(contact.phone, "+00 111 / +00 222");
+    assert.equal(contact.email, "first@example.test");
+});
+
+test("前序空联系方式只进入禁用预览，不改变首个非空标量的兼容选择", () => {
+    const vcf = [
+        "BEGIN:VCARD", "FN:空值候选",
+        "TEL:", "EMAIL:", "URL:",
+        "TEL:+00 333", "EMAIL:available@example.test", "URL:https://available.example.test",
+        "END:VCARD",
+    ].join("\r\n");
+    const [contact] = parseVcfForImport(vcf);
+    assert.equal(contact.phone, "+00 333");
+    assert.equal(contact.email, "available@example.test");
+    assert.equal(contact.website, "https://available.example.test");
+    assert.deepEqual(contact.methodPreview?.map(({ property, sourceIndex, disabled }) => ({ property, sourceIndex, disabled })), [
+        { property: "TEL", sourceIndex: 1, disabled: true },
+        { property: "EMAIL", sourceIndex: 1, disabled: true },
+        { property: "URL", sourceIndex: 1, disabled: true },
+        { property: "TEL", sourceIndex: 2, disabled: false },
+        { property: "EMAIL", sourceIndex: 2, disabled: false },
+        { property: "URL", sourceIndex: 2, disabled: false },
+    ]);
+    assert.equal(contact.phoneValues, undefined);
+    assert.equal(contact.emailValues, undefined);
+    assert.equal(contact.websiteValues, undefined);
 });
 
 test("parseVcf：BDAY 接受紧凑/ISO/带时间三种形式，无年份（--0520）与文本形式丢弃", () => {
@@ -143,6 +330,27 @@ test("serializeVcf → parseVcf 往返：公历与农历卡片的字段都不丢
     ];
     const parsed = parseVcf(serializeVcf(people));
     assert.deepEqual(parsed, people);
+});
+
+test("serializeVcf 只导出现有标量，不把预览候选或 TYPE 元数据当作已保存值", () => {
+    const person = base({
+        phone: "+00 selected", email: "selected@example.test", website: "https://selected.example.test",
+        phoneValues: ["preview-phone-a", "preview-phone-b"],
+        emailValues: ["preview-a@example.test", "preview-b@example.test"],
+        websiteValues: ["https://preview-a.example.test", "https://preview-b.example.test"],
+        methodPreview: [
+            { field: "phone", property: "TEL", sourceIndex: 7, types: ["preview-type"], value: "preview-phone", disabled: false },
+            { field: "email", property: "EMAIL", sourceIndex: 2, types: ["preview-type"], value: "preview@example.test", disabled: false },
+        ],
+    });
+    const before = structuredClone(person);
+    const text = serializeVcf([person]);
+    assert.equal(text.split("\r\n").filter((line) => line.startsWith("TEL;")).length, 1);
+    assert.equal(text.split("\r\n").filter((line) => line.startsWith("EMAIL;")).length, 1);
+    assert.equal(text.split("\r\n").filter((line) => line.startsWith("URL:")).length, 1);
+    assert.ok(!text.includes("preview"));
+    assert.deepEqual(parseVcf(text), [base({ phone: person.phone, email: person.email, website: person.website })]);
+    assert.deepEqual(person, before, "导出不修改本次预览或标量输入");
 });
 
 test("normalizeVcfDate / escapeVcf / unescapeVcf / splitUnescaped：边界行为", () => {

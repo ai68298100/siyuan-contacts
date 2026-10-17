@@ -1,0 +1,125 @@
+{
+  "researchFormat": 1,
+  "syntheticOnly": true,
+  "kernelRequests": 0,
+  "productionChanges": false,
+  "candidateContractAccepted": false,
+  "writeAllowed": false,
+  "tombstoneAllowed": false,
+  "projectionWrites": 0,
+  "D1Adopted": false,
+  "redacted": true,
+  "coverage": {
+    "primaryDelete": true,
+    "primarySwitch": true,
+    "zeroPrimary": true,
+    "explicitDeleteVsUnbind": true,
+    "tombstoneNoResurrection": true,
+    "staleProjectionConflict": true,
+    "crossPersonIsolation": true
+  },
+  "comparedEvidence": {
+    "S2": "general snapshot/recovery tombstones and stale confirmation; no primary projection planner",
+    "L1": "isolated AV lifecycle observation of missing primary and unbind; no explicit zero-primary/tombstone contract",
+    "L2": "identity gate for owner/item/doc changes; no primary projection state machine"
+  },
+  "policy": {
+    "deletePrimary": "explicit-delete-produces-tombstone-and-zero-primary; never-auto-promote",
+    "switchPrimary": "explicit-existing-method-only; exactly-one-primary-per-person-type",
+    "zeroPrimary": "desired-projection-is-empty; requires-fresh-baseline-and-explicit-confirmation",
+    "unbind": "remove-roster-eligibility; retain-methods; no-tombstone; block-projection",
+    "staleProjection": "observed-av-differs-from-last-verified-baseline -> conflict-zero-write",
+    "tombstone": "same-method-id-cannot-return-as-active"
+  },
+  "summary": {
+    "total": 21,
+    "passed": 21,
+    "failed": 0,
+    "checks": [
+      {
+        "id": "baseline-selects-explicit-primary",
+        "pass": true
+      },
+      {
+        "id": "switch-primary-requires-explicit-existing-method",
+        "pass": true
+      },
+      {
+        "id": "switch-primary-does-not-touch-other-person",
+        "pass": true
+      },
+      {
+        "id": "delete-primary-does-not-auto-promote",
+        "pass": true
+      },
+      {
+        "id": "zero-primary-projects-empty-only-after-fresh-baseline",
+        "pass": true
+      },
+      {
+        "id": "delete-primary-emits-tombstone",
+        "pass": true
+      },
+      {
+        "id": "tombstone-blocks-old-method-resurrection",
+        "pass": true
+      },
+      {
+        "id": "unbind-retains-methods-and-adds-no-tombstone",
+        "pass": true
+      },
+      {
+        "id": "unbind-blocks-projection-without-deleting-methods",
+        "pass": true
+      },
+      {
+        "id": "delete-and-unbind-are-distinct",
+        "pass": true
+      },
+      {
+        "id": "stale-av-value-is-conflict-even-when-clearing",
+        "pass": true
+      },
+      {
+        "id": "fresh-baseline-allows-explicit-empty-projection",
+        "pass": true
+      },
+      {
+        "id": "unchanged-primary-is-idempotent",
+        "pass": true
+      },
+      {
+        "id": "unknown-baseline-does-not-clear-av",
+        "pass": true
+      },
+      {
+        "id": "invalid-target-blocks-zero-write",
+        "pass": true
+      },
+      {
+        "id": "replacement-must-be-observed",
+        "pass": true
+      },
+      {
+        "id": "duplicate-primary-is-unknown",
+        "pass": true
+      },
+      {
+        "id": "duplicate-tombstone-is-rejected",
+        "pass": true
+      },
+      {
+        "id": "person-b-projection-remains-independent",
+        "pass": true
+      },
+      {
+        "id": "stale-method-snapshot-requires-repreview",
+        "pass": true
+      },
+      {
+        "id": "all-plans-and-transitions-report-zero-production-writes",
+        "pass": true
+      }
+    ]
+  }
+}

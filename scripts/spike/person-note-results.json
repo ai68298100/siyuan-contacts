@@ -1,0 +1,374 @@
+{
+  "workspace": "C:\\Users\\Admin\\AppData\\Local\\Temp\\SiYuan-Contacts-Person-Note-Spike-e35bb91c-4fcc-4cfe-acc9-f43635708101",
+  "kernel": "D:/RJ/SiYuan/resources/kernel/SiYuan-Kernel.exe",
+  "port": 14004,
+  "observations": [
+    {
+      "name": "legacy",
+      "markdown": "**人物备注**\n\n偏好安静\n{: custom-lvct-person-note=\"1\"}",
+      "docId": "20261016173802-nj00ybi",
+      "inserted": [
+        {
+          "timestamp": 0,
+          "doOperations": [
+            {
+              "action": "insert",
+              "data": "<div data-node-id=\"20261016173802-c2pitos\" data-node-index=\"1\" data-type=\"NodeParagraph\" class=\"p\" updated=\"20261016173802\"><div contenteditable=\"true\" spellcheck=\"false\"><span data-type=\"strong\">人物备注</span></div><div class=\"protyle-attr\" contenteditable=\"false\">​</div></div><div data-node-id=\"20261016173802-qbwu88r\" data-node-index=\"2\" data-type=\"NodeParagraph\" class=\"p\" custom-lvct-person-note=\"1\" updated=\"20261016173802\"><div contenteditable=\"true\" spellcheck=\"false\">偏好安静</div><div class=\"protyle-attr\" contenteditable=\"false\">​</div></div>",
+              "id": "20261016173802-c2pitos",
+              "rootID": "",
+              "parentID": "20261016173802-nj00ybi",
+              "previousID": "",
+              "nextID": "",
+              "retData": null,
+              "blockIDs": null,
+              "blockID": "",
+              "deckID": "",
+              "avID": "",
+              "srcIDs": null,
+              "srcs": null,
+              "isDetached": false,
+              "name": "",
+              "type": "",
+              "format": "",
+              "keyID": "",
+              "rowID": "",
+              "isTwoWay": false,
+              "backRelationKeyID": "",
+              "removeDest": false,
+              "layout": "",
+              "groupID": "",
+              "targetGroupID": "",
+              "viewID": "",
+              "ignoreDefaultFill": false,
+              "context": null
+            }
+          ],
+          "undoOperations": null
+        }
+      ],
+      "rows": [
+        {
+          "ial": "{: id=\"20261016173802-c2pitos\" updated=\"20261016173802\"}",
+          "id": "20261016173802-c2pitos",
+          "markdown": "**人物备注**",
+          "parent_id": "20261016173802-nj00ybi",
+          "type": "p"
+        },
+        {
+          "ial": "{: id=\"20261016173802-nj00ybi\" title=\"legacy\" updated=\"20261016173802\" type=\"doc\"}",
+          "id": "20261016173802-nj00ybi",
+          "markdown": "",
+          "parent_id": "",
+          "type": "d"
+        },
+        {
+          "ial": "{: id=\"20261016173802-pghmawc\" updated=\"20261016173802\"}",
+          "id": "20261016173802-pghmawc",
+          "markdown": "保留的正文",
+          "parent_id": "20261016173802-nj00ybi",
+          "type": "p"
+        },
+        {
+          "ial": "{: id=\"20261016173802-qbwu88r\" updated=\"20261016173802\" custom-lvct-person-note=\"1\"}",
+          "id": "20261016173802-qbwu88r",
+          "markdown": "偏好安静",
+          "parent_id": "20261016173802-nj00ybi",
+          "type": "p"
+        }
+      ],
+      "children": [
+        {
+          "id": "20261016173802-c2pitos",
+          "type": "p",
+          "content": "人物备注",
+          "markdown": "**人物备注**"
+        },
+        {
+          "id": "20261016173802-qbwu88r",
+          "type": "p",
+          "content": "偏好安静",
+          "markdown": "偏好安静"
+        },
+        {
+          "id": "20261016173802-pghmawc",
+          "type": "p",
+          "content": "保留的正文",
+          "markdown": "保留的正文"
+        }
+      ],
+      "marked": [
+        {
+          "ial": "{: id=\"20261016173802-qbwu88r\" updated=\"20261016173802\" custom-lvct-person-note=\"1\"}",
+          "id": "20261016173802-qbwu88r",
+          "markdown": "偏好安静",
+          "parent_id": "20261016173802-nj00ybi",
+          "type": "p"
+        }
+      ]
+    },
+    {
+      "name": "superblock",
+      "markdown": "{{{row\n**人物备注**\n\n第一段\n\n第二段\n}}}\n{: custom-lvct-person-note=\"1\"}",
+      "docId": "20261016173802-s1mosgs",
+      "inserted": [
+        {
+          "timestamp": 0,
+          "doOperations": [
+            {
+              "action": "insert",
+              "data": "<div data-node-id=\"20261016173802-qdl18ot\" data-node-index=\"1\" data-type=\"NodeSuperBlock\" class=\"sb\" custom-lvct-person-note=\"1\" updated=\"20261016173802\" data-sb-layout=\"row\"><div data-node-id=\"20261016173802-hf633bl\" data-type=\"NodeParagraph\" class=\"p\" updated=\"20261016173802\"><div contenteditable=\"true\" spellcheck=\"false\"><span data-type=\"strong\">人物备注</span></div><div class=\"protyle-attr\" contenteditable=\"false\">​</div></div><div data-node-id=\"20261016173802-j8dra08\" data-type=\"NodeParagraph\" class=\"p\" updated=\"20261016173802\"><div contenteditable=\"true\" spellcheck=\"false\">第一段</div><div class=\"protyle-attr\" contenteditable=\"false\">​</div></div><div data-node-id=\"20261016173802-l5tescw\" data-type=\"NodeParagraph\" class=\"p\" updated=\"20261016173802\"><div contenteditable=\"true\" spellcheck=\"false\">第二段</div><div class=\"protyle-attr\" contenteditable=\"false\">​</div></div><div class=\"protyle-attr\" contenteditable=\"false\">​</div></div>",
+              "id": "20261016173802-qdl18ot",
+              "rootID": "",
+              "parentID": "20261016173802-s1mosgs",
+              "previousID": "",
+              "nextID": "",
+              "retData": null,
+              "blockIDs": null,
+              "blockID": "",
+              "deckID": "",
+              "avID": "",
+              "srcIDs": null,
+              "srcs": null,
+              "isDetached": false,
+              "name": "",
+              "type": "",
+              "format": "",
+              "keyID": "",
+              "rowID": "",
+              "isTwoWay": false,
+              "backRelationKeyID": "",
+              "removeDest": false,
+              "layout": "",
+              "groupID": "",
+              "targetGroupID": "",
+              "viewID": "",
+              "ignoreDefaultFill": false,
+              "context": null
+            }
+          ],
+          "undoOperations": null
+        }
+      ],
+      "rows": [
+        {
+          "ial": "{: id=\"20261016173802-hf633bl\" updated=\"20261016173802\"}",
+          "id": "20261016173802-hf633bl",
+          "markdown": "**人物备注**",
+          "parent_id": "20261016173802-qdl18ot",
+          "type": "p"
+        },
+        {
+          "ial": "{: id=\"20261016173802-j8dra08\" updated=\"20261016173802\"}",
+          "id": "20261016173802-j8dra08",
+          "markdown": "第一段",
+          "parent_id": "20261016173802-qdl18ot",
+          "type": "p"
+        },
+        {
+          "ial": "{: id=\"20261016173802-l5tescw\" updated=\"20261016173802\"}",
+          "id": "20261016173802-l5tescw",
+          "markdown": "第二段",
+          "parent_id": "20261016173802-qdl18ot",
+          "type": "p"
+        },
+        {
+          "ial": "{: id=\"20261016173802-qdl18ot\" updated=\"20261016173802\" custom-lvct-person-note=\"1\"}",
+          "id": "20261016173802-qdl18ot",
+          "markdown": "{{{row\n**人物备注**\n\n第一段\n\n第二段\n\n}}}",
+          "parent_id": "20261016173802-s1mosgs",
+          "type": "s"
+        },
+        {
+          "ial": "{: id=\"20261016173802-s1mosgs\" title=\"superblock\" type=\"doc\" updated=\"20261016173802\"}",
+          "id": "20261016173802-s1mosgs",
+          "markdown": "",
+          "parent_id": "",
+          "type": "d"
+        },
+        {
+          "ial": "{: id=\"20261016173802-zfdopca\" updated=\"20261016173802\"}",
+          "id": "20261016173802-zfdopca",
+          "markdown": "保留的正文",
+          "parent_id": "20261016173802-s1mosgs",
+          "type": "p"
+        }
+      ],
+      "children": [
+        {
+          "id": "20261016173802-qdl18ot",
+          "type": "s",
+          "content": " 人物备注第一段第二段",
+          "markdown": "{{{row\n**人物备注**\n\n第一段\n\n第二段\n\n}}}"
+        },
+        {
+          "id": "20261016173802-zfdopca",
+          "type": "p",
+          "content": "保留的正文",
+          "markdown": "保留的正文"
+        }
+      ],
+      "marked": [
+        {
+          "ial": "{: id=\"20261016173802-qdl18ot\" updated=\"20261016173802\" custom-lvct-person-note=\"1\"}",
+          "id": "20261016173802-qdl18ot",
+          "markdown": "{{{row\n**人物备注**\n\n第一段\n\n第二段\n\n}}}",
+          "parent_id": "20261016173802-s1mosgs",
+          "type": "s"
+        }
+      ]
+    },
+    {
+      "name": "code",
+      "markdown": "````text\n人物备注\n\n第一段\n\n第二段  \n- [ ] 待办\n{: custom-lvct-org=\"1\"}\n```\n````\n{: custom-lvct-person-note=\"1\"}",
+      "docId": "20261016173802-y6dwt4u",
+      "inserted": [
+        {
+          "timestamp": 0,
+          "doOperations": [
+            {
+              "action": "insert",
+              "data": "<div data-node-id=\"20261016173802-byda4mp\" data-node-index=\"1\" data-type=\"NodeCodeBlock\" class=\"code-block\" custom-lvct-person-note=\"1\" updated=\"20261016173802\"><div class=\"protyle-action\"><span class=\"protyle-action--first protyle-action__language\" contenteditable=\"false\">text</span><span class=\"fn__flex-1\"></span><span class=\"ariaLabel protyle-icon protyle-icon--first protyle-action__copy\" data-position=\"4north\"><svg><use xlink:href=\"#iconCopy\"></use></svg></span><span class=\"ariaLabel protyle-icon protyle-icon--last protyle-action__menu\" data-position=\"4north\"><svg><use xlink:href=\"#iconMore\"></use></svg></span></div><div class=\"hljs\"><div></div><div contenteditable=\"true\" style=\"flex: 1\" spellcheck=\"false\">人物备注\n\n第一段\n\n第二段  \n- [ ] 待办\n{: custom-lvct-org=&quot;1&quot;}\n```\n</div></div><div class=\"protyle-attr\" contenteditable=\"false\">​</div></div>",
+              "id": "20261016173802-byda4mp",
+              "rootID": "",
+              "parentID": "20261016173802-y6dwt4u",
+              "previousID": "",
+              "nextID": "",
+              "retData": null,
+              "blockIDs": null,
+              "blockID": "",
+              "deckID": "",
+              "avID": "",
+              "srcIDs": null,
+              "srcs": null,
+              "isDetached": false,
+              "name": "",
+              "type": "",
+              "format": "",
+              "keyID": "",
+              "rowID": "",
+              "isTwoWay": false,
+              "backRelationKeyID": "",
+              "removeDest": false,
+              "layout": "",
+              "groupID": "",
+              "targetGroupID": "",
+              "viewID": "",
+              "ignoreDefaultFill": false,
+              "context": null
+            }
+          ],
+          "undoOperations": null
+        }
+      ],
+      "rows": [
+        {
+          "ial": "{: id=\"20261016173802-byda4mp\" updated=\"20261016173802\" custom-lvct-person-note=\"1\"}",
+          "id": "20261016173802-byda4mp",
+          "markdown": "```text\n人物备注\n\n第一段\n\n第二段  \n- [ ] 待办\n{: custom-lvct-org=\"1\"}\n‍```\n```",
+          "parent_id": "20261016173802-y6dwt4u",
+          "type": "c"
+        },
+        {
+          "ial": "{: id=\"20261016173802-ohccg5i\" updated=\"20261016173802\"}",
+          "id": "20261016173802-ohccg5i",
+          "markdown": "保留的正文",
+          "parent_id": "20261016173802-y6dwt4u",
+          "type": "p"
+        },
+        {
+          "ial": "{: id=\"20261016173802-y6dwt4u\" title=\"code\" type=\"doc\" updated=\"20261016173802\"}",
+          "id": "20261016173802-y6dwt4u",
+          "markdown": "",
+          "parent_id": "",
+          "type": "d"
+        }
+      ],
+      "children": [
+        {
+          "id": "20261016173802-byda4mp",
+          "type": "c",
+          "content": "人物备注\n\n第一段\n\n第二段  \n- [ ] 待办\n{: custom-lvct-org=\"1\"}\n‍```\n",
+          "markdown": "```text\n人物备注\n\n第一段\n\n第二段  \n- [ ] 待办\n{: custom-lvct-org=\"1\"}\n‍```\n```"
+        },
+        {
+          "id": "20261016173802-ohccg5i",
+          "type": "p",
+          "content": "保留的正文",
+          "markdown": "保留的正文"
+        }
+      ],
+      "marked": [
+        {
+          "ial": "{: id=\"20261016173802-byda4mp\" updated=\"20261016173802\" custom-lvct-person-note=\"1\"}",
+          "id": "20261016173802-byda4mp",
+          "markdown": "```text\n人物备注\n\n第一段\n\n第二段  \n- [ ] 待办\n{: custom-lvct-org=\"1\"}\n‍```\n```",
+          "parent_id": "20261016173802-y6dwt4u",
+          "type": "c"
+        }
+      ]
+    },
+    {
+      "name": "dom-paragraph",
+      "docId": "20261016173802-fypay9e",
+      "rows": [
+        {
+          "content": "人物备注\n第一段\n\n第二段  \n- [ ] 待办\n{: custom-lvct-org=\"1\"}\n}}}\n    缩进\t末尾 ",
+          "ial": "{: id=\"20261016000000-notedom\" custom-lvct-person-note=\"1\" updated=\"20261016000000\"}",
+          "id": "20261016000000-notedom",
+          "markdown": "**人物备注**\n第一段\n\n第二段  \n- [ ] 待办\n{: custom-lvct-org=\"1\"}\n}}}\n    缩进\t末尾",
+          "parent_id": "20261016173802-fypay9e",
+          "type": "p"
+        },
+        {
+          "content": "保留的正文",
+          "ial": "{: updated=\"20261016173802\" id=\"20261016173802-0gu6djd\"}",
+          "id": "20261016173802-0gu6djd",
+          "markdown": "保留的正文",
+          "parent_id": "20261016173802-fypay9e",
+          "type": "p"
+        },
+        {
+          "content": "dom-paragraph",
+          "ial": "{: id=\"20261016173802-fypay9e\" title=\"dom-paragraph\" type=\"doc\" updated=\"20261016000000\"}",
+          "id": "20261016173802-fypay9e",
+          "markdown": "",
+          "parent_id": "",
+          "type": "d"
+        }
+      ]
+    }
+  ],
+  "version": "3.8.8-alpha.1",
+  "service": {
+    "serviceDoc": "20261016173803-d2abssz",
+    "serviceRows": [
+      {
+        "content": "service",
+        "ial": "{: id=\"20261016173803-d2abssz\" title=\"service\" updated=\"20261016173803\" type=\"doc\"}",
+        "id": "20261016173803-d2abssz",
+        "markdown": "",
+        "type": "d"
+      },
+      {
+        "content": "保留的正文",
+        "ial": "{: id=\"20261016173803-kaw1uwk\" updated=\"20261016173803\"}",
+        "id": "20261016173803-kaw1uwk",
+        "markdown": "保留的正文",
+        "type": "p"
+      },
+      {
+        "content": "人物备注\n第一段 & <b>文本</b> \"单引号'\"\n\n第二段  \n- [ ] 待办\n{: custom-lvct-org=\"1\"}\n}}}\n    缩进\t末尾\n```\n😀",
+        "ial": "{: id=\"20261016173803-x8x3bqu\" custom-lvct-person-note-format=\"2\" custom-lvct-person-note=\"1\" updated=\"20261016173803\"}",
+        "id": "20261016173803-x8x3bqu",
+        "markdown": "**人物备注**\n第一段 & <b>文本</b> \"单引号'\"\n\n第二段  \n- [ ] 待办\n{: custom-lvct-org=\"1\"}\n}}}\n    缩进\t末尾\n```\n😀",
+        "type": "p"
+      }
+    ],
+    "createdExact": true,
+    "updatedExact": true,
+    "conflictBlocked": true,
+    "legacyRecoveredAndUpdated": true,
+    "restartReadbackExact": true,
+    "clearedAndBodyPreserved": true
+  }
+}

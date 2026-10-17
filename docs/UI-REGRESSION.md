@@ -1,5 +1,11 @@
 # UI 隔离回归
 
+> **2026-10-17 #51/#54 最终生命周期回归：** `pnpm check` 0/0，单测 **710/710**，Chrome 桌面/390px/宿主样式各 **416/416**，E2E 安全与内核 smoke **17/17**。最终生产构建真实 Chrome 联合轮 `9e8b5db6-5834-42c7-a5ec-fee5b471bd10` 完成补充资料完整生命周期、备注冲突重读/清空、旧版拆块安全恢复、筛选复制、双页面零覆盖和同名人物隔离；验证侧 248 次请求及归属核验通过。证据见 [原始需求验收](verification/ISSUE-051-054-ACCEPTANCE-2026-10-17.md) 与 [完整生命周期](verification/PERSON-FIELDS-LIFECYCLE-2026-10-17.md)。本轮未发布，线上 v0.5.16 不包含修复；原生编辑器 CAS、真机和日常用户库仍是独立边界。
+
+> **2026-10-17 #51/#54 详情使用闭环上一阶段基线：** `pnpm check` 0/0、单测701/701，Chrome桌面/390px/宿主样式各412/412；补充资料定向桌面/390px各22/22，覆盖筛选/完整值复制/隐藏条目全量编辑、拒绝重试、HTTP焦点选区、迟到反馈及Workbench卸载重挂载复制互斥。该阶段真实Chrome联合run `a4340d07-454b-47a7-86d7-360098f37c60`通过；最终生命周期结果见上方 `9e8b5db6...` 条目。本轮未发布，真机/日常库/原生编辑器CAS未因此获得结论。
+
+> **2026-10-17 #51/#54 本地首版：** `pnpm check` 0 errors / 0 warnings、单测689/689，Chrome桌面、390px、宿主样式隔离 UI 均403/403，生产构建与本地包完整性门禁通过。补充资料新增12条业务用例（定向含框架异常断言13/13），覆盖重复条目/两层分组、两种分组删除、校验、草稿关闭、失败重试、revision与迟到响应隔离、长值、PersonDetail/Workbench接线及HTTP UUID fallback；vCard新增主值选择、损失报告和原请求重试。实际内核服务与真实Chrome人物详情另验，见[内核服务](verification/PERSON-FIELDS-2026-10-17.md)及[真实前端](verification/PERSON-FIELDS-REAL-UI-2026-10-17.md)。本轮未发布；原生编辑器竞争、真机及日常用户工作区保持待验。下方发布数字均属历史快照。
+
 > **2026-10-16 v0.5.16 发布回归：** 当前单位 active 投影、图谱 member 生命周期和 related 查询隔离已发布；发布前本地 `pnpm check` 0 errors / 0 warnings、单测 597/597、桌面/移动/宿主样式 UI 各 381/381、构建与发布门禁通过。AG-B13-007 契约复评的定向域测试 55/55 通过，见 [成员历史矩阵](verification/ORG-MEMBERSHIP-HISTORY-MATRIX-2026-10-16.md)。Release 附件下载复核为 582,401 B，SHA-256 `91c2d4bece34509a2a72468a7d097af4d1bd566ceadfcb2a392fc4331cd731b8`。PR #42 两条 CI 通过；发布后 main CI 首次 B03 失败及复跑单列于 [RELEASE](RELEASE.md)。Issue #35 与真实宿主余项继续保留。
 
 > **2026-10-16 v0.5.15 发布回归：** 往来账本创建、连续写入和状态变更均覆盖陈旧列表回读；`pnpm check` 0 errors / 0 warnings、`pnpm test` 596/596、桌面/移动/宿主样式 UI 381/381 通过。`package.zip` 581,946 B，SHA-256 `cd271b7b62db1b1ce86d99b17e64e4a7a547963f79db70016bac467553ab2f8b`。Issue #35 仍缺原始脱敏 VCF。

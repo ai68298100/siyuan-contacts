@@ -449,6 +449,9 @@ export async function runOrganizationProjectionRegression({ test, assert, kernel
             await until(() => !fixture.querySelector(".lvct-org-manager__member-edit"), "保存后表单未结束");
             assert(state.membership().id === id && state.membership().affiliationKind === "education", "结束成员更换身份或丢失分类");
             assert(document.activeElement?.classList.contains("lvct-org-membership-result"), "结果焦点未落到事实与投影报告");
+            // The result appears before the member refresh and viewport restore
+            // finish. Wait for the picker to accept clicks after that refresh.
+            await until(() => fixture.querySelector('[aria-label="选择要添加的联系人"]:not([disabled])'), "成员保存后候选器未就绪");
             const addPicker = fixture.querySelector('[aria-label="选择要添加的联系人"]');
             addPicker.click();
             await until(() => fixture.querySelector(".lvct-picker__panel"), "历史成员候选器未打开");

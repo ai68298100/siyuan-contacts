@@ -1,0 +1,593 @@
+{
+  "checks": [
+    {
+      "id": "baseline-three-methods",
+      "pass": true
+    },
+    {
+      "id": "edit-preserves-id-lineage",
+      "pass": true
+    },
+    {
+      "id": "delete-is-explicit-loss",
+      "pass": true
+    },
+    {
+      "id": "new-method-gets-fresh-id",
+      "pass": true
+    },
+    {
+      "id": "reorder-keeps-all-ids",
+      "pass": true
+    },
+    {
+      "id": "duplicate-value-keeps-separate-lineage",
+      "pass": true
+    },
+    {
+      "id": "same-value-cross-card-never-merges",
+      "pass": true
+    },
+    {
+      "id": "default-roundtrip-retains-supported-methods",
+      "pass": true
+    },
+    {
+      "id": "default-export-reports-unknown",
+      "pass": true
+    },
+    {
+      "id": "include-unmapped-retains-raw-line",
+      "pass": true
+    },
+    {
+      "id": "imported-lineage-is-visible",
+      "pass": true
+    },
+    {
+      "id": "imported-lineage-source-is-stable",
+      "pass": true
+    },
+    {
+      "id": "empty-value-unknown",
+      "pass": true
+    },
+    {
+      "id": "control-value-unknown",
+      "pass": true
+    },
+    {
+      "id": "duplicate-id-unknown",
+      "pass": true
+    },
+    {
+      "id": "multiple-primary-unknown",
+      "pass": true
+    },
+    {
+      "id": "loss-report-is-categorical",
+      "pass": true
+    },
+    {
+      "id": "no-automatic-merge-or-repair",
+      "pass": true
+    }
+  ],
+  "summary": {
+    "total": 18,
+    "passed": 18,
+    "failed": 0
+  },
+  "baseline": {
+    "cards": [
+      {
+        "cardId": "card-a-fictional",
+        "nameDigest": "30d63a37f6c3bd9e",
+        "methodCount": 3,
+        "methodIds": [
+          "method-a-phone-0",
+          "method-a-email-1",
+          "method-a-url-2"
+        ],
+        "methodDigests": [
+          {
+            "id": "method-a-phone-0",
+            "type": "phone",
+            "valueDigest": "4da7465b47feda11",
+            "labelDigest": "bc62d1b6b936c78d",
+            "source": {
+              "cardId": "card-a-fictional",
+              "property": "PHONE",
+              "sourceIndex": 0
+            },
+            "order": 0
+          },
+          {
+            "id": "method-a-email-1",
+            "type": "email",
+            "valueDigest": "16cf3de9fd08355b",
+            "labelDigest": "bc62d1b6b936c78d",
+            "source": {
+              "cardId": "card-a-fictional",
+              "property": "EMAIL",
+              "sourceIndex": 1
+            },
+            "order": 1
+          },
+          {
+            "id": "method-a-url-2",
+            "type": "url",
+            "valueDigest": "37f58c3315be7800",
+            "labelDigest": "3e0d676d2d85073d",
+            "source": {
+              "cardId": "card-a-fictional",
+              "property": "URL",
+              "sourceIndex": 2
+            },
+            "order": 2
+          }
+        ],
+        "unmappedCount": 1,
+        "loss": []
+      },
+      {
+        "cardId": "card-b-fictional",
+        "nameDigest": "2fd6af89f588734e",
+        "methodCount": 1,
+        "methodIds": [
+          "method-b-phone-0"
+        ],
+        "methodDigests": [
+          {
+            "id": "method-b-phone-0",
+            "type": "phone",
+            "valueDigest": "4da7465b47feda11",
+            "labelDigest": "bc62d1b6b936c78d",
+            "source": {
+              "cardId": "card-b-fictional",
+              "property": "PHONE",
+              "sourceIndex": 0
+            },
+            "order": 0
+          }
+        ],
+        "unmappedCount": 0,
+        "loss": []
+      }
+    ]
+  },
+  "operations": {
+    "edited": {
+      "cardId": "card-a-fictional",
+      "nameDigest": "30d63a37f6c3bd9e",
+      "methodCount": 3,
+      "methodIds": [
+        "method-a-phone-0",
+        "method-a-email-1",
+        "method-a-url-2"
+      ],
+      "methodDigests": [
+        {
+          "id": "method-a-phone-0",
+          "type": "phone",
+          "valueDigest": "5b4d9de5391a3722",
+          "labelDigest": "7666843e9379fdd4",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "PHONE",
+            "sourceIndex": 0
+          },
+          "order": 0
+        },
+        {
+          "id": "method-a-email-1",
+          "type": "email",
+          "valueDigest": "16cf3de9fd08355b",
+          "labelDigest": "bc62d1b6b936c78d",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "EMAIL",
+            "sourceIndex": 1
+          },
+          "order": 1
+        },
+        {
+          "id": "method-a-url-2",
+          "type": "url",
+          "valueDigest": "37f58c3315be7800",
+          "labelDigest": "3e0d676d2d85073d",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "URL",
+            "sourceIndex": 2
+          },
+          "order": 2
+        }
+      ],
+      "unmappedCount": 1,
+      "loss": []
+    },
+    "deleted": {
+      "cardId": "card-a-fictional",
+      "nameDigest": "30d63a37f6c3bd9e",
+      "methodCount": 2,
+      "methodIds": [
+        "method-a-phone-0",
+        "method-a-url-2"
+      ],
+      "methodDigests": [
+        {
+          "id": "method-a-phone-0",
+          "type": "phone",
+          "valueDigest": "5b4d9de5391a3722",
+          "labelDigest": "7666843e9379fdd4",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "PHONE",
+            "sourceIndex": 0
+          },
+          "order": 0
+        },
+        {
+          "id": "method-a-url-2",
+          "type": "url",
+          "valueDigest": "37f58c3315be7800",
+          "labelDigest": "3e0d676d2d85073d",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "URL",
+            "sourceIndex": 2
+          },
+          "order": 2
+        }
+      ],
+      "unmappedCount": 1,
+      "loss": [
+        {
+          "kind": "deleted",
+          "reason": "explicit-user-delete",
+          "methodId": "method-a-email-1",
+          "valueDigest": "16cf3de9fd08355b"
+        }
+      ]
+    },
+    "added": {
+      "cardId": "card-a-fictional",
+      "nameDigest": "30d63a37f6c3bd9e",
+      "methodCount": 3,
+      "methodIds": [
+        "method-a-phone-0",
+        "method-a-url-2",
+        "method-84739965a8f51311"
+      ],
+      "methodDigests": [
+        {
+          "id": "method-a-phone-0",
+          "type": "phone",
+          "valueDigest": "5b4d9de5391a3722",
+          "labelDigest": "7666843e9379fdd4",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "PHONE",
+            "sourceIndex": 0
+          },
+          "order": 0
+        },
+        {
+          "id": "method-a-url-2",
+          "type": "url",
+          "valueDigest": "37f58c3315be7800",
+          "labelDigest": "3e0d676d2d85073d",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "URL",
+            "sourceIndex": 2
+          },
+          "order": 2
+        },
+        {
+          "id": "method-84739965a8f51311",
+          "type": "email",
+          "valueDigest": "15274aa2e9c43621",
+          "labelDigest": "0006d696d8e1ec28",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "EMAIL",
+            "sourceIndex": 2
+          },
+          "order": 2
+        }
+      ],
+      "unmappedCount": 1,
+      "loss": [
+        {
+          "kind": "deleted",
+          "reason": "explicit-user-delete",
+          "methodId": "method-a-email-1",
+          "valueDigest": "16cf3de9fd08355b"
+        }
+      ]
+    },
+    "reordered": {
+      "cardId": "card-a-fictional",
+      "nameDigest": "30d63a37f6c3bd9e",
+      "methodCount": 3,
+      "methodIds": [
+        "method-84739965a8f51311",
+        "method-a-url-2",
+        "method-a-phone-0"
+      ],
+      "methodDigests": [
+        {
+          "id": "method-84739965a8f51311",
+          "type": "email",
+          "valueDigest": "15274aa2e9c43621",
+          "labelDigest": "0006d696d8e1ec28",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "EMAIL",
+            "sourceIndex": 2
+          },
+          "order": 0
+        },
+        {
+          "id": "method-a-url-2",
+          "type": "url",
+          "valueDigest": "37f58c3315be7800",
+          "labelDigest": "3e0d676d2d85073d",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "URL",
+            "sourceIndex": 2
+          },
+          "order": 1
+        },
+        {
+          "id": "method-a-phone-0",
+          "type": "phone",
+          "valueDigest": "5b4d9de5391a3722",
+          "labelDigest": "7666843e9379fdd4",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "PHONE",
+            "sourceIndex": 0
+          },
+          "order": 2
+        }
+      ],
+      "unmappedCount": 1,
+      "loss": [
+        {
+          "kind": "deleted",
+          "reason": "explicit-user-delete",
+          "methodId": "method-a-email-1",
+          "valueDigest": "16cf3de9fd08355b"
+        }
+      ]
+    },
+    "duplicated": {
+      "cardId": "card-a-fictional",
+      "nameDigest": "30d63a37f6c3bd9e",
+      "methodCount": 4,
+      "methodIds": [
+        "method-84739965a8f51311",
+        "method-a-url-2",
+        "method-a-phone-0",
+        "method-4f75038d7cb09203"
+      ],
+      "methodDigests": [
+        {
+          "id": "method-84739965a8f51311",
+          "type": "email",
+          "valueDigest": "15274aa2e9c43621",
+          "labelDigest": "0006d696d8e1ec28",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "EMAIL",
+            "sourceIndex": 2
+          },
+          "order": 0
+        },
+        {
+          "id": "method-a-url-2",
+          "type": "url",
+          "valueDigest": "37f58c3315be7800",
+          "labelDigest": "3e0d676d2d85073d",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "URL",
+            "sourceIndex": 2
+          },
+          "order": 1
+        },
+        {
+          "id": "method-a-phone-0",
+          "type": "phone",
+          "valueDigest": "5b4d9de5391a3722",
+          "labelDigest": "7666843e9379fdd4",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "PHONE",
+            "sourceIndex": 0
+          },
+          "order": 2
+        },
+        {
+          "id": "method-4f75038d7cb09203",
+          "type": "phone",
+          "valueDigest": "5b4d9de5391a3722",
+          "labelDigest": "40292bf171010c8d",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "PHONE",
+            "sourceIndex": 3
+          },
+          "order": 3
+        }
+      ],
+      "unmappedCount": 1,
+      "loss": [
+        {
+          "kind": "deleted",
+          "reason": "explicit-user-delete",
+          "methodId": "method-a-email-1",
+          "valueDigest": "16cf3de9fd08355b"
+        },
+        {
+          "kind": "duplicate-value-visible",
+          "methodId": "method-4f75038d7cb09203",
+          "originalId": "method-a-phone-0",
+          "valueDigest": "5b4d9de5391a3722"
+        }
+      ]
+    }
+  },
+  "exportObservations": {
+    "default": {
+      "bytes": 474,
+      "lines": 17,
+      "includesUnmapped": false,
+      "digest": "4f076c146a05866d"
+    },
+    "includeUnmapped": {
+      "bytes": 519,
+      "lines": 18,
+      "includesUnmapped": true,
+      "digest": "1be84fb20ae8fe5f"
+    },
+    "defaultRoundTrip": {
+      "cardId": "card-a-fictional",
+      "nameDigest": "30d63a37f6c3bd9e",
+      "methodCount": 4,
+      "methodIds": [
+        "method-84739965a8f51311",
+        "method-a-url-2",
+        "method-a-phone-0",
+        "method-4f75038d7cb09203"
+      ],
+      "methodDigests": [
+        {
+          "id": "method-84739965a8f51311",
+          "type": "email",
+          "valueDigest": "15274aa2e9c43621",
+          "labelDigest": "7cd5885327fd60e8",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "EMAIL",
+            "sourceIndex": 2
+          },
+          "order": 2
+        },
+        {
+          "id": "method-a-url-2",
+          "type": "url",
+          "valueDigest": "37f58c3315be7800",
+          "labelDigest": "36e65c39f83b8df9",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "URL",
+            "sourceIndex": 2
+          },
+          "order": 2
+        },
+        {
+          "id": "method-a-phone-0",
+          "type": "phone",
+          "valueDigest": "5b4d9de5391a3722",
+          "labelDigest": "bb00c1bdc7a2685d",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "PHONE",
+            "sourceIndex": 0
+          },
+          "order": 0
+        },
+        {
+          "id": "method-4f75038d7cb09203",
+          "type": "phone",
+          "valueDigest": "5b4d9de5391a3722",
+          "labelDigest": "7cd5885327fd60e8",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "PHONE",
+            "sourceIndex": 3
+          },
+          "order": 3
+        }
+      ],
+      "unmappedCount": 0,
+      "loss": []
+    },
+    "includeUnmappedRoundTrip": {
+      "cardId": "card-a-fictional",
+      "nameDigest": "30d63a37f6c3bd9e",
+      "methodCount": 4,
+      "methodIds": [
+        "method-84739965a8f51311",
+        "method-a-url-2",
+        "method-a-phone-0",
+        "method-4f75038d7cb09203"
+      ],
+      "methodDigests": [
+        {
+          "id": "method-84739965a8f51311",
+          "type": "email",
+          "valueDigest": "15274aa2e9c43621",
+          "labelDigest": "7cd5885327fd60e8",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "EMAIL",
+            "sourceIndex": 2
+          },
+          "order": 2
+        },
+        {
+          "id": "method-a-url-2",
+          "type": "url",
+          "valueDigest": "37f58c3315be7800",
+          "labelDigest": "36e65c39f83b8df9",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "URL",
+            "sourceIndex": 2
+          },
+          "order": 2
+        },
+        {
+          "id": "method-a-phone-0",
+          "type": "phone",
+          "valueDigest": "5b4d9de5391a3722",
+          "labelDigest": "bb00c1bdc7a2685d",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "PHONE",
+            "sourceIndex": 0
+          },
+          "order": 0
+        },
+        {
+          "id": "method-4f75038d7cb09203",
+          "type": "phone",
+          "valueDigest": "5b4d9de5391a3722",
+          "labelDigest": "7cd5885327fd60e8",
+          "source": {
+            "cardId": "card-a-fictional",
+            "property": "PHONE",
+            "sourceIndex": 3
+          },
+          "order": 3
+        }
+      ],
+      "unmappedCount": 1,
+      "loss": []
+    }
+  },
+  "syntheticOnly": true,
+  "kernelRequests": 0,
+  "productionChanges": false,
+  "candidateContractAccepted": false,
+  "rawValuesOmitted": true,
+  "byteRoundTripVerified": false,
+  "externalInteropVerified": false,
+  "uiVerified": false
+}
