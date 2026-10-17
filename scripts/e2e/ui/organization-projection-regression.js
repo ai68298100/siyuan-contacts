@@ -467,8 +467,10 @@ export async function runOrganizationProjectionRegression({ test, assert, kernel
             button("保存").click();
             await until(() => state.membership().status === "active" && !fixture.querySelector(".lvct-org-manager__member-edit"), "原期间恢复失败");
             assert(state.membership().id === id && state.store.get(ORG_MEMBERSHIP_STORAGE_KEY).memberships.length === 1, "恢复新增了成员记录");
+            // 恢复事实和收起表单早于成员刷新及 run() 的忙态收尾。
+            await until(() => !button("移除").disabled, "恢复成员后移除入口仍在忙态");
             button("移除").click();
-            await tick();
+            await until(() => fixture.querySelector('[aria-label="确认移除这段成员历史"]'), "移除确认尚未打开");
             const removePreview = fixture.querySelector('[aria-label="确认移除这段成员历史"]');
             const removeRow = removePreview.closest(".lvct-org-manager__member");
             assert(removeRow.scrollWidth <= removeRow.clientWidth + 1, "组织侧移除确认横向溢出");

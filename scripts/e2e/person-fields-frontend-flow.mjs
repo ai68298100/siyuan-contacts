@@ -1,4 +1,4 @@
-/** One bounded real Chrome/person-fields UI run, only in a fresh owned Kernel. */
+/** Bounded Chrome person-fields/relation-picker UI runs, only in a fresh owned Kernel. */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -14,17 +14,20 @@ import { stopIsolatedBrowser } from "./browser-cleanup.mjs";
 import { verifyRealFrontend } from "./frontend-flow.mjs";
 
 export async function runPersonFieldsRealFrontend() {
-    assert.equal(process.env.LVCT_RUN_PERSON_FIELDS_REAL_UI, "1", "Explicit opt-in required");
+    const relationPicker = process.env.LVCT_RELATION_PICKER_REAL_UI === "1";
+    const personOrganizations = process.env.LVCT_PERSON_ORGANIZATIONS_REAL_UI === "1";
+    assert.ok(relationPicker || personOrganizations || process.env.LVCT_RUN_PERSON_FIELDS_REAL_UI === "1", "Explicit opt-in required");
     assert.equal(process.platform, "win32");
     const runId = randomUUID();
-    const multiWindow = process.env.LVCT_PERSON_FIELDS_MULTIWINDOW === "1";
-    const filterCopy = process.env.LVCT_PERSON_FIELDS_FILTER_COPY === "1";
-    const lifecycle = process.env.LVCT_PERSON_FIELDS_LIFECYCLE === "1";
-    const legacyRecovery = process.env.LVCT_PERSON_NOTE_LEGACY_RECOVERY === "1";
-    const workspace = path.join(fs.realpathSync(os.tmpdir()), `SiYuan-Lvct-Person-Fields-UI-${runId}`);
+    const multiWindow = !relationPicker && process.env.LVCT_PERSON_FIELDS_MULTIWINDOW === "1";
+    const filterCopy = !relationPicker && process.env.LVCT_PERSON_FIELDS_FILTER_COPY === "1";
+    const lifecycle = !relationPicker && process.env.LVCT_PERSON_FIELDS_LIFECYCLE === "1";
+    const legacyRecovery = !relationPicker && process.env.LVCT_PERSON_NOTE_LEGACY_RECOVERY === "1";
+    const scenePrefix = personOrganizations ? "person-organizations" : relationPicker ? "relation-picker" : "person-fields";
+    const workspace = path.join(fs.realpathSync(os.tmpdir()), `SiYuan-Lvct-${personOrganizations ? "Person-Organizations" : relationPicker ? "Relation-Picker" : "Person-Fields"}-UI-${runId}`);
     assert.equal(fs.existsSync(workspace), false);
-    const markerName = "person-fields-real-ui.json";
-    const createdBy = "lvct bounded fictional person fields real UI";
+    const markerName = `${scenePrefix}-real-ui.json`;
+    const createdBy = `lvct bounded fictional ${scenePrefix} real UI`;
     const kernel = ["D:/biji/SiYuan/resources/kernel/SiYuan-Kernel.exe", "D:/RJ/SiYuan/resources/kernel/SiYuan-Kernel.exe"].find(fs.existsSync);
     assert.ok(kernel, "Isolated Kernel executable missing");
     const chrome = "C:/Program Files/Google/Chrome/Application/chrome.exe";
@@ -39,7 +42,7 @@ export async function runPersonFieldsRealFrontend() {
     fs.writeFileSync(path.join(workspace, markerName), JSON.stringify(marker) + "\n");
     const storage = path.join(workspace, "data/storage/petal/lvct-isolated-test");
     fs.mkdirSync(storage, { recursive: true });
-    const evidence = { runId, workspace, kernel: marker.kernel, port, chrome, startedAt: new Date().toISOString(), fictionalOnly: true,
+    const evidence = { runId, scene: scenePrefix, workspace, kernel: marker.kernel, port, chrome, startedAt: new Date().toISOString(), fictionalOnly: true,
         actualProductionServices: true, actualProductionUi: true, nativeEditorCasVerified: false, kernelRequests: 0, listenerOwnershipChecks: 0,
         ownKernelPid: null, requestRoutes: [], frontend: null, cleanup: { ownKernelExited: false, portReleased: false, workspaceRetained: true },
         dist: Object.fromEntries(["index.js", "index.css", "plugin.json"].map(name => [name, createHash("sha256").update(fs.readFileSync(path.resolve(import.meta.dirname, "../../dist", name))).digest("hex")])) };
@@ -97,10 +100,19 @@ export async function runPersonFieldsRealFrontend() {
         const { initializeWorkspace } = await import("../../src/services/init.ts");
         const { createContact } = await import("../../src/services/contacts.ts");
         const { emptyDraft } = await import("../../src/domain/person.ts");
-        const settings = await initializeWorkspace(plugin, { notebookName: `lvct-contacts-smoke-fields-${runId}`, createSelf: false }, () => {});
-        const first = await createContact(settings, { ...emptyDraft(), name: "虚构补充资料UI甲" });
-        const second = await createContact(settings, { ...emptyDraft(), name: multiWindow ? first.name : "虚构补充资料UI乙" }, { allowSameName: multiWindow });
+        const settings = await initializeWorkspace(plugin, { notebookName: `lvct-contacts-smoke-${scenePrefix}-${runId}`, createSelf: false }, () => {});
+        const first = await createContact(settings, { ...emptyDraft(), name: relationPicker ? "虚构关系选择UI甲" : "虚构补充资料UI甲" });
+        const second = await createContact(settings, { ...emptyDraft(), name: multiWindow ? first.name : relationPicker ? "虚构关系选择UI乙" : "虚构补充资料UI乙" }, { allowSameName: multiWindow });
         evidence.people = { first: { docId: first.docId, itemId: first.itemId, name: first.name }, second: { docId: second.docId, itemId: second.itemId, name: second.name } };
+        let organizationFixture;
+        if (personOrganizations) {
+            const { createOrganization } = await import("../../src/services/org.ts");
+            organizationFixture = [];
+            for (const name of ["虚构多选单位甲", "虚构多选学校乙"]) {
+                organizationFixture.push({ ...(await createOrganization(settings, name, plugin)), name });
+            }
+            evidence.organizationFixture = organizationFixture;
+        }
         let legacyFixture;
         if (legacyRecovery) {
             const person = await createContact(settings, { ...emptyDraft(), name: "虚构旧备注恢复UI丙" });
@@ -117,8 +129,8 @@ export async function runPersonFieldsRealFrontend() {
             evidence.legacyFixture = legacyFixture;
         }
         process.env.LVCT_TEST_BROWSER = chrome;
-        process.env.LVCT_E2E_ARTIFACT_DIR = path.join(workspace, "person-fields-ui-artifacts");
-        evidence.frontend = await verifyRealFrontend({ workspace, storage, baseURL: `http://127.0.0.1:${port}`, request: envelope, accessAuthCode: token, first, second, settings, personFieldsOnly: true, personFieldsMultiWindow: multiWindow, personFieldsFilterCopy: filterCopy, personFieldsLifecycle: lifecycle, personNoteLegacyRecovery: legacyFixture, deadlineMs: lifecycle || legacyRecovery ? 180000 : 120000 });
+        process.env.LVCT_E2E_ARTIFACT_DIR = path.join(workspace, `${scenePrefix}-ui-artifacts`);
+        evidence.frontend = await verifyRealFrontend({ workspace, storage, baseURL: `http://127.0.0.1:${port}`, request: envelope, accessAuthCode: token, first, second, settings, relationPickerOnly: relationPicker, personOrganizations: organizationFixture, personFieldsOnly: !relationPicker && !personOrganizations, personFieldsMultiWindow: multiWindow, personFieldsFilterCopy: filterCopy, personFieldsLifecycle: lifecycle, personNoteLegacyRecovery: legacyFixture, deadlineMs: personOrganizations ? 240000 : lifecycle || legacyRecovery ? 180000 : 120000 });
         if (!evidence.frontend.ok || evidence.frontend.failure || !evidence.frontend.browserProcess?.exited || !evidence.frontend.browserProcess?.profileRemoved) process.exitCode = 1;
     } catch (error) { evidence.error = String(error?.stack ?? error).replaceAll(token || "[NO-TOKEN]", "[REDACTED]"); process.exitCode = 1; }
     finally {
@@ -133,16 +145,16 @@ export async function runPersonFieldsRealFrontend() {
         hooks?.deregister(); delete globalThis.__lvctPersonFieldsRealUi;
         evidence.completedAt = new Date().toISOString();
         const content = JSON.stringify(evidence, null, 2) + "\n";
-        const output = path.resolve(import.meta.dirname, `../../docs/verification/PERSON-FIELDS-REAL-UI-${runId}.json`);
+        const output = path.resolve(import.meta.dirname, `../../docs/verification/${scenePrefix.toUpperCase()}-REAL-UI-${runId}.json`);
         fs.writeFileSync(output, content, { encoding: "utf8", flag: "wx" });
-        fs.writeFileSync(path.join(workspace, `person-fields-real-ui-evidence-${runId}.json`), content, { encoding: "utf8", flag: "wx" });
+        fs.writeFileSync(path.join(workspace, `${scenePrefix}-real-ui-evidence-${runId}.json`), content, { encoding: "utf8", flag: "wx" });
         const fields = evidence.frontend?.personFields;
-        console.log(JSON.stringify({ runId, output, workspace, kernelRequests: evidence.kernelRequests, listenerOwnershipChecks: evidence.listenerOwnershipChecks, ownKernelPid: evidence.ownKernelPid, browserProcess: evidence.frontend?.browserProcess, ok: evidence.frontend?.ok ?? false, fields: fields ? { saved: fields.saved, detailClosed: fields.detailClosed, detailReopened: fields.detailReopened, blockId: fields.blockId, serviceAndSqlVerified: fields.serviceAndSqlVerified, originalNativeBodiesPreserved: fields.originalNativeBodiesPreserved } : null, lifecycle: evidence.frontend?.personFieldsLifecycle ? { completed: evidence.frontend.personFieldsLifecycle.completed ?? false, saves: evidence.frontend.personFieldsLifecycle.saves.map(item => item.step), emptyReopenedSameBlock: evidence.frontend.personFieldsLifecycle.emptyReopenedSameBlock, recreatedReopenedSameBlock: evidence.frontend.personFieldsLifecycle.recreatedReopenedSameBlock, noteClearedAndReopened: evidence.frontend.personFieldsLifecycle.noteClearedAndReopened } : null, failure: evidence.frontend?.failure ?? evidence.error ?? null, cleanup: evidence.cleanup }, null, 2));
+        console.log(JSON.stringify({ runId, scene: scenePrefix, output, workspace, kernelRequests: evidence.kernelRequests, listenerOwnershipChecks: evidence.listenerOwnershipChecks, ownKernelPid: evidence.ownKernelPid, browserProcess: evidence.frontend?.browserProcess, ok: evidence.frontend?.ok ?? false, relationPicker: evidence.frontend?.relationPicker ?? null, fields: fields ? { saved: fields.saved, detailClosed: fields.detailClosed, detailReopened: fields.detailReopened, blockId: fields.blockId, serviceAndSqlVerified: fields.serviceAndSqlVerified, originalNativeBodiesPreserved: fields.originalNativeBodiesPreserved } : null, lifecycle: evidence.frontend?.personFieldsLifecycle ? { completed: evidence.frontend.personFieldsLifecycle.completed ?? false, saves: evidence.frontend.personFieldsLifecycle.saves.map(item => item.step), emptyReopenedSameBlock: evidence.frontend.personFieldsLifecycle.emptyReopenedSameBlock, recreatedReopenedSameBlock: evidence.frontend.personFieldsLifecycle.recreatedReopenedSameBlock, noteClearedAndReopened: evidence.frontend.personFieldsLifecycle.noteClearedAndReopened } : null, failure: evidence.frontend?.failure ?? evidence.error ?? null, cleanup: evidence.cleanup }, null, 2));
     }
     return evidence;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-    if (process.env.LVCT_RUN_PERSON_FIELDS_REAL_UI === "1") await runPersonFieldsRealFrontend();
-    else console.log(JSON.stringify({ runEnabled: false, gate: "LVCT_RUN_PERSON_FIELDS_REAL_UI=1", kernelRequests: 0, workspaceWrites: 0 }));
+    if (process.env.LVCT_RUN_PERSON_FIELDS_REAL_UI === "1" || process.env.LVCT_RELATION_PICKER_REAL_UI === "1" || process.env.LVCT_PERSON_ORGANIZATIONS_REAL_UI === "1") await runPersonFieldsRealFrontend();
+    else console.log(JSON.stringify({ runEnabled: false, gate: "LVCT_RUN_PERSON_FIELDS_REAL_UI=1 or LVCT_RELATION_PICKER_REAL_UI=1 or LVCT_PERSON_ORGANIZATIONS_REAL_UI=1", kernelRequests: 0, workspaceWrites: 0 }));
 }

@@ -44,6 +44,7 @@ import StatusNotice from "../StatusNotice.svelte";
         settings,
         i18n,
         person,
+        availableGroups = [],
         /** FUNC-01.7-a：数据变化代际（Workbench 广播）；变化时原地重载洞察与跟进（写入/编辑中跳过） */
         revision = 0,
         onLoadOrgMemberships,
@@ -92,6 +93,8 @@ import StatusNotice from "../StatusNotice.svelte";
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
         person: ContactSummary;
+        /** 当前名册中已使用的分组，供详情编辑复用已有选项。 */
+        availableGroups?: readonly string[];
         revision?: number;
         /** 记一笔互动（facade.recordInteraction） */
         onRecord: (personDocId: string, note?: string) => Promise<void>;
@@ -108,8 +111,8 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadOrgMemberships?: (docId: string) => Promise<import("../../services/org").PersonOrgMembershipView[]>;
         /** B13.5 双向编辑（可选）：打开组织管理弹窗维护归属；未接线时隐藏按钮 */
         onOpenOrgManager?: () => void;
-        /** B13.5：组织候选为空时打开新建组织页。 */
-        onCreateOrganization?: () => void | Promise<void>;
+        /** 在原联系人草稿上打开新建组织页，成功后返回已核实的新组织。 */
+        onCreateOrganization?: (initialName?: string) => void | { docId: string; name: string } | Promise<void | { docId: string; name: string }>;
         onOpenOrganization?: (docId: string) => void;
         /** B13.5 双向编辑完整版（可选）：归属候选（活跃组织）；未接线时隐藏添加表单 */
         onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string; archived?: boolean }>>;
@@ -831,10 +834,16 @@ import StatusNotice from "../StatusNotice.svelte";
     let addOrgBusy = $state(false);
     let orgAction = $state<"create" | "add" | "edit" | "remove" | "">("");
     let addOrgError = $state("");
-    /* 候选排除已有当前归属；历史 former 仍可重新登记新的当前期间。 */
-    const orgCandidateOptions = $derived(orgCandidates.filter((org) =>
-        !orgMemberships.some((membership) => membership.orgDocId === org.docId && membership.status === "active"),
-    ));
+    /*
+     * 候选列表不能随状态下拉先行过滤掉已有当前组织：用户需要先选中
+     * 该组织，才能把这次操作明确改成“补录历史”。否则同组织多段经历
+     * 在详情页没有可达路径（状态控件又依赖先选组织）。提交时仍由
+     * addOrgMembership 保持 active 幂等保护。
+     */
+    const orgCandidateOptions = $derived(orgCandidates);
+    function hasActiveOrgMembership(orgDocId: string): boolean {
+        return orgMemberships.some((membership) => membership.orgDocId === orgDocId && membership.status === "active");
+    }
     useCloseGuard({
         busy: () => addOrgBusy || orgLoading || orgCandidatesLoading,
         dirty: () => Boolean(addOrgDocId || addOrgDepartment.trim() || addOrgTitle.trim() || addOrgJoinedOn || addOrgLeftOn || addOrgStatusLabel.trim() || addOrgNote.trim() || addOrgStatus !== "active" || addOrgAffiliationKind !== "unspecified"
@@ -858,9 +867,16 @@ import StatusNotice from "../StatusNotice.svelte";
         addOrgBusy = true;
         orgAction = "create";
         addOrgError = "";
+        const personDocId = current.docId;
         try {
-            await onCreateOrganization();
+            const created = await onCreateOrganization();
+            if (!detailAlive || current.docId !== personDocId) return;
             await loadOrgCandidates();
+            if (!detailAlive || current.docId !== personDocId || !created) return;
+            // 新组织的稳定身份来自创建结果；不能按同名猜测或覆盖其他归属草稿。
+            if (!orgCandidates.some((org) => org.docId === created.docId)) orgCandidates = [...orgCandidates, created];
+            addOrgDocId = created.docId;
+            if (created.name.trim() === "家庭") addOrgAffiliationKind = "family";
         } catch (error) {
             if (detailAlive) addOrgError = requestErrorMessage(error);
         } finally {
@@ -970,15 +986,28 @@ import StatusNotice from "../StatusNotice.svelte";
     }
 
     function changeAddOrgStatus(status: OrgMembershipStatus): void {
+        if (status === "active" && (selectedAddOrg?.archived || (addOrgDocId && hasActiveOrgMembership(addOrgDocId)))) {
+            addOrgStatus = "former";
+            addOrgError = "该组织已有当前归属或已归档，只能补录历史经历。";
+            return;
+        }
         addOrgStatus = status;
         if (status === "active") addOrgLeftOn = "";
     }
 
     function changeAddOrg(docId: string): void {
         addOrgDocId = docId;
+        addOrgError = "";
         const org = orgCandidates.find((candidate) => candidate.docId === docId);
-        if (org?.archived) {
+        if (org?.archived || hasActiveOrgMembership(docId)) {
+            /* 选中已有当前组织后直接进入历史模式，保留稳定组织身份，
+             * 让用户继续填写期间/备注，而不是把选择器表现成“无反应”。 */
             addOrgStatus = "former";
+            addOrgLeftOn = "";
+        } else {
+            /* 切换到普通新组织时恢复默认的当前模式，避免上一个
+             * 历史补录的状态和结束日期串到新的组织草稿。 */
+            addOrgStatus = "active";
             addOrgLeftOn = "";
         }
         if (org?.name.trim() === "家庭") addOrgAffiliationKind = "family";
@@ -1506,7 +1535,7 @@ import StatusNotice from "../StatusNotice.svelte";
                     aria-label={text("orgAddOrgLabel", "选择要加入的组织")}>
                     <option value="">{text("orgAddOrgPick", "选择组织…")}</option>
                     {#each orgCandidateOptions as org (org.docId)}
-                        <option value={org.docId}>{org.name}{org.archived ? "（已归档，仅补录历史）" : ""} · {org.docId}</option>
+                        <option value={org.docId}>{org.name}{org.archived ? "（已归档，仅补录历史）" : hasActiveOrgMembership(org.docId) ? "（已有当前归属，可补录历史）" : ""} · {org.docId}</option>
                     {/each}
                 </select>
                 {#if orgCandidatesLoading}<span class="ft__smaller ft__on-surface" role="status">正在读取组织候选…</span>{/if}
@@ -1521,14 +1550,14 @@ import StatusNotice from "../StatusNotice.svelte";
                     <option value="family">{affiliationLabel("family")}</option><option value="unspecified">{affiliationLabel("unspecified")}</option><option value="work">{affiliationLabel("work")}</option><option value="education">{affiliationLabel("education")}</option>
                 </select>
                 <select class="b3-select" value={addOrgStatus} onchange={(event) => changeAddOrgStatus(event.currentTarget.value as OrgMembershipStatus)} disabled={addOrgBusy || !addOrgDocId} aria-label="当前状态">
-                    <option value="active" disabled={Boolean(selectedAddOrg?.archived)}>当前在职/就读</option><option value="former">已离开/毕业</option>
+                    <option value="active" disabled={Boolean(selectedAddOrg?.archived || (addOrgDocId && hasActiveOrgMembership(addOrgDocId)))}>当前在职/就读</option><option value="former">已离开/毕业</option>
                 </select>
                 <input class="b3-text-field" maxlength="40" bind:value={addOrgStatusLabel} disabled={addOrgBusy || !addOrgDocId} aria-label="自定义状态" placeholder="自定义状态，如实习、休学" />
                 <input class="b3-text-field" maxlength="240" bind:value={addOrgNote} disabled={addOrgBusy || !addOrgDocId} aria-label={text("orgMemberNote", "成员备注")} placeholder={text("orgMemberNotePlaceholder", "仅记录这段组织经历")} />
                 <button type="button" class="b3-button b3-button--text" disabled={addOrgBusy || orgLoading || orgCandidatesLoading || !!orgReadError || !!orgCandidatesError || addOrgDocId === ""}
                     onclick={() => void addOrgMembership()}>{addOrgBusy && orgAction === "add" ? "添加中…" : text("orgAddSubmit", "添加归属")}</button>
                 {#if selectedAddOrg?.archived}<p class="ft__smaller ft__on-surface">组织已归档，只能补录历史经历；恢复组织后才可添加当前归属。</p>{/if}
-                {#if onCreateOrganization && !orgCandidateOptions.some((org) => !org.archived)}
+                {#if onCreateOrganization}
                     <button type="button" class="b3-button b3-button--outline" disabled={addOrgBusy || orgLoading || orgCandidatesLoading} bind:this={createOrganizationTrigger}
                         onclick={() => void createOrganizationFromDetail()}>{addOrgBusy && orgAction === "create" ? "创建中…" : text("orgCreateFirst", "新建组织")}</button>
                 {/if}
@@ -1890,6 +1919,7 @@ import StatusNotice from "../StatusNotice.svelte";
         <PersonEditDialog
             {settings}
             {i18n}
+            {availableGroups}
             person={current}
             onLoadRelationshipLabels={onLoadRelationshipLabels}
             onSaveRelationshipLabels={onSaveRelationshipLabels}

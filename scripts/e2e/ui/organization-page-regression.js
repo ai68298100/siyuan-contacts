@@ -8,8 +8,26 @@ import { GROUP_CUSTOM_OPTION } from "../../../src/domain/contact-group";
 import { listOrganizationMembersPage } from "../../../src/services/org";
 import { listContacts } from "../../../src/services/contacts";
 import { invalidateRoster } from "../../../src/services/roster";
+import { DEFAULT_VIEW_PREFERENCES } from "../../../src/domain/preferences";
 
 export async function runOrganizationPageRegression({ test, assert, kernel, settings, fixture, until, button }) {
+    await test("分组选项：已有自定义分组进入选择器并去重，内部选项不泄漏", async () => {
+        const instance = mount(GroupFieldFixture, { target: fixture });
+        try {
+            const select = fixture.querySelector("select[aria-label='分组']");
+            assert(select, "分组选择器未渲染");
+            const values = [...select.options].map((option) => option.value);
+            assert(values.filter((value) => value === "客户").length === 1, "已有自定义分组没有去重");
+            assert(values.includes("校友会") && !values.includes("__lvct_group_option__:stale"), "已有分组候选或内部选项处理错误");
+            select.value = "客户";
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+            await tick();
+            assert(fixture.querySelector("[data-group-value]")?.textContent === "客户", "选择已有自定义分组没有回填草稿");
+        } finally {
+            await unmount(instance);
+        }
+    });
+
     await test("分组自定义选项：选择后显示输入框并回填自定义文字", async () => {
         const instance = mount(GroupFieldFixture, { target: fixture });
         try {
@@ -87,6 +105,89 @@ export async function runOrganizationPageRegression({ test, assert, kernel, sett
             else delete window.FileReader;
             await unmount(instance);
         }
+    });
+
+    await test("组织资料编辑器：已有草稿套用模板前预览并选择合并方式", async () => {
+        const saved = [];
+        const instance = mount(OrganizationProfileEditor, { target: fixture, props: {
+            initial: { name: "已有组织", description: "保留我的介绍", departments: [], customFields: [] },
+            onSave: async (draft) => { saved.push(draft); },
+        } });
+        try {
+            const preset = [...fixture.querySelectorAll(".lvct-org-profile-editor__preset")].find((item) => item.textContent.includes("家庭"));
+            assert(preset, "家庭模板入口未渲染");
+            preset.click();
+            await until(() => fixture.querySelector('[role="alertdialog"][aria-label="预览组织模板"]'), "已有草稿点击模板没有打开预览");
+            const preview = fixture.querySelector('[role="alertdialog"][aria-label="预览组织模板"]');
+            assert(preview.textContent.includes("核心家庭") && preview.textContent.includes("亲属")
+                && preview.textContent.includes("仅填空白") && preview.textContent.includes("覆盖模板字段"), "模板预览未列出实际部门或缺少合并选项");
+            button("取消", preview).click();
+            await tick();
+            assert(!fixture.querySelector('[role="alertdialog"][aria-label="预览组织模板"]'), "取消模板预览没有关闭");
+
+            preset.click();
+            await until(() => fixture.querySelector('[role="alertdialog"][aria-label="预览组织模板"]'), "再次点击模板没有打开预览");
+            button("仅填空白", fixture.querySelector('[role="alertdialog"][aria-label="预览组织模板"]')).click();
+            await tick();
+            assert(fixture.querySelector('[aria-label="组织名称（必填）"]').value === "已有组织", "仅填空白覆盖了已有组织名称");
+            assert(fixture.querySelectorAll('input[aria-label^="部门 "][aria-label$="名称"]').length === 2, "仅填空白没有补充空部门列表");
+
+            const company = [...fixture.querySelectorAll(".lvct-org-profile-editor__preset")].find((item) => item.textContent.includes("工作单位"));
+            company.click();
+            await until(() => fixture.querySelector('[role="alertdialog"][aria-label="预览组织模板"]'), "已有部门时切换模板没有打开预览");
+            button("覆盖模板字段", fixture.querySelector('[role="alertdialog"][aria-label="预览组织模板"]')).click();
+            await tick();
+            assert(fixture.querySelector('[aria-label="组织名称（必填）"]').value === "工作单位", "覆盖模板字段没有替换组织名称");
+        } finally { await unmount(instance); }
+    });
+
+    await test("组织资料编辑器：删除有下级的部门先确认，保存前可撤销", async () => {
+        const instance = mount(OrganizationProfileEditor, { target: fixture, props: {
+            initial: { name: "层级组织", departments: [
+                { id: "dept-root", name: "总部", parentId: null, description: "" },
+                { id: "dept-child", name: "研发", parentId: "dept-root", description: "" },
+            ], customFields: [] },
+            onSave() {},
+        } });
+        try {
+            const remove = fixture.querySelector('button[aria-label="删除部门 1"]');
+            remove.click();
+            await until(() => fixture.querySelector('[role="alertdialog"][aria-label="确认删除部门"]'), "删除有下级部门没有打开影响确认");
+            assert(fixture.querySelectorAll('input[aria-label^="部门 "][aria-label$="名称"]').length === 2, "打开确认前部门已被立即删除");
+            const confirm = fixture.querySelector('[role="alertdialog"][aria-label="确认删除部门"]');
+            assert(confirm.textContent.includes("1 个下级部门") && confirm.textContent.includes("保留"), "部门删除影响说明不完整");
+            button("确认删除部门", confirm).click();
+            await tick();
+            assert(fixture.querySelectorAll('input[aria-label^="部门 "][aria-label$="名称"]').length === 1, "确认删除后目标部门仍在");
+            assert(fixture.querySelector('input[aria-label="部门 1 名称"]').value === "研发", "确认删除后下级部门没有保留");
+            assert(fixture.querySelector('select[aria-label="部门 1 上级部门"]').value === "", "确认删除后下级部门仍指向已删除上级");
+            button("撤销“总部”", fixture).click();
+            await tick();
+            assert(fixture.querySelectorAll('input[aria-label^="部门 "][aria-label$="名称"]').length === 2, "部门撤销没有恢复原行");
+            assert(fixture.querySelector('select[aria-label="部门 2 上级部门"]').value === "dept-root", "部门撤销没有恢复下级归属");
+        } finally { await unmount(instance); }
+    });
+
+    await test("组织资料编辑器：自定义字段删除后显示撤销并恢复原顺序", async () => {
+        const instance = mount(OrganizationProfileEditor, { target: fixture, props: {
+            initial: { name: "字段组织", departments: [], customFields: [
+                { id: "field-a", label: "官网", value: "https://example.com" },
+                { id: "field-b", label: "行业", value: "软件" },
+            ] },
+            onSave() {},
+        } });
+        try {
+            fixture.querySelector('button[aria-label="删除自定义字段 1"]').click();
+            await tick();
+            assert(fixture.querySelectorAll('input[aria-label^="自定义字段 "][aria-label$="名称"]').length === 1, "删除字段后的字段行数不正确");
+            assert(fixture.querySelector('input[aria-label="自定义字段 1 名称"]').value === "行业", "删除字段后后续字段没有前移");
+            const undo = [...fixture.querySelectorAll("button")].find((item) => item.textContent.includes("撤销“官网”"));
+            assert(undo, "删除字段后没有撤销入口");
+            undo.click();
+            await tick();
+            assert(fixture.querySelector('input[aria-label="自定义字段 1 名称"]').value === "官网"
+                && fixture.querySelector('input[aria-label="自定义字段 2 名称"]').value === "行业", "撤销字段没有恢复原顺序和内容");
+        } finally { await unmount(instance); }
     });
 
     await test("Issue #31：组织管理/资料弹窗在桌面放大，移动端保持全屏", async () => {
@@ -348,6 +449,57 @@ export async function runOrganizationPageRegression({ test, assert, kernel, sett
             button("重试").click();
             await until(() => !fixture.textContent.includes("成员读取失败，结果尚未核实"), "只读重试未恢复成员");
             assert(requests >= 4 && search.value === "失败", "重试丢弃搜索上下文");
+        } finally { await unmount(instance); }
+    });
+
+    await test("组织成员移动：同名目标显示稳定文档 ID，确认后按选定身份提交", async () => {
+        const currentId = "20261017000000-orgcur01";
+        const targetA = "20261017000000-orgsame1";
+        const targetB = "20261017000000-orgsame2";
+        const member = {
+            id: "20261017000000-move001", orgDocId: currentId, personDocId: "20261017000000-person1",
+            personName: "待移动成员", department: "研发", title: "工程师", joinedOn: "2024-01-01", leftOn: "", status: "active",
+        };
+        const organizations = [
+            { docId: currentId, name: "当前组织", hpath: "/当前组织", notebookId: settings.notebookId, archived: false, memberships: [member] },
+            { docId: targetA, name: "同名组织", hpath: "/工作/同名组织", notebookId: settings.notebookId, archived: false, memberships: [] },
+            { docId: targetB, name: "同名组织", hpath: "/学习/同名组织", notebookId: settings.notebookId, archived: false, memberships: [] },
+        ];
+        const moveCalls = [];
+        const facade = {
+            settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+            listContacts: async () => [{ docId: member.personDocId, itemId: "row-move", name: member.personName, isSelf: false }],
+            listOrganizations: async () => organizations.map((organization) => ({ ...organization, memberships: organization.memberships.filter((item) => item.id !== member.id || item.orgDocId === organization.docId) })),
+            listOrganizationMembers: async (orgDocId) => organizations.find((organization) => organization.docId === orgDocId)?.memberships.map((item) => ({ ...item })) ?? [],
+            moveOrganizationMember: async (id, targetOrgDocId) => {
+                moveCalls.push({ id, targetOrgDocId });
+                const index = organizations[0].memberships.findIndex((item) => item.id === id);
+                if (index >= 0) {
+                    const moved = { ...organizations[0].memberships[index], orgDocId: targetOrgDocId };
+                    organizations[0].memberships.splice(index, 1);
+                    organizations.find((organization) => organization.docId === targetOrgDocId).memberships.push(moved);
+                }
+                return { fact: "verified", membership: { ...member, orgDocId: targetOrgDocId }, projections: [] };
+            },
+        };
+        const instance = mount(OrgManagerDialog, { target: fixture, props: { facade, onClose() {} } });
+        try {
+            await until(() => fixture.querySelector('.lvct-org-manager__member[data-membership-id="20261017000000-move001"]'), "待移动成员未加载");
+            const row = fixture.querySelector('.lvct-org-manager__member[data-membership-id="20261017000000-move001"]');
+            button("移动", row).click();
+            await until(() => fixture.querySelector('select[aria-label="移动到组织"]'), "移动目标选择器未打开");
+            const select = fixture.querySelector('select[aria-label="移动到组织"]');
+            const options = [...select.querySelectorAll("option")];
+            const first = options.find((option) => option.value === targetA);
+            const second = options.find((option) => option.value === targetB);
+            assert(first?.textContent.includes(targetA) && second?.textContent.includes(targetB), "同名组织候选未显示稳定文档 ID");
+            assert(first.textContent !== second.textContent, "同名组织候选仍无法区分");
+            select.value = targetB;
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+            await tick();
+            button("确认移动", row).click();
+            await until(() => moveCalls.length === 1, "移动未提交");
+            assert(moveCalls[0].id === member.id && moveCalls[0].targetOrgDocId === targetB, "移动提交了错误的同名组织身份");
         } finally { await unmount(instance); }
     });
 }

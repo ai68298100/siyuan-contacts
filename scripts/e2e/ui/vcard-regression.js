@@ -104,6 +104,67 @@ export function configureVcardKernel(kernel, settings) {
 }
 
 export async function runVcardRegression({ test, assert, kernel, settings, fixture, until, button }) {
+    await test("vCard 批量选择非同名项保留逐卡确认的同名选择", async () => {
+        const state = configureVcardKernel(kernel, settings);
+        state.sameName("手动确认同名");
+        const app = mount(VCardDialog, { target: fixture, props: { settings, onImported() {}, onClose() {} } });
+        try {
+            const source = ["手动确认同名", "批量候选甲", "批量候选乙"].map((name) => `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nEND:VCARD`).join("\n");
+            const transfer = new DataTransfer();
+            transfer.items.add(new File([source], "bulk-selection.vcf", { type: "text/vcard" }));
+            const file = fixture.querySelector('input[type="file"]');
+            file.files = transfer.files;
+            file.dispatchEvent(new Event("change", { bubbles: true }));
+            await until(() => fixture.querySelectorAll(".lvct-vcard__card").length === 3, "批量选择预览未出现");
+            const cards = [...fixture.querySelectorAll('.lvct-vcard__card input[type="checkbox"]')];
+            const all = fixture.querySelector('.lvct-import__row--head input[type="checkbox"]');
+            assert(!cards[0].checked && cards[1].checked && cards[2].checked, "初始同名与非同名选择不正确");
+            cards[0].click();
+            cards[1].click();
+            await until(() => cards[0].checked && !cards[1].checked && !all.checked, "手动逐卡选择未就绪");
+            all.click();
+            await until(() => cards[1].checked && cards[2].checked, "批量勾选未选中非同名项");
+            assert(cards[0].checked, "批量勾选非同名项清除了已确认的同名选择");
+            await until(() => all.checked && fixture.textContent.includes("导入为联系人（3）"), "批量勾选后的总数不正确");
+            all.click();
+            await until(() => !cards[1].checked && !cards[2].checked, "批量取消未取消非同名项");
+            assert(cards[0].checked && fixture.textContent.includes("导入为联系人（1）"), "批量取消非同名项清除了手动同名选择");
+            cards[0].click();
+            await until(() => !cards[0].checked, "手动取消同名项未生效");
+            all.click();
+            await until(() => cards[1].checked && cards[2].checked, "再次批量勾选未恢复非同名项");
+            assert(!cards[0].checked && state.creates.length === 0 && state.binds.length === 0 && state.writes.length === 0, "批量选择自动确认同名项或提前写入");
+        } finally { await unmount(app); }
+    });
+    await test("vCard 批量选择状态仅计算可选非同名项，待核实卡片不参与全选", async () => {
+        const state = configureVcardKernel(kernel, settings);
+        state.docs.set("20261004000000-pend001", { id: "20261004000000-pend001", name: "待核实原文档", requestId: "unbound-source" });
+        const app = mount(VCardDialog, { target: fixture, props: { settings, onImported() {}, onClose() {} } });
+        try {
+            const load = async (names) => {
+                const source = names.map((name) => `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nEND:VCARD`).join("\n");
+                const transfer = new DataTransfer();
+                transfer.items.add(new File([source], "bulk-eligible.vcf", { type: "text/vcard" }));
+                const file = fixture.querySelector('input[type="file"]');
+                file.files = transfer.files;
+                file.dispatchEvent(new Event("change", { bubbles: true }));
+                await until(() => fixture.querySelectorAll(".lvct-vcard__card").length === names.length, "待核实卡片预览未出现");
+            };
+            await load(["可批量选择", "待核实原文档"]);
+            const cards = [...fixture.querySelectorAll('.lvct-vcard__card input[type="checkbox"]')];
+            const all = fixture.querySelector('.lvct-import__row--head input[type="checkbox"]');
+            assert(cards[0].checked && !cards[1].checked && cards[1].disabled, "待核实卡片未被隔离");
+            assert(all.checked && !all.disabled, "已选全部可选项时，全选状态被待核实卡片干扰");
+            all.click();
+            await until(() => !cards[0].checked && !all.checked, "批量取消未更新可选项");
+            all.click();
+            await until(() => cards[0].checked && all.checked, "批量恢复未更新可选项");
+            assert(!cards[1].checked && cards[1].disabled, "批量操作选中了待核实卡片");
+            await load(["待核实原文档"]);
+            const unavailableAll = fixture.querySelector('.lvct-import__row--head input[type="checkbox"]');
+            assert(unavailableAll.disabled && !unavailableAll.checked && state.creates.length === 0 && state.writes.length === 0, "没有可选项时仍可全选或提前写入");
+        } finally { await unmount(app); }
+    });
     await test("vCard 多联系方式预览选择主值后按单值写入，未知重试沿用已选草稿", async () => {
         const state = configureVcardKernel(kernel, settings);
         state.failField = true;

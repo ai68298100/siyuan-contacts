@@ -5,7 +5,7 @@
 
 > 产品定位与已交付基线见 [产品愿景与后续开发总计划](PRODUCT-PLAN.md)，需求来源见 [用户反馈待办](FEEDBACK-BACKLOG.md)。当前执行顺序、任务状态和验收见 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md)；下文保留历史阶段与远期设计。
 
-> **2026-10-16 计划校准：** v0.5.16 已发布并完成附件下载校验，见 [RELEASE](RELEASE.md)。图谱成员生命周期已落地：当前单位只投影 active，成员边支持 active/former/mixed 并与 related 查询隔离。往来账本陈旧回读竞态已随 v0.5.15 修复并完成创建、连续写入和状态变更回归。Issue #35 缺少脱敏 VCF，不能确认 vCard 无名卡片候选修复是否命中报告根因；#36–#40 已完成并关闭。本文继续承载产品取舍、调研候选和历史路线；原子任务状态与顺序唯一以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准，发布门禁以 [RELEASE](RELEASE.md) 和 [UI-REGRESSION](UI-REGRESSION.md) 为准。AG-B13-007 现有模型契约和隔离实现已完成复评（D-0037/0038），整卡仍为 partial；无需新 schema，不重复安排契约评审。v3.8.7 隔离内核服务验收已通过 9/9，但其他用户工作区、多窗口、原生图和真机仍属 Host Queue；下一步优先推进 `AG-HOST-003/006`，没有 ready 实现卡时不直接扩大运行时代码。`AG-SCALE-001` 保持 P2/partial，R54 视觉迁移仍需拆为带依赖和验收标准的原子任务卡。
+> **2026-10-17 计划校准：** v0.5.17 已发布并完成附件下载校验，见 [RELEASE](RELEASE.md)。#51/#54 的重复资料、两层分组和个人备注恢复已收口；图谱成员生命周期已落地：当前单位只投影 active，成员边支持 active/former/mixed 并与 related 查询隔离。往来账本陈旧回读竞态已随 v0.5.15 修复并完成创建、连续写入和状态变更回归。Issue #35 缺少脱敏 VCF，不能确认 vCard 无名卡片候选修复是否命中报告根因；#36–#40 已完成并关闭。本文继续承载产品取舍、调研候选和历史路线；原子任务状态与顺序唯一以 [AGENT-DEVELOPMENT-BACKLOG](AGENT-DEVELOPMENT-BACKLOG.md) 为准，发布门禁以 [RELEASE](RELEASE.md) 和 [UI-REGRESSION](UI-REGRESSION.md) 为准。AG-B13-007 现有模型契约和隔离实现已完成复评（D-0037/0038），整卡仍为 partial；无需新 schema，不重复安排契约评审。隔离内核服务验收已通过，但其他用户工作区、多窗口、原生图和真机仍属 Host Queue；下一步优先推进 `AG-HOST-003/006`，没有 ready 实现卡时不直接扩大运行时代码。`AG-SCALE-001` 保持 P2/partial，R54 视觉迁移仍需拆为带依赖和验收标准的原子任务卡。
 
 > **历史快照说明：** 下文按日期记录的 v0.3.0/v0.5.0 阶段路线、B11–B14 初始待办及产品候选，均保留为需求来源；它们不描述当前版本、当前任务状态或发布状态。
 

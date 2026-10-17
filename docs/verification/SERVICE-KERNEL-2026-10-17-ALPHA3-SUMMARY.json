@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-17",
+  "kernelVersion": "3.8.8-alpha.3",
+  "frontend": "browser-desktop",
+  "bridgeProtocol": 2,
+  "isolated": true,
+  "uuidWorkspace": true,
+  "randomPort": true,
+  "storageAdapter": "controlled files in isolated workspace",
+  "actualProductServices": {
+    "passed": 11,
+    "total": 11
+  },
+  "followUps": {
+    "taskCount": 9,
+    "indexDocumentDashboardReconciliation": true,
+    "editCompleteDelete": true,
+    "faultRecovery": true,
+    "restartReadback": true,
+    "nativeEditorUi": false,
+    "dashboardServiceOnly": true
+  },
+  "capture": {
+    "candidateCount": 2,
+    "beforeInteractions": 2,
+    "afterInteractions": 2,
+    "originalEventIdsPreserved": true,
+    "projectionMarkerCounts": {
+      "source": 1,
+      "diary": 1,
+      "place": 1,
+      "firstPerson": 1,
+      "secondPerson": 1
+    },
+    "completed": true,
+    "dialogClosed": true
+  },
+  "organizationCrossWindow": {
+    "rename": true,
+    "memberEdit": true,
+    "archive": true,
+    "restore": true,
+    "reloadReadback": true
+  },
+  "limitations": [
+    "真实用户工作区未覆盖",
+    "原生编辑器交互未覆盖",
+    "其他任务管理器互读未覆盖",
+    "Android 真机未覆盖"
+  ],
+  "scopeNote": "本摘要只保留脱敏后的状态与计数；原始运行证据含临时工作区路径和网络诊断，不纳入仓库。"
+}

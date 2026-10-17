@@ -1,4 +1,4 @@
-import { mount, unmount } from "svelte";
+import { mount, unmount, tick } from "svelte";
 import { configureVcardKernel } from "./vcard-regression.js";
 import { scanImportCandidates } from "../../../src/services/import-scan";
 import { runDocumentImportQueue, writeImportFields } from "../../../src/services/import";
@@ -19,6 +19,7 @@ export function configureImportKernel(kernel, settings) {
     state.failMappings = false;
     state.failGroup = false;
     state.sourceNotebookId = "20261004000000-import1";
+    state.importNotebooks = [{ id: state.sourceNotebookId, name: "导入来源" }];
     state.addDoc = (index, name = `人物 ${index}`, notebookId = settings.notebookId) => {
         const id = `20261004000000-${String(index).padStart(7, "0")}`;
         state.docs.set(id, { id, name, notebookId });
@@ -36,7 +37,7 @@ export function configureImportKernel(kernel, settings) {
         return rowId;
     };
     kernel.handler = async (route, body) => {
-        if (route === "/api/notebook/lsNotebooks") return { notebooks: [{ id: state.sourceNotebookId, name: "导入来源" }] };
+        if (route === "/api/notebook/lsNotebooks") return { notebooks: state.importNotebooks };
         if (route === "/api/query/sql" && body.stmt.includes("SELECT id, content, hpath")) {
             const afterId = body.stmt.match(/id > '([^']+)'/)?.[1] ?? "";
             const notebookId = body.stmt.match(/box='([^']+)'/)?.[1];
@@ -199,6 +200,68 @@ export async function runImportRegression({ test, assert, kernel, settings, fixt
         } finally { await unmount(component); }
     });
 
+    await test("AG-IMP-002 收编刷新保留稳定来源，来源消失时要求明确重选", async () => {
+        const state = configureImportKernel(kernel, settings);
+        const firstNotebook = state.sourceNotebookId;
+        const secondNotebook = "20261004000000-import2";
+        state.importNotebooks = [
+            { id: firstNotebook, name: "来源一" },
+            { id: secondNotebook, name: "来源二" },
+        ];
+        state.addDoc(1, "来源二人物", secondNotebook);
+        const component = mount(ImportDialog, { target: fixture, props: { settings, onImported() {}, onClose() {} } });
+        try {
+            await until(() => fixture.querySelector('select[aria-label="选择待收编文档的笔记本"]')?.value === firstNotebook, "初始来源未选择");
+            const source = fixture.querySelector('select[aria-label="选择待收编文档的笔记本"]');
+            source.value = secondNotebook;
+            source.dispatchEvent(new Event("change", { bubbles: true }));
+            await until(() => fixture.textContent.includes("来源二人物"), "切换来源后候选未加载");
+            const selectedCandidate = fixture.querySelectorAll('input[type="checkbox"]')[1];
+            selectedCandidate.checked = true;
+            selectedCandidate.dispatchEvent(new Event("change", { bubbles: true }));
+            await tick();
+            assert(!button("收编为联系人（1）").disabled, "选择来源候选后没有保留可提交对象");
+
+            const keyword = fixture.querySelector('input[aria-label="按文档名过滤"]');
+            keyword.value = "无匹配";
+            keyword.dispatchEvent(new Event("input", { bubbles: true }));
+            await until(() => fixture.textContent.includes("清除关键词"), "无匹配状态未提供刷新入口");
+            state.importNotebooks = [
+                { id: firstNotebook, name: "来源一" },
+                { id: secondNotebook, name: "来源二（刷新后）" },
+            ];
+            button("刷新笔记本").click();
+            await until(() => fixture.querySelector('select[aria-label="选择待收编文档的笔记本"]')?.value === secondNotebook, "刷新后未保留稳定来源");
+            await until(() => fixture.textContent.includes("刷新笔记本"), "刷新后无匹配状态未恢复");
+
+            state.importNotebooks = [{ id: firstNotebook, name: "来源一" }];
+            button("刷新笔记本").click();
+            await until(() => fixture.querySelector('select[aria-label="选择待收编文档的笔记本"]')?.value === "", "来源消失后未要求明确重选");
+            assert(button("收编为联系人（1）").disabled
+                && fixture.textContent.includes("原来源笔记本已不可用，请重新选择来源"), "来源消失时未明确提示重新选择或仍允许使用旧来源提交");
+        } finally { await unmount(component); }
+    });
+
+    await test("AG-IMP-002 路径筛选无匹配提供清除入口且保留已选对象", async () => {
+        const state = configureImportKernel(kernel, settings);
+        state.addDoc(1, "路径人物", state.sourceNotebookId);
+        const component = mount(ImportDialog, { target: fixture, props: { settings, onImported() {}, onClose() {} } });
+        try {
+            await until(() => fixture.textContent.includes("路径人物"), "初始候选未加载");
+            const checkbox = fixture.querySelectorAll('input[type="checkbox"]')[1];
+            checkbox.checked = true;
+            checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+            const folder = fixture.querySelector('input[aria-label="按文件夹前缀过滤"]');
+            folder.value = "/不存在";
+            folder.dispatchEvent(new Event("input", { bubbles: true }));
+            await until(() => fixture.textContent.includes("清除路径筛选"), "路径无匹配未提供清除入口");
+            assert(fixture.textContent.includes("当前范围隐藏 1 篇") && !button("收编为联系人（1）").disabled, "清除路径筛选前丢失已选对象");
+            button("清除路径筛选").click();
+            await until(() => fixture.textContent.includes("路径人物") && !fixture.textContent.includes("清除路径筛选"), "清除路径筛选未恢复候选");
+            assert(!button("收编为联系人（1）").disabled, "清除路径筛选后已选对象丢失");
+        } finally { await unmount(component); }
+    });
+
     await test("AG-IMP-002 补录队列不随父层数组变更，暂停保留输入", async () => {
         configureImportKernel(kernel, settings);
         const people = [{ ...emptyDraft(), name: "原人物", docId: "20261004000000-person1", itemId: "原行", relatedItemIds: [] }];
@@ -248,6 +311,53 @@ export async function runImportRegression({ test, assert, kernel, settings, fixt
             await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent.includes("应用到表单（1）") && !node.disabled), "生日映射未准备");
             button("应用到表单（1）").click();
             assert(applied.birthday === "1990-01-01" && applied.isLunar === false, "公历日期沿用旧农历标记");
+        } finally { await unmount(component); }
+    });
+
+    await test("AG-IMP-001 识别预览可返回修改原文并重新识别", async () => {
+        let applied = null;
+        const component = mount(QuickFillDialog, { target: fixture, props: {
+            existing: emptyDraft(), initialText: "姓名：甲\n电话：13800000001",
+            initialResult: parseContactText("姓名：甲\n电话：13800000001"),
+            onApply(value) { applied = value; }, onClose() {},
+        } });
+        try {
+            await until(() => [...fixture.querySelectorAll("button")].some((node) => node.textContent.includes("返回修改原文")), "识别预览没有返回原文入口");
+            button("返回修改原文").click();
+            await until(() => fixture.querySelector(".lvct-qf__input"), "返回原文没有打开编辑区");
+            const source = fixture.querySelector(".lvct-qf__input");
+            assert(source?.value === "姓名：甲\n电话：13800000001", "返回原文没有保留识别输入");
+            source.value = "姓名：乙\n电话：13900000002";
+            source.dispatchEvent(new Event("input", { bubbles: true }));
+            await tick();
+            button("识别").click();
+            await until(() => fixture.querySelectorAll(".lvct-qf__item").length === 2, "修改原文后没有重新生成预览");
+            assert(fixture.textContent.includes("乙") && fixture.textContent.includes("13900000002"), "重新识别没有使用修改后的原文");
+            const selected = fixture.querySelector(".lvct-qf__item input");
+            selected?.click();
+            const applyButton = [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("应用到表单"));
+            assert(applyButton, "重新识别后没有应用按钮");
+            applyButton.click();
+            assert(applied?.name === "乙" || applied?.phone === "13900000002", "重新识别后的候选未能应用");
+        } finally { await unmount(component); }
+    });
+
+    await test("AG-IMP-001 同日期换历法明确提示并默认不覆盖", async () => {
+        let applied = null;
+        const component = mount(QuickFillDialog, { target: fixture, props: {
+            existing: { ...emptyDraft(), birthday: "1990-01-01", isLunar: false },
+            initialResult: { items: [{ field: "birthday", value: "1990-01-01", raw: "农历生日", note: "农历", confidence: "certain" }], unrecognized: [] },
+            onApply(value) { applied = value; }, onClose() {},
+        } });
+        try {
+            await until(() => fixture.querySelector(".lvct-qf__item"), "换历法候选未展示");
+            assert(fixture.textContent.includes("公历 → 农历") && !fixture.querySelector(".lvct-qf__item input").checked, "同日期换历法没有提示或被默认覆盖");
+            fixture.querySelector(".lvct-qf__item input").click();
+            await until(() => [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("应用到表单") && !node.disabled), "明确选择换历法后无法应用");
+            const applyButton = [...fixture.querySelectorAll("button")].find((node) => node.textContent.includes("应用到表单"));
+            assert(applyButton && !applyButton.disabled, "明确选择换历法后无法应用");
+            applyButton.click();
+            assert(applied?.birthday === "1990-01-01" && applied?.isLunar === true, "换历法应用没有成对写入生日与历法");
         } finally { await unmount(component); }
     });
 

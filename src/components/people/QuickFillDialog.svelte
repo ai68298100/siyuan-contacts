@@ -7,11 +7,13 @@
     import LvctDialog from "../LvctDialog.svelte";
     import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
+    import { tick } from "svelte";
 
     let {
         i18n,
         existing,
         initialResult,
+        initialText,
         onApply,
         onClose,
     }: {
@@ -23,6 +25,8 @@
         };
         /** FAST-01.3：外部已解析好的结果（选区/整篇文档识别），直接进预览阶段 */
         initialResult?: QuickFillResult;
+        /** FAST-01.3：外部识别的原文，允许用户返回修改后重新识别 */
+        initialText?: string;
         onApply: (patch: {
             name?: string; phone?: string; email?: string; wechat?: string;
             website?: string; birthday?: string; isLunar?: boolean; group?: string;
@@ -45,7 +49,8 @@
     const SINGLE_FIELDS = new Set(["name", "phone", "email", "wechat", "website", "birthday", "group"]);
 
     // svelte-ignore state_referenced_locally
-    let pasteText = $state("");
+    let pasteText = $state(initialText ?? "");
+    let sourceInput: HTMLTextAreaElement | undefined = $state();
     // svelte-ignore state_referenced_locally
     let previewed = $state(initialResult !== undefined);
     // svelte-ignore state_referenced_locally
@@ -77,6 +82,12 @@
         if (item.field === "tags") return "";
         return String((existing as Record<string, unknown>)[item.field] ?? "");
     }
+    function candidateIsLunar(item: QuickFillItem): boolean {
+        return item.field === "birthday" && Boolean(item.note?.includes("农历"));
+    }
+    function calendarLabel(isLunar: boolean): string {
+        return text(isLunar ? "qfCalendarLunar" : "qfCalendarSolar", isLunar ? "农历" : "公历");
+    }
     /** 无年份生日当前契约无法写入：可预览、不可勾选 */
     function notWritable(item: QuickFillItem): boolean {
         return item.field === "birthday" && /^\d{2}-\d{2}$/.test(item.value);
@@ -84,13 +95,23 @@
     /** 已一致（同名同值）不展示；其余返回 true */
     function isRedundant(item: QuickFillItem): boolean {
         if (item.field === "tags") return existing.tags.includes(item.value);
-        if (item.field === "birthday" && existing.isLunar !== undefined) return currentValue(item) === item.value && existing.isLunar === Boolean(item.note?.includes("农历"));
+        if (item.field === "birthday") return currentValue(item) === item.value && existing.isLunar !== undefined && existing.isLunar === candidateIsLunar(item);
         return currentValue(item) === item.value;
     }
     function conflict(item: QuickFillItem): boolean {
         if (item.field === "tags") return false;
         const value = currentValue(item);
+        if (item.field === "birthday" && value.length > 0) {
+            return value !== item.value || existing.isLunar === undefined || existing.isLunar !== candidateIsLunar(item);
+        }
         return value.length > 0 && value !== item.value;
+    }
+    function conflictLabel(item: QuickFillItem): string {
+        if (item.field !== "birthday" || currentValue(item) !== item.value) return text("qfConflict", "将覆盖当前值：{value}", { value: currentValue(item) });
+        if (existing.isLunar === undefined) return text("qfCalendarUnknown", "将覆盖当前生日；现有历法待核实");
+        return text("qfCalendarConflict", "将覆盖当前生日历法：{current} → {next}", {
+            current: calendarLabel(existing.isLunar), next: calendarLabel(candidateIsLunar(item)),
+        });
     }
     function visibleItems(): QuickFillItem[] {
         return (result?.items ?? []).filter((item) => !isRedundant(item));
@@ -99,6 +120,12 @@
         result = parseContactText(pasteText);
         previewed = true;
         selectDefaults();
+    }
+    async function editSource(): Promise<void> {
+        previewed = false;
+        checked = new Set<string>();
+        await tick();
+        sourceInput?.focus({ preventScroll: true });
     }
     /** 默认勾选：无冲突且可写的新增值（已有值默认不覆盖，用户明确选择后才写入） */
     function selectDefaults() {
@@ -151,7 +178,7 @@
     /* V-02/D-40 语义补齐：粘贴未识别、或识别结果未应用即关闭=丢草稿，经守卫确认放弃。
        apply() 是完成动作，直接 onClose 不拦（调用方在 onApply 后自行关闭）。 */
     function hasUnsavedDraft(): boolean {
-        if (previewed) return visibleItems().length > 0;
+        if (previewed) return pasteText.trim().length > 0 || visibleItems().length > 0 || (result?.unrecognized.length ?? 0) > 0;
         return pasteText.trim().length > 0;
     }
     const guardedClose = useCloseGuard({
@@ -175,7 +202,7 @@
             </p>
             <textarea class="b3-text-field fn__block lvct-qf__input" rows="7"
                 placeholder={text("qfPlaceholder", "张三\n手机：13800138000\n微信：zhang_san\n邮箱：a@example.com")}
-                aria-label={text("qfInputLabel", "待识别的联系人内容")}
+                aria-label={text("qfInputLabel", "待识别的联系人内容")} bind:this={sourceInput}
                 bind:value={pasteText}></textarea>
             <div class="lvct-form__actions">
                 <button class="b3-button b3-button--cancel" onclick={requestClose}>{text("formCancel", "取消")}</button>
@@ -196,7 +223,7 @@
                         {item.value}
                         {#if item.note}<small class="ft__smaller ft__on-surface">（{item.note}）</small>{/if}
                         {#if conflict(item)}
-                            <small class="ft__smaller ft__on-surface">{text("qfConflict", "将覆盖当前值：{value}", { value: currentValue(item) })}</small>
+                            <small class="ft__smaller ft__on-surface">{conflictLabel(item)}</small>
                         {/if}
                         {#if notWritable(item)}
                             <small class="ft__smaller ft__on-surface">{text("qfNoYear", "缺少年份，暂不能写入；可先补全年份再识别")}</small>
@@ -215,6 +242,9 @@
             {/if}
             <div class="lvct-form__actions">
                 <button class="b3-button b3-button--cancel" onclick={requestClose}>{text("formCancel", "取消")}</button>
+                {#if pasteText.trim().length > 0}
+                    <button class="b3-button b3-button--outline" onclick={() => void editSource()}>{text("qfEditSource", "返回修改原文")}</button>
+                {/if}
                 <button class="b3-button" disabled={checked.size === 0} onclick={apply}>
                     {text("qfApply", "应用到表单（{n}）", { n: checked.size })}
                 </button>

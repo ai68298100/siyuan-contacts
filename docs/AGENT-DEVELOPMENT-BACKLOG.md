@@ -4,7 +4,7 @@
 >
 > **更新规则：** 一个任务只允许一个 Agent 认领；先更新本卡状态，再开始编码。完成代码不等于真实宿主完成，`host_pending` 必须保留到真内核、真机或多窗口证据齐全。版本号、`CHANGELOG`、README 徽章、`docs/PROGRESS.md` 是普通实现任务的保护文件；用户明确要求校准状态文档时，仅按该文档任务范围更新。
 
-> **2026-10-06 产品评审入口（历史快照）：** 当时复核为桌面 UI `314/315`、390px UI `315/316`，且工作区有未提交变更。跨模块产品判断见 [PRODUCT-REVIEW-2026-10-06](PRODUCT-REVIEW-2026-10-06.md)。当前版本与门禁以本文件 2026-10-16 快照和 [RELEASE](RELEASE.md) 为准；不要沿用该历史数字或已完成的 PR-P0-01/02 作为当前待办。
+> **2026-10-06 产品评审入口（历史快照）：** 当时复核为桌面 UI `314/315`、390px UI `315/316`，且工作区有未提交变更。跨模块产品判断见 [PRODUCT-REVIEW-2026-10-06](PRODUCT-REVIEW-2026-10-06.md)。当前版本与门禁以本文件最新状态和 [RELEASE](RELEASE.md) / [UI-REGRESSION](UI-REGRESSION.md) 为准；不要沿用该历史数字或已完成的 PR-P0-01/02 作为当前待办。
 
 ## 1. 给 Agent 的最短规则
 
@@ -66,6 +66,8 @@ evidence_paths / owner / last_updated / commit
 
 > **v0.5.16 发布与契约复评（2026-10-16）：** PR #42 普通合并后，annotated tag `v0.5.16` 指向 `4372593`；Release 附件下载复核为 582,401 B，SHA-256 `91c2d4bece34509a2a72468a7d097af4d1bd566ceadfcb2a392fc4331cd731b8`。发布前本地 `pnpm check`、597/597 单测、三套 UI 各 381/381、构建与发布门禁通过；发布后 CI 与未验收边界见 [RELEASE](RELEASE.md)。AG-B13-007 现有模型契约已完成复评（D-0037/0038），无需新增 schema，整卡仍为 `partial`。
 
+> **v0.5.17 发布与 Host Queue 校准（2026-10-17）：** #51/#54 已完成并关闭；`pnpm check` 0/0、710/710 单测、桌面/移动/宿主样式 UI 各 416/416、构建和 Release 门禁通过。隔离真实内核续跑为 `3.8.8-alpha.3`、实际服务 `11/11`，真实 Chrome `browser-desktop` 通过；脱敏证据见 [HOST-QUEUE-2026-10-17](verification/HOST-QUEUE-2026-10-17.md) 与 [ALPHA3 摘要](verification/SERVICE-KERNEL-2026-10-17-ALPHA3-SUMMARY.json)。真实用户工作区、原生编辑器、原生图、其他任务管理器互读和 Android 真机仍保持 `host_pending`；PR #33 的 G-03 隔离真实宿主 smoke 已通过，合入仍需用户授权，不重发 v0.5.17。
+
 > **v0.5.16 后执行顺序：** ① Issue [#35 无法导入联系人](https://github.com/ai68298100/siyuan-contacts/issues/35) 继续保持开放，取得保留首卡属性结构的脱敏 VCF 后再确认候选修复是否命中根因；② 若具备隔离的真实思源测试环境，优先推进 P0 `AG-HOST-003`（任务块全量对账）和 `AG-HOST-006`（用户反馈真实读写验收）；③ AG-B13-007 的现有契约、当前投影与 member 边生命周期隔离实现已收口，不重复安排契约评审，继续补真实宿主、多窗口、迁移、真机和规模证据；④ `AG-SCALE-001` 保持 P2/partial，R54 视觉迁移先补成有依赖和验收条件的原子任务卡。2026-10-17 已按重复工单关闭 #46、#48；对应宿主余项仍留在 Host Queue。
 
 依赖开放口径：`done_isolated` / `host_pending` 仅开放不依赖真实宿主结论的隔离开发；真实端点、真机与多窗口结论仍由 Host Queue 守门。`ready` 必须满足所有实现前置；`partial` 表示已有代码，不代表剩余步骤的依赖已满足。
@@ -78,7 +80,7 @@ evidence_paths / owner / last_updated / commit
 
 #### AG-ISSUE-051-054-FIELDS — 重复资料与两层分组首版
 
-- **status / priority / type / milestone：** `host_pending` / P1 / feature+regression / M4；生产实现和隔离内核服务验证完成，界面与真实宿主证据分别记录，未提交、未发布。
+- **status / priority / type / milestone：** `host_pending` / P1 / feature+regression / M4；生产实现、隔离内核与隔离 Chrome 验收已完成，真实用户工作区、原生编辑器竞争、真机等边界继续由 Host Queue 守门；发布与 issue 关闭见 `AG-ISSUE-051-054-CLOSE`。
 - **user_outcome / user_scenario：** 人物详情可维护多个电话、微信、邮箱等同名或同值条目，并可放入“联系方式”等顶层分组；个人备注继续独立保存。
 - **source_ids / current_evidence：** Issue #51/#54、D-0039；域、API/服务、编辑器、facade 与人物详情已接通。隔离真实内核创建/更新/清空、冲突零覆盖、未知只读核实、错 owner 拒绝及重启回读通过；139次请求逐次核验 PID 归属，5次生产服务写入。
 - **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §6A、现有 DOM 块写读实证 / 本首版交付与 issue 验收 / person-fields / UUID 隔离工作区、虚构资料；完整 contactMethods 研究不是本卡前置。
@@ -87,13 +89,13 @@ evidence_paths / owner / last_updated / commit
 - **ordered_steps：** 冻结 D-0039/§6A → 域/API/service → 编辑器和详情接线 → 单测/隔离 UI/构建 → UUID 内核重启与冲突/未知验证 → 真实详情入口回归 → 交付并核对用户场景。
 - **test_fixtures / test_commands / acceptance：** 同名同值、两层分组、特殊字符/多行/空值、分组删除的两种选择、草稿关闭、迟到响应、失败重试、HTTP UUID fallback、390px；`pnpm check`、`pnpm test`、三套 UI、`pnpm build`、`pnpm check:release` 与专门 spike。成功必须同块完整回读；未知不重发；失败保留草稿，坏格式不按空库覆盖。
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 原块 ID 和完整基线冲突则停止；未知请求在当前窗口只读核实，非原生 CAS；仅虚构数据验收。每人最多100项、标签80字符、值2000字符、JSON100000字符；加载只查目标文档，候选上限2用于歧义检测。
-- **evidence_paths / owner / last_updated / commit：** [首版范围](verification/MULTI-CONTACT-MINIMAL-PATH-2026-10-17.md)、[真实内核验证](verification/PERSON-FIELDS-2026-10-17.md)、`scripts/e2e/ui/person-fields-regression.js`、`scripts/spike/person-fields-results-b3986e47-2fdd-47df-9709-eb06f79027d0.json` / Codex / 2026-10-17 / 未提交。
-- **退出边界：** 补充资料随人物文档备份，未进入基础主字段、全局搜索、快捷联系、AI、桥、vCard 或插件迁移包。原生编辑器竞争、真机和日常用户工作区不以隔离回归替代。#51/#54 在发布与用户场景核对前保持开放。
-- **完成回报：** `pnpm check` 0/0、完整单测689/689，Chrome桌面/390px/宿主样式 UI 各403/403，构建与本地包完整性门禁通过；定向补充资料UI桌面/390px各13/13。真实隔离Chrome人物详情新增分组与两个同名多行电话、保存、关闭重开，与生产service及SQL完整核对通过，见[真实前端](verification/PERSON-FIELDS-REAL-UI-2026-10-17.md)。整卡保留 `host_pending`，仅剩声明中的真实环境边界和交付验收，不重复安排已完成的实现与研究。
+- **evidence_paths / owner / last_updated / commit：** [首版范围](verification/MULTI-CONTACT-MINIMAL-PATH-2026-10-17.md)、[真实内核验证](verification/PERSON-FIELDS-2026-10-17.md)、`scripts/e2e/ui/person-fields-regression.js`、`scripts/spike/person-fields-results-b3986e47-2fdd-47df-9709-eb06f79027d0.json` / Codex / 2026-10-17 / `0674d9e`（随 `ee4e515` 文档同步）。
+- **退出边界：** 补充资料随人物文档备份，未进入基础主字段、全局搜索、快捷联系、AI、桥、vCard 或插件迁移包。原生编辑器竞争、真机和日常用户工作区不以隔离回归替代。#51/#54 的发布与关闭已完成，剩余环境边界不回退为开发任务。
+- **完成回报：** 首版隔离与 v0.5.17 联合验收已由 `AG-ISSUE-051-054-CLOSE` 汇总：`pnpm check` 0/0、完整单测710/710、Chrome桌面/390px/宿主样式 UI 各416/416、E2E/Kernel smoke 17/17；Release 附件下载复核通过。整卡保留 `host_pending` 只表示声明中的真实环境边界。
 
 #### AG-ISSUE-051-054-USE — 补充资料详情查找、复制与双页面冲突验收
 
-- **status / priority / type / milestone：** `done` / P1 / feature+e2e / M4；本卡要求的隔离真实Chrome范围已验收，未提交、未发布；父卡的其他环境边界仍分别保留。
+- **status / priority / type / milestone：** `done` / P1 / feature+e2e / M4；本卡要求的隔离真实Chrome范围已验收并随 v0.5.17 交付；父卡的真实用户工作区、原生编辑器和真机边界仍分别保留。
 - **user_outcome / user_scenario：** 在人物详情内从多条资料中筛选所需号码/微信/邮箱，复制完整多行内容；另一页面已修改时，当前草稿不会覆盖新资料。
 - **source_ids / current_evidence：** #51/#54、用户继续开发指令、D-0039；详情筛选、完整复制和跨详情实例在途互斥已实现，真实隔离Chrome联合验收通过，见本轮报告。
 - **depends_on / blocks / parallel_group / preconditions：** AG-ISSUE-051-054-FIELDS 的已完成实现、DATA-CONTRACT §6A 展示约定 / 详情使用闭环交付 / person-fields-use / 仅当前已确认快照，本地筛选不发请求。
@@ -102,9 +104,9 @@ evidence_paths / owner / last_updated / commit
 - **ordered_steps：** 冻结展示约定 → 纯筛选与剪贴板helper → 阅读态控件和反馈 → 失败/迟到/全量编辑UI回归 → 重建 → 真实筛选复制与双页面冲突/恢复、同名人物隔离。
 - **test_fixtures / test_commands / acceptance：** 分组/名称/完整多行值、同名同值、空组/无命中、筛选后完整编辑保存、剪贴板拒绝/HTTP fallback、切人迟到结果、390px；域与clipboard测试、`pnpm check/test`、三套UI、构建、真实前端runner；筛选不写资料，复制完整原值，冲突零覆盖。
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 复制失败明确提示手动选择，不改保存状态；迟到反馈丢弃；只读筛选清空即复原。查询和值不新增日志或持久索引，剪贴板只在点击时写入；每人最多100项，本地线性筛选。
-- **evidence_paths / owner / last_updated / commit：** [本轮报告](verification/PERSON-FIELDS-USE-2026-10-17.md)、[真实双页面联合](verification/PERSON-FIELDS-MULTIWINDOW-2026-10-17.md)、`tests/person-fields.test.ts`、`tests/clipboard.test.ts`、`scripts/e2e/ui/person-fields-regression.js` / Codex / 2026-10-17 / 未提交。
+- **evidence_paths / owner / last_updated / commit：** [本轮报告](verification/PERSON-FIELDS-USE-2026-10-17.md)、[真实双页面联合](verification/PERSON-FIELDS-MULTIWINDOW-2026-10-17.md)、`tests/person-fields.test.ts`、`tests/clipboard.test.ts`、`scripts/e2e/ui/person-fields-regression.js` / Codex / 2026-10-17 / `0674d9e`。
 - **退出边界：** 详情内筛选不等于联系人全局搜索。双页面按先后顺序验证旧基线冲突，不宣称原生编辑器或内核CAS；真机与日常用户库仍单列。
-- **完成回报：** check 0/0、单测701/701、桌面/390px/宿主样式各412/412，补充资料定向各22/22，构建、本地包完整性与E2E保护17/17通过。真实Chrome最终构建run `a4340d07-454b-47a7-86d7-360098f37c60`通过备注和补充资料保存重开、标准复制/DOM fallback、筛选后全量保存、双页面旧基线冲突零块写、放弃重读后恢复、同名人物独立保存；125次验证侧请求逐次核验监听归属，进程/端口/profile清理完成。共享复制锁覆盖真实Workbench卸载/重挂载；Windows剪贴板换行规范化单列，不trim内容。#51/#54待发布与用户场景核对，本卡不因此重新标为开发中。
+- **完成回报：** 本卡的隔离 Chrome 范围已并入 v0.5.17 联合验收；最终 `pnpm test` 710/710、三套 UI 各416/416、E2E/Kernel smoke 17/17，详情筛选、完整复制、冲突零覆盖和同名人物隔离均已复核。共享复制锁覆盖真实 Workbench 卸载/重挂载；Windows 剪贴板换行规范化单列，不 trim 内容。#51/#54 已发布并关闭，本卡不因此重新标为开发中。
 
 #### AG-ISSUE-051-054-CLOSE — 原始需求复核、备注重读恢复与资料生命周期验收
 
@@ -117,7 +119,7 @@ evidence_paths / owner / last_updated / commit
 - **ordered_steps：** 按issue逐项核对 → 备注错误恢复就地实现/回归 → 已存资料生命周期真实runner → check/test/三套UI/build → 最终隔离真实联合 → 原始需求验收矩阵与交付边界收口。
 - **test_fixtures / test_commands / acceptance：** 备注冲突/取消/保留/放弃/读取失败/切人迟到及其他区域草稿；旧多段读取失败→核对→显式解除旧关联→原文全保留→人工全文保存重开；多label重复、改组、解除组、排序、两种删组、清空后重开与再新增；保存逐次核对完整snapshot和原块。check/test/UI、真实runner；不为验证擅自发布。
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 失败与取消不丢草稿，重读不自动写；真实请求逐次核验本轮Kernel归属，场景有界，进程/端口/profile清理；只使用虚构数据。
-- **evidence_paths / owner / last_updated / commit：** [原始需求验收](verification/ISSUE-051-054-ACCEPTANCE-2026-10-17.md)、[完整生命周期](verification/PERSON-FIELDS-LIFECYCLE-2026-10-17.md)、`docs/verification/PERSON-FIELDS-REAL-UI-9e8b5db6-5834-42c7-a5ec-fee5b471bd10.json` / Codex / 2026-10-17 / 未提交。
+- **evidence_paths / owner / last_updated / commit：** [原始需求验收](verification/ISSUE-051-054-ACCEPTANCE-2026-10-17.md)、[完整生命周期](verification/PERSON-FIELDS-LIFECYCLE-2026-10-17.md)、`docs/verification/PERSON-FIELDS-REAL-UI-9e8b5db6-5834-42c7-a5ec-fee5b471bd10.json` / Codex / 2026-10-17 / `0674d9e`（文档同步 `ee4e515`）。
 - **退出边界：** 原始需求已实现且其要求的隔离真实宿主证据齐全即可开发完成；正式发布单列。全局检索、AV投影、vCard往返、原生编辑器CAS、真机和日常用户库不扩张为#51/#54原始需求的隐含前置。
 - **完成回报：** `pnpm test` 710/710、`pnpm check` 0/0、桌面/390px/宿主样式 UI 各416/416、E2E安全与内核 smoke 17/17；最终真实 Chrome 联合轮 248 次验证侧请求及归属核验全部通过。v0.5.17 Release 附件 601,897 B / SHA256 `472918deacd8aa985e4a8effb9af3796382aa4336cd546bb59db1e4c7317f11d` 已下载复核，#51/#54 已回复并关闭。旧版多段备注仅支持用户确认后的安全解除关联和手动全文重存，不自动拼接；全局检索、AV投影、vCard往返、原生编辑器CAS、真机和日常用户库另行处理。
 
@@ -132,8 +134,8 @@ evidence_paths / owner / last_updated / commit
 - **ordered_steps：** 固定无帧回调回归 → 给视口恢复加有界退出与清理 → 核对草稿/滚动/焦点与迟到回调 → 定向 UI 和 check → 宿主复跑。
 - **test_fixtures / test_commands / acceptance：** 暂停 RAF、成员保存、外部刷新、草稿、滚动焦点；定向组织上下文 UI、`pnpm check`；无帧回调也解除 busy，操作只写一次，滚动与草稿保留，清理后的回调不再干预当前界面。
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 保留现有错误与只读重试，不自动重写；仅虚构组织和成员；每次视口恢复至多一次 RAF 加有界计时器，无轮询。
-- **evidence_paths / owner / last_updated / commit：** [ORG-BACKGROUND-RAF-2026-10-17](verification/ORG-BACKGROUND-RAF-2026-10-17.md)、`scripts/e2e/ui/organization-context-regression.js` / `org_background_raf_fix` / 2026-10-17 / 未提交。
-- **完成回报：** 保留其他既有未提交变更。后台直接跳过第二帧、可见页 100 ms 回退，visibilitychange/卸载清理等待。`pnpm check` 0 errors / 0 warnings；桌面和 390px 定向组织 UI 各 13/13，完整桌面 UI 389/389。覆盖暂停 RAF、等待中转后台、忙态解除、草稿/滚动/焦点与迟到回调。重建后隔离真实内核 Chrome 双页面的改名、成员编辑、归档和恢复均通过，写入前第一页为 hidden 且无残留 busy；见 [HOST-ORG-DUAL-WINDOW-2026-10-17](verification/HOST-ORG-DUAL-WINDOW-2026-10-17.json)。主 Host Queue 仍保留人物文档投影专门双页、原生多窗口、日常工作区和真机等边界。未提交、未发布。
+- **evidence_paths / owner / last_updated / commit：** [ORG-BACKGROUND-RAF-2026-10-17](verification/ORG-BACKGROUND-RAF-2026-10-17.md)、`scripts/e2e/ui/organization-context-regression.js` / `org_background_raf_fix` / 2026-10-17 / `0674d9e`。
+- **完成回报：** 后台直接跳过第二帧、可见页 100 ms 回退，visibilitychange/卸载清理等待。`pnpm check` 0 errors / 0 warnings；桌面和 390px 定向组织 UI 各 13/13，完整桌面 UI 389/389。覆盖暂停 RAF、等待中转后台、忙态解除、草稿/滚动/焦点与迟到回调。重建后隔离真实内核 Chrome 双页面的改名、成员编辑、归档和恢复均通过，写入前第一页为 hidden 且无残留 busy；见 [HOST-ORG-DUAL-WINDOW-2026-10-17](verification/HOST-ORG-DUAL-WINDOW-2026-10-17.json)。主 Host Queue 仍保留人物文档投影专门双页、原生多窗口、日常工作区和真机等边界。
 
 #### AG-RF-004-N1 — 原生人物文档全量联系方式可读性实验
 
@@ -187,7 +189,7 @@ evidence_paths / owner / last_updated / commit
 - **test_fixtures / test_commands / acceptance：** 普通值、实际换行/反斜杠/引号、Markdown/HTML、同值跨人；基线、改正文、同人复制、跨人复制、属性丢失/改写和重载逐项保存 UI 事实以及原始 `id/root_id/parent_id/type/content/markdown/ial`、直接子块与原样 N2 报告。同人若保留方法 ID 且正文有效，必须可见 `duplicate/method-id`；跨人若保留旧 owner/ID 且正文有效，必须可见 `conflict/owner-or-parent`；正文折行、属性改写/丢失或值不一致按实际输入进入 `unknown`，不能按姓名/值重连或自动改 owner/source/ID。任何未知、重复、冲突或不完整范围均 `complete=false`、`writeAllowed=false`、`methods=[]`；只有明确受控枚举范围可作本次判定，不能推广为历史全集。刷新后事实与拒绝报告保持一致，零自动身份分配/修复/墓碑/投影写入。
 - **failure_retry_rollback / privacy_boundary / performance_budget：** UI 或写入结果未知先只读核实，不自动重发粘贴；仅保存虚构夹具与本轮页面证据，不读系统无关剪贴板。原生 clipboard 载荷若可被动观察，只作补充且不改变默认事件，不能替代持久回读；不能观察时如实单列。只关闭本轮创建页面并停止持有进程，核实端口释放，保留虚构工作区；小样本研究不承诺大库或并发隔离。
 - **evidence_paths / owner / last_updated / commit：** `docs/verification/MULTI-CONTACT-NATIVE-EDITOR-UI-COPY-2026-10-17.md`（准备协议）、`docs/verification/MULTI-CONTACT-NATIVE-EDITOR-HOST-2026-10-17.md`、`docs/verification/MULTI-CONTACT-NATIVE-COPY-2026-10-17.md` 与 N2-HOST 既有 results；本卡真实 UI 证据尚无 / Codex + next_research_scope / 2026-10-17 / 未提交。
-- **明确退出边界：** 实际原生操作可因候选被宿主改写而得到可见拒绝，不能把“值可见”宣称为严格候选可读。无真实 UI、未出现新持久块或只完成菜单可达均不得标完成；两页面同时写/删块竞争、桌面原生多窗口、人物生命周期、卸载/全配置删除、完整搜索和数据出口另列后续验收。即使本卡收口，D1 仍须综合比较，#51/#54 保持开放。
+- **明确退出边界：** 实际原生操作可因候选被宿主改写而得到可见拒绝，不能把“值可见”宣称为严格候选可读。无真实 UI、未出现新持久块或只完成菜单可达均不得标完成；两页面同时写/删块竞争、桌面原生多窗口、人物生命周期、卸载/全配置删除、完整搜索和数据出口另列后续验收。即使本卡收口，D1 仍须综合比较；完整联系方式研究父卡继续开放，不影响 #51/#54 已交付的补充资料范围。
 
 #### AG-RF-004-N3 — 原生候选范围发现与丢标记反例
 
@@ -252,7 +254,7 @@ evidence_paths / owner / last_updated / commit
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 未知写零自动重发，失败保留完整证据；物理缺行只报unknown-not-delete，不推断用户删除意图、不晋升/清空/投影/墓碑/恢复。所有赋值和移除仅显式实验夹具操作，自动业务写恒0；只结束持有进程，核实端口释放，保留虚构工作区。小样本有界读取，不承诺CAS、历史全集或全库性能；token不进入证据。
 - **evidence_paths / owner / last_updated / commit：** [联合生命周期证据](verification/MULTI-CONTACT-LIFECYCLE-2026-10-17.md)、`scripts/spike/contact-methods-lifecycle-spike.mjs`、`scripts/spike/contact-methods-lifecycle-results.json`及本轮UUID副本 / Codex + lifecycle_probe + lifecycle_contract_review / 2026-10-17 / 已完成隔离、未提交。
 - **完成回报：** runUUID `329a34fa-cb9b-43eb-a6c4-c404ac906f52`，Kernel `3.8.8-alpha.2`；方法4→3、名册2→1→2的联合五阶段均独立回读。甲主方法移除后主表旧phone保留、次方法primary文本为0；解绑后甲文档与剩余方法仍可达但无名册资格；本轮同doc重绑实际换itemID且phone为空，方法身份/归属/原文不变。乙全程不变；重启按实际重绑事实只读比对通过。76 HTTP/ownPID76，fixture23且仅初始化scalar2，重启后修改0，projection/replay/墓碑0；两个持有PID退出、端口释放。三份raw逐字节相等、token未入证据；独立审计从原始载荷/响应重建事实通过。纯34/34包含完整源下换itemID及曾解绑后复用同itemID拒绝；旧目标拒绝只是研究诊断，未实现生产guard/CAS/持久恢复。默认/import/dry-run零副作用、语法与diff检查通过，未改生产实现或发布。
-- **明确退出边界：** 最多done_isolated；D1Adopted、历史全集、外层writeAllowed/tombstoneAllowed、UI与并发验证始终false。重绑只覆盖同docId；同名新doc、人物删文档/移动、真实卸载、生产恢复与完整备份出口未验。#51/#54保持开放。
+- **明确退出边界：** 最多done_isolated；D1Adopted、历史全集、外层writeAllowed/tombstoneAllowed、UI与并发验证始终false。重绑只覆盖同docId；同名新doc、人物删文档/移动、真实卸载、生产恢复与完整备份出口未验。完整联系方式研究父卡保持开放；#51/#54 的补充资料首版已交付并单独验收。
 
 #### AG-RF-004-D3D4-P — 主值删除、零主值投影与解绑差异纯研究
 
@@ -1226,7 +1228,7 @@ evidence_paths / owner / last_updated / commit
 - **依赖：** `AG-B14-002`。
 - **步骤：** 在桌面和移动真实宿主执行原生图入口；确认中心、返回、范围提示；创建受控块链接，观察原生图是否生成预期边；保存版本、前端、截图、响应。
 - **验收：** 证据可复现；失败时保持自研图/文本降级，不能修改用户正文以“修出”边。
-- **当前证据：** 隔离图数据 `refs` 双向边、`getGraph/getLocalGraph` 已通过；普通 Markdown `siyuan://blocks/<docId>` 未形成 refs 边。原生图面板入口、中心透传和真实成边仍未核验。
+- **当前证据：** 2026-10-17 在真实 Kernel `3.8.8-alpha.3` 的 UUID 隔离工作区中复跑：`refs` 前向两条边、反向边回链、`getGraph/getLocalGraph` 形状和中心/入链范围均通过；普通 Markdown `siyuan://blocks/<docId>` 仍未形成 refs 边。脱敏摘要见 [AG-HOST-001 图 Kernel 证据](verification/AG-HOST-001-GRAPH-KERNEL-2026-10-17.json)。原生图面板入口、中心透传、返回语义、移动端和真实用户工作区仍未核验，整卡保持 `host_pending`。
 
 ### AG-HOST-002 — 组织、成员和多窗口刷新
 
@@ -1243,7 +1245,7 @@ evidence_paths / owner / last_updated / commit
 - **依赖：** `AG-P0-008`。
 - **步骤：** 创建、修改、完成、删除至少 6 条跨日期任务；重启/刷新后检查索引、文档和首页；注入一个受控块读取失败。
 - **验收：** 各侧状态逐项一致或明确未对账；失败不会伪装成功。
-- **当前证据：** 2026-10-17 的 v3.8.8-alpha.2 隔离真实内核通过 11/11，包含 9 条跨日期任务的索引/文档/首页逐项对账、编辑/完成/删除、受控读取失败和两次重启回读；证据见 [HOST-QUEUE-2026-10-17](verification/HOST-QUEUE-2026-10-17.md) 与 [SERVICE-KERNEL-2026-10-17](verification/SERVICE-KERNEL-2026-10-17.json)。真实用户工作区、原生编辑器交互和其他任务管理器互读仍待验。
+- **当前证据：** 2026-10-17 的 v3.8.8-alpha.3 隔离真实内核通过 11/11，包含 9 条跨日期任务的索引/文档/首页逐项对账、编辑/完成/删除、受控读取失败和重启回读；证据见 [HOST-QUEUE-2026-10-17](verification/HOST-QUEUE-2026-10-17.md) 与 [SERVICE-KERNEL-2026-10-17-ALPHA3-SUMMARY](verification/SERVICE-KERNEL-2026-10-17-ALPHA3-SUMMARY.json)。真实用户工作区、原生编辑器交互和其他任务管理器互读仍待验。
 
 ### AG-HOST-004 — 真机移动、键盘、安全区和系统返回
 
@@ -1274,7 +1276,7 @@ evidence_paths / owner / last_updated / commit
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 局部成功保留事实，只清理本轮受控测试产物；禁外发真实往来与联系人；记录请求数和大库边界，不新增性能承诺。
 - **current_evidence：** 2026-10-17 隔离真实产品服务 `11/11`，真实 browser-desktop `realFrontend=true`，插件加载、桥 protocol 2、稳定 ref、工作台、生日、账本、别名、跟进、组织工作台、组织改名/成员编辑/归档/恢复、页面重载和人物/互动双页面幂等均通过；捕获来源文档、命令和原生弹窗可达，2 位候选重复提交完成，原 2 条互动 ID 保留，来源/日记/地点/双方人物 5 侧标记均各 1，弹窗正常关闭；组织改名/成员编辑/归档/恢复双页面均通过。真实用户工作区、组织人物投影专门双页、原生图和真机仍未验。
 - **2026-10-05 复核：** 真实隔离 browser-desktop `realFrontend=true`，核心用户旅程、页面重载回读和双页面稳定幂等均通过；捕获来源文档打开仍返回 `Uncaught`，因此捕获 UI 保持未验。该证据不替代真实用户工作区、组织双窗口、原生图和真机验收。
-- **evidence_paths / owner / last_updated / commit：** `docs/verification/HOST-QUEUE-2026-10-17.md`、`docs/verification/SERVICE-KERNEL-2026-10-17.json`、`docs/verification/HOST-QUEUE-2026-10-16.md`、`docs/verification/REAL-FRONTEND-2026-10-04.md`；Codex；2026-10-17；待提交。
+- **evidence_paths / owner / last_updated / commit：** `docs/verification/HOST-QUEUE-2026-10-17.md`、`docs/verification/SERVICE-KERNEL-2026-10-17-ALPHA3-SUMMARY.json`、`docs/verification/SERVICE-KERNEL-2026-10-17.json`（alpha.2 历史基线）、`docs/verification/HOST-QUEUE-2026-10-16.md`、`docs/verification/REAL-FRONTEND-2026-10-04.md`；Codex；2026-10-17；待提交。
 
 ## 6. 研究候选（只调研，不直接开发）
 

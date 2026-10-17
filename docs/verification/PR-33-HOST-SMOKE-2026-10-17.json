@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-17",
+  "pr": 33,
+  "commit": "8eb3bb259db0ed45aa60d9cb433c37c9538f6e96",
+  "kernelVersion": "3.8.8-alpha.3",
+  "frontend": "browser-desktop",
+  "bridgeProtocol": 2,
+  "isolated": true,
+  "uuidWorkspace": true,
+  "randomPort": true,
+  "pluginLoaded": true,
+  "releaseGate": true,
+  "actualProductServices": {
+    "passed": 11,
+    "total": 11
+  },
+  "hostSmoke": {
+    "captureDialog": true,
+    "captureCompleted": true,
+    "captureCandidateCount": 2,
+    "organizationCrossWindow": true,
+    "pageReloadReadback": true
+  },
+  "limitations": [
+    "真实用户工作区未覆盖",
+    "原生编辑器交互未覆盖",
+    "其他任务管理器互读未覆盖",
+    "Android 真机未覆盖"
+  ],
+  "scopeNote": "本摘要只记录 PR 头在隔离真实宿主上的兼容性 smoke；不代表用户工作区、真机或完整发布验收。构建 ZIP 含时间戳，check:release 使用本轮 package.zip 的新鲜校验文件。"
+}

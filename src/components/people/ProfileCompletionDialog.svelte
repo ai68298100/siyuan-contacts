@@ -4,7 +4,7 @@
      *  跳过不写入；中途关闭经 B06 守卫确认。 */
     import { writeImportFields } from "../../services/import";
     import type { WritableContactField } from "../../domain/contact-write.ts";
-    import { emptyDraft } from "../../domain/person";
+    import { emptyDraft, validateDraft } from "../../domain/person";
     import { importAnchor, snapshotCompletionPeople } from "../../domain/import.ts";
     import { untrack } from "svelte";
     import GroupField from "./GroupField.svelte";
@@ -98,7 +98,11 @@
             if (!currentPerson.birthday && draft.birthday) fields.push("birthday", "lunarBirthday");
             const tags = tagsText.split(/[，,、\s]+/).map((tag) => tag.trim()).filter(Boolean);
             if (tags.length) fields.push("tags");
-            submittedRequest = { draft: { ...currentPerson, ...draft, name: currentPerson.name, tags }, fields };
+            const submittedDraft = { ...currentPerson, ...draft, name: currentPerson.name, tags };
+            const validationErrors = validateDraft(submittedDraft);
+            if (validationErrors.length) throw new Error(validationErrors.join("；"));
+            // 仅在请求可发送后冻结原输入；本地校验失败应允许修正后重新提交。
+            submittedRequest = { draft: submittedDraft, fields };
         }
         const result = await writeImportFields(settings, currentPerson, currentPerson, submittedRequest.draft,
             failedFields.length ? failedFields : submittedRequest.fields);

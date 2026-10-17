@@ -49,16 +49,24 @@ export function capturePeopleProfileLifetime(plugin: Plugin): () => void {
     };
 }
 
-export async function enrichContactProfiles(people: ContactSummary[], plugin = profilePlugin): Promise<ContactSummary[]> {
-    if (!plugin) return people;
+async function readContactProfileSnapshot(plugin: Plugin | undefined) {
+    if (!plugin) return null;
     const [affiliations, relationship] = await Promise.allSettled([
         Promise.all([scanOrganizations(), loadOrgMembershipStore(plugin)]),
         Promise.all([loadSelfIdentity(plugin), loadRelationshipLabelStore(plugin)]),
     ]);
-    const readAt = Date.now();
+    return {
+        affiliations, relationship, readAt: Date.now(),
+        organizationMap: affiliations.status === "fulfilled"
+            ? new Map(affiliations.value[0].map((organization) => [organization.docId, organization])) : null,
+    };
+}
+
+function projectContactProfiles(people: ContactSummary[], snapshot: Awaited<ReturnType<typeof readContactProfileSnapshot>>): ContactSummary[] {
+    if (!snapshot) return people;
+    const { affiliations, relationship, readAt, organizationMap } = snapshot;
     const counts = new Map<string, number>();
     for (const person of people) counts.set(person.docId, (counts.get(person.docId) ?? 0) + 1);
-    const organizationMap = affiliations.status === "fulfilled" ? new Map(affiliations.value[0].map((organization) => [organization.docId, organization])) : null;
     const identity = relationship.status === "fulfilled" ? relationship.value[0] : undefined;
     const self = identity ? people.filter((person) => person.docId === identity.selfDocId) : [];
     const selfDocId = identity === null ? null : identity && self.length === 1 && self[0].itemId === identity.selfItemId ? identity.selfDocId : undefined;
@@ -70,6 +78,16 @@ export async function enrichContactProfiles(people: ContactSummary[], plugin = p
             ? projectPersonRelationshipLabels(relationship.value[1], selfDocId, person.docId) : { state: "unknown" as const, labels: null },
         relationshipMessage: relationship.status === "rejected" || selfDocId === undefined ? "本人参照或称谓读取未核实" : undefined,
     } }));
+}
+
+/** 同一轮渐进名册共享只读快照；完整名册可再次投影，以核实跨页的本人参照。 */
+export function createContactProfileProjection(plugin = profilePlugin): (people: ContactSummary[]) => Promise<ContactSummary[]> {
+    let snapshot: ReturnType<typeof readContactProfileSnapshot> | undefined;
+    return async (people) => projectContactProfiles(people, await (snapshot ??= readContactProfileSnapshot(plugin)));
+}
+
+export async function enrichContactProfiles(people: ContactSummary[], plugin = profilePlugin): Promise<ContactSummary[]> {
+    return projectContactProfiles(people, await readContactProfileSnapshot(plugin));
 }
 
 export interface RelationshipLabelEditorState {

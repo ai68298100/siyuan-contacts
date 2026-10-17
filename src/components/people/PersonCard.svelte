@@ -14,6 +14,7 @@
         onToggleSelected,
         onOpenPersonDoc,
         recent,
+        recentUnknown = false,
         orgLine = "",
     }: {
         person: ContactSummary;
@@ -23,6 +24,7 @@
         onToggleSelected?: (selected: boolean) => void;
         onOpenPersonDoc?: (docId: string) => void;
         recent?: { occurredAt: number; localDate: string };
+        recentUnknown?: boolean;
         /** B12：单位显示串（组织名 · 部门，来自成员索引投影） */
         orgLine?: string;
     } = $props();
@@ -36,6 +38,7 @@
     }
     const birthday = $derived(nextBirthday(person.birthday, person.isLunar));
     const recentLabel = $derived.by(() => {
+        if (recentUnknown) return "最近互动待核实";
         if (!recent) return "暂无互动";
         const today = new Date();
         const day = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();

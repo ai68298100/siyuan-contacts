@@ -12,8 +12,8 @@ import type { VcfDocumentCheckpoint } from "../domain/vcard.ts";
 import { withStoreLock } from "../data/storage";
 import { discoverAllImportCandidates } from "./import-scan";
 import { getRoster, invalidateRoster } from "./roster";
-import { enrichContactProfiles } from "./people-profiles";
-import { enrichContactAliases } from "./contact-aliases";
+import { createContactProfileProjection, enrichContactProfiles } from "./people-profiles";
+import { createContactAliasProjection, enrichContactAliases } from "./contact-aliases";
 import { filterContactSearch } from "../domain/contact-search";
 import { profileText } from "../domain/people-profiles";
 import { rosterFromRender, rosterPageState } from "../domain/roster";
@@ -66,11 +66,26 @@ export interface ContactPage {
     page: number;
     pageSize: number;
     total: number;
+    totalKnown: boolean;
     hasMore: boolean;
 }
 
+export type ContactListProjection = (people: ContactSummary[]) => Promise<ContactSummary[]>;
+
 export interface ContactPageOptions {
     signal?: AbortSignal;
+    project?: ContactListProjection;
+}
+
+/** 一次名册读取共享扩展资料快照；搜索条件变化仅在当前名册上做投影。 */
+export function createContactListProjection(): ContactListProjection {
+    const profile = createContactProfileProjection();
+    const aliases = createContactAliasProjection();
+    return async (people) => markSelfContacts(await aliases(await profile(people)));
+}
+
+function markSelfContacts(people: ContactSummary[]): ContactSummary[] {
+    return people.map((person) => person.profile?.selfDocId === person.docId ? { ...person, isSelf: true } : person);
 }
 
 /**
@@ -99,21 +114,33 @@ export async function listContactPage(
         ? { view: { ...rendered.view, rows: returnedRows.slice((page - 1) * pageSize, page * pageSize) } }
         : rendered;
     const rawPeople = rosterFromRender(pagedRendered, settings.fieldMap);
-    const total = typeof rowCount === "number" && Number.isSafeInteger(rowCount) && rowCount >= 0
+    const totalKnown = typeof rowCount === "number" && Number.isSafeInteger(rowCount) && rowCount >= 0;
+    const total = totalKnown
         ? rowCount
         : (page - 1) * pageSize + rawPeople.length;
-    const enriched = await enrichContactAliases(await enrichContactProfiles(rawPeople));
-    const people = enriched.map((person) => person.profile?.selfDocId === person.docId
-        ? { ...person, isSelf: true }
-        : person);
-    const hasKnownRowCount = typeof rowCount === "number" && Number.isSafeInteger(rowCount) && rowCount >= 0;
-    const state = rosterPageState(page, pageSize, total, people.length);
+    // 部分宿主会把首次请求限制在更小的一页；只有权威总数证明尚有数据时
+    // 才将首屏长度作为有效分页大小，后续请求须沿用，避免跳过中间行。
+    const effectivePageSize = !responseLooksUnpaged && page === 1 && totalKnown
+        && rawPeople.length > 0 && rawPeople.length < pageSize && total > rawPeople.length
+        ? rawPeople.length : pageSize;
+    const offset = (page - 1) * effectivePageSize;
+    if (totalKnown && offset > total) throw new Error("联系人分页页码超过权威总数，已停止继续读取");
+    if (totalKnown && rawPeople.length === 0 && offset < total) throw new Error("联系人分页返回空页但仍有后续数据，已停止继续读取");
+    if (totalKnown && page > 1 && rawPeople.length < effectivePageSize && offset + rawPeople.length < total) {
+        throw new Error("联系人分页返回中间短页，分页大小尚未核实，已停止继续读取");
+    }
+    if (totalKnown && rawPeople.length > 0 && offset + rawPeople.length > total) throw new Error("联系人分页总数与实际读取不一致，请重新读取核实");
+    const enriched = options.project ? await options.project(rawPeople)
+        : await enrichContactAliases(await enrichContactProfiles(rawPeople));
+    const people = markSelfContacts(enriched);
+    const state = rosterPageState(page, effectivePageSize, total, people.length);
     return {
         people,
         page,
-        pageSize,
-        total: Math.max(state.total, (page - 1) * pageSize + people.length),
-        hasMore: hasKnownRowCount ? state.hasMore : people.length === pageSize,
+        pageSize: effectivePageSize,
+        total: Math.max(state.total, offset + people.length),
+        totalKnown,
+        hasMore: totalKnown ? state.hasMore : people.length === effectivePageSize,
     };
 }
 

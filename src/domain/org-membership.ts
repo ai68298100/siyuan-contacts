@@ -38,6 +38,23 @@ export interface OrgMembershipStore {
 
 export type OrgMembershipStatusFilter = "all" | "active" | "former";
 
+/**
+ * 组织归属选择器的候选规则：当前归属模式保持幂等，历史模式允许在
+ * 已有当前归属的同一组织上再补一段 former 经历。组织列表本身已在
+ * service 层排除已移除组织，因此这里只处理成员记录与状态语义。
+ */
+export function filterOrganizationMembershipCandidates<
+    T extends { docId: string },
+>(
+    organizations: readonly T[],
+    memberships: readonly Pick<OrgMembership, "orgDocId" | "status">[],
+    status: OrgMembershipStatus,
+): T[] {
+    if (status === "former") return [...organizations];
+    const activeOrgIds = new Set(memberships.filter((item) => item.status === "active").map((item) => item.orgDocId));
+    return organizations.filter((organization) => !activeOrgIds.has(organization.docId));
+}
+
 export interface OrgMembershipPage<T> {
     items: T[];
     offset: number;

@@ -54,7 +54,7 @@ pnpm install          # 国内网络慢可先: pnpm config set registry https://
 
 ## 当前状态速览（详见 docs/PROGRESS.md）
 
-- v0.5.16 已发布并完成附件下载校验；当前门禁和未验证项以 [docs/RELEASE.md](RELEASE.md) 为准
+- v0.5.17 已发布并完成附件下载校验；当前门禁和未验证项以 [docs/RELEASE.md](RELEASE.md) / [docs/UI-REGRESSION.md](UI-REGRESSION.md) 为准
 - 已完成：F01–F16 及联系人管理（含存量笔记收编）、vCard (.vcf) 导入导出、关系图谱、相关人物双链区块、
   农历生日提醒、久未联系仪表盘、从笔记捕获（含 AI 抽取）、人物文档档案条、对外人员服务桥、性能预算
-- 下一步：Issue #35 仍需脱敏 VCF 确认是否命中根因；#36–#40 已完成并关闭。AG-B13-007 的现有模型契约与隔离实现已收口并随 v0.5.16 发布，整卡仍为 `partial`，不再重复开契约评审。若有隔离真实思源环境，按 [执行看板](AGENT-DEVELOPMENT-BACKLOG.md) 推进 Host Queue `AG-HOST-003/006`，B13 宿主证据按卡补齐；没有 ready 实现卡时，不从历史待办直接开工。
+- 下一步：Issue #35 仍需真实脱敏 VCF 确认是否命中根因；#36–#40、#51/#54 已完成并关闭。AG-B13-007 的现有模型契约与隔离实现已收口并随 v0.5.16 发布，整卡仍为 `partial`，不再重复开契约评审。隔离真实内核 `11/11` 与 Chrome `browser-desktop` 已通过，但真实用户工作区、原生编辑器/图、其他任务管理器互读和真机仍属 Host Queue；按 [执行看板](AGENT-DEVELOPMENT-BACKLOG.md) 推进 `AG-HOST-003/006`，没有 ready 实现卡时不从历史待办直接开工。

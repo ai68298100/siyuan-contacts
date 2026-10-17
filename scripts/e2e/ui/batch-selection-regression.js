@@ -186,6 +186,94 @@ export async function runBatchSelectionRegression({ test, assert, kernel, settin
         } finally { release(); await disposePeople(component, state, fixture, until); }
     });
 
+    await test("批量加入组织断点：部分成功锁定原组织，重读目录不换联系人范围或重试集合", async () => {
+        const state = configureBatchSelection(kernel, settings, 2);
+        const organizations = [{ docId: "20261004000000-org0001", name: "原目标组织" }, { docId: "20261004000000-org0002", name: "另一个组织" }];
+        const calls = [];
+        let firstFailure = true;
+        const component = mount(PeopleView, { target: fixture, props: {
+            settings, preferences: { ...DEFAULT_VIEW_PREFERENCES, peopleView: "card" }, revision: 0,
+            initialSort: "name", loadRecentInteractions: async () => ({}), onOpenDetail() {},
+            onPreferencesChange: async (next) => next, onLoadOrgCandidates: async () => organizations.map((org) => ({ ...org })),
+            onAddOrgMembership: async (personDocId, orgDocId) => {
+                calls.push({ personDocId, orgDocId });
+                if (personDocId === state.people[0].docId && firstFailure) { firstFailure = false; throw new Error("保留原组织断点"); }
+            },
+        } });
+        try {
+            await until(() => fixture.querySelectorAll(".lvct-person-card").length === 2, "组织断点名册未加载");
+            button("选择当前页（2 人）").click(); await tick(); button("加入组织").click();
+            await until(() => batchDialog(fixture)?.querySelector("select option[value='20261004000000-org0001']"), "组织断点候选未加载");
+            const dialog = batchDialog(fixture); let selector = dialog.querySelector("select");
+            selector.value = organizations[0].docId; selector.dispatchEvent(new Event("change", { bubbles: true }));
+            button("加入所选组织", dialog).click();
+            await until(() => dialog.textContent.includes("1 人失败") && !button("重试失败项", dialog).disabled, "组织断点失败未呈现");
+            assert(selector.disabled, "部分成功后仍允许静默更改目标组织");
+            const originalTargets = targets(dialog);
+            // A new visible selection outside the preview must not replace its fixed queue.
+            setSearch(fixture, state.people[1].name);
+            await until(() => fixture.querySelectorAll(".lvct-person-card").length === 1, "断点搜索未收窄");
+            button("选择当前页（1 人）").click();
+            organizations.reverse();
+            button("重新读取组织", dialog).click();
+            await until(() => !button("重新读取组织", dialog).disabled, "断点目录重读未完成");
+            selector = dialog.querySelector("select");
+            assert(selector.value === "20261004000000-org0001" && selector.disabled && dialog.textContent.includes("保留原组织断点")
+                && JSON.stringify(targets(dialog)) === JSON.stringify(originalTargets), "重读目录改变原组织、联系人或失败集合");
+            // Programmatic change events cannot redefine an already-started intent either.
+            selector.value = "20261004000000-org0002"; selector.dispatchEvent(new Event("change", { bubbles: true }));
+            await tick();
+            assert(selector.value === "20261004000000-org0001", "禁用组织选择器被 change 绕过");
+            button("重试失败项", dialog).click();
+            await until(() => !batchDialog(fixture), "原组织断点没有完成");
+            assert(calls.length === 3 && calls.every((call) => call.orgDocId === "20261004000000-org0001")
+                && calls.filter((call) => call.personDocId === state.people[1].docId).length === 1, "目录刷新或换目标导致成功项重写或跨组织重试");
+        } finally { await disposePeople(component, state, fixture, until); }
+    });
+
+    await test("批量加入组织断点：原组织失效或读取失败时零重试，恢复同一身份后只重试原失败人", async () => {
+        const state = configureBatchSelection(kernel, settings, 2);
+        const original = { docId: "20261004000000-org0001", name: "需核实的原组织" };
+        const other = { docId: "20261004000000-org0002", name: original.name };
+        let candidates = [original, other], readFails = false, firstFailure = true;
+        const calls = [];
+        const component = mount(PeopleView, { target: fixture, props: {
+            settings, preferences: { ...DEFAULT_VIEW_PREFERENCES, peopleView: "card" }, revision: 0,
+            initialSort: "name", loadRecentInteractions: async () => ({}), onOpenDetail() {}, onPreferencesChange: async (next) => next,
+            onLoadOrgCandidates: async () => { if (readFails) throw new Error("目录核实失败"); return candidates.map((org) => ({ ...org })); },
+            onAddOrgMembership: async (personDocId, orgDocId) => {
+                calls.push({ personDocId, orgDocId });
+                if (personDocId === state.people[0].docId && firstFailure) { firstFailure = false; throw new Error("原失败人"); }
+            },
+        } });
+        try {
+            await until(() => fixture.querySelectorAll(".lvct-person-card").length === 2, "失效目标名册未加载");
+            button("选择当前页（2 人）").click(); await tick(); button("加入组织").click();
+            await until(() => batchDialog(fixture)?.querySelector(`option[value='${original.docId}']`), "失效目标候选未加载");
+            const dialog = batchDialog(fixture); let selector = dialog.querySelector("select");
+            assert([...selector.options].filter((option) => option.value).every((option) => option.textContent.includes(option.value)), "同名目标组织缺少稳定身份区分");
+            selector.value = original.docId; selector.dispatchEvent(new Event("change", { bubbles: true }));
+            button("加入所选组织", dialog).click();
+            await until(() => dialog.textContent.includes("原失败人") && !button("重试失败项", dialog).disabled, "失效目标首次断点未出现");
+            for (const unavailable of [[{ ...original, archived: true }, other], [{ ...other, name: original.name }]]) {
+                candidates = unavailable; button("重新读取组织", dialog).click();
+                await until(() => !button("重新读取组织", dialog).disabled, "失效目标重读未完成");
+                selector = dialog.querySelector("select");
+                assert(button("重试失败项", dialog).disabled && selector.value === original.docId && dialog.textContent.includes("原失败人"), "失效目标被清除、同名替换或重试集合丢失");
+                button("重试失败项", dialog).click(); await tick();
+                assert(calls.length === 2, "原目标未核实时仍发送组织写入");
+            }
+            candidates = [original, other]; readFails = true; button("重新读取组织", dialog).click();
+            await until(() => dialog.textContent.includes("目录核实失败") && !button("重新读取组织", dialog).disabled, "目录失败没有反馈");
+            assert(button("重试失败项", dialog).disabled && calls.length === 2, "目录读取失败沿用旧候选进行写入");
+            readFails = false; button("重新读取组织", dialog).click();
+            await until(() => !button("重试失败项", dialog).disabled, "同一组织恢复后无法核实并继续");
+            button("重试失败项", dialog).click(); await until(() => !batchDialog(fixture), "原组织恢复后断点未完成");
+            assert(calls.length === 3 && calls.every((call) => call.orgDocId === original.docId)
+                && calls.filter((call) => call.personDocId === state.people[1].docId).length === 1, "恢复后重复成功人或写入替代组织");
+        } finally { await disposePeople(component, state, fixture, until); }
+    });
+
     await test("批量选择 200/201 边界：当前页不含第 201 人，加载更多不暗增选择，全部筛选包含下一页", async () => {
         const state = configureBatchSelection(kernel, settings, 201);
         const component = mountPeople(fixture, settings);

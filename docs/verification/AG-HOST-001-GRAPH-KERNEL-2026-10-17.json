@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-17",
+  "kernelVersion": "3.8.8-alpha.3",
+  "isolated": true,
+  "randomPort": true,
+  "uuidWorkspace": true,
+  "graphApi": {
+    "getGraphWithConf": "observed",
+    "getGraphWithoutConf": "required-conf",
+    "getLocalGraphWithConf": "observed",
+    "getLocalGraphWithoutConf": "required-conf",
+    "getBlockGraph": "unsupported-or-empty-response"
+  },
+  "refs": {
+    "forwardEdges": 2,
+    "reverseEdge": true,
+    "markdownSiyuanBlockLinkCreatesRefs": false
+  },
+  "graphShape": {
+    "localGraphNodes": 4,
+    "globalGraphNodes": 5,
+    "localGraphIncludesCenterAndInboundFixture": true
+  },
+  "nativeGraphPanel": "not_verified",
+  "productionChanges": false,
+  "scopeNote": "本轮只验证真实 Kernel 的 refs、图端点形状和反向边；未打开真实原生图面板，未验证中心透传、返回语义、移动端行为或真实用户工作区。"
+}

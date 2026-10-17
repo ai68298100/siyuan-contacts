@@ -73,6 +73,11 @@ import { runGraphLayoutRegression } from "./graph-layout-regression.js";
 import { runAiPreflightRegression } from "./ai-preflight-regression.js";
 import { runImportRegression } from "./import-regression.js";
 import { runPersonFieldsRegression } from "./person-fields-regression.js";
+import { runPersonEditOrganizationRegression } from "./person-edit-organizations-regression.js";
+import { runAddPersonOrganizationRegression } from "./add-person-organizations-regression.js";
+import { runOrganizationHistoryRegression } from "./organization-history-regression.js";
+import { runFormSaveBoundariesRegression } from "./form-save-boundaries-regression.js";
+import { runPersonPickerInteractionRegression } from "./person-picker-interaction-regression.js";
 
 import { runAliasRegression } from "./alias-regression.js";
 import { runOrganizationContextRegression } from "./organization-context-regression.js";
@@ -80,6 +85,8 @@ import { runSettingsRepairRegression } from "./settings-repair-regression.js";
 import { runDocumentNavigationRegression } from "./document-navigation-regression.js";
 import { runOpenDocumentRegression } from "./open-document-regression.js";
 import { runBatchSelectionRegression } from "./batch-selection-regression.js";
+import { runSearchCompletenessRegression } from "./search-completeness-regression.js";
+import { runRecentFilterBoundariesRegression } from "./recent-filter-boundaries-regression.js";
 import { buildAiPreflight } from "../../../src/domain/ai-preflight";
 import { buildAiCandidateDrafts } from "../../../src/domain/ai-candidates";
 
@@ -125,6 +132,35 @@ function navButton(labels, root = fixture) {
 function input(node, value) {
     node.value = value;
     node.dispatchEvent(new Event("input", { bubbles: true }));
+}
+async function trustedRelationInput(node, target = "relation-empty-cta", action = "click") {
+    let trusted = false;
+    const selector = target === "relation-heading"
+        ? "#lvct-detail-panel-relations h4"
+        : "#lvct-detail-panel-relations .lvct-empty__actions button";
+    // Observe on the fixture so a late roster refresh replacing the original
+    // button cannot lose the click observer while CDP finds the current button.
+    const observe = (event) => {
+        if (event.target instanceof Element && event.target.closest(selector)) trusted = event.isTrusted;
+    };
+    fixture.addEventListener("click", observe, true);
+    const requestId = `relation-empty-${Date.now()}`;
+    await new Promise((resolve, reject) => {
+        const finish = (error) => {
+            clearTimeout(timeout);
+            window.removeEventListener("lvct:trusted-click-done", complete);
+            fixture.removeEventListener("click", observe, true);
+            error ? reject(new Error(error)) : resolve();
+        };
+        const complete = (event) => {
+            if (event.detail.requestId === requestId) finish(event.detail.error);
+        };
+        const timeout = setTimeout(() => finish("Chrome 真实点击请求超时"), 5000);
+        window.addEventListener("lvct:trusted-click-done", complete);
+        window.__lvctTrustedClick(JSON.stringify({ requestId, target, action }));
+    });
+    if (!trusted) console.log(`B03 input target=${target} originalConnected=${node.isConnected}`);
+    return trusted;
 }
 /** B03 可搜索选人器驱动：按 aria-label 打开浮层，按候选名筛选后点选第一项 */
 async function pickOption(label, name) {
@@ -389,6 +425,7 @@ async function test(name, action) {
         delete state.__lvctWorkbench;
         history.replaceState(state, "", location.href);
         fixture.replaceChildren();
+        document.querySelector("#results").hidden = false;
         document.querySelector("#results").textContent = JSON.stringify(results, null, 2);
     }
 }
@@ -716,7 +753,7 @@ await test("数据刷新乱序防护：慢的旧互动响应不得覆盖新数�
     assert(peopleNav && peopleNav.closest("button"), "未找到联系人导航按钮");
     peopleNav.closest("button").click();
     await until(() => fixture.querySelector(".lvct-person-card"), "名册未渲染");
-    assert(fixture.textContent.includes("暂无互动"), "初始未拿到互动数据应显示暂无互动");
+    assert(fixture.textContent.includes("最近互动待核实"), "初始未拿到互动数据应显示待核实状态");
     emitDataChanged();
     await until(() => fixture.textContent.includes("昨天互动"), "数据变化未带来新互动数据");
     /* 迟到的旧响应（60 天前）必须在代际守卫处丢弃 */
@@ -870,6 +907,25 @@ await test("相关人选择走可搜索选人器：电话关键词筛选、空�
     await until(() => fixture.querySelector(".lvct-picker__panel"), "空态选择联系人按钮未打开选人浮层");
     fixture.querySelector(".lvct-picker__search").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
     await until(() => !fixture.querySelector(".lvct-picker__panel"), "空态选择联系人浮层无法关闭");
+    // A native click can run queued microtasks between DOM event listeners.
+    // Keep the synthetic control above, and exercise the same CTA with Chrome
+    // trusted input so an outside-click race cannot pass only in the fixture.
+    const trusted = await trustedRelationInput(emptyRelationCta);
+    console.log(`B03 empty relation CTA isTrusted=${trusted}`);
+    assert(trusted, "关系空态回归必须使用 Chrome 真实输入（isTrusted=true）");
+    await pause(80);
+    assert(fixture.querySelector(".lvct-picker__panel"), "真实点击空状态“选择联系人”后选人浮层被立即关闭（isTrusted=true）");
+    assert(fixture.querySelector(".lvct-picker__trigger").getAttribute("aria-expanded") === "true", "真实打开后 aria-expanded 未同步");
+    assert(document.activeElement === fixture.querySelector(".lvct-picker__search"), "真实打开后搜索框未获得焦点");
+    const relationHeading = fixture.querySelector("#lvct-detail-panel-relations h4");
+    assert(await trustedRelationInput(relationHeading, "relation-heading"), "外部点击必须来自 Chrome 真实输入");
+    await until(() => !fixture.querySelector(".lvct-picker__panel"), "真实外部点击未关闭选人浮层");
+    assert(await trustedRelationInput(emptyRelationCta, "relation-empty-cta", "enter"), "键盘重开必须产生可信激活事件");
+    await pause(80);
+    assert(fixture.querySelector(".lvct-picker__panel"), "Chrome Enter 激活空态入口后没有保持选人浮层打开");
+    assert(document.activeElement === fixture.querySelector(".lvct-picker__search"), "键盘重开后搜索框未获得焦点");
+    fixture.querySelector(".lvct-picker__search").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    await until(() => !fixture.querySelector(".lvct-picker__panel"), "真实点击打开的空态选人浮层无法关闭");
     await until(() => fixture.querySelector(".lvct-picker__trigger:not([disabled])"), "选人浮层触发器未就绪");
     fixture.querySelector(".lvct-picker__trigger").click();
     await until(() => fixture.querySelector(".lvct-picker__panel"), "选人浮层未打开");
@@ -1613,6 +1669,7 @@ await test("新建联系人先核验组织和本人前置条件，不因补充�
     await tick();
     const relationshipInput = fixture.querySelector('[placeholder^="例如：同事、朋友、校友"]');
     input(relationshipInput, "同事");
+    await until(() => !button("创建联系人").disabled, "补充资料初始读取完成后创建入口未恢复");
     button("创建联系人").click();
     await until(() => [...fixture.querySelectorAll('[role="alert"]')].some((node) => node.textContent?.includes("先在设置中指定“我”的档案")), "本人身份缺失时没有给出创建前提示");
     assert(state.creates.length === 0, "关系称谓缺少本人身份时仍创建了联系人文档");
@@ -1621,6 +1678,7 @@ await test("新建联系人先核验组织和本人前置条件，不因补充�
     [...fixture.querySelectorAll("button")].find((node) => node.textContent?.includes("创建本人档案"))?.click();
     await until(() => fixture.textContent.includes("本人档案已设置"), "本人档案设置没有成功反馈");
     assert(relationshipInput?.value === "同事", "设置本人档案后联系人补充资料草稿丢失");
+    await until(() => !button("创建联系人").disabled, "本人档案设置后创建入口未恢复");
     button("创建联系人").click();
     await until(() => state.creates.length === 1, "设置本人档案后未能继续创建联系人");
 });
@@ -2653,6 +2711,7 @@ await test("人物详情窗口：居中宽版、焦点循环和嵌套 Esc；X �
     const editorPanel = [...fixture.querySelectorAll(".lvct-dialog-panel")].at(-1);
     await until(() => [...editorPanel.querySelectorAll("button")].some((node) => node.textContent.trim() === "新建组织" && !node.disabled), "人物编辑新建组织入口未启用");
     const findCreateOrgTrigger = () => [...editorPanel.querySelectorAll("button")].find((node) => node.textContent.trim() === "新建组织");
+    const findOrgReturnTrigger = () => editorPanel.querySelector('button[aria-label="选择组织（可多选）"]');
     let createOrgTrigger = button("新建组织", editorPanel);
     createOrgTrigger.focus();
     createOrgTrigger.click();
@@ -2665,9 +2724,9 @@ await test("人物详情窗口：居中宽版、焦点循环和嵌套 Esc；X �
     orgClose.focus();
     orgClose.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await until(() => !fixture.querySelector(".lvct-org-profile-editor"), "新建组织 Esc 没有关闭资料窗口");
-    await until(() => findCreateOrgTrigger() && !findCreateOrgTrigger().disabled && document.activeElement === findCreateOrgTrigger(), "取消新建组织没有等待候选刷新后恢复入口焦点");
+    await until(() => findOrgReturnTrigger() && !findOrgReturnTrigger().disabled && document.activeElement === findOrgReturnTrigger(), "取消新建组织没有等待候选刷新后恢复选择器焦点");
     createOrgTrigger = findCreateOrgTrigger();
-    assert(panel.isConnected && editorPanel.isConnected && document.activeElement === createOrgTrigger, "取消新建组织没有返回人物编辑入口");
+    assert(panel.isConnected && editorPanel.isConnected && document.activeElement === findOrgReturnTrigger(), "取消新建组织没有返回人物编辑入口");
     createOrgTrigger.click();
     await until(() => fixture.querySelector(".lvct-org-profile-editor"), "再次新建组织窗口未打开");
     const dirtyOrgPanel = fixture.querySelector(".lvct-org-profile-editor").closest(".lvct-dialog-panel");
@@ -2684,7 +2743,7 @@ await test("人物详情窗口：居中宽版、焦点循环和嵌套 Esc；X �
     orgName.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
     await until(() => document.querySelector(".lvct-closeguard"), "新建组织 Esc 没有保护自己的脏草稿");
     document.querySelector('.lvct-closeguard button[data-choice="discard"]').click();
-    await until(() => !fixture.querySelector(".lvct-org-profile-editor") && findCreateOrgTrigger() && !findCreateOrgTrigger().disabled && document.activeElement === findCreateOrgTrigger(), "放弃组织草稿没有返回人物编辑入口");
+    await until(() => !fixture.querySelector(".lvct-org-profile-editor") && findOrgReturnTrigger() && !findOrgReturnTrigger().disabled && document.activeElement === findOrgReturnTrigger(), "放弃组织草稿没有返回人物编辑选择器");
     editorPanel.querySelector(".lvct-dialog-panel__close").focus();
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await until(() => fixture.querySelectorAll(".lvct-dialog-panel").length === 1, "嵌套编辑 Esc 没有只关闭一层");
@@ -2891,67 +2950,6 @@ await test("字段编辑界面：邮箱和生日校验关联到字段并聚焦�
     assert(document.activeElement === birthday && birthdayState.writes.length === 0 && saved === 0 && !closed, "生日校验未聚焦字段、仍写入或关闭编辑页");
 });
 
-await test("B12 编辑界面：关系称谓可填写，工作单位与学校可选择并保存", async () => {
-    let relationship = null;
-    const added = [];
-    let saved = 0;
-    mounted = mount(PersonEditDialog, { target: fixture, props: {
-        settings, person,
-        onLoadRelationshipLabels: async () => ({ selfDocId: "20260927000000-self001", record: relationship }),
-        onSaveRelationshipLabels: async (docId, selfDocId, labels) => {
-            relationship = { id: "label-1", selfDocId, personDocId: docId, labels, createdAt: "2026-10-08T00:00:00Z", updatedAt: "2026-10-08T00:00:00Z" };
-            return relationship;
-        },
-        onLoadOrgMemberships: async () => [],
-        onLoadOrgCandidates: async () => [{ docId: "org-work", name: "测试公司" }, { docId: "org-school", name: "测试学校" }],
-        onAddOrgMembership: async (docId, orgDocId, extra) => { added.push({ docId, orgDocId, extra }); },
-        onSaved: () => { saved += 1; }, onClose: () => {},
-    } });
-    await until(() => fixture.querySelector(".lvct-person-edit__profile input[maxlength=\"1600\"]"), `编辑页未显示资料补充区：${fixture.textContent}`);
-    await tick();
-    const relationshipInput = fixture.querySelector(".lvct-person-edit__profile input[maxlength=\"1600\"]");
-    assert(relationshipInput, `关系称谓输入框在渲染后消失：${fixture.textContent}`);
-    input(relationshipInput, "同事、朋友");
-    const selects = [...fixture.querySelectorAll(".lvct-person-edit__profile select")];
-    assert(selects.length === 2, "工作单位/学校选择器缺失");
-    selects[0].value = "org-work";
-    selects[0].dispatchEvent(new Event("change", { bubbles: true }));
-    selects[1].value = "org-school";
-    selects[1].dispatchEvent(new Event("change", { bubbles: true }));
-    await tick();
-    button("保存这些资料").click();
-    await until(() => saved === 1, "资料补充保存未完成");
-    assert(relationship?.labels.join("、") === "同事、朋友", "关系称谓未保存");
-    assert(added.length === 2 && added.some((item) => item.extra.affiliationKind === "work") && added.some((item) => item.extra.affiliationKind === "education"), "工作单位/学校归属未写入");
-});
-
-await test("B12 编辑界面：本人可选择工作单位与学校且不显示自身关系称谓", async () => {
-    const added = [];
-    let saved = 0;
-    mounted = mount(PersonEditDialog, { target: fixture, props: {
-        settings, person: { ...person, isSelf: true },
-        onLoadRelationshipLabels: async () => { throw new Error("本人不应读取关系称谓"); },
-        onSaveRelationshipLabels: async () => { throw new Error("本人不应保存关系称谓"); },
-        onLoadOrgMemberships: async () => [],
-        onLoadOrgCandidates: async () => [{ docId: "org-work", name: "测试公司" }, { docId: "org-school", name: "测试学校" }],
-        onAddOrgMembership: async (docId, orgDocId, extra) => { added.push({ docId, orgDocId, extra }); },
-        onSaved: () => { saved += 1; }, onClose: () => {},
-    } });
-    await until(() => fixture.querySelectorAll(".lvct-person-edit__profile select").length === 2, `本人编辑页未显示组织选择：${fixture.textContent}`);
-    assert(!fixture.querySelector('.lvct-person-edit__profile input[maxlength="1600"]'), "本人编辑页不应显示与我的关系输入");
-    const selects = [...fixture.querySelectorAll(".lvct-person-edit__profile select")];
-    selects[0].value = "org-work";
-    selects[0].dispatchEvent(new Event("change", { bubbles: true }));
-    selects[1].value = "org-school";
-    selects[1].dispatchEvent(new Event("change", { bubbles: true }));
-    await tick();
-    button("保存这些资料").click();
-    await until(() => saved === 1, "本人组织归属保存未完成");
-    assert(added.length === 2 && added.every((item) => item.docId === person.docId)
-        && added.some((item) => item.extra.affiliationKind === "work")
-        && added.some((item) => item.extra.affiliationKind === "education"), "本人工作单位/学校归属未写入");
-});
-
 await test("CODE-02.4 编辑写前预校验：非法生日/邮箱零写入，逐字段失败报告可重试", async () => {
     let setCellCount = 0;
     let failWechat = true;
@@ -3108,11 +3106,11 @@ await test("B13.5 双向编辑完整版：人物详情内添加/移除组织归�
         onOpenPersonDoc() {}, onNavigate() {}, onDeleted() {}, onClose() {},
     } });
     await until(() => fixture.textContent.includes("组织归属"), "组织归属区块未挂载");
-    /* 候选过滤：已加入的测试公司不进下拉，只有新公司 */
+    /* 已有当前组织保留在候选中用于补录历史；新组织也可继续加入 */
     const orgSelect = fixture.querySelector('select[aria-label="选择要加入的组织"]');
     assert(orgSelect, "添加归属表单未出现");
     const optionTexts = [...orgSelect.querySelectorAll("option")].map((node) => node.textContent);
-    assert(!optionTexts.some((text) => text.includes("测试公司")), "已加入组织不应出现在候选");
+    assert(optionTexts.some((text) => text.includes("测试公司")), "已有组织应保留为历史补录候选");
     assert(optionTexts.some((text) => text.includes("新公司")), "未加入组织应出现在候选");
     /* 添加归属：选组织+填部门 → 走 facade（personDocId/orgDocId 分传）→ 刷新 + onChanged */
     orgSelect.value = "20260930000000-org0002";
@@ -7120,6 +7118,10 @@ await runLifecycleRegression({ test, assert, fixture, until, settings });
 await runTextEncodingRegression({ test, assert, kernel, settings });
 await runVcardRegression({ test, assert, kernel, settings, fixture, until, button });
 await runPersonFieldsRegression({ test, assert, settings, fixture, until, button });
+await runPersonEditOrganizationRegression({ test, assert, settings, person, fixture, until, button, input });
+await runAddPersonOrganizationRegression({ test, assert, settings, kernel, fixture, until, button, input });
+await runOrganizationHistoryRegression({ test, assert, settings, person, fixture, until, button, input });
+await runPersonPickerInteractionRegression({ test, assert, fixture, until, person });
 await runSelfIdentityRegression({ test, assert, kernel, settings, fixture, until, button });
 await runOrganizationHealthRegression({ test, assert, kernel, settings, fixture, until, button });
 await runPersonIdentityRegression({ test, assert, kernel, settings, fixture, until, button });
@@ -7129,12 +7131,15 @@ await runGraphQueryRegression({ test, assert, kernel, settings, fixture, until, 
 await runGraphLayoutRegression({ test, assert, kernel, settings, fixture, until, button });
 await runAiPreflightRegression({ test, assert, kernel, settings, fixture });
 await runImportRegression({ test, assert, kernel, settings, fixture, until, button });
+await runFormSaveBoundariesRegression({ test, assert, kernel, settings, fixture, until, button, input });
 await runAliasRegression({ test, assert, kernel, settings, fixture, until });
 await runOrganizationContextRegression({ test, assert, kernel, settings, fixture, until, button });
 await runSettingsRepairRegression({ test, assert, kernel, settings, fixture, until, button });
 await runDocumentNavigationRegression({ test, assert, kernel, settings, fixture, until, button });
 await runOpenDocumentRegression({ test, assert });
 await runBatchSelectionRegression({ test, assert, kernel, settings, fixture, until, button });
+await runSearchCompletenessRegression({ test, assert, kernel, settings, fixture, until, button });
+await runRecentFilterBoundariesRegression({ test, assert, kernel, settings, fixture, until, button });
 
 await pause(100);
 results.push({ name: "无未处理异常及响应式循环", ok: runtimeErrors.length === 0, detail: runtimeErrors.join("\n") });

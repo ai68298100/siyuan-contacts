@@ -4,6 +4,7 @@
 import { Dialog } from "siyuan";
 import { mount, unmount } from "svelte";
 import type { Component } from "svelte";
+import { dialogEscapeScope } from "./dialog-escape-scope";
 
 /**
  * D-40：宿主关闭通道守卫。
@@ -83,6 +84,14 @@ export const svelteDialog = (args: {
             if ((event as KeyboardEvent).key !== "Escape") return;
             /* 焦点不在本弹窗内时可能是更上层浮层的 Esc，保持宿主行为 */
             if (!target || !dialog.element.contains(target)) return;
+            // 在宿主 document keydown 和 Svelte 委托之前，明确交给最内层选择浮层。
+            const closeScope = dialogEscapeScope(target);
+            if (closeScope) {
+                event.stopImmediatePropagation();
+                event.preventDefault();
+                closeScope();
+                return;
+            }
         } else if (event.type === "click") {
             if (!target?.closest?.(".b3-dialog__scrim, .b3-dialog__close")) return;
         } else {
