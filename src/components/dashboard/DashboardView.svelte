@@ -860,7 +860,7 @@
                 {#snippet actionRow(card: ActionCard)}
                     <div class="lvct-dash__rowwrap">
                         <div class="lvct-dash__row lvct-dash__action-row">
-                            <button class="lvct-dash__row-main" onclick={() => onOpenDetail(card.person)}>
+                            <button type="button" class="lvct-dash__row-main" aria-label={`查看 ${card.person.name} 的详情`} onclick={() => onOpenDetail(card.person)}>
                                 <span class="lvct-dash__row-primary">
                                     <span class="lvct-dash__person-avatar" data-group={card.person.group || "未分组"}>
                                         {card.person.name.slice(0, 1)}
@@ -912,8 +912,10 @@
                         <section class="lvct-dash__group" data-action-group={group.key}>
                             <button
                                 type="button"
+                                id={`lvct-dash-group-btn-${group.key}`}
                                 class="lvct-dash__group-head"
                                 aria-expanded={!isGroupCollapsed(group)}
+                                aria-controls={`lvct-dash-group-content-${group.key}`}
                                 onclick={() => toggleGroup(group)}
                             >
                                 <span class="lvct-dash__group-caret" aria-hidden="true">{isGroupCollapsed(group) ? "▸" : "▾"}</span>
@@ -934,7 +936,7 @@
                                 </div>
                             {/if}
                             {#if !isGroupCollapsed(group)}
-                                <div class="lvct-dash__list">
+                                <div id={`lvct-dash-group-content-${group.key}`} role="region" aria-labelledby={`lvct-dash-group-btn-${group.key}`} class="lvct-dash__list">
                                     {#each group.cards as card (card.person.docId)}
                                         {@render actionRow(card)}
                                     {/each}
@@ -976,10 +978,10 @@
                         <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>查看联系人</button>
                     </ViewState>
                 {:else}
-                    <div class="lvct-dash__list">
+                    <div id="lvct-dash-birthdays-list" class="lvct-dash__list">
                         {#each previewList(data?.birthdays ?? [], showAllBirthdays, BIRTHDAY_PREVIEW_LIMIT) as item (item.person.itemId)}
                             <div class="lvct-dash__row lvct-dash__row--contact">
-                                <button type="button" class="lvct-dash__row-main" onclick={() => onOpenDetail(item.person)}>
+                                <button type="button" class="lvct-dash__row-main" aria-label={`查看 ${item.person.name} 的详情`} onclick={() => onOpenDetail(item.person)}>
                                     <span class="lvct-dash__person-avatar" data-group={item.person.group || "未分组"}>
                                         {item.person.name.slice(0, 1)}
                                     </span>
@@ -1029,7 +1031,7 @@
                         {/each}
                     </div>
                     {#if data.birthdays.length > BIRTHDAY_PREVIEW_LIMIT}
-                        <button class="lvct-dash__show-all" onclick={openAllBirthdays}>
+                        <button type="button" class="lvct-dash__show-all" aria-expanded={showAllBirthdays} aria-controls="lvct-dash-birthdays-list" onclick={openAllBirthdays}>
                             {showAllBirthdays ? text("dashShowLess", "收起") : text("dashShowAllN", "查看全部（共 {n} 条）", { n: data.birthdays.length })}
                         </button>
                     {/if}
@@ -1048,10 +1050,10 @@
                         <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>{text("dashGoContacts", "前往联系人")}</button>
                     </ViewState>
                 {:else}
-                    <div class="lvct-dash__list">
+                    <div id="lvct-dash-stale-list" class="lvct-dash__list">
                         {#each previewList(data?.stale ?? [], showAllStale, STALE_PREVIEW_LIMIT) as item (item.person.itemId)}
                             <div class="lvct-dash__row lvct-dash__row--contact">
-                                <button class="lvct-dash__row-main" onclick={() => onOpenDetail(item.person)}>
+                                <button type="button" class="lvct-dash__row-main" aria-label={`查看 ${item.person.name} 的详情`} onclick={() => onOpenDetail(item.person)}>
                                     <span class="lvct-dash__person-avatar" data-group={item.person.group || "未分组"}>
                                         {item.person.name.slice(0, 1)}
                                     </span>
@@ -1100,7 +1102,7 @@
                         {/each}
                     </div>
                     {#if data.stale.length > STALE_PREVIEW_LIMIT}
-                        <button class="lvct-dash__show-all" onclick={openAllStale}>
+                        <button type="button" class="lvct-dash__show-all" aria-expanded={showAllStale} aria-controls="lvct-dash-stale-list" onclick={openAllStale}>
                             {showAllStale ? text("dashShowLess", "收起") : text("dashShowAllN", "查看全部（共 {n} 条）", { n: data.stale.length })}
                         </button>
                     {/if}
