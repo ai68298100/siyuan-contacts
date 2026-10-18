@@ -13,6 +13,7 @@ import { buildMeetingBriefing } from "../domain/briefing";
 import type { MeetingBriefingItem } from "../domain/briefing";
 import { getOrgDisplayForDoc } from "../services/org";
 import { formatBirthdayDisplay, nextBirthday } from "../domain/occasions";
+import { copyPlainText } from "../shared/clipboard";
 import { svelteDialog } from "../libs/dialog";
 import { requestPersonNavigation, subscribeDataChanged } from "../libs/data-events";
 import PersonEditDialog from "../components/people/PersonEditDialog.svelte";
@@ -156,6 +157,45 @@ function t(context: PanelContext, key: string, fallback: string, values?: Record
 /** 档案条 chips 最多直接展示的枚数，超出折叠为可展开的 +N。 */
 const STRIP_CHIPS_MAX = 6;
 
+interface StripChipItem {
+    text: string;
+    copyValue?: string;
+    ariaLabel?: string;
+    title?: string;
+}
+
+function renderStripChip(context: PanelContext, item: StripChipItem): HTMLElement {
+    if (!item.copyValue) {
+        const span = document.createElement("span");
+        span.className = "lvct-chip";
+        span.textContent = item.text;
+        if (item.title) span.title = item.title;
+        return span;
+    }
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "lvct-chip lvct-strip__chip-action";
+    btn.textContent = item.text;
+    if (item.title) btn.title = item.title;
+    if (item.ariaLabel) btn.setAttribute("aria-label", item.ariaLabel);
+
+    let copyTimer: ReturnType<typeof setTimeout> | null = null;
+    btn.addEventListener("click", () => {
+        void copyPlainText(item.copyValue!).then(() => {
+            btn.textContent = t(context, "stripCopied", "✓ 已复制");
+            btn.classList.add("lvct-strip__chip--copied");
+            if (copyTimer) clearTimeout(copyTimer);
+            copyTimer = setTimeout(() => {
+                btn.textContent = item.text;
+                btn.classList.remove("lvct-strip__chip--copied");
+            }, 1500);
+        }).catch((err) => {
+            console.warn("[lvct] 复制联系方式失败", err);
+        });
+    });
+    return btn;
+}
+
 function buildStrip(
     context: PanelContext,
     protyle: ProtyleLike,
@@ -204,36 +244,59 @@ function buildStrip(
 
     const chips = document.createElement("div");
     chips.className = "lvct-strip__chips";
-    const chipData: string[] = [];
-    if (extras.latestNote) chipData.push(`🗒 ${extras.latestNote}`);
-    if (person.phone) chipData.push(`📞 ${person.phone}`);
-    if (person.wechat) chipData.push(`💬 ${person.wechat}`);
-    if (person.email) chipData.push(`✉️ ${person.email}`);
-    if (person.birthday) chipData.push(`🎂 ${formatBirthdayDisplay(person.birthday, person.isLunar)}`);
-    for (const tag of person.tags) chipData.push(`#${tag}`);
-    if (chipData.length === 0) {
+    const chipItems: StripChipItem[] = [];
+    if (extras.latestNote) chipItems.push({ text: `🗒 ${extras.latestNote}`, title: extras.latestNote });
+    if (person.phone) {
+        chipItems.push({
+            text: `📞 ${person.phone}`,
+            copyValue: person.phone,
+            title: t(context, "stripCopyPhone", "点击复制电话：{val}", { val: person.phone }),
+            ariaLabel: t(context, "stripCopyPhoneAria", "复制电话 {val}", { val: person.phone }),
+        });
+    }
+    if (person.wechat) {
+        chipItems.push({
+            text: `💬 ${person.wechat}`,
+            copyValue: person.wechat,
+            title: t(context, "stripCopyWechat", "点击复制微信：{val}", { val: person.wechat }),
+            ariaLabel: t(context, "stripCopyWechatAria", "复制微信 {val}", { val: person.wechat }),
+        });
+    }
+    if (person.email) {
+        chipItems.push({
+            text: `✉️ ${person.email}`,
+            copyValue: person.email,
+            title: t(context, "stripCopyEmail", "点击复制邮箱：{val}", { val: person.email }),
+            ariaLabel: t(context, "stripCopyEmailAria", "复制邮箱 {val}", { val: person.email }),
+        });
+    }
+    if (person.birthday) {
+        chipItems.push({
+            text: `🎂 ${formatBirthdayDisplay(person.birthday, person.isLunar)}`,
+            title: formatBirthdayDisplay(person.birthday, person.isLunar),
+        });
+    }
+    for (const tag of person.tags) chipItems.push({ text: `#${tag}`, title: `#${tag}` });
+    if (chipItems.length === 0) {
         const empty = document.createElement("span");
         empty.className = "ft__smaller ft__on-surface";
         empty.textContent = t(context, "stripEmptyContact", "未填写联系资料，可点右侧编辑");
         chips.appendChild(empty);
     }
     // B04：chips 有上限，超出折叠为 +N，按需展开完整值。
-    const visibleChips = chipData.slice(0, STRIP_CHIPS_MAX);
-    for (const chip of visibleChips) {
-        const span = document.createElement("span");
-        span.className = "lvct-chip";
-        span.textContent = chip;
-        chips.appendChild(span);
+    const visibleChips = chipItems.slice(0, STRIP_CHIPS_MAX);
+    for (const item of visibleChips) {
+        chips.appendChild(renderStripChip(context, item));
     }
-    if (chipData.length > visibleChips.length) {
+    if (chipItems.length > visibleChips.length) {
         // 同一人物可在分屏编辑器中出现多次，ARIA 目标必须按档案条唯一。
         const overflowId = `lvct-strip-overflow-${++stripOverflowSequence}`;
         const more = document.createElement("button");
         more.type = "button";
         more.className = "lvct-chip lvct-strip__chip-more";
-        more.textContent = t(context, "stripChipsMore", "+{n}", { n: chipData.length - visibleChips.length });
-        more.title = chipData.slice(visibleChips.length).join("、");
-        more.setAttribute("aria-label", t(context, "stripChipsMoreAria", "展开其他联系资料（{n}）", { n: chipData.length - visibleChips.length }));
+        more.textContent = t(context, "stripChipsMore", "+{n}", { n: chipItems.length - visibleChips.length });
+        more.title = chipItems.slice(visibleChips.length).map((i) => i.text).join("、");
+        more.setAttribute("aria-label", t(context, "stripChipsMoreAria", "展开其他联系资料（{n}）", { n: chipItems.length - visibleChips.length }));
         more.setAttribute("aria-expanded", "false");
         more.setAttribute("aria-controls", overflowId);
         chips.appendChild(more);
@@ -245,11 +308,8 @@ function buildStrip(
         overflow.id = overflowId;
         overflow.className = "lvct-strip__chip-overflow";
         overflow.hidden = true;
-        for (const chip of chipData.slice(visibleChips.length)) {
-            const span = document.createElement("span");
-            span.className = "lvct-chip";
-            span.textContent = chip;
-            overflow.appendChild(span);
+        for (const item of chipItems.slice(visibleChips.length)) {
+            overflow.appendChild(renderStripChip(context, item));
         }
         more.addEventListener("click", () => {
             overflow.hidden = !overflow.hidden;
@@ -260,7 +320,7 @@ function buildStrip(
                     context,
                     overflow.hidden ? "stripChipsMoreAria" : "stripChipsLessAria",
                     overflow.hidden ? "展开其他联系资料（{n}）" : "收起其他联系资料",
-                    { n: chipData.length - visibleChips.length },
+                    { n: chipItems.length - visibleChips.length },
                 ),
             );
         });

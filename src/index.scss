@@ -3847,6 +3847,33 @@ html[data-theme-mode="dark"] .lvct-doc-strip {
     color: var(--lvct-text-3);
 }
 
+.lvct-strip__chip-action {
+    cursor: pointer;
+    background: var(--lvct-bg-elevated);
+    border: 1px solid var(--lvct-border-subtle);
+    color: var(--lvct-text-2);
+    display: inline-flex;
+    align-items: center;
+    transition: background-color var(--lvct-dur-fast) ease, border-color var(--lvct-dur-fast) ease, color var(--lvct-dur-fast) ease;
+
+    &:hover {
+        background: var(--lvct-bg-hover, var(--b3-theme-surface-lighter));
+        border-color: var(--lvct-primary);
+        color: var(--lvct-primary);
+    }
+
+    &:focus-visible {
+        outline: var(--lvct-focus-ring-width, 2px) solid var(--lvct-focus-ring-color, var(--b3-theme-primary));
+        outline-offset: var(--lvct-focus-ring-offset, 1px);
+    }
+
+    &.lvct-strip__chip--copied {
+        background: var(--lvct-success-bg, rgba(46, 160, 67, 0.12));
+        border-color: var(--lvct-success);
+        color: var(--lvct-success);
+    }
+}
+
 .lvct-strip__briefing {
     margin-top: 6px;
     padding-top: 6px;
