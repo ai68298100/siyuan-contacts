@@ -1690,6 +1690,16 @@ html[data-theme-mode="dark"] .lvct-people__batchbar {
     span:nth-child(3) { width: 60%; }
 }
 
+.lvct-empty--loading {
+    .lvct-view-state__content {
+        gap: var(--lvct-sp-1);
+    }
+
+    b {
+        color: var(--lvct-text-2);
+    }
+}
+
 /* UX-02.6 错误态：图标章转危险色 + 微高光 */
 .lvct-empty--error .lvct-empty__icon {
     background: linear-gradient(135deg, color-mix(in srgb, var(--lvct-danger) 18%, var(--lvct-bg-surface)), var(--lvct-danger-soft));
@@ -4210,6 +4220,9 @@ html[data-theme-mode="dark"] .lvct-doc-strip {
     justify-content: space-between;
     gap: var(--lvct-sp-3);
 
+    > div { min-width: 0; flex: 1; }
+    > .b3-button { flex: 0 0 auto; white-space: nowrap; }
+
     h4 { margin: 0; }
     p { margin: var(--lvct-sp-1) 0 0; }
 }
@@ -4600,6 +4613,7 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
     margin: 0;
     padding: 0;
     list-style: none;
+    min-height: 0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -6197,10 +6211,37 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
 }
 
 .lvct-org-manager__member-name {
-    display: inline-flex;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    gap: 2px;
+    overflow-wrap: anywhere;
+}
+
+.lvct-org-manager__member-primary,
+.lvct-org-manager__member-meta,
+.lvct-org-manager__member-period {
+    display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 6px;
+    min-width: 0;
+}
+
+.lvct-org-manager__member-primary strong {
+    font-weight: 650;
+    overflow-wrap: anywhere;
+}
+
+.lvct-org-manager__member-meta,
+.lvct-org-manager__member-period {
+    color: var(--lvct-text-2);
+    font-size: var(--lvct-fs-caption);
+}
+
+.lvct-org-manager__member-period {
+    color: var(--lvct-text-3);
 }
 
 .lvct-org-manager__member-status {
@@ -6216,8 +6257,13 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
     white-space: nowrap;
 }
 
+.lvct-org-manager__member-status--active {
+    background: var(--lvct-accent-soft);
+    color: var(--lvct-accent);
+}
+
 .lvct-org-manager__member-note {
-    display: inline-block;
+    display: block;
     max-width: min(36ch, 100%);
     overflow: hidden;
     color: var(--lvct-text-2);
@@ -6225,6 +6271,64 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
     text-overflow: ellipsis;
     white-space: nowrap;
     vertical-align: middle;
+}
+
+.lvct-org-manager__member-actions {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--lvct-sp-1);
+    flex-shrink: 0;
+}
+
+.lvct-org-manager__member-menu {
+    position: absolute;
+    z-index: 2;
+    top: calc(100% - 2px);
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    min-width: 132px;
+    padding: var(--lvct-sp-1);
+    border: 1px solid var(--lvct-border-strong);
+    border-radius: var(--lvct-r-md);
+    background: var(--lvct-bg-elevated);
+    box-shadow: var(--lvct-shadow-float);
+
+    .b3-button {
+        width: 100%;
+        justify-content: flex-start;
+        text-align: left;
+    }
+}
+
+.lvct-org-manager__pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--lvct-sp-2);
+    flex-wrap: wrap;
+    padding-top: var(--lvct-sp-2);
+    border-top: 1px solid var(--lvct-border-subtle);
+    color: var(--lvct-text-2);
+    font-size: var(--lvct-fs-caption);
+}
+
+.lvct-org-manager__page-size,
+.lvct-org-manager__page-buttons {
+    display: flex;
+    align-items: center;
+    gap: var(--lvct-sp-1);
+}
+
+.lvct-org-manager__page-size .b3-select {
+    min-height: var(--lvct-touch-min);
+}
+
+.lvct-org-manager__page-buttons .b3-button {
+    min-height: var(--lvct-touch-min);
 }
 
 .lvct-org-manager__detail > .fn__flex:first-child .b3-button--cancel {
@@ -6613,6 +6717,30 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
 
             .b3-button { min-height: var(--lvct-touch-min-mobile); }
         }
+    }
+
+    .lvct-org-manager__member-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .lvct-org-manager__member-menu {
+        position: static;
+        flex-direction: row;
+        flex-wrap: wrap;
+        width: 100%;
+        min-width: 0;
+        box-shadow: none;
+        background: var(--lvct-bg-surface);
+    }
+
+    .lvct-org-manager__pagination {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .lvct-org-manager__page-buttons {
+        justify-content: space-between;
     }
 
     .lvct-org-manager__members {

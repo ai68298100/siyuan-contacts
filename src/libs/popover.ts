@@ -81,12 +81,33 @@ export function attachPopover(
     const onClick = (event: MouseEvent) => outside(event);
 
     place();
+    // Content can settle after the popover is first mounted (for example when
+    // an async alias lookup finishes). Reposition whenever its measured size
+    // changes so a panel that grows near the viewport edge is re-clamped.
+    let resizeFrame: number | undefined;
+    const resizeObserver = typeof ResizeObserver === "undefined"
+        ? undefined
+        : new ResizeObserver(() => {
+            // Reposition after async content settles, while disconnecting
+            // during measurement so visibility/style writes do not create a
+            // ResizeObserver feedback loop in Chromium.
+            if (resizeFrame !== undefined) return;
+            resizeFrame = requestAnimationFrame(() => {
+                resizeFrame = undefined;
+                resizeObserver?.disconnect();
+                place();
+                resizeObserver?.observe(panel);
+            });
+        });
+    resizeObserver?.observe(panel);
     window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", onResize);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("pointerdown", onPointerDown, true);
     window.addEventListener("click", onClick);
     return () => {
+        resizeObserver?.disconnect();
+        if (resizeFrame !== undefined) cancelAnimationFrame(resizeFrame);
         window.removeEventListener("scroll", onScroll, true);
         window.removeEventListener("resize", onResize);
         window.removeEventListener("keydown", onKeyDown);

@@ -92,4 +92,30 @@ export async function runPersonPickerInteractionRegression({ test, assert, fixtu
             await unmount(instance);
         }
     });
+
+    await test("人员选择一致性：combobox 结果播报与候选焦点语义稳定", async () => {
+        const items = [
+            { id: "person/aria-001", label: "语义测试甲", docId: "doc-aria-001" },
+            { id: "person/aria-002", label: "语义测试乙", docId: "doc-aria-002" },
+        ];
+        const instance = mount(PersonPicker, { target: fixture, props: { items, onSelect: () => {} } });
+        try {
+            await tick();
+            const trigger = fixture.querySelector(".lvct-picker__trigger");
+            trigger.click();
+            await until(() => fixture.querySelector(".lvct-picker__search"), "语义回归选人器未打开");
+            const search = fixture.querySelector(".lvct-picker__search");
+            const list = fixture.querySelector('[role="listbox"]');
+            const status = fixture.querySelector('[role="status"][aria-live="polite"]');
+            assert(list?.id && search.getAttribute("aria-controls") === list.id, "搜索框未关联稳定 listbox");
+            assert(status?.id && search.getAttribute("aria-describedby") === status.id, "搜索框未关联结果播报");
+            await until(() => status.textContent.includes("找到 2 个联系人"), "选人器未播报完整候选数量");
+            const options = [...fixture.querySelectorAll('[role="option"]')];
+            assert(options.length === 2 && options.every((option) => option.getAttribute("tabindex") === "-1"), "候选项仍混入 Tab 顺序");
+            assert(search.getAttribute("aria-activedescendant") === options[0].id, "初始活动候选未通过 aria-activedescendant 指定");
+            search.value = "不存在";
+            search.dispatchEvent(new Event("input", { bubbles: true }));
+            await until(() => status.textContent.includes("没有匹配的联系人") && !search.getAttribute("aria-activedescendant"), "空结果未清除活动候选或播报空态");
+        } finally { await unmount(instance); }
+    });
 }

@@ -69,6 +69,21 @@ test("生日显示：农历使用农历月日，公历明确标注口径", () =>
     assert.equal(formatBirthdayDisplay("invalid", true), "invalid");
 });
 
+test("农历年龄按下一次生日周岁计算，当天不加虚岁、已过生日取下一农历年", () => {
+    const occurrence = lunarToSolar(2026, 1, 1);
+    assert.ok(occurrence);
+    const today = nextBirthday("1990-01-01", true, occurrence);
+    assert.ok(today);
+    assert.equal(today.daysUntil, 0);
+    assert.equal(today.age, 36);
+    const tomorrow = new Date(occurrence);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const nextYear = nextBirthday("1990-01-01", true, tomorrow);
+    assert.ok(nextYear);
+    assert.equal(solarToLunar(nextYear.date)?.year, 2027);
+    assert.equal(nextYear.age, 37);
+});
+
 test("upcomingBirthdays：混合公历与农历按各自下一次公历发生日排序", () => {
     const now = new Date(2026, 1, 1);
     const list = upcomingBirthdays([

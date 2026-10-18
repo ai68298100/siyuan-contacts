@@ -65,6 +65,7 @@
     let aliasRequest = 0;
     let openTimer: ReturnType<typeof setTimeout> | undefined;
     const listboxId = `lvct-picker-${Math.random().toString(36).slice(2)}`;
+    const statusId = `${listboxId}-status`;
     onDestroy(() => {
         aliasRequest += 1;
         clearTimeout(openTimer);
@@ -205,6 +206,14 @@
             onPickerKeydown(event);
         }
     }
+
+    function optionId(item: PickerItem, index: number): string {
+        // Keep the active-descendant target unique even when two records have
+        // the same label or an item id contains punctuation that is awkward in
+        // a CSS selector. The index is scoped to this rendered result set.
+        const safeId = item.id.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 48);
+        return `${listboxId}-option-${index}-${safeId || "item"}`;
+    }
 </script>
 
 <div class="lvct-picker" bind:this={wrap}>
@@ -215,6 +224,7 @@
             bind:this={triggerEl}
             aria-haspopup="listbox"
             aria-controls={open ? listboxId : undefined}
+            aria-describedby={open ? statusId : undefined}
             aria-expanded={open}
             aria-label={ariaLabel}
             disabled={disabled}
@@ -246,28 +256,32 @@
                 bind:value={query}
                 placeholder={text("pickerSearch", searchText)}
                 aria-label={text("pickerSearch", searchText)}
+                aria-describedby={statusId}
                 aria-busy={aliasLoading}
                 role="combobox"
                 aria-autocomplete="list"
                 aria-expanded="true"
                 aria-controls={listboxId}
-                aria-activedescendant={filtered.length > 0 && highlight < filtered.length ? `${listboxId}-option-${highlight}` : undefined}
+                aria-activedescendant={filtered.length > 0 && highlight < filtered.length ? optionId(filtered[highlight], highlight) : undefined}
                 onkeydown={onSearchKeydown}
                 oninput={() => { highlight = 0; if (listEl) listEl.scrollTop = 0; }}
             />
-            {#if aliasLoading}
-                <p class="lvct-picker__status" role="status">{text("pickerAliasLoading", "正在读取别名…")}</p>
-            {/if}
+            <p id={statusId} class="lvct-picker__status" role="status" aria-live="polite" aria-atomic="true">
+                {aliasLoading ? text("pickerAliasLoading", "正在读取别名…") : filtered.length > 0 ? `找到 ${filtered.length} 个联系人，可用方向键移动并按 Enter 选择。` : emptyText}
+            </p>
             {#if filtered.length === 0 && !aliasLoading}
-                <div class="lvct-picker__empty" role="status">{emptyText}</div>
+                <div class="lvct-picker__empty" aria-hidden="true">{emptyText}</div>
             {/if}
             <ul class="lvct-picker__list" id={listboxId} role="listbox" bind:this={listEl}>
                 {#each filtered as item, index (item.id)}
                     <li role="none">
                         <button
                             type="button"
-                            id={`${listboxId}-option-${index}`}
+                            id={optionId(item, index)}
                             role="option"
+                            tabindex="-1"
+                            aria-setsize={filtered.length}
+                            aria-posinset={index + 1}
                             aria-selected={item.id === value}
                             class="lvct-picker__option"
                             class:lvct-picker__option--active={index === highlight}

@@ -141,7 +141,7 @@ import StatusNotice from "../StatusNotice.svelte";
         onSaveCadence?: (personDocId: string, cadence: PersonCadence | null) => Promise<void>;
         /** 互动备注模板（F09，可选：未接线时隐藏选用入口） */
         onListTemplates?: () => Promise<NoteTemplate[]>;
-        onSaveTemplates?: (templates: NoteTemplate[]) => Promise<NoteTemplate[]>;
+        onSaveTemplates?: (templates: NoteTemplate[], expected: readonly NoteTemplate[]) => Promise<NoteTemplate[]>;
         onLoadExchanges?: (personDocId: string) => Promise<import("../../domain/exchanges").ExchangeRecord[]>;
         onCreateExchange?: (input: import("../../services/exchanges").CreatePersonExchangeInput) => Promise<import("../../domain/exchanges").ExchangeRecord>;
         onChangeExchangeStatus?: (id: string, status: import("../../domain/exchanges").ExchangeStatus, settledOn?: string, expected?: { updatedAt: number }) => Promise<import("../../domain/exchanges").ExchangeRecord>;
@@ -524,10 +524,17 @@ import StatusNotice from "../StatusNotice.svelte";
         templateChoice = "";
     }
 
-    async function persistTemplates(list: NoteTemplate[]): Promise<NoteTemplate[]> {
-        const saved = await onSaveTemplates!(list);
+    async function persistTemplates(list: NoteTemplate[], expected: readonly NoteTemplate[]): Promise<NoteTemplate[]> {
+        const saved = await onSaveTemplates!(list, expected);
         templates = saved;
         return saved;
+    }
+
+    async function reloadTemplates(): Promise<NoteTemplate[]> {
+        const latest = await onListTemplates!();
+        templates = latest;
+        templateLoadError = "";
+        return latest;
     }
 
     const relatedPeople = $derived(
@@ -1937,7 +1944,7 @@ import StatusNotice from "../StatusNotice.svelte";
 
 {#if templateManagerOpen}
     <LvctDialog title={text("tplManagerTitle", "管理互动备注模板")} onClose={() => (templateManagerOpen = false)}>
-        <TemplateManager {i18n} templates={templates} onSave={persistTemplates} onClose={() => (templateManagerOpen = false)} />
+        <TemplateManager {i18n} templates={templates} onSave={persistTemplates} onReload={reloadTemplates} onClose={() => (templateManagerOpen = false)} />
     </LvctDialog>
 {/if}
 

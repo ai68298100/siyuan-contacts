@@ -2,6 +2,7 @@
     import { onMount, tick } from "svelte";
     import type { Snippet } from "svelte";
     import { createCloseScope } from "./close-guard";
+    import { getFocusableElements } from "../shared/focusable-elements";
 
     let {
         title,
@@ -32,10 +33,7 @@
     const previousActive = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     function focusables(): HTMLElement[] {
-        if (!panel) return [];
-        return [...panel.querySelectorAll<HTMLElement>(
-            "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])",
-        )];
+        return panel ? getFocusableElements(panel) : [];
     }
 
     async function requestClose() {

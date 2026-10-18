@@ -103,17 +103,27 @@ function memberIds(root) {
     return [...root.querySelectorAll(".lvct-org-manager__member")].map((row) => row.dataset.membershipId).join(",");
 }
 
-async function filterAndExpand({ root, until, button }, count = 600) {
-    await until(() => ready(root) && root.querySelectorAll(".lvct-org-manager__member").length === 200, "指定组织首屏未完成");
+async function filterAndExpand({ root, until, button }, targetPage = 1) {
+    await until(() => ready(root) && root.querySelectorAll(".lvct-org-manager__member").length === 20
+        && root.textContent.includes("1–20 / 1001 条"), "指定组织首屏未完成");
     input(root.querySelector('input[type="search"]'), "研发");
-    await until(() => ready(root), "成员搜索未完成");
+    await until(() => ready(root) && root.querySelectorAll(".lvct-org-manager__member").length === 20
+        && root.textContent.includes("1–20 / 1001 条"), "成员搜索未完成");
     const status = root.querySelector('[aria-label="成员状态"]');
     status.value = "active";
     status.dispatchEvent(new Event("change", { bubbles: true }));
-    await until(() => ready(root) && root.textContent.includes("801 条记录"), "成员状态未保留或筛选未完成");
-    for (let loaded = 200; loaded < count; loaded += 200) {
-        button("加载更多", root).click();
-        await until(() => ready(root) && root.querySelectorAll(".lvct-org-manager__member").length === loaded + 200, "成员窗口未扩展到目标页");
+    await until(() => ready(root) && root.querySelectorAll(".lvct-org-manager__member").length === 20
+        && root.textContent.includes("1–20 / 801 条"), "成员状态未保留或筛选未完成");
+    const pageSize = root.querySelector('[aria-label="每页成员条数"]');
+    pageSize.value = "100";
+    pageSize.dispatchEvent(new Event("change", { bubbles: true }));
+    await until(() => ready(root) && root.querySelectorAll(".lvct-org-manager__member").length === 100
+        && root.textContent.includes("1–100 / 801 条"), "每页 100 条设置未生效");
+    for (let page = 1; page < targetPage; page += 1) {
+        button("下一页", root).click();
+        const start = page * 100 + 1;
+        await until(() => ready(root) && root.querySelectorAll(".lvct-org-manager__member").length === 100
+            && root.textContent.includes(`${start}–${start + 99} / 801 条`), "成员分页未前进到目标页");
     }
 }
 
@@ -174,6 +184,9 @@ export async function runOrganizationContextRegression({ test, assert, kernel, s
         try {
             await until(() => ready(fixture) && fixture.querySelector(".lvct-org-manager__member"), "组织或成员列表未就绪");
             const manager = fixture.querySelector(".lvct-org-manager");
+            /* 已有成员默认收起添加区；先显式打开再编辑新增备注草稿。 */
+            button("添加成员", fixture).click();
+            await until(() => fixture.querySelector(".lvct-org-manager__add-note input"), "按需添加区未展开");
             const note = fixture.querySelector(".lvct-org-manager__add-note input");
             input(note, "仅属于原组织的备注");
             const anotherOrg = [...fixture.querySelectorAll(".lvct-org-manager__org-item")]
@@ -182,7 +195,7 @@ export async function runOrganizationContextRegression({ test, assert, kernel, s
             anotherOrg.click();
             await until(() => document.querySelector('.lvct-closeguard button[data-choice="discard"]'), "切换组织未保护备注草稿");
             document.querySelector('.lvct-closeguard button[data-choice="discard"]').click();
-            await until(() => manager.dataset.orgDocId === state.orgA && note.isConnected && note.value === "",
+            await until(() => manager.dataset.orgDocId === state.orgA && (!note.isConnected || note.value === ""),
                 "放弃原组织草稿后仍把旧备注带入目标组织");
             assert(state.writes.length === 0, "切换组织意外写入成员记录");
         } finally {
@@ -281,7 +294,7 @@ export async function runOrganizationContextRegression({ test, assert, kernel, s
             let nextFrame = 0;
             let visibility = "visible";
             try {
-                await filterAndExpand({ root: scrollHost, until, button }, 200);
+                await filterAndExpand({ root: scrollHost, until, button });
                 const manager = scrollHost.querySelector(".lvct-org-manager");
                 const search = scrollHost.querySelector('input[type="search"]');
                 const ids = memberIds(scrollHost);
@@ -348,7 +361,7 @@ export async function runOrganizationContextRegression({ test, assert, kernel, s
     }
 
     for (const mode of ["分页 facade", "全量 facade 兼容"]) {
-        await test(`组织上下文：${mode}刷新保留 600 条窗口、搜索、状态、滚动和焦点，故障与失联不跳组织`, async () => {
+        await test(`组织上下文：${mode}刷新保留当前分页、搜索、状态、滚动和焦点，故障与失联不跳组织`, async () => {
             const state = contextFixture();
             if (mode === "全量 facade 兼容") delete state.facade.listOrganizationMembersPage;
             const scrollHost = document.createElement("div");
@@ -373,7 +386,7 @@ export async function runOrganizationContextRegression({ test, assert, kernel, s
                 assert(memberIds(scrollHost) === ids && search.value === "研发" && scrollHost.querySelector('[aria-label="成员状态"]').value === "active", "刷新重置窗口、搜索或状态");
                 assert(scrollHost.scrollTop === scrollTop && document.activeElement === search, "刷新丢失滚动或搜索焦点");
                 assert(manager.dataset.orgDocId === state.orgB && scrollHost.querySelector(".lvct-org-manager__org-item--active")?.textContent.includes("已归档"), "原组织归档后切到其他组织或丢失归档分组选择");
-                if (mode === "分页 facade") assert(state.pages.slice(pageStart).map((page) => page.offset).join(",") === "0,200,400", "刷新没有重建全部已加载页，或重复请求");
+                if (mode === "分页 facade") assert(state.pages.slice(pageStart).map((page) => page.offset).join(",") === "0", "刷新没有只读取当前页，或重复请求");
                 state.failOrganizations = true;
                 reads = state.orgReads;
                 emitDataChanged({ topics: ["organizations"], docIds: [state.orgB] });
@@ -400,7 +413,7 @@ export async function runOrganizationContextRegression({ test, assert, kernel, s
                 assert(state.pages.filter((page) => page.docId === state.orgA).length + state.fullReads.filter((docId) => docId === state.orgA).length === otherRequests, "失联后请求了另一组织成员");
                 state.organizations = organizations;
                 emitDataChanged({ topics: ["organizations"], docIds: [state.orgB] });
-                await until(() => ready(scrollHost) && scrollHost.querySelectorAll(".lvct-org-manager__member").length === 600, "原组织恢复未保留已加载窗口");
+                await until(() => ready(scrollHost) && scrollHost.querySelectorAll(".lvct-org-manager__member").length === 100, "原组织恢复未保留当前分页");
                 assert(memberIds(scrollHost) === ids && scrollHost.querySelector('input[type="search"]').value === "研发"
                     && scrollHost.querySelector('[aria-label="成员状态"]').value === "active", "原组织恢复丢失筛选或成员身份");
             } finally { await unmount(instance); scrollHost.remove(); }
@@ -430,8 +443,8 @@ export async function runOrganizationContextRegression({ test, assert, kernel, s
             await until(() => state.orgReads === reads + 1 && ready(fixture), "写后必要补读未完成");
             await tick();
             assert(state.writes.length === 1 && state.writes[0].expected.title === "成员", "保存重复写入或未保留原记录快照");
-            assert(state.orgReads === reads + 1 && state.pages.slice(pageStart).map((page) => page.offset).join(",") === "0,200,400", "写后刷新重复或丢失窗口");
-            assert(fixture.querySelectorAll(".lvct-org-manager__member").length === 600 && fixture.textContent.includes("更新职位")
+            assert(state.orgReads === reads + 1 && state.pages.slice(pageStart).map((page) => page.offset).join(",") === "0", "写后刷新重复或丢失当前页");
+            assert(fixture.querySelectorAll(".lvct-org-manager__member").length === 100 && fixture.textContent.includes("更新职位")
                 && fixture.querySelector('input[type="search"]').value === "研发" && fixture.querySelector('[aria-label="成员状态"]').value === "active", "保存后重置组织上下文");
         } finally { releaseWrite?.(); await unmount(instance); }
     });
@@ -458,7 +471,8 @@ export async function runOrganizationContextRegression({ test, assert, kernel, s
             cardTrigger.click();
             await until(() => fixture.querySelector(".lvct-org-manager")?.dataset.orgDocId === state.orgB && ready(fixture), "具体组织入口未按卡片 docId 打开");
             const manager = fixture.querySelector(".lvct-org-manager");
-            await filterAndExpand({ root: manager, until, button });
+            /* 深页返回回归：按页导航到包含稳定成员 350 的第 4 页。 */
+            await filterAndExpand({ root: manager, until, button }, 4);
             const ids = memberIds(manager);
             const panel = manager.closest(".lvct-dialog-panel");
             panel.style.maxHeight = "240px";

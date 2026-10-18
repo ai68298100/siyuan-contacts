@@ -149,7 +149,19 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .lvct-btn--loading::after { animation-duration: var(--lvct-dur-reduced); }
+        /* The reduced-motion contract applies to every plugin surface, including
+           popovers and controls added after this shared stylesheet was written.
+           Keep focus/pressed states visible, but remove movement and looping
+           spinners so opening a dialog or waiting on a write is static. */
+        *,
+        *::before,
+        *::after {
+            animation: none !important;
+            transition-duration: var(--lvct-dur-none) !important;
+            scroll-behavior: auto !important;
+        }
+
+        .lvct-btn--loading::after { animation: none !important; }
 
         /* UX-02.1 动效降级：位移动效只保留透明度，pop-in 直出 */
         .b3-button:not(:disabled):active { transform: none; }

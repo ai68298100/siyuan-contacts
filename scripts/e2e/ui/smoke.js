@@ -1206,7 +1206,7 @@ await test("完整迁移包：六模块导出→恢复预览→确认合并，�
 
     await recordInteraction(plugin, { personDocId: "20260927000000-person1", localDate: "2026-09-28", source: "manual", note: "已有互动" });
     await createFollowUpRecord(plugin, { requestId: "20261014000000-fuexist", personDocId: "20260927000000-person1", title: "已有跟进", dueDate: "2026-10-01" });
-    await saveTemplatesStore(plugin, [{ id: "tpl-exist", name: "已有模板", content: "x" }]);
+    await saveTemplatesStore(plugin, [{ id: "tpl-exist", name: "已有模板", content: "x" }], DEFAULT_TEMPLATES);
 
     const bundleText = await exportMigrationBundle(plugin);
     const bundle = JSON.parse(bundleText);
@@ -1267,9 +1267,12 @@ await test("迁移恢复单模块失败可见、不阻断其他模块且不污�
     const bundle = JSON.parse(bundleText);
     bundle.modules.templates = { schemaVersion: 1, templates: [{ id: "tpl-new", name: "包内模板", content: "y" }] };
     /* 向包内注入一条库中没有的互动：证明失败模块之外照常发生真实合并 */
-    bundle.modules.interactions.events.push({
+    /* 互动模块存在 rawStore 时，以原始快照为唯一事实；同步更新投影和
+     * rawStore，验证严格导入确实会合并包内新增，而不是误读陈旧投影。 */
+    bundle.modules.interactions.rawStore.events.push({
         id: "evt-extra", personDocId: "20260927000000-person2", occurredAt: 1, localDate: "2026-09-29", source: "manual",
     });
+    bundle.modules.interactions.events.push(bundle.modules.interactions.rawStore.events.at(-1));
     const result = await importMigrationBundle(plugin, JSON.stringify(bundle));
 
     assert(result.failed.length === 1 && result.failed[0].key === "templates",
@@ -1996,8 +1999,12 @@ await test("B13.3 组织管理弹窗：新建组织、添加/移除成员经 fac
         const memberRow = fixture.querySelector(".lvct-org-manager__member");
         assert(memberRow && memberRow.scrollWidth <= memberRow.clientWidth + 2, "窄视口成员行仍横向溢出");
     }
-    /* 移除成员（B13.4 起行内含编辑与移除两个按钮，按文案定位） */
+    /* 移除成员：已有成员行将移动/接替/移除收进“更多”，查看详情与编辑仍直接可达。 */
     const removeRow = [...fixture.querySelectorAll(".lvct-org-manager__member")].find((node) => node.textContent.includes("张三"));
+    const removeMore = removeRow?.querySelector(".lvct-org-manager__member-more");
+    assert(removeMore?.getAttribute("aria-label") === "更多成员操作：张三", "成员行更多操作缺少稳定 aria-label");
+    removeMore.click();
+    await tick();
     button("移除", removeRow).click();
     await until(() => removeRow.textContent.includes("确认移除这段成员历史"), "成员历史移除确认未显示");
     assert(memberOps.length === 1, "未确认就移除成员历史");
@@ -5190,14 +5197,14 @@ await test("备注模板：空存储回退内置默认，增改删落盘且重�
         { id: "tpl-meet", name: "见面", content: "和{{姓名}}见面，聊了……" },
         { id: "tpl-call-2", name: "周一直呼", content: "{{姓名}}，关于……" },
     ];
-    const savedList = await saveTemplates(plugin, next);
+    const savedList = await saveTemplates(plugin, next, DEFAULT_TEMPLATES);
     assert(writes === 1, "保存未写入");
     assert(JSON.stringify(savedList.map((item) => item.name)) === JSON.stringify(["见面", "周一直呼"]), "保存内容错误");
     // 重开恢复（存储为准，内置默认不再出现）
     assert(JSON.stringify((await listTemplates(plugin)).map((item) => item.id)) === JSON.stringify(["tpl-meet", "tpl-call-2"]), "重开未按存储恢复");
     // 保存不能通过静默丢弃非法条目报告成功。
     let rejected = false;
-    try { await saveTemplates(plugin, [...next, { id: "", name: "坏" }, { id: "x", name: "  ", content: "c" }]); }
+    try { await saveTemplates(plugin, [...next, { id: "", name: "坏" }, { id: "x", name: "  ", content: "c" }], next); }
     catch { rejected = true; }
     assert(rejected && writes === 1, "非法条目未在写入前明确拒绝");
     assert(JSON.stringify((await listTemplates(plugin)).map((item) => item.id)) === JSON.stringify(["tpl-meet", "tpl-call-2"]), "非法保存修改了原模板");
@@ -5967,10 +5974,58 @@ await test("档案条显示待跟进与相关人计数，chips 超量折叠为 +
     const text = element.querySelector(".lvct-doc-strip").textContent;
     assert(text.includes("待跟进 2"), "待跟进计数徽标未显示（已完成项不应计入）");
     assert(text.includes("相关人 1"), "相关人计数徽标未显示");
-    const chips = [...element.querySelectorAll(".lvct-strip__chips .lvct-chip")];
-    assert(chips.length === 7, `chips 应为 6 枚 + 1 个折叠项，实际 ${chips.length}`);
-    assert(chips[chips.length - 1].textContent.trim() === "+2", "折叠计数错误");
-    assert(chips[chips.length - 1].title.includes("庚") && chips[chips.length - 1].title.includes("辛"), "折叠项未带全量提示");
+    const chipsRoot = element.querySelector(".lvct-strip__chips");
+    const visibleChips = () => [...chipsRoot.querySelectorAll(".lvct-chip")]
+        .filter((chip) => chip.getClientRects().length > 0 && getComputedStyle(chip).visibility !== "hidden");
+    const chips = visibleChips();
+    assert(chips.length === 7, `初始可见 chips 应为 6 枚 + 1 个折叠项，实际 ${chips.length}`);
+    assert(chips.slice(0, 6).map((chip) => chip.textContent).join("、") === tagValues.slice(0, 6).map((tag) => `#${tag}`).join("、"), "初始可见标签或顺序错误");
+    const more = chipsRoot.querySelector(".lvct-strip__chip-more");
+    const overflow = chipsRoot.querySelector(".lvct-strip__chip-overflow");
+    assert(more.textContent.trim() === "+2", "折叠计数错误");
+    assert(more.title.includes("庚") && more.title.includes("辛"), "折叠项未带全量提示");
+    assert(more instanceof HTMLButtonElement && more.type === "button" && more.tabIndex === 0 && !more.disabled, "折叠项必须是键盘可达的原生按钮");
+    assert(overflow.hidden && more.getAttribute("aria-expanded") === "false", "折叠项初始展开状态不一致");
+    assert(more.getAttribute("aria-controls") === overflow.id && document.getElementById(overflow.id) === overflow, "折叠项 ARIA 引用未指向实际内容");
+    assert(more.getAttribute("aria-label").includes("展开") && more.getAttribute("aria-label").includes("2"), "折叠项缺少展开及数量的可访问名称");
+    more.focus();
+    assert(document.activeElement === more, "折叠项不能获取键盘焦点");
+    const pressMore = async (action) => {
+        let trustedClick = false;
+        const observe = (event) => { trustedClick = event.isTrusted && event.detail === 0; };
+        more.addEventListener("click", observe, { once: true });
+        const requestId = `strip-chips-${action}-${Date.now()}`;
+        await new Promise((resolve, reject) => {
+            const finish = (error) => {
+                clearTimeout(timeout);
+                window.removeEventListener("lvct:trusted-click-done", complete);
+                more.removeEventListener("click", observe);
+                error ? reject(new Error(error)) : resolve();
+            };
+            const complete = (event) => { if (event.detail.requestId === requestId) finish(event.detail.error); };
+            const timeout = setTimeout(() => finish("档案条 Chrome 真实键盘请求超时"), 5000);
+            window.addEventListener("lvct:trusted-click-done", complete);
+            window.__lvctTrustedClick(JSON.stringify({ requestId, target: "strip-chips-more", action }));
+        });
+        assert(trustedClick, `档案条 ${action} 未触发浏览器原生键盘点击`);
+    };
+    await pressMore("enter");
+    assert(!overflow.hidden && more.getAttribute("aria-expanded") === "true", "Enter 未展开其他联系资料");
+    assert(visibleChips().length === 9 && [...overflow.children].map((chip) => chip.textContent).join("、") === "#庚、#辛", "展开后没有展示完整的剩余值");
+    assert(more.getAttribute("aria-label").includes("收起") && document.activeElement === more, "展开后可访问名称或键盘焦点丢失");
+    await pressMore("space");
+    assert(overflow.hidden && more.getAttribute("aria-expanded") === "false" && visibleChips().length === 7, "Space 未恢复折叠状态");
+    assert(more.getAttribute("aria-label").includes("展开") && document.activeElement === more, "收起后可访问名称或键盘焦点丢失");
+    const secondElement = document.createElement("div");
+    secondElement.innerHTML = '<div class="protyle-title"></div>';
+    fixture.append(secondElement);
+    handleProtyleEvent(context, { detail: { protyle: { element: secondElement, block: { rootID: person.docId } } } });
+    await until(() => secondElement.querySelector(".lvct-strip__chip-more"), "分屏档案条未渲染");
+    const secondMore = secondElement.querySelector(".lvct-strip__chip-more");
+    const secondOverflow = secondElement.querySelector(".lvct-strip__chip-overflow");
+    assert(secondOverflow.id !== overflow.id && document.getElementById(secondMore.getAttribute("aria-controls")) === secondOverflow, "同一人物分屏档案条的 ARIA 引用相互串联");
+    secondMore.click();
+    assert(!secondOverflow.hidden && overflow.hidden, "分屏档案条展开影响了另一处人物资料");
     element.querySelector(".lvct-doc-strip")?.remove();
 });
 

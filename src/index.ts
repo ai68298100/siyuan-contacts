@@ -1384,8 +1384,8 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         return listTemplates(this);
     }
 
-    async saveTemplates(templates: readonly NoteTemplate[]) {
-        return saveTemplates(this, templates);
+    async saveTemplates(templates: readonly NoteTemplate[], expected: readonly NoteTemplate[]) {
+        return saveTemplates(this, templates, expected);
     }
 
     async buildReviewReport(from: string, to: string) {

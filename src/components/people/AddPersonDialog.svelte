@@ -620,13 +620,13 @@
 
 <style>
     .lvct-add-person__org-selector { margin-top: 8px; }
-    .lvct-add-person__org-draft { min-width: 0; margin: 12px 0; padding: 12px; border: 1px solid var(--b3-border-color); border-radius: 8px; }
+    .lvct-add-person__org-draft { min-width: 0; margin: 12px 0; padding: 12px; border: 1px solid var(--lvct-border-subtle); border-radius: 8px; }
     .lvct-add-person__org-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
     .lvct-add-person__org-head strong { flex: 1; min-width: 0; overflow-wrap: anywhere; }
     .lvct-add-person__org-head button { flex-shrink: 0; }
-    .lvct-add-person__org-more { border-top: 1px solid var(--b3-border-color); padding-top: 8px; }
-    .lvct-add-person__org-more summary { cursor: pointer; color: var(--b3-theme-on-surface); padding: 8px 0; }
+    .lvct-add-person__org-more { border-top: 1px solid var(--lvct-border-subtle); padding-top: 8px; }
+    .lvct-add-person__org-more summary { cursor: pointer; color: var(--lvct-text-2); padding: 8px 0; }
     .lvct-add-person__org-more[open] summary { margin-bottom: 8px; }
-    .lvct-add-person__org-confirm { padding: 12px; margin-top: 8px; border: 1px solid var(--b3-theme-primary); border-radius: 8px; }
+    .lvct-add-person__org-confirm { padding: 12px; margin-top: 8px; border: 1px solid var(--lvct-accent); border-radius: 8px; }
     .lvct-add-person__org-draft :global(.lvct-form__grid) { margin-bottom: 8px; }
 </style>

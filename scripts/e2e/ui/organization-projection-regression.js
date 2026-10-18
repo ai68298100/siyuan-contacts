@@ -450,7 +450,10 @@ export async function runOrganizationProjectionRegression({ test, assert, kernel
             assert(state.membership().id === id && state.membership().affiliationKind === "education", "结束成员更换身份或丢失分类");
             assert(document.activeElement?.classList.contains("lvct-org-membership-result"), "结果焦点未落到事实与投影报告");
             // The result appears before the member refresh and viewport restore
-            // finish. Wait for the picker to accept clicks after that refresh.
+            // finish. Existing members keep the add panel collapsed; open it
+            // explicitly before checking the candidate picker.
+            await until(() => button("添加成员") && !button("添加成员").disabled, "成员保存后添加入口未就绪");
+            button("添加成员").click();
             await until(() => fixture.querySelector('[aria-label="选择要添加的联系人"]:not([disabled])'), "成员保存后候选器未就绪");
             const addPicker = fixture.querySelector('[aria-label="选择要添加的联系人"]');
             addPicker.click();
@@ -468,8 +471,13 @@ export async function runOrganizationProjectionRegression({ test, assert, kernel
             await until(() => state.membership().status === "active" && !fixture.querySelector(".lvct-org-manager__member-edit"), "原期间恢复失败");
             assert(state.membership().id === id && state.store.get(ORG_MEMBERSHIP_STORAGE_KEY).memberships.length === 1, "恢复新增了成员记录");
             // 恢复事实和收起表单早于成员刷新及 run() 的忙态收尾。
-            await until(() => !button("移除").disabled, "恢复成员后移除入口仍在忙态");
-            button("移除").click();
+            const restoredRow = fixture.querySelector(".lvct-org-manager__member");
+            const restoredMore = restoredRow?.querySelector(".lvct-org-manager__member-more");
+            await until(() => restoredMore && !restoredMore.disabled, "恢复成员后更多入口仍在忙态");
+            restoredMore.click();
+            const removeButton = () => [...(restoredRow?.querySelectorAll("button") ?? [])].find((node) => node.textContent.trim() === "移除");
+            await until(() => removeButton() && !removeButton().disabled, "恢复成员后移除入口仍在忙态");
+            removeButton().click();
             await until(() => fixture.querySelector('[aria-label="确认移除这段成员历史"]'), "移除确认尚未打开");
             const removePreview = fixture.querySelector('[aria-label="确认移除这段成员历史"]');
             const removeRow = removePreview.closest(".lvct-org-manager__member");
@@ -488,7 +496,7 @@ export async function runOrganizationProjectionRegression({ test, assert, kernel
             const search = fixture.querySelector('input[type="search"]');
             search.value = "研发";
             search.dispatchEvent(new Event("input", { bubbles: true }));
-            await until(() => fixture.textContent.includes("1 条记录"), "筛选未完成");
+            await until(() => fixture.textContent.includes("1–1 / 1 条"), "筛选未完成");
             await updateOrgMembership(state.plugin, state.membership().id, { title: "外部更新职位" });
             emitDataChanged();
             await until(() => fixture.textContent.includes("外部更新职位"), "广播未重读当前事实");

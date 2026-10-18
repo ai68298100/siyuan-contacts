@@ -33,6 +33,7 @@
     import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal, Bookmark, Pencil, Trash2 } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
     import { isAbortError } from "../../shared/async";
+    import { getFocusableElements } from "../../shared/focusable-elements";
     import { requestErrorMessage } from "../../shared/error-presenter";
     import type { ContactExtendedDraft } from "../../domain/contact-create";
     import { buildVirtualRows, estimateVirtualHeight, virtualRowAtOffset, virtualRowRange } from "../../domain/virtual-list";
@@ -301,10 +302,7 @@
     const mobileSheetTitleId = "lvct-people-mobile-tools-title";
 
     function focusableMobileSheetElements(): HTMLElement[] {
-        if (!mobileSheetPanel) return [];
-        return [...mobileSheetPanel.querySelectorAll<HTMLElement>(
-            "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])",
-        )];
+        return mobileSheetPanel ? getFocusableElements(mobileSheetPanel) : [];
     }
 
     function openMobileSheet() {

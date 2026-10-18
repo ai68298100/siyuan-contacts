@@ -385,16 +385,45 @@ export async function runOrganizationPageRegression({ test, assert, kernel, sett
         };
         const instance = mount(OrgManagerDialog, { target: fixture, props: { facade, onClose() {} } });
         try {
-            await until(() => fixture.querySelectorAll(".lvct-org-manager__member").length === 200, "首屏未限制为 200 条记录");
-            button("加载更多").click();
-            await until(() => fixture.querySelectorAll(".lvct-org-manager__member").length === 400, "加载更多未追加第二页");
+            await until(() => fixture.querySelectorAll(".lvct-org-manager__member").length === 20
+                && fixture.textContent.includes("1–20 / 1001 条"), "首屏未按默认每页 20 条记录");
+            const pageSize = fixture.querySelector('[aria-label="每页成员条数"]');
+            assert(pageSize?.value === "20", "成员分页默认值不是每页 20 条");
+            pageSize.value = "50";
+            pageSize.dispatchEvent(new Event("change", { bubbles: true }));
+            await until(() => fixture.querySelectorAll(".lvct-org-manager__member").length === 50
+                && fixture.textContent.includes("1–50 / 1001 条"), "切换每页 50 条未生效");
+            const nextPage = button("下一页", fixture);
+            assert(!nextPage.disabled, "首分页未提供下一页");
+            const firstPageIds = [...fixture.querySelectorAll(".lvct-org-manager__member")].map((row) => row.dataset.membershipId);
+            nextPage.click();
+            await until(() => fixture.querySelectorAll(".lvct-org-manager__member").length === 50
+                && fixture.textContent.includes("51–100 / 1001 条"), "下一页未切到稳定第二页");
+            const secondPageIds = [...fixture.querySelectorAll(".lvct-org-manager__member")].map((row) => row.dataset.membershipId);
+            assert(secondPageIds.length === 50 && secondPageIds[0] && secondPageIds[0] !== firstPageIds[0]
+                && secondPageIds.at(-1) !== firstPageIds.at(-1), "第二页首尾成员 ID 不稳定");
+            const previousPage = button("上一页", fixture);
+            previousPage.click();
+            await until(() => fixture.textContent.includes("1–50 / 1001 条"), "上一页未回到首分页");
+            assert([...fixture.querySelectorAll(".lvct-org-manager__member")].map((row) => row.dataset.membershipId).join(",") === firstPageIds.join(","), "上一页未恢复原首尾成员身份");
+            pageSize.value = "100";
+            pageSize.dispatchEvent(new Event("change", { bubbles: true }));
+            await until(() => fixture.querySelectorAll(".lvct-org-manager__member").length === 100
+                && fixture.textContent.includes("1–100 / 1001 条"), "切换每页 100 条未生效");
+            button("下一页", fixture).click();
+            await until(() => fixture.textContent.includes("101–200 / 1001 条"), "每页 100 条下一页未生效");
             window.__stage = "organization-page-search";
             const search = fixture.querySelector('input[type="search"]');
             search.value = "唯一部门";
             search.dispatchEvent(new Event("input", { bubbles: true }));
-            await until(() => fixture.querySelectorAll(".lvct-org-manager__member").length === 1, "搜索未重置分页");
+            await until(() => fixture.querySelectorAll(".lvct-org-manager__member").length === 1
+                && fixture.textContent.includes("1–1 / 1 条"), "搜索未重置分页");
             window.__stage = "organization-page-assert";
-            assert(fixture.textContent.includes("成员999") && fixture.textContent.includes("1 条记录"), "筛选后的对象或计数错误");
+            assert(fixture.textContent.includes("成员999") && fixture.textContent.includes("1–1 / 1 条"), "筛选后的对象或计数错误");
+            const addToggle = button("添加成员", fixture);
+            assert(addToggle && !addToggle.disabled, "已有成员未提供按需添加入口");
+            addToggle.click();
+            await until(() => fixture.querySelector('[aria-label="选择要添加的联系人"]'), "按需添加区未展开");
             const addPicker = fixture.querySelector('[aria-label="选择要添加的联系人"]');
             addPicker.click();
             await until(() => fixture.querySelector(".lvct-picker__panel"), "组织成员候选器未打开");
@@ -452,6 +481,57 @@ export async function runOrganizationPageRegression({ test, assert, kernel, sett
         } finally { await unmount(instance); }
     });
 
+    await test("组织成员界面：添加按需展开、更多菜单 Esc 还原焦点、长文字不横溢", async () => {
+        const member = {
+            id: "20261017000000-longmem1", orgDocId: "20261017000000-longorg1",
+            personDocId: "20261017000000-longper1", personName: "超长成员姓名".repeat(8),
+            department: "超长部门名称".repeat(12), title: "超长职位名称".repeat(12),
+            joinedOn: "2026-01-01", leftOn: "", status: "active",
+            note: "超长成员备注".repeat(20), affiliationKind: "work",
+        };
+        const facade = {
+            listContacts: async () => [],
+            listOrganizations: async () => [{ docId: member.orgDocId, name: "长文字组织", hpath: "/长文字组织", notebookId: settings.notebookId, archived: false, memberships: [member] }],
+            listOrganizationMembersPage: async (_docId, options) => ({
+                items: [member], offset: options.offset ?? 0, limit: options.limit, total: 1, hasMore: false,
+                personDocIds: [member.personDocId], activePersonDocIds: [member.personDocId],
+            }),
+        };
+        const host = document.createElement("div");
+        host.style.width = "390px";
+        host.style.maxWidth = "100%";
+        fixture.append(host);
+        const instance = mount(OrgManagerDialog, { target: host, props: { facade, onClose() {} } });
+        try {
+            await until(() => host.querySelector(`[data-membership-id="${member.id}"]`), "长文字成员行未加载");
+            const row = host.querySelector(`[data-membership-id="${member.id}"]`);
+            assert(!host.querySelector(".lvct-org-manager__add"), "已有成员时添加区应默认收起");
+            const add = button("添加成员", host);
+            assert(add && !add.disabled, "已有成员缺少按需添加入口");
+            add.click();
+            await until(() => host.querySelector('.lvct-org-manager__add .lvct-picker__trigger[aria-label="选择要添加的联系人"]'), "按需添加区未展开");
+            add.click();
+            await until(() => !host.querySelector(".lvct-org-manager__add"), "再次点击添加成员未收起草稿区");
+            const more = row.querySelector(".lvct-org-manager__member-more");
+            assert(more?.getAttribute("aria-label") === `更多成员操作：${member.personName}`, "更多成员操作 aria-label 未包含稳定姓名");
+            more.click();
+            await until(() => host.querySelector(`#lvct-member-actions-${member.id}`), "成员更多菜单未展开");
+            const menuButton = host.querySelector(`#lvct-member-actions-${member.id} button`);
+            menuButton.focus({ preventScroll: true });
+            menuButton.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+            await until(() => !host.querySelector(`#lvct-member-actions-${member.id}`) && document.activeElement === more, "更多菜单 Esc 未关闭或未还原焦点");
+            const overflowNodes = [row, ...row.querySelectorAll("span,button")]
+                .filter((node) => !node.classList.contains("lvct-org-manager__member-note") && node.scrollWidth > node.clientWidth + 2);
+            assert(overflowNodes.length === 0, `390px 长成员姓名/部门/职位/备注横向溢出：${overflowNodes.map((node) => `${node.className || node.tagName}:${node.scrollWidth}/${node.clientWidth}`).join(",")}`);
+            const note = row.querySelector(".lvct-org-manager__member-note");
+            const noteStyle = note && getComputedStyle(note);
+            assert(noteStyle?.overflow === "hidden" && noteStyle.textOverflow === "ellipsis" && noteStyle.whiteSpace === "nowrap", "长成员备注未采用可读的省略策略");
+        } finally {
+            await unmount(instance);
+            host.remove();
+        }
+    });
+
     await test("组织成员移动：同名目标显示稳定文档 ID，确认后按选定身份提交", async () => {
         const currentId = "20261017000000-orgcur01";
         const targetA = "20261017000000-orgsame1";
@@ -486,6 +566,10 @@ export async function runOrganizationPageRegression({ test, assert, kernel, sett
         try {
             await until(() => fixture.querySelector('.lvct-org-manager__member[data-membership-id="20261017000000-move001"]'), "待移动成员未加载");
             const row = fixture.querySelector('.lvct-org-manager__member[data-membership-id="20261017000000-move001"]');
+            const more = row.querySelector('.lvct-org-manager__member-more');
+            assert(more?.getAttribute("aria-label") === "更多成员操作：待移动成员", "移动成员缺少按行更多操作入口");
+            more.click();
+            await until(() => row.querySelector(`#lvct-member-actions-${member.id}`), "更多成员操作菜单未展开");
             button("移动", row).click();
             await until(() => fixture.querySelector('select[aria-label="移动到组织"]'), "移动目标选择器未打开");
             const select = fixture.querySelector('select[aria-label="移动到组织"]');

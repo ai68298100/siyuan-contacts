@@ -13,7 +13,7 @@
     import OrgManagerDialog from "./org/OrgManagerDialog.svelte";
     import OrganizationProfileEditor from "./org/OrganizationProfileEditor.svelte";
     import { createCloseScope, anyDirtyChanges } from "./close-guard";
-    import { House, UsersRound, Network, Settings, Building2, Sparkles, UserPlus, Search } from "@lucide/svelte";
+    import { House, UsersRound, Network, Settings, Building2, UserPlus, Search } from "@lucide/svelte";
     import SettingsView from "./SettingsView.svelte";
     import { getContext, onDestroy, onMount, tick } from "svelte";
     import { translateText } from "../domain/translation";
@@ -603,16 +603,6 @@
             <span class="lvct-workbench__nav-icon" aria-hidden="true">{#if view.id === "home"}<House size={16}/>{:else if view.id === "people"}<UsersRound size={16}/>{:else if view.id === "orgs"}<Building2 size={16}/>{:else}<Network size={16}/>{/if}</span><span class="lvct-workbench__nav-text">{isMobile ? view.shortLabel : view.label}</span>
             </button>
             {/each}
-            <span class="lvct-workbench__nav-label lvct-workbench__nav-label--secondary">{text("navUpcoming", "即将推出")}</span>
-            <button
-                class="lvct-workbench__nav-item"
-                disabled
-                aria-label={text("navSuggestionsAria", "建议（即将推出）")}
-                title={text("navSuggestionsUnavailable", "建议功能尚未开放")}
-            >
-                <span class="lvct-workbench__nav-icon" aria-hidden="true"><Sparkles size={16}/></span>
-                <span class="lvct-workbench__nav-text">{text("navSuggestions", "建议")}</span>
-            </button>
             <button
                 class="lvct-workbench__nav-item lvct-workbench__nav-item--mobile-settings"
                 class:lvct-workbench__nav-item--active={current === "settings"}
@@ -861,7 +851,7 @@
             onGetCadence={(docId) => facade.getPersonCadence(docId)}
             onSaveCadence={(docId, cadence) => facade.savePersonCadence(docId, cadence)}
             onListTemplates={() => facade.listTemplates()}
-            onSaveTemplates={(templates) => facade.saveTemplates(templates)}
+            onSaveTemplates={(templates, expected) => facade.saveTemplates(templates, expected)}
             {onOpenPersonDoc}
             onNavigate={showDetail}
             onNavigateDocId={(docId) => openPersonByDocId(docId)}

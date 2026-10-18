@@ -836,16 +836,16 @@
 {/if}
 
 <style>
-    .lvct-person-edit__org-draft { border: 1px solid var(--b3-border-color); border-radius: 8px; padding: 12px; margin: 12px 0; min-width: 0; }
+    .lvct-person-edit__org-draft { border: 1px solid var(--lvct-border-subtle); border-radius: 8px; padding: 12px; margin: 12px 0; min-width: 0; }
     .lvct-person-edit__org-draft-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
     .lvct-person-edit__org-draft-head strong { min-width: 0; overflow-wrap: anywhere; }
     .lvct-person-edit__org-draft-head button { flex-shrink: 0; }
-    .lvct-person-edit__org-confirm { padding: 12px; margin-top: 8px; border: 1px solid var(--b3-theme-primary); border-radius: 8px; }
+    .lvct-person-edit__org-confirm { padding: 12px; margin-top: 8px; border: 1px solid var(--lvct-accent); border-radius: 8px; }
     .lvct-person-edit__org-more { margin-top: 8px; }
     .lvct-person-edit__org-more summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 40px; cursor: pointer; }
-    .lvct-person-edit__org-more summary::before { content: "▸"; color: var(--b3-theme-primary); }
+    .lvct-person-edit__org-more summary::before { content: "▸"; color: var(--lvct-accent); }
     .lvct-person-edit__org-more[open] summary::before { content: "▾"; }
-    .lvct-person-edit__org-more summary:focus-visible { outline: 2px solid var(--b3-theme-primary); border-radius: 4px; }
+    .lvct-person-edit__org-more summary:focus-visible { outline: 2px solid var(--lvct-accent); border-radius: 4px; }
     .lvct-person-edit__org-more summary small { font-size: 12px; }
     .lvct-person-edit__org-more[open] summary { margin-bottom: 8px; }
     .lvct-person-edit__org-draft :global(.lvct-form__grid) { margin-bottom: 0; }

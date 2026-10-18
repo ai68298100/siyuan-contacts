@@ -16,6 +16,7 @@
 import { getContext, onDestroy, onMount, setContext } from "svelte";
 import { decideClose, type CloseGuardState } from "../domain/close-policy";
 import { translateText } from "../domain/translation";
+import { getFocusableElements } from "../shared/focusable-elements";
 
 const KEY = Symbol("lvct-close-guard");
 
@@ -224,9 +225,7 @@ function openGuardDialog(summary: { changes: string[]; canSave: boolean }): Prom
                 return;
             }
             if (event.key !== "Tab") return;
-            const focusable = [...overlay.querySelectorAll<HTMLElement>(
-                "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])",
-            )];
+            const focusable = getFocusableElements(overlay);
             if (focusable.length === 0) return;
             const first = focusable[0];
             const last = focusable[focusable.length - 1];

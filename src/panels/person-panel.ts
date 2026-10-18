@@ -23,6 +23,7 @@ import type { ContactSummary } from "../domain/person";
 import type { LifecycleToken } from "../domain/lifecycle";
 
 const STRIP_CLASS = "lvct-doc-strip";
+let stripOverflowSequence = 0;
 const stripRequests = new WeakMap<HTMLElement, number>();
 /** FUNC-01.7-a：已注入档案条的活跃文档登记——数据变化时原地重渲染（不整页刷新） */
 const activeStrips = new Map<HTMLElement, { context: PanelContext; protyle: ProtyleLike; rootId: string }>();
@@ -152,7 +153,7 @@ async function updateStrip(context: PanelContext, protyle: ProtyleLike, rootId: 
 function t(context: PanelContext, key: string, fallback: string, values?: Record<string, string | number>): string {
     return translateText(context.i18n, key, fallback, values);
 }
-/** 档案条 chips 最多直接展示的枚数，超出折叠为 +N（悬停可见全量） */
+/** 档案条 chips 最多直接展示的枚数，超出折叠为可展开的 +N。 */
 const STRIP_CHIPS_MAX = 6;
 
 function buildStrip(
@@ -166,7 +167,6 @@ function buildStrip(
 ): HTMLElement {
     const strip = document.createElement("div");
     strip.className = `${STRIP_CLASS} lvct-strip`;
-    strip.dataset.personDocId = person.docId;
     strip.dataset.personDocId = person.docId;
 
     const avatar = document.createElement("span");
@@ -217,7 +217,7 @@ function buildStrip(
         empty.textContent = t(context, "stripEmptyContact", "未填写联系资料，可点右侧编辑");
         chips.appendChild(empty);
     }
-    // B04：chips 有上限，超出折叠为 +N（title 带全量），防止长标签撑爆档案条
+    // B04：chips 有上限，超出折叠为 +N，按需展开完整值。
     const visibleChips = chipData.slice(0, STRIP_CHIPS_MAX);
     for (const chip of visibleChips) {
         const span = document.createElement("span");
@@ -226,11 +226,45 @@ function buildStrip(
         chips.appendChild(span);
     }
     if (chipData.length > visibleChips.length) {
-        const more = document.createElement("span");
+        // 同一人物可在分屏编辑器中出现多次，ARIA 目标必须按档案条唯一。
+        const overflowId = `lvct-strip-overflow-${++stripOverflowSequence}`;
+        const more = document.createElement("button");
+        more.type = "button";
         more.className = "lvct-chip lvct-strip__chip-more";
         more.textContent = t(context, "stripChipsMore", "+{n}", { n: chipData.length - visibleChips.length });
         more.title = chipData.slice(visibleChips.length).join("、");
+        more.setAttribute("aria-label", t(context, "stripChipsMoreAria", "展开其他联系资料（{n}）", { n: chipData.length - visibleChips.length }));
+        more.setAttribute("aria-expanded", "false");
+        more.setAttribute("aria-controls", overflowId);
         chips.appendChild(more);
+
+        /* The old title-only overflow marker was invisible to keyboard and touch
+         * users. Keep the compact +N affordance, while exposing the complete
+         * values on demand without changing the contact data contract. */
+        const overflow = document.createElement("div");
+        overflow.id = overflowId;
+        overflow.className = "lvct-strip__chip-overflow";
+        overflow.hidden = true;
+        for (const chip of chipData.slice(visibleChips.length)) {
+            const span = document.createElement("span");
+            span.className = "lvct-chip";
+            span.textContent = chip;
+            overflow.appendChild(span);
+        }
+        more.addEventListener("click", () => {
+            overflow.hidden = !overflow.hidden;
+            more.setAttribute("aria-expanded", String(!overflow.hidden));
+            more.setAttribute(
+                "aria-label",
+                t(
+                    context,
+                    overflow.hidden ? "stripChipsMoreAria" : "stripChipsLessAria",
+                    overflow.hidden ? "展开其他联系资料（{n}）" : "收起其他联系资料",
+                    { n: chipData.length - visibleChips.length },
+                ),
+            );
+        });
+        chips.appendChild(overflow);
     }
     main.appendChild(identity);
     main.appendChild(chips);
