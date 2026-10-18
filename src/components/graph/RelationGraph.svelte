@@ -151,7 +151,12 @@
     const activeFilterCount = $derived(Number(Boolean(orgNarrowId)) + Number(query.scope !== "global")
         + (graphMode === "relations" ? Number(Boolean(groupFilter)) + Number(isolatedOnly) + Number(!showOrgs) : 0));
     const snapshot = $derived(buildGraphQuerySnapshot(sources, query, references));
-    const displayedOrg = $derived(hoveredPerson ? undefined : hoveredOrg ?? snapshot.graph.nodes.find((node) => node.id === selectedOrgId && node.kind === "org"));
+    // G-12：节点与联系人预建 Map 索引，避免在渲染、hover、点击与路径导出时频繁对全量数组做 .find 扫描
+    const nodeById = $derived(new Map(snapshot.graph.nodes.map((node) => [node.id, node])));
+    const peopleByDocId = $derived(new Map(snapshot.people.map((person) => [person.docId, person])));
+    const allPeopleByDocId = $derived(new Map(people.map((person) => [person.docId, person])));
+
+    const displayedOrg = $derived(hoveredPerson ? undefined : hoveredOrg ?? (selectedOrgId && nodeById.get(selectedOrgId)?.kind === "org" ? nodeById.get(selectedOrgId) : undefined));
     const canvasData = $derived(JSON.stringify(snapshot.graph));
     const snapshotStatusText = $derived.by(() => loading || nativeLoading
         ? text("graphSnapshotLoading", "正在核实图查询…")
@@ -173,15 +178,15 @@
     const hoveredNativeDegree = $derived.by(() => {
         const person = hoveredPerson;
         if (graphMode !== "native" || !person) return -1;
-        return snapshot.graph.nodes.find((node) => node.id === person.docId)?.degree ?? 0;
+        return nodeById.get(person.docId)?.degree ?? 0;
     });
     const relations = $derived({ neighborIds: snapshot.result.neighborIds });
     const secondMode = $derived.by(() => !compareId && relationDepth === "second");
     const resultIds = $derived(snapshot.result.ids);
-    const resultPeople = $derived(resultIds.map((id) => snapshot.people.find((person) => person.docId === id)).filter((person) => person !== undefined));
+    const resultPeople = $derived(resultIds.map((id) => peopleByDocId.get(id)).filter((person): person is ContactSummary => person !== undefined));
     const pathMode = $derived.by(() => Boolean(compareId) && queryMode === "path");
     const pathIds = $derived(snapshot.result.pathIds);
-    const pathPeople = $derived(pathIds.map((id) => snapshot.people.find((person) => person.docId === id)).filter((person) => person !== undefined));
+    const pathPeople = $derived(pathIds.map((id) => peopleByDocId.get(id)).filter((person): person is ContactSummary => person !== undefined));
 
     // ---- 查询结果导出（F16） ----
     let resultExportMessage = $state("");
@@ -586,11 +591,11 @@
 
     function scheduleHover(event: cytoscape.EventObject) {
         const docId = event.target.id();
-        const person = people.find((item) => item.docId === docId);
+        const person = allPeopleByDocId.get(docId);
         if (!person) {
             /* B14：组织节点 hover 卡（名称+成员连接数+跳转入口） */
-            const orgNode = snapshot.graph.nodes.find((node) => node.id === docId && node.kind === "org");
-            if (!orgNode) return;
+            const orgNode = nodeById.get(docId);
+            if (!orgNode || orgNode.kind !== "org") return;
             if (hoverTimer) clearTimeout(hoverTimer);
             if (clearHoverTimer) clearTimeout(clearHoverTimer);
             const position = event.renderedPosition ?? event.target.renderedPosition();
@@ -752,7 +757,7 @@
 
         instance.on("tap", "node", (event: cytoscape.EventObject) => {
             const docId = event.target.id();
-            const person = people.find((item) => item.docId === docId);
+            const person = allPeopleByDocId.get(docId);
             if (person) {
                 selectedOrgId = "";
                 clearHover();
@@ -823,13 +828,12 @@
         await switchNativeScope("global");
     }
 
-    const nodeById = $derived(new Map(snapshot.graph.nodes.map((node) => [node.id, node])));
     function nodeName(id: string): string { return nodeById.get(id)?.label ?? id; }
 
     function openTextNode(node: GraphNode) {
         if (node.kind === "org") focusOrganization(node.id);
         else {
-            const person = snapshot.people.find((entry) => entry.docId === node.id);
+            const person = peopleByDocId.get(node.id);
             if (person) openSnapshotPerson(person);
         }
     }
