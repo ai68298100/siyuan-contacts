@@ -1055,8 +1055,8 @@ import StatusNotice from "../StatusNotice.svelte";
 
     loadCommonOrgs();
 
-    /* FUNC-01.7-a：数据变化（跨窗口/宿主）→ 原地重载洞察与跟进；写入/操作挂起时跳过
-       （Workbench 对草稿场景给出可见提示条），当前人物与输入草稿保留 */
+    /* FUNC-01.7-a & K-04：数据变化（跨窗口/宿主）→ 原地重载洞察、跟进与组织成员事实；
+       各模块独立守卫未保存草稿，彼此不串锁阻断，当前人物与输入草稿严格保留 */
     let lastSeenRevision = untrack(() => revision);
     let refreshPending = $state(false);
     let orgRefreshPending = $state(false);
@@ -1066,8 +1066,7 @@ import StatusNotice from "../StatusNotice.svelte";
             refreshPending = true;
             orgRefreshPending = true;
         }
-        if (busy || followUpBusy || personNoteSaving || personNoteLegacyBusy || cadenceSaving || personNoteDraft !== personNote) return;
-        if (refreshPending) {
+        if (refreshPending && !busy && !followUpBusy && !personNoteSaving && !personNoteLegacyBusy && !cadenceSaving && personNoteDraft === personNote) {
             refreshPending = false;
             void loadOthers();
             void loadInsights();
