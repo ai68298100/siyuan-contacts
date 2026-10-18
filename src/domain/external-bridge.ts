@@ -1,6 +1,7 @@
 import { defaultBridgeRef, toLocalDateKey, normalizeInteractionStoreForWrite } from "./interactions.ts";
 import { birthdayToMs } from "./person.ts";
 import { validateDocumentTitle } from "./format.ts";
+import { isValidDateKey } from "./date-key.ts";
 import type { VcfDocumentCheckpoint } from "./vcard.ts";
 
 export const BRIDGE_PROTOCOL = 2;
@@ -181,8 +182,8 @@ export function normalizeBridgeInteraction(ids: unknown, meta?: unknown, now = n
     if (!Array.isArray(ids) || ids.length > 200) throw new BridgeError("invalid_input", operation);
     const value = optionsInput(meta, ["ref", "date", "place", "note"], operation);
     const date = value.date === undefined ? toLocalDateKey(now) : textInput(value.date, 10, operation, false);
-    const occurredAt = birthdayToMs(date);
-    if (occurredAt === null) throw new BridgeError("invalid_input", operation);
+    if (!isValidDateKey(date)) throw new BridgeError("invalid_input", operation);
+    const occurredAt = birthdayToMs(date) ?? new Date(`${date}T00:00:00`).getTime();
     const place = value.place === undefined ? "" : textInput(value.place, 512, operation);
     const note = value.note === undefined ? "" : textInput(value.note, 4096, operation);
     const docIds = [...new Set(ids.filter(isBridgeId))].sort();
@@ -258,7 +259,7 @@ export function normalizeBridgeRequestStore(raw: unknown): BridgeRequestStore {
             if (!docIds.every(isBridgeId)
                 || new Set(docIds).size !== docIds.length
                 || docIds.some((docId, index) => index > 0 && docId <= docIds[index - 1])
-                || typeof request.date !== "string" || birthdayToMs(request.date) === null || typeof request.note !== "string"
+                || typeof request.date !== "string" || !isValidDateKey(request.date) || typeof request.note !== "string"
                 || !Array.isArray(request.items) || request.items.length !== docIds.length) return fail();
             for (const [index, item] of request.items.entries()) {
                 if (!record(item) || item.docId !== docIds[index]
