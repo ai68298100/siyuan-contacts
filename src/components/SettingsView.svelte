@@ -63,6 +63,18 @@ import type { ViewPreferences } from "../domain/preferences";
 
     let activeSection: SectionId = $state("general");
 
+    async function switchSection(next: SectionId, focusHeading = true): Promise<void> {
+        if (activeSection === next) return;
+        if (auditBusy || orgProjectionBusy) return;
+        activeSection = next;
+        if (focusHeading) {
+            await tick();
+            const panel = document.getElementById(`lvct-settings-panel-${next}`);
+            const heading = panel?.querySelector<HTMLElement>("h2");
+            heading?.focus({ preventScroll: true });
+        }
+    }
+
     function handleNavKeydown(event: KeyboardEvent) {
         if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") return;
         if (auditBusy || orgProjectionBusy) return;
@@ -992,7 +1004,7 @@ import type { ViewPreferences } from "../domain/preferences";
                     aria-describedby={auditBusy || orgProjectionBusy ? "lvct-settings-nav-status" : undefined}
                     title={auditBusy ? "资料体检进行中，完成后可切换设置分区" : orgProjectionBusy ? "组织双链核对进行中，完成后可切换设置分区" : undefined}
                     disabled={auditBusy || orgProjectionBusy}
-                    onclick={() => { if (!auditBusy && !orgProjectionBusy) activeSection = section.id; }}
+                    onclick={() => void switchSection(section.id, true)}
                 >
                     <span aria-hidden="true">
                         {#if section.id === "general"}<SlidersHorizontal size={16}/>
@@ -1023,7 +1035,7 @@ import type { ViewPreferences } from "../domain/preferences";
             {#if activeSection === "general"}
                 <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
                 <section id="lvct-settings-panel-general" class="lvct-settings__panel" role="tabpanel" aria-labelledby="lvct-settings-tab-general" tabindex="0">
-                    <h2>{text("settingsGeneral", "通用")}</h2>
+                    <h2 tabindex="-1">{text("settingsGeneral", "通用")}</h2>
                     <p class="lvct-settings__desc">界面与默认行为偏好，仅存于插件本地 JSON，不影响数据库内容。</p>
                     {#if preferencesDirty}
                         <p class="lvct-settings__draft-status" role="status">有未保存修改；切换设置分区会保留草稿，返回工作台时会提示你。</p>
@@ -1211,7 +1223,7 @@ import type { ViewPreferences } from "../domain/preferences";
             {:else if activeSection === "data"}
                 <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
                 <section id="lvct-settings-panel-data" class="lvct-settings__panel" role="tabpanel" aria-labelledby="lvct-settings-tab-data" tabindex="0">
-                    <h2>{text("settingsData", "数据与字段")}</h2>
+                    <h2 tabindex="-1">{text("settingsData", "数据与字段")}</h2>
                     <p class="lvct-settings__desc">字段 ID 固化在设置中，列名可在思源里自由修改；若列被删除可在此恢复或补建。</p>
 
                     <div class="lvct-settings__row">
@@ -1577,7 +1589,7 @@ import type { ViewPreferences } from "../domain/preferences";
             {:else if activeSection === "reminder"}
                 <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
                 <section id="lvct-settings-panel-reminder" class="lvct-settings__panel" role="tabpanel" aria-labelledby="lvct-settings-tab-reminder" tabindex="0">
-                    <h2>{text("settingsReminder", "提醒")}</h2>
+                    <h2 tabindex="-1">{text("settingsReminder", "提醒")}</h2>
                     <p class="lvct-settings__desc">首页展示近期公历和农历生日，根据互动事件计算联系间隔。</p>
 
                     <!-- B08：已暂缓的提醒（reminder-dismissals）一键恢复，避免"点过就找不回" -->
@@ -1649,7 +1661,7 @@ import type { ViewPreferences } from "../domain/preferences";
             {:else if activeSection === "ai"}
                 <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
                 <section id="lvct-settings-panel-ai" class="lvct-settings__panel" role="tabpanel" aria-labelledby="lvct-settings-tab-ai" tabindex="0">
-                    <h2>{text("settingsAiPrivacy", "AI 与隐私")}</h2>
+                    <h2 tabindex="-1">{text("settingsAiPrivacy", "AI 与隐私")}</h2>
                     <p class="lvct-settings__desc">AI 一律显式触发，可全局关闭；插件不持有密钥、无后台扫描。</p>
 
                     <label class="lvct-settings__switch-row">
@@ -1672,7 +1684,7 @@ import type { ViewPreferences } from "../domain/preferences";
             {:else if activeSection === "bridge"}
                 <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
                 <section id="lvct-settings-panel-bridge" class="lvct-settings__panel" role="tabpanel" aria-labelledby="lvct-settings-tab-bridge" tabindex="0">
-                    <h2>{text("settingsBridge", "服务桥")}</h2>
+                    <h2 tabindex="-1">{text("settingsBridge", "服务桥")}</h2>
                     <p class="lvct-settings__desc">供其他插件搜索、创建联系人和记录互动。</p>
 
                     <div class="lvct-settings__row">
@@ -1686,7 +1698,7 @@ import type { ViewPreferences } from "../domain/preferences";
             {:else if activeSection === "about"}
                 <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
                 <section id="lvct-settings-panel-about" class="lvct-settings__panel" role="tabpanel" aria-labelledby="lvct-settings-tab-about" tabindex="0">
-                    <h2>{text("settingsAbout", "关于")}</h2>
+                    <h2 tabindex="-1">{text("settingsAbout", "关于")}</h2>
                     <p class="lvct-settings__desc">联系人文档和思源数据库是原生数据；插件互动事件、设置和视图偏好保存在插件数据目录，卸载并删除插件数据时可能丢失。请先导出互动备份。</p>
 
                     <div class="lvct-settings__row">
