@@ -334,7 +334,10 @@
         }
         const first = items[0];
         const last = items[items.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
+        if (!mobileSheetPanel?.contains(document.activeElement)) {
+            event.preventDefault();
+            first.focus();
+        } else if (event.shiftKey && document.activeElement === first) {
             event.preventDefault();
             last.focus();
         } else if (!event.shiftKey && document.activeElement === last) {
