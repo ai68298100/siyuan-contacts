@@ -528,11 +528,14 @@
             ? { ...extraFilter, recentFrom: "", recentTo: "", neverContacted: false }
             : extraFilter;
         const final = applyPeopleFilters(result, recentState !== "ready" ? {} : recent, recentSafeFilter);
-        const birthdayDays = new Map(final.map((person) => [person.itemId, nextBirthday(person.birthday, person.isLunar)?.daysUntil ?? Infinity]));
         const effectiveSortMode = recentState !== "ready" && sortMode === "recent" ? "name" : sortMode;
+        // G-11：全员下次生日计算惰性化，仅在生日排序模式下按需计算，避免姓名/分组/最近互动排序下的农历计算开销
+        const birthdayDays = effectiveSortMode === "birthday"
+            ? new Map(final.map((person) => [person.itemId, nextBirthday(person.birthday, person.isLunar)?.daysUntil ?? Infinity]))
+            : null;
         final.sort((a, b) => {
             if (effectiveSortMode === "group") return a.group.localeCompare(b.group, "zh-CN") || a.name.localeCompare(b.name, "zh-CN");
-            if (effectiveSortMode === "birthday") return (birthdayDays.get(a.itemId) ?? Infinity) - (birthdayDays.get(b.itemId) ?? Infinity) || a.name.localeCompare(b.name, "zh-CN");
+            if (effectiveSortMode === "birthday" && birthdayDays) return (birthdayDays.get(a.itemId) ?? Infinity) - (birthdayDays.get(b.itemId) ?? Infinity) || a.name.localeCompare(b.name, "zh-CN");
             if (effectiveSortMode === "recent") return (recent[b.docId]?.occurredAt ?? -Infinity) - (recent[a.docId]?.occurredAt ?? -Infinity) || a.name.localeCompare(b.name, "zh-CN");
             return a.name.localeCompare(b.name, "zh-CN");
         });
