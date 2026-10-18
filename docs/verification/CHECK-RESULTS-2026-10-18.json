@@ -1,0 +1,424 @@
+{
+  "date": "2026-10-18",
+  "timezone": "Asia/Shanghai",
+  "commit": "6b52b6f6040f23d129811d83bb2993e9638422e7",
+  "version": "0.5.18",
+  "typecheck": {
+    "exitCode": 0,
+    "errors": 0,
+    "warnings": 0
+  },
+  "unitTests": {
+    "exitCode": 0,
+    "passed": 756,
+    "failed": 0,
+    "skipped": 0
+  },
+  "ui": {
+    "desktop1280": {
+      "exitCode": 0,
+      "passed": 475,
+      "failed": 0,
+      "browser": "Google Chrome",
+      "productionComponents": true,
+      "kernel": "in-memory adapter"
+    },
+    "mobile390": {
+      "exitCode": 0,
+      "passed": 475,
+      "failed": 0,
+      "browser": "Google Chrome",
+      "productionComponents": true,
+      "kernel": "in-memory adapter"
+    },
+    "hostCss": {
+      "exitCode": 0,
+      "passed": 475,
+      "failed": 0,
+      "browser": "Google Chrome",
+      "productionComponents": true,
+      "kernel": "in-memory adapter"
+    }
+  },
+  "hostAssets": {
+    "available": true,
+    "baseCharacters": 554402,
+    "daylightCharacters": 10690,
+    "midnightCharacters": 10871
+  },
+  "controlInventory": {
+    "scope": "Current Svelte component source; runtime failures, conditional visibility and host behavior require separate verification",
+    "files": 40,
+    "controls": 803,
+    "findings": [
+      {
+        "id": "src/components/LvctDialog.svelte:115",
+        "kind": "keyboard_review",
+        "evidence": [
+          "onclick={(event) => { if (closeOnBackdrop && event.target === event.currentTarget) void requestClose(); }}"
+        ]
+      },
+      {
+        "id": "src/components/people/PeopleView.svelte:1711",
+        "kind": "keyboard_review",
+        "evidence": [
+          "onclick={(event) => { if (event.target === event.currentTarget) closeMobileSheet(); }}"
+        ]
+      },
+      {
+        "id": "src/components/people/PersonCard.svelte:57",
+        "kind": "keyboard_review",
+        "evidence": [
+          "onclick={(event) => event.stopPropagation()}"
+        ]
+      }
+    ]
+  },
+  "screenshots": {
+    "generated": 77,
+    "failed": 0,
+    "exitCode": 0,
+    "localDirectory": "scripts/e2e/shots",
+    "gitIgnored": true,
+    "results": [
+      "general desktop light: OK",
+      "general mobile light: OK",
+      "general desktop dark: OK",
+      "general mobile dark: OK",
+      "data desktop light: OK",
+      "data mobile light: OK",
+      "data desktop dark: OK",
+      "data mobile dark: OK",
+      "wizard reuse desktop light: OK",
+      "wizard reuse desktop dark: OK",
+      "wizard reuse mobile light: OK",
+      "wizard reuse mobile dark: OK",
+      "wizard failed desktop light: OK",
+      "wizard failed desktop dark: OK",
+      "wizard failed mobile light: OK",
+      "wizard failed mobile dark: OK",
+      "home desktop light: OK",
+      "home desktop dark: OK",
+      "home mobile light: OK",
+      "home mobile dark: OK",
+      "actions desktop light: OK",
+      "actions desktop dark: OK",
+      "actions tablet light: OK",
+      "actions tablet dark: OK",
+      "actions mobile light: OK",
+      "actions mobile dark: OK",
+      "actions narrow light: OK",
+      "actions narrow dark: OK",
+      "people desktop light: OK",
+      "people desktop dark: OK",
+      "people mobile light: OK",
+      "people mobile dark: OK",
+      "table desktop light: OK",
+      "table desktop dark: OK",
+      "table mobile light: OK",
+      "table mobile dark: OK",
+      "peek desktop light: OK",
+      "peek desktop dark: OK",
+      "peek mobile light: OK",
+      "peek mobile dark: OK",
+      "graph desktop light: OK",
+      "graph desktop dark: OK",
+      "graph tablet light: OK",
+      "graph tablet dark: OK",
+      "graph mobile light: OK",
+      "graph mobile dark: OK",
+      "graph narrow light: OK",
+      "graph narrow dark: OK",
+      "orgs desktop light: OK",
+      "orgs desktop dark: OK",
+      "orgs mobile light: OK",
+      "orgs mobile dark: OK",
+      "orgdetail desktop light: OK",
+      "orgdetail desktop dark: OK",
+      "orgdetail mobile light: OK",
+      "orgdetail mobile dark: OK",
+      "orgmgr desktop light: OK",
+      "orgmgr desktop dark: OK",
+      "orgmgr mobile light: OK",
+      "orgmgr mobile dark: OK",
+      "quickfill desktop light: OK",
+      "quickfill desktop dark: OK",
+      "quickfill mobile light: OK",
+      "quickfill mobile dark: OK",
+      "host wizard-reuse desktop: OK",
+      "host wizard-failed desktop: OK",
+      "host settings-data desktop: OK",
+      "host workbench-home desktop: OK",
+      "host workbench-people desktop: OK",
+      "host workbench-people mobile: OK",
+      "host pop-viewsmenu desktop: OK",
+      "host pop-viewsmenu mobile: OK",
+      "host pop-morefilter desktop: OK",
+      "host pop-colmenu desktop: OK",
+      "host pop-orgmgr desktop: OK",
+      "host workbench-home-dark desktop: OK",
+      "host pop-viewsmenu-dark desktop: OK"
+    ],
+    "note": "Generated surfaces and sampled visual review; not complete manual screen-reader or device acceptance."
+  },
+  "build": {
+    "exitCode": 0,
+    "zipBytes": 619768,
+    "zipSha256": "146a94ab92585d5b6093eceed89262bf34740fd1d217e2f2b675b684a20f460b"
+  },
+  "localReleaseGate": {
+    "exitCode": 0,
+    "failedChecks": [],
+    "officialAssetValid": true,
+    "allNinePayloadFilesMatchOfficialAsset": true,
+    "sidecarUnmodified": true
+  },
+  "kernelFirstRun": {
+    "isolated": true,
+    "randomPort": true,
+    "uuidWorkspace": true,
+    "kernelVersion": "3.8.8-alpha.3",
+    "actualProductServices": true,
+    "realFrontend": false,
+    "cleanupFailure": null,
+    "hostPending": null,
+    "results": [
+      {
+        "name": "实际初始化与稳定人物创建",
+        "ok": true
+      },
+      {
+        "name": "设置补列与四层重绑只读预览及确认回读",
+        "ok": true
+      },
+      {
+        "name": "生日早年、公历农历连续保存与清空回读",
+        "ok": true
+      },
+      {
+        "name": "多人事项来源、当日日记、地点和双方人物投影及重复捕获",
+        "ok": true
+      },
+      {
+        "name": "往来账本稳定请求、结清与重新打开",
+        "ok": true
+      },
+      {
+        "name": "别名唯一核实、重复幂等、泛称拒绝与列表搜索",
+        "ok": true
+      },
+      {
+        "name": "组织员工接替保留旧历史与双方文档投影",
+        "ok": true
+      },
+      {
+        "name": "迁移包新模块覆盖、预览与现状优先重复恢复",
+        "ok": true
+      },
+      {
+        "name": "原生任务块九条跨日期事项全量对账、修改删除与故障恢复",
+        "ok": true
+      },
+      {
+        "name": "真实内核重启后的锚点核验与原人物数据回读",
+        "ok": true
+      },
+      {
+        "name": "原生任务块重启后索引文档首页逐项回读",
+        "ok": true
+      }
+    ]
+  },
+  "frontendFirstRun": {
+    "ok": false,
+    "frontend": "browser-desktop",
+    "pluginInstalled": true,
+    "pluginLoaded": true,
+    "bridgeLoaded": true,
+    "bridgeProtocol": 2,
+    "bridgeGetPerson": true,
+    "replayStable": true,
+    "workbenchTopbar": true,
+    "birthdayEditor": true,
+    "birthdaySaved": false,
+    "failure": "生日编辑保存按钮不可定位"
+  },
+  "frontendFirstRunDriverIssue": {
+    "location": "scripts/e2e/frontend-flow.mjs:1104-1113",
+    "reason": "Driver checks save immediately after the date input appears; profileLoading intentionally keeps save disabled."
+  },
+  "logs": {
+    "check": "C:\\Users\\Admin\\AppData\\Local\\Temp\\lvct-audit-20261018-check.log",
+    "unit": "C:\\Users\\Admin\\AppData\\Local\\Temp\\lvct-audit-20261018-test.log",
+    "desktop": "C:\\Users\\Admin\\AppData\\Local\\Temp\\lvct-audit-20261018-ui-desktop.log",
+    "mobile": "C:\\Users\\Admin\\AppData\\Local\\Temp\\lvct-audit-20261018-ui-mobile.log",
+    "hostCss": "C:\\Users\\Admin\\AppData\\Local\\Temp\\lvct-audit-20261018-ui-host.log",
+    "build": "C:\\Users\\Admin\\AppData\\Local\\Temp\\lvct-audit-20261018-build.log",
+    "localReleaseGate": "C:\\Users\\Admin\\AppData\\Local\\Temp\\lvct-audit-20261018-release-check.log",
+    "screenshots": "C:\\Users\\Admin\\AppData\\Local\\Temp\\lvct-audit-20261018-screenshots.log",
+    "services": "C:\\Users\\Admin\\AppData\\Local\\Temp\\lvct-audit-20261018-services.log"
+  },
+  "boundaries": [
+    "No daily user workspace writes",
+    "No Android device acceptance",
+    "No native graph UI acceptance",
+    "No live AI provider call",
+    "No GitHub mutations",
+    "Local product changes are present; no remote writes, release, or daily workspace writes"
+  ],
+  "frontendDiagnosticRerun": {
+    "driverPatchedInMemoryOnly": true,
+    "productCodeUnchanged": true,
+    "originalDriverUnchanged": true,
+    "purpose": "Wait for profileLoading to finish and Save to become enabled; retain first-run LIMITED result.",
+    "actualProductServicesPassed": 11,
+    "kernelVersion": "3.8.8-alpha.3",
+    "realFrontend": true,
+    "evidencePath": "C:\\Users\\Admin\\AppData\\Local\\Temp\\lvct-audit-20261018-profile-ready-b1bfe78f-02e4-421e-84f8-ec10e717089f.json",
+    "evidenceSha256": "4ddecf3085eeeb7bdf7695ab1e43d121b2ff43b7bf2f850606b4df3675c7d652",
+    "frontend": {
+      "ok": true,
+      "isolated": true,
+      "pluginInstalled": true,
+      "pluginLoaded": true,
+      "browserAuthentication": false,
+      "bridgeLoaded": true,
+      "bridgeGetPerson": true,
+      "replayCreated": true,
+      "replayStable": true,
+      "workbenchTopbar": true,
+      "birthdayEditor": true,
+      "birthdaySaved": true,
+      "ledgerEditor": true,
+      "ledgerCreated": true,
+      "ledgerSettled": true,
+      "ledgerReopened": true,
+      "aliasEditor": true,
+      "aliasSaved": true,
+      "aliasRejected": true,
+      "followUpEditor": true,
+      "followUpCreated": true,
+      "followUpCompleted": true,
+      "followUpKernelVerified": true,
+      "organizationView": true,
+      "organizationRenamed": true,
+      "organizationMemberEdited": true,
+      "organizationArchived": true,
+      "organizationRestored": true,
+      "organizationReloaded": true,
+      "captureEditorOpen": true,
+      "captureContextMenu": false,
+      "captureCommandPanel": true,
+      "captureDialog": true,
+      "captureCompleted": true,
+      "uiReloaded": true,
+      "multiWindowStable": true,
+      "multiWindowInteraction": true,
+      "organizationCrossWindow": true,
+      "organizationMemberCrossWindow": true,
+      "organizationArchiveCrossWindow": true,
+      "organizationRestoreCrossWindow": true,
+      "captureDialogClosed": true,
+      "hostReady": true,
+      "frontend": "browser-desktop",
+      "bridgeProtocol": 2,
+      "captureCandidateCount": 2,
+      "limitations": [],
+      "failure": null,
+      "auditDriverProfileReady": {
+        "temporaryHook": true,
+        "productionChanges": false,
+        "before": {
+          "form": true,
+          "loading": true,
+          "dateDisabled": false,
+          "saveDisabled": true
+        },
+        "after": {
+          "form": true,
+          "loading": false,
+          "dateDisabled": false,
+          "saveDisabled": false
+        },
+        "waitMs": 1297
+      },
+      "browserProcess": {
+        "exited": true,
+        "profileRemoved": true
+      }
+    },
+    "cleanupFailure": null
+  },
+  "scope": "Audit baseline plus current local repair validation",
+  "currentValidation": {
+    "date": "2026-10-18",
+    "branch": "fix/audit-20261018",
+    "typecheck": {
+      "warnings": 0,
+      "errors": 0,
+      "exitCode": 0
+    },
+    "unitTests": {
+      "skipped": 0,
+      "failed": 0,
+      "exitCode": 0,
+      "passed": 756
+    },
+    "ui": {
+      "mobile390": {
+        "failed": 0,
+        "exitCode": 0,
+        "passed": 475
+      },
+      "desktop1280": {
+        "failed": 0,
+        "exitCode": 0,
+        "passed": 475
+      },
+      "hostCss": {
+        "failed": 0,
+        "exitCode": 0,
+        "passed": 475
+      }
+    },
+    "build": {
+      "zipSha256": "146a94ab92585d5b6093eceed89262bf34740fd1d217e2f2b675b684a20f460b",
+      "zipBytes": 619768,
+      "exitCode": 0
+    },
+    "localReleaseGate": {
+      "exitCode": 0,
+      "failedChecks": []
+    },
+    "gitDiffCheck": {
+      "exitCode": 0
+    },
+    "controlInventory": {
+      "files": 40,
+      "controls": 803,
+      "findings": [
+        {
+          "id": "src/components/LvctDialog.svelte:115",
+          "kind": "keyboard_review",
+          "evidence": [
+            "onclick={(event) => { if (closeOnBackdrop && event.target === event.currentTarget) void requestClose(); }}"
+          ]
+        },
+        {
+          "id": "src/components/people/PeopleView.svelte:1711",
+          "kind": "keyboard_review",
+          "evidence": [
+            "onclick={(event) => { if (event.target === event.currentTarget) closeMobileSheet(); }}"
+          ]
+        },
+        {
+          "id": "src/components/people/PersonCard.svelte:57",
+          "kind": "keyboard_review",
+          "evidence": [
+            "onclick={(event) => event.stopPropagation()}"
+          ]
+        }
+      ]
+    }
+  }
+}
