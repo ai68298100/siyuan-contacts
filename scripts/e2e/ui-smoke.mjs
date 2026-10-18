@@ -119,12 +119,14 @@ try {
                 "relation-heading": "#fixture #lvct-detail-panel-relations h4",
                 "org-search": '#fixture .lvct-person-edit__profile input[aria-label="搜索组织"]',
                 "org-focused-option": '#fixture .lvct-person-edit__profile .lvct-org-multi__option input[type="checkbox"]:focus',
+                "strip-chips-more": "#fixture .lvct-strip__chip-more",
             };
             const selector = Object.hasOwn(targets, request.target) ? targets[request.target] : undefined;
             const actions = {
                 "relation-empty-cta": ["click", "enter"], "relation-heading": ["click"],
                 "org-search": ["enter", "arrowdown", "arrowup", "home", "end"],
                 "org-focused-option": ["enter", "space", "arrowdown", "arrowup", "home", "end"],
+                "strip-chips-more": ["enter", "space"],
             };
             const action = request.action ?? "click";
             if (!/^[a-z0-9-]{1,60}$/.test(requestId ?? "") || !selector

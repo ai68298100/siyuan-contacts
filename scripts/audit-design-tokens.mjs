@@ -19,8 +19,11 @@ const outPath = outIndex >= 0 && args[outIndex + 1]
   ? path.resolve(root, args[outIndex + 1])
   : null;
 
-const sourceRoots = ["src/style", "src/index.scss", "docs/ui-prototype.html"];
-const includeExtensions = new Set([".scss", ".css", ".html"]);
+/* Include component-scoped <style> blocks as first-class audit input. The
+ * previous scope only covered global Sass, so a component could reintroduce
+ * host colors or spacing without appearing in the report. */
+const sourceRoots = ["src", "docs/ui-prototype.html"];
+const includeExtensions = new Set([".scss", ".css", ".html", ".svelte"]);
 
 async function collectFiles(entry) {
   const absolute = path.resolve(root, entry);
@@ -71,9 +74,16 @@ function countTokenUsages(text) {
   return (text.match(/var\(\s*--lvct-[\w-]+/g) ?? []).length;
 }
 
+function auditText(file, source) {
+  if (path.extname(file) !== ".svelte") return source;
+  return [...source.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)]
+    .map((match) => match[1])
+    .join("\n");
+}
+
 const byFile = [];
 const aggregate = {
-  files: files.length,
+  files: 0,
   bytes: 0,
   lines: 0,
   declarations: 0,
@@ -86,7 +96,9 @@ const aggregate = {
 const allUnique = Object.fromEntries(Object.keys(aggregate.uniqueLiterals).map((key) => [key, []]));
 
 for (const file of files) {
-  const text = await fs.readFile(file, "utf8");
+  const text = auditText(file, await fs.readFile(file, "utf8"));
+  /* Keep the report about CSS, not Svelte markup/logic. */
+  if (text.trim() === "") continue;
   const rel = path.relative(root, file).replaceAll(path.sep, "/");
   const stats = {
     file: rel,
@@ -100,6 +112,7 @@ for (const file of files) {
     nonGridLengths: 0,
   };
   aggregate.bytes += stats.bytes;
+  aggregate.files += 1;
   aggregate.lines += stats.lines;
   aggregate.declarations += stats.declarations;
   aggregate.tokenDeclarations += stats.tokenDeclarations;
@@ -122,7 +135,7 @@ const uniqueLiterals = Object.fromEntries(Object.entries(allUnique).map(([key, v
 const result = {
   generatedAt: new Date().toISOString(),
   scope: sourceRoots,
-  methodology: "Lexical audit of SCSS and prototype HTML; CSS custom-property references are tracked separately from literal values.",
+  methodology: "Lexical audit of global/component-scoped CSS and prototype HTML; Svelte markup and logic are excluded, while CSS custom-property references are tracked separately from literals.",
   aggregate: {
     ...aggregate,
     uniqueLiterals,

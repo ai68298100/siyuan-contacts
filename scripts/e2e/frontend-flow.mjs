@@ -1106,10 +1106,17 @@ export async function verifyRealFrontend({
         await waitUntil(deadline, async () => Boolean(await browserSession.evaluate("document.querySelector('.lvct-form input[type=date]')")), "生日编辑控件");
         evidence.birthdayEditor = Boolean(edit);
         if (!evidence.birthdayEditor) throw new Error("生日编辑控件已出现但编辑入口不可定位");
+        // The date field mounts before the organization/profile read finishes.
+        // Wait for the actual submit control instead of treating its deliberate
+        // loading lock as a missing save button. Scope to the outer form actions;
+        // nested member editors have their own action rows.
+        const birthdayEditorReady = () => browserSession.evaluate("(()=>{const input=document.querySelector('.lvct-form input[type=date]');const form=input?.closest('.lvct-form');const save=form?.querySelector(':scope > .lvct-form__actions > button.b3-button--primary');return Boolean(input&&!input.disabled&&save&&!save.disabled)})()");
+        await waitUntil(deadline, birthdayEditorReady, "人物资料加载完成且生日保存可用");
         const birthday = "2026-12-24";
         const birthdayInput = await browserSession.evaluate(`(()=>{const input=document.querySelector('.lvct-form input[type=date]');if(!input)return false;const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(input,${json(birthday)});input.dispatchEvent(new Event('input',{bubbles:true}));return input.value===${json(birthday)}})()`);
         if (!birthdayInput) throw new Error("生日编辑控件无法接受隔离测试日期");
-        const save = await browserSession.evaluate("(()=>{const input=document.querySelector('.lvct-form input[type=date]');const button=input?.closest('.lvct-form')?.querySelector('.lvct-form__actions button:last-child');if(!button||button.disabled)return false;button.click();return true})()");
+        await waitUntil(deadline, birthdayEditorReady, "生日输入后的保存按钮就绪");
+        const save = await browserSession.evaluate("(()=>{const input=document.querySelector('.lvct-form input[type=date]');const button=input?.closest('.lvct-form')?.querySelector(':scope > .lvct-form__actions > button.b3-button--primary');if(!button||button.disabled)return false;button.click();return true})()");
         if (!save) throw new Error("生日编辑保存按钮不可定位");
         await waitUntil(deadline, async () => Boolean(await browserSession.evaluate(`document.querySelector('.lvct-detail')?.textContent?.includes(${json(birthday)})`)), "生日保存回读");
         evidence.birthdaySaved = true;

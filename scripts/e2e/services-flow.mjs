@@ -309,6 +309,12 @@ try {
         });
         evidence.realFrontend = evidence.frontend.ok;
         console.log(`真实 browser-desktop 前端验收：${evidence.frontend.ok ? "PASS" : "LIMITED"}`);
+        // An explicitly requested frontend run is required, even when all
+        // service checks passed. Keep LIMITED evidence without reporting exit 0.
+        if (!evidence.frontend.ok) {
+            process.exitCode = 1;
+            console.error(`真实前端验收未完成：${evidence.frontend.failure || evidence.frontend.limitations?.join("；") || "详见前端证据"}`);
+        }
     }
 } catch (error) {
     evidence.results.push({ name: "未完成步骤", ok: false, detail: error.stack });
