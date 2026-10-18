@@ -14,6 +14,7 @@
     import type { RelationshipLabelEditorState } from "../../services/people-profiles";
     import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
+    import { confirmDialog } from "../../libs/confirm-dialog";
     import QuickFillDialog from "./QuickFillDialog.svelte";
     import GroupField from "./GroupField.svelte";
     import BirthdayField from "./BirthdayField.svelte";
@@ -191,10 +192,17 @@
         removingOrgDocId = "";
         void tick().then(focusOrganizationSelector);
     }
-    function requestRemoveOrgDraft(entry: OrgDraft): void {
+    async function requestRemoveOrgDraft(entry: OrgDraft): Promise<void> {
         if (profileBusy) return;
         if (entry.attempted) {
-            if (!window.confirm("仅放弃这条本地待核实草稿；可能已保存的组织归属不会撤销。请在已有经历中核对。确定放弃？")) return;
+            const confirmed = await confirmDialog({
+                title: "放弃待核实草稿",
+                message: "仅放弃这条本地待核实草稿；可能已保存的组织归属不会撤销。请在已有经历中核对。确定放弃？",
+                confirmLabel: "放弃",
+                cancelLabel: "保留",
+                danger: true,
+            });
+            if (!confirmed) return;
             removeOrgDraftNow(entry.orgDocId);
             return;
         }
@@ -310,8 +318,17 @@
         editingOrgNote = membership.note ?? "";
         editingOrgKind = membership.affiliationKind ?? "unspecified";
     }
-    function cancelEditMembership(): void {
-        if (editingAttemptedInput && !window.confirm("仅放弃本地编辑草稿，可能已保存的组织经历不会撤销。确定放弃？")) return;
+    async function cancelEditMembership(): Promise<void> {
+        if (editingAttemptedInput) {
+            const confirmed = await confirmDialog({
+                title: "放弃编辑草稿",
+                message: "仅放弃本地编辑草稿，可能已保存的组织经历不会撤销。确定放弃？",
+                confirmLabel: "放弃",
+                cancelLabel: "继续编辑",
+                danger: true,
+            });
+            if (!confirmed) return;
+        }
         editingMembershipId = "";
         editingMembershipSnapshot = null;
         editingAttemptedInput = null;
@@ -319,7 +336,14 @@
     async function saveEditMembership(): Promise<void> { await saveProfileEditor(); }
     async function removeMembership(membership: import("../../services/org").PersonOrgMembershipView): Promise<void> {
         if (!onRemoveOrgMembership || profileBusy || profileLoading) return;
-        if (!window.confirm(`确定删除「${membership.orgName}」的这段组织经历吗？正常离职或毕业请编辑状态并保留历史。`)) return;
+        const confirmed = await confirmDialog({
+            title: "删除组织经历",
+            message: `确定删除「${membership.orgName}」的这段组织经历吗？正常离职或毕业请编辑状态并保留历史。`,
+            confirmLabel: "删除",
+            cancelLabel: "取消",
+            danger: true,
+        });
+        if (!confirmed) return;
         profileBusy = true;
         profileError = "";
         try {

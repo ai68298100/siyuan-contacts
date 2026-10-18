@@ -7,6 +7,7 @@
     import { toLocalDateKey } from "../../domain/interactions";
     import type { ExchangeDirection, ExchangeKind, ExchangeRecord, ExchangeStatus } from "../../domain/exchanges";
     import { translateText } from "../../domain/translation";
+    import { confirmDialog } from "../../libs/confirm-dialog";
 
     let {
         personDocId,
@@ -186,7 +187,16 @@
 
     async function changeStatus(record: ExchangeRecord, status: ExchangeStatus): Promise<void> {
         if (busy || loading || readFailed || saveUnknown) return;
-        if (status === "cancelled" && !window.confirm(`确定取消「${recordLabel(record)}」吗？取消后仍保留历史记录。`)) return;
+        if (status === "cancelled") {
+            const confirmed = await confirmDialog({
+                title: "取消往来记录",
+                message: `确定取消「${recordLabel(record)}」吗？取消后仍保留历史记录。`,
+                confirmLabel: "确认取消",
+                cancelLabel: "保留",
+                danger: true,
+            });
+            if (!confirmed) return;
+        }
         busy = true;
         errorText = "";
         const docId = personDocId;

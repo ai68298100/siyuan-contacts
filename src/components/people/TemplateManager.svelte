@@ -6,6 +6,7 @@
     import { useCloseGuard } from "../close-guard";
     import { translateText } from "../../domain/translation";
     import { requestErrorMessage } from "../../shared/error-presenter";
+    import { confirmDialog } from "../../libs/confirm-dialog";
 
     let {
         templates,
@@ -48,8 +49,15 @@
         draft = [...draft, { id: newTemplateId(), name: "", content: "" }];
     }
 
-    function removeTemplate(id: string) {
-        if (!window.confirm(text("tplManagerDeleteConfirm", "删除这个模板？已保存的互动不受影响。"))) return;
+    async function removeTemplate(id: string) {
+        const confirmed = await confirmDialog({
+            title: "删除模板",
+            message: text("tplManagerDeleteConfirm", "删除这个模板？已保存的互动不受影响。"),
+            confirmLabel: "删除",
+            cancelLabel: "取消",
+            danger: true,
+        });
+        if (!confirmed) return;
         draft = draft.filter((item) => item.id !== id);
         savedMessage = "";
     }
@@ -80,9 +88,17 @@
         }
     }
 
-    function useLatest() {
+    async function useLatest() {
         if (busy || latestTemplates === null) return;
-        if (isDirty() && !window.confirm(text("tplManagerReloadConfirm", "放弃当前未保存的模板草稿，载入刚读取的版本吗？此操作不会写入存储。"))) return;
+        if (isDirty()) {
+            const confirmed = await confirmDialog({
+                title: "载入最新版本",
+                message: text("tplManagerReloadConfirm", "放弃当前未保存的模板草稿，载入刚读取的版本吗？此操作不会写入存储。"),
+                confirmLabel: "放弃并载入",
+                cancelLabel: "保留草稿",
+            });
+            if (!confirmed) return;
+        }
         draft = latestTemplates.map((item) => ({ ...item }));
         savedDraft = latestTemplates.map((item) => ({ ...item }));
         latestTemplates = null;
@@ -95,9 +111,17 @@
         const cleaned = draft
             .map((item) => ({ ...item, name: item.name.trim(), content: item.content.trim() }))
             .filter((item) => item.name.length > 0);
-        if (cleaned.length !== draft.length && !window.confirm(text("tplManagerDropEmptyConfirm", "名称为空的模板会被丢弃，继续保存吗？"))) {
-            if (rethrowOnFailure) throw new Error("模板保存已取消");
-            return;
+        if (cleaned.length !== draft.length) {
+            const confirmed = await confirmDialog({
+                title: "丢弃空名称模板",
+                message: text("tplManagerDropEmptyConfirm", "名称为空的模板会被丢弃，继续保存吗？"),
+                confirmLabel: "继续保存",
+                cancelLabel: "返回编辑",
+            });
+            if (!confirmed) {
+                if (rethrowOnFailure) throw new Error("模板保存已取消");
+                return;
+            }
         }
         busy = true;
         errorText = "";
