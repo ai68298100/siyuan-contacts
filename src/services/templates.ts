@@ -13,9 +13,9 @@ export async function listTemplates(plugin: Plugin): Promise<NoteTemplate[]> {
     return store ? store.templates : [...DEFAULT_TEMPLATES];
 }
 
-/** 全量保存（增改删统一入口），返回归一化后的列表 */
-export async function saveTemplates(plugin: Plugin, templates: readonly NoteTemplate[]): Promise<NoteTemplate[]> {
+/** 全量保存携带编辑基线；冲突零写，返回已核实的归一化列表。 */
+export async function saveTemplates(plugin: Plugin, templates: readonly NoteTemplate[], expected: readonly NoteTemplate[]): Promise<NoteTemplate[]> {
     const normalized = normalizeTemplatesForWrite(templates);
-    await saveTemplatesStore(plugin, normalized);
+    await saveTemplatesStore(plugin, normalized, expected);
     return normalized;
 }
