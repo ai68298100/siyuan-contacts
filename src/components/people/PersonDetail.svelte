@@ -39,6 +39,7 @@ import StatusNotice from "../StatusNotice.svelte";
     import type { OrgMembershipWriteReport } from "../../services/org-member-writes";
     import { orgMembershipStatusLabel } from "../../domain/org-membership";
     import type { OrgAffiliationKind, OrgMembership, OrgMembershipPatch, OrgMembershipStatus } from "../../domain/org-membership";
+    import { confirmDialog } from "../../libs/confirm-dialog";
 
     let {
         settings,
@@ -458,7 +459,14 @@ import StatusNotice from "../StatusNotice.svelte";
 
     async function deleteTimelineItem(eventId: string) {
         if (busy || !onDeleteInteraction) return;
-        if (!window.confirm(`删除「${current.name}」的这条互动吗？只删除本人的记录，其他参与者与人物文档会保留。`)) return;
+        const confirmed = await confirmDialog({
+            title: "删除互动记录",
+            message: `删除「${current.name}」的这条互动吗？只删除本人的记录，其他参与者与人物文档会保留。`,
+            confirmLabel: "删除",
+            cancelLabel: "取消",
+            danger: true,
+        });
+        if (!confirmed) return;
         busy = true;
         errorText = "";
         try {
@@ -681,7 +689,14 @@ import StatusNotice from "../StatusNotice.svelte";
 
     async function confirmDelete() {
         if (deleting || busy) return;
-        if (!window.confirm(`确定从人脉名册移除「${current.name}」吗？人物文档会保留。`)) return;
+        const confirmed = await confirmDialog({
+            title: "移除联系人",
+            message: `确定从人脉名册移除「${current.name}」吗？人物文档会保留。`,
+            confirmLabel: "移除",
+            cancelLabel: "取消",
+            danger: true,
+        });
+        if (!confirmed) return;
         deleting = true;
         errorText = "";
         try {
@@ -1147,7 +1162,14 @@ import StatusNotice from "../StatusNotice.svelte";
 
     async function cancelFollowUp(item: FollowUpItem) {
         if (followUpBusy || !onSetFollowUpStatus) return;
-        if (!window.confirm(`取消跟进「${item.title || text("fuKeepInTouch", "保持联系")}」？取消后不再出现在待办中。`)) return;
+        const confirmed = await confirmDialog({
+            title: "取消跟进计划",
+            message: `取消跟进「${item.title || text("fuKeepInTouch", "保持联系")}」？取消后不再出现在待办中。`,
+            confirmLabel: "取消计划",
+            cancelLabel: "保留",
+            danger: true,
+        });
+        if (!confirmed) return;
         followUpBusy = true;
         followUpError = "";
         followUpActionError = "";

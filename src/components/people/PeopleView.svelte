@@ -33,6 +33,7 @@
     import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal, Bookmark, Pencil, Trash2 } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
     import { isAbortError } from "../../shared/async";
+    import { confirmDialog } from "../../libs/confirm-dialog";
     import { getFocusableElements } from "../../shared/focusable-elements";
     import { requestErrorMessage } from "../../shared/error-presenter";
     import type { ContactExtendedDraft } from "../../domain/contact-create";
@@ -911,7 +912,15 @@
             viewHint = `最多保存 ${SAVED_VIEWS_LIMIT} 个视图；请覆盖已有同名视图，或删除一个后再新增。`;
             return;
         }
-        if (existing && !window.confirm(`已存在同名视图「${name}」，覆盖它吗？`)) return;
+        if (existing) {
+            const confirmed = await confirmDialog({
+                title: "覆盖已有视图",
+                message: `已存在同名视图「${name}」，覆盖它吗？`,
+                confirmLabel: "覆盖",
+                cancelLabel: "取消",
+            });
+            if (!confirmed) return;
+        }
         const nextView: SavedView = {
             id: existing?.id ?? `view-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
             name,
@@ -943,7 +952,14 @@
     }
 
     async function deleteSavedView(view: SavedView) {
-        if (!window.confirm(`删除视图「${view.name}」？只删除这条保存的规则，不改联系人与当前列表。`)) return;
+        const confirmed = await confirmDialog({
+            title: "删除已保存视图",
+            message: `删除视图「${view.name}」？只删除这条保存的规则，不改联系人与当前列表。`,
+            confirmLabel: "删除",
+            cancelLabel: "取消",
+            danger: true,
+        });
+        if (!confirmed) return;
         const nextViews = localViews.filter((item) => item.id !== view.id);
         if (!(await persistViews(nextViews))) return;
         localViews = normalizeSavedViews(nextViews);
@@ -1460,7 +1476,14 @@
         if (selectionScopePending) { batchError = pendingScopeMessage; return; }
         const names = selectedPeople.map((person) => person.name).slice(0, 5).join("、");
         const suffix = selectedPeople.length > 5 ? ` 等 ${selectedPeople.length} 人` : "";
-        if (!window.confirm(`将从人脉名册移除「${names}${suffix}」，共 ${selectedPeople.length} 人（筛选外 ${hiddenSelectionCount} 人）。人物文档和互动记录会保留，确定继续吗？`)) return;
+        const confirmed = await confirmDialog({
+            title: "批量移除联系人",
+            message: `将从人脉名册移除「${names}${suffix}」，共 ${selectedPeople.length} 人（筛选外 ${hiddenSelectionCount} 人）。人物文档和互动记录会保留，确定继续吗？`,
+            confirmLabel: "确认移除",
+            cancelLabel: "取消",
+            danger: true,
+        });
+        if (!confirmed) return;
         batchBusy = true;
         batchError = "";
         try {

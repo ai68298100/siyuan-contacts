@@ -4034,6 +4034,56 @@ html[data-theme-mode="dark"] .lvct-doc-strip {
     gap: var(--lvct-sp-2);
     flex-wrap: wrap;
 }
+
+/* ---------- 通用无障碍确认弹窗（K-10，alertdialog 直挂 body） ---------- */
+
+.lvct-confirm-dialog-root {
+    --lvct-z-confirm: calc(var(--lvct-z-popover) + 220);
+    position: fixed;
+    inset: 0;
+    z-index: var(--lvct-z-confirm);
+}
+
+.lvct-confirm-dialog__mask {
+    position: absolute;
+    inset: 0;
+    background: var(--lvct-overlay);
+}
+
+.lvct-confirm-dialog__panel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(440px, calc(100vw - 32px));
+    background: var(--lvct-bg-elevated);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-lg);
+    box-shadow: var(--lvct-shadow-3);
+    padding: var(--lvct-sp-4);
+    box-sizing: border-box;
+
+    h3 {
+        margin: 0 0 8px;
+        font-size: 16px;
+        color: var(--lvct-text-1);
+    }
+}
+
+.lvct-confirm-dialog__message {
+    margin: 0 0 var(--lvct-sp-4);
+    color: var(--lvct-text-2);
+    font-size: var(--lvct-fs-body);
+    line-height: var(--lvct-lh-body, 1.6);
+    word-break: break-word;
+}
+
+.lvct-confirm-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--lvct-sp-2);
+    flex-wrap: wrap;
+}
 /* ---------- 人物详情 ---------- */
 
 .lvct-detail {
