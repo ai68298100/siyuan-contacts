@@ -128,6 +128,8 @@
 
     // ---- B08 行内快捷处置（生日跳过本年 / 久未联系顺延与不再提醒 / 从未互动跳过今天） ----
     let rowMenuKey = $state("");
+    let rowMenuTrigger: HTMLElement | null = null;
+
     // C06：会话内撤销——只保留最近一次操作的反向闭包，跨刷新/重启不保留
     let undoAction: { run: () => Promise<void> } | null = $state(null);
     function setUndo(message: string, run: () => Promise<void>): void {
@@ -150,8 +152,39 @@
             alBusy = false;
         }
     }
-    function toggleRowMenu(key: string): void {
-        rowMenuKey = rowMenuKey === key ? "" : key;
+
+    function toggleRowMenu(key: string, trigger?: HTMLElement): void {
+        if (rowMenuKey === key) {
+            closeRowMenu(true);
+        } else {
+            rowMenuKey = key;
+            rowMenuTrigger = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+        }
+    }
+
+    function closeRowMenu(restoreFocus = true): void {
+        if (!rowMenuKey) return;
+        rowMenuKey = "";
+        if (restoreFocus && rowMenuTrigger?.isConnected) {
+            rowMenuTrigger.focus();
+        }
+        rowMenuTrigger = null;
+    }
+
+    function handleGlobalKeydown(event: KeyboardEvent): void {
+        if (event.key === "Escape" && rowMenuKey) {
+            event.preventDefault();
+            event.stopPropagation();
+            closeRowMenu(true);
+        }
+    }
+
+    function handleGlobalClick(event: MouseEvent): void {
+        if (!rowMenuKey) return;
+        const target = event.target as HTMLElement | null;
+        if (target && !target.closest(".lvct-dash__rowmenu") && !target.closest(".lvct-dash__quick-button--more") && !target.closest("[data-row-menu-trigger]")) {
+            closeRowMenu(false);
+        }
     }
     function isNeverCard(card: ActionCard): boolean {
         return card.reasons.some((reason) => reason.neverContacted);
@@ -421,6 +454,13 @@
         const timer = window.setInterval(() => { clockTick += 1; }, 30_000);
         return () => window.clearInterval(timer);
     });
+    let lastRefreshedDate = $state(toLocalToday());
+    $effect(() => {
+        if (localTodayKey !== lastRefreshedDate) {
+            lastRefreshedDate = localTodayKey;
+            void refresh();
+        }
+    });
     const greetingKey = $derived.by(() => {
         clockTick;
         const hour = new Date().getHours();
@@ -436,6 +476,7 @@
     const todayBirthdays = $derived.by(() => data?.birthdays.filter((item) => item.bucket === "today") ?? []);
 
     async function refresh() {
+        closeRowMenu(false);
         const version = ++refreshVersion;
         refreshing = true;
         errorText = "";
@@ -734,6 +775,8 @@
     };
 </script>
 
+<svelte:window onkeydown={handleGlobalKeydown} onclick={handleGlobalClick} />
+
 <div class="lvct-dash">
     {#if errorText}
         <ViewState compact error title={text("dashLoadFailTitle", "仪表盘加载失败")} description={errorText}>
@@ -878,14 +921,18 @@
                                 {card.bucket === "stale" ? text("dashTakeALook", "去看看") : text("dashProcess", "处理")}
                             </button>
                             <button
+                                type="button"
+                                id={`lvct-dash-action-menu-btn-${card.person.docId}`}
                                 class="b3-button b3-button--outline lvct-dash__quick-button lvct-dash__quick-button--more"
                                 aria-label={`更多处置：${card.person.name}`}
                                 aria-expanded={rowMenuKey === `action:${card.person.docId}`}
-                                onclick={() => toggleRowMenu(`action:${card.person.docId}`)}
+                                aria-controls={rowMenuKey === `action:${card.person.docId}` ? `lvct-dash-action-menu-${card.person.docId}` : undefined}
+                                data-row-menu-trigger="true"
+                                onclick={(event) => toggleRowMenu(`action:${card.person.docId}`, event.currentTarget)}
                             >⋯</button>
                         </div>
                         {#if rowMenuKey === `action:${card.person.docId}`}
-                            <div class="lvct-dash__quick-form lvct-dash__rowmenu">
+                            <div id={`lvct-dash-action-menu-${card.person.docId}`} class="lvct-dash__quick-form lvct-dash__rowmenu" role="group" aria-labelledby={`lvct-dash-action-menu-btn-${card.person.docId}`}>
                                 {#if isNeverCard(card)}
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => dismissNeverToday(card.person))}>今天先跳过</button>
                                 {:else if card.bucket === "stale"}
@@ -1015,14 +1062,17 @@
                                 >跳过本年</button>
                                 <button
                                     type="button"
-                                    class="b3-button b3-button--outline lvct-dash__quick-button"
+                                    id={`lvct-dash-birthday-menu-btn-${item.person.docId}`}
+                                    class="b3-button b3-button--outline lvct-dash__quick-button lvct-dash__quick-button--more"
                                     aria-label={`更多生日处置：${item.person.name}`}
                                     aria-expanded={rowMenuKey === `birthday:${item.person.docId}`}
-                                    onclick={(event) => { event.stopPropagation(); toggleRowMenu(`birthday:${item.person.docId}`); }}
+                                    aria-controls={rowMenuKey === `birthday:${item.person.docId}` ? `lvct-dash-birthday-menu-${item.person.docId}` : undefined}
+                                    data-row-menu-trigger="true"
+                                    onclick={(event) => { event.stopPropagation(); toggleRowMenu(`birthday:${item.person.docId}`, event.currentTarget); }}
                                 >⋯</button>
                             </div>
                             {#if rowMenuKey === `birthday:${item.person.docId}`}
-                                <div class="lvct-dash__quick-form lvct-dash__rowmenu">
+                                <div id={`lvct-dash-birthday-menu-${item.person.docId}`} class="lvct-dash__quick-form lvct-dash__rowmenu" role="group" aria-labelledby={`lvct-dash-birthday-menu-btn-${item.person.docId}`}>
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => dismissBirthdayToday(item.person))}>今天不再提醒</button>
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => dismissBirthdayWeek(item.person))}>未来 7 天不再提醒</button>
                                     <button class="b3-button b3-button--cancel" disabled={alBusy} onclick={() => runRowAction(() => dismissBirthdayForever(item.person))}>不再提醒</button>
@@ -1085,14 +1135,18 @@
                                     </button>
                                 {/if}
                                 <button
-                                    class="b3-button b3-button--outline lvct-dash__quick-button"
-                                    aria-label={`更多处置：${item.person.name}`}
+                                    type="button"
+                                    id={`lvct-dash-stale-menu-btn-${item.person.docId}`}
+                                    class="b3-button b3-button--outline lvct-dash__quick-button lvct-dash__quick-button--more"
+                                    aria-label={`更多久未联系处置：${item.person.name}`}
                                     aria-expanded={rowMenuKey === `stale:${item.person.docId}`}
-                                    onclick={(event) => { event.stopPropagation(); toggleRowMenu(`stale:${item.person.docId}`); }}
+                                    aria-controls={rowMenuKey === `stale:${item.person.docId}` ? `lvct-dash-stale-menu-${item.person.docId}` : undefined}
+                                    data-row-menu-trigger="true"
+                                    onclick={(event) => { event.stopPropagation(); toggleRowMenu(`stale:${item.person.docId}`, event.currentTarget); }}
                                 >⋯</button>
                             </div>
                             {#if rowMenuKey === `stale:${item.person.docId}`}
-                                <div class="lvct-dash__quick-form lvct-dash__rowmenu">
+                                <div id={`lvct-dash-stale-menu-${item.person.docId}`} class="lvct-dash__quick-form lvct-dash__rowmenu" role="group" aria-labelledby={`lvct-dash-stale-menu-btn-${item.person.docId}`}>
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(item.person, 3))}>顺延 3 天</button>
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(item.person, 7))}>顺延 1 周</button>
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(item.person, 30))}>顺延 1 个月</button>
