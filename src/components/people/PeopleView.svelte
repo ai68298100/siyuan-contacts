@@ -1477,15 +1477,15 @@
 
 <div class="lvct-people" bind:this={peopleElement}>
     <!-- B09-1：工具栏控件 snippet 化——桌面原位渲染；移动端收进「筛选与整理」底部弹层（互斥渲染，popover 单挂载） -->
-    {#snippet viewMenuControl()}
-        <span id="lvct-people-viewsmenu" bind:this={viewsMenuWrap} style="position:relative; display:inline-flex">
-            <button class="b3-button b3-button--outline" aria-label={text("peopleViews", "视图")} aria-expanded={viewsOpen} aria-controls={viewsOpen ? "lvct-people-viewsmenu-panel" : undefined} onclick={() => (viewsOpen = !viewsOpen)}>
+    {#snippet viewMenuControl(prefix = "desktop")}
+        <span id={`lvct-people-viewsmenu-${prefix}`} bind:this={viewsMenuWrap} style="position:relative; display:inline-flex">
+            <button class="b3-button b3-button--outline" aria-label={text("peopleViews", "视图")} aria-expanded={viewsOpen} aria-controls={viewsOpen ? `lvct-people-viewsmenu-panel-${prefix}` : undefined} onclick={() => (viewsOpen = !viewsOpen)}>
                 <Bookmark size={16}/>{activeViewName ? `${text("peopleViews", "视图")}：${activeViewName}` : text("peopleViews", "视图")}
             </button>
             {#if viewsOpen}
                 <!-- Saved views expose independent apply, rename and delete actions;
                      keep native button semantics inside a labelled group. -->
-                <div id="lvct-people-viewsmenu-panel" class="lvct-people__moremenu lvct-people__viewsmenu" bind:this={viewsMenuPanel} role="group" aria-label="保存的视图">
+                <div id={`lvct-people-viewsmenu-panel-${prefix}`} class="lvct-people__moremenu lvct-people__viewsmenu" bind:this={viewsMenuPanel} role="group" aria-label="保存的视图">
                     {#if localViews.length === 0}
                         <p class="lvct-people__viewsmenu-empty">还没有保存的视图。设置筛选条件后，点下方「保存当前筛选为视图」。</p>
                     {/if}
@@ -1505,30 +1505,44 @@
             {/if}
         </span>
     {/snippet}
-    {#snippet filterControls()}
-        <select class="b3-select" bind:value={groupFilter} aria-label={text("peopleGroupLabel", "分组筛选")} onchange={() => (visibleCount = PAGE_SIZE)}>
+    {#snippet filterControls(prefix = "desktop")}
+        <select
+            id={`lvct-people-group-filter-${prefix}`}
+            class="b3-select"
+            bind:value={groupFilter}
+            aria-label={text("peopleGroupLabel", "分组筛选")}
+            title={text("peopleGroupLabel", "分组筛选")}
+            onchange={() => (visibleCount = PAGE_SIZE)}
+        >
             <option value="">{text("peopleAllGroups", "全部分组")}</option>
             {#each groups as group (group)}
                 <option value={group}>{group}</option>
             {/each}
         </select>
-        <select class="b3-select" bind:value={sortMode} aria-label={text("peopleSortLabel", "排序方式")} onchange={() => (visibleCount = PAGE_SIZE)}>
+        <select
+            id={`lvct-people-sort-mode-${prefix}`}
+            class="b3-select"
+            bind:value={sortMode}
+            aria-label={text("peopleSortLabel", "排序方式")}
+            title={text("peopleSortLabel", "排序方式")}
+            onchange={() => (visibleCount = PAGE_SIZE)}
+        >
             <option value="name">{text("peopleSortName", "按姓名")}</option>
             <option value="group">{text("peopleSortGroup", "按分组")}</option>
             <option value="birthday">{text("peopleSortBirthday", "按生日临近")}</option>
             <option value="recent" disabled={recentState !== "ready"}>{recentState === "error" ? "按最近互动（读取失败）" : recentState === "loading" ? "按最近互动（读取中）" : text("peopleSortRecent", "按最近互动")}</option>
         </select>
-        <span id="lvct-people-moremenu" bind:this={moreMenuWrap} style="position:relative; display:inline-flex">
+        <span id={`lvct-people-moremenu-${prefix}`} bind:this={moreMenuWrap} style="position:relative; display:inline-flex">
             <button
                 class="b3-button b3-button--outline"
                 aria-expanded={moreOpen}
-                aria-controls={moreOpen ? "lvct-people-moremenu-panel" : undefined}
+                aria-controls={moreOpen ? `lvct-people-moremenu-panel-${prefix}` : undefined}
                 onclick={() => (moreOpen = !moreOpen)}
             >
                 <SlidersHorizontal size={16}/>{text("peopleMoreFilters", "更多筛选")}{isExtraFilterActive(extraFilter) ? " ·" : ""}
             </button>
             {#if moreOpen}
-                <div id="lvct-people-moremenu-panel" class="lvct-people__moremenu" bind:this={moreMenuPanel} role="group" aria-label="组合筛选">
+                <div id={`lvct-people-moremenu-panel-${prefix}`} class="lvct-people__moremenu" bind:this={moreMenuPanel} role="group" aria-label="组合筛选">
                     <p class="lvct-people__menu-title">高级筛选</p>
                     <p class="lvct-people__menu-hint">只显示已核实资料；条件会保留在当前视图中。</p>
                     <label class="lvct-form__item">
@@ -1602,7 +1616,7 @@
             />
         {/if}
         {#if !isMobile}
-            {@render viewMenuControl()}
+            {@render viewMenuControl("desktop")}
             <input
                 class="b3-text-field fn__flex-1 lvct-people__desktop-search"
                 type="text"
@@ -1611,7 +1625,7 @@
                 value={searchText}
                 oninput={(event) => { searchText = (event.currentTarget as HTMLInputElement).value; onExternalSearchChange?.(searchText); }}
             />
-            {@render filterControls()}
+            {@render filterControls("desktop")}
         {/if}
         <span class="lvct-people__viewtoggle">
             <span class="lvct-seg" role="group" aria-label="切换卡片/表格" title="切换卡片/表格">
@@ -1724,8 +1738,8 @@
                 <button type="button" class="b3-button b3-button--text" bind:this={mobileSheetCloseButton} onclick={() => closeMobileSheet()}>{text("dashCollapse", "收起")}</button>
             </div>
             <div class="lvct-sheet__body">
-                {@render viewMenuControl()}
-                {@render filterControls()}
+                {@render viewMenuControl("mobile")}
+                {@render filterControls("mobile")}
                 {@render actionControls()}
                 <button class="b3-button b3-button--outline" onclick={() => { closeMobileSheet(false); adding = true; }}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
             </div>
