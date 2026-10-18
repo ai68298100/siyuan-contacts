@@ -441,11 +441,14 @@ export function buildCommonOrgBackground(options: {
     const { personDocId, membershipIndex, namesByDoc, orgNames, contactsByDoc } = options;
     const ownRecords = membershipIndex.get(personDocId) ?? [];
     if (ownRecords.length === 0) return [];
+    /* G-09：提取目标人物关联的全部组织集合，剪枝无关组织的扫描与索引构造 */
+    const ownOrgDocIds = new Set(ownRecords.map((record) => record.orgDocId));
     /* 组织 →（人物 → 该组织成员记录）：键序沿用 membershipIndex 首现序，保证同伴顺序稳定 */
     const membersByOrg = new Map<string, Map<string, OrgMembership[]>>();
     for (const [peerDocId, peerRecords] of membershipIndex) {
         if (peerDocId === personDocId) continue;
         for (const record of peerRecords) {
+            if (!ownOrgDocIds.has(record.orgDocId)) continue;
             let byPerson = membersByOrg.get(record.orgDocId);
             if (!byPerson) {
                 byPerson = new Map();

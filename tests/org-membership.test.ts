@@ -470,3 +470,51 @@ test("C-14：buildOrgLinksSection 组织名含方括号与特殊字符时保持 
         "**所属组织**：[某组织\\[北京\\]分部\\\\实验室](siyuan://blocks/20261004000000-org0001)（工作单位 · 在职 · 研发部 · 工程师）",
     );
 });
+
+test("G-09：共同组织背景支持预剪枝无关组织，大名册稳定顺序输出", () => {
+    const targetId = "target-person";
+    const orgTargetA = "20261004000000-org0001";
+    const orgTargetB = "20261004000000-org0002";
+    const orgUnrelated = "20261004000000-org9999";
+
+    const index = new Map<string, OrgMembership[]>([
+        [targetId, [
+            membership({ id: "m-target-1", orgDocId: orgTargetA, personDocId: targetId, joinedOn: "2022-01-01" }),
+            membership({ id: "m-target-2", orgDocId: orgTargetB, personDocId: targetId, joinedOn: "2024-01-01" }),
+        ]],
+        ["peer-a1", [membership({ id: "m-a1", orgDocId: orgTargetA, personDocId: "peer-a1", joinedOn: "2022-03-01" })]],
+        ["peer-b1", [membership({ id: "m-b1", orgDocId: orgTargetB, personDocId: "peer-b1", joinedOn: "2024-02-01" })]],
+        // 模拟大量无关组织的成员记录
+        ["peer-unrelated-1", [membership({ id: "m-u1", orgDocId: orgUnrelated, personDocId: "peer-unrelated-1" })]],
+        ["peer-unrelated-2", [membership({ id: "m-u2", orgDocId: orgUnrelated, personDocId: "peer-unrelated-2" })]],
+    ]);
+
+    const names = new Map([
+        [targetId, "目标人"],
+        ["peer-a1", "同事A1"],
+        ["peer-b1", "同事B1"],
+        ["peer-unrelated-1", "无关同事1"],
+        ["peer-unrelated-2", "无关同事2"],
+    ]);
+
+    const orgNames = new Map([
+        [orgTargetA, "目标公司A"],
+        [orgTargetB, "目标公司B"],
+        [orgUnrelated, "无关公司U"],
+    ]);
+
+    const result = buildCommonOrgBackground({
+        personDocId: targetId,
+        membershipIndex: index,
+        namesByDoc: names,
+        orgNames,
+    });
+
+    assert.equal(result.length, 2, "只输出目标人物所属的 2 个组织");
+    assert.equal(result[0].orgName, "目标公司A");
+    assert.equal(result[0].peers.length, 1);
+    assert.equal(result[0].peers[0].name, "同事A1");
+    assert.equal(result[1].orgName, "目标公司B");
+    assert.equal(result[1].peers.length, 1);
+    assert.equal(result[1].peers[0].name, "同事B1");
+});
