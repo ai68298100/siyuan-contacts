@@ -1183,18 +1183,26 @@
         selectedScope = "manual";
         const person = people.find((item) => item.itemId === itemId);
         if (selected && person) selectedPeopleCache = { ...selectedPeopleCache, [itemId]: person };
-        selectedIds = selected
-            ? [...new Set([...selectedIds, itemId])]
-            : selectedIds.filter((id) => id !== itemId);
+        if (selected) {
+            if (selectedIdSet.has(itemId)) return;
+            selectedIds = [...selectedIds, itemId];
+        } else {
+            if (!selectedIdSet.has(itemId)) return;
+            selectedIds = selectedIds.filter((id) => id !== itemId);
+        }
     }
 
     function toggleAllVisible(selected: boolean) {
         selectedScope = "manual";
-        if (selected) selectedPeopleCache = { ...selectedPeopleCache, ...Object.fromEntries(visible.map((person) => [person.itemId, person])) };
-        const visibleIds = new Set(visible.map((person) => person.itemId));
-        selectedIds = selected
-            ? [...new Set([...selectedIds, ...visibleIds])]
-            : selectedIds.filter((id) => !visibleIds.has(id));
+        if (selected) {
+            selectedPeopleCache = { ...selectedPeopleCache, ...Object.fromEntries(visible.map((person) => [person.itemId, person])) };
+            const toAdd = visible.map((person) => person.itemId).filter((id) => !selectedIdSet.has(id));
+            if (toAdd.length === 0) return;
+            selectedIds = [...selectedIds, ...toAdd];
+        } else {
+            const visibleIds = new Set(visible.map((person) => person.itemId));
+            selectedIds = selectedIds.filter((id) => !visibleIds.has(id));
+        }
     }
 
     function parseTags(value: string): string[] {
