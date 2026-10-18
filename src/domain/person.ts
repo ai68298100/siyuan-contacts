@@ -7,6 +7,7 @@ import type { FieldKey } from "./fields";
 import { validateDocumentTitle } from "./format.ts";
 import type { PersonProfile } from "./people-profiles.ts";
 import { lunarToSolar } from "./lunar.ts";
+import { isValidDateKey } from "./date-key.ts";
 
 /** 新建联系人表单草稿 */
 export interface ContactDraft {
@@ -52,10 +53,9 @@ export function validateDraft(draft: ContactDraft): string[] {
 
 /** "YYYY-MM-DD" → 当地时区当日零点的毫秒时间戳；无效返回 null */
 export function birthdayToMs(birthday: string): number | null {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(birthday)) return null;
+    if (!isValidDateKey(birthday)) return null;
     const [year, month, day] = birthday.split("-").map(Number);
     const date = new Date(year, month - 1, day);
-    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
     return date.getTime();
 }
 

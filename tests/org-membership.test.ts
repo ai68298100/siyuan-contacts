@@ -15,6 +15,7 @@ import {
     projectPersonAffiliations,
     orgMembershipStatusLabel,
     filterOrganizationMembershipCandidates,
+    isValidMembershipPeriod,
 } from "../src/domain/org-membership.ts";
 import type { OrgMembership } from "../src/domain/org-membership.ts";
 import { buildOrgProjectionTargets, orgProjectionSourceSnapshot, parseOrgProjectionOperationStore } from "../src/domain/org-projections.ts";
@@ -442,4 +443,15 @@ test("B13.5b 成员排序与分页：在职优先、稳定 tie-break、筛选不
     assert.equal(page.total, 2);
     assert.equal(page.hasMore, false);
     assert.throws(() => pageOrgMemberships(items, { limit: 501 }), /1-500/);
+});
+
+test("C-30：组织成员期间统一使用真实公历校验（闰年平年二月、月末与空日期）", () => {
+    assert.equal(isValidMembershipPeriod("2024-02-29", "", "active"), true, "闰年2月29日合法");
+    assert.equal(isValidMembershipPeriod("2023-02-29", "", "active"), false, "平年2月29日非法");
+    assert.equal(isValidMembershipPeriod("1900-02-29", "", "active"), false, "百年不闰二月29日非法");
+    assert.equal(isValidMembershipPeriod("2000-02-29", "", "active"), true, "四百年一闰2月29日合法");
+    assert.equal(isValidMembershipPeriod("2024-04-31", "", "active"), false, "四月大日期非法");
+    assert.equal(isValidMembershipPeriod("", "", "active"), true, "空日期允许");
+    assert.equal(isValidMembershipPeriod("2024-01-01", "2024-02-01", "former"), true, "合法历史区间");
+    assert.equal(isValidMembershipPeriod("2024-02-01", "2024-01-01", "former"), false, "加入晚于离开非法");
 });

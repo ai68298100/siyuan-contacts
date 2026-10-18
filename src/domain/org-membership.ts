@@ -5,6 +5,7 @@
  */
 
 import { parseStoreRecords, StoreIntegrityError } from "./store-integrity.ts";
+import { isValidDateKey } from "./date-key.ts";
 
 export type OrgMembershipStatus = "active" | "former";
 export type OrgAffiliationKind = "family" | "work" | "education" | "unspecified";
@@ -87,15 +88,8 @@ export function pageOrgMemberships<T extends Pick<OrgMembership, "status" | "joi
 }
 
 const ID_PATTERN = /^\d{14}-[0-9a-z]{7}$/;
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
 function validMembershipDate(value: string): boolean {
-    if (value === "") return true;
-    if (!DATE_PATTERN.test(value)) return false;
-    const [year, month, day] = value.split("-").map(Number);
-    const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-    const days = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    return year > 0 && month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1];
+    return value === "" || isValidDateKey(value);
 }
 
 export function isValidMembershipPeriod(joinedOn: string, leftOn: string, status: OrgMembershipStatus): boolean {
