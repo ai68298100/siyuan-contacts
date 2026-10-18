@@ -204,6 +204,7 @@ export interface TimelineItem {
     source: InteractionSource;
     /** 同场人数（含本人）；同场事件才 >1 */
     groupSize: number;
+    occurredAt?: number;
 }
 
 function occasionKey(event: InteractionEvent): string | undefined {
@@ -236,9 +237,14 @@ export function buildTimeline(
                 ...(event.note ? { note: event.note } : {}),
                 source: event.source,
                 groupSize: key === undefined ? 1 : participants.get(key)?.size ?? 1,
+                occurredAt: event.occurredAt,
             };
         })
-        .sort((a, b) => (a.localDate < b.localDate ? 1 : a.localDate > b.localDate ? -1 : 0));
+        .sort((a, b) => (
+            b.localDate.localeCompare(a.localDate)
+            || (b.occurredAt ?? 0) - (a.occurredAt ?? 0)
+            || b.eventId.localeCompare(a.eventId)
+        ));
 }
 
 export interface CoAttendance {

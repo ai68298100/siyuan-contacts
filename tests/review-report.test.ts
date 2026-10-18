@@ -91,3 +91,20 @@ test("报表忽略非法互动日期，避免伪造统计和上一周期数量",
     assert.equal(report.total, 1);
     assert.deepEqual(report.entries.map((entry) => entry.eventId), ["ok"]);
 });
+
+test("M-10：交往报表同日事件与同名联系人排序确定性（tie-breaker: personDocId 与 eventId）", () => {
+    const sameNameRoster = [person("doc-1", "张三"), person("doc-2", "张三")];
+    const events: InteractionEvent[] = [
+        event({ id: "e-b", personDocId: "doc-2", localDate: "2026-09-15" }),
+        event({ id: "e-c", personDocId: "doc-1", localDate: "2026-09-15" }),
+        event({ id: "e-a", personDocId: "doc-1", localDate: "2026-09-15" }),
+    ];
+    const report1 = buildReviewReport({ events, roster: sameNameRoster, range });
+    const report2 = buildReviewReport({ events: [...events].reverse(), roster: sameNameRoster, range });
+    assert.deepEqual(report1.entries, report2.entries, "不同输入顺序的报表明细排序必须完全一致");
+    assert.deepEqual(
+        report1.entries.map((e) => `${e.personDocId}:${e.eventId}`),
+        ["doc-1:e-a", "doc-1:e-c", "doc-2:e-b"],
+        "同日同名条目按 personDocId、eventId 升序确定排序",
+    );
+});

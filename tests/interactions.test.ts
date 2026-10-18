@@ -207,3 +207,21 @@ test("lastInteractionByPerson / staleContacts：最近互动与久未联系排�
     const stale = staleContacts(store, people, 30, now);
     assert.deepEqual(stale.map((info) => info.person.name), ["丙", "乙"], "从未互动排最前，其后按天数降序");
 });
+
+test("M-10：buildTimeline 同日事件按 occurredAt 倒序与 eventId tie-breaker 严格确定排序", () => {
+    const events: InteractionEvent[] = [
+        event({ id: "e-older", personDocId: "d-target", localDate: "2026-10-01", occurredAt: 1000 }),
+        event({ id: "e-newer-b", personDocId: "d-target", localDate: "2026-10-01", occurredAt: 2000 }),
+        event({ id: "e-newer-a", personDocId: "d-target", localDate: "2026-10-01", occurredAt: 2000 }),
+        event({ id: "e-yesterday", personDocId: "d-target", localDate: "2026-09-30", occurredAt: 3000 }),
+    ];
+    // 乱序打乱输入，验证无论输入顺序如何，时间线输出始终一致确定
+    const timeline1 = buildTimeline(events, "d-target");
+    const timeline2 = buildTimeline([...events].reverse(), "d-target");
+    assert.deepEqual(timeline1, timeline2, "多次生成或不同输入顺序输出必须完全一致");
+    assert.deepEqual(
+        timeline1.map((item) => item.eventId),
+        ["e-newer-b", "e-newer-a", "e-older", "e-yesterday"],
+        "先按日期倒序，同日按 occurredAt 倒序，再次按 eventId 倒序",
+    );
+});
