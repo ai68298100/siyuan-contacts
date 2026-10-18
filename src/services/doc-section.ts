@@ -7,12 +7,12 @@
 import { readMarkedBlocks, upsertMarkedBlock } from "../api/blocks";
 import { KernelPermissionError, KernelResponseError } from "../api/client";
 import type { ContactSummary } from "../domain/person";
-import { escapeMarkdown } from "../domain/briefing-export";
+import { escapeLinkLabel } from "../domain/format";
 
 export const RELATED_SECTION_ATTR = "custom-lvct-related";
 
 function sectionMarkdown(related: readonly ContactSummary[]): string {
-    const links = related.map((item) => `[${escapeMarkdown(item.name.replace(/[\r\n]+/g, " "))}](siyuan://blocks/${item.docId})`);
+    const links = related.map((item) => `[${escapeLinkLabel(item.name)}](siyuan://blocks/${item.docId})`);
     return `**相关人物**：${links.join("、")}`;
 }
 

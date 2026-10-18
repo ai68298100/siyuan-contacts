@@ -1,5 +1,5 @@
 import { birthdayToMs } from "./person.ts";
-import { documentHPath } from "./format.ts";
+import { documentHPath, escapeLinkLabel } from "./format.ts";
 
 export const OCCASION_DIARY_FOLDER = "日记";
 export const OCCASION_PLACE_FOLDER = "地点";
@@ -34,10 +34,6 @@ function assertDate(value: string): string {
 
 function safeText(value: string): string {
     return value.trim().replace(/[\r\n]+/g, " ");
-}
-
-function escapeLinkLabel(value: string): string {
-    return safeText(value).replaceAll("\\", "\\\\").replaceAll("[", "\\[").replaceAll("]", "\\]");
 }
 
 function link(label: string, docId: string): string {

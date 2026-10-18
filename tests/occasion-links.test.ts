@@ -7,6 +7,7 @@ import {
     occasionMarkerAttr,
     occasionPlacePath,
 } from "../src/domain/occasion-links.ts";
+import { escapeLinkLabel } from "../src/domain/format.ts";
 
 const sourceDocId = "20261002000000-src0001";
 const diaryDocId = "20261002000000-day0001";
@@ -48,4 +49,11 @@ test("事项投影同时包含来源、日期、地点与参与人双链", () =>
     assert.match(person, /共同事项/);
     assert.doesNotMatch(person, /同行人员.*20261002000000-per0001/);
     assert.match(person, /同行人员.*20261002000000-per0002/);
+});
+
+test("C-14：escapeLinkLabel 链接标签转义方括号、反斜杠与换行，防止破坏 Markdown 语法", () => {
+    assert.equal(escapeLinkLabel("普通姓名"), "普通姓名");
+    assert.equal(escapeLinkLabel("李[四]"), "李\\[四\\]");
+    assert.equal(escapeLinkLabel("公司\\分部"), "公司\\\\分部");
+    assert.equal(escapeLinkLabel("第一行\r\n第二行"), "第一行 第二行");
 });

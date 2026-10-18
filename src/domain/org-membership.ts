@@ -6,6 +6,7 @@
 
 import { parseStoreRecords, StoreIntegrityError } from "./store-integrity.ts";
 import { isValidDateKey } from "./date-key.ts";
+import { escapeLinkLabel } from "./format.ts";
 
 export type OrgMembershipStatus = "active" | "former";
 export type OrgAffiliationKind = "family" | "work" | "education" | "unspecified";
@@ -350,7 +351,7 @@ export function buildOrgLinksSection(entries: readonly OrgLinkEntry[]): string {
         const details = [classification, status, entry.department, entry.title].filter(Boolean);
         const suffix = details.length ? `（${details.join(" · ")}）`
             : "";
-        return `[${entry.orgName}](siyuan://blocks/${entry.orgDocId})${suffix}`;
+        return `[${escapeLinkLabel(entry.orgName)}](siyuan://blocks/${entry.orgDocId})${suffix}`;
     });
     return `**所属组织**：${links.join("、")}`;
 }

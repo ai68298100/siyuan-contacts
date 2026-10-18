@@ -16,6 +16,7 @@ import {
     orgMembershipStatusLabel,
     filterOrganizationMembershipCandidates,
     isValidMembershipPeriod,
+    buildOrgLinksSection,
 } from "../src/domain/org-membership.ts";
 import type { OrgMembership } from "../src/domain/org-membership.ts";
 import { buildOrgProjectionTargets, orgProjectionSourceSnapshot, parseOrgProjectionOperationStore } from "../src/domain/org-projections.ts";
@@ -454,4 +455,18 @@ test("C-30：组织成员期间统一使用真实公历校验（闰年平年二�
     assert.equal(isValidMembershipPeriod("", "", "active"), true, "空日期允许");
     assert.equal(isValidMembershipPeriod("2024-01-01", "2024-02-01", "former"), true, "合法历史区间");
     assert.equal(isValidMembershipPeriod("2024-02-01", "2024-01-01", "former"), false, "加入晚于离开非法");
+});
+
+test("C-14：buildOrgLinksSection 组织名含方括号与特殊字符时保持 Markdown 链接有效", () => {
+    const links = buildOrgLinksSection([{
+        orgDocId: "20261004000000-org0001",
+        orgName: "某组织[北京]分部\\实验室\r\n",
+        affiliationKind: "work",
+        department: "研发部",
+        title: "工程师",
+    }]);
+    assert.equal(
+        links,
+        "**所属组织**：[某组织\\[北京\\]分部\\\\实验室](siyuan://blocks/20261004000000-org0001)（工作单位 · 在职 · 研发部 · 工程师）",
+    );
 });

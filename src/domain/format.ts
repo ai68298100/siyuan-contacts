@@ -36,6 +36,14 @@ export function escapeMarkdown(text: string): string {
     return text.replace(/([\\`*_\[\]#<>])/g, "\\$1");
 }
 
+/**
+ * C-14：Markdown 链接标签文本转义。
+ * 保证含 `[`、`]`、`\` 或换行的人名/组织名不会破坏 `[标签](siyuan://blocks/...)` 的 Markdown 链接语法结构。
+ */
+export function escapeLinkLabel(value: string): string {
+    return value.trim().replace(/[\r\n]+/g, " ").replace(/([\\\[\]])/g, "\\$1");
+}
+
 export function markdownHeading(title: string): string {
     return `# ${escapeMarkdown(title.trim())}\n\n`;
 }
