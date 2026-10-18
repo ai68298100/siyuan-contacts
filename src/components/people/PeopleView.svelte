@@ -1933,11 +1933,10 @@
                 <tbody>
                     {#if virtualized}<tr class="lvct-people__virtual-row" aria-hidden="true"><td colspan={tableColumns.length + 2} style={`height:${virtualTopSpacer}px`}></td></tr>{/if}
                     {#each renderedVisible as person (person.itemId)}
-                        <tr tabindex="0" aria-label={`查看 ${person.name} 的详情`} class:lvct-people__row--active={activePersonId === person.itemId} data-person-item-id={person.itemId}
-                            onclick={(event) => { event.currentTarget.focus({ preventScroll: true }); onOpenDetail(person); }}
-                            onkeydown={(event) => {
-                                if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
-                                event.preventDefault();
+                        <tr tabindex="-1" class:lvct-people__row--active={activePersonId === person.itemId} data-person-item-id={person.itemId}
+                            onclick={(event) => {
+                                if ((event.target as HTMLElement)?.closest("input, button, a")) return;
+                                event.currentTarget.focus({ preventScroll: true });
                                 onOpenDetail(person);
                             }}>
                             <td class="lvct-people__select-cell">
@@ -1949,7 +1948,12 @@
                                     onchange={(event) => toggleSelected(person.itemId, (event.currentTarget as HTMLInputElement).checked)}
                                 />
                             </td>
-                            <td><b>{person.name}</b>{#if onOpenPersonDoc}<button type="button" class="lvct-people__open-doc" title={`打开 ${person.name} 的文档`} aria-label={`打开 ${person.name} 的文档`} onclick={(event) => { event.stopPropagation(); onOpenPersonDoc(person.docId); }}><ExternalLink size={16}/></button>{/if}</td>
+                            <td class="lvct-people__name-cell">
+                                <button type="button" class="lvct-people__name-btn" aria-label={`查看 ${person.name} 的详情`} onclick={(event) => { event.stopPropagation(); onOpenDetail(person); }}>
+                                    <b>{person.name}</b>
+                                </button>
+                                {#if onOpenPersonDoc}<button type="button" class="lvct-people__open-doc" title={`打开 ${person.name} 的文档`} aria-label={`打开 ${person.name} 的文档`} onclick={(event) => { event.stopPropagation(); onOpenPersonDoc(person.docId); }}><ExternalLink size={16}/></button>{/if}
+                            </td>
                             {#each tableColumns as column (column)}
                                 <td>
                                     {#if column === "group"}{person.group || "—"}
