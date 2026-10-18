@@ -68,6 +68,7 @@ export class FollowUpWriteUnknownError extends Error {
 export const FOLLOW_UP_STORE_VERSION = 1;
 
 import { isValidDateKey } from "./date-key.ts";
+import { StoreIntegrityError } from "./store-integrity.ts";
 export { isValidDateKey } from "./date-key.ts";
 
 /** 推迟语义选项（Google Inbox snooze 语义）：不做裸日期选择器，「指定日期」为唯一显式入口 */
@@ -159,16 +160,26 @@ function isFollowUpItem(raw: unknown): raw is FollowUpItem {
 /** 写前检查：不丢弃损坏数据；版本或结构不兼容抛错（与互动库同纪律） */
 export function normalizeFollowUpStoreForWrite(raw: unknown): FollowUpStore {
     if (raw == null || raw === "") return emptyFollowUpStore();
-    if (typeof raw !== "object" ||
-        (raw as Partial<FollowUpStore>).schemaVersion !== FOLLOW_UP_STORE_VERSION) {
-        throw new Error("跟进事项存储格式或版本不兼容，操作已停止；请先备份并检查原文件");
+    if (typeof raw !== "object" || Array.isArray(raw)) {
+        throw new StoreIntegrityError("跟进事项", "需要版本化对象");
     }
     const record = raw as Partial<FollowUpStore>;
-    if (!Array.isArray(record.items) || !record.items.every(isFollowUpItem)) {
-        throw new Error("跟进事项存储内容损坏，操作已停止；请先备份并检查原文件");
+    if (record.schemaVersion !== FOLLOW_UP_STORE_VERSION) {
+        throw new StoreIntegrityError("跟进事项", "版本不兼容");
     }
-    if (new Set(record.items.map((item) => item.id)).size !== record.items.length) {
-        throw new Error("跟进事项存储存在重复 ID，操作已停止；请先备份并检查原文件");
+    if (!Array.isArray(record.items)) {
+        throw new StoreIntegrityError("跟进事项", "条目容器必须为数组");
+    }
+    const seen = new Set<string>();
+    for (let index = 0; index < record.items.length; index++) {
+        const item = record.items[index];
+        if (!isFollowUpItem(item)) {
+            throw new StoreIntegrityError("跟进事项", "条目字段或业务规则无效", record.items.length, index);
+        }
+        if (seen.has(item.id)) {
+            throw new StoreIntegrityError("跟进事项", `存在重复 ID（${item.id}）`, record.items.length, index);
+        }
+        seen.add(item.id);
     }
     return normalizeFollowUpStore(raw);
 }

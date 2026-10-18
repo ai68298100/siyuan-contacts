@@ -22,6 +22,7 @@ export interface ReminderDismissalStore {
 export const REMINDER_DISMISSALS_STORE_VERSION = 1;
 
 import { isValidDateKey } from "./date-key.ts";
+import { StoreIntegrityError } from "./store-integrity.ts";
 
 /** 人物文档 ID（与 SQL 安全面同一校验，对齐 cadence） */
 const DOC_ID_RE = /^\d{14}-[0-9a-z]{7}$/;
@@ -59,22 +60,33 @@ export function normalizeDismissalStore(raw: unknown): ReminderDismissalStore {
 /** 严格展示/写入读取：损坏数据抛错，避免提醒故障被当成空列表。 */
 export function normalizeDismissalStoreForWrite(raw: unknown): ReminderDismissalStore {
     if (raw == null || raw === "") return { schemaVersion: REMINDER_DISMISSALS_STORE_VERSION, dismissals: [] };
-    if (typeof raw !== "object" || (raw as Record<string, unknown>).schemaVersion !== REMINDER_DISMISSALS_STORE_VERSION
-        || !Array.isArray((raw as Record<string, unknown>).dismissals)) {
-        throw new Error("提醒暂缓存储格式或版本不兼容，操作已停止；请先备份并检查原文件");
+    if (typeof raw !== "object" || Array.isArray(raw)) {
+        throw new StoreIntegrityError("提醒暂缓", "需要版本化对象");
     }
-    const entries = (raw as { dismissals: unknown[] }).dismissals;
+    const record = raw as Record<string, unknown>;
+    if (record.schemaVersion !== REMINDER_DISMISSALS_STORE_VERSION) {
+        throw new StoreIntegrityError("提醒暂缓", "版本不兼容");
+    }
+    if (!Array.isArray(record.dismissals)) {
+        throw new StoreIntegrityError("提醒暂缓", "条目容器必须为数组");
+    }
+    const entries = record.dismissals as unknown[];
     const seen = new Set<string>();
-    for (const entry of entries) {
-        if (entry === null || typeof entry !== "object") throw new Error("提醒暂缓存储内容损坏，操作已停止；请先备份并检查原文件");
+    for (let index = 0; index < entries.length; index++) {
+        const entry = entries[index];
+        if (entry === null || typeof entry !== "object") {
+            throw new StoreIntegrityError("提醒暂缓", "条目必须为对象", entries.length, index);
+        }
         const candidate = entry as Record<string, unknown>;
         if (typeof candidate.personDocId !== "string" || !DOC_ID_RE.test(candidate.personDocId)
             || !isValidKind(candidate.kind) || typeof candidate.until !== "string"
             || candidate.until !== "" && !isValidDateKey(candidate.until)) {
-            throw new Error("提醒暂缓存储内容损坏，操作已停止；请先备份并检查原文件");
+            throw new StoreIntegrityError("提醒暂缓", "条目字段或日期无效", entries.length, index);
         }
         const key = `${candidate.personDocId}|${candidate.kind}`;
-        if (seen.has(key)) throw new Error("提醒暂缓存储存在重复记录，操作已停止；请先备份并检查原文件");
+        if (seen.has(key)) {
+            throw new StoreIntegrityError("提醒暂缓", `存在重复记录（${key}）`, entries.length, index);
+        }
         seen.add(key);
     }
     return normalizeDismissalStore(raw);

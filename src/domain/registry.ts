@@ -13,6 +13,7 @@ export interface RegistryStore {
 export const REGISTRY_STORE_VERSION = 1;
 
 import { isValidDateKey } from "./date-key.ts";
+import { StoreIntegrityError } from "./store-integrity.ts";
 
 /** 人物文档 ID（与 SQL 安全面同一校验） */
 const DOC_ID_RE = /^\d{14}-[0-9a-z]{7}$/;
@@ -36,19 +37,24 @@ export function normalizeRegistryStore(raw: unknown): RegistryStore {
 /** 严格展示/写入读取：现有库损坏时抛错，禁止把故障伪装为未登记。 */
 export function normalizeRegistryStoreForWrite(raw: unknown): RegistryStore {
     if (raw == null || raw === "") return { schemaVersion: REGISTRY_STORE_VERSION, registeredAt: {} };
-    if (typeof raw !== "object" || (raw as Record<string, unknown>).schemaVersion !== REGISTRY_STORE_VERSION
-        || (raw as Record<string, unknown>).registeredAt === null
-        || typeof (raw as Record<string, unknown>).registeredAt !== "object"
-        || Array.isArray((raw as Record<string, unknown>).registeredAt)) {
-        throw new Error("收编时间索引存储格式或版本不兼容，操作已停止；请先备份并检查原文件");
+    if (typeof raw !== "object" || Array.isArray(raw)) {
+        throw new StoreIntegrityError("收编时间索引", "需要版本化对象");
     }
-    const entries = (raw as { registeredAt: Record<string, unknown> }).registeredAt;
-    for (const [docId, date] of Object.entries(entries)) {
+    const record = raw as Record<string, unknown>;
+    if (record.schemaVersion !== REGISTRY_STORE_VERSION) {
+        throw new StoreIntegrityError("收编时间索引", "版本不兼容");
+    }
+    if (record.registeredAt === null || typeof record.registeredAt !== "object" || Array.isArray(record.registeredAt)) {
+        throw new StoreIntegrityError("收编时间索引", "条目容器必须为对象映射");
+    }
+    const entries = Object.entries(record.registeredAt as Record<string, unknown>);
+    for (let index = 0; index < entries.length; index++) {
+        const [docId, date] = entries[index];
         if (!DOC_ID_RE.test(docId) || !isValidDateKey(date)) {
-            throw new Error("收编时间索引存储内容损坏，操作已停止；请先备份并检查原文件");
+            throw new StoreIntegrityError("收编时间索引", `人物文档 ID 或收编日期无效（${docId}: ${date}）`, entries.length, index);
         }
     }
-    return { schemaVersion: REGISTRY_STORE_VERSION, registeredAt: { ...entries } as Record<string, string> };
+    return { schemaVersion: REGISTRY_STORE_VERSION, registeredAt: { ...(record.registeredAt as Record<string, string>) } };
 }
 
 /**
