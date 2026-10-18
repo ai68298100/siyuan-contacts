@@ -754,11 +754,12 @@ import type { ViewPreferences } from "../domain/preferences";
             const issuesNote = result.issues.length > 0
                 ? `；待处理：${result.issues.map((entry) => `${entry.label} ${entry.id}（人物 ${entry.personDocId}${entry.orgDocId ? `，组织 ${entry.orgDocId}` : ""}${entry.selfDocId ? `，本人 ${entry.selfDocId}` : ""}；${entry.message}）`).join("、")}`
                 : "";
-            const skipped = result.skipped.interactions + result.skipped.followUps
-                + result.modules.reduce((total, module) => total + (module.skipped ?? 0), 0);
+            const skipped = result.modules.reduce((total, module) => total + (module.skipped
+                ?? (module.key === "interactions" ? result.skipped.interactions : module.key === "followUps" ? result.skipped.followUps : 0)), 0);
             const removed = result.modules.reduce((total, module) => total + (module.removed ?? 0), 0);
+            const tombstonesAdded = result.modules.reduce((total, module) => total + (module.tombstonesAdded ?? 0), 0);
             const prefix = result.failed.length > 0 || result.issues.length > 0 ? "迁移恢复待核实" : "迁移恢复完成";
-            bundleMessage = `${prefix}：${summary}${skipped > 0 ? `（跳过 ${skipped} 条）` : ""}${removed > 0 ? `；删除标记移除 ${removed} 条` : ""}${failedNote}${issuesNote}`;
+            bundleMessage = `${prefix}：${summary}${skipped > 0 ? `（跳过 ${skipped} 条）` : ""}${removed > 0 ? `；删除标记移除 ${removed} 条` : ""}${tombstonesAdded > 0 ? `；新增删除标记 ${tombstonesAdded} 条` : ""}${failedNote}${issuesNote}`;
             bundlePreviewText = result.retryBundle ?? "";
             const next = result.retryBundle ? await facade.previewMigrationImport(result.retryBundle) : null;
             if (!selfAlive || request !== bundleRequest) return;
@@ -1355,7 +1356,7 @@ import type { ViewPreferences } from "../domain/preferences";
                         {#if bundleResult}
                             <ul aria-label="已核实模块">
                                 {#each bundleResult.modules as module (module.key)}
-                                    <li>{module.label}：已核实新增 {module.merged} 条，跳过 {module.skipped ?? 0} 条，删除 {module.removed ?? 0} 条。</li>
+                                    <li>{module.label}：已核实新增 {module.merged} 条，跳过 {module.skipped ?? (module.key === "interactions" ? bundleResult.skipped.interactions : module.key === "followUps" ? bundleResult.skipped.followUps : 0)} 条，删除 {module.removed ?? 0} 条{module.tombstonesAdded !== undefined ? `，新增删除标记 ${module.tombstonesAdded} 条` : ""}。</li>
                                 {/each}
                             </ul>
                             {#if bundleResult.failed.length > 0}<ul aria-label="未完成模块">
@@ -1381,6 +1382,9 @@ import type { ViewPreferences } from "../domain/preferences";
                                 <li>{module.label}：{module.count} 条{module.tombstones ? `，删除标记 ${module.tombstones} 条` : ""}</li>
                             {/each}
                         </ul>
+                        {#if bundlePreview.some((module) => module.key === "interactions" && (module.tombstones ?? 0) > 0)}
+                            <p class="lvct-settings__inline-hint" role="note">互动删除标记会移除当前库中同 ID 的互动，并阻止旧包复活记录。以上为包内数量，实际移除数在恢复后显示。</p>
+                        {/if}
                         <div class="lvct-settings__actions">
                             <button class="b3-button b3-button--outline" onclick={runImportBundle} disabled={importingBundle}>
                                 {importingBundle ? "恢复中…" : bundleMessage ? "核实并重试未完成模块" : "确认恢复（现状优先合并）"}
@@ -1390,7 +1394,7 @@ import type { ViewPreferences } from "../domain/preferences";
                         <p class="lvct-settings__inline-hint" role="status">迁移包为空或没有可恢复的模块。</p>
                     {/if}
                     {#if bundlePreview && bundlePreview.length > 0}
-                        <p class="ft__smaller ft__on-surface">先恢复人物与组织原文并重绑数据库；按双方文档 ID 核对，不按姓名自动关联。别名与成员删除标记优先，旧包不会复活已删除记录。只恢复成员事实，关联段落需另行预览重建；未核实项会保留供手动重试。</p>
+                        <p class="ft__smaller ft__on-surface">先恢复人物与组织原文并重绑数据库；按双方文档 ID 核对，不按姓名自动关联。互动、别名与成员删除标记优先，旧包不会复活已删除记录。只恢复成员事实，关联段落需另行预览重建；未核实项会保留供手动重试。</p>
                     {/if}
 
                     <div class="lvct-settings__row">
