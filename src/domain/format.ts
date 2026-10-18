@@ -39,3 +39,25 @@ export function escapeMarkdown(text: string): string {
 export function markdownHeading(title: string): string {
     return `# ${escapeMarkdown(title.trim())}\n\n`;
 }
+
+const WINDOWS_RESERVED_NAMES = /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+
+/**
+ * K-11：跨平台安全文件名清洗。
+ * 过滤 Windows/macOS/Linux 非法字符（/\:*?"<>|）、控制字符、尾随空格/点号，并做安全长度截断。
+ */
+export function sanitizeFileName(name: string, fallback = "未命名", maxLength = 64): string {
+    const raw = typeof name === "string" ? name.trim() : "";
+    if (!raw) return fallback;
+    let cleaned = raw
+        .replace(/[<>:"/\\|?*\u0000-\u001F\u007F]/g, "_")
+        .trim()
+        .replace(/[. ]+$/g, "");
+    if (WINDOWS_RESERVED_NAMES.test(cleaned)) {
+        cleaned = `_${cleaned}`;
+    }
+    if (cleaned.length > maxLength) {
+        cleaned = cleaned.slice(0, maxLength).trim().replace(/[. ]+$/g, "");
+    }
+    return cleaned || fallback;
+}

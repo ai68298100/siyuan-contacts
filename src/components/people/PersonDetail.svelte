@@ -32,7 +32,7 @@ import StatusNotice from "../StatusNotice.svelte";
     import PersonFieldsEditor from "./PersonFieldsEditor.svelte";
     import type { PersonFieldsSnapshot, PersonFieldsState } from "../../domain/person-fields";
     import type { LegacyPersonNoteSnapshot } from "../../domain/person-note";
-    import { buildBriefingMarkdown } from "../../domain/briefing-export";
+    import { buildBriefingMarkdown, buildBriefingFilename } from "../../domain/briefing-export";
     import { addReviewDays, groupByMonth, inDateRange, onThisDay } from "../../domain/date-review";
     import { toLocalDateKey } from "../../domain/interactions";
     import OrgMembershipResult from "../org/OrgMembershipResult.svelte";
@@ -674,7 +674,7 @@ import StatusNotice from "../StatusNotice.svelte";
         const anchor = document.createElement("a");
         anchor.href = url;
         const stamp = new Date().toISOString().slice(0, 10);
-        anchor.download = `小驴人脉_简报_${current.name}_${stamp}.md`;
+        anchor.download = buildBriefingFilename(current.name, stamp);
         anchor.click();
         URL.revokeObjectURL(url);
     }

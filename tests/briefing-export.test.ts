@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildBriefingMarkdown, escapeMarkdown } from "../src/domain/briefing-export.ts";
+import { buildBriefingMarkdown, escapeMarkdown, sanitizeFileName, buildBriefingFilename } from "../src/domain/briefing-export.ts";
 import type { BriefingExportInput } from "../src/domain/briefing-export.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
 
@@ -68,4 +68,38 @@ test("简报导出：农历生日与跟进标题转义", () => {
         followUps: [{ title: "问 [他] 的近况 #重要", dueDate: "2026-10-15" }],
     });
     assert(tricky.includes("问 \\[他\\] 的近况 \\#重要"), "跟进标题特殊字符未转义");
+});
+
+test("K-11：简报文件名跨平台清洗、Windows保留名与超长截断保护", () => {
+    /* 1. 非法路径字符转下划线，且输出绝不包含非法字符 */
+    const unsafeName = '张/三\\:*"<>|?';
+    const cleanedUnsafe = sanitizeFileName(unsafeName);
+    assert.equal(cleanedUnsafe, "张_三________");
+    assert.ok(!/[<>:"/\\|?*\u0000-\u001F\u007F]/.test(cleanedUnsafe));
+
+    /* 2. 尾随点号、空格和控制字符剥离 */
+    assert.equal(sanitizeFileName("李四...  \r\n"), "李四");
+
+    /* 3. Windows 保留设备名称避让 */
+    assert.equal(sanitizeFileName("CON"), "_CON");
+    assert.equal(sanitizeFileName("aux"), "_aux");
+    assert.equal(sanitizeFileName("NUL"), "_NUL");
+
+    /* 4. 空值与空白回退 */
+    assert.equal(sanitizeFileName("", "联系人"), "联系人");
+    assert.equal(sanitizeFileName("   ", "默认"), "默认");
+
+    /* 5. 超长截断并在截断点剥离尾随点/空格 */
+    const veryLongName = "超长名字".repeat(25) + "... ";
+    const truncated = sanitizeFileName(veryLongName, "联系人", 20);
+    assert(truncated.length <= 20);
+    assert(!truncated.endsWith("."));
+    assert(!truncated.endsWith(" "));
+
+    /* 6. buildBriefingFilename 集成验证 */
+    const filename = buildBriefingFilename('王*五/经理', '2026-10-19');
+    assert.equal(filename, "小驴人脉_简报_王_五_经理_2026-10-19.md");
+
+    const fallbackFilename = buildBriefingFilename('   ', '2026-10-19');
+    assert.equal(fallbackFilename, "小驴人脉_简报_联系人_2026-10-19.md");
 });
