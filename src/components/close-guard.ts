@@ -240,10 +240,28 @@ function openGuardDialog(summary: { changes: string[]; canSave: boolean }): Prom
                 first.focus();
             }
         };
+        interface SiblingState {
+            element: HTMLElement;
+            hadAriaHidden: boolean;
+            oldAriaHidden: string | null;
+            hadInert: boolean;
+        }
+        const isolatedSiblings: SiblingState[] = [];
         const finish = (choice: CloseGuardChoice) => {
             if (finished) return;
             finished = true;
             document.removeEventListener("keydown", onKeydown, true);
+            for (const item of isolatedSiblings) {
+                if (!item.element.isConnected) continue;
+                if (item.hadAriaHidden && item.oldAriaHidden !== null) {
+                    item.element.setAttribute("aria-hidden", item.oldAriaHidden);
+                } else {
+                    item.element.removeAttribute("aria-hidden");
+                }
+                if (!item.hadInert) {
+                    item.element.removeAttribute("inert");
+                }
+            }
             overlay.remove();
             if (previousActive?.isConnected) queueMicrotask(() => previousActive.focus());
             resolve(choice);
@@ -271,6 +289,20 @@ function openGuardDialog(summary: { changes: string[]; canSave: boolean }): Prom
                 </div>
             </div>`;
         document.body.appendChild(overlay);
+
+        /* D-18：背景元素焦点与辅助技术隔离，避免读屏读到遮罩下方背景内容 */
+        for (const child of document.body.children) {
+            if (child !== overlay && child instanceof HTMLElement) {
+                isolatedSiblings.push({
+                    element: child,
+                    hadAriaHidden: child.hasAttribute("aria-hidden"),
+                    oldAriaHidden: child.getAttribute("aria-hidden"),
+                    hadInert: child.hasAttribute("inert"),
+                });
+                child.setAttribute("aria-hidden", "true");
+                child.setAttribute("inert", "");
+            }
+        }
         const saveButton = overlay.querySelector<HTMLButtonElement>("button[data-choice='save']")!;
         if (!summary.canSave) saveButton.remove();
         for (const button of overlay.querySelectorAll<HTMLButtonElement>("button[data-choice]")) {
