@@ -400,19 +400,21 @@
     {:else if !preview}
         <ViewState compact loading title={text("captureAnalyzing", "正在分析笔记中的联系人")} />
     {:else if result}
-        <div class="lvct-capture__steps" aria-label="捕获进度">
-            <span class="lvct-capture__step--done"><b>1</b> {text("captureStepIdentify", "识别")}</span>
+        <nav class="lvct-capture__steps" aria-label="捕获向导步骤">
+            <span id="lvct-capture-step-1-done" class="lvct-capture__step--done"><b>1</b> {text("captureStepIdentify", "识别")}</span>
             <i aria-hidden="true">›</i>
-            <span class="lvct-capture__step--done"><b>2</b> {text("captureStepConfirm", "确认")}</span>
+            <span id="lvct-capture-step-2-done" class="lvct-capture__step--done"><b>2</b> {text("captureStepConfirm", "确认")}</span>
             <i aria-hidden="true">›</i>
-            <span class="lvct-capture__step--active"><b>3</b> {text("captureStepDone", "完成")}</span>
-        </div>
-        <div class="lvct-form__hint">
-            <p class="lvct-capture__done-line"><CheckCircle2 size={14}/> {text("captureDoneInteractions", "已记录 {n} 条互动", { n: result.interactions })}</p>
-            {#if result.createdNames.length > 0}<p class="lvct-capture__done-line"><Sparkles size={14}/> {text("captureDoneCreated", "新增联系人：{n}", { n: result.createdNames.join("、") })}</p>{/if}
-            {#if result.attendeeBlockWritten}<p class="lvct-capture__done-line"><Sparkles size={14}/> {text("captureDoneBlock", "笔记已写入「参与人员」双链区块")}</p>{/if}
-            {#if result.occasionLinksWritten > 0}<p class="lvct-capture__done-line"><Sparkles size={14}/> {text("captureDoneOccasionLinks", "已完成 {n} 个事项双链区块", { n: result.occasionLinksWritten })}</p>{/if}
-            {#if result.dateDocId || result.placeDocId}<p class="lvct-capture__done-line"><Sparkles size={14}/> {text("captureDoneOccasionDocuments", "已关联当日日记与地点文档")}</p>{/if}
+            <span id="lvct-capture-step-3-done" class="lvct-capture__step--active" aria-current="step"><b>3</b> {text("captureStepDone", "完成")}</span>
+        </nav>
+        <div id="lvct-capture-panel-3" class="lvct-form__hint" role="region" aria-labelledby="lvct-capture-step-3-done">
+            <div role="status" aria-live="polite">
+                <p class="lvct-capture__done-line"><CheckCircle2 size={14}/> {text("captureDoneInteractions", "已记录 {n} 条互动", { n: result.interactions })}</p>
+                {#if result.createdNames.length > 0}<p class="lvct-capture__done-line"><Sparkles size={14}/> {text("captureDoneCreated", "新增联系人：{n}", { n: result.createdNames.join("、") })}</p>{/if}
+                {#if result.attendeeBlockWritten}<p class="lvct-capture__done-line"><Sparkles size={14}/> {text("captureDoneBlock", "笔记已写入「参与人员」双链区块")}</p>{/if}
+                {#if result.occasionLinksWritten > 0}<p class="lvct-capture__done-line"><Sparkles size={14}/> {text("captureDoneOccasionLinks", "已完成 {n} 个事项双链区块", { n: result.occasionLinksWritten })}</p>{/if}
+                {#if result.dateDocId || result.placeDocId}<p class="lvct-capture__done-line"><Sparkles size={14}/> {text("captureDoneOccasionDocuments", "已关联当日日记与地点文档")}</p>{/if}
+            </div>
             {#if result.occasionLinkFailures.length > 0}
                 <p class="ft__smaller lvct-text-danger">
                     {text("captureDoneOccasionFailures", "有 {n} 个事项双链投影未完成，可重试捕获：{details}", {
@@ -488,19 +490,26 @@
             <button class="b3-button b3-button--text" onclick={closeIfIdle}>{text("captureDone", "完成")}</button>
         </div>
     {:else}
-        <div class="lvct-capture__steps" aria-label="捕获进度">
-            <span class:lvct-capture__step--active={step === 1}><b>1</b> {text("captureStepIdentify", "识别")}</span>
+        <nav class="lvct-capture__steps" aria-label="捕获向导步骤">
+            <span id="lvct-capture-step-1" class:lvct-capture__step--active={step === 1} class:lvct-capture__step--done={step > 1} aria-current={step === 1 ? "step" : undefined}>
+                <b>1</b> {text("captureStepIdentify", "识别")}
+            </span>
             <i aria-hidden="true">›</i>
-            <span class:lvct-capture__step--active={step === 2}><b>2</b> {text("captureStepConfirm", "确认")}</span>
+            <span id="lvct-capture-step-2" class:lvct-capture__step--active={step === 2} class:lvct-capture__step--done={step > 2} aria-current={step === 2 ? "step" : undefined}>
+                <b>2</b> {text("captureStepConfirm", "确认")}
+            </span>
             <i aria-hidden="true">›</i>
-            <span><b>3</b> {text("captureStepDone", "完成")}</span>
-        </div>
+            <span id="lvct-capture-step-3" class:lvct-capture__step--active={step === 3} aria-current={step === 3 ? "step" : undefined}>
+                <b>3</b> {text("captureStepDone", "完成")}
+            </span>
+        </nav>
         <p class="ft__smaller ft__on-surface lvct-form__hint">
             {text("captureSourceNote", "笔记：")}{preview.docName || docId}
         </p>
         <p class="ft__smaller">来源 {docId} · 双链按文档 ID 核对。保留原文，仅追加/更新插件标记区块。</p>
 
         {#if step === 1}
+        <div id="lvct-capture-panel-1" role="region" aria-labelledby="lvct-capture-step-1">
         <div class="lvct-form__item">
             <span>{text("captureCandidateCount", "联系人候选（{n}，来源见各项标记）", { n: preview.linked.length })}</span>
             {#if preview.linked.length === 0}
@@ -621,9 +630,11 @@
                 {/each}
             </div>
         {/if}
+        </div>
         {/if}
 
         {#if step === 2}
+        <div id="lvct-capture-panel-2" role="region" aria-labelledby="lvct-capture-step-2">
         <div class="lvct-form__grid">
             <label class="lvct-form__item">
                 <span>{text("captureOccasionDate", "场合日期")}</span>
@@ -663,6 +674,7 @@
         <p class="ft__smaller ft__on-surface lvct-form__hint">
             {text("captureProjectionPolicy", "变更日期、地点或参与者时，历史互动不改；旧日记、旧地点和被移除人物中的插件投影保留，只更新本次目标。纠错请先预览，再删除错误互动并重新记录。")}
         </p>
+        </div>
         {:else}
         <div class="lvct-form__actions">
             <button class="b3-button b3-button--cancel" onclick={closeIfIdle}>{text("captureCancel", "取消")}</button>
