@@ -157,6 +157,21 @@ evidence_paths / owner / last_updated / commit
 - **退出边界：** 域层纯函数实现与测试全部通过；UI 并排比对向导弹窗后续单独挂接。
 - **完成回报：** `pnpm check` 0 错误 0 警告、单测 805/805 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
 
+#### AG-E30-OCCASION — 群体活动与场合实体（E-30 聚类投影）纯函数域模型与算法
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+domain / M4；已完成场合实体数据模型（`OccasionEntity`，支持会议/聚餐/婚礼/聚会/出行/论坛/活动等类型、发生日期/跨天结束日期/地点/来源文档/多参与者/账本关联/备注）、严格安全校验（`validateOccasion` 防非法/倒挂日期、防路径穿越地点、防重复参与者）、参与者互动事件自动投影（`deriveOccasionInteractionEvents` 共享 `externalRef` 与同场前缀），经 3/3 单测与架构完整性守门全绿。
+- **user_outcome / user_scenario：** 面对包含多位联系人的群体活动（如团队聚餐、技术研讨会、朋友婚礼），系统允许抽象为统一场合实体，一次性生成参与者名单与关联；自动派生各参与者的时间线互动事件并标记同行人，使图谱与共同出席洞察无缝联动，无需对每个人重复手工录入。
+- **source_ids / current_evidence：** E-30、`docs/ACTIVE-BACKLOG.md`；`src/domain/occasion-cluster.ts`、`tests/occasion-cluster.test.ts`；单测全量通过。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3.1 / 纯函数域层计算，不修改底层持久化 schema，无新存储开销。
+- **allowed_files / forbidden_files：** occasion-cluster 域与测试、package.json / 保护文件。
+- **contract_change / host_or_spike_required：** 无存储结构变更；纯函数生成目标 OccasionEntity 与派生 InteractionEvent 数组。
+- **ordered_steps：** 场合实体数据结构设计 → validateOccasion 严格校验规则 → deriveOccasionInteractionEvents 投影算法 → 单元测试与 package.json 门禁注册 → 门禁通过。
+- **test_fixtures / test_commands / acceptance：** 纯函数标题/类型/日期/跨天/地点/参与者合法性与安全防御、多参与者互动事件派生（共享 externalRef、包含同行人名单）、ID 格式校验；`pnpm check`、`pnpm test`（808/808）、`pnpm build` 与 `pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算，O(N) 投影复杂度；本地纯函数，不发送外部网络或大模型。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/occasion-cluster.ts`、`tests/occasion-cluster.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 域层纯函数实现与测试全部通过；UI 创建弹窗与笔记捕获联动后续单独挂接。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 808/808 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
+
 #### AG-ISSUE-051-054-FIELDS — 重复资料与两层分组首版
 
 - **status / priority / type / milestone：** `host_pending` / P1 / feature+regression / M4；生产实现、隔离内核与隔离 Chrome 验收已完成，真实用户工作区、原生编辑器竞争、真机等边界继续由 Host Queue 守门；发布与 issue 关闭见 `AG-ISSUE-051-054-CLOSE`。
