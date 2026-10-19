@@ -591,3 +591,25 @@ test("Epoch 6: detectCheckinBridge 支持多别名探测与状态自证", () => 
     }
 });
 
+test("桥版本单一事实源：优先取 deps.version() 运行期版本，无时回退到常量 0.5.19", () => {
+    const { api } = fixture();
+    // 默认 fixture 未配 version()：回退到编译期常量 0.5.19
+    assert.equal(api.version, "0.5.19");
+    assert.equal(api.getOverview().version, "0.5.19");
+
+    // 配置了运行期 version()（如来自 plugin.manifest）：优先采用该版本
+    const runtimeApi = createExternalBridgeApi({
+        ...fixture().deps,
+        version: () => "0.5.20-beta.1",
+    });
+    assert.equal(runtimeApi.version, "0.5.20-beta.1");
+    assert.equal(runtimeApi.getOverview().version, "0.5.20-beta.1");
+
+    // version() 抛错或返回空串时：平滑回退，不阻断桥构建
+    const faultApi = createExternalBridgeApi({
+        ...fixture().deps,
+        version: () => { throw new Error("manifest read failed"); },
+    });
+    assert.equal(faultApi.version, "0.5.19");
+});
+

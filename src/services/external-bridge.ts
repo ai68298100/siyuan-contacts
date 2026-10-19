@@ -23,10 +23,13 @@ export interface BridgeDependencies {
     create(settings: ContactsSettings, name: string, request: BridgeCreateRequest): Promise<BridgePerson>;
     event(docId: string, ref: string): Promise<{ date: string; note: string } | null>;
     record(docId: string, ref: string, occurredAt: number, note: string): Promise<{ recorded: boolean }>;
+    /** 运行期插件版本（来自 manifest）；缺省时回退到编译期常量 */
+    version?(): string;
 }
 
 export const LVCONTACTS_BRIDGE_PROTOCOL = BRIDGE_PROTOCOL;
-export const LVCONTACTS_BRIDGE_VERSION = "0.5.18";
+/** 编译期回退版本；运行时一律以插件 manifest 版本为准（见 version() 依赖）。 */
+export const LVCONTACTS_BRIDGE_VERSION = "0.5.19";
 export const LVCONTACTS_API_NAME = "LvContacts";
 export const LVCONTACTS_API_ALIASES = [
     "LvContacts",
@@ -68,6 +71,20 @@ function anchors(settings: ContactsSettings): BridgeAnchors {
 
 function sameAnchors(previous: BridgeAnchors, settings: ContactsSettings): boolean {
     return previous.notebookId === settings.notebookId && previous.avId === settings.avId && previous.dbBlockId === settings.dbBlockId;
+}
+
+/**
+ * 桥版本解析：运行时优先取插件 manifest 版本，避免与发布版本漂移；
+ * 依赖未提供或返回空串时回退到编译期常量。
+ */
+function bridgeVersion(deps: BridgeDependencies): string {
+    try {
+        const runtime = deps.version?.();
+        if (typeof runtime === "string" && runtime.trim()) return runtime.trim();
+    } catch {
+        // 版本读取失败不应阻断桥创建
+    }
+    return LVCONTACTS_BRIDGE_VERSION;
 }
 
 export function createExternalBridgeApi(deps: BridgeDependencies): LvContactsBridgeApi {
@@ -117,7 +134,7 @@ export function createExternalBridgeApi(deps: BridgeDependencies): LvContactsBri
     return Object.freeze({
         protocol: BRIDGE_PROTOCOL,
         apiVersion: 1,
-        version: LVCONTACTS_BRIDGE_VERSION,
+        version: bridgeVersion(deps),
         capabilities: BRIDGE_CAPABILITIES,
         safety: Object.freeze({ stableDocIds: true, persistentRequests: true, itemResults: true, unknownWrites: "verify_first" as const }),
         async whenReady() {
@@ -141,7 +158,7 @@ export function createExternalBridgeApi(deps: BridgeDependencies): LvContactsBri
             return Object.freeze({
                 protocol: BRIDGE_PROTOCOL,
                 apiVersion: 1,
-                version: LVCONTACTS_BRIDGE_VERSION,
+                version: bridgeVersion(deps),
                 capabilities: BRIDGE_CAPABILITIES,
                 safety: Object.freeze({ stableDocIds: true, persistentRequests: true, itemResults: true, unknownWrites: "verify_first" as const }),
                 writable: Boolean(settings?.notebookId && settings?.avId),

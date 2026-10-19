@@ -115,6 +115,11 @@ export function initExternalBridge(plugin: Plugin, getSettings: () => ContactsSe
         record: (personDocId, externalRef, occurredAt, note) => recordInteractionWithResult(plugin, {
             personDocId, source: "api", externalRef, occurredAt, ...(note ? { note } : {}),
         }),
+        // 桥版本单一事实源：以运行时 manifest 为准，避免与发布版本漂移
+        version: () => {
+            const manifestVersion = (plugin as { manifest?: { version?: string } }).manifest?.version;
+            return typeof manifestVersion === "string" && manifestVersion.trim() ? manifestVersion.trim() : "";
+        },
     });
     const mountedAliases = typeof window !== "undefined"
         ? mountBridgeAliases(window as unknown as Record<string, unknown>, api)
