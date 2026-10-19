@@ -84,4 +84,27 @@ export async function deleteInteraction(plugin: Plugin, eventId: string, expecte
     });
 }
 
+/** 批量追加多条互动事件（例如群体活动投影），在单个存储锁内完成并写后回读 */
+export async function appendInteractionBatch(
+    plugin: Plugin,
+    events: readonly InteractionEvent[],
+): Promise<{ added: number; total: number }> {
+    if (events.length === 0) return { added: 0, total: 0 };
+    return withStoreLock(INTERACTION_STORAGE_KEY, async () => {
+        let current = normalizeInteractionStoreForWrite(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY));
+        let added = 0;
+        for (const event of events) {
+            const next = appendEvent(current, event);
+            if (next !== current) {
+                current = next;
+                added += 1;
+            }
+        }
+        if (added > 0) {
+            await saveJsonVerified(plugin, INTERACTION_STORAGE_KEY, current);
+        }
+        return { added, total: current.events.length };
+    });
+}
+
 export { emptyStore };

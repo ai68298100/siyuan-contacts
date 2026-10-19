@@ -1,6 +1,30 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
+import { registerHooks } from "node:module";
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
+import type { Plugin } from "siyuan";
+
+// src/data/interactions.ts 使用无扩展名相对导入（vite 构建正常）；node --test 直跑需 resolve 钩子补 .ts。
+const hooks = registerHooks({
+    resolve(specifier, context, nextResolve) {
+        if (specifier === "siyuan") return { shortCircuit: true, url: "data:text/javascript," + encodeURIComponent("export default {};export function fetchPost(){}export function fetchSyncPost(){}") };
+        if (specifier.startsWith(".") && context.parentURL?.startsWith("file:")) {
+            const candidate = new URL(specifier + ".ts", context.parentURL);
+            if (existsSync(fileURLToPath(candidate))) return nextResolve(candidate.href, context);
+        }
+        return nextResolve(specifier, context);
+    },
+    load(url, context, nextLoad) {
+        if (url.startsWith("file:") && url.endsWith(".ts")) return { shortCircuit: true, format: "module", source:
+            ts.transpileModule(readFileSync(fileURLToPath(url), "utf8"), { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText };
+        return nextLoad(url, context);
+    },
+});
+process.on("exit", () => hooks.deregister());
+
+const {
     addOccasionToStore,
     deriveOccasionInteractionEvents,
     emptyOccasionStore,
@@ -11,18 +35,18 @@ import {
     updateOccasionInStore,
     validateOccasion,
     MAX_OCCASIONS,
-    type OccasionEntity,
-} from "../src/domain/occasion-cluster.ts";
-import { StoreIntegrityError } from "../src/domain/store-integrity.ts";
-import {
+} = await import("../src/domain/occasion-cluster.ts");
+type OccasionEntity = import("../src/domain/occasion-cluster.ts").OccasionEntity;
+const { StoreIntegrityError } = await import("../src/domain/store-integrity.ts");
+const {
     listOccasionEntities,
     loadOccasionStoreStrict,
     removeOccasionEntity,
     saveOccasionEntity,
     updateOccasionEntity,
     OCCASIONS_STORAGE_KEY,
-} from "../src/data/occasions.ts";
-import type { Plugin } from "siyuan";
+} = await import("../src/data/occasions.ts");
+const { createOccasion, deleteOccasion, listOccasions } = await import("../src/services/occasions.ts");
 
 const doc1 = "20261019000000-doc0001";
 const doc2 = "20261019000000-doc0002";
@@ -223,4 +247,63 @@ test("E-30 occasion 数据层：saveOccasionEntity、listOccasionEntities、upda
 
     memory.set(OCCASIONS_STORAGE_KEY, { schemaVersion: 999, occasions: [] });
     await assert.rejects(() => loadOccasionStoreStrict(plugin), StoreIntegrityError);
+});
+
+test("E-30 occasion 服务层：createOccasion 自动派生互动事件，deleteOccasion 清理", async () => {
+    const memory = new Map<string, unknown>();
+    const plugin = {
+        async loadData(key: string) {
+            return memory.has(key) ? structuredClone(memory.get(key)) : null;
+        },
+        async saveData(key: string, value: unknown) {
+            memory.set(key, structuredClone(value));
+        },
+    } as unknown as Plugin;
+
+    const occasion = await createOccasion(plugin, {
+        title: "团队季度聚餐",
+        type: "meal",
+        date: "2026-10-19",
+        place: "西贝餐厅",
+        attendees: [
+            { personDocId: doc1, name: "张三" },
+            { personDocId: doc2, name: "李四" },
+        ],
+    });
+    assert.match(occasion.id, /^\d{14}-[0-9a-z]{7}$/);
+    assert.equal(occasion.attendees.length, 2);
+
+    // 场合落盘
+    const listed = await listOccasions(plugin);
+    assert.equal(listed.length, 1);
+    assert.equal(listed[0].title, "团队季度聚餐");
+
+    // 互动事件已派生：每位参与者一条
+    const interactionStore = memory.get("interaction-events.json") as { events: Array<{ personDocId: string; externalRef?: string }> } | undefined;
+    assert.ok(interactionStore, "互动事件库应已写入");
+    assert.equal(interactionStore.events.length, 2);
+    assert.equal(interactionStore.events[0].externalRef, occasion.id, "互动事件应共享场合 ID 作为外部引用");
+
+    // 删除场合（互动事件保留）→ 幂等删除
+    const afterDelete = await deleteOccasion(plugin, occasion.id);
+    assert.equal(afterDelete, undefined);
+    assert.equal((await listOccasions(plugin)).length, 0);
+
+    // 不派生互动事件的场合
+    const silentOccasion = await createOccasion(plugin, {
+        title: "静默活动",
+        type: "other",
+        date: "2026-10-19",
+        attendees: [{ personDocId: doc3, name: "王五" }],
+        deriveInteractions: false,
+    });
+    const storeAfterSilent = memory.get("interaction-events.json") as { events: unknown[] };
+    assert.equal(storeAfterSilent.events.length, 2, "静默活动不新增互动事件");
+    assert.ok(silentOccasion.id);
+
+    // 非法输入拒绝
+    await assert.rejects(
+        () => createOccasion(plugin, { title: "", type: "meeting", date: "2026-10-19", attendees: [] }),
+        /创建群体活动失败/,
+    );
 });
