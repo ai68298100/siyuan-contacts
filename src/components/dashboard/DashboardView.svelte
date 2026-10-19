@@ -129,62 +129,16 @@
 
     // ---- B08 行内快捷处置（生日跳过本年 / 久未联系顺延与不再提醒 / 从未互动跳过今天） ----
     let rowMenuKey = $state("");
-    let rowMenuTrigger: HTMLElement | null = null;
 
-    // C06：会话内撤销——只保留最近一次操作的反向闭包，跨刷新/重启不保留
-    let undoAction: { run: () => Promise<void> } | null = $state(null);
-    function setUndo(message: string, run: () => Promise<void>): void {
-        alMessage = message;
-        undoAction = { run };
-    }
-    async function runUndo(): Promise<void> {
-        const action = undoAction;
-        if (!action || alBusy) return;
-        alBusy = true;
-        alError = "";
-        try {
-            await action.run();
-            undoAction = null;
-            alMessage = "已撤销";
-            await refresh();
-        } catch (error) {
-            alError = requestErrorMessage(error);
-        } finally {
-            alBusy = false;
-        }
-    }
-
-    function toggleRowMenu(key: string, trigger?: HTMLElement): void {
-        if (rowMenuKey === key) {
-            closeRowMenu(true);
-        } else {
-            rowMenuKey = key;
-            rowMenuTrigger = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
-        }
-    }
-
-    function closeRowMenu(restoreFocus = true): void {
-        if (!rowMenuKey) return;
-        rowMenuKey = "";
-        if (restoreFocus && rowMenuTrigger?.isConnected) {
-            rowMenuTrigger.focus();
-        }
-        rowMenuTrigger = null;
+    function toggleRowMenu(key: string): void {
+        rowMenuKey = rowMenuKey === key ? "" : key;
     }
 
     function handleGlobalKeydown(event: KeyboardEvent): void {
         if (event.key === "Escape" && rowMenuKey) {
             event.preventDefault();
             event.stopPropagation();
-            closeRowMenu(true);
-        }
-    }
-
-    function handleGlobalClick(event: MouseEvent): void {
-        if (!rowMenuKey) return;
-        const target = event.target as HTMLElement | null;
-        if (target && !target.closest(".lvct-dash__rowmenu") && !target.closest(".lvct-dash__quick-button--more") && !target.closest("[data-row-menu-trigger]")) {
-            closeRowMenu(false);
+            rowMenuKey = "";
         }
     }
     function isNeverCard(card: ActionCard): boolean {
@@ -476,8 +430,30 @@
     });
     const todayBirthdays = $derived.by(() => data?.birthdays.filter((item) => item.bucket === "today") ?? []);
 
+    // C06：会话内撤销——只保留最近一次操作的反向闭包，跨刷新/重启不保留
+    let undoAction: { run: () => Promise<void> } | null = $state(null);
+    function setUndo(message: string, run: () => Promise<void>): void {
+        alMessage = message;
+        undoAction = { run };
+    }
+    async function runUndo(): Promise<void> {
+        const action = undoAction;
+        if (!action || alBusy) return;
+        alBusy = true;
+        alError = "";
+        try {
+            await action.run();
+            undoAction = null;
+            alMessage = "已撤销";
+            await refresh();
+        } catch (error) {
+            alError = requestErrorMessage(error);
+        } finally {
+            alBusy = false;
+        }
+    }
+
     async function refresh() {
-        closeRowMenu(false);
         const version = ++refreshVersion;
         refreshing = true;
         errorText = "";
@@ -811,7 +787,7 @@
     };
 </script>
 
-<svelte:window onkeydown={handleGlobalKeydown} onclick={handleGlobalClick} />
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="lvct-dash">
     {#if errorText}
@@ -964,7 +940,7 @@
                                 aria-expanded={rowMenuKey === `action:${card.person.docId}`}
                                 aria-controls={rowMenuKey === `action:${card.person.docId}` ? `lvct-dash-action-menu-${card.person.docId}` : undefined}
                                 data-row-menu-trigger="true"
-                                onclick={(event) => toggleRowMenu(`action:${card.person.docId}`, event.currentTarget)}
+                                onclick={() => toggleRowMenu(`action:${card.person.docId}`)}
                             >⋯</button>
                         </div>
                         {#if rowMenuKey === `action:${card.person.docId}`}
@@ -1104,7 +1080,7 @@
                                     aria-expanded={rowMenuKey === `birthday:${item.person.docId}`}
                                     aria-controls={rowMenuKey === `birthday:${item.person.docId}` ? `lvct-dash-birthday-menu-${item.person.docId}` : undefined}
                                     data-row-menu-trigger="true"
-                                    onclick={(event) => { event.stopPropagation(); toggleRowMenu(`birthday:${item.person.docId}`, event.currentTarget); }}
+                                    onclick={(event) => { event.stopPropagation(); toggleRowMenu(`birthday:${item.person.docId}`); }}
                                 >⋯</button>
                             </div>
                             {#if rowMenuKey === `birthday:${item.person.docId}`}
@@ -1178,7 +1154,7 @@
                                     aria-expanded={rowMenuKey === `stale:${item.person.docId}`}
                                     aria-controls={rowMenuKey === `stale:${item.person.docId}` ? `lvct-dash-stale-menu-${item.person.docId}` : undefined}
                                     data-row-menu-trigger="true"
-                                    onclick={(event) => { event.stopPropagation(); toggleRowMenu(`stale:${item.person.docId}`, event.currentTarget); }}
+                                    onclick={(event) => { event.stopPropagation(); toggleRowMenu(`stale:${item.person.docId}`); }}
                                 >⋯</button>
                             </div>
                             {#if rowMenuKey === `stale:${item.person.docId}`}
