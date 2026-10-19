@@ -50,18 +50,8 @@
 <!-- 卡片保留鼠标快捷打开；tabindex 仅用于关闭详情后恢复焦点，键盘入口是独立详情按钮。 -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<article
-    class="lvct-person-card"
-    class:lvct-person-card--active={active}
-    tabindex="-1"
-    aria-label={`${person.name}，联系人`}
-    data-person-item-id={person.itemId}
-    onclick={(event) => {
-        if ((event.target as HTMLElement)?.closest("input, button, a, label")) return;
-        event.currentTarget.focus({ preventScroll: true });
-        onOpen(person);
-    }}
->
+<article class="lvct-person-card" class:lvct-person-card--active={active} tabindex="-1" aria-label={`${person.name}，联系人`} data-person-item-id={person.itemId}
+    onclick={(event) => { event.currentTarget.focus({ preventScroll: true }); onOpen(person); }}>
     <div class="lvct-person-card__top">
     {#if onToggleSelected}
         <label class="lvct-person-card__select-hit-area" onclick={(event) => event.stopPropagation()}>

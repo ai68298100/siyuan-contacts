@@ -63,16 +63,10 @@ import type { ViewPreferences } from "../domain/preferences";
 
     let activeSection: SectionId = $state("general");
 
-    async function switchSection(next: SectionId, focusHeading = true): Promise<void> {
+    function switchSection(next: SectionId): void {
         if (activeSection === next) return;
         if (auditBusy || orgProjectionBusy) return;
         activeSection = next;
-        if (focusHeading) {
-            await tick();
-            const panel = document.getElementById(`lvct-settings-panel-${next}`);
-            const heading = panel?.querySelector<HTMLElement>("h2");
-            heading?.focus({ preventScroll: true });
-        }
     }
 
     function handleNavKeydown(event: KeyboardEvent) {
@@ -1004,7 +998,7 @@ import type { ViewPreferences } from "../domain/preferences";
                     aria-describedby={auditBusy || orgProjectionBusy ? "lvct-settings-nav-status" : undefined}
                     title={auditBusy ? "资料体检进行中，完成后可切换设置分区" : orgProjectionBusy ? "组织双链核对进行中，完成后可切换设置分区" : undefined}
                     disabled={auditBusy || orgProjectionBusy}
-                    onclick={() => void switchSection(section.id, true)}
+                    onclick={() => switchSection(section.id)}
                 >
                     <span aria-hidden="true">
                         {#if section.id === "general"}<SlidersHorizontal size={16}/>

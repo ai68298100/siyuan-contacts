@@ -1985,11 +1985,7 @@
                     {#if virtualized}<tr class="lvct-people__virtual-row" aria-hidden="true"><td colspan={tableColumns.length + 2} style={`height:${virtualTopSpacer}px`}></td></tr>{/if}
                     {#each renderedVisible as person (person.itemId)}
                         <tr tabindex="-1" class:lvct-people__row--active={activePersonId === person.itemId} data-person-item-id={person.itemId}
-                            onclick={(event) => {
-                                if ((event.target as HTMLElement)?.closest("input, button, a")) return;
-                                event.currentTarget.focus({ preventScroll: true });
-                                onOpenDetail(person);
-                            }}>
+                            onclick={(event) => { event.currentTarget.focus({ preventScroll: true }); onOpenDetail(person); }}>
                             <td class="lvct-people__select-cell">
                                 <input
                                     type="checkbox"
