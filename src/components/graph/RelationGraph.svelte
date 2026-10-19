@@ -671,7 +671,7 @@
                     classes: searchNeedle ? "lvct-graph-hit" : "",
                 })),
                 ...graph.edges.map((edge) => ({
-                    data: { source: edge.source, target: edge.target, kind: edge.kind ?? "related", memberStatus: edge.memberStatus, themeEdge: palette.edge },
+                    data: { source: edge.source, target: edge.target, kind: edge.kind ?? "related", memberStatus: edge.memberStatus, coCount: edge.coCount, themeEdge: palette.edge },
                 })),
             ],
             // 同步完成布局，避免筛选/切页销毁画布后动画帧继续访问 renderer。
@@ -728,6 +728,8 @@
                 { selector: 'edge[kind = "member"][memberStatus = "mixed"]', style: { "line-style": "dashed", width: 3 } },
                 // 引用是双向连接投影，不画方向箭头，以免把无向去重后的端点误作引用方向。
                 { selector: 'edge[kind = "ref"]', style: { "line-style": "dotted", width: 3 } },
+                // E-34：共同出席弱联系（推断关联），细虚线与半透明强调，仅展示，不参与关系查询
+                { selector: 'edge[kind = "co_occurrence"]', style: { "line-style": "dashed", "line-dash-pattern": [4, 4], width: 2, opacity: 0.7 } },
             ],
         });
         graphInstance = instance;
@@ -1311,7 +1313,7 @@
                 {/each}
             </ul>
             <h3>{text("graphTextEdges", "边及来源")}（{snapshot.graph.edges.length}）</h3>
-            <ul>{#each snapshot.graph.edges.slice(0, textLimit) as edge}<li title={`${edge.source} — ${edge.target}（无向展示）`}>{nodeName(edge.source)} — {nodeName(edge.target)} · {graphEdgeLabel(edge.kind, edge.memberStatus)}</li>{/each}</ul>
+            <ul>{#each snapshot.graph.edges.slice(0, textLimit) as edge}<li title={`${edge.source} — ${edge.target}（无向展示）`}>{nodeName(edge.source)} — {nodeName(edge.target)} · {graphEdgeLabel(edge.kind, edge.memberStatus)}{edge.coCount ? `（同场 ${edge.coCount} 次）` : ""}</li>{/each}</ul>
             {#if snapshot.result.pathIds.length}<h3>{text("graphTextPath", "related 路径链")}</h3><ol>{#each snapshot.result.pathIds as id}<li title={id}>{nodeName(id)}</li>{/each}</ol>{/if}
             <p role="status">文本已列出 {Math.min(textLimit, snapshot.graph.nodes.length)} / {snapshot.graph.nodes.length} 节点，{Math.min(textLimit, snapshot.graph.edges.length)} / {snapshot.graph.edges.length} 边；导出包含完整展示快照。</p>
             {#if textLimit < Math.max(snapshot.graph.nodes.length, snapshot.graph.edges.length)}<button class="b3-button b3-button--outline" onclick={() => (textLimit += 100)}>{text("graphTextMore", "继续列出节点与边")}</button>{/if}
@@ -1506,7 +1508,7 @@
         <details class="lvct-graph-summary__details" open={snapshot.state === "unknown" || snapshot.state === "center_missing"}>
             <summary>{text("graphSummaryDetails", "来源与排除详情")}</summary>
             <p>登记 {snapshot.counts.registered ?? "未知"} · 来源节点 {snapshot.counts.sourceNodes ?? "未知"} / 边 {snapshot.counts.sourceEdges ?? "未知"} · 范围内 {snapshot.counts.rangeNodes} · 筛选后 {snapshot.counts.filteredNodes} · 范围排除 {snapshot.counts.rangeExcluded ?? "未知"} · 筛选排除 {snapshot.counts.filterExcluded}</p>
-            <p>{graphMode === "relations" ? `${graphEdgeLabel("related")}；${graphEdgeLabel("member", "active")}（虚线）、${graphEdgeLabel("member", "former")}（点线）、${graphEdgeLabel("member", "mixed")}（加粗虚线）。只有 related 参与关系查询。` : `${graphEdgeLabel("ref")}（含回链）；只读思源双链索引，只展示登记文档之间的引用，不是整库图，不修改思源图谱设置。`}</p>
+            <p>{graphMode === "relations" ? `${graphEdgeLabel("related")}；${graphEdgeLabel("co_occurrence")}（细虚线）；${graphEdgeLabel("member", "active")}（虚线）、${graphEdgeLabel("member", "former")}（点线）、${graphEdgeLabel("member", "mixed")}（加粗虚线）。只有 related 参与关系查询。` : `${graphEdgeLabel("ref")}（含回链）；只读思源双链索引，只展示登记文档之间的引用，不是整库图，不修改思源图谱设置。`}</p>
             {#if graphMode === "native"}<p>使用思源自己的图谱或反链：打开节点的来源文档，再从思源文档菜单进入关系图或反链。此处采用同一份双链索引独立绘制，不代替思源原生面板。</p>{/if}
             {#if graphMode === "native" && (groupFilter || isolatedOnly)}<p>已保留关系图分组/无关系筛选；这些条件不应用于文档引用图。</p>{/if}
             {#if snapshot.retainedByRange.length}<p>{text("graphRangeRetained", "范围外中心优先保留：{names}（不属于当前范围或组织成员集合，不新增关系事实）", { names: snapshot.retainedByRange.map(nodeName).join("、") })}</p>{/if}

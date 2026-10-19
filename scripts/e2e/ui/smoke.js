@@ -7458,13 +7458,13 @@ await test("E-28 跨人物跟进多视角分组：人物/组织/部门/来源四
         onOpenPerson: () => {},
     } });
 
-    await until(() => fixture.querySelector(".lvct-followup-group"), "分组总览未渲染");
+    await until(() => fixture.querySelector(".lvct-fu-group"), "分组总览未渲染");
 
     // 摘要展示
-    assert(fixture.textContent.includes("共 2 条待办 / 3 条"), "摘要计数错误");
+    assert(fixture.textContent.includes("2 条待办 / 3 条"), "摘要计数错误");
 
-    // 4 个分组：人物×3 + 组织×1 + 部门×1 + 来源×1
-    const groupNodes = [...fixture.querySelectorAll(".lvct-followup-group__item")];
+    // 4 类分组：人物×3 + 组织×1 + 部门×1 + 来源×1 = 6 个分组块
+    const groupNodes = [...fixture.querySelectorAll(".lvct-fu-group__group")];
     assert(groupNodes.length === 6, `应输出 6 个分组，实际 ${groupNodes.length}`);
 
     // 曙光科技组织下应包含 张三 与 李四
@@ -7479,8 +7479,8 @@ await test("E-28 跨人物跟进多视角分组：人物/组织/部门/来源四
 
     // 状态徽章展示：同一事项可在多分组中出现，徽章计数按出现次数统计
     // open=张三(人物/组织/来源+部门=4) + 李四(人物/组织=2) = 6；done=王五(人物/来源=2)
-    const openBadges = [...fixture.querySelectorAll(".lvct-followup-group__status--open")];
-    const doneBadges = [...fixture.querySelectorAll(".lvct-followup-group__status--done")];
+    const openBadges = [...fixture.querySelectorAll(".lvct-fu-group__status--open")];
+    const doneBadges = [...fixture.querySelectorAll(".lvct-fu-group__status--done")];
     assert(openBadges.length === 6, `open 徽章数量应为 6，实际 ${openBadges.length}`);
     assert(doneBadges.length === 2, `done 徽章数量应为 2，实际 ${doneBadges.length}`);
 });
