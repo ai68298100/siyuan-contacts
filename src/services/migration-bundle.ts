@@ -43,6 +43,10 @@ import { validateOrganizationProfile } from "../domain/organization-profile";
 import type { OrganizationProfileDraft } from "../domain/organization-profile";
 import { capturePeopleProfileLifetime, verifyRelationshipLabelReferences } from "./people-profiles";
 import { loadTopicsStoreStrict, mergeTopicsStore, TOPICS_STORAGE_KEY } from "../data/topics";
+import { loadGiftIdeaStoreStrict, mergeGiftIdeasStore, GIFT_IDEAS_STORAGE_KEY } from "../data/gift-ideas";
+import { normalizeGiftIdeaStoreForWrite, type GiftIdeaStore } from "../domain/gift-ideas";
+import { loadOccasionStoreStrict, mergeOccasionsStore, OCCASIONS_STORAGE_KEY } from "../data/occasions";
+import { normalizeOccasionStoreForWrite, type OccasionStore } from "../domain/occasion-cluster";
 import { TRASH_STORAGE_KEY } from "../data/trash";
 import { parseTopicStore } from "../domain/topics";
 import type { PersonTopicStore } from "../domain/topics";
@@ -51,7 +55,7 @@ const BUNDLE_SCHEMA_VERSION = 1;
 export const MIGRATION_BUNDLE_STORAGE_KEY = "lvct-migration-bundle";
 
 export interface MigrationModulePreview {
-    key: "interactions" | "followUps" | "cadences" | "reminderDismissals" | "registry" | "templates" | "exchanges" | "aliases" | "selfIdentity" | "orgMemberships" | "organizationProfiles" | "relationshipLabels" | "topics";
+    key: "interactions" | "followUps" | "cadences" | "reminderDismissals" | "registry" | "templates" | "exchanges" | "aliases" | "selfIdentity" | "orgMemberships" | "organizationProfiles" | "relationshipLabels" | "topics" | "giftIdeas" | "occasions";
     label: string;
     count: number;
     tombstones?: number;
@@ -71,6 +75,8 @@ export const MIGRATION_COVERAGE = [
     { key: ORGANIZATION_PROFILES_STORAGE_KEY, status: "included", module: "organizationProfiles" },
     { key: RELATIONSHIP_LABEL_STORAGE_KEY, status: "included", module: "relationshipLabels" },
     { key: TOPICS_STORAGE_KEY, status: "included", module: "topics" },
+    { key: GIFT_IDEAS_STORAGE_KEY, status: "included", module: "giftIdeas" },
+    { key: OCCASIONS_STORAGE_KEY, status: "included", module: "occasions" },
     { key: "org-projection-checkpoints.json", status: "excluded", reason: "本工作区未完成文档投影请求，不跨库重放" },
     { key: "organization-operations.json", status: "excluded", reason: "本工作区组织创建/改名操作断点，不跨库重放" },
     { key: "bridge-requests.json", status: "excluded", reason: "本工作区外部桥请求断点，不跨库重放" },
@@ -93,6 +99,8 @@ interface BundleModules {
     organizationProfiles?: { schemaVersion: 1; profiles: Record<string, OrganizationProfileDraft> };
     relationshipLabels?: PersonRelationshipLabelStore;
     topics?: PersonTopicStore;
+    giftIdeas?: GiftIdeaStore;
+    occasions?: OccasionStore;
 }
 
 interface MigrationBundle {
@@ -103,7 +111,7 @@ interface MigrationBundle {
 }
 
 const MIGRATION_MODULE_KEYS = new Set<MigrationModulePreview["key"]>([
-    "interactions", "followUps", "cadences", "reminderDismissals", "registry", "templates", "exchanges", "aliases", "selfIdentity", "orgMemberships", "organizationProfiles", "relationshipLabels", "topics",
+    "interactions", "followUps", "cadences", "reminderDismissals", "registry", "templates", "exchanges", "aliases", "selfIdentity", "orgMemberships", "organizationProfiles", "relationshipLabels", "topics", "giftIdeas", "occasions",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -170,6 +178,8 @@ function validateBundleModules(value: unknown): asserts value is BundleModules {
     }
     if (value.relationshipLabels !== undefined) parsePersonRelationshipLabelStore(requireModuleEnvelope(value.relationshipLabels, "与我的关系"));
     if (value.topics !== undefined) parseTopicStore(requireModuleEnvelope(value.topics, "谈资备忘"));
+    if (value.giftIdeas !== undefined) normalizeGiftIdeaStoreForWrite(requireModuleEnvelope(value.giftIdeas, "礼物点子与偏好"));
+    if (value.occasions !== undefined) normalizeOccasionStoreForWrite(requireModuleEnvelope(value.occasions, "群体活动与场合"));
     if (value.selfIdentity !== undefined) {
         const module = requireModuleEnvelope(value.selfIdentity, "本人身份");
         if (!("identity" in module)) throw new Error("本人身份模块缺少 identity，拒绝导入");
@@ -197,7 +207,7 @@ function parseBundle(text: string): MigrationBundle {
 }
 
 export async function exportMigrationBundle(plugin: Plugin): Promise<string> {
-    const [interactions, followUps, cadences, reminderDismissals, registry, templatesStore, exchanges, aliases, identity, orgMemberships, organizationProfiles, relationshipLabels, topics] = await Promise.all([
+    const [interactions, followUps, cadences, reminderDismissals, registry, templatesStore, exchanges, aliases, identity, orgMemberships, organizationProfiles, relationshipLabels, topics, giftIdeas, occasions] = await Promise.all([
         JSON.parse(await exportInteractionJson(plugin)) as BundleModules["interactions"],
         JSON.parse(await exportFollowUpsJson(plugin)) as BundleModules["followUps"],
         loadCadenceMapStrict(plugin),
@@ -211,6 +221,8 @@ export async function exportMigrationBundle(plugin: Plugin): Promise<string> {
         withStoreLock(ORGANIZATION_PROFILES_STORAGE_KEY, () => loadOrganizationProfiles(plugin)),
         withStoreLock(RELATIONSHIP_LABEL_STORAGE_KEY, () => loadRelationshipLabelStore(plugin)),
         withStoreLock(TOPICS_STORAGE_KEY, () => loadTopicsStoreStrict(plugin)),
+        withStoreLock(GIFT_IDEAS_STORAGE_KEY, () => loadGiftIdeaStoreStrict(plugin)),
+        withStoreLock(OCCASIONS_STORAGE_KEY, () => loadOccasionStoreStrict(plugin)),
     ]);
     return JSON.stringify({
         schemaVersion: BUNDLE_SCHEMA_VERSION,
@@ -231,6 +243,8 @@ export async function exportMigrationBundle(plugin: Plugin): Promise<string> {
             organizationProfiles: { schemaVersion: 1, profiles: organizationProfiles },
             relationshipLabels,
             topics,
+            giftIdeas,
+            occasions,
         },
     }, null, 2);
 }
@@ -273,6 +287,14 @@ export function previewMigrationImport(text: string): MigrationModulePreview[] {
     if (modules.topics) {
         const totalCount = Object.values(modules.topics.topics ?? {}).reduce((acc, list) => acc + (Array.isArray(list) ? list.length : 0), 0);
         push("topics", "谈资备忘", totalCount);
+    }
+    if (modules.giftIdeas) {
+        const totalCount = Object.values(modules.giftIdeas.ideas ?? {}).reduce((acc, list) => acc + (Array.isArray(list) ? list.length : 0), 0);
+        push("giftIdeas", "礼物点子与偏好", totalCount);
+    }
+    if (modules.occasions) {
+        const totalCount = Array.isArray(modules.occasions.occasions) ? modules.occasions.occasions.length : 0;
+        push("occasions", "群体活动与场合", totalCount);
     }
     return previews;
 }
@@ -502,6 +524,20 @@ export async function importMigrationBundle(plugin: Plugin, text: string): Promi
             const incoming = parseTopicStore(modules.topics);
             const summary = await mergeTopicsStore(plugin, incoming);
             result.modules.push({ key: "topics", label: "谈资备忘", merged: summary.merged, skipped: summary.skipped });
+        });
+    }
+    if (modules.giftIdeas) {
+        await runModule("giftIdeas", "礼物点子与偏好", async () => {
+            const incoming = normalizeGiftIdeaStoreForWrite(modules.giftIdeas);
+            const summary = await mergeGiftIdeasStore(plugin, incoming);
+            result.modules.push({ key: "giftIdeas", label: "礼物点子与偏好", merged: summary.merged, skipped: summary.skipped });
+        });
+    }
+    if (modules.occasions) {
+        await runModule("occasions", "群体活动与场合", async () => {
+            const incoming = normalizeOccasionStoreForWrite(modules.occasions);
+            const summary = await mergeOccasionsStore(plugin, incoming);
+            result.modules.push({ key: "occasions", label: "群体活动与场合", merged: summary.merged, skipped: summary.skipped });
         });
     }
     const pending = new Set([...result.failed.map((module) => module.key), ...result.issues.map((entry) => entry.key)]);

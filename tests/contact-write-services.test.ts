@@ -37,6 +37,8 @@ const { exportMigrationBundle, importMigrationBundle, previewMigrationImport, MI
 const { TEMPLATES_STORAGE_KEY } = await import("../src/data/templates.ts");
 const { TOPICS_STORAGE_KEY, loadTopicsStoreStrict } = await import("../src/data/topics.ts");
 const { TRASH_STORAGE_KEY } = await import("../src/data/trash.ts");
+const { GIFT_IDEAS_STORAGE_KEY } = await import("../src/data/gift-ideas.ts");
+const { OCCASIONS_STORAGE_KEY } = await import("../src/data/occasions.ts");
 const { previewInteractionImportDiff } = await import("../src/services/interaction-import.ts");
 const { loadReminderDismissalsStrict } = await import("../src/data/reminder-dismissals.ts");
 const { invalidateRoster } = await import("../src/services/roster.ts");
@@ -846,12 +848,22 @@ test("有效称谓恢复逐项核实，明确空记录恢复且重复导入零�
     assert.ok(MIGRATION_COVERAGE.some((module) => module.key === "bridge-requests.json" && module.status === "excluded"));
 });
 
-test("迁移覆盖矩阵把回收站列为排除项，避免跨库误恢复已重建联系人", () => {
+test("迁移覆盖矩阵把回收站列为排除项，并包含礼物点子与群体活动场合", () => {
     const trashCoverage = MIGRATION_COVERAGE.find((m) => m.key === TRASH_STORAGE_KEY);
     assert.ok(trashCoverage, "MIGRATION_COVERAGE 必须记录回收站键");
     assert.equal(trashCoverage.status, "excluded");
     assert.ok(String((trashCoverage as { reason?: string }).reason).includes("软删除缓冲"));
     assert.equal(MIGRATION_COVERAGE.filter((m) => m.status === "excluded").length, 6, "排除项数量应随新增缓冲区同步");
+
+    const giftCoverage = MIGRATION_COVERAGE.find((m) => m.key === GIFT_IDEAS_STORAGE_KEY);
+    assert.ok(giftCoverage, "MIGRATION_COVERAGE 必须包含 GIFT_IDEAS_STORAGE_KEY");
+    assert.equal(giftCoverage.status, "included");
+    assert.equal(giftCoverage.module, "giftIdeas");
+
+    const occCoverage = MIGRATION_COVERAGE.find((m) => m.key === OCCASIONS_STORAGE_KEY);
+    assert.ok(occCoverage, "MIGRATION_COVERAGE 必须包含 OCCASIONS_STORAGE_KEY");
+    assert.equal(occCoverage.status, "included");
+    assert.equal(occCoverage.module, "occasions");
 });
 
 test("迁移包包含谈资备忘 topics 模块，支持覆盖检查、预览计数与现状优先合并", async () => {

@@ -7,6 +7,7 @@ import type { Plugin } from "siyuan";
 import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage.ts";
 import {
     addOccasionToStore,
+    mergeOccasionStore,
     normalizeOccasionStore,
     normalizeOccasionStoreForWrite,
     removeOccasionFromStore,
@@ -69,5 +70,20 @@ export async function removeOccasionEntity(
         const updated = removeOccasionFromStore(store, occasionId);
         await saveJsonVerified(plugin, OCCASIONS_STORAGE_KEY, updated);
         return updated.occasions;
+    });
+}
+
+/** 迁移合并群体活动与场合实体（现状优先） */
+export async function mergeOccasionsStore(
+    plugin: Plugin,
+    incoming: OccasionStore,
+): Promise<{ merged: number; skipped: number }> {
+    return withStoreLock(OCCASIONS_STORAGE_KEY, async () => {
+        const current = normalizeOccasionStoreForWrite(await loadJsonStrict(plugin, OCCASIONS_STORAGE_KEY));
+        const { store: updated, merged, skipped } = mergeOccasionStore(current, incoming);
+        if (merged > 0) {
+            await saveJsonVerified(plugin, OCCASIONS_STORAGE_KEY, updated);
+        }
+        return { merged, skipped };
     });
 }

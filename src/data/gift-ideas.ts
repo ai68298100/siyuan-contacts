@@ -7,6 +7,7 @@ import type { Plugin } from "siyuan";
 import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage.ts";
 import {
     addGiftIdeaToStore,
+    mergeGiftIdeaStore,
     normalizeGiftIdeaStore,
     normalizeGiftIdeaStoreForWrite,
     removeGiftIdeaFromStore,
@@ -71,5 +72,20 @@ export async function removePersonGiftIdea(
         const updated = removeGiftIdeaFromStore(store, personDocId, ideaId);
         await saveJsonVerified(plugin, GIFT_IDEAS_STORAGE_KEY, updated);
         return updated.ideas[personDocId] ? [...updated.ideas[personDocId]] : [];
+    });
+}
+
+/** 迁移合并礼物点子与偏好存储（现状优先） */
+export async function mergeGiftIdeasStore(
+    plugin: Plugin,
+    incoming: GiftIdeaStore,
+): Promise<{ merged: number; skipped: number }> {
+    return withStoreLock(GIFT_IDEAS_STORAGE_KEY, async () => {
+        const current = normalizeGiftIdeaStoreForWrite(await loadJsonStrict(plugin, GIFT_IDEAS_STORAGE_KEY));
+        const { store: updated, merged, skipped } = mergeGiftIdeaStore(current, incoming);
+        if (merged > 0) {
+            await saveJsonVerified(plugin, GIFT_IDEAS_STORAGE_KEY, updated);
+        }
+        return { merged, skipped };
     });
 }

@@ -158,6 +158,48 @@ export function removeGiftIdeaFromStore(store: GiftIdeaStore, personDocId: strin
     };
 }
 
+export interface GiftIdeaMergeResult {
+    store: GiftIdeaStore;
+    merged: number;
+    skipped: number;
+}
+
+/** 迁移合并礼物点子与偏好存储（现状优先、条目去重与单人上限保护） */
+export function mergeGiftIdeaStore(current: GiftIdeaStore, incoming: GiftIdeaStore): GiftIdeaMergeResult {
+    const updated: Record<string, GiftIdeaItem[]> = { ...current.ideas };
+    let merged = 0;
+    let skipped = 0;
+
+    for (const [docId, incomingList] of Object.entries(incoming.ideas)) {
+        const currentList = updated[docId] ? [...updated[docId]] : [];
+        const existingIds = new Set(currentList.map((item) => item.id));
+
+        for (const item of incomingList) {
+            if (existingIds.has(item.id)) {
+                skipped += 1;
+                continue;
+            }
+            if (currentList.length < MAX_GIFT_IDEAS_PER_PERSON) {
+                currentList.push(item);
+                existingIds.add(item.id);
+                merged += 1;
+            } else {
+                skipped += 1;
+            }
+        }
+
+        if (currentList.length > 0) {
+            updated[docId] = currentList;
+        }
+    }
+
+    return {
+        store: { schemaVersion: GIFT_IDEA_STORE_VERSION, ideas: updated },
+        merged,
+        skipped,
+    };
+}
+
 /**
  * 将已送出的礼物点子转为正式往来账本记录（ExchangeRecord）：
  * kind = "item", direction = "payable"（我方赠出），金额取预估值。

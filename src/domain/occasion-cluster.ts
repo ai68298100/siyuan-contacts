@@ -238,6 +238,40 @@ export function removeOccasionFromStore(store: OccasionStore, occasionId: string
     };
 }
 
+export interface OccasionMergeResult {
+    store: OccasionStore;
+    merged: number;
+    skipped: number;
+}
+
+/** 迁移合并群体活动与场合实体（现状优先、条目去重与全库上限保护） */
+export function mergeOccasionStore(current: OccasionStore, incoming: OccasionStore): OccasionMergeResult {
+    const existingIds = new Set(current.occasions.map((item) => item.id));
+    const mergedList = [...current.occasions];
+    let merged = 0;
+    let skipped = 0;
+
+    for (const item of incoming.occasions) {
+        if (existingIds.has(item.id)) {
+            skipped += 1;
+            continue;
+        }
+        if (mergedList.length < MAX_OCCASIONS) {
+            mergedList.push(item);
+            existingIds.add(item.id);
+            merged += 1;
+        } else {
+            skipped += 1;
+        }
+    }
+
+    return {
+        store: { schemaVersion: OCCASION_STORE_VERSION, occasions: mergedList },
+        merged,
+        skipped,
+    };
+}
+
 export function normalizeOccasionStore(raw: unknown): OccasionStore {
     if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return emptyOccasionStore();
     const record = raw as Record<string, unknown>;
