@@ -2,6 +2,7 @@ node_modules/
 dev/
 dist/
 package.zip
+/package.zip.sha256
 *.tsbuildinfo
 .mimosa/
 scripts/e2e/shots/

@@ -106,15 +106,17 @@ export function nextBirthday(birthday: string, isLunar: boolean, now: Date = new
     const todayLunar = solarToLunar(today);
     if (!todayLunar) return undefined;
 
-    let target = lunarOccurrenceIn(todayLunar.year, birthLunar.month, birthLunar.day);
+    let targetYear = todayLunar.year;
+    let target = lunarOccurrenceIn(targetYear, birthLunar.month, birthLunar.day);
     if (!target || daysBetween(today, target) < 0) {
-        target = lunarOccurrenceIn(todayLunar.year + 1, birthLunar.month, birthLunar.day);
+        targetYear += 1;
+        target = lunarOccurrenceIn(targetYear, birthLunar.month, birthLunar.day);
     }
     if (!target) return undefined;
     return {
         date: target,
         daysUntil: daysBetween(today, target),
-        age: todayLunar.year - parsed.getFullYear() + 1, // 农历虚岁口径按周岁近似：年份差
+        age: targetYear - birthLunar.year,
         label: formatLunar(birthLunar),
     };
 }

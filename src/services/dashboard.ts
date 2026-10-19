@@ -172,7 +172,7 @@ export async function loadDashboard(
         ...buckets.upcoming,
     ].filter((item) => !ordinaryScopeUnknown && item.personDocId !== identity?.selfDocId).map(withBucket);
 
-    // 行动清单（F07）：生日 + 节奏 + 跟进三源按人聚合
+    // 行动清单（F07 / G-10）：生日 + 节奏 + 跟进三源预建 Map 索引，将 O(N²) 降为 O(N) 一次性联结
     const followUpsByDoc = new Map<string, { id: string; title: string; dueDate: string }[]>();
     for (const card of followUps) {
         if (!card.reachable) continue;
@@ -180,10 +180,13 @@ export async function loadDashboard(
         list.push({ id: card.item.id, title: card.item.title, dueDate: card.item.dueDate });
         followUpsByDoc.set(card.item.personDocId, list);
     }
+    const birthdaysByDocId = new Map(birthdays.map((item) => [item.person.docId, item]));
+    const staleByDocId = new Map(staleRemindable.map((info) => [info.person.docId, info]));
+
     const inputs: ActionPersonInput[] = people.map((person) => {
-        const birthday = birthdays.find((item) => item.person.docId === person.docId);
+        const birthday = birthdaysByDocId.get(person.docId);
         /* 被提醒暂缓的人不产生久未联系行动卡（呈现屏蔽）；统计保持真实 */
-        const staleInfo = staleRemindable.find((info) => info.person.docId === person.docId);
+        const staleInfo = staleByDocId.get(person.docId);
         return {
             person,
             ...(birthday ? { birthdayDaysUntil: birthday.projection.daysUntil, birthdayDate: toLocalDateKey(birthday.projection.date) } : {}),

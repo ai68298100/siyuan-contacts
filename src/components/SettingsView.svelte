@@ -62,6 +62,28 @@ import type { ViewPreferences } from "../domain/preferences";
     ]);
 
     let activeSection: SectionId = $state("general");
+
+    function switchSection(next: SectionId): void {
+        if (activeSection === next) return;
+        if (auditBusy || orgProjectionBusy) return;
+        activeSection = next;
+    }
+
+    function handleNavKeydown(event: KeyboardEvent) {
+        if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") return;
+        if (auditBusy || orgProjectionBusy) return;
+        event.preventDefault();
+        const index = sections.findIndex((s) => s.id === activeSection);
+        if (index === -1) return;
+        const next = event.key === "Home" ? 0
+            : event.key === "End" ? sections.length - 1
+            : event.key === "ArrowDown" || event.key === "ArrowRight"
+                ? (index + 1) % sections.length
+                : (index - 1 + sections.length) % sections.length;
+        activeSection = sections[next].id;
+        const nav = event.currentTarget as HTMLElement;
+        nav.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus();
+    }
     let health: SettingsHealth | null = $state(null);
 
     /* B11.3/B11.5：本人档案状态与显式改绑入口（通用分区） */
@@ -754,11 +776,12 @@ import type { ViewPreferences } from "../domain/preferences";
             const issuesNote = result.issues.length > 0
                 ? `；待处理：${result.issues.map((entry) => `${entry.label} ${entry.id}（人物 ${entry.personDocId}${entry.orgDocId ? `，组织 ${entry.orgDocId}` : ""}${entry.selfDocId ? `，本人 ${entry.selfDocId}` : ""}；${entry.message}）`).join("、")}`
                 : "";
-            const skipped = result.skipped.interactions + result.skipped.followUps
-                + result.modules.reduce((total, module) => total + (module.skipped ?? 0), 0);
+            const skipped = result.modules.reduce((total, module) => total + (module.skipped
+                ?? (module.key === "interactions" ? result.skipped.interactions : module.key === "followUps" ? result.skipped.followUps : 0)), 0);
             const removed = result.modules.reduce((total, module) => total + (module.removed ?? 0), 0);
+            const tombstonesAdded = result.modules.reduce((total, module) => total + (module.tombstonesAdded ?? 0), 0);
             const prefix = result.failed.length > 0 || result.issues.length > 0 ? "迁移恢复待核实" : "迁移恢复完成";
-            bundleMessage = `${prefix}：${summary}${skipped > 0 ? `（跳过 ${skipped} 条）` : ""}${removed > 0 ? `；删除标记移除 ${removed} 条` : ""}${failedNote}${issuesNote}`;
+            bundleMessage = `${prefix}：${summary}${skipped > 0 ? `（跳过 ${skipped} 条）` : ""}${removed > 0 ? `；删除标记移除 ${removed} 条` : ""}${tombstonesAdded > 0 ? `；新增删除标记 ${tombstonesAdded} 条` : ""}${failedNote}${issuesNote}`;
             bundlePreviewText = result.retryBundle ?? "";
             const next = result.retryBundle ? await facade.previewMigrationImport(result.retryBundle) : null;
             if (!selfAlive || request !== bundleRequest) return;
@@ -961,16 +984,21 @@ import type { ViewPreferences } from "../domain/preferences";
     </div>
 
     <div class="lvct-settings__layout">
-        <nav class="lvct-settings__nav" aria-label="设置分区">
+        <div class="lvct-settings__nav" role="tablist" tabindex="-1" aria-label="设置分区" onkeydown={handleNavKeydown}>
             {#each sections as section (section.id)}
                 <button
+                    id={`lvct-settings-tab-${section.id}`}
+                    type="button"
+                    role="tab"
                     class="lvct-settings__nav-item"
                     class:lvct-settings__nav-item--active={activeSection === section.id}
-                    aria-current={activeSection === section.id ? "page" : undefined}
+                    aria-selected={activeSection === section.id}
+                    aria-controls={`lvct-settings-panel-${section.id}`}
+                    tabindex={activeSection === section.id ? 0 : -1}
                     aria-describedby={auditBusy || orgProjectionBusy ? "lvct-settings-nav-status" : undefined}
                     title={auditBusy ? "资料体检进行中，完成后可切换设置分区" : orgProjectionBusy ? "组织双链核对进行中，完成后可切换设置分区" : undefined}
                     disabled={auditBusy || orgProjectionBusy}
-                    onclick={() => { if (!auditBusy && !orgProjectionBusy) activeSection = section.id; }}
+                    onclick={() => switchSection(section.id)}
                 >
                     <span aria-hidden="true">
                         {#if section.id === "general"}<SlidersHorizontal size={16}/>
@@ -993,14 +1021,15 @@ import type { ViewPreferences } from "../domain/preferences";
                     {/if}
                 </p>
             {/if}
-        </nav>
+        </div>
 
         <div class="lvct-settings__body">
             <StatusNotice message={errorText ? `操作失败：${errorText}` : ""} error />
 
             {#if activeSection === "general"}
-                <section class="lvct-settings__panel">
-                    <h2>{text("settingsGeneral", "通用")}</h2>
+                <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
+                <section id="lvct-settings-panel-general" class="lvct-settings__panel" role="tabpanel" aria-labelledby="lvct-settings-tab-general" tabindex="0">
+                    <h2 tabindex="-1">{text("settingsGeneral", "通用")}</h2>
                     <p class="lvct-settings__desc">界面与默认行为偏好，仅存于插件本地 JSON，不影响数据库内容。</p>
                     {#if preferencesDirty}
                         <p class="lvct-settings__draft-status" role="status">有未保存修改；切换设置分区会保留草稿，返回工作台时会提示你。</p>
@@ -1186,8 +1215,9 @@ import type { ViewPreferences } from "../domain/preferences";
                     </div>
                 </section>
             {:else if activeSection === "data"}
-                <section class="lvct-settings__panel">
-                    <h2>{text("settingsData", "数据与字段")}</h2>
+                <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
+                <section id="lvct-settings-panel-data" class="lvct-settings__panel" role="tabpanel" aria-labelledby="lvct-settings-tab-data" tabindex="0">
+                    <h2 tabindex="-1">{text("settingsData", "数据与字段")}</h2>
                     <p class="lvct-settings__desc">字段 ID 固化在设置中，列名可在思源里自由修改；若列被删除可在此恢复或补建。</p>
 
                     <div class="lvct-settings__row">
@@ -1355,7 +1385,7 @@ import type { ViewPreferences } from "../domain/preferences";
                         {#if bundleResult}
                             <ul aria-label="已核实模块">
                                 {#each bundleResult.modules as module (module.key)}
-                                    <li>{module.label}：已核实新增 {module.merged} 条，跳过 {module.skipped ?? 0} 条，删除 {module.removed ?? 0} 条。</li>
+                                    <li>{module.label}：已核实新增 {module.merged} 条，跳过 {module.skipped ?? (module.key === "interactions" ? bundleResult.skipped.interactions : module.key === "followUps" ? bundleResult.skipped.followUps : 0)} 条，删除 {module.removed ?? 0} 条{module.tombstonesAdded !== undefined ? `，新增删除标记 ${module.tombstonesAdded} 条` : ""}。</li>
                                 {/each}
                             </ul>
                             {#if bundleResult.failed.length > 0}<ul aria-label="未完成模块">
@@ -1381,6 +1411,9 @@ import type { ViewPreferences } from "../domain/preferences";
                                 <li>{module.label}：{module.count} 条{module.tombstones ? `，删除标记 ${module.tombstones} 条` : ""}</li>
                             {/each}
                         </ul>
+                        {#if bundlePreview.some((module) => module.key === "interactions" && (module.tombstones ?? 0) > 0)}
+                            <p class="lvct-settings__inline-hint" role="note">互动删除标记会移除当前库中同 ID 的互动，并阻止旧包复活记录。以上为包内数量，实际移除数在恢复后显示。</p>
+                        {/if}
                         <div class="lvct-settings__actions">
                             <button class="b3-button b3-button--outline" onclick={runImportBundle} disabled={importingBundle}>
                                 {importingBundle ? "恢复中…" : bundleMessage ? "核实并重试未完成模块" : "确认恢复（现状优先合并）"}
@@ -1390,7 +1423,7 @@ import type { ViewPreferences } from "../domain/preferences";
                         <p class="lvct-settings__inline-hint" role="status">迁移包为空或没有可恢复的模块。</p>
                     {/if}
                     {#if bundlePreview && bundlePreview.length > 0}
-                        <p class="ft__smaller ft__on-surface">先恢复人物与组织原文并重绑数据库；按双方文档 ID 核对，不按姓名自动关联。别名与成员删除标记优先，旧包不会复活已删除记录。只恢复成员事实，关联段落需另行预览重建；未核实项会保留供手动重试。</p>
+                        <p class="ft__smaller ft__on-surface">先恢复人物与组织原文并重绑数据库；按双方文档 ID 核对，不按姓名自动关联。互动、别名与成员删除标记优先，旧包不会复活已删除记录。只恢复成员事实，关联段落需另行预览重建；未核实项会保留供手动重试。</p>
                     {/if}
 
                     <div class="lvct-settings__row">
@@ -1548,8 +1581,9 @@ import type { ViewPreferences } from "../domain/preferences";
                     {/if}
                 </section>
             {:else if activeSection === "reminder"}
-                <section class="lvct-settings__panel">
-                    <h2>{text("settingsReminder", "提醒")}</h2>
+                <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
+                <section id="lvct-settings-panel-reminder" class="lvct-settings__panel" role="tabpanel" aria-labelledby="lvct-settings-tab-reminder" tabindex="0">
+                    <h2 tabindex="-1">{text("settingsReminder", "提醒")}</h2>
                     <p class="lvct-settings__desc">首页展示近期公历和农历生日，根据互动事件计算联系间隔。</p>
 
                     <!-- B08：已暂缓的提醒（reminder-dismissals）一键恢复，避免"点过就找不回" -->
@@ -1619,8 +1653,9 @@ import type { ViewPreferences } from "../domain/preferences";
                     </div>
                 </section>
             {:else if activeSection === "ai"}
-                <section class="lvct-settings__panel">
-                    <h2>{text("settingsAiPrivacy", "AI 与隐私")}</h2>
+                <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
+                <section id="lvct-settings-panel-ai" class="lvct-settings__panel" role="tabpanel" aria-labelledby="lvct-settings-tab-ai" tabindex="0">
+                    <h2 tabindex="-1">{text("settingsAiPrivacy", "AI 与隐私")}</h2>
                     <p class="lvct-settings__desc">AI 一律显式触发，可全局关闭；插件不持有密钥、无后台扫描。</p>
 
                     <label class="lvct-settings__switch-row">
@@ -1641,8 +1676,9 @@ import type { ViewPreferences } from "../domain/preferences";
                     </div>
                 </section>
             {:else if activeSection === "bridge"}
-                <section class="lvct-settings__panel">
-                    <h2>{text("settingsBridge", "服务桥")}</h2>
+                <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
+                <section id="lvct-settings-panel-bridge" class="lvct-settings__panel" role="tabpanel" aria-labelledby="lvct-settings-tab-bridge" tabindex="0">
+                    <h2 tabindex="-1">{text("settingsBridge", "服务桥")}</h2>
                     <p class="lvct-settings__desc">供其他插件搜索、创建联系人和记录互动。</p>
 
                     <div class="lvct-settings__row">
@@ -1654,8 +1690,9 @@ import type { ViewPreferences } from "../domain/preferences";
                     </p>
                 </section>
             {:else if activeSection === "about"}
-                <section class="lvct-settings__panel">
-                    <h2>{text("settingsAbout", "关于")}</h2>
+                <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
+                <section id="lvct-settings-panel-about" class="lvct-settings__panel" role="tabpanel" aria-labelledby="lvct-settings-tab-about" tabindex="0">
+                    <h2 tabindex="-1">{text("settingsAbout", "关于")}</h2>
                     <p class="lvct-settings__desc">联系人文档和思源数据库是原生数据；插件互动事件、设置和视图偏好保存在插件数据目录，卸载并删除插件数据时可能丢失。请先导出互动备份。</p>
 
                     <div class="lvct-settings__row">

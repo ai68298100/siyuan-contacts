@@ -14,11 +14,11 @@ export interface OrgMembershipWriteReport {
     projections: OrgProjectionRepairResult[];
 }
 
-async function requireActiveTargets(settings: ContactsSettings, orgDocId: string, personDocId: string): Promise<void> {
+async function requireActiveTargets(settings: ContactsSettings, orgDocId: string, personDocId: string, preserveExistingActive = false): Promise<void> {
     invalidateRoster();
     const [organizations, people] = await Promise.all([scanOrganizations(), getRoster(settings)]);
     const organization = organizations.find((entry) => entry.docId === orgDocId);
-    if (!organization || organization.archived) throw new Error("目标组织不可达或已归档，未登记当前成员");
+    if (!organization || organization.removed || organization.archived && !preserveExistingActive) throw new Error("目标组织不可达或已归档，未登记当前成员");
     if (people.filter((person) => person.docId === personDocId).length !== 1 || organizations.some((entry) => entry.docId === personDocId)) {
         throw new Error("人物未唯一绑定当前名册，或目标是组织文档；未按名称猜测成员身份");
     }
@@ -70,7 +70,11 @@ export async function saveOrganizationMember(plugin: Plugin, settings: ContactsS
 
 export async function editOrganizationMember(plugin: Plugin, settings: ContactsSettings, id: string, patch: OrgMembershipPatch, expected?: OrgMembership): Promise<OrgMembershipWriteReport> {
     const current = await membershipById(plugin, id);
-    if ((patch.status ?? current.status) === "active") await requireActiveTargets(settings, current.orgDocId, current.personDocId);
+    // Archiving only changes organization visibility. Existing active facts may
+    // keep their status while being edited; adding/restoring active facts still
+    // requires an active organization. The full snapshot is checked under the
+    // membership lock below, including changes that arrive during this read.
+    if ((patch.status ?? current.status) === "active") await requireActiveTargets(settings, current.orgDocId, current.personDocId, current.status === "active");
     const membership = await updateOrgMembership(plugin, id, patch, expected ?? current);
     return projectVerifiedMembership(plugin, settings, membership);
 }

@@ -104,9 +104,9 @@ export interface ContactsPluginFacade {
     resumeReminder(personDocId: string, kind: "birthday" | "stale"): Promise<void>;
     /** 已暂缓提醒列表（设置页恢复入口用） */
     loadReminderDismissals(): Promise<import("./domain/reminder-dismissals").ReminderDismissal[]>;
-    /** 互动备注模板（F09）：空存储返回内置默认；全量保存（增改删统一入口） */
+    /** 互动备注模板（F09）：空存储返回内置默认；全量保存必须核对编辑基线。 */
     listTemplates(): Promise<NoteTemplate[]>;
-    saveTemplates(templates: readonly NoteTemplate[]): Promise<NoteTemplate[]>;
+    saveTemplates(templates: readonly NoteTemplate[], expected: readonly NoteTemplate[]): Promise<NoteTemplate[]>;
     /** 交往回顾报表（F12）：区间互动统计（只读投影，人物条数与同场活动分口径） */
     buildReviewReport(from: string, to: string): Promise<ReviewReport>;
     /** 导出中心摘要：名册人数与活跃互动条数（展示用，容错读取） */

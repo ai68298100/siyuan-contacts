@@ -7,9 +7,9 @@
  */
 import { formatBirthdayDisplay, nextBirthday } from "./occasions.ts";
 import type { ContactSummary } from "./person.ts";
-import { escapeMarkdown } from "./format.ts";
+import { escapeMarkdown, sanitizeFileName } from "./format.ts";
 import { profileText } from "./people-profiles.ts";
-export { escapeMarkdown } from "./format.ts";
+export { escapeMarkdown, sanitizeFileName } from "./format.ts";
 
 export interface BriefingTimelineEntry {
     localDate: string;
@@ -120,4 +120,13 @@ export function buildBriefingMarkdown(input: BriefingExportInput): string {
     lines.push("---");
     lines.push("来源：小驴人脉插件导出 · 仅含本地记录的事实，交往次数不代表关系亲疏。");
     return lines.join("\n");
+}
+
+/**
+ * 会面简报下载文件名生成（K-11 / CODE-02.14）：对人物姓名做跨平台安全清洗与防截断保护。
+ */
+export function buildBriefingFilename(personName: string, stamp: string): string {
+    const safeName = sanitizeFileName(personName, "联系人", 50);
+    const safeStamp = sanitizeFileName(stamp, new Date().toISOString().slice(0, 10), 20);
+    return `小驴人脉_简报_${safeName}_${safeStamp}.md`;
 }

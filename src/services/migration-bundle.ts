@@ -6,12 +6,13 @@ import { loadReminderDismissalsStrict, mergeReminderDismissals } from "../data/r
 import { loadRegistryStrict, mergeRegistryEntries } from "../data/registry";
 import { loadTemplatesStoreStrict, mergeTemplatesStore, TEMPLATES_STORAGE_KEY } from "../data/templates";
 import { normalizeTemplatesForWrite } from "../domain/interaction-templates";
-import { importInteractionJson } from "./interaction-import";
+import { INTERACTION_STORAGE_KEY } from "../data/interactions";
+import { mergeInteractionBackup, parseInteractionBackup } from "../domain/interaction-backup";
 import { mergeFollowUpStore } from "../data/followups";
 import { syncFollowUpTasksToDoc } from "./followup-sync";
 import { EXCHANGE_STORAGE_KEY, loadExchangeStore, mergeExchangeStore } from "../data/exchanges";
 import { PERSON_ALIAS_STORAGE_KEY, loadPersonAliasStore, mergePersonAliasStore } from "../data/person-aliases";
-import { loadJsonStrict, withStoreLock } from "../data/storage";
+import { loadJsonStrict, saveJsonVerified, withStoreLock } from "../data/storage";
 import { parseExchangeStore } from "../domain/exchanges";
 import type { ExchangeStore } from "../domain/exchanges";
 import { parsePersonAliasStore } from "../domain/person-aliases";
@@ -118,10 +119,7 @@ function validateBundleModules(value: unknown): asserts value is BundleModules {
     }
     if (value.interactions !== undefined) {
         const module = requireModuleEnvelope(value.interactions, "互动");
-        if (!Array.isArray(module.events) || !Array.isArray(module.tombstones)) {
-            throw new Error("互动模块字段损坏，拒绝导入");
-        }
-        normalizeInteractionStoreForWrite({ schemaVersion: 1, events: module.events, tombstones: module.tombstones });
+        parseInteractionBackup(JSON.stringify(module));
     }
     if (value.followUps !== undefined) {
         const module = requireModuleEnvelope(value.followUps, "跟进");
@@ -235,7 +233,12 @@ export function previewMigrationImport(text: string): MigrationModulePreview[] {
     const push = (key: MigrationModulePreview["key"], label: string, count: number): void => {
         if (count > 0) previews.push({ key, label, count });
     };
-    push("interactions", "互动事件", Array.isArray(modules.interactions?.events) ? modules.interactions!.events!.length : 0);
+    if (modules.interactions) {
+        const store = parseInteractionBackup(JSON.stringify(modules.interactions));
+        if (store.events.length > 0 || store.tombstones.length > 0) {
+            previews.push({ key: "interactions", label: "互动事件", count: store.events.length, tombstones: store.tombstones.length });
+        }
+    }
     push("followUps", "跟进事项", Array.isArray(modules.followUps?.items) ? modules.followUps!.items!.length : 0);
     push("cadences", "联系节奏", Object.keys(modules.cadences?.cadences ?? {}).length);
     push("reminderDismissals", "提醒暂缓", Array.isArray(modules.reminderDismissals?.dismissals) ? modules.reminderDismissals!.dismissals!.length : 0);
@@ -268,7 +271,7 @@ export interface MigrationModuleFailure {
 }
 
 export interface MigrationImportResult {
-    modules: { key: MigrationModulePreview["key"]; label: string; merged: number; skipped?: number; removed?: number }[];
+    modules: { key: MigrationModulePreview["key"]; label: string; merged: number; skipped?: number; removed?: number; tombstonesAdded?: number }[];
     /** FUNC-01.6-b：合并失败模块（含原因）；失败不阻断其他模块，也不得报整包成功 */
     failed: MigrationModuleFailure[];
     /** 跟进合并/互动合并各自的跳过数（现状优先未计入 merged） */
@@ -290,14 +293,21 @@ export async function importMigrationBundle(plugin: Plugin, text: string): Promi
         }
     };
 
-    if (Array.isArray(modules.interactions?.events)) {
+    if (modules.interactions) {
         await runModule("interactions", "互动事件", async () => {
-            const summary = await importInteractionJson(plugin, JSON.stringify({
-                schemaVersion: 1,
-                events: modules.interactions!.events,
-                tombstones: Array.isArray(modules.interactions!.tombstones) ? modules.interactions!.tombstones : [],
-            }));
-            result.modules.push({ key: "interactions", label: "互动事件", merged: summary.added });
+            const incoming = parseInteractionBackup(JSON.stringify(modules.interactions));
+            const summary = await withStoreLock(INTERACTION_STORAGE_KEY, async () => {
+                const current = normalizeInteractionStoreForWrite(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY));
+                const merged = mergeInteractionBackup(current, incoming);
+                if (JSON.stringify(merged.store) !== JSON.stringify(current)) {
+                    try {
+                        await saveJsonVerified(plugin, INTERACTION_STORAGE_KEY, merged.store);
+                    } catch (cause) { throw new MigrationWriteUnknownError(cause); }
+                }
+                return merged.summary;
+            });
+            result.modules.push({ key: "interactions", label: "互动事件", merged: summary.added, skipped: summary.skipped,
+                removed: summary.removed, tombstonesAdded: summary.tombstonesAdded });
             result.skipped.interactions = summary.skipped;
         });
     }
@@ -308,7 +318,7 @@ export async function importMigrationBundle(plugin: Plugin, text: string): Promi
                 items: modules.followUps!.items,
             });
             const summary = await mergeFollowUpStore(plugin, incoming.items);
-            result.modules.push({ key: "followUps", label: "跟进事项", merged: summary.added });
+            result.modules.push({ key: "followUps", label: "跟进事项", merged: summary.added, skipped: summary.skipped });
             result.skipped.followUps = summary.skipped;
             /* FUNC-01.6-b：恢复后对新增人物触发安全任务同步（settings 未初始化/文档不可达在 sync 内降级） */
             for (const personDocId of summary.personDocIds) {

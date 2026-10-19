@@ -31,7 +31,10 @@ const DATE_MARK_RE = /(?:^|\s)📅(\d{4}-\d{2}-\d{2})\s*$/;
 /** 任务行序列化：取消的计划不产出任务行（由 plan 的 delete 表达） */
 export function buildTaskMarkdown(title: string, dueDate: string, done: boolean): string {
     if (!isValidDateKey(dueDate)) throw new Error("跟进日期必须是有效的 YYYY-MM-DD 日期");
-    const safeTitle = title.trim() || "保持联系";
+    const rawTitle = title.trim();
+    /* CODE-02.14：标题末尾若已带与到期日相同的受控日历标记，避免重复追加双重日期 */
+    const cleanTitle = rawTitle.replace(new RegExp(`(?:^|[ \\t])📅${dueDate}[ \\t]*$`), "").trim();
+    const safeTitle = cleanTitle || "保持联系";
     const titleText = safeTitle.split(/\r?\n/).join(" ");
     return `- [${done ? "X" : " "}] ${titleText} 📅${dueDate}`;
 }

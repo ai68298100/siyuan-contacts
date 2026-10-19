@@ -4,7 +4,7 @@
  * 只映射插件字段契约内的属性（docs/DATA-CONTRACT.md §7），其余属性忽略。
  * 映射语义决策见 docs/DECISIONS.md D-0013。
  */
-import { birthdayToMs } from "./person.ts";
+import { isValidDateKey } from "./date-key.ts";
 
 /** 源卡片中的联系方式候选；只供本次导入预览，不是持久条目身份。 */
 export interface VCardMethodPreview {
@@ -358,7 +358,7 @@ export function normalizeVcfDate(raw: string): string {
     if (!match) match = /^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/.exec(value);
     if (!match) return "";
     const ymd = `${match[1]}-${match[2]}-${match[3]}`;
-    return birthdayToMs(ymd) !== null ? ymd : "";
+    return isValidDateKey(ymd) ? ymd : "";
 }
 
 /** QP 解码：=XX 十六进制字节序列按字符集还原；残留软换行（=后接换行）剔除 */

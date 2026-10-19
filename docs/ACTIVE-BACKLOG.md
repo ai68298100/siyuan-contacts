@@ -1,5 +1,7 @@
 # 当前开发待办总索引
 
+> **2026-10-18 当前审计入口：** GitHub **v0.5.18 已发布**，本地/远程 main 一致；下方 10-17 的“本地未发布”、旧包 hash 和 v0.5.17 当前状态均为历史轮次。当前使用状态与 UI/原型对账见[综合审计](CURRENT-STATUS-AUDIT-2026-10-18.md)。本轮复现的三个 P1（归档成员状态、模板并发覆盖、互动墓碑预览）已在 `fix/audit-20261018` 本地修复，并通过单测与 UI 回归；修复尚未提交、推送或发布。后续转向 Host Queue、PR #33、集市客户端可见性和 #35 样本门槛。
+
 > **2026-10-17 QuickFill、组织模板与导入来源筛选收口（本地未发布）：** QuickFill 返回修改原文、重新识别、生日历法差异和成对写入已完成；导入来源筛选可保留稳定来源并在来源变化时要求明确重选；组织模板安全应用、部门影响确认和自定义字段草稿撤销已完成。当前最终 UI 回归记录为 **473/473**，`pnpm check` 0/0、`pnpm test` 728/728、`pnpm build`、`pnpm check:release` 和 `git diff --check` 通过；当前 `package.zip` 616,024 B，`package.zip.sha256` 记录 SHA256 `16f251674a9c9dfc6288820b20ec5694be8021449f918ff667870bb4f0764424`，未提交、推送或发布。
 
 > **2026-10-17 当前工作树收口校准（本地未发布）：** 组织统一多选/真实新建、同组织历史补录、同名组织稳定 ID 消歧、相关人空态可信点击、搜索与筛选范围保护、已有自定义分组候选、QuickFill 返回修改/生日历法差异、组织模板安全应用/删除撤销和导入来源筛选保留均已完成；后续只保留真实宿主/真机/多窗口验收。
@@ -82,7 +84,7 @@
 | A-04 | 多窗口/跨窗口 `onDataChanged`、缓存失效与草稿保护 | Host pending；两窗口外部写入后结果一致，不覆盖编辑草稿 |
 | A-05 | 思源任务管理器互读跟进块 | Host pending；勾选、改标题、改期、删除和不可达状态双向可解释 |
 | A-06 | 原生图面板打开通道、`siyuan://blocks` 是否在真实图中成边、关闭后返回工作台 | Host pending；核对 B14.2/B14.7/B14.10 |
-| A-07 | 集市 PR、发布资产、图标/预览图人工终审与安装说明校准 | PR #2289 已提交且 `ci-passed`；待维护者审阅/合并、Stage 收录核对及 README 安装说明校准 |
+| A-07 | 集市客户端可见性、发布资产与安装说明校准 | 10-18 已核实 PR #2289 于 09-30 合并，Stage 已同步 v0.5.18（616,803 B，SHA-256 `5b93d0de228fb1c41e0311249736130e8deccfe5335a40a7df640b74c1f83cfe`）。仍需核对真实客户端实际可见性，不重复提交收录 PR |
 
 ## B. 现有主线余项
 
@@ -308,8 +310,14 @@
 - E-26（依赖 E-04，参考 Dex）：礼物“点子/偏好”清单与已经发生的赠礼事实分开，支持来源笔记、想法、已采购/已送状态，用户确认后才转礼物事件；未送点子不计入人情统计或财务导出。
 - E-27（生态候选，关联 C-06/C-13/E-12）：小驴雷切可通过公开桥按姓名/组织检索并以稳定 `docId` 打开人物或组织；小驴打卡只读消费已确认的生日/提醒投影。先明确协议能力版本、隐私范围、缺失插件降级和跨窗口调用时效，不读其它插件私有存储，不把外部调用当已落地集成。
 - E-28（展示候选，参考 SiYuan Tasks）：跟进列表按人物、当前组织/部门或来源文档分组，并提供“今天/逾期/未来”视角与原生任务块跳转；组织历史可能导致一项多组时只计一次，优先级若要加入需独立事实字段，不从 emoji 或互动频率擅自推断。
+- E-29（先定契约，参考 Dex/Monica）：动态关系温度与联系紧迫度分级（Relationship Health Score & Interaction Heat）。基于用户在人物身上设定的期望联系节奏（如 14天/30天/90天/365天），动态计算当前联系健康度百分比与视觉热度标识（常温/温热/微凉/渐冻），支持在名册与首页直观排序筛选，不写入黑盒评分，完全基于客观时间推导。
+- E-30（先定实体模型，参考 Monica/Clay）：群体活动与独立场合实体（Occasion & Multi-attendee Clustering）。将包含多位联系人、共同地点、日期的群体活动（如项目会议、聚餐、婚礼）抽象为统一场合记录，一次性关联参与者名单、人情往来记录与笔记双链，避免每人分别维护孤立重复的互动事件。
+- E-31（高复杂度候选，参考 Google Contacts/Clay）：重复人物定点字段级安全合并向导（Deduplication & Deep Merge Wizard）。在当前只读疑似重复对的基础上，提供向导式并排比对界面，允许用户逐字段选择保留主值、合并多值或转移组织历史，生成带完整审计快照的可撤销合并方案，绝不静默删除原人物文档。
+- E-32（低成本高价值候选，参考 Monica/Dex）：会面谈资与待办提醒置顶备忘（Topics to Mention & Conversation Starters）。在人物详情中提供“下次见面聊什么/已承诺事项”轻量备忘卡，并在会前简报 Markdown 导出中置顶呈现，会面结束后可一键转为已发生互动备注。
+- E-33（安全机制候选，参考 Google Contacts）：联系人软删除回收站与误删时光机（Trash & Soft Delete Buffer）。从名册解绑或删除联系人时进入 30 天插件软回收站缓冲区，期间保留稳定 ID、组织经历和关系边，支持一键无损撤销与定点恢复，避免误解绑后繁琐的文档重新扫描。
+- E-34（思源生态原生特性，参考 Another Graph）：基于块引用的共同出现弱联系智能引荐（Inferred Co-occurrence Connections）。通过思源内核只读 SQL 分析经常在同一笔记或同一父级块下被共同引用的两个人，在关系图谱中以虚线“推断关联”呈现，允许用户在图谱中一键核实并转为正式的双向联系人关系。
 
-本轮外部参照仅用于提炼交互和数据需求，不复用其它插件代码，也不代表已有集成：[Monica 功能清单](https://github.com/monicahq/monica)、[Google Contacts 导出](https://support.google.com/contacts/answer/7199294?hl=en)、[Google Contacts 合并](https://support.google.com/contacts/answer/7078226?hl=en)、[Google Contacts 恢复](https://support.google.com/contacts/answer/7280886?hl=en)、[Dex 产品说明](https://www.getdex.com/product-overview)、[Obsidian Bases](https://help.obsidian.md/bases)、[思源 Database Properties Panel](https://github.com/Macavity/siyuan-database-properties-panel)、[Another Graph](https://github.com/CherryGS/sy-another-graph)、[Sidebar Hub](https://github.com/gowithmoon/siyuan-plugin-sidebar-hub)、[Table Master](https://github.com/famotime/siyuan-table-master)、[SiYuan Tasks](https://github.com/Macavity/siyuan-tasks)、[小驴雷切](https://github.com/ai68298100/siyuan-speed-switch)、[小驴打卡](https://github.com/ai68298100/siyuan-checkin)。
+本轮外部参照仅用于提炼交互和数据需求，不复用其它插件代码，也不代表已有集成：[Monica 功能清单](https://github.com/monicahq/monica)、[Google Contacts 导出](https://support.google.com/contacts/answer/7199294?hl=en)、[Google Contacts 合并](https://support.google.com/contacts/answer/7078226?hl=en)、[Google Contacts 恢复](https://support.google.com/contacts/answer/7280886?hl=en)、[Dex 产品说明](https://www.getdex.com/product-overview)、[Clay 产品说明](https://clay.earth)、[Obsidian Bases](https://help.obsidian.md/bases)、[思源 Database Properties Panel](https://github.com/Macavity/siyuan-database-properties-panel)、[Another Graph](https://github.com/CherryGS/sy-another-graph)、[Sidebar Hub](https://github.com/gowithmoon/siyuan-plugin-sidebar-hub)、[Table Master](https://github.com/famotime/siyuan-table-master)、[SiYuan Tasks](https://github.com/Macavity/siyuan-tasks)、[小驴雷切](https://github.com/ai68298100/siyuan-speed-switch)、[小驴打卡](https://github.com/ai68298100/siyuan-checkin)。
 
 ## G. 工程质量、性能与供应链
 
@@ -359,7 +367,7 @@
 - V-24（P1 可识别性缺陷，关联 D-06/D-25）：设置“已暂缓的提醒”只显示提醒类型与人物文档 ID 后六位，`SettingsView.svelte:1018-1029` 中多人的“恢复提醒”没有可辨姓名；回读人物名/状态并保留完整稳定 ID 作为诊断，缺失文档明确标出，不可按同名猜目标。验收十人以上搜索/筛选、同名、已删人物、恢复前后对象和次数一致。
 - V-25（P2 设置导航与动作命名，关联 D-25/V-12）：数据页有两颗同名“导出 JSON”与两个“再次导出”，读屏/语音难分互动和跟进；390px 设置导航占顶部两行，长数据页滚至备份/体检后切分区需长距离回顶。给同类动作包含数据类型的可见或辅助名称；提供长页可达的分区切换/返回方式和位置恢复，避免 sticky 导航遮住软键盘、底栏或错误焦点。
 - V-26（P1 截图可信度缺口，关联 V-16/D-13/G-02）：**第一批已完成（2026-10-01，PROGRESS 第 101 轮）**——`shot-workbench.html` initialView 映射补 settings 分支（曾落 people 兜底致 settings-* 与 people-* 字节相同）+ READY 补 `.lvct-settings` 选择器；`shot-wizard.html` 注入 iconLvContacts symbol（logo 曾渲染紫色空方块）；`breakpoint-sweep.mjs` 拍后按宽分组 SHA256 去重门禁（同宽跨页字节相同即失败，24 景全异）。Peek 共同背景 facade 已在前序轮补齐。**余项：700/768/900 中间宽档未纳入矩阵（V-05 已选四档，加档留评审）。** 原登记：断点脚本把 `settings` 当工作台初始视图传入，但映射回退为 `people`；向导夹具缺宿主图标注入；截图验收需断言页面标识、关键内容、预期/非预期错误与组件边界；保留 390/640/700/768/900/1280px 可追溯结果。
-- V-27（P1 减弱动画缺陷，关联 D-26）：原型要求系统开启 `prefers-reduced-motion` 时去掉位移动效；`index.scss:301-303` 仅把初始化进度条无限平移动画放慢到 2.4s，通用弹窗缩放、移动 sheet 上滑和 Peek 右滑仍在运行。用静态进度/文字状态代替无限位移，关闭弹层位移与弹性缓动，保留焦点反馈；覆盖系统减弱动画、明暗、390px 和桌面短高场景。
+- V-27（P1 减弱动画缺陷，关联 D-26）：✅ **公共控件层已完成（2026-10-18）**——`src/style/_controls.scss` 在插件控件根范围内统一关闭动画、过渡和滚动行为，加载旋转完全静态化，同时保留焦点/按下反馈；`pnpm check`、设计令牌审计、Chrome 桌面/390px/宿主样式回归均通过。真机系统级减弱动画和宿主原生动画仍归 D-26/U-24 验收。原登记：原型要求系统开启 `prefers-reduced-motion` 时去掉位移动效；`index.scss:301-303` 仅把初始化进度条无限平移动画放慢到 2.4s，通用弹窗缩放、移动 sheet 上滑和 Peek 右滑仍在运行。
 
 ## U. 本轮新增：UI 专项质感与视觉系统优化（2026-09-30）
 
@@ -380,9 +388,9 @@
 - U-13（P1，关联 UI-08/V-10/V-11/D-08）：提升关系图谱的画布质感与可读性。工具栏、范围/模式、图例、缩放、刷新和空态需要分层；节点选中、悬停、聚焦、路径高亮、组织/部门颜色和边类型要同时具备颜色之外的形状/线型/文字差异；空画布和节点很多时都要有明确的视觉焦点，不让虚线网格成为主要内容。
 - U-14（P1，关联 UI-04/D-27）：统一表单的标签、输入框、选择器、日期控件、帮助文字和错误提示布局。组织归属、人员编辑、批量加入、捕获、导入和设置不能各自采用不同的标签对齐、占位文字和错误位置；复核原生 date/select/checkbox/file chrome 与插件控件的高度、边框和图标，消除 `padding-top:22px` 一类补偿式对齐；为长标签、可选字段、只读值、异步校验和保存中状态定义同一视觉契约。
 - U-15（P1，关联 UI-02/D-18/D-19/V-13）：统一弹窗、底部 Sheet、下拉菜单、确认框和嵌套浮层的层级及视觉边界。每层要有标题、上下文、主次动作和关闭反馈；背景遮罩、边缘圆角、滚动条、菜单阴影、焦点返回和忙碌态不能随组件重复实现；当前 `.lvct-dialog-mask` 每层使用约 35% dim+blur，Peek→QuickFill 嵌套截图出现多次变暗，需明确只由最外层承担遮罩。原型有统一滚动条样式而源码未建立插件根滚动条契约，也需一并补齐，避免捕获/快速录入等多层界面出现“里面和外面都是主弹窗”的观感。
-- U-16（P1，关联 UI-11/K-03/K-05/V-17）：建立跨页面的 loading、empty、error、success、partial-success 和 stale 状态视觉语言。当前 `ViewState.svelte:23-39` 的 loading/empty/error 共用相近容器，主要只换字符和颜色；统一图标尺寸、说明长度、重试按钮位置、状态颜色、骨架屏形状和旧数据标识；首帧未知不能显示“0 条/暂无”，读取失败不能伪装为空，写入部分成功要能在视觉上区分已完成与待处理。
+- U-16（P1，关联 UI-11/K-03/K-05/V-17）：**公共状态层已完成（2026-10-18）**——`ViewState.svelte` 统一 Lucide 语义图标、loading 骨架层、`aria-busy` 与错误/普通状态 `aria-live`；跨业务部分成功、stale 和真实宿主播报仍随各业务入口继续验收。原登记：建立跨页面的 loading、empty、error、success、partial-success 和 stale 状态视觉语言。当前 `ViewState.svelte:23-39` 的 loading/empty/error 共用相近容器，主要只换字符和颜色；统一图标尺寸、说明长度、重试按钮位置、状态颜色、骨架屏形状和旧数据标识；首帧未知不能显示“0 条/暂无”，读取失败不能伪装为空，写入部分成功要能在视觉上区分已完成与待处理。
 - U-17（P1，关联 D-06/V-20/V-24）：统一长内容的截断、换行和展开规则。姓名、组织名、部门、职位、标签、导入候选和错误信息在卡片、表格、Peek、弹窗和移动端使用一致的最大行数与展开入口；省略号不能隐藏关键身份，悬停提示不能成为移动端唯一出口，长文本应可复制和回看完整值。
-- U-18（P2，关联 UI-01/D-08）：整理图标、头像、徽标和空态插画的视觉语言。令牌要求头像使用分组渐变，但 `index.scss:1467-1485,2431-2449` 目前仍是扁平纯色；统一 Lucide 图标的线宽、尺寸、基线和按钮内边距，替换 `♧/!/✅/🎂/⋯/↗/›` 等同一语义混用 Unicode、emoji、文字和不同风格图标的情况；组织、部门、职位、数据库、双链、失败和空态需要可复用的图标语义，图谱组织色补入令牌，不把紫色方块等夹具问题误判为产品品牌资产。
+- U-18（P2，关联 UI-01/D-08）：**状态空态图标已完成（2026-10-18）**——公共 `ViewState` 已将默认空态、错误、成功、导入和新增语义切换到 Lucide，并保留旧字符兼容映射；全插件其余图标/头像渐变、文档条快捷图标仍需后续统一。原登记：整理图标、头像、徽标和空态插画的视觉语言。令牌要求头像使用分组渐变，但 `index.scss:1467-1485,2431-2449` 目前仍是扁平纯色；统一 Lucide 图标的线宽、尺寸、基线和按钮内边距，替换 `♧/!/✅/🎂/⋯/↗/›` 等同一语义混用 Unicode、emoji、文字和不同风格图标的情况；组织、部门、职位、数据库、双链、失败和空态需要可复用的图标语义，图谱组织色补入令牌，不把紫色方块等夹具问题误判为产品品牌资产。
 - U-19（P1，关联 UI-10/A-03/V-03/V-13）：建立移动端的完整视觉规格。底部导航、安全区、全屏弹窗、Peek 抽屉、筛选 Sheet、键盘顶起、触控目标、横向滚动和页面底部留白需要统一；联系人卡片、图谱、组织成员表和设置长页分别验证 390×568、390×844、横屏窄宽和真实 WebView，不能只把桌面布局压缩到手机宽度。
 - U-20（P1，关联 A-02/V-15/D-26）：做思源明暗主题与第三方主题的视觉适配矩阵。验证 b3 变量缺失、字体/按钮被宿主重置、菜单背景继承、焦点环、滚动条、选中底色和错误卡片；每个主题都记录允许继承的宿主样式与插件必须隔离的样式，避免隔离浏览器通过而真实思源显得突兀。
 - U-21（P1，关联 D-26/V-27）：补齐 hover、focus-visible、pressed、selected、dragging、busy 和 disabled 的连续反馈。所有可操作元素至少有两种非颜色线索，状态切换不能突然改变布局或造成文字抖动；定义页面切换、Peek 打开、批量选择、保存成功和失败提示的过渡节奏，并与 `prefers-reduced-motion` 统一。

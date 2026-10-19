@@ -22,6 +22,7 @@
     import { useCloseGuard } from "../close-guard";
     import { onDestroy } from "svelte";
     import { requestErrorMessage } from "../../shared/error-presenter";
+    import { confirmDialog } from "../../libs/confirm-dialog";
 
     let {
         facade,
@@ -128,30 +129,17 @@
 
     // ---- B08 行内快捷处置（生日跳过本年 / 久未联系顺延与不再提醒 / 从未互动跳过今天） ----
     let rowMenuKey = $state("");
-    // C06：会话内撤销——只保留最近一次操作的反向闭包，跨刷新/重启不保留
-    let undoAction: { run: () => Promise<void> } | null = $state(null);
-    function setUndo(message: string, run: () => Promise<void>): void {
-        alMessage = message;
-        undoAction = { run };
-    }
-    async function runUndo(): Promise<void> {
-        const action = undoAction;
-        if (!action || alBusy) return;
-        alBusy = true;
-        alError = "";
-        try {
-            await action.run();
-            undoAction = null;
-            alMessage = "已撤销";
-            await refresh();
-        } catch (error) {
-            alError = requestErrorMessage(error);
-        } finally {
-            alBusy = false;
-        }
-    }
+
     function toggleRowMenu(key: string): void {
         rowMenuKey = rowMenuKey === key ? "" : key;
+    }
+
+    function handleGlobalKeydown(event: KeyboardEvent): void {
+        if (event.key === "Escape" && rowMenuKey) {
+            event.preventDefault();
+            event.stopPropagation();
+            rowMenuKey = "";
+        }
     }
     function isNeverCard(card: ActionCard): boolean {
         return card.reasons.some((reason) => reason.neverContacted);
@@ -421,6 +409,13 @@
         const timer = window.setInterval(() => { clockTick += 1; }, 30_000);
         return () => window.clearInterval(timer);
     });
+    let lastRefreshedDate = $state(toLocalToday());
+    $effect(() => {
+        if (localTodayKey !== lastRefreshedDate) {
+            lastRefreshedDate = localTodayKey;
+            void refresh();
+        }
+    });
     const greetingKey = $derived.by(() => {
         clockTick;
         const hour = new Date().getHours();
@@ -434,6 +429,29 @@
         return new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(new Date());
     });
     const todayBirthdays = $derived.by(() => data?.birthdays.filter((item) => item.bucket === "today") ?? []);
+
+    // C06：会话内撤销——只保留最近一次操作的反向闭包，跨刷新/重启不保留
+    let undoAction: { run: () => Promise<void> } | null = $state(null);
+    function setUndo(message: string, run: () => Promise<void>): void {
+        alMessage = message;
+        undoAction = { run };
+    }
+    async function runUndo(): Promise<void> {
+        const action = undoAction;
+        if (!action || alBusy) return;
+        alBusy = true;
+        alError = "";
+        try {
+            await action.run();
+            undoAction = null;
+            alMessage = "已撤销";
+            await refresh();
+        } catch (error) {
+            alError = requestErrorMessage(error);
+        } finally {
+            alBusy = false;
+        }
+    }
 
     async function refresh() {
         const version = ++refreshVersion;
@@ -534,6 +552,41 @@
             return;
         }
         onOpenPeople({ itemIds, label: "待办跟进", sort: "name" });
+    }
+
+    async function startQuickRecord(person: ContactSummary): Promise<void> {
+        if (quickBusy) return;
+        if (quickPersonId === person.itemId) return;
+        if (quickPersonId && quickNote.trim()) {
+            const confirmed = await confirmDialog({
+                title: "放弃未记录的备注",
+                message: "当前互动备注草稿尚未记录，切换将放弃已输入的内容，确定切换吗？",
+                confirmLabel: "放弃并切换",
+                cancelLabel: "继续编辑",
+                danger: true,
+            });
+            if (!confirmed) return;
+        }
+        quickPersonId = person.itemId;
+        quickNote = "";
+        quickError = "";
+    }
+
+    async function cancelQuickRecord(): Promise<void> {
+        if (quickBusy) return;
+        if (quickNote.trim()) {
+            const confirmed = await confirmDialog({
+                title: "放弃未记录的备注",
+                message: "当前互动备注草稿尚未记录，取消将放弃已输入的内容，确定取消吗？",
+                confirmLabel: "放弃备注",
+                cancelLabel: "继续编辑",
+                danger: true,
+            });
+            if (!confirmed) return;
+        }
+        quickPersonId = "";
+        quickNote = "";
+        quickError = "";
     }
 
     async function recordQuick(person: ContactSummary) {
@@ -734,6 +787,8 @@
     };
 </script>
 
+<svelte:window onkeydown={handleGlobalKeydown} />
+
 <div class="lvct-dash">
     {#if errorText}
         <ViewState compact error title={text("dashLoadFailTitle", "仪表盘加载失败")} description={errorText}>
@@ -860,7 +915,7 @@
                 {#snippet actionRow(card: ActionCard)}
                     <div class="lvct-dash__rowwrap">
                         <div class="lvct-dash__row lvct-dash__action-row">
-                            <button class="lvct-dash__row-main" onclick={() => onOpenDetail(card.person)}>
+                            <button type="button" class="lvct-dash__row-main" aria-label={`查看 ${card.person.name} 的详情`} onclick={() => onOpenDetail(card.person)}>
                                 <span class="lvct-dash__row-primary">
                                     <span class="lvct-dash__person-avatar" data-group={card.person.group || "未分组"}>
                                         {card.person.name.slice(0, 1)}
@@ -878,14 +933,18 @@
                                 {card.bucket === "stale" ? text("dashTakeALook", "去看看") : text("dashProcess", "处理")}
                             </button>
                             <button
+                                type="button"
+                                id={`lvct-dash-action-menu-btn-${card.person.docId}`}
                                 class="b3-button b3-button--outline lvct-dash__quick-button lvct-dash__quick-button--more"
                                 aria-label={`更多处置：${card.person.name}`}
                                 aria-expanded={rowMenuKey === `action:${card.person.docId}`}
+                                aria-controls={rowMenuKey === `action:${card.person.docId}` ? `lvct-dash-action-menu-${card.person.docId}` : undefined}
+                                data-row-menu-trigger="true"
                                 onclick={() => toggleRowMenu(`action:${card.person.docId}`)}
                             >⋯</button>
                         </div>
                         {#if rowMenuKey === `action:${card.person.docId}`}
-                            <div class="lvct-dash__quick-form lvct-dash__rowmenu">
+                            <div id={`lvct-dash-action-menu-${card.person.docId}`} class="lvct-dash__quick-form lvct-dash__rowmenu" role="group" aria-labelledby={`lvct-dash-action-menu-btn-${card.person.docId}`}>
                                 {#if isNeverCard(card)}
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => dismissNeverToday(card.person))}>今天先跳过</button>
                                 {:else if card.bucket === "stale"}
@@ -912,8 +971,10 @@
                         <section class="lvct-dash__group" data-action-group={group.key}>
                             <button
                                 type="button"
+                                id={`lvct-dash-group-btn-${group.key}`}
                                 class="lvct-dash__group-head"
                                 aria-expanded={!isGroupCollapsed(group)}
+                                aria-controls={`lvct-dash-group-content-${group.key}`}
                                 onclick={() => toggleGroup(group)}
                             >
                                 <span class="lvct-dash__group-caret" aria-hidden="true">{isGroupCollapsed(group) ? "▸" : "▾"}</span>
@@ -934,7 +995,7 @@
                                 </div>
                             {/if}
                             {#if !isGroupCollapsed(group)}
-                                <div class="lvct-dash__list">
+                                <div id={`lvct-dash-group-content-${group.key}`} role="region" aria-labelledby={`lvct-dash-group-btn-${group.key}`} class="lvct-dash__list">
                                     {#each group.cards as card (card.person.docId)}
                                         {@render actionRow(card)}
                                     {/each}
@@ -976,10 +1037,10 @@
                         <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>查看联系人</button>
                     </ViewState>
                 {:else}
-                    <div class="lvct-dash__list">
+                    <div id="lvct-dash-birthdays-list" class="lvct-dash__list">
                         {#each previewList(data?.birthdays ?? [], showAllBirthdays, BIRTHDAY_PREVIEW_LIMIT) as item (item.person.itemId)}
                             <div class="lvct-dash__row lvct-dash__row--contact">
-                                <button type="button" class="lvct-dash__row-main" onclick={() => onOpenDetail(item.person)}>
+                                <button type="button" class="lvct-dash__row-main" aria-label={`查看 ${item.person.name} 的详情`} onclick={() => onOpenDetail(item.person)}>
                                     <span class="lvct-dash__person-avatar" data-group={item.person.group || "未分组"}>
                                         {item.person.name.slice(0, 1)}
                                     </span>
@@ -1013,14 +1074,17 @@
                                 >跳过本年</button>
                                 <button
                                     type="button"
-                                    class="b3-button b3-button--outline lvct-dash__quick-button"
+                                    id={`lvct-dash-birthday-menu-btn-${item.person.docId}`}
+                                    class="b3-button b3-button--outline lvct-dash__quick-button lvct-dash__quick-button--more"
                                     aria-label={`更多生日处置：${item.person.name}`}
                                     aria-expanded={rowMenuKey === `birthday:${item.person.docId}`}
+                                    aria-controls={rowMenuKey === `birthday:${item.person.docId}` ? `lvct-dash-birthday-menu-${item.person.docId}` : undefined}
+                                    data-row-menu-trigger="true"
                                     onclick={(event) => { event.stopPropagation(); toggleRowMenu(`birthday:${item.person.docId}`); }}
                                 >⋯</button>
                             </div>
                             {#if rowMenuKey === `birthday:${item.person.docId}`}
-                                <div class="lvct-dash__quick-form lvct-dash__rowmenu">
+                                <div id={`lvct-dash-birthday-menu-${item.person.docId}`} class="lvct-dash__quick-form lvct-dash__rowmenu" role="group" aria-labelledby={`lvct-dash-birthday-menu-btn-${item.person.docId}`}>
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => dismissBirthdayToday(item.person))}>今天不再提醒</button>
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => dismissBirthdayWeek(item.person))}>未来 7 天不再提醒</button>
                                     <button class="b3-button b3-button--cancel" disabled={alBusy} onclick={() => runRowAction(() => dismissBirthdayForever(item.person))}>不再提醒</button>
@@ -1029,7 +1093,7 @@
                         {/each}
                     </div>
                     {#if data.birthdays.length > BIRTHDAY_PREVIEW_LIMIT}
-                        <button class="lvct-dash__show-all" onclick={openAllBirthdays}>
+                        <button type="button" class="lvct-dash__show-all" aria-expanded={showAllBirthdays} aria-controls="lvct-dash-birthdays-list" onclick={openAllBirthdays}>
                             {showAllBirthdays ? text("dashShowLess", "收起") : text("dashShowAllN", "查看全部（共 {n} 条）", { n: data.birthdays.length })}
                         </button>
                     {/if}
@@ -1048,10 +1112,10 @@
                         <button class="b3-button b3-button--outline" onclick={() => onOpenPeople()}>{text("dashGoContacts", "前往联系人")}</button>
                     </ViewState>
                 {:else}
-                    <div class="lvct-dash__list">
+                    <div id="lvct-dash-stale-list" class="lvct-dash__list">
                         {#each previewList(data?.stale ?? [], showAllStale, STALE_PREVIEW_LIMIT) as item (item.person.itemId)}
                             <div class="lvct-dash__row lvct-dash__row--contact">
-                                <button class="lvct-dash__row-main" onclick={() => onOpenDetail(item.person)}>
+                                <button type="button" class="lvct-dash__row-main" aria-label={`查看 ${item.person.name} 的详情`} onclick={() => onOpenDetail(item.person)}>
                                     <span class="lvct-dash__person-avatar" data-group={item.person.group || "未分组"}>
                                         {item.person.name.slice(0, 1)}
                                     </span>
@@ -1074,23 +1138,27 @@
                                 {#if quickPersonId === item.person.itemId}
                                     <div class="lvct-dash__quick-form">
                                         <input class="b3-text-field" type="text" aria-label={text("dashQuickNoteLabel", "与{name}互动的备注", { name: item.person.name })} placeholder={text("dashQuickNotePlaceholder", "备注（可选）")} bind:value={quickNote} disabled={quickBusy} />
-                                        <button class="b3-button b3-button--text" onclick={() => recordQuick(item.person)} disabled={quickBusy}>{quickBusy ? text("dashRecording", "记录中…") : text("dashRecord", "记录")}</button>
-                                        <button class="b3-button b3-button--cancel" onclick={() => { quickPersonId = ""; quickError = ""; }} disabled={quickBusy}>{text("dashCancel", "取消")}</button>
+                                        <button type="button" class="b3-button b3-button--text" onclick={() => void recordQuick(item.person)} disabled={quickBusy}>{quickBusy ? text("dashRecording", "记录中…") : text("dashRecord", "记录")}</button>
+                                        <button type="button" class="b3-button b3-button--cancel" onclick={() => void cancelQuickRecord()} disabled={quickBusy}>{text("dashCancel", "取消")}</button>
                                     </div>
                                 {:else}
-                                    <button class="b3-button b3-button--outline lvct-dash__quick-button" onclick={() => { quickPersonId = item.person.itemId; quickNote = ""; }} disabled={quickBusy || quickDoneId === item.person.itemId}>
+                                    <button type="button" class="b3-button b3-button--outline lvct-dash__quick-button" onclick={() => void startQuickRecord(item.person)} disabled={quickBusy || quickDoneId === item.person.itemId}>
                                         {quickDoneId === item.person.itemId ? text("dashRecordedDone", "已记录 ✓") : text("dashQuickRecord", "记一笔")}
                                     </button>
                                 {/if}
                                 <button
-                                    class="b3-button b3-button--outline lvct-dash__quick-button"
-                                    aria-label={`更多处置：${item.person.name}`}
+                                    type="button"
+                                    id={`lvct-dash-stale-menu-btn-${item.person.docId}`}
+                                    class="b3-button b3-button--outline lvct-dash__quick-button lvct-dash__quick-button--more"
+                                    aria-label={`更多久未联系处置：${item.person.name}`}
                                     aria-expanded={rowMenuKey === `stale:${item.person.docId}`}
+                                    aria-controls={rowMenuKey === `stale:${item.person.docId}` ? `lvct-dash-stale-menu-${item.person.docId}` : undefined}
+                                    data-row-menu-trigger="true"
                                     onclick={(event) => { event.stopPropagation(); toggleRowMenu(`stale:${item.person.docId}`); }}
                                 >⋯</button>
                             </div>
                             {#if rowMenuKey === `stale:${item.person.docId}`}
-                                <div class="lvct-dash__quick-form lvct-dash__rowmenu">
+                                <div id={`lvct-dash-stale-menu-${item.person.docId}`} class="lvct-dash__quick-form lvct-dash__rowmenu" role="group" aria-labelledby={`lvct-dash-stale-menu-btn-${item.person.docId}`}>
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(item.person, 3))}>顺延 3 天</button>
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(item.person, 7))}>顺延 1 周</button>
                                     <button class="b3-button b3-button--outline" disabled={alBusy} onclick={() => runRowAction(() => snoozeStale(item.person, 30))}>顺延 1 个月</button>
@@ -1100,7 +1168,7 @@
                         {/each}
                     </div>
                     {#if data.stale.length > STALE_PREVIEW_LIMIT}
-                        <button class="lvct-dash__show-all" onclick={openAllStale}>
+                        <button type="button" class="lvct-dash__show-all" aria-expanded={showAllStale} aria-controls="lvct-dash-stale-list" onclick={openAllStale}>
                             {showAllStale ? text("dashShowLess", "收起") : text("dashShowAllN", "查看全部（共 {n} 条）", { n: data.stale.length })}
                         </button>
                     {/if}

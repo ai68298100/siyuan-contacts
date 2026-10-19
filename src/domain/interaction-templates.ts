@@ -31,12 +31,14 @@ export interface TemplateVars {
     lastInteraction: string;
 }
 
-/** 纯本地变量替换：全部占位符替换所有出现；未知占位符原样保留 */
+/** 单次扫描原模板；替换值按字面保留，不再解释其中的占位符或 $ 替换语法。 */
 export function renderTemplate(content: string, vars: TemplateVars): string {
-    return content
-        .replaceAll("{{姓名}}", vars.name)
-        .replaceAll("{{日期}}", vars.date)
-        .replaceAll("{{上次互动}}", vars.lastInteraction);
+    const values: Readonly<Record<string, string>> = {
+        "{{姓名}}": vars.name,
+        "{{日期}}": vars.date,
+        "{{上次互动}}": vars.lastInteraction,
+    };
+    return content.replace(/\{\{(?:姓名|日期|上次互动)\}\}/g, (placeholder) => values[placeholder]);
 }
 
 function isNoteTemplate(raw: unknown): raw is NoteTemplate {

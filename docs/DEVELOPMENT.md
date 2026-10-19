@@ -124,7 +124,7 @@ UI 与内核 E2E 使用隔离浏览器/临时工作区，但模拟布局不能�
 
 1. 更新 `package.json`、`plugin.json` 版本（可用 `pnpm update-version` 交互完成），同步 `README.md`、`docs/CHANGELOG.md` 和对应发布说明。
 2. 执行上面的检查，尤其是 `pnpm check:release`。该门禁校验 zip SHA-256 和单 `index.js` 约束；它不发布 GitHub Release。
-3. `pnpm build` 生成 `dist/` 与 `package.zip`；随后运行 `sha256sum package.zip > package.zip.sha256`（Windows 可用等价 SHA-256 工具）生成门禁需要的校验文件。查看 `git diff` 和校验值，确认包只含预期运行文件。CI 在构建后自动生成该文件。
+3. `pnpm build` 生成 `dist/`、`package.zip` 和同轮 `package.zip.sha256`；随后运行 `pnpm check:release`。查看 `git diff` 和校验值，确认包只含预期运行文件。`package.zip.sha256` 是本地构建产物并被忽略，CI 也在构建后使用同一流程生成并上传它。
 4. 发布时创建/更新 GitHub tag 和 Release，并附上 `package.zip`；仓库最新发布流程以 `.github/workflows/` 和 GitHub Release 页面为准。推送源码本身不会自动安装到用户思源。
 5. 用户端可在思源插件目录安装 Release 包，或在本机开发时使用 `pnpm make-install`；普通手动安装与市场客户端可见性是不同渠道。
 

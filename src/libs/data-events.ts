@@ -38,7 +38,17 @@ dataChannel?.addEventListener("message", (event: MessageEvent<unknown>) => {
 export function emitDataChanged(change: Omit<DataChangeDetail, "revision"> = {}, token?: LifecycleToken): void {
     if (token && !token.isAlive()) return;
     const detail = { ...change, version: 1 as const, sourceId, revision: ++revision };
-    window.dispatchEvent(new CustomEvent(LVCT_DATA_CHANGED, { detail }));
+    if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+        window.dispatchEvent(new CustomEvent(LVCT_DATA_CHANGED, { detail }));
+        const ecosystemDetail = {
+            v: 1,
+            source: "siyuan-contacts",
+            type: "data-changed",
+            eventId: `contacts_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            at: new Date().toISOString(),
+        };
+        window.dispatchEvent(new CustomEvent("lv-contacts:data-changed", { detail: ecosystemDetail }));
+    }
     dataChannel?.postMessage(detail);
 }
 

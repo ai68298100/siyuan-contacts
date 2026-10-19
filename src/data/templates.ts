@@ -5,7 +5,7 @@
  */
 import type { Plugin } from "siyuan";
 import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage";
-import { normalizeTemplates, normalizeTemplatesForWrite } from "../domain/interaction-templates";
+import { DEFAULT_TEMPLATES, normalizeTemplates, normalizeTemplatesForWrite } from "../domain/interaction-templates";
 import type { NoteTemplate } from "../domain/interaction-templates";
 
 export const TEMPLATES_STORAGE_KEY = "interaction-templates.json";
@@ -29,12 +29,23 @@ export async function loadTemplatesStoreStrict(plugin: Plugin): Promise<Template
     return parseTemplatesStoreStrict(await loadJsonStrict(plugin, TEMPLATES_STORAGE_KEY));
 }
 
-/** 全量保存（增改删统一走这里）：锁内严格读取，损坏当前库拒绝覆盖；写后回读验证 */
-export async function saveTemplatesStore(plugin: Plugin, templates: readonly NoteTemplate[]): Promise<void> {
+/** 全量保存需带编辑基线；锁内核对现状，过期草稿不覆盖并发新增、修改或删除。 */
+export async function saveTemplatesStore(plugin: Plugin, templates: readonly NoteTemplate[], expected: readonly NoteTemplate[]): Promise<void> {
     const normalized = normalizeTemplatesForWrite(templates);
+    const baseline = normalizeTemplatesForWrite(expected);
     return withStoreLock(TEMPLATES_STORAGE_KEY, async () => {
-        parseTemplatesStoreStrict(await loadJsonStrict(plugin, TEMPLATES_STORAGE_KEY));
-        await saveJsonVerified(plugin, TEMPLATES_STORAGE_KEY, { schemaVersion: 1, templates: normalized });
+        const store = parseTemplatesStoreStrict(await loadJsonStrict(plugin, TEMPLATES_STORAGE_KEY));
+        const current = store?.templates ?? DEFAULT_TEMPLATES;
+        // 上次请求可能已保存但回读失败；同一目标已存在只核实成功，不重写。
+        if (JSON.stringify(current) === JSON.stringify(normalized)) return;
+        if (JSON.stringify(current) !== JSON.stringify(baseline)) {
+            throw new Error("模板已被其他窗口修改或恢复，本次未保存。草稿已保留，请重新读取当前版本并核对后再编辑。");
+        }
+        try {
+            await saveJsonVerified(plugin, TEMPLATES_STORAGE_KEY, { schemaVersion: 1, templates: normalized });
+        } catch (cause) {
+            throw new Error("模板保存结果尚未核实，草稿与编辑基线已保留。请重新读取核实，或用相同草稿重试。", { cause });
+        }
     });
 }
 

@@ -4,22 +4,28 @@ AG-P0-010 · protocol 2 · 仅提供既有的选人、建人和共同互动能�
 
 ## 版本与能力
 
-启用插件后挂载 `window.LvContacts`，初始化前调用会拒绝 `not_initialized`。卸载使旧对象也失效；调用方应重新取得当前对象。
+启用插件后挂载 `window.LvContacts`，并同步挂载生态多别名 `window.lvContacts`、`window.xiaolvContacts`、`window.siyuanContacts`。初始化前调用会拒绝 `not_initialized`。卸载使旧对象也失效；调用方应重新取得当前对象。
 
 ```js
-const bridge = window.LvContacts;
+const bridge = window.LvContacts || window.lvContacts || window.xiaolvContacts || window.siyuanContacts;
 if (!bridge || bridge.protocol !== 2
     || !["searchPeople", "getPerson", "ensurePerson", "recordInteraction"]
         .every((capability) => bridge.capabilities.includes(capability))) {
     return; // 显示集成暂不可用，保留本插件手动流程
 }
+if (bridge.whenReady) await bridge.whenReady();
+const overview = bridge.getOverview?.();
 ```
 
-`protocol`、`capabilities` 和 `safety` 声明不可修改。`safety` 为 `{stableDocIds:true,persistentRequests:true,itemResults:true,unknownWrites:"verify_first"}`。能力声明只有四个既有方法，不包含合并、资料更新、组织、任务、通知或其他业务。
+`protocol`、`capabilities` 和 `safety` 声明不可修改。`safety` 为 `{stableDocIds:true,persistentRequests:true,itemResults:true,unknownWrites:"verify_first"}`。能力声明包含四个既有业务方法，并扩展 `whenReady()`、`hasCapability()` 与 `getOverview()`。
 
-| 项目 | v1 | v2 兼容决策 |
+| 项目 | v1 | v2 / Epoch-6 兼容决策 |
 |---|---|---|
-| 版本检测 | 示例曾使用 `>=1` | 必须精确匹配支持的主版本及能力 |
+| 版本检测 | 示例曾使用 `>=1` | 精确匹配支持的主版本及能力，支持 `whenReady()` 探针 |
+| 挂载别名 | 单一 `LvContacts` | 规范化四别名：`LvContacts`、`lvContacts`、`xiaolvContacts`、`siyuanContacts` |
+| 挂载机制 | 简单覆盖 | First-Instance-Wins 抢占挂载与身份核验安全卸载，防止误删活跃桥 |
+| 概览透传 | 无 | `getOverview()` 暴露协议、版本、只读/可写状态与脱敏安全元数据 |
+| 生态广播 | 无 | 广播 `lv-contacts:data-changed`、`lv-contacts:interaction-logged`、`lv-contacts:person-created` |
 | ensurePerson(name) | 可能复用唯一同名或新建 | 姓名只返回候选；新建须给 ref，选人须给 docId |
 | recordInteraction | 只返回 recorded | 保留 recorded，增加逐项结果与未知状态 |
 | 错误 | 普通 Error/原始服务错误 | 固定错误码、写状态和无私人内容的诊断 |

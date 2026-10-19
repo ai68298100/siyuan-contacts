@@ -130,7 +130,13 @@ export function buildReviewReport(params: {
             groupSize,
         });
     }
-    entries.sort((a, b) => b.localDate.localeCompare(a.localDate) || a.personName.localeCompare(b.personName, "zh-CN"));
+    /* M-10：同日或同名条目加入 personDocId 与 eventId tie-breaker，保证排序输出严格确定 */
+    entries.sort((a, b) =>
+        b.localDate.localeCompare(a.localDate)
+        || a.personName.localeCompare(b.personName, "zh-CN")
+        || a.personDocId.localeCompare(b.personDocId)
+        || a.eventId.localeCompare(b.eventId),
+    );
 
     const countsByPerson = new Map<string, number>();
     for (const entry of entries) {
@@ -138,7 +144,11 @@ export function buildReviewReport(params: {
     }
     const topPeople = [...countsByPerson.entries()]
         .map(([personDocId, count]) => ({ personDocId, name: nameByDoc.get(personDocId) ?? "", count }))
-        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-CN"))
+        .sort((a, b) =>
+            b.count - a.count
+            || a.name.localeCompare(b.name, "zh-CN")
+            || a.personDocId.localeCompare(b.personDocId),
+        )
         .slice(0, 5);
 
     const total = entries.length;

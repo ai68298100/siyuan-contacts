@@ -165,19 +165,19 @@
     .lvct-org-multi__options { max-height: min(280px, 40vh); overflow: auto; margin: 8px 0; }
     .lvct-org-multi__result-count { margin: 4px 0 0; }
     .lvct-org-multi__selected { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-    .lvct-org-multi__chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 0 2px 0 10px; border-radius: 16px; background: var(--b3-theme-primary-lightest); }
+    .lvct-org-multi__chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 0 2px 0 10px; border-radius: 16px; background: var(--lvct-accent-soft); }
     .lvct-org-multi__chip > span { min-width: 0; overflow-wrap: anywhere; }
     .lvct-org-multi__chip button { flex-shrink: 0; width: 32px; height: 32px; padding: 0; }
     .lvct-org-multi__status { margin: 6px 0; }
-    .lvct-org-multi__option:focus-within { outline: 2px solid var(--b3-theme-primary); outline-offset: -2px; }
+    .lvct-org-multi__option:focus-within { outline: 2px solid var(--lvct-accent); outline-offset: -2px; }
     .lvct-org-multi__option { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px; box-sizing: border-box; border-radius: 6px; cursor: pointer; }
-    .lvct-org-multi__option:hover { background: var(--b3-list-hover); }
-    .lvct-org-multi__option--selected { background: var(--b3-theme-primary-lightest); }
+    .lvct-org-multi__option:hover { background: var(--lvct-bg-hover); }
+    .lvct-org-multi__option--selected { background: var(--lvct-accent-soft); }
     .lvct-org-multi__option span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-    .lvct-org-multi__option small { display: block; color: var(--b3-theme-on-surface); }
-    .lvct-org-multi__empty { padding: 12px 8px; color: var(--b3-theme-on-surface); }
+    .lvct-org-multi__option small { display: block; color: var(--lvct-text-2); }
+    .lvct-org-multi__empty { padding: 12px 8px; color: var(--lvct-text-2); }
     .lvct-org-multi__footer, .lvct-org-multi__summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .lvct-org-multi__footer { border-top: 1px solid var(--b3-border-color); padding-top: 8px; }
+    .lvct-org-multi__footer { border-top: 1px solid var(--lvct-border-subtle); padding-top: 8px; }
     .lvct-org-multi__footer button { white-space: normal; overflow-wrap: anywhere; }
     .lvct-org-multi__summary { margin-top: 6px; }
     @media (max-width: 640px) { .lvct-org-multi__chip button { width: 44px; height: 44px; } }

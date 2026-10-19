@@ -250,6 +250,11 @@ test("parseVcf：BDAY 接受紧凑/ISO/带时间三种形式，无年份（--052
     assert.equal(parseVcf(build("--0520"))[0].birthday, "");
     assert.equal(parseVcf(build("五月二十"))[0].birthday, "");
     assert.equal(parseVcf(build("1990-13-40"))[0].birthday, "", "日历不存在的日期丢弃");
+    /* C-30：公历闰年与平年边界 */
+    assert.equal(parseVcf(build("20240229"))[0].birthday, "2024-02-29", "闰年2月29日合法");
+    assert.equal(parseVcf(build("20230229"))[0].birthday, "", "平年2月29日非法必须丢弃");
+    assert.equal(parseVcf(build("1900-02-29"))[0].birthday, "", "百年不闰二月29日非法丢弃");
+    assert.equal(parseVcf(build("2000-02-29"))[0].birthday, "2000-02-29", "四百年一闰2月29日合法");
 });
 
 test("parseVcf：本插件导出的 X-LVCT-BDAY-LUNAR 回读为农历生日", () => {

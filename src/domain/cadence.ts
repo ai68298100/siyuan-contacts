@@ -15,6 +15,8 @@ export const CADENCE_STORE_VERSION = 1;
 export const CADENCE_DAYS_MIN = 1;
 export const CADENCE_DAYS_MAX = 365;
 
+import { StoreIntegrityError } from "./store-integrity.ts";
+
 /** 人物文档 ID（与 SQL 安全面同一校验） */
 const DOC_ID_RE = /^\d{14}-[0-9a-z]{7}$/;
 
@@ -49,17 +51,26 @@ export function normalizeCadenceMap(raw: unknown): Record<string, PersonCadence>
 /** 写前包络检查：版本或结构不兼容抛错（损坏不覆盖，与互动/跟进库同纪律） */
 export function normalizeCadenceMapForWrite(raw: unknown): Record<string, PersonCadence> {
     if (raw == null || raw === "") return {};
-    if (typeof raw !== "object" || (raw as Partial<{ schemaVersion: unknown }>).schemaVersion !== CADENCE_STORE_VERSION ||
-        typeof (raw as Partial<{ cadences: unknown }>).cadences !== "object" ||
-        (raw as Partial<{ cadences: unknown }>).cadences === null) {
-        throw new Error("联系节奏存储格式或版本不兼容，操作已停止；请先备份并检查原文件");
+    if (typeof raw !== "object" || Array.isArray(raw)) {
+        throw new StoreIntegrityError("联系节奏", "需要版本化对象");
     }
-    const cadences = (raw as { cadences: unknown }).cadences;
-    for (const [docId, value] of Object.entries(cadences as Record<string, unknown>)) {
-        if (!isPersonDocId(docId)) throw new Error("联系节奏存储内容损坏，操作已停止；请先备份并检查原文件");
+    const record = raw as Partial<{ schemaVersion: unknown; cadences: unknown }>;
+    if (record.schemaVersion !== CADENCE_STORE_VERSION) {
+        throw new StoreIntegrityError("联系节奏", "版本不兼容");
+    }
+    if (typeof record.cadences !== "object" || record.cadences === null || Array.isArray(record.cadences)) {
+        throw new StoreIntegrityError("联系节奏", "条目容器必须为对象映射");
+    }
+    const cadences = record.cadences as Record<string, unknown>;
+    const entries = Object.entries(cadences);
+    for (let index = 0; index < entries.length; index++) {
+        const [docId, value] = entries[index];
+        if (!isPersonDocId(docId)) {
+            throw new StoreIntegrityError("联系节奏", `人物文档 ID 无效（${docId}）`, entries.length, index);
+        }
         if (value === null || typeof value !== "object" || clampDays((value as { days: unknown }).days) === null
             || (Object.hasOwn(value, "paused") && typeof (value as { paused?: unknown }).paused !== "boolean")) {
-            throw new Error("联系节奏存储内容损坏，操作已停止；请先备份并检查原文件");
+            throw new StoreIntegrityError("联系节奏", `条目字段无效（${docId}）`, entries.length, index);
         }
     }
     return normalizeCadenceMap(raw);

@@ -1,0 +1,119 @@
+{
+  "auditDate": "2026-10-18",
+  "schemaVersion": 1,
+  "productionCodeModified": false,
+  "scope": {
+    "realKernelRequests": 0,
+    "realPluginStorageIO": false,
+    "dailyWorkspaceAccess": false,
+    "realUIInteraction": false,
+    "pluginAdapter": "In-memory loadData/saveData with structuredClone and Map-backed records",
+    "sdkAdapter": "Node registerHooks stubs the siyuan SDK; archived-member projection reads receive a controlled error, other probes issue no SDK requests",
+    "moduleLoading": "Node registerHooks resolves extensionless local TypeScript imports and transpiles with the repository TypeScript compiler; production functions are invoked unchanged",
+    "limitations": "These probes demonstrate deterministic production service/data/domain behavior. They do not verify real Plugin storage, cross-window Web Locks, actual SiYuan UI, native editor CAS, or devices."
+  },
+  "probes": [
+    {
+      "id": "FC-01",
+      "priority": "P1",
+      "name": "archived-editor-status-coercion",
+      "level": "production service and data with in-memory Plugin; UI payload derived from source",
+      "entryPoint": "src/services/org-member-writes.ts#editOrganizationMember",
+      "uiSource": "src/components/org/OrgManagerDialog.svelte:610,630",
+      "input": {
+        "originalStatus": "active",
+        "originalJoinedOn": "2020-01-01",
+        "originalLeftOn": "",
+        "submittedPatch": { "title": "仅修改职位", "status": "former" }
+      },
+      "observed": {
+        "beforeStatus": "active",
+        "afterStatus": "former",
+        "afterTitle": "仅修改职位",
+        "storageWrites": 1,
+        "fact": "verified",
+        "projections": ["unknown", "unknown"]
+      },
+      "interpretation": "Editing another field in an archived organization's active member sends an implicit former transition and persists it. Projection errors do not roll back the member fact."
+    },
+    {
+      "id": "FC-02",
+      "priority": "P1",
+      "name": "template-stale-editor-after-merge",
+      "level": "production data layer with in-memory Plugin",
+      "entryPoints": ["src/data/templates.ts#mergeTemplatesStore", "src/data/templates.ts#saveTemplatesStore"],
+      "sequence": ["Keep an editor draft containing tpl-base", "Merge a new tpl-new through mergeTemplatesStore", "Save the old editor draft after modifying tpl-base"],
+      "observed": {
+        "afterMergeIds": ["tpl-base", "tpl-new"],
+        "afterOldEditorSaveIds": ["tpl-base"],
+        "lostConcurrentTemplate": true,
+        "storageWrites": 2
+      },
+      "interpretation": "The lock serializes saves but the stale whole-list replacement deletes an unseen concurrent addition."
+    },
+    {
+      "id": "FC-03",
+      "priority": "P1",
+      "name": "migration-hidden-tombstone-delete",
+      "level": "production migration service and data with in-memory Plugin; UI gating established from source",
+      "entryPoints": ["src/services/migration-bundle.ts#previewMigrationImport", "src/services/migration-bundle.ts#importMigrationBundle"],
+      "uiSource": "src/components/SettingsView.svelte:1378,1390",
+      "input": {
+        "currentInteractionCount": 1,
+        "bundleInteractionEventsCount": 0,
+        "bundleInteractionTombstonesCount": 1,
+        "tombstoneMatchesCurrentEvent": true,
+        "bundleTemplatesCount": 1
+      },
+      "observed": {
+        "onlyTombstonesPreview": [],
+        "visiblePreviewKeys": ["templates"],
+        "beforeInteractionCount": 1,
+        "afterInteractionCount": 0,
+        "reportedModules": [
+          { "key": "interactions", "label": "互动事件", "merged": 0 },
+          { "key": "templates", "label": "备注模板", "merged": 1 }
+        ],
+        "reportedFailures": 0,
+        "storageWrites": 2,
+        "removedPropertyReturned": false
+      },
+      "interpretation": "The preview omits interaction deletion, import still deletes the event, and the result loses the removed count. A tombstone-only bundle has no normal confirmation entry."
+    },
+    {
+      "id": "FC-04",
+      "priority": "P2",
+      "name": "migration-ignores-invalid-raw-snapshot",
+      "level": "production migration service and data with in-memory Plugin",
+      "entryPoints": ["src/services/migration-bundle.ts#previewMigrationImport", "src/services/migration-bundle.ts#importMigrationBundle"],
+      "input": {
+        "interactionsModuleSchemaVersion": 1,
+        "rawStoreSchemaVersion": 99,
+        "rawStoreContainsInvalidEvent": true,
+        "projectedEventsAndTombstonesValid": true
+      },
+      "observed": { "previewAccepted": ["interactions"], "importAccepted": true, "reportedFailures": 0 },
+      "interpretation": "Migration uses projected events/tombstones and ignores the invalid rawStore that independent interaction backup parsing would reject."
+    },
+    {
+      "id": "FC-05",
+      "priority": "P2",
+      "name": "template-dollar-replacement",
+      "level": "production pure domain function",
+      "entryPoint": "src/domain/interaction-templates.ts#renderTemplate",
+      "input": { "template": "和{{姓名}}见面", "name": "张$&", "date": "2026-10-18", "lastInteraction": "无" },
+      "observed": { "expected": "和张$&见面", "actual": "和张{{姓名}}见面" },
+      "interpretation": "A literal replacement string interprets the dollar-match sequence instead of preserving the person's name."
+    },
+    {
+      "id": "FC-06",
+      "priority": "P3",
+      "name": "lunar-birthday-age",
+      "level": "production pure domain function; no current UI consumer of age found",
+      "entryPoint": "src/domain/occasions.ts#nextBirthday",
+      "input": { "birthday": "1990-01-01", "isLunar": true, "now": "lunarToSolar(2026,1,1)" },
+      "observed": { "daysUntil": 0, "expectedAgePerInterface": 36, "actualAge": 37 },
+      "interpretation": "The documented completed-years field uses current lunar year minus birth year plus one even on the actual birthday."
+    }
+  ]
+}

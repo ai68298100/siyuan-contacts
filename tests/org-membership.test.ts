@@ -15,6 +15,8 @@ import {
     projectPersonAffiliations,
     orgMembershipStatusLabel,
     filterOrganizationMembershipCandidates,
+    isValidMembershipPeriod,
+    buildOrgLinksSection,
 } from "../src/domain/org-membership.ts";
 import type { OrgMembership } from "../src/domain/org-membership.ts";
 import { buildOrgProjectionTargets, orgProjectionSourceSnapshot, parseOrgProjectionOperationStore } from "../src/domain/org-projections.ts";
@@ -442,4 +444,77 @@ test("B13.5b 成员排序与分页：在职优先、稳定 tie-break、筛选不
     assert.equal(page.total, 2);
     assert.equal(page.hasMore, false);
     assert.throws(() => pageOrgMemberships(items, { limit: 501 }), /1-500/);
+});
+
+test("C-30：组织成员期间统一使用真实公历校验（闰年平年二月、月末与空日期）", () => {
+    assert.equal(isValidMembershipPeriod("2024-02-29", "", "active"), true, "闰年2月29日合法");
+    assert.equal(isValidMembershipPeriod("2023-02-29", "", "active"), false, "平年2月29日非法");
+    assert.equal(isValidMembershipPeriod("1900-02-29", "", "active"), false, "百年不闰二月29日非法");
+    assert.equal(isValidMembershipPeriod("2000-02-29", "", "active"), true, "四百年一闰2月29日合法");
+    assert.equal(isValidMembershipPeriod("2024-04-31", "", "active"), false, "四月大日期非法");
+    assert.equal(isValidMembershipPeriod("", "", "active"), true, "空日期允许");
+    assert.equal(isValidMembershipPeriod("2024-01-01", "2024-02-01", "former"), true, "合法历史区间");
+    assert.equal(isValidMembershipPeriod("2024-02-01", "2024-01-01", "former"), false, "加入晚于离开非法");
+});
+
+test("C-14：buildOrgLinksSection 组织名含方括号与特殊字符时保持 Markdown 链接有效", () => {
+    const links = buildOrgLinksSection([{
+        orgDocId: "20261004000000-org0001",
+        orgName: "某组织[北京]分部\\实验室\r\n",
+        affiliationKind: "work",
+        department: "研发部",
+        title: "工程师",
+    }]);
+    assert.equal(
+        links,
+        "**所属组织**：[某组织\\[北京\\]分部\\\\实验室](siyuan://blocks/20261004000000-org0001)（工作单位 · 在职 · 研发部 · 工程师）",
+    );
+});
+
+test("G-09：共同组织背景支持预剪枝无关组织，大名册稳定顺序输出", () => {
+    const targetId = "target-person";
+    const orgTargetA = "20261004000000-org0001";
+    const orgTargetB = "20261004000000-org0002";
+    const orgUnrelated = "20261004000000-org9999";
+
+    const index = new Map<string, OrgMembership[]>([
+        [targetId, [
+            membership({ id: "m-target-1", orgDocId: orgTargetA, personDocId: targetId, joinedOn: "2022-01-01" }),
+            membership({ id: "m-target-2", orgDocId: orgTargetB, personDocId: targetId, joinedOn: "2024-01-01" }),
+        ]],
+        ["peer-a1", [membership({ id: "m-a1", orgDocId: orgTargetA, personDocId: "peer-a1", joinedOn: "2022-03-01" })]],
+        ["peer-b1", [membership({ id: "m-b1", orgDocId: orgTargetB, personDocId: "peer-b1", joinedOn: "2024-02-01" })]],
+        // 模拟大量无关组织的成员记录
+        ["peer-unrelated-1", [membership({ id: "m-u1", orgDocId: orgUnrelated, personDocId: "peer-unrelated-1" })]],
+        ["peer-unrelated-2", [membership({ id: "m-u2", orgDocId: orgUnrelated, personDocId: "peer-unrelated-2" })]],
+    ]);
+
+    const names = new Map([
+        [targetId, "目标人"],
+        ["peer-a1", "同事A1"],
+        ["peer-b1", "同事B1"],
+        ["peer-unrelated-1", "无关同事1"],
+        ["peer-unrelated-2", "无关同事2"],
+    ]);
+
+    const orgNames = new Map([
+        [orgTargetA, "目标公司A"],
+        [orgTargetB, "目标公司B"],
+        [orgUnrelated, "无关公司U"],
+    ]);
+
+    const result = buildCommonOrgBackground({
+        personDocId: targetId,
+        membershipIndex: index,
+        namesByDoc: names,
+        orgNames,
+    });
+
+    assert.equal(result.length, 2, "只输出目标人物所属的 2 个组织");
+    assert.equal(result[0].orgName, "目标公司A");
+    assert.equal(result[0].peers.length, 1);
+    assert.equal(result[0].peers[0].name, "同事A1");
+    assert.equal(result[1].orgName, "目标公司B");
+    assert.equal(result[1].peers.length, 1);
+    assert.equal(result[1].peers[0].name, "同事B1");
 });

@@ -21,6 +21,38 @@ test("buildTaskMarkdown/parseTaskMarkdown：序列化与解析往返，含勾选
     assert.equal(parseTaskMarkdown("- [ ] 无日期任务").dueDate, null);
 });
 
+test("CODE-02.14：标题含日期标记仍保留标题和正确到期日，不追加双重日历标记", () => {
+    /* 标题末尾带相同日历标记时，不重复拼接两次日历 */
+    const withSameDate = buildTaskMarkdown("确认会议 📅2026-10-01", "2026-10-01", false);
+    assert.equal(withSameDate, "- [ ] 确认会议 📅2026-10-01");
+    const parsedSame = parseTaskMarkdown(withSameDate);
+    assert.equal(parsedSame.title, "确认会议");
+    assert.equal(parsedSame.dueDate, "2026-10-01");
+
+    /* 标题中间包含日期标记时，标题内的日期完整保留，末尾受控日期正确解析 */
+    const withInnerDate = buildTaskMarkdown("讨论 📅2026-11-15 会议排期", "2026-10-01", false);
+    assert.equal(withInnerDate, "- [ ] 讨论 📅2026-11-15 会议排期 📅2026-10-01");
+    const parsedInner = parseTaskMarkdown(withInnerDate);
+    assert.equal(parsedInner.title, "讨论 📅2026-11-15 会议排期");
+    assert.equal(parsedInner.dueDate, "2026-10-01");
+
+    /* 标题包含多行文本时被压平为单行，防破坏列表项结构 */
+    const multiline = buildTaskMarkdown("第一行\r\n第二行", "2026-10-01", false);
+    assert.equal(multiline, "- [ ] 第一行 第二行 📅2026-10-01");
+
+    /* taskMatchesItem 一致性校验：原标题带末尾日期时，对账判定为一致，不触发误改 */
+    const item = {
+        id: "fu-date-title",
+        personDocId: "person-1",
+        title: "确认会议 📅2026-10-01",
+        dueDate: "2026-10-01",
+        status: "open" as const,
+        createdAt: 1,
+        updatedAt: 1,
+    };
+    assert.equal(taskMatchesItem(item, [{ blockId: "block-1", followUpId: item.id, markdown: "- [ ] 确认会议 📅2026-10-01" }]), true);
+});
+
 test("planTaskSync：新建/更新/打勾/删除四类计划，不触碰用户手工任务", () => {
     const blocks = [
         { blockId: "blk-old", followUpId: "fu-old", markdown: "- [ ] 旧标题 📅2026-09-01" },

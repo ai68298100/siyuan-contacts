@@ -3,7 +3,7 @@ import { newNodeId } from "../api/client";
 import { documentExists } from "../api/blocks";
 import { createContact, ContactCreationError, ContactNameAmbiguityError, filterContacts, listContacts, previewContactCreation } from "../services/contacts";
 import type { ContactCreationRequest } from "../services/contacts";
-import { createExternalBridgeApi } from "../services/external-bridge.ts";
+import { createExternalBridgeApi, mountBridgeAliases, unmountBridgeAliases } from "../services/external-bridge.ts";
 import type { LvContactsBridgeApi } from "../services/external-bridge.ts";
 import { recordInteractionWithResult, INTERACTION_STORAGE_KEY } from "../data/interactions";
 import { loadJsonStrict, saveJsonVerified, withStoreLock } from "../data/storage";
@@ -20,15 +20,28 @@ import type { ContactsSettings } from "../domain/model";
 export { defaultBridgeRef };
 export { BRIDGE_PROTOCOL, BridgeError, BridgePersonAmbiguityError } from "../domain/external-bridge.ts";
 export type { BridgePerson, BridgeInteractionMeta, BridgeEnsureOptions, BridgeInteractionResult } from "../domain/external-bridge.ts";
-export type { LvContactsBridgeApi } from "../services/external-bridge.ts";
+export {
+    LVCONTACTS_BRIDGE_PROTOCOL,
+    LVCONTACTS_BRIDGE_VERSION,
+    LVCONTACTS_API_NAME,
+    LVCONTACTS_API_ALIASES,
+} from "../services/external-bridge.ts";
+export type {
+    LvContactsApiAlias,
+    ContactsBridgeOverview,
+    LvContactsBridgeApi,
+} from "../services/external-bridge.ts";
 
 declare global {
     interface Window {
         LvContacts?: LvContactsBridgeApi;
+        lvContacts?: LvContactsBridgeApi;
+        xiaolvContacts?: LvContactsBridgeApi;
+        siyuanContacts?: LvContactsBridgeApi;
     }
 }
 
-let mounted: { api: LvContactsBridgeApi; deactivate(): void } | undefined;
+let mounted: { api: LvContactsBridgeApi; mountedAliases: string[]; deactivate(): void } | undefined;
 
 export function initExternalBridge(plugin: Plugin, getSettings: () => ContactsSettings | null): void {
     disposeExternalBridge();
@@ -103,13 +116,17 @@ export function initExternalBridge(plugin: Plugin, getSettings: () => ContactsSe
             personDocId, source: "api", externalRef, occurredAt, ...(note ? { note } : {}),
         }),
     });
-    mounted = { api, deactivate: () => { active = false; } };
-    window.LvContacts = api;
+    const mountedAliases = typeof window !== "undefined"
+        ? mountBridgeAliases(window as unknown as Record<string, unknown>, api)
+        : [];
+    mounted = { api, mountedAliases, deactivate: () => { active = false; } };
 }
 
 export function disposeExternalBridge(): void {
     if (!mounted) return;
     mounted.deactivate();
-    if (window.LvContacts === mounted.api) delete window.LvContacts;
+    if (typeof window !== "undefined") {
+        unmountBridgeAliases(window as unknown as Record<string, unknown>, mounted.api, mounted.mountedAliases);
+    }
     mounted = undefined;
 }

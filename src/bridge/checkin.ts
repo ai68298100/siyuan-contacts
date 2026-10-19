@@ -15,11 +15,16 @@ export type CheckinBridgeState =
 interface CheckinBridgeApi {
     readonly protocol?: number;
     readonly capabilities?: readonly string[];
+    whenReady?(): Promise<boolean>;
+    hasCapability?(capability: string): boolean;
 }
 
 declare global {
     interface Window {
         siyuanCheckin?: CheckinBridgeApi;
+        xiaolvCheckin?: CheckinBridgeApi;
+        lvCheckin?: CheckinBridgeApi;
+        LvCheckin?: CheckinBridgeApi;
     }
 }
 
@@ -31,7 +36,16 @@ export interface CheckinBridgeStatus {
 
 export function detectCheckinBridge(): CheckinBridgeStatus {
     try {
-        const api = window.siyuanCheckin;
+        if (typeof window === "undefined") {
+            return { state: "unsupported", protocol: null };
+        }
+        const host = window as unknown as {
+            siyuanCheckin?: CheckinBridgeApi;
+            xiaolvCheckin?: CheckinBridgeApi;
+            lvCheckin?: CheckinBridgeApi;
+            LvCheckin?: CheckinBridgeApi;
+        };
+        const api = host.siyuanCheckin || host.xiaolvCheckin || host.lvCheckin || host.LvCheckin;
         if (!api || typeof api !== "object") {
             return { state: "unsupported", protocol: null };
         }

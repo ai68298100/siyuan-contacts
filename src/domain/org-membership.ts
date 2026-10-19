@@ -5,6 +5,8 @@
  */
 
 import { parseStoreRecords, StoreIntegrityError } from "./store-integrity.ts";
+import { isValidDateKey } from "./date-key.ts";
+import { escapeLinkLabel } from "./format.ts";
 
 export type OrgMembershipStatus = "active" | "former";
 export type OrgAffiliationKind = "family" | "work" | "education" | "unspecified";
@@ -87,15 +89,8 @@ export function pageOrgMemberships<T extends Pick<OrgMembership, "status" | "joi
 }
 
 const ID_PATTERN = /^\d{14}-[0-9a-z]{7}$/;
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
 function validMembershipDate(value: string): boolean {
-    if (value === "") return true;
-    if (!DATE_PATTERN.test(value)) return false;
-    const [year, month, day] = value.split("-").map(Number);
-    const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-    const days = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    return year > 0 && month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1];
+    return value === "" || isValidDateKey(value);
 }
 
 export function isValidMembershipPeriod(joinedOn: string, leftOn: string, status: OrgMembershipStatus): boolean {
@@ -356,7 +351,7 @@ export function buildOrgLinksSection(entries: readonly OrgLinkEntry[]): string {
         const details = [classification, status, entry.department, entry.title].filter(Boolean);
         const suffix = details.length ? `（${details.join(" · ")}）`
             : "";
-        return `[${entry.orgName}](siyuan://blocks/${entry.orgDocId})${suffix}`;
+        return `[${escapeLinkLabel(entry.orgName)}](siyuan://blocks/${entry.orgDocId})${suffix}`;
     });
     return `**所属组织**：${links.join("、")}`;
 }
@@ -446,11 +441,14 @@ export function buildCommonOrgBackground(options: {
     const { personDocId, membershipIndex, namesByDoc, orgNames, contactsByDoc } = options;
     const ownRecords = membershipIndex.get(personDocId) ?? [];
     if (ownRecords.length === 0) return [];
+    /* G-09：提取目标人物关联的全部组织集合，剪枝无关组织的扫描与索引构造 */
+    const ownOrgDocIds = new Set(ownRecords.map((record) => record.orgDocId));
     /* 组织 →（人物 → 该组织成员记录）：键序沿用 membershipIndex 首现序，保证同伴顺序稳定 */
     const membersByOrg = new Map<string, Map<string, OrgMembership[]>>();
     for (const [peerDocId, peerRecords] of membershipIndex) {
         if (peerDocId === personDocId) continue;
         for (const record of peerRecords) {
+            if (!ownOrgDocIds.has(record.orgDocId)) continue;
             let byPerson = membersByOrg.get(record.orgDocId);
             if (!byPerson) {
                 byPerson = new Map();

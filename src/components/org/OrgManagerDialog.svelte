@@ -20,6 +20,13 @@
     import type { PickerItem } from "../people/PersonPicker.svelte";
     import { subscribeDataChanged } from "../../libs/data-events";
     import { organizationOptionLabel } from "../../domain/organization-scan";
+    import {
+        buildOrganizationMemberCsv,
+        buildOrganizationMemberTsv,
+        filterOrganizationMemberExportRows,
+    } from "../../domain/org-members-export";
+    import type { OrganizationMemberExportRow } from "../../domain/org-members-export";
+    import { copyPlainText } from "../../shared/clipboard";
 
     let {
         facade,
@@ -54,12 +61,14 @@
     let memberQuery = $state("");
     let memberStatus = $state<"all" | "active" | "former">("all");
     let memberOffset = $state(0);
+    let memberPageSize = $state(20);
     let memberTotal = $state(0);
     let memberHasMore = $state(false);
-    // Keep the editor open for the established empty-state workflow.  The
-    // template hides it while a selection is still loading so that the loading
-    // frame is not mistaken for an unexplained blank box.
-    let showAddMember = $state(true);
+    let memberAttemptOffset = 0;
+    let loadedMemberOrgDocId = "";
+    let memberSearchTimer: ReturnType<typeof setTimeout> | undefined;
+    let showAddMember = $state(false);
+    let expandedMemberId = $state("");
     let memberLoading = $state(false);
     let memberError = $state("");
     let membersRequest = 0;
@@ -79,6 +88,7 @@
         membersRequest += 1;
         organizationsRequest += 1;
         rosterRequest += 1;
+        clearTimeout(memberSearchTimer);
         for (const finish of pendingViewportFrames) finish();
     });
     let roster: ContactSummary[] = $state([]);
@@ -89,8 +99,11 @@
     let addPersonId = $state("");
     let formBusy = $state(false);
     let formBusyLabel = $state("");
+    let memberExporting = $state(false);
+    let memberExportMessage = $state("");
+    let memberExportError = $state("");
     let recoveryBusy = $state(false);
-    const busy = $derived(formBusy || recoveryBusy);
+    const busy = $derived(formBusy || recoveryBusy || memberExporting);
     let loading = $state(true);
     let errorMessage = $state("");
     let recoveryRefreshKey = $state(0);
@@ -151,6 +164,15 @@
     });
 
     const currentOrg = $derived(draftOrg);
+    const memberSummary = $derived.by(() => {
+        const records = currentOrg?.memberships ?? [];
+        return { people: new Set(records.map((entry) => entry.personDocId)).size,
+            active: records.filter((entry) => entry.status === "active").length,
+            former: records.filter((entry) => entry.status === "former").length };
+    });
+    const memberPageCount = $derived(Math.max(1, Math.ceil(memberTotal / memberPageSize)));
+    const memberPageNumber = $derived(Math.floor(memberOffset / memberPageSize) + 1);
+    const memberControlsDisabled = $derived(busy || hasDraft || selectionGuardBusy || organizationMissing);
     const activeOrgs = $derived(orgs.filter((org) => !org.archived && !org.removed));
     const archivedOrgs = $derived(orgs.filter((org) => org.archived && !org.removed));
     const removedOrgs = $derived(orgs.filter((org) => org.removed));
@@ -304,15 +326,16 @@
         if (requested) void untrack(() => selectOrg(requested, true));
     });
 
-    async function loadMembers(reset = true, preserveWindow = false, preservedViewport?: ReturnType<typeof captureViewport>): Promise<void> {
+    async function loadMembers(reset = true, preservePage = false, preservedViewport?: ReturnType<typeof captureViewport>, requestedOffset?: number): Promise<void> {
         if (!alive) return;
         const request = ++membersRequest;
         const previousFocus = captureViewport().focus;
         const docId = currentOrgDocId;
         const query = memberQuery;
         const status = memberStatus;
-        const offset = reset ? 0 : memberOffset;
-        const windowSize = preserveWindow ? Math.max(200, memberOffset) : 200;
+        let offset = requestedOffset ?? (reset && !preservePage ? 0 : memberOffset);
+        const limit = memberPageSize;
+        memberAttemptOffset = offset;
         let viewport: ReturnType<typeof captureViewport> | undefined;
         if (!docId) {
             members = [];
@@ -324,51 +347,48 @@
         }
         memberLoading = true;
         memberError = "";
+        expandedMemberId = "";
         try {
+            let page;
+            let activeIds: string[];
             if (facade.listOrganizationMembersPage) {
-                const items: OrganizationMember[] = [];
-                let page;
-                let pageOffset = offset;
-                do {
-                    page = await facade.listOrganizationMembersPage(docId, { query, status, offset: pageOffset, limit: 200 });
+                // A refresh reads only the visible page. If its last record was
+                // removed, clamp to the last valid page before presenting it.
+                for (let attempt = 0; ; attempt += 1) {
+                    page = await facade.listOrganizationMembersPage(docId, { query, status, offset, limit });
                     if (!alive || request !== membersRequest) return;
-                    if (page.offset !== pageOffset || page.hasMore && page.items.length === 0) throw new Error("成员分页未前进，结果尚未核实");
-                    items.push(...page.items);
-                    pageOffset = page.offset + page.items.length;
-                } while (preserveWindow && page.hasMore && items.length < windowSize);
-                if (!alive || request !== membersRequest) return;
-                if (hasDraft) { refreshNeeded = true; return; }
-                viewport = preservedViewport ?? captureViewport();
-                viewport.focus ??= previousFocus;
-                members = reset ? items : [...members, ...items];
-                activeMemberPersonDocIds = page.activePersonDocIds;
-                memberOffset = page.offset + page.items.length;
-                memberTotal = page.total;
-                memberHasMore = page.hasMore;
-                if (page.total === 0) showAddMember = true;
+                    if (page.offset !== offset || page.items.length > limit || !Number.isSafeInteger(page.total) || page.total < 0
+                        || page.hasMore && page.items.length === 0) throw new Error("成员分页未前进，结果尚未核实");
+                    const lastOffset = Math.max(0, Math.floor((page.total - 1) / limit) * limit);
+                    if (offset <= lastOffset) break;
+                    if (attempt >= 2) throw new Error("成员列表持续变化，请重新读取");
+                    offset = lastOffset;
+                    memberAttemptOffset = offset;
+                }
+                activeIds = page.activePersonDocIds;
             } else {
                 const all = await facade.listOrganizationMembers(docId);
                 if (!alive || request !== membersRequest) return;
                 const filtered = query.trim()
-                    ? all.filter((member) => [member.personName, member.department, member.title]
+                    ? all.filter((member) => [member.personName, member.department, member.title, member.statusLabel ?? "", member.note ?? ""]
                         .some((value) => value.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))) : all;
-                const items: OrganizationMember[] = [];
-                let page;
-                let pageOffset = offset;
-                do {
-                    page = pageOrgMemberships(filtered, { status, offset: pageOffset, limit: 200 });
-                    items.push(...page.items);
-                    pageOffset = page.offset + page.items.length;
-                } while (preserveWindow && page.hasMore && items.length < windowSize);
-                if (hasDraft) { refreshNeeded = true; return; }
-                viewport = preservedViewport ?? captureViewport();
-                viewport.focus ??= previousFocus;
-                members = reset ? items : [...members, ...items];
-                activeMemberPersonDocIds = all.filter((member) => member.status === "active").map((member) => member.personDocId);
-                memberOffset = page.offset + page.items.length;
-                memberTotal = page.total;
-                memberHasMore = page.hasMore;
-                if (page.total === 0) showAddMember = true;
+                page = pageOrgMemberships(filtered, { status, offset, limit });
+                const lastOffset = Math.max(0, Math.floor((page.total - 1) / limit) * limit);
+                if (offset > lastOffset) page = pageOrgMemberships(filtered, { status, offset: lastOffset, limit });
+                activeIds = all.filter((member) => member.status === "active").map((member) => member.personDocId);
+            }
+            if (hasDraft) { refreshNeeded = true; return; }
+            viewport = preservedViewport ?? captureViewport();
+            viewport.focus ??= previousFocus;
+            members = page.items;
+            activeMemberPersonDocIds = activeIds;
+            memberOffset = page.offset;
+            memberAttemptOffset = page.offset;
+            memberTotal = page.total;
+            memberHasMore = page.hasMore;
+            if (loadedMemberOrgDocId !== docId) {
+                showAddMember = page.total === 0 && !query.trim() && status === "all";
+                loadedMemberOrgDocId = docId;
             }
         } catch (error) {
             if (alive && request === membersRequest) memberError = requestErrorMessage(error);
@@ -380,36 +400,122 @@
         }
     }
 
-    function reloadMembers(): void {
+    function reloadMembers(debounce = false): void {
         if (busy || loading || selectionGuardBusy || hasDraft || organizationMissing) return;
-        void (async () => {
-            try {
-                await loadMembers(true);
-            } catch (error) {
-                errorMessage = requestErrorMessage(error);
-            }
-        })();
+        clearTimeout(memberSearchTimer);
+        memberExportMessage = "";
+        memberExportError = "";
+        // Invalidate an older query as soon as typing starts, before the next
+        // debounced request, so late results cannot flash as a confirmed match.
+        membersRequest += 1;
+        memberLoading = true;
+        expandedMemberId = "";
+        if (debounce) memberSearchTimer = setTimeout(() => { void loadMembers(true); }, 180);
+        else void loadMembers(true);
     }
 
-    function loadMoreMembers(): void {
-        if (busy || memberLoading || selectionGuardBusy || hasDraft || memberError || !memberHasMore) return;
-        void (async () => {
-            try {
-                await loadMembers(false);
-            } catch (error) {
-                errorMessage = requestErrorMessage(error);
-            }
-        })();
+    function changeMemberPage(offset: number): void {
+        if (memberControlsDisabled || memberLoading || memberError || offset < 0 || offset >= memberTotal) return;
+        void loadMembers(false, false, undefined, offset);
     }
 
     function retryMembers(): void {
         if (busy || loading || memberLoading || organizationsRefreshing || selectionGuardBusy || hasDraft || organizationMissing) return;
-        void loadMembers(true, true);
+        void loadMembers(false, true, undefined, memberAttemptOffset);
     }
 
     function reloadOrganizations(): void {
         if (busy || loading || memberLoading || organizationsRefreshing || selectionGuardBusy || hasDraft) return;
         void loadOrgs(true).catch((error) => { if (alive) errorMessage = requestErrorMessage(error); });
+    }
+
+    function toMemberExportRow(member: OrganizationMember, organizationName: string): OrganizationMemberExportRow {
+        return {
+            id: member.id,
+            orgDocId: member.orgDocId,
+            organizationName,
+            personDocId: member.personDocId,
+            personName: member.personName,
+            department: member.department,
+            title: member.title,
+            joinedOn: member.joinedOn,
+            leftOn: member.leftOn,
+            status: member.status,
+            statusLabel: member.statusLabel,
+            affiliationKind: member.affiliationKind,
+            note: member.note,
+        };
+    }
+
+    async function loadMembersForExport(): Promise<OrganizationMemberExportRow[]> {
+        const docId = currentOrgDocId;
+        if (!docId) return [];
+        const query = memberQuery.trim();
+        const status = memberStatus;
+        const organizationName = currentOrg?.name ?? "";
+        /* 旧宿主没有分页 facade 时，沿用已有全量读取并在本地复现筛选语义。 */
+        if (!facade.listOrganizationMembersPage) {
+            const all = await facade.listOrganizationMembers(docId);
+            return filterOrganizationMemberExportRows(all.map((member) => toMemberExportRow(member, organizationName)), { query, status });
+        }
+        const pageSize = 200;
+        const rows: OrganizationMember[] = [];
+        const rowIds = new Set<string>();
+        let offset = 0;
+        let expectedTotal: number | undefined;
+        for (let pageIndex = 0; pageIndex < 5000; pageIndex += 1) {
+            const page = await facade.listOrganizationMembersPage(docId, { query, status, offset, limit: pageSize });
+            const reportedLimit = Number.isSafeInteger(page.limit) ? page.limit : pageSize;
+            if (page.offset !== offset || !Array.isArray(page.items) || !Number.isSafeInteger(page.total) || page.total < 0
+                || !Number.isSafeInteger(reportedLimit) || reportedLimit < 1 || reportedLimit > 500
+                || page.items.length > reportedLimit || typeof page.hasMore !== "boolean") {
+                throw new Error("成员导出分页结果尚未核实，请重新读取后重试");
+            }
+            expectedTotal ??= page.total;
+            if (page.total !== expectedTotal) throw new Error("成员列表在导出期间发生变化，请重新读取后重试");
+            if (page.items.some((item) => rowIds.has(item.id))) throw new Error("成员导出分页出现重复记录，请重新读取后重试");
+            page.items.forEach((item) => rowIds.add(item.id));
+            rows.push(...page.items);
+            if (!page.hasMore) {
+                if (rows.length !== expectedTotal) throw new Error("成员导出未读取完整，结果尚未核实");
+                return rows.map((member) => toMemberExportRow(member, organizationName));
+            }
+            if (page.items.length === 0) throw new Error("成员导出分页未前进，结果尚未核实");
+            offset += page.items.length;
+        }
+        throw new Error("成员数量过大，导出已停止；请缩小筛选范围后重试");
+    }
+
+    async function exportFilteredMembers(kind: "csv" | "copy-tsv"): Promise<void> {
+        if (memberExporting || busy || loading || organizationsRefreshing || selectionGuardBusy || memberLoading || !currentOrgDocId) return;
+        memberExporting = true;
+        memberExportMessage = "";
+        memberExportError = "";
+        try {
+            const exported = await loadMembersForExport();
+            if (!alive) return;
+            if (kind === "copy-tsv") {
+                await copyPlainText(buildOrganizationMemberTsv(exported, { includeBom: false }));
+                if (alive) memberExportMessage = `已复制当前筛选的 ${exported.length} 条成员记录（TSV）`;
+                return;
+            }
+            const organizationName = currentOrg?.name ?? "";
+            const stamp = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+            const safeOrganizationName = (organizationName || "组织")
+                .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_").trim().replace(/[. ]+$/g, "") || "组织";
+            const blob = new Blob([buildOrganizationMemberCsv(exported)], { type: "text/csv;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = `小驴人脉_${safeOrganizationName}_成员_${stamp}.csv`;
+            anchor.click();
+            setTimeout(() => URL.revokeObjectURL(url), 0);
+            memberExportMessage = `已下载当前筛选的 ${exported.length} 条成员记录（CSV）`;
+        } catch (error) {
+            if (alive) memberExportError = requestErrorMessage(error);
+        } finally {
+            if (alive) memberExporting = false;
+        }
     }
 
     async function loadRoster(): Promise<void> {
@@ -510,6 +616,15 @@
                 currentOrgDocId = docId;
                 members = [];
                 memberOffset = 0;
+                memberAttemptOffset = 0;
+                loadedMemberOrgDocId = "";
+                memberQuery = "";
+                memberStatus = "all";
+                memberExportMessage = "";
+                memberExportError = "";
+                showAddMember = false;
+                expandedMemberId = "";
+                clearTimeout(memberSearchTimer);
                 memberTotal = 0;
                 memberHasMore = false;
                 activeMemberPersonDocIds = [];
@@ -543,6 +658,9 @@
                 if (!alive) return;
                 newOrgName = "";
                 currentOrgDocId = created.docId;
+                memberOffset = 0;
+                memberQuery = "";
+                memberStatus = "all";
                 /* 创建写入已完成，组织刷新是只读收口；允许新组织的成员入口
                    在列表出现后立即可用，不把后台成员读取误报成写入忙态。 */
                 formBusy = false;
@@ -601,13 +719,14 @@
     /** B13.4：进入成员编辑（表单初始化自当前记录） */
     function startEditMember(member: OrganizationMember): void {
         if (busy || hasDraft || memberError) return;
+        expandedMemberId = "";
         editingMemberId = member.id;
         editingMemberSnapshot = { ...member };
         editDepartment = member.department;
         editTitle = member.title;
         editJoinedOn = member.joinedOn;
         editLeftOn = member.leftOn;
-        editStatus = currentOrg?.archived ? "former" : member.status;
+        editStatus = member.status;
         editStatusLabel = member.statusLabel ?? "";
         editNote = member.note ?? "";
         editAffiliationKind = member.affiliationKind ?? "unspecified";
@@ -644,6 +763,7 @@
 
     function startMoveMember(member: OrganizationMember): void {
         if (busy || hasDraft || memberError || !facade.moveOrganizationMember) return;
+        expandedMemberId = "";
         movingMemberId = member.id;
         movingMemberSnapshot = { ...member };
         moveTargetOrgId = "";
@@ -667,12 +787,16 @@
             const target = moveTargetOrgId;
             cancelMoveMember();
             currentOrgDocId = target;
+            memberOffset = 0;
+            memberQuery = "";
+            memberStatus = "all";
             await loadOrgs(true);
         }, "移动中…");
     }
 
     function startReplaceMember(member: OrganizationMember): void {
         if (busy || memberLoading || organizationsRefreshing || hasDraft || memberError || member.status !== "active") return;
+        expandedMemberId = "";
         const today = toLocalDateKey(new Date());
         replacingMemberId = member.id;
         replacingMemberSnapshot = { ...member };
@@ -778,9 +902,96 @@
         editStatus = status;
         if (status === "active") editLeftOn = "";
     }
+
+    function resetAddDraft(): void {
+        addPersonId = "";
+        addAffiliationKind = currentOrg?.name.trim() === "家庭" ? "family" : "unspecified";
+        addStatus = currentOrg?.archived ? "former" : "active";
+        addStatusLabel = "";
+        addDepartment = "";
+        addTitle = "";
+        addNote = "";
+        addJoinedOn = "";
+        addLeftOn = "";
+    }
+
+    async function toggleAddMember(): Promise<void> {
+        if (showAddMember) {
+            await guardedClose(() => { resetAddDraft(); showAddMember = false; });
+        } else {
+            expandedMemberId = "";
+            showAddMember = true;
+            await tick();
+            managerElement?.querySelector<HTMLButtonElement>(".lvct-org-manager__add .lvct-picker__trigger")?.focus();
+        }
+    }
+
+    function closeMemberActions(restoreFocus = false): void {
+        const id = expandedMemberId;
+        expandedMemberId = "";
+        if (restoreFocus && id) {
+            const row = [...(managerElement?.querySelectorAll<HTMLElement>(".lvct-org-manager__member") ?? [])]
+                .find((element) => element.dataset.membershipId === id);
+            row?.querySelector<HTMLButtonElement>(".lvct-org-manager__member-more")?.focus({ preventScroll: true });
+        }
+    }
+
+    async function toggleMemberActions(id: string): Promise<void> {
+        if (expandedMemberId === id) { closeMemberActions(); return; }
+        expandedMemberId = id;
+        await tick();
+        document.getElementById(`lvct-member-actions-${id}`)?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+    }
+
+    function dismissMemberActions(event: PointerEvent): void {
+        if (expandedMemberId && event.target instanceof Element && !event.target.closest("[data-member-actions]")) closeMemberActions();
+    }
+
+    function handleMemberKeydown(event: KeyboardEvent): void {
+        if (event.key === "Escape" && expandedMemberId) {
+            event.preventDefault();
+            event.stopPropagation();
+            closeMemberActions(true);
+        }
+    }
 </script>
 
-<div class="lvct-dialog-root lvct-org-manager" data-org-doc-id={currentOrgDocId} aria-busy={busy} bind:this={managerElement}>
+<svelte:window onpointerdown={dismissMemberActions} />
+
+{#snippet memberIdentity(member: OrganizationMember)}
+    <span class="lvct-org-manager__member-name">
+        <span class="lvct-org-manager__member-primary"><strong>{member.personName}</strong>
+            <span class="lvct-org-manager__member-status" class:lvct-org-manager__member-status--active={member.status === "active"}>{orgMembershipStatusLabel(member)}</span>
+        </span>
+        <span class="lvct-org-manager__member-meta">{[affiliationLabel(member.affiliationKind), member.department, member.title].filter(Boolean).join(" · ")}</span>
+        {#if member.joinedOn || member.leftOn}
+            <span class="lvct-org-manager__member-period">{member.joinedOn || "加入日期未填"} — {member.leftOn || (member.status === "active" ? "至今" : "离开日期未填")}</span>
+        {/if}
+        {#if member.note}<span class="lvct-org-manager__member-note">{member.note}</span>{/if}
+    </span>
+{/snippet}
+
+{#snippet memberPagination()}
+    <nav class="lvct-org-manager__pagination" aria-label="成员分页">
+        <span class="lvct-org-manager__page-summary" role="status" aria-live="polite" aria-atomic="true">
+            {memberLoading ? text("orgMembersLoading", "正在加载成员…") : memberError ? "成员读取失败，当前页待核实" : `${memberTotal ? memberOffset + 1 : 0}–${memberOffset + members.length} / ${memberTotal} 条`}
+        </span>
+        <label class="lvct-org-manager__page-size"><span>每页</span>
+            <select class="b3-select" aria-label="每页成员条数" bind:value={memberPageSize} onchange={() => reloadMembers()} disabled={memberControlsDisabled || memberLoading}>
+                <option value={20}>20 条</option><option value={50}>50 条</option><option value={100}>100 条</option>
+            </select>
+        </label>
+        <div class="lvct-org-manager__page-buttons">
+            <button type="button" class="b3-button b3-button--outline" onclick={() => changeMemberPage(memberOffset - memberPageSize)}
+                disabled={memberControlsDisabled || memberLoading || !!memberError || memberOffset === 0}>上一页</button>
+            <span>第 {memberPageNumber} / {memberPageCount} 页</span>
+            <button type="button" class="b3-button b3-button--outline" onclick={() => changeMemberPage(memberOffset + memberPageSize)}
+                disabled={memberControlsDisabled || memberLoading || !!memberError || !memberHasMore}>下一页</button>
+        </div>
+    </nav>
+{/snippet}
+
+<div class="lvct-dialog-root lvct-org-manager" role="dialog" tabindex="-1" aria-label="组织管理" data-org-doc-id={currentOrgDocId} aria-busy={busy} bind:this={managerElement} onkeydown={handleMemberKeydown}>
     {#if busy}<p class="ft__smaller ft__on-surface" role="status" aria-live="polite">{formBusyLabel || "正在处理…"}</p>{/if}
     {#if refreshNeeded}<p class="lvct-org-manager__refresh" role="status">{text("orgMembershipRefreshNeeded", "成员或组织有新变化，重新读取后核对。未保存的表单保留。")}</p>{/if}
     <div class="lvct-org-manager__layout">
@@ -942,11 +1153,7 @@
                             <ul class="lvct-org-manager__member-list" aria-label="已移除组织的成员历史">
                                 {#each members as member (member.id)}
                                     <li class="lvct-org-manager__member" data-membership-id={member.id} data-person-doc-id={member.personDocId}>
-                                        <span class="lvct-org-manager__member-name">
-                                            {member.personName} · {affiliationLabel(member.affiliationKind)}{member.title ? ` · ${member.title}` : ""}{member.department ? `（${member.department}）` : ""}
-                                            <span class="lvct-org-manager__member-status">{orgMembershipStatusLabel(member)}</span>
-                                            {#if member.note}<span class="lvct-org-manager__member-note" title={member.note}>💬 {member.note}</span>{/if}
-                                        </span>
+                                        {@render memberIdentity(member)}
                                         {#if onOpenPerson}
                                             <button type="button" class="b3-button b3-button--text" disabled={busy || memberLoading || organizationsRefreshing || selectionGuardBusy}
                                                 onclick={() => onOpenPerson?.(member.personDocId, currentOrgDocId)}>{text("orgCommonOpen", "查看详情")}</button>
@@ -954,36 +1161,41 @@
                                     </li>
                                 {/each}
                             </ul>
-                            {#if memberHasMore}
-                                <button type="button" class="b3-button b3-button--outline" onclick={loadMoreMembers}
-                                    disabled={busy || memberLoading || organizationsRefreshing || selectionGuardBusy}>
-                                    {memberLoading ? text("orgMembersLoading", "正在加载成员…") : text("orgMembersLoadMore", "加载更多")}
-                                </button>
-                            {/if}
+                            {@render memberPagination()}
                         {/if}
                     </div>
                 {:else}
                 <div class="lvct-org-manager__members" aria-busy={busy}>
                     <div class="fn__flex" style="gap: 8px; align-items: center; flex-wrap: wrap;">
                         <b>{text("orgMembersTitle", "成员")}</b>
-                        <span class="ft__smaller ft__on-surface">{text("orgMemberCount", "{n} 条记录", { n: memberTotal })}</span>
+                        <span class="ft__smaller ft__on-surface">{memberSummary.people} 人 · {memberSummary.active} 条当前 · {memberSummary.former} 条历史</span>
+                        <button type="button" class="b3-button b3-button--outline"
+                            disabled={busy || loading || organizationsRefreshing || memberLoading || selectionGuardBusy || !!memberError || memberTotal === 0}
+                            title={memberTotal === 0 ? "当前筛选没有可导出的成员" : undefined}
+                            onclick={() => void exportFilteredMembers("csv")}>{memberExporting ? "准备导出…" : "下载 CSV"}</button>
+                        <button type="button" class="b3-button b3-button--outline"
+                            disabled={busy || loading || organizationsRefreshing || memberLoading || selectionGuardBusy || !!memberError || memberTotal === 0}
+                            title={memberTotal === 0 ? "当前筛选没有可复制的成员" : undefined}
+                            onclick={() => void exportFilteredMembers("copy-tsv")}>{memberExporting ? "处理中…" : "复制 TSV"}</button>
                         <button type="button" class="b3-button b3-button--primary lvct-org-manager__add-toggle"
                             disabled={busy || loading || memberError !== "" || selectionGuardBusy || !!editingMemberId || !!replacingMemberId || !!movingMemberId || !!removingMemberId}
-                            onclick={() => (showAddMember = !showAddMember)}>
+                            onclick={toggleAddMember}>
                             {showAddMember ? text("orgMemberAddCollapse", "收起添加") : text("orgMemberAdd", "添加成员")}</button>
                     </div>
                     <div class="fn__flex" style="gap: 8px; margin: 8px 0; flex-wrap: wrap;">
                         <input class="b3-text-field fn__flex-1" type="search" bind:value={memberQuery}
                             placeholder={text("orgMemberSearch", "搜索姓名、部门、职位、状态或备注")}
                             aria-label={text("orgMemberSearch", "搜索姓名、部门、职位、状态或备注")}
-                            oninput={reloadMembers} disabled={busy || hasDraft || selectionGuardBusy} />
-                        <select class="b3-select" bind:value={memberStatus} onchange={reloadMembers} disabled={busy || hasDraft || selectionGuardBusy}
+                            oninput={() => reloadMembers(true)} disabled={busy || hasDraft || selectionGuardBusy} />
+                        <select class="b3-select" bind:value={memberStatus} onchange={() => reloadMembers()} disabled={busy || hasDraft || selectionGuardBusy}
                             aria-label={text("orgMemberStatusFilter", "成员状态") }>
                             <option value="all">{text("orgMemberStatusAll", "全部")}</option>
                             <option value="active">{text("orgStatusActive", "在职/在读")}</option>
                             <option value="former">{text("orgStatusFormer", "已离开")}</option>
                         </select>
                     </div>
+                    {#if memberExportMessage}<p class="ft__smaller ft__on-surface" role="status" aria-live="polite">{memberExportMessage}</p>{/if}
+                    {#if memberExportError}<p class="lvct-form__error" role="alert">{memberExportError}</p>{/if}
                     {#if showAddMember}
                         <div class="lvct-org-manager__add" class:lvct-org-manager__add--loading={memberLoading} aria-label={text("orgMemberAddPanel", "添加成员") }>
                             <p class="ft__smaller ft__on-surface">{text("orgMembershipAddImpact", "添加会登记新期间并更新双方当前双链；已离开的期间保留，重复添加当前成员不新增记录。")}</p>
@@ -1124,7 +1336,7 @@
                                             <label>{text("orgMemberStatusLabel", "状态")}
                                                 <select class="b3-select fn__block" value={editStatus} onchange={(event) => changeEditStatus(event.currentTarget.value as OrgMembershipStatus)} disabled={busy}
                                                     aria-label={text("orgMemberStatusLabel", "状态")}>
-                                                    <option value="active" disabled={Boolean(currentOrg?.archived)}>{text("orgStatusActive", "当前在职/就读")}</option>
+                                                    <option value="active" disabled={Boolean(currentOrg?.archived) && editingMemberSnapshot?.status !== "active"}>{text("orgStatusActive", "当前在职/就读")}</option>
                                                     <option value="former">{text("orgStatusFormer", "已离开/毕业")}</option>
                                                 </select></label>
                                             <label><span>{text("orgMemberCustomStatus", "自定义状态")}</span><input class="b3-text-field fn__block" maxlength="40" bind:value={editStatusLabel} disabled={busy} placeholder={text("orgMemberCustomStatusPlaceholder", "例如：实习、兼职、休学")} /></label>
@@ -1136,7 +1348,7 @@
                                                     <option value="family">{affiliationLabel("family")}</option>
                                                     <option value="unspecified">{affiliationLabel("unspecified")}</option>
                                                 </select></label>
-                                                <p class="ft__smaller ft__on-surface">{currentOrg?.archived ? "该组织已归档，不能新增或恢复当前归属；可维护现存记录并保留历史。" : text("orgMembershipEditImpact", "保存会更新这段成员记录及双方当前双链；离开保留历史。恢复在职/在学须清空离开日期。")}</p>
+                                                <p class="ft__smaller ft__on-surface">{currentOrg?.archived ? "该组织已归档，可保留原状态维护现存记录；只有明确改为已离开才会结束该段经历。不能新增当前归属或将历史记录恢复为当前。" : text("orgMembershipEditImpact", "保存会更新这段成员记录及双方当前双链；离开保留历史。恢复在职/在学须清空离开日期。")}</p>
                                             <div class="fn__flex" style="gap: 8px;">
                                                 <button type="button" class="b3-button b3-button--text" disabled={busy}
                                                     onclick={saveEditMember}>{busy && formBusyLabel === "保存中…" ? "保存中…" : text("orgMemberSave", "保存")}</button>
@@ -1145,32 +1357,34 @@
                                             </div>
                                         </div>
                                     {:else}
-                                        <span class="lvct-org-manager__member-name">
-                                            {member.personName} · {affiliationLabel(member.affiliationKind)}{member.title ? ` · ${member.title}` : ""}{member.department ? `（${member.department}）` : ""}
-                                            <span class="lvct-org-manager__member-status">{orgMembershipStatusLabel(member)}</span>
-                                            {#if member.note}<span class="lvct-org-manager__member-note" title={member.note}>💬 {member.note}</span>{/if}
-                                        </span>
-                                        <span class="fn__flex" style="gap: 4px;">
+                                        {@render memberIdentity(member)}
+                                        <span class="lvct-org-manager__member-actions" data-member-actions>
                                             {#if onOpenPerson}
                                                 <button type="button" class="b3-button b3-button--text" disabled={busy || memberLoading || organizationsRefreshing || hasDraft || selectionGuardBusy || !!movingMemberId}
                                                     onclick={() => onOpenPerson?.(member.personDocId, currentOrgDocId)}>{text("orgCommonOpen", "查看详情")}</button>
                                             {/if}
                                             <button type="button" class="b3-button b3-button--text" disabled={busy || hasDraft || !!memberError || !!movingMemberId}
                                                 onclick={() => startEditMember(member)}>{text("orgMemberEdit", "编辑")}</button>
-                                            {#if facade.moveOrganizationMember}
-                                                <button type="button" class="b3-button b3-button--text" disabled={busy || hasDraft || !!memberError || !!movingMemberId}
-                                                    onclick={() => startMoveMember(member)}>{text("orgMemberMove", "移动")}</button>
-                                            {/if}
-                                            {#if member.status === "active" && !currentOrg?.archived}
-                                                <button type="button" class="b3-button b3-button--text" disabled={busy || hasDraft || !!memberError || !!movingMemberId}
-                                                    onclick={() => startReplaceMember(member)}>{text("orgMemberReplace", "接替")}</button>
-                                            {/if}
-                                            <button
-                                                type="button"
-                                                class="b3-button b3-button--cancel"
+                                            <button type="button" class="b3-button b3-button--text lvct-org-manager__member-more"
+                                                aria-expanded={expandedMemberId === member.id} aria-controls={`lvct-member-actions-${member.id}`}
+                                                aria-label={`更多成员操作：${member.personName}`}
                                                 disabled={busy || hasDraft || !!memberError || !!movingMemberId}
-                                                onclick={() => { removingMemberId = member.id; removingMemberSnapshot = { ...member }; }}
-                                            >{text("orgMemberRemove", "移除")}</button>
+                                                onclick={() => void toggleMemberActions(member.id)}>更多</button>
+                                            {#if expandedMemberId === member.id}
+                                                <span id={`lvct-member-actions-${member.id}`} class="lvct-org-manager__member-menu" role="group" aria-label={`更多成员操作：${member.personName}`}>
+                                                    {#if facade.moveOrganizationMember}
+                                                        <button type="button" class="b3-button b3-button--text" disabled={busy || hasDraft || !!memberError || !!movingMemberId}
+                                                            onclick={() => startMoveMember(member)}>{text("orgMemberMove", "移动")}</button>
+                                                    {/if}
+                                                    {#if member.status === "active" && !currentOrg?.archived}
+                                                        <button type="button" class="b3-button b3-button--text" disabled={busy || hasDraft || !!memberError || !!movingMemberId}
+                                                            onclick={() => startReplaceMember(member)}>{text("orgMemberReplace", "接替")}</button>
+                                                    {/if}
+                                                    <button type="button" class="b3-button b3-button--cancel" disabled={busy || hasDraft || !!memberError || !!movingMemberId}
+                                                        onclick={() => { removingMemberId = member.id; expandedMemberId = ""; removingMemberSnapshot = { ...member }; }}>
+                                                        {text("orgMemberRemove", "移除")}</button>
+                                                </span>
+                                            {/if}
                                         </span>
                                         {#if removingMemberId === member.id}
                                             <div class="lvct-org-manager__member-confirm" role="group" aria-label={text("orgMembershipRemoveConfirm", "确认移除这段成员历史")}>
@@ -1183,13 +1397,7 @@
                                 </li>
                             {/each}
                         </ul>
-                        {#if memberHasMore}
-                            <button type="button" class="b3-button b3-button--outline" onclick={loadMoreMembers}
-                                disabled={busy || memberLoading || hasDraft || !!memberError || selectionGuardBusy}
-                                title={busy || memberLoading ? "成员列表仍在读取，请稍候" : hasDraft ? "请先保存或取消当前成员编辑" : memberError ? "请先重试成员列表读取" : selectionGuardBusy ? "正在核对组织关系，请稍候" : undefined}>
-                                {memberLoading ? text("orgMembersLoading", "正在加载成员…") : text("orgMembersLoadMore", "加载更多")}
-                            </button>
-                        {/if}
+                        {@render memberPagination()}
                     {/if}
                 </div>
                 {/if}

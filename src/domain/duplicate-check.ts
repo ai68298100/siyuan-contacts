@@ -84,9 +84,13 @@ export function findDuplicatePairs(people: readonly ContactSummary[], maxPairs: 
     const addToBucket = (bucket: Map<string, ContactSummary[]>, kind: DuplicateReasonKind, buildLabel: (key: string) => string) => {
         for (const [key, members] of bucket) {
             if (members.length < 2) continue;
+            if (pairs.size >= maxPairs) return; /* G-07：达到配对上限时立即终止外层循环 */
+            const label = buildLabel(key);
             for (let i = 0; i < members.length; i += 1) {
+                if (pairs.size >= maxPairs) return;
                 for (let j = i + 1; j < members.length; j += 1) {
-                    addReason(members[i], members[j], { kind, label: buildLabel(key) });
+                    if (pairs.size >= maxPairs) return;
+                    addReason(members[i], members[j], { kind, label });
                 }
             }
         }

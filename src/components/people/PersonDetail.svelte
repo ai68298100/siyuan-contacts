@@ -32,13 +32,14 @@ import StatusNotice from "../StatusNotice.svelte";
     import PersonFieldsEditor from "./PersonFieldsEditor.svelte";
     import type { PersonFieldsSnapshot, PersonFieldsState } from "../../domain/person-fields";
     import type { LegacyPersonNoteSnapshot } from "../../domain/person-note";
-    import { buildBriefingMarkdown } from "../../domain/briefing-export";
+    import { buildBriefingMarkdown, buildBriefingFilename } from "../../domain/briefing-export";
     import { addReviewDays, groupByMonth, inDateRange, onThisDay } from "../../domain/date-review";
     import { toLocalDateKey } from "../../domain/interactions";
     import OrgMembershipResult from "../org/OrgMembershipResult.svelte";
     import type { OrgMembershipWriteReport } from "../../services/org-member-writes";
     import { orgMembershipStatusLabel } from "../../domain/org-membership";
     import type { OrgAffiliationKind, OrgMembership, OrgMembershipPatch, OrgMembershipStatus } from "../../domain/org-membership";
+    import { confirmDialog } from "../../libs/confirm-dialog";
 
     let {
         settings,
@@ -141,7 +142,7 @@ import StatusNotice from "../StatusNotice.svelte";
         onSaveCadence?: (personDocId: string, cadence: PersonCadence | null) => Promise<void>;
         /** 互动备注模板（F09，可选：未接线时隐藏选用入口） */
         onListTemplates?: () => Promise<NoteTemplate[]>;
-        onSaveTemplates?: (templates: NoteTemplate[]) => Promise<NoteTemplate[]>;
+        onSaveTemplates?: (templates: NoteTemplate[], expected: readonly NoteTemplate[]) => Promise<NoteTemplate[]>;
         onLoadExchanges?: (personDocId: string) => Promise<import("../../domain/exchanges").ExchangeRecord[]>;
         onCreateExchange?: (input: import("../../services/exchanges").CreatePersonExchangeInput) => Promise<import("../../domain/exchanges").ExchangeRecord>;
         onChangeExchangeStatus?: (id: string, status: import("../../domain/exchanges").ExchangeStatus, settledOn?: string, expected?: { updatedAt: number }) => Promise<import("../../domain/exchanges").ExchangeRecord>;
@@ -458,7 +459,14 @@ import StatusNotice from "../StatusNotice.svelte";
 
     async function deleteTimelineItem(eventId: string) {
         if (busy || !onDeleteInteraction) return;
-        if (!window.confirm(`删除「${current.name}」的这条互动吗？只删除本人的记录，其他参与者与人物文档会保留。`)) return;
+        const confirmed = await confirmDialog({
+            title: "删除互动记录",
+            message: `删除「${current.name}」的这条互动吗？只删除本人的记录，其他参与者与人物文档会保留。`,
+            confirmLabel: "删除",
+            cancelLabel: "取消",
+            danger: true,
+        });
+        if (!confirmed) return;
         busy = true;
         errorText = "";
         try {
@@ -524,10 +532,17 @@ import StatusNotice from "../StatusNotice.svelte";
         templateChoice = "";
     }
 
-    async function persistTemplates(list: NoteTemplate[]): Promise<NoteTemplate[]> {
-        const saved = await onSaveTemplates!(list);
+    async function persistTemplates(list: NoteTemplate[], expected: readonly NoteTemplate[]): Promise<NoteTemplate[]> {
+        const saved = await onSaveTemplates!(list, expected);
         templates = saved;
         return saved;
+    }
+
+    async function reloadTemplates(): Promise<NoteTemplate[]> {
+        const latest = await onListTemplates!();
+        templates = latest;
+        templateLoadError = "";
+        return latest;
     }
 
     const relatedPeople = $derived(
@@ -667,14 +682,21 @@ import StatusNotice from "../StatusNotice.svelte";
         const anchor = document.createElement("a");
         anchor.href = url;
         const stamp = new Date().toISOString().slice(0, 10);
-        anchor.download = `小驴人脉_简报_${current.name}_${stamp}.md`;
+        anchor.download = buildBriefingFilename(current.name, stamp);
         anchor.click();
         URL.revokeObjectURL(url);
     }
 
     async function confirmDelete() {
         if (deleting || busy) return;
-        if (!window.confirm(`确定从人脉名册移除「${current.name}」吗？人物文档会保留。`)) return;
+        const confirmed = await confirmDialog({
+            title: "移除联系人",
+            message: `确定从人脉名册移除「${current.name}」吗？人物文档会保留。`,
+            confirmLabel: "移除",
+            cancelLabel: "取消",
+            danger: true,
+        });
+        if (!confirmed) return;
         deleting = true;
         errorText = "";
         try {
@@ -1048,8 +1070,8 @@ import StatusNotice from "../StatusNotice.svelte";
 
     loadCommonOrgs();
 
-    /* FUNC-01.7-a：数据变化（跨窗口/宿主）→ 原地重载洞察与跟进；写入/操作挂起时跳过
-       （Workbench 对草稿场景给出可见提示条），当前人物与输入草稿保留 */
+    /* FUNC-01.7-a & K-04：数据变化（跨窗口/宿主）→ 原地重载洞察、跟进与组织成员事实；
+       各模块独立守卫未保存草稿，彼此不串锁阻断，当前人物与输入草稿严格保留 */
     let lastSeenRevision = untrack(() => revision);
     let refreshPending = $state(false);
     let orgRefreshPending = $state(false);
@@ -1059,8 +1081,7 @@ import StatusNotice from "../StatusNotice.svelte";
             refreshPending = true;
             orgRefreshPending = true;
         }
-        if (busy || followUpBusy || personNoteSaving || personNoteLegacyBusy || cadenceSaving || personNoteDraft !== personNote) return;
-        if (refreshPending) {
+        if (refreshPending && !busy && !followUpBusy && !personNoteSaving && !personNoteLegacyBusy && !cadenceSaving && personNoteDraft === personNote) {
             refreshPending = false;
             void loadOthers();
             void loadInsights();
@@ -1141,7 +1162,14 @@ import StatusNotice from "../StatusNotice.svelte";
 
     async function cancelFollowUp(item: FollowUpItem) {
         if (followUpBusy || !onSetFollowUpStatus) return;
-        if (!window.confirm(`取消跟进「${item.title || text("fuKeepInTouch", "保持联系")}」？取消后不再出现在待办中。`)) return;
+        const confirmed = await confirmDialog({
+            title: "取消跟进计划",
+            message: `取消跟进「${item.title || text("fuKeepInTouch", "保持联系")}」？取消后不再出现在待办中。`,
+            confirmLabel: "取消计划",
+            cancelLabel: "保留",
+            danger: true,
+        });
+        if (!confirmed) return;
         followUpBusy = true;
         followUpError = "";
         followUpActionError = "";
@@ -1937,7 +1965,7 @@ import StatusNotice from "../StatusNotice.svelte";
 
 {#if templateManagerOpen}
     <LvctDialog title={text("tplManagerTitle", "管理互动备注模板")} onClose={() => (templateManagerOpen = false)}>
-        <TemplateManager {i18n} templates={templates} onSave={persistTemplates} onClose={() => (templateManagerOpen = false)} />
+        <TemplateManager {i18n} templates={templates} onSave={persistTemplates} onReload={reloadTemplates} onClose={() => (templateManagerOpen = false)} />
     </LvctDialog>
 {/if}
 
