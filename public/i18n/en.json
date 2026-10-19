@@ -982,5 +982,12 @@
   "settingsPageSubtitle": "Configure default behaviors, data anchors, and reminders to keep your contacts workspace under control.",
   "homeSearchDisabled": "Please enter a contact name or keyword",
   "orgEditTitle": "Edit Organization Profile",
-  "orgCreateTitle": "Create Organization"
+  "orgCreateTitle": "Create Organization",
+  "topicsConvertBtn": "To Interaction",
+  "topicsConvertAria": "Transfer topic to interaction note",
+  "topicsConverted": "Transferred",
+  "topicsConvertConfirmTitle": "Replace Interaction Note Draft",
+  "topicsConvertConfirmMsg": "You currently have an unsaved interaction note draft. Transferring this topic will replace your draft. Continue?",
+  "topicsConvertConfirmBtn": "Replace Draft",
+  "topicsConvertCancelBtn": "Cancel"
 }

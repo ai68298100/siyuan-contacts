@@ -7225,6 +7225,51 @@ await test("E-32 会面谈资与备忘：空态、添加置顶、复制反馈与
     assert(fixture.textContent.includes("置顶话题 B"), "保留的话题消失了");
 });
 
+await test("E-32 会面谈资转互动备注：一键填入草稿、防覆盖守卫确认与记录后自动移除谈资", async () => {
+    let recordedNote = "";
+    let topicsList = [
+        { id: "top-101", text: "聊聊开源组件", createdAt: 1000 },
+    ];
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async (_docId, note) => {
+            recordedNote = note;
+        },
+        onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onDeleted() {}, onClose() {}, onChanged() {},
+        onLoadTopics: async () => [...topicsList],
+        onAddTopic: async () => [...topicsList],
+        onRemoveTopic: async (_docId, topicId) => {
+            topicsList = topicsList.filter((item) => item.id !== topicId);
+            return [...topicsList];
+        },
+    } });
+
+    await until(() => fixture.querySelector(".lvct-detail__topics-section"), "未渲染谈资备忘分区");
+    await until(() => fixture.textContent.includes("聊聊开源组件"), "未加载初始话题");
+
+    // 点击「转互动」按钮
+    const convertBtn = fixture.querySelector(".lvct-detail__topic-actions button:nth-child(2)");
+    assert(convertBtn, "未找到转互动按钮");
+    assert(convertBtn.textContent.includes("转互动"), "按钮文案应为转互动");
+    convertBtn.click();
+
+    // 检查互动输入框是否已填入话题内容
+    const noteInput = fixture.querySelector(".lvct-detail__record input");
+    assert(noteInput, "未找到互动备注输入框");
+    await until(() => noteInput.value === "聊聊开源组件", "转互动未将话题内容填入输入框");
+    await until(() => convertBtn.textContent.includes("已转入草稿"), "转入后按钮未更新为已转入草稿");
+
+    // 点击「记录」按钮完成互动记录
+    const recordBtn = fixture.querySelector(".lvct-detail__record button");
+    assert(recordBtn, "未找到记录按钮");
+    recordBtn.click();
+
+    await until(() => recordedNote === "聊聊开源组件", "未记录填入的谈资互动备注");
+    await until(() => fixture.querySelectorAll(".lvct-detail__topic-item").length === 0, "互动记录完成后谈资未被移除");
+    assert(fixture.textContent.includes("暂无谈资备忘"), "谈资移除后未恢复空态");
+});
+
 await runMigrationRegression({ test, assert, person, settings, kernel, fixture, until, button });
 await runPeopleProfileRegression({ test, assert, kernel, settings, fixture, until, button });
 await runProfileCardRegression({ test, assert, fixture });

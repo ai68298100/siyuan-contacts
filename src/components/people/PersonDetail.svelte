@@ -231,6 +231,19 @@ import StatusNotice from "../StatusNotice.svelte";
         if (!current) throw new Error("当前没有人物");
         await onRecord(current.docId, noteText.trim() || undefined);
         recorded = true;
+        if (pendingConvertedTopicId && onRemoveTopic) {
+            const topicIdToRemove = pendingConvertedTopicId;
+            pendingConvertedTopicId = "";
+            try {
+                const list = await onRemoveTopic(current.docId, topicIdToRemove);
+                if (detailAlive) {
+                    topics = list;
+                    onChanged();
+                }
+            } catch (err) {
+                console.warn("[lvct] 互动记录后移除已转换谈资失败", err);
+            }
+        }
         noteText = "";
         await loadInsights();
     }
@@ -670,6 +683,7 @@ import StatusNotice from "../StatusNotice.svelte";
     let newTopicText = $state("");
     let addingTopic = $state(false);
     let copiedTopicId = $state("");
+    let pendingConvertedTopicId = $state("");
 
     async function loadTopics() {
         if (!onLoadTopics) return;
@@ -728,6 +742,23 @@ import StatusNotice from "../StatusNotice.svelte";
         } catch (err) {
             console.warn("[lvct] 复制谈资备忘失败", err);
         }
+    }
+
+    async function handleConvertToInteraction(topic: import("../../domain/topics").PersonTopicItem) {
+        if (noteText.trim() && noteText.trim() !== topic.text) {
+            const ok = await confirmDialog({
+                title: text("topicsConvertConfirmTitle", "替换互动备注草稿"),
+                message: text("topicsConvertConfirmMsg", "当前已有未记录的互动备注草稿，转入谈资将替换当前草稿。确定继续吗？"),
+                confirmLabel: text("topicsConvertConfirmBtn", "确认替换"),
+                cancelLabel: text("topicsConvertCancelBtn", "取消"),
+            });
+            if (!ok) return;
+        }
+        noteText = topic.text;
+        recorded = false;
+        pendingConvertedTopicId = topic.id;
+        const noteInput = document.querySelector<HTMLInputElement>(".lvct-detail__record input");
+        noteInput?.focus();
     }
 
     // ---- 会面简报导出（F11） ----
@@ -1471,6 +1502,12 @@ import StatusNotice from "../StatusNotice.svelte";
                                     aria-label={text("topicsCopyAria", "复制话题内容")}
                                     onclick={() => void handleCopyTopic(topic)}
                                 >{copiedTopicId === topic.id ? text("topicsCopied", "已复制 ✓") : text("topicsCopy", "复制")}</button>
+                                <button
+                                    type="button"
+                                    class="b3-button b3-button--text"
+                                    aria-label={text("topicsConvertAria", "将谈资转为互动备注")}
+                                    onclick={() => void handleConvertToInteraction(topic)}
+                                >{pendingConvertedTopicId === topic.id ? text("topicsConverted", "已转入草稿") : text("topicsConvertBtn", "转互动")}</button>
                                 <button
                                     type="button"
                                     class="b3-button b3-button--cancel"

@@ -982,5 +982,12 @@
   "settingsPageSubtitle": "配置默认行为、数据锚点和提醒，让联系人工作台保持可控。",
   "homeSearchDisabled": "请输入联系人姓名或其他关键词",
   "orgEditTitle": "编辑组织资料",
-  "orgCreateTitle": "新建组织"
+  "orgCreateTitle": "新建组织",
+  "topicsConvertBtn": "转互动",
+  "topicsConvertAria": "将谈资转为互动备注",
+  "topicsConverted": "已转入草稿",
+  "topicsConvertConfirmTitle": "替换互动备注草稿",
+  "topicsConvertConfirmMsg": "当前已有未记录的互动备注草稿，转入谈资将替换当前草稿。确定继续吗？",
+  "topicsConvertConfirmBtn": "确认替换",
+  "topicsConvertCancelBtn": "取消"
 }
