@@ -16,6 +16,15 @@ import {
     type GiftIdeaItem,
 } from "../src/domain/gift-ideas.ts";
 import { StoreIntegrityError } from "../src/domain/store-integrity.ts";
+import {
+    addPersonGiftIdea,
+    loadGiftIdeaStoreStrict,
+    loadPersonGiftIdeas,
+    removePersonGiftIdea,
+    updatePersonGiftIdea,
+    GIFT_IDEAS_STORAGE_KEY,
+} from "../src/data/gift-ideas.ts";
+import type { Plugin } from "siyuan";
 
 const personDocId = "20261019000000-doc0001";
 
@@ -127,4 +136,48 @@ test("E-26 gift: 读写严格检查与容错归一化", () => {
     // 容错读取
     assert.deepEqual(normalizeGiftIdeaStore(null), emptyGiftIdeaStore());
     assert.deepEqual(normalizeGiftIdeaStore("invalid"), emptyGiftIdeaStore());
+});
+
+test("E-26 gift 数据层：addPersonGiftIdea、loadPersonGiftIdeas、update 与 remove 存储闭环", async () => {
+    const memory = new Map<string, unknown>();
+    const plugin = {
+        async loadData(key: string) {
+            return memory.has(key) ? structuredClone(memory.get(key)) : null;
+        },
+        async saveData(key: string, value: unknown) {
+            memory.set(key, structuredClone(value));
+        },
+    } as unknown as Plugin;
+
+    // 初始状态为空
+    assert.deepEqual(await loadPersonGiftIdeas(plugin, personDocId), []);
+
+    // 存入第一个礼物点子
+    const idea1 = mockIdea({ id: "g1", title: "降噪耳机", type: "idea", priceEstimate: 1299 });
+    const list1 = await addPersonGiftIdea(plugin, idea1);
+    assert.equal(list1.length, 1);
+    assert.equal(list1[0].title, "降噪耳机");
+
+    // 存入一条偏好
+    const pref1 = mockIdea({ id: "g2", title: "喜欢乌龙茶", type: "preference" });
+    const list2 = await addPersonGiftIdea(plugin, pref1);
+    assert.equal(list2.length, 2);
+
+    // 回读验证
+    const loaded = await loadPersonGiftIdeas(plugin, personDocId);
+    assert.equal(loaded.length, 2);
+
+    // 更新点子状态为已采购
+    const updated = await updatePersonGiftIdea(plugin, personDocId, "g1", { status: "purchased" });
+    const updatedItem = updated.find((i) => i.id === "g1")!;
+    assert.equal(updatedItem.status, "purchased");
+
+    // 移除点子
+    const afterRemove = await removePersonGiftIdea(plugin, personDocId, "g1");
+    assert.equal(afterRemove.length, 1);
+    assert.equal(afterRemove[0].id, "g2");
+
+    // 损坏数据严格拒绝
+    memory.set(GIFT_IDEAS_STORAGE_KEY, { schemaVersion: 999, ideas: {} });
+    await assert.rejects(() => loadGiftIdeaStoreStrict(plugin), StoreIntegrityError);
 });

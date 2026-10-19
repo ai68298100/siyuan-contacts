@@ -187,20 +187,20 @@ evidence_paths / owner / last_updated / commit
 - **退出边界：** 域层纯函数实现与测试全部通过；UI 跟进列表多视角分组视图后续单独挂接。
 - **完成回报：** `pnpm check` 0 错误 0 警告、单测 810/810 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
 
-#### AG-E26-GIFT-IDEAS — 礼物点子与偏好清单（E-26）纯函数域模型与算法
+#### AG-E26-GIFT-IDEAS — 礼物点子与偏好清单（E-26）纯函数域与存储层
 
-- **status / priority / type / milestone：** `done_isolated` / P1 / feature+domain / M3；已完成礼物点子与喜好偏好数据模型（`GiftIdeaItem` / `GiftIdeaStore`，支持 idea/preference 类别、idea/purchased/given 状态、预算、链接、场合与规格备注）、单人 30 条上限与安全校验（`validateGiftIdea`）、已送出点子转正式往来账本记录投影（`convertGiftIdeaToExchange`，作为 payable/settled 支出），经 4/4 单测与架构完整性守门全绿。
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+data / M3；已完成礼物点子与喜好偏好数据模型（`GiftIdeaItem` / `GiftIdeaStore`，支持 idea/preference 类别、idea/purchased/given 状态、预算、链接、场合与规格备注）、单人 30 条上限与安全校验（`validateGiftIdea`）、已送出点子转正式往来账本记录投影（`convertGiftIdeaToExchange`，作为 payable/settled 支出），以及数据存储层（`src/data/gift-ideas.ts`，`gift-ideas.json` 键表与 Web Lock + 写后回读，DATA-CONTRACT §3 登记），经 5/5 单测与架构完整性守门全绿。
 - **user_outcome / user_scenario：** 用户可随手记录联系人的喜好偏好（如“喜欢黑咖啡无糖”）或送礼点子（如“生日送降噪耳机”），跟踪构思/已采购/已送出状态；未送点子绝不计入人情往来或财务统计；礼物实际送出后可一键转换为正式往来账本记录，账目与点子清晰解耦。
-- **source_ids / current_evidence：** E-26、`docs/ACTIVE-BACKLOG.md`；`src/domain/gift-ideas.ts`、`tests/gift-ideas.test.ts`；单测全量通过。
-- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3 exchanges / 纯函数域层计算，不修改持久化 JSON，不污染往来账本财务统计。
-- **allowed_files / forbidden_files：** gift-ideas 域与测试、package.json / 保护文件。
-- **contract_change / host_or_spike_required：** 无存储结构变更；纯函数输出 GiftIdeaItem 与派生 ExchangeRecord。
-- **ordered_steps：** 礼物点子与偏好类型设计 → 校验与单人上限算法 → 转往来账本投影实现 → 单元测试与 package.json 门禁注册 → 门禁通过。
-- **test_fixtures / test_commands / acceptance：** 纯函数标题/文档ID/金额非负校验、add/update/remove 与 30 条上限、活跃点子与偏好过滤、转正式往来记录（金额/日期/支出方向/结清状态/场合描述匹配）、坏库严格抛错；`pnpm check`、`pnpm test`（814/814）、`pnpm build` 与 `pnpm check:release`。
-- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算，O(1) 决策复杂度；纯本地计算，不发送外部网络或大模型。
-- **evidence_paths / owner / last_updated / commit：** `src/domain/gift-ideas.ts`、`tests/gift-ideas.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
-- **退出边界：** 域层纯函数实现与测试全部通过；UI 点子面板与转账本按钮后续单独挂接。
-- **完成回报：** `pnpm check` 0 错误 0 警告、单测 814/814 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
+- **source_ids / current_evidence：** E-26、`docs/ACTIVE-BACKLOG.md`；`src/domain/gift-ideas.ts`、`src/data/gift-ideas.ts`、`tests/gift-ideas.test.ts`；单测全量通过。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3 gift-ideas / 独立自管 JSON，Web Lock + 写后回读，未送出不污染往来账本财务统计。
+- **allowed_files / forbidden_files：** gift-ideas 域/数据与测试、package.json、契约 / 保护文件。
+- **contract_change / host_or_spike_required：** DATA-CONTRACT §3 新增 `gift-ideas.json`（版本 1，单人最多 30 条，严格读 + Web Lock + 写后回读校验）。
+- **ordered_steps：** 礼物点子与偏好类型设计 → 校验与单人上限算法 → 转往来账本投影实现 → 数据存储层实现 → 契约登记 → 单元与存储测试 → 门禁通过。
+- **test_fixtures / test_commands / acceptance：** 纯函数标题/文档ID/金额非负校验、add/update/remove 与 30 条上限、活跃点子与偏好过滤、转正式往来记录（金额/日期/支出方向/结清状态/场合描述匹配）、数据层存储闭环回读、坏库严格抛错；`pnpm check`、`pnpm test`（815/815）、`pnpm build` 与 `pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算与本地存储，单人 30 条上限控制体积；坏条目拒绝抛出 StoreIntegrityError；纯本地存储。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/gift-ideas.ts`、`src/data/gift-ideas.ts`、`tests/gift-ideas.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 域层纯函数实现与数据存储层测试全部通过；UI 点子面板与转账本按钮后续单独挂接。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 815/815 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
 
 #### AG-ISSUE-051-054-FIELDS — 重复资料与两层分组首版
 
