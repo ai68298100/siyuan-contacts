@@ -25,10 +25,37 @@ export interface BridgeDependencies {
     record(docId: string, ref: string, occurredAt: number, note: string): Promise<{ recorded: boolean }>;
 }
 
+export const LVCONTACTS_BRIDGE_PROTOCOL = BRIDGE_PROTOCOL;
+export const LVCONTACTS_BRIDGE_VERSION = "0.5.18";
+export const LVCONTACTS_API_NAME = "LvContacts";
+export const LVCONTACTS_API_ALIASES = [
+    "LvContacts",
+    "lvContacts",
+    "xiaolvContacts",
+    "siyuanContacts",
+] as const;
+
+export type LvContactsApiAlias = (typeof LVCONTACTS_API_ALIASES)[number];
+
+export interface ContactsBridgeOverview {
+    protocol: number;
+    apiVersion: number;
+    version: string;
+    capabilities: readonly string[];
+    safety: Readonly<{ stableDocIds: true; persistentRequests: true; itemResults: true; unknownWrites: "verify_first" }>;
+    writable: boolean;
+    updatedAt: string;
+}
+
 export interface LvContactsBridgeApi {
     readonly protocol: number;
+    readonly apiVersion: number;
+    readonly version: string;
     readonly capabilities: readonly string[];
     readonly safety: Readonly<{ stableDocIds: true; persistentRequests: true; itemResults: true; unknownWrites: "verify_first" }>;
+    whenReady(): Promise<boolean>;
+    hasCapability(capability: string): boolean;
+    getOverview(): ContactsBridgeOverview;
     searchPeople(keyword?: string): Promise<BridgePerson[]>;
     getPerson(docId: string): Promise<BridgePerson | null>;
     ensurePerson(name: string, options?: BridgeEnsureOptions): Promise<BridgePerson & { created: boolean }>;
@@ -89,8 +116,38 @@ export function createExternalBridgeApi(deps: BridgeDependencies): LvContactsBri
 
     return Object.freeze({
         protocol: BRIDGE_PROTOCOL,
+        apiVersion: 1,
+        version: LVCONTACTS_BRIDGE_VERSION,
         capabilities: BRIDGE_CAPABILITIES,
         safety: Object.freeze({ stableDocIds: true, persistentRequests: true, itemResults: true, unknownWrites: "verify_first" as const }),
+        async whenReady() {
+            try {
+                deps.guard();
+                deps.settings();
+                return true;
+            } catch {
+                throw new BridgeError("disposed", "getPerson");
+            }
+        },
+        hasCapability(capability: string) {
+            return (BRIDGE_CAPABILITIES as readonly string[]).includes(capability)
+                || capability === "whenReady"
+                || capability === "getOverview"
+                || capability === "hasCapability";
+        },
+        getOverview(): ContactsBridgeOverview {
+            deps.guard();
+            const settings = deps.settings();
+            return Object.freeze({
+                protocol: BRIDGE_PROTOCOL,
+                apiVersion: 1,
+                version: LVCONTACTS_BRIDGE_VERSION,
+                capabilities: BRIDGE_CAPABILITIES,
+                safety: Object.freeze({ stableDocIds: true, persistentRequests: true, itemResults: true, unknownWrites: "verify_first" as const }),
+                writable: Boolean(settings?.notebookId && settings?.avId),
+                updatedAt: new Date().toISOString(),
+            });
+        },
         async searchPeople(keyword?: string) {
             const query = bridgeKeyword(keyword);
             const settings = settingsFor("searchPeople");
@@ -166,7 +223,19 @@ export function createExternalBridgeApi(deps: BridgeDependencies): LvContactsBri
                 await persist(store, "ensurePerson", true);
                 const verified = resolveBridgePerson(await freshPeople(settings, "ensurePerson"), person.docId, "ensurePerson");
                 if (!verified || verified.itemId !== person.itemId) throw new BridgeError("identity_unknown", "ensurePerson", "unknown");
-                return { ...bridgePerson(verified), created: true };
+                const outcome = { ...bridgePerson(verified), created: true };
+                if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+                    const detail = {
+                        v: 1,
+                        source: "siyuan-contacts",
+                        type: "person-created",
+                        eventId: `contacts_created_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                        at: new Date().toISOString(),
+                    };
+                    window.dispatchEvent(new CustomEvent("lv-contacts:person-created", { detail }));
+                    window.dispatchEvent(new CustomEvent("lv-contacts:data-changed", { detail: { ...detail, type: "data-changed" } }));
+                }
+                return outcome;
             });
         },
         async recordInteraction(personDocIds: readonly string[], meta?: BridgeInteractionMeta) {
@@ -258,8 +327,49 @@ export function createExternalBridgeApi(deps: BridgeDependencies): LvContactsBri
                         }
                     }
                 }
-                return summarizeBridgeInteraction(results, recorded);
+                const summary = summarizeBridgeInteraction(results, recorded);
+                if (summary.recorded > 0 && typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+                    const detail = {
+                        v: 1,
+                        source: "siyuan-contacts",
+                        type: "interaction-logged",
+                        eventId: `contacts_interaction_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                        at: new Date().toISOString(),
+                    };
+                    window.dispatchEvent(new CustomEvent("lv-contacts:interaction-logged", { detail }));
+                    window.dispatchEvent(new CustomEvent("lv-contacts:data-changed", { detail: { ...detail, type: "data-changed" } }));
+                }
+                return summary;
             });
         },
     });
 }
+
+export function mountBridgeAliases(
+    host: Record<string, unknown> | undefined,
+    api: LvContactsBridgeApi
+): string[] {
+    if (!host) return [];
+    const mounted: string[] = [];
+    for (const alias of LVCONTACTS_API_ALIASES) {
+        if (!host[alias] || host[alias] === api) {
+            host[alias] = api;
+            mounted.push(alias);
+        }
+    }
+    return mounted;
+}
+
+export function unmountBridgeAliases(
+    host: Record<string, unknown> | undefined,
+    api: LvContactsBridgeApi,
+    aliases: readonly string[]
+): void {
+    if (!host) return;
+    for (const alias of aliases) {
+        if (host[alias] === api) {
+            delete host[alias];
+        }
+    }
+}
+

@@ -333,6 +333,29 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
         // 对外人员服务桥（任务管理等插件经 window.LvContacts 查人/建人/记交集）
         initExternalBridge(this, () => this.settings);
+
+        // 跨插件生态联动事件监听（打卡、拾遗、闪卡、考试）
+        const ecosystemHandler = () => {
+            if (this.isLifecycleActive(lifecycleToken) && this.preferencesActive) {
+                this.onDataChanged();
+            }
+        };
+        if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+            window.addEventListener("lv-checkin:item-recorded", ecosystemHandler);
+            window.addEventListener("lv-glean:data-changed", ecosystemHandler);
+            window.addEventListener("lv-cards:reviewed", ecosystemHandler);
+            window.addEventListener("lv-exam:stats", ecosystemHandler);
+        }
+        const prevCleanup = this.eventCleanup;
+        this.eventCleanup = () => {
+            prevCleanup?.();
+            if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
+                window.removeEventListener("lv-checkin:item-recorded", ecosystemHandler);
+                window.removeEventListener("lv-glean:data-changed", ecosystemHandler);
+                window.removeEventListener("lv-cards:reviewed", ecosystemHandler);
+                window.removeEventListener("lv-exam:stats", ecosystemHandler);
+            }
+        };
     }
 
     onLayoutReady() {

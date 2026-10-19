@@ -4,10 +4,18 @@ import {
     BRIDGE_PROTOCOL, BRIDGE_STORAGE_KEY, BridgeError, BridgePersonAmbiguityError, bridgeEventEvidence,
     normalizeBridgeEnsure, normalizeBridgeInteraction, normalizeBridgeRequestStore, resolveBridgePerson,
 } from "../src/domain/external-bridge.ts";
-import { createExternalBridgeApi } from "../src/services/external-bridge.ts";
+import {
+    createExternalBridgeApi,
+    LVCONTACTS_BRIDGE_PROTOCOL,
+    LVCONTACTS_BRIDGE_VERSION,
+    LVCONTACTS_API_ALIASES,
+    mountBridgeAliases,
+    unmountBridgeAliases,
+} from "../src/services/external-bridge.ts";
 import type { BridgeDependencies } from "../src/services/external-bridge.ts";
 import type { BridgeRequestStore, BridgePerson } from "../src/domain/external-bridge.ts";
 import type { ContactsSettings } from "../src/domain/model.ts";
+import { detectCheckinBridge } from "../src/bridge/checkin.ts";
 
 const firstId = "20261004000000-person1";
 const secondId = "20261004000000-person2";
@@ -426,3 +434,160 @@ test("队列等待中卸载或锚点变化阻止迟到写入", async () => {
     await assert.rejects(write, { code: "disposed" });
     assert.equal(state.records, 0);
 });
+
+test("Epoch 6: whenReady、hasCapability 和 getOverview 契约自证且不泄露个人隐私", async () => {
+    const { api, state } = fixture();
+    assert.equal(await api.whenReady(), true);
+
+    // hasCapability
+    assert.equal(api.hasCapability("searchPeople"), true);
+    assert.equal(api.hasCapability("getPerson"), true);
+    assert.equal(api.hasCapability("ensurePerson"), true);
+    assert.equal(api.hasCapability("recordInteraction"), true);
+    assert.equal(api.hasCapability("whenReady"), true);
+    assert.equal(api.hasCapability("getOverview"), true);
+    assert.equal(api.hasCapability("hasCapability"), true);
+    assert.equal(api.hasCapability("deletePerson"), false);
+    assert.equal(api.hasCapability("unknownMethod"), false);
+
+    // getOverview
+    const overview = api.getOverview();
+    assert.equal(overview.protocol, 2);
+    assert.equal(overview.apiVersion, 1);
+    assert.equal(overview.version, LVCONTACTS_BRIDGE_VERSION);
+    assert.deepEqual(overview.capabilities, ["searchPeople", "getPerson", "ensurePerson", "recordInteraction"]);
+    assert.equal(overview.safety.stableDocIds, true);
+    assert.equal(overview.safety.persistentRequests, true);
+    assert.equal(overview.safety.itemResults, true);
+    assert.equal(overview.safety.unknownWrites, "verify_first");
+    assert.equal(overview.writable, true);
+    assert.equal(typeof overview.updatedAt, "string");
+    // Verify object immutability and zero leak of roster/contacts
+    assert.equal(Object.isFrozen(overview), true);
+    const jsonStr = JSON.stringify(overview);
+    assert.doesNotMatch(jsonStr, /同名人物|roster|firstId|secondId|phone|address/);
+
+    // whenReady & getOverview on disposed
+    state.active = false;
+    await assert.rejects(api.whenReady(), { code: "disposed" });
+    assert.throws(() => api.getOverview(), { code: "disposed" });
+});
+
+test("Epoch 6: 多别名挂载、First-Instance-Wins 与身份校验安全卸载", () => {
+    const fakeWindow: Record<string, any> = {};
+    const { api } = fixture();
+
+    // 1. Mount all aliases
+    const mounted1 = mountBridgeAliases(fakeWindow, api);
+    assert.deepEqual(mounted1, [...LVCONTACTS_API_ALIASES]);
+    for (const alias of LVCONTACTS_API_ALIASES) {
+        assert.equal(fakeWindow[alias], api);
+    }
+
+    // 2. Simulate third-party instance conflict on one alias (First-Instance-Wins)
+    const foreigner = { protocol: 2, name: "alien" } as any;
+    fakeWindow.LvContacts = foreigner;
+
+    // Second mount should respect existing foreign object and NOT overwrite it
+    // Nor should it overwrite existing aliases already owned by api1
+    const { api: api2 } = fixture();
+    const mounted2 = mountBridgeAliases(fakeWindow, api2);
+    assert.equal(fakeWindow.LvContacts, foreigner, "Existing foreign bridge must not be overwritten");
+    assert.equal(mounted2.includes("LvContacts"), false, "Foreign alias should not be in mounted list");
+    assert.deepEqual(mounted2, []);
+    assert.equal(fakeWindow.lvContacts, api);
+
+    // 3. Unmount api1 should remove only its owned aliases and leave foreigner intact
+    unmountBridgeAliases(fakeWindow, api, mounted1);
+    assert.equal(fakeWindow.LvContacts, foreigner, "Foreigner must not be deleted");
+    assert.equal(fakeWindow.lvContacts, undefined, "Owned alias must be cleaned up");
+    assert.equal(fakeWindow.xiaolvContacts, undefined);
+    assert.equal(fakeWindow.siyuanContacts, undefined);
+});
+
+test("Epoch 6: 建人和互动触发松耦合 DOM CustomEvent 广播", async () => {
+    const originalWindow = (globalThis as any).window;
+    const originalCustomEvent = (globalThis as any).CustomEvent;
+    const dispatchedEvents: Array<{ type: string; detail: any }> = [];
+    (globalThis as any).window = {
+        dispatchEvent: (event: any) => {
+            dispatchedEvents.push({ type: event.type, detail: event.detail });
+            return true;
+        },
+    };
+    (globalThis as any).CustomEvent = class {
+        type: string;
+        detail: any;
+        constructor(type: string, params?: any) {
+            this.type = type;
+            this.detail = params?.detail;
+        }
+    };
+
+    try {
+        const { api } = fixture();
+        // Record interaction
+        const result = await api.recordInteraction([firstId], { ref: "plugin:event:test", date: "2026-10-04" });
+        assert.equal(result.recorded, 1);
+
+        // Verify interaction event dispatched
+        const interactionEvent = dispatchedEvents.find((e) => e.type === "lv-contacts:interaction-logged");
+        assert.ok(interactionEvent, "Should dispatch lv-contacts:interaction-logged");
+        assert.equal(interactionEvent.detail.v, 1);
+        assert.equal(interactionEvent.detail.source, "siyuan-contacts");
+        assert.equal(interactionEvent.detail.type, "interaction-logged");
+        assert.ok(interactionEvent.detail.eventId);
+        assert.ok(interactionEvent.detail.at);
+
+        // Ensure person with creation
+        const ensured = await api.ensurePerson("新人物", { ref: "ext:person:test" });
+        assert.equal(ensured.created, true);
+
+        const personEvent = dispatchedEvents.find((e) => e.type === "lv-contacts:person-created");
+        assert.ok(personEvent, "Should dispatch lv-contacts:person-created");
+        assert.equal(personEvent.detail.v, 1);
+        assert.equal(personEvent.detail.source, "siyuan-contacts");
+        assert.equal(personEvent.detail.type, "person-created");
+        assert.ok(personEvent.detail.eventId);
+        assert.ok(personEvent.detail.at);
+    } finally {
+        (globalThis as any).window = originalWindow;
+        (globalThis as any).CustomEvent = originalCustomEvent;
+    }
+});
+
+test("Epoch 6: detectCheckinBridge 支持多别名探测与状态自证", () => {
+    const originalWindow = (globalThis as any).window;
+    try {
+        // 1. No window -> unsupported
+        delete (globalThis as any).window;
+        assert.deepEqual(detectCheckinBridge(), { state: "unsupported", protocol: null });
+
+        // 2. Window without checkin -> unsupported
+        (globalThis as any).window = {};
+        assert.deepEqual(detectCheckinBridge(), { state: "unsupported", protocol: null });
+
+        // 3. Low protocol -> pending
+        (globalThis as any).window = { siyuanCheckin: { protocol: 4 } };
+        assert.deepEqual(detectCheckinBridge(), { state: "pending", protocol: 4 });
+
+        // 4. Standard siyuanCheckin ready
+        (globalThis as any).window = { siyuanCheckin: { protocol: 5 } };
+        assert.deepEqual(detectCheckinBridge(), { state: "ready", protocol: 5 });
+
+        // 5. Multi-alias xiaolvCheckin fallback
+        (globalThis as any).window = { xiaolvCheckin: { protocol: 5 } };
+        assert.deepEqual(detectCheckinBridge(), { state: "ready", protocol: 5 });
+
+        // 6. Multi-alias lvCheckin fallback
+        (globalThis as any).window = { lvCheckin: { protocol: 6 } };
+        assert.deepEqual(detectCheckinBridge(), { state: "ready", protocol: 6 });
+
+        // 7. Multi-alias LvCheckin fallback
+        (globalThis as any).window = { LvCheckin: { protocol: 5 } };
+        assert.deepEqual(detectCheckinBridge(), { state: "ready", protocol: 5 });
+    } finally {
+        (globalThis as any).window = originalWindow;
+    }
+});
+
