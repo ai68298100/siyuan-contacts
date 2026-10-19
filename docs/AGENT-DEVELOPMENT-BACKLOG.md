@@ -200,7 +200,7 @@ evidence_paths / owner / last_updated / commit
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算与本地存储，单人 30 条上限控制体积；坏条目拒绝抛出 StoreIntegrityError；纯本地存储。
 - **evidence_paths / owner / last_updated / commit：** `src/domain/gift-ideas.ts`、`src/data/gift-ideas.ts`、`tests/gift-ideas.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
 - **退出边界：** 域层纯函数实现与数据存储层测试全部通过；UI 点子面板与转账本按钮后续单独挂接。
-- **完成回报：** `pnpm check` 0 错误 0 警告、单测 815/815 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 815/815 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过；E-26 礼物点子与偏好 UI 已接入 PersonDetail（录入/状态推进/已送出转往来账本/移除），双语 i18n 完整，三套 UI 各 482/482 守门。
 
 #### AG-ISSUE-051-054-FIELDS — 重复资料与两层分组首版
 

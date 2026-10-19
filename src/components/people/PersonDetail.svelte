@@ -42,6 +42,8 @@ import StatusNotice from "../StatusNotice.svelte";
     import type { OrgAffiliationKind, OrgMembership, OrgMembershipPatch, OrgMembershipStatus } from "../../domain/org-membership";
     import { confirmDialog } from "../../libs/confirm-dialog";
     import { copyPlainText } from "../../shared/clipboard";
+    import { convertGiftIdeaToExchange, newGiftIdeaId, type GiftIdeaItem, type GiftIdeaStatus, type GiftIdeaType } from "../../domain/gift-ideas";
+    import { newExchangeRequestId } from "../../services/exchanges";
 
     let {
         settings,
@@ -96,6 +98,10 @@ import StatusNotice from "../StatusNotice.svelte";
         onAddTopic,
         onRemoveTopic,
         onRemoveContactToTrash,
+        onLoadGiftIdeas,
+        onAddGiftIdea,
+        onUpdateGiftIdea,
+        onRemoveGiftIdea,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
@@ -163,6 +169,11 @@ import StatusNotice from "../StatusNotice.svelte";
         onRemoveTopic?: (personDocId: string, topicId: string) => Promise<import("../../domain/topics").PersonTopicItem[]>;
         /** E-33 联系人回收站软删除（可选） */
         onRemoveContactToTrash?: (person: import("../../domain/person").ContactSummary) => Promise<void>;
+        /** E-26 礼物点子与偏好清单（可选） */
+        onLoadGiftIdeas?: (personDocId: string) => Promise<import("../../domain/gift-ideas").GiftIdeaItem[]>;
+        onAddGiftIdea?: (item: import("../../domain/gift-ideas").GiftIdeaItem) => Promise<import("../../domain/gift-ideas").GiftIdeaItem[]>;
+        onUpdateGiftIdea?: (personDocId: string, ideaId: string, patch: Partial<import("../../domain/gift-ideas").GiftIdeaItem>) => Promise<import("../../domain/gift-ideas").GiftIdeaItem[]>;
+        onRemoveGiftIdea?: (personDocId: string, ideaId: string) => Promise<import("../../domain/gift-ideas").GiftIdeaItem[]>;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -763,6 +774,115 @@ import StatusNotice from "../StatusNotice.svelte";
         pendingConvertedTopicId = topic.id;
         const noteInput = document.querySelector<HTMLInputElement>(".lvct-detail__record input");
         noteInput?.focus();
+    }
+
+    // ---- E-26 礼物点子与偏好清单 ----
+    const giftIdeasSupported = $derived(Boolean(onLoadGiftIdeas));
+    let giftIdeas = $state<GiftIdeaItem[]>([]);
+    let giftIdeasLoading = $state(false);
+    let giftIdeasError = $state("");
+    let newGiftTitle = $state("");
+    let newGiftType = $state<GiftIdeaType>("idea");
+    let newGiftPrice = $state<string | number>("");
+    let newGiftOccasion = $state("");
+    let addingGift = $state(false);
+
+    async function loadGiftIdeas() {
+        if (!onLoadGiftIdeas) return;
+        const docId = current.docId;
+        giftIdeasLoading = true;
+        giftIdeasError = "";
+        try {
+            const list = await onLoadGiftIdeas(docId);
+            if (detailAlive && current.docId === docId) giftIdeas = list;
+        } catch (error) {
+            if (detailAlive && current.docId === docId) giftIdeasError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive && current.docId === docId) giftIdeasLoading = false;
+        }
+    }
+    loadGiftIdeas();
+
+    async function handleAddGiftIdea() {
+        if (!onAddGiftIdea || addingGift || !newGiftTitle.trim()) return;
+        addingGift = true;
+        giftIdeasError = "";
+        try {
+            const rawPrice = typeof newGiftPrice === "number" ? newGiftPrice : newGiftPrice.trim() ? Number(newGiftPrice.trim()) : undefined;
+            const item: GiftIdeaItem = {
+                id: newGiftIdeaId(),
+                personDocId: current.docId,
+                type: newGiftType,
+                status: "idea",
+                title: newGiftTitle.trim(),
+                priceEstimate: typeof rawPrice === "number" && Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : undefined,
+                targetOccasion: newGiftOccasion.trim() || undefined,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            };
+            const list = await onAddGiftIdea(item);
+            if (detailAlive) {
+                giftIdeas = list;
+                newGiftTitle = "";
+                newGiftPrice = "";
+                newGiftOccasion = "";
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) giftIdeasError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive) addingGift = false;
+        }
+    }
+
+    async function handleToggleGiftStatus(item: GiftIdeaItem) {
+        if (!onUpdateGiftIdea) return;
+        const nextStatus: GiftIdeaStatus = item.status === "idea" ? "purchased" : item.status === "purchased" ? "given" : "idea";
+        try {
+            const list = await onUpdateGiftIdea(current.docId, item.id, { status: nextStatus });
+            if (detailAlive) {
+                giftIdeas = list;
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) giftIdeasError = requestErrorMessage(error);
+        }
+    }
+
+    async function handleConvertGiftToExchange(item: GiftIdeaItem) {
+        if (!onCreateExchange) return;
+        const todayStr = toLocalDateKey(new Date());
+        const exchange = convertGiftIdeaToExchange(item, todayStr);
+        try {
+            await onCreateExchange({
+                requestId: newExchangeRequestId(),
+                personDocId: exchange.personDocId,
+                kind: exchange.kind,
+                direction: exchange.direction,
+                description: exchange.description,
+                amount: exchange.amount,
+                currency: exchange.currency,
+                occurredOn: exchange.occurredOn,
+                dueOn: exchange.dueOn,
+                note: exchange.note,
+            });
+            onChanged();
+        } catch (error) {
+            if (detailAlive) giftIdeasError = requestErrorMessage(error);
+        }
+    }
+
+    async function handleRemoveGiftIdea(ideaId: string) {
+        if (!onRemoveGiftIdea) return;
+        try {
+            const list = await onRemoveGiftIdea(current.docId, ideaId);
+            if (detailAlive) {
+                giftIdeas = list;
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) giftIdeasError = requestErrorMessage(error);
+        }
     }
 
     // ---- 会面简报导出（F11） ----
@@ -1547,6 +1667,105 @@ import StatusNotice from "../StatusNotice.svelte";
                                     class="b3-button b3-button--cancel"
                                     aria-label={text("topicsRemoveAria", "移除话题")}
                                     onclick={() => void handleRemoveTopic(topic.id)}
+                                >×</button>
+                            </span>
+                        </li>
+                    {/each}
+                </ul>
+            {/if}
+        </section>
+    {/if}
+
+    {#if giftIdeasSupported}
+        <section class="lvct-detail__section lvct-detail__gifts-section" aria-labelledby="lvct-gifts-title">
+            <div class="lvct-detail__section-head">
+                <div>
+                    <h4 id="lvct-gifts-title">{text("giftsTitle", "礼物点子与偏好")}</h4>
+                    <p class="ft__smaller ft__on-surface">{text("giftsDesc", "记录送礼想法与喜好偏好；送出后可一键转为往来账本，未送前不计入账目。")}</p>
+                </div>
+                {#if giftIdeasLoading}
+                    <span class="ft__smaller ft__on-surface">{text("giftsLoading", "读取中…")}</span>
+                {/if}
+            </div>
+            {#if giftIdeasError}
+                <p class="ft__smaller lvct-text-danger" role="alert">{giftIdeasError} <button type="button" class="b3-button b3-button--text" onclick={loadGiftIdeas}>{text("giftsRetry", "重试")}</button></p>
+            {/if}
+            <div class="lvct-detail__topics-input-row">
+                <select class="b3-select" bind:value={newGiftType} aria-label={text("giftsTypeAria", "点子类型")}>
+                    <option value="idea">{text("giftsTypeIdea", "送礼点子")}</option>
+                    <option value="preference">{text("giftsTypePref", "喜好偏好")}</option>
+                </select>
+                <input
+                    class="b3-text-field fn__flex-1"
+                    type="text"
+                    placeholder={newGiftType === "idea" ? text("giftsPlaceholderIdea", "礼物名称，如：思源定制手账本") : text("giftsPlaceholderPref", "喜好偏好，如：喜欢黑咖啡无糖")}
+                    aria-label={text("giftsTitleAria", "礼物或偏好名称")}
+                    bind:value={newGiftTitle}
+                    disabled={addingGift || giftIdeasLoading}
+                    onkeydown={(event) => { if (event.key === "Enter") { event.preventDefault(); void handleAddGiftIdea(); } }}
+                />
+                {#if newGiftType === "idea"}
+                    <input
+                        class="b3-text-field"
+                        style="width: 80px;"
+                        type="number"
+                        min="0"
+                        placeholder={text("giftsPricePlaceholder", "预算￥")}
+                        aria-label={text("giftsPriceAria", "预估预算")}
+                        bind:value={newGiftPrice}
+                        disabled={addingGift || giftIdeasLoading}
+                    />
+                {/if}
+                <button
+                    type="button"
+                    class="b3-button b3-button--outline"
+                    disabled={addingGift || giftIdeasLoading || !newGiftTitle.trim()}
+                    onclick={handleAddGiftIdea}
+                >{addingGift ? text("giftsAdding", "添加中…") : text("giftsAddBtn", "添加")}</button>
+            </div>
+            {#if giftIdeas.length === 0}
+                <p class="ft__smaller ft__on-surface lvct-detail__topics-empty">{text("giftsEmpty", "暂无送礼点子或喜好偏好。记录下来，重要时刻不再为选礼物发愁。")}</p>
+            {:else}
+                <ul class="lvct-detail__topics-list" aria-label={text("giftsListAria", "礼物点子与偏好列表")}>
+                    {#each giftIdeas as idea (idea.id)}
+                        <li class="lvct-detail__topic-item">
+                            <span class="lvct-detail__topic-text">
+                                <span class={`lvct-chip ${idea.type === "idea" ? "lvct-bucket--soon" : "lvct-bucket--today"}`}>
+                                    {idea.type === "idea" ? text("giftsBadgeIdea", "点子") : text("giftsBadgePref", "偏好")}
+                                </span>
+                                {idea.title}
+                                {#if idea.priceEstimate}
+                                    <span class="ft__smaller ft__on-surface">（￥{idea.priceEstimate}）</span>
+                                {/if}
+                                {#if idea.targetOccasion}
+                                    <span class="ft__smaller ft__on-surface">· {idea.targetOccasion}</span>
+                                {/if}
+                            </span>
+                            <span class="lvct-detail__topic-actions">
+                                {#if idea.type === "idea"}
+                                    <button
+                                        type="button"
+                                        class="b3-button b3-button--text"
+                                        onclick={() => void handleToggleGiftStatus(idea)}
+                                        title={text("giftsStatusAria", "点击切换送礼状态")}
+                                    >
+                                        {idea.status === "idea" ? text("giftsStatusIdea", "构思中")
+                                        : idea.status === "purchased" ? text("giftsStatusPurchased", "已采购待送")
+                                        : text("giftsStatusGiven", "已送出 ✓")}
+                                    </button>
+                                    {#if idea.status === "given" && onCreateExchange}
+                                        <button
+                                            type="button"
+                                            class="b3-button b3-button--outline"
+                                            onclick={() => void handleConvertGiftToExchange(idea)}
+                                        >{text("giftsConvertToExchange", "转入账本")}</button>
+                                    {/if}
+                                {/if}
+                                <button
+                                    type="button"
+                                    class="b3-button b3-button--cancel"
+                                    aria-label={text("giftsRemoveAria", "删除")}
+                                    onclick={() => void handleRemoveGiftIdea(idea.id)}
                                 >×</button>
                             </span>
                         </li>

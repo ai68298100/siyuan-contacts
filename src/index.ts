@@ -89,6 +89,7 @@ import { loadPersonTopics, addPersonTopic, removePersonTopic } from "./data/topi
 import { listPersonExchanges, createPersonExchange, updatePersonExchange, changePersonExchangeStatus } from "./services/exchanges";
 import { listPersonAliases, addPersonAlias, removePersonAlias, resolveAlias } from "./services/person-aliases";
 import { listTrash, restoreContactFromTrash, removeContactToTrash, emptyTrash } from "./services/trash";
+import { loadPersonGiftIdeas, addPersonGiftIdea, updatePersonGiftIdea, removePersonGiftIdea } from "./data/gift-ideas";
 import { buildReview } from "./services/review-report";
 import { importInteractionJson, previewInteractionImport } from "./services/interaction-import";
 import { previewInteractionImportDiff } from "./services/interaction-import";
@@ -1454,6 +1455,31 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const token = this.lifecycleToken;
         await emptyTrash(this);
         emitDataChanged({ topics: ["people"] }, token);
+    }
+
+    async loadPersonGiftIdeas(personDocId: string) {
+        return loadPersonGiftIdeas(this, personDocId);
+    }
+
+    async addPersonGiftIdea(item: import("./domain/gift-ideas").GiftIdeaItem) {
+        const token = this.lifecycleToken;
+        const result = await addPersonGiftIdea(this, item);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async updatePersonGiftIdea(personDocId: string, ideaId: string, patch: Partial<import("./domain/gift-ideas").GiftIdeaItem>) {
+        const token = this.lifecycleToken;
+        const result = await updatePersonGiftIdea(this, personDocId, ideaId, patch);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async removePersonGiftIdea(personDocId: string, ideaId: string) {
+        const token = this.lifecycleToken;
+        const result = await removePersonGiftIdea(this, personDocId, ideaId);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
     }
 
     async buildReviewReport(from: string, to: string) {

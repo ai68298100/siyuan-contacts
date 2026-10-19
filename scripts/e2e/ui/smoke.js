@@ -7485,6 +7485,87 @@ await test("E-28 跨人物跟进多视角分组：人物/组织/部门/来源四
     assert(doneBadges.length === 2, `done 徽章数量应为 2，实际 ${doneBadges.length}`);
 });
 
+await test("E-26 礼物点子与偏好：录入点子与偏好、状态推进、已送出转入往来账本与移除", async () => {
+    let gifts = [];
+    let exchangeCreated = null;
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async () => {},
+        onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onDeleted() {}, onClose() {}, onChanged() {},
+        onLoadGiftIdeas: async () => [...gifts],
+        onAddGiftIdea: async (item) => { gifts = [item, ...gifts]; return [...gifts]; },
+        onUpdateGiftIdea: async (_docId, ideaId, patch) => {
+            gifts = gifts.map((item) => item.id === ideaId ? { ...item, ...patch } : item);
+            return [...gifts];
+        },
+        onRemoveGiftIdea: async (_docId, ideaId) => { gifts = gifts.filter((item) => item.id !== ideaId); return [...gifts]; },
+        onCreateExchange: async (input) => { exchangeCreated = input; return { ...input, id: "ex-1" }; },
+    } });
+
+    await until(() => fixture.querySelector(".lvct-detail__gifts-section"), "礼物点子分区未渲染");
+    assert(fixture.textContent.includes("暂无送礼点子或喜好偏好"), "初始空态未显示");
+
+    // 录入一条送礼点子（含预算）
+    const titleInput = fixture.querySelector(".lvct-detail__gifts-section .lvct-detail__topics-input-row input[type='text']");
+    assert(titleInput, "未找到名称输入框");
+    input(titleInput, "思源定制手账本");
+    const priceInput = fixture.querySelector(".lvct-detail__gifts-section input[type='number']");
+    assert(priceInput, "未找到预算输入框（点子类型下应可见）");
+    input(priceInput, "128");
+    const addBtn = [...fixture.querySelectorAll(".lvct-detail__gifts-section button")].find((b) => b.textContent.trim() === "添加");
+    assert(addBtn, "未找到添加按钮");
+    await until(() => !addBtn.disabled, "输入后添加按钮未启用");
+    addBtn.click();
+    await until(() => fixture.textContent.includes("思源定制手账本"), "添加点子后未渲染");
+    assert(fixture.textContent.includes("￥128"), "预算未展示");
+    assert(fixture.textContent.includes("构思中"), "默认状态应为构思中");
+
+    // 状态推进：构思中 → 已采购待送
+    const statusBtn = [...fixture.querySelectorAll(".lvct-detail__gifts-section button")].find((b) => b.textContent.includes("构思中"));
+    assert(statusBtn, "未找到状态按钮");
+    statusBtn.click();
+    await until(() => fixture.textContent.includes("已采购待送"), "状态未推进到已采购");
+
+    // 状态推进：已采购 → 已送出，出现「转入账本」
+    const purchasedBtn = [...fixture.querySelectorAll(".lvct-detail__gifts-section button")].find((b) => b.textContent.includes("已采购待送"));
+    purchasedBtn.click();
+    await until(() => fixture.textContent.includes("已送出"), "状态未推进到已送出");
+    const convertBtn = [...fixture.querySelectorAll(".lvct-detail__gifts-section button")].find((b) => b.textContent.trim() === "转入账本");
+    assert(convertBtn, "已送出后未出现转入账本按钮");
+
+    // 转入往来账本
+    convertBtn.click();
+    await until(() => exchangeCreated !== null, "未调用往来账本创建");
+    assert(exchangeCreated.kind === "item", "账目类型应为物品");
+    assert(exchangeCreated.direction === "payable", "我方赠出应为支出方向");
+    assert(exchangeCreated.amount === 128, "账目金额应取预估值");
+    assert(exchangeCreated.description.includes("赠礼"), "账目描述应带赠礼前缀");
+
+    // 切换到偏好类型录入
+    const typeSelect = fixture.querySelector(".lvct-detail__gifts-section select");
+    assert(typeSelect, "未找到类型选择器");
+    typeSelect.value = "preference";
+    typeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    const prefInput = fixture.querySelector(".lvct-detail__gifts-section .lvct-detail__topics-input-row input[type='text']");
+    input(prefInput, "喜欢乌龙茶");
+    const addBtn2 = [...fixture.querySelectorAll(".lvct-detail__gifts-section button")].find((b) => b.textContent.trim() === "添加");
+    await until(() => !addBtn2.disabled, "偏好输入后添加按钮未启用");
+    addBtn2.click();
+    await until(() => fixture.textContent.includes("喜欢乌龙茶"), "偏好未渲染");
+    assert(fixture.textContent.includes("偏好"), "偏好徽章未展示");
+
+    // 移除偏好
+    const giftItems = [...fixture.querySelectorAll(".lvct-detail__gifts-section .lvct-detail__topic-item")];
+    const prefItem = giftItems.find((node) => node.textContent.includes("喜欢乌龙茶"));
+    assert(prefItem, "未找到偏好条目");
+    const removeBtn = [...prefItem.querySelectorAll("button")].find((b) => b.textContent.trim() === "×");
+    assert(removeBtn, "未找到移除按钮");
+    removeBtn.click();
+    await until(() => !fixture.textContent.includes("喜欢乌龙茶"), "偏好未被移除");
+});
+
 await pause(100);
 results.push({ name: "无未处理异常及响应式循环", ok: runtimeErrors.length === 0, detail: runtimeErrors.join("\n") });
 document.querySelector("#results").textContent = JSON.stringify(results, null, 2);

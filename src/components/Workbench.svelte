@@ -856,6 +856,10 @@
             onAddTopic={facade.addPersonTopic ? (docId, text) => facade.addPersonTopic!(docId, text) : undefined}
             onRemoveTopic={facade.removePersonTopic ? (docId, topicId) => facade.removePersonTopic!(docId, topicId) : undefined}
             onRemoveContactToTrash={facade.removeContactToTrash ? (person) => facade.removeContactToTrash!(person) : undefined}
+            onLoadGiftIdeas={facade.loadPersonGiftIdeas ? (docId) => facade.loadPersonGiftIdeas!(docId) : undefined}
+            onAddGiftIdea={facade.addPersonGiftIdea ? (item) => facade.addPersonGiftIdea!(item) : undefined}
+            onUpdateGiftIdea={facade.updatePersonGiftIdea ? (docId, ideaId, patch) => facade.updatePersonGiftIdea!(docId, ideaId, patch) : undefined}
+            onRemoveGiftIdea={facade.removePersonGiftIdea ? (docId, ideaId) => facade.removePersonGiftIdea!(docId, ideaId) : undefined}
             {onOpenPersonDoc}
             onNavigate={showDetail}
             onNavigateDocId={(docId) => openPersonByDocId(docId)}

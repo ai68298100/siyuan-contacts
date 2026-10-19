@@ -116,6 +116,11 @@ export interface ContactsPluginFacade {
     listTrash?(): Promise<import("./domain/trash").TrashContactEntry[]>;
     restoreContactFromTrash?(entryId: string): Promise<{ docId: string; itemId: string; name: string }>;
     emptyTrash?(): Promise<void>;
+    /** E-26：礼物点子与偏好清单（Gift Ideas & Preferences） */
+    loadPersonGiftIdeas?(personDocId: string): Promise<import("./domain/gift-ideas").GiftIdeaItem[]>;
+    addPersonGiftIdea?(item: import("./domain/gift-ideas").GiftIdeaItem): Promise<import("./domain/gift-ideas").GiftIdeaItem[]>;
+    updatePersonGiftIdea?(personDocId: string, ideaId: string, patch: Partial<import("./domain/gift-ideas").GiftIdeaItem>): Promise<import("./domain/gift-ideas").GiftIdeaItem[]>;
+    removePersonGiftIdea?(personDocId: string, ideaId: string): Promise<import("./domain/gift-ideas").GiftIdeaItem[]>;
     /** 交往回顾报表（F12）：区间互动统计（只读投影，人物条数与同场活动分口径） */
     buildReviewReport(from: string, to: string): Promise<ReviewReport>;
     /** 导出中心摘要：名册人数与活跃互动条数（展示用，容错读取） */
