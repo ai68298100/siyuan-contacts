@@ -82,6 +82,21 @@ evidence_paths / owner / last_updated / commit
 
 2026-10-16 未解决 Issue 研究筛选保留为历史：#35 的三处合成解析缺口已修复并通过 17/17 矩阵，但不等于小米根因已确认；#51/#54 的完整联系方式投影、搜索与迁移研究继续保留为后续候选。重复资料与两层分组已有独立生产契约和实现，不再沿用“母子条目排在完整联系方式契约之后”的旧顺序。历史研究来源见 [OPEN-ISSUE-RESEARCH-PLAN-2026-10-16](verification/OPEN-ISSUE-RESEARCH-PLAN-2026-10-16.md)，当前交付范围见 [首版实现](verification/MULTI-CONTACT-MINIMAL-PATH-2026-10-17.md)。
 
+#### AG-E32-TOPICS — 会面谈资与备忘（E-32）收口与保真
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+migration / M4；已完成纯函数域层、持久化存储、严格写前检查、迁移包往返与覆盖、双语国际化（14键）、简报导出置顶及桌面/移动/宿主样式 UI 476/476 回归；真实思源多窗口与日常工作区待 Host Queue。
+- **user_outcome / user_scenario：** 用户在人物详情可随时记录与联系人下次见面想聊的话题、承诺或兴趣点；新增话题自动置顶，支持一键复制反馈与移除；导出会面简报 Markdown 时自动置顶呈现；跨设备/工作区迁移时谈资备忘完整保留，不因迁移丢失。
+- **source_ids / current_evidence：** E-32、PR #62；`src/domain/topics.ts`、`src/data/topics.ts`、`src/services/migration-bundle.ts`、`src/components/people/PersonDetail.svelte`、`public/i18n/`；单测 794/794 全绿，UI 回归 476/476。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3 键表更新 / 迁移覆盖与 i18n 完整性 / topics / 独立自管 JSON，无 AV 字段变化。
+- **allowed_files / forbidden_files：** topics 域/数据/服务、PersonDetail、i18n、migration-bundle、测试、相关契约与回归文档 / 版本号、CHANGELOG、README 徽章、PROGRESS.md、真实用户库。
+- **contract_change / host_or_spike_required：** DATA-CONTRACT §3 新增 `person-topics.json`（版本 1，单人最多 15 条，单条 140 字符，docId 正则，严格读 + Web Lock + 写后回读），迁移包模块数 12 → 13 并入 `MIGRATION_COVERAGE`。
+- **ordered_steps：** 注册单测至 package.json → 补充 DATA-CONTRACT 契约 → 迁移 bundle 导出/导入/预览支持与往返测试 → 双语国际化与 text() 改造 → smoke UI 夹具与 476/476 回归 → 任务卡与状态归档。
+- **test_fixtures / test_commands / acceptance：** 纯函数新增/置顶/移除/规范化/超长超限/严格校验、简报置顶导出、迁移合并现状优先与去重、MIGRATION_COVERAGE 包含、smoke UI 空态/新增/置顶/复制/移除；`pnpm check`、`pnpm test`（794/794）、`pnpm test:ui`（476/476）、`pnpm build`、`pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 坏条目整体拒绝抛出 StoreIntegrityError；写失败保留草稿；单人最多 15 条、单条 140 字符；纯本地插件 JSON，不发送网络或外部 AI。
+- **evidence_paths / owner / last_updated / commit：** `tests/topics.test.ts`、`tests/contact-write-services.test.ts`、`scripts/e2e/ui/smoke.js`、`scripts/e2e/ui/migration-regression.js` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 隔离代码、单测、迁移和三套 UI 476/476 全部通过；真实思源跨窗口、真机与日常库保留 Host Queue。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 794/794、三套 UI（桌面、390px、宿主样式）各 476/476、`pnpm build` 与 `pnpm check:release` 全部通过。
+
 #### AG-ISSUE-051-054-FIELDS — 重复资料与两层分组首版
 
 - **status / priority / type / milestone：** `host_pending` / P1 / feature+regression / M4；生产实现、隔离内核与隔离 Chrome 验收已完成，真实用户工作区、原生编辑器竞争、真机等边界继续由 Host Queue 守门；发布与 issue 关闭见 `AG-ISSUE-051-054-CLOSE`。

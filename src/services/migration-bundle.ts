@@ -42,12 +42,15 @@ import { loadOrganizationProfiles, saveOrganizationProfile, ORGANIZATION_PROFILE
 import { validateOrganizationProfile } from "../domain/organization-profile";
 import type { OrganizationProfileDraft } from "../domain/organization-profile";
 import { capturePeopleProfileLifetime, verifyRelationshipLabelReferences } from "./people-profiles";
+import { loadTopicsStoreStrict, mergeTopicsStore, TOPICS_STORAGE_KEY } from "../data/topics";
+import { parseTopicStore } from "../domain/topics";
+import type { PersonTopicStore } from "../domain/topics";
 
 const BUNDLE_SCHEMA_VERSION = 1;
 export const MIGRATION_BUNDLE_STORAGE_KEY = "lvct-migration-bundle";
 
 export interface MigrationModulePreview {
-    key: "interactions" | "followUps" | "cadences" | "reminderDismissals" | "registry" | "templates" | "exchanges" | "aliases" | "selfIdentity" | "orgMemberships" | "organizationProfiles" | "relationshipLabels";
+    key: "interactions" | "followUps" | "cadences" | "reminderDismissals" | "registry" | "templates" | "exchanges" | "aliases" | "selfIdentity" | "orgMemberships" | "organizationProfiles" | "relationshipLabels" | "topics";
     label: string;
     count: number;
     tombstones?: number;
@@ -66,6 +69,7 @@ export const MIGRATION_COVERAGE = [
     { key: ORG_MEMBERSHIP_STORAGE_KEY, status: "included", module: "orgMemberships" },
     { key: ORGANIZATION_PROFILES_STORAGE_KEY, status: "included", module: "organizationProfiles" },
     { key: RELATIONSHIP_LABEL_STORAGE_KEY, status: "included", module: "relationshipLabels" },
+    { key: TOPICS_STORAGE_KEY, status: "included", module: "topics" },
     { key: "org-projection-checkpoints.json", status: "excluded", reason: "本工作区未完成文档投影请求，不跨库重放" },
     { key: "organization-operations.json", status: "excluded", reason: "本工作区组织创建/改名操作断点，不跨库重放" },
     { key: "bridge-requests.json", status: "excluded", reason: "本工作区外部桥请求断点，不跨库重放" },
@@ -86,6 +90,7 @@ interface BundleModules {
     orgMemberships?: OrgMembershipStore;
     organizationProfiles?: { schemaVersion: 1; profiles: Record<string, OrganizationProfileDraft> };
     relationshipLabels?: PersonRelationshipLabelStore;
+    topics?: PersonTopicStore;
 }
 
 interface MigrationBundle {
@@ -96,7 +101,7 @@ interface MigrationBundle {
 }
 
 const MIGRATION_MODULE_KEYS = new Set<MigrationModulePreview["key"]>([
-    "interactions", "followUps", "cadences", "reminderDismissals", "registry", "templates", "exchanges", "aliases", "selfIdentity", "orgMemberships", "organizationProfiles", "relationshipLabels",
+    "interactions", "followUps", "cadences", "reminderDismissals", "registry", "templates", "exchanges", "aliases", "selfIdentity", "orgMemberships", "organizationProfiles", "relationshipLabels", "topics",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -162,6 +167,7 @@ function validateBundleModules(value: unknown): asserts value is BundleModules {
         }
     }
     if (value.relationshipLabels !== undefined) parsePersonRelationshipLabelStore(requireModuleEnvelope(value.relationshipLabels, "与我的关系"));
+    if (value.topics !== undefined) parseTopicStore(requireModuleEnvelope(value.topics, "谈资备忘"));
     if (value.selfIdentity !== undefined) {
         const module = requireModuleEnvelope(value.selfIdentity, "本人身份");
         if (!("identity" in module)) throw new Error("本人身份模块缺少 identity，拒绝导入");
@@ -189,7 +195,7 @@ function parseBundle(text: string): MigrationBundle {
 }
 
 export async function exportMigrationBundle(plugin: Plugin): Promise<string> {
-    const [interactions, followUps, cadences, reminderDismissals, registry, templatesStore, exchanges, aliases, identity, orgMemberships, organizationProfiles, relationshipLabels] = await Promise.all([
+    const [interactions, followUps, cadences, reminderDismissals, registry, templatesStore, exchanges, aliases, identity, orgMemberships, organizationProfiles, relationshipLabels, topics] = await Promise.all([
         JSON.parse(await exportInteractionJson(plugin)) as BundleModules["interactions"],
         JSON.parse(await exportFollowUpsJson(plugin)) as BundleModules["followUps"],
         loadCadenceMapStrict(plugin),
@@ -202,6 +208,7 @@ export async function exportMigrationBundle(plugin: Plugin): Promise<string> {
         withStoreLock(ORG_MEMBERSHIP_STORAGE_KEY, () => loadOrgMembershipStore(plugin)),
         withStoreLock(ORGANIZATION_PROFILES_STORAGE_KEY, () => loadOrganizationProfiles(plugin)),
         withStoreLock(RELATIONSHIP_LABEL_STORAGE_KEY, () => loadRelationshipLabelStore(plugin)),
+        withStoreLock(TOPICS_STORAGE_KEY, () => loadTopicsStoreStrict(plugin)),
     ]);
     return JSON.stringify({
         schemaVersion: BUNDLE_SCHEMA_VERSION,
@@ -221,6 +228,7 @@ export async function exportMigrationBundle(plugin: Plugin): Promise<string> {
             orgMemberships,
             organizationProfiles: { schemaVersion: 1, profiles: organizationProfiles },
             relationshipLabels,
+            topics,
         },
     }, null, 2);
 }
@@ -260,6 +268,10 @@ export function previewMigrationImport(text: string): MigrationModulePreview[] {
         }
     }
     if (modules.organizationProfiles) push("organizationProfiles", "组织资料", Object.keys(modules.organizationProfiles.profiles ?? {}).length);
+    if (modules.topics) {
+        const totalCount = Object.values(modules.topics.topics ?? {}).reduce((acc, list) => acc + (Array.isArray(list) ? list.length : 0), 0);
+        push("topics", "谈资备忘", totalCount);
+    }
     return previews;
 }
 
@@ -481,6 +493,13 @@ export async function importMigrationBundle(plugin: Plugin, text: string): Promi
                 }
                 addSummary("relationshipLabels", "与我的关系", summary);
             });
+        });
+    }
+    if (modules.topics) {
+        await runModule("topics", "谈资备忘", async () => {
+            const incoming = parseTopicStore(modules.topics);
+            const summary = await mergeTopicsStore(plugin, incoming);
+            result.modules.push({ key: "topics", label: "谈资备忘", merged: summary.merged, skipped: summary.skipped });
         });
     }
     const pending = new Set([...result.failed.map((module) => module.key), ...result.issues.map((entry) => entry.key)]);

@@ -1430,22 +1430,22 @@ import StatusNotice from "../StatusNotice.svelte";
         <section class="lvct-detail__section lvct-detail__topics-section" aria-labelledby="lvct-topics-title">
             <div class="lvct-detail__section-head">
                 <div>
-                    <h4 id="lvct-topics-title">会面谈资与备忘</h4>
-                    <p class="ft__smaller ft__on-surface">记录下次见面想聊的话题、承诺的事情或兴趣关注；导出简报时自动置顶。</p>
+                    <h4 id="lvct-topics-title">{text("topicsTitle", "会面谈资与备忘")}</h4>
+                    <p class="ft__smaller ft__on-surface">{text("topicsDesc", "记录下次见面想聊的话题、承诺的事情或兴趣关注；导出简报时自动置顶。")}</p>
                 </div>
                 {#if topicsLoading}
-                    <span class="ft__smaller ft__on-surface">读取中…</span>
+                    <span class="ft__smaller ft__on-surface">{text("topicsLoading", "读取中…")}</span>
                 {/if}
             </div>
             {#if topicsError}
-                <p class="ft__smaller lvct-text-danger" role="alert">{topicsError} <button type="button" class="b3-button b3-button--text" onclick={loadTopics}>重试</button></p>
+                <p class="ft__smaller lvct-text-danger" role="alert">{topicsError} <button type="button" class="b3-button b3-button--text" onclick={loadTopics}>{text("topicsRetry", "重试")}</button></p>
             {/if}
             <div class="lvct-detail__topics-input-row">
                 <input
                     class="b3-text-field fn__flex-1"
                     type="text"
-                    placeholder="添加一条下次见面想聊的话题或备忘…"
-                    aria-label="新增谈资备忘"
+                    placeholder={text("topicsPlaceholder", "添加一条下次见面想聊的话题或备忘…")}
+                    aria-label={text("topicsAddAria", "新增谈资备忘")}
                     bind:value={newTopicText}
                     disabled={addingTopic || topicsLoading}
                     onkeydown={(event) => { if (event.key === "Enter") { event.preventDefault(); void handleAddTopic(); } }}
@@ -1455,12 +1455,12 @@ import StatusNotice from "../StatusNotice.svelte";
                     class="b3-button b3-button--outline"
                     disabled={addingTopic || topicsLoading || !newTopicText.trim()}
                     onclick={handleAddTopic}
-                >{addingTopic ? "添加中…" : "添加备忘"}</button>
+                >{addingTopic ? text("topicsAdding", "添加中…") : text("topicsAddBtn", "添加备忘")}</button>
             </div>
             {#if topics.length === 0}
-                <p class="ft__smaller ft__on-surface lvct-detail__topics-empty">暂无谈资备忘。随手记下一两件想聊的事，会前不慌张。</p>
+                <p class="ft__smaller ft__on-surface lvct-detail__topics-empty">{text("topicsEmpty", "暂无谈资备忘。随手记下一两件想聊的事，会前不慌张。")}</p>
             {:else}
-                <ul class="lvct-detail__topics-list" aria-label="会面谈资备忘列表">
+                <ul class="lvct-detail__topics-list" aria-label={text("topicsListAria", "会面谈资备忘列表")}>
                     {#each topics as topic (topic.id)}
                         <li class="lvct-detail__topic-item">
                             <span class="lvct-detail__topic-text">📌 {topic.text}</span>
@@ -1468,13 +1468,13 @@ import StatusNotice from "../StatusNotice.svelte";
                                 <button
                                     type="button"
                                     class="b3-button b3-button--text"
-                                    aria-label="复制话题内容"
+                                    aria-label={text("topicsCopyAria", "复制话题内容")}
                                     onclick={() => void handleCopyTopic(topic)}
-                                >{copiedTopicId === topic.id ? "已复制 ✓" : "复制"}</button>
+                                >{copiedTopicId === topic.id ? text("topicsCopied", "已复制 ✓") : text("topicsCopy", "复制")}</button>
                                 <button
                                     type="button"
                                     class="b3-button b3-button--cancel"
-                                    aria-label="移除话题"
+                                    aria-label={text("topicsRemoveAria", "移除话题")}
                                     onclick={() => void handleRemoveTopic(topic.id)}
                                 >×</button>
                             </span>

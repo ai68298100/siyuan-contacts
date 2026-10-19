@@ -924,5 +924,19 @@
   "orgsFilteredSummary": "当前显示 {shown} 个",
   "orgsNoMatchTitle": "没有匹配的组织",
   "orgsNoMatchDesc": "试试其他名称或清除筛选条件。",
-  "orgManagerTitle": "组织管理"
+  "orgManagerTitle": "组织管理",
+  "topicsTitle": "会面谈资与备忘",
+  "topicsDesc": "记录下次见面想聊的话题、承诺的事情或兴趣关注；导出简报时自动置顶。",
+  "topicsLoading": "读取中…",
+  "topicsRetry": "重试",
+  "topicsPlaceholder": "添加一条下次见面想聊的话题或备忘…",
+  "topicsAddAria": "新增谈资备忘",
+  "topicsAdding": "添加中…",
+  "topicsAddBtn": "添加备忘",
+  "topicsEmpty": "暂无谈资备忘。随手记下一两件想聊的事，会前不慌张。",
+  "topicsListAria": "会面谈资备忘列表",
+  "topicsCopyAria": "复制话题内容",
+  "topicsCopied": "已复制 ✓",
+  "topicsCopy": "复制",
+  "topicsRemoveAria": "移除话题"
 }

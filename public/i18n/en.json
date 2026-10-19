@@ -924,5 +924,19 @@
   "orgsFilteredSummary": "Showing {shown}",
   "orgsNoMatchTitle": "No matching organizations",
   "orgsNoMatchDesc": "Try another name or clear the filters.",
-  "orgManagerTitle": "Organization management"
+  "orgManagerTitle": "Organization management",
+  "topicsTitle": "Conversation Starters & Notes",
+  "topicsDesc": "Note down topics to discuss, promises made, or shared interests for your next meeting. Pinned to briefing export.",
+  "topicsLoading": "Loading…",
+  "topicsRetry": "Retry",
+  "topicsPlaceholder": "Add a topic or reminder for your next meeting…",
+  "topicsAddAria": "Add conversation starter or note",
+  "topicsAdding": "Adding…",
+  "topicsAddBtn": "Add Note",
+  "topicsEmpty": "No conversation starters yet. Jot down a thought or two so you're ready when you meet.",
+  "topicsListAria": "List of conversation starters and notes",
+  "topicsCopyAria": "Copy topic text",
+  "topicsCopied": "Copied ✓",
+  "topicsCopy": "Copy",
+  "topicsRemoveAria": "Remove topic"
 }

@@ -7160,6 +7160,71 @@ await test("读取故障显式化：跟进计划读取失败显示错误态与�
     assert(!fixture.textContent.includes("跟进计划加载失败"), "成功后错误态未清除");
 });
 
+await test("E-32 会面谈资与备忘：空态、添加置顶、复制反馈与移除话题", async () => {
+    let topicsList = [];
+    let loadCount = 0;
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async () => {},
+        onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onDeleted() {}, onClose() {}, onChanged() {},
+        onLoadTopics: async () => {
+            loadCount++;
+            return [...topicsList];
+        },
+        onAddTopic: async (_docId, text) => {
+            const newItem = { id: `top-${Date.now()}-${Math.random()}`, text, createdAt: Date.now() };
+            topicsList = [newItem, ...topicsList];
+            return [...topicsList];
+        },
+        onRemoveTopic: async (_docId, topicId) => {
+            topicsList = topicsList.filter((item) => item.id !== topicId);
+            return [...topicsList];
+        },
+    } });
+
+    await until(() => fixture.querySelector(".lvct-detail__topics-section"), "未渲染谈资备忘分区");
+    assert(fixture.textContent.includes("暂无谈资备忘"), "初始空列表未显示空态文案");
+
+    // 添加一条
+    const inputEl = fixture.querySelector(".lvct-detail__topics-input-row input");
+    assert(inputEl, "未找到话题输入框");
+    input(inputEl, "测试话题 A");
+
+    const addBtn = fixture.querySelector(".lvct-detail__topics-input-row button");
+    assert(addBtn, "未找到添加备忘按钮");
+    await until(() => !addBtn.disabled, "输入后添加按钮未启用");
+    addBtn.click();
+
+    await until(() => fixture.textContent.includes("测试话题 A"), "添加后未渲染话题 A");
+    assert(!fixture.textContent.includes("暂无谈资备忘"), "添加后仍显示空态");
+
+    // 添加第二条，必须置顶在最前
+    input(inputEl, "置顶话题 B");
+    await until(() => !addBtn.disabled, "第二条输入后添加按钮未启用");
+    addBtn.click();
+
+    await until(() => fixture.textContent.includes("置顶话题 B"), "未渲染话题 B");
+    const topicItems = fixture.querySelectorAll(".lvct-detail__topic-item");
+    assert(topicItems.length === 2, "话题数量应为 2");
+    assert(topicItems[0].textContent.includes("置顶话题 B"), "新添加的话题未置顶在首位");
+
+    // 复制按钮
+    const copyBtn = topicItems[0].querySelector(".lvct-detail__topic-actions button:first-child");
+    assert(copyBtn, "未找到复制按钮");
+    copyBtn.click();
+    await until(() => copyBtn.textContent.includes("已复制"), "点击复制后未展示已复制反馈");
+
+    // 移除第一条（测试话题 A，位于索引 1）
+    const removeBtn = topicItems[1].querySelector(".lvct-detail__topic-actions button:last-child");
+    assert(removeBtn, "未找到移除按钮");
+    removeBtn.click();
+
+    await until(() => fixture.querySelectorAll(".lvct-detail__topic-item").length === 1, "移除后列表未更新");
+    assert(!fixture.textContent.includes("测试话题 A"), "已移除的话题仍残留在界面");
+    assert(fixture.textContent.includes("置顶话题 B"), "保留的话题消失了");
+});
+
 await runMigrationRegression({ test, assert, person, settings, kernel, fixture, until, button });
 await runPeopleProfileRegression({ test, assert, kernel, settings, fixture, until, button });
 await runProfileCardRegression({ test, assert, fixture });

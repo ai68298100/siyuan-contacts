@@ -35,6 +35,7 @@ const { withStoreLock } = await import("../src/data/storage.ts");
 const { loadRelationshipLabelStore, RELATIONSHIP_LABEL_STORAGE_KEY } = await import("../src/data/person-relationship-labels.ts");
 const { exportMigrationBundle, importMigrationBundle, previewMigrationImport, MIGRATION_BUNDLE_STORAGE_KEY, MIGRATION_COVERAGE } = await import("../src/services/migration-bundle.ts");
 const { TEMPLATES_STORAGE_KEY } = await import("../src/data/templates.ts");
+const { TOPICS_STORAGE_KEY, loadTopicsStoreStrict } = await import("../src/data/topics.ts");
 const { previewInteractionImportDiff } = await import("../src/services/interaction-import.ts");
 const { loadReminderDismissalsStrict } = await import("../src/data/reminder-dismissals.ts");
 const { invalidateRoster } = await import("../src/services/roster.ts");
@@ -842,6 +843,60 @@ test("有效称谓恢复逐项核实，明确空记录恢复且重复导入零�
     assert.equal(state.jsonWrites, 1);
     assert.deepEqual((await loadRelationshipLabelStore(plugin)).labels[0], incoming);
     assert.ok(MIGRATION_COVERAGE.some((module) => module.key === "bridge-requests.json" && module.status === "excluded"));
+});
+
+test("迁移包包含谈资备忘 topics 模块，支持覆盖检查、预览计数与现状优先合并", async () => {
+    const { state, plugin } = fixture();
+    const topicCoverage = MIGRATION_COVERAGE.find((m) => m.key === TOPICS_STORAGE_KEY);
+    assert.ok(topicCoverage, "MIGRATION_COVERAGE 必须包含 TOPICS_STORAGE_KEY");
+    assert.equal(topicCoverage.status, "included");
+    assert.equal(topicCoverage.module, "topics");
+
+    const docId = "20261019000000-doc0001";
+    const existingTopicId = "20261019000000-top0001";
+    state.store.set(TOPICS_STORAGE_KEY, {
+        schemaVersion: 1,
+        topics: {
+            [docId]: [{ id: existingTopicId, text: "当前库已有话题", createdAt: 1000 }],
+        },
+    });
+
+    const exported = await exportMigrationBundle(plugin);
+    const parsedExport = JSON.parse(exported);
+    assert.ok(parsedExport.modules.topics, "导出包必须包含 topics 模块");
+    assert.equal(parsedExport.modules.topics.topics[docId].length, 1);
+
+    const incomingBundle = JSON.stringify({
+        schemaVersion: 1,
+        storageKey: MIGRATION_BUNDLE_STORAGE_KEY,
+        modules: {
+            topics: {
+                schemaVersion: 1,
+                topics: {
+                    [docId]: [
+                        { id: existingTopicId, text: "覆盖文本（应被现状优先忽略）", createdAt: 2000 },
+                        { id: "20261019000000-top0002", text: "新导入话题", createdAt: 3000 },
+                    ],
+                },
+            },
+        },
+    });
+
+    const preview = previewMigrationImport(incomingBundle);
+    const topicPreview = preview.find((p) => p.key === "topics");
+    assert.ok(topicPreview);
+    assert.equal(topicPreview.count, 2);
+
+    const importResult = await importMigrationBundle(plugin, incomingBundle);
+    const topicModuleResult = importResult.modules.find((m) => m.key === "topics");
+    assert.ok(topicModuleResult);
+    assert.equal(topicModuleResult.merged, 1);
+    assert.equal(topicModuleResult.skipped, 1);
+
+    const currentStore = await loadTopicsStoreStrict(plugin);
+    assert.equal(currentStore.topics[docId].length, 2);
+    assert.equal(currentStore.topics[docId][0].text, "当前库已有话题");
+    assert.equal(currentStore.topics[docId][1].text, "新导入话题");
 });
 
 test("称谓恢复可达与旧本人记录混合时，成功项写后仅核实自己的原参照", async () => {
