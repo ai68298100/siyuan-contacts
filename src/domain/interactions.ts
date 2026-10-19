@@ -207,7 +207,7 @@ export interface TimelineItem {
     occurredAt?: number;
 }
 
-function occasionKey(event: InteractionEvent): string | undefined {
+export function occasionKey(event: InteractionEvent): string | undefined {
     return event.externalRef ? JSON.stringify([event.source, event.externalRef]) : undefined;
 }
 

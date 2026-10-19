@@ -276,10 +276,13 @@ export function buildGraphQuerySnapshot(sources: GraphSources, query: GraphQuery
         result: { kind, status: resultStatus, ids: [...resultIds].sort(compareGraphIds), pathIds, neighborIds: relations.neighborIds, reason } };
 }
 
-export function graphEdgeLabel(kind: "related" | "member" | "ref" | undefined, memberStatus?: "active" | "former" | "mixed"): string {
+export function graphEdgeLabel(kind: "related" | "member" | "ref" | "co_occurrence" | undefined, memberStatus?: "active" | "former" | "mixed"): string {
     if (kind === "member") {
         const lifecycle = memberStatus === "active" ? "当前" : memberStatus === "former" ? "历史" : memberStatus === "mixed" ? "当前+历史" : "";
         return `组织成员（member）${lifecycle ? `·${lifecycle}` : ""}`;
+    }
+    if (kind === "co_occurrence") {
+        return "共同出席推断（co_occurrence）";
     }
     return kind === "ref" ? "文档块引用（ref）" : "显式人物关系（related）";
 }

@@ -127,6 +127,21 @@ evidence_paths / owner / last_updated / commit
 - **退出边界：** 隔离域/数据/服务/UI 全部通过；真实思源多窗口并发删除、真机与日常库恢复体验保留 Host Queue。批量删除入口是否接入回收站属后续独立决策。
 - **完成回报：** `pnpm check` 0 错误 0 警告、单测 801/801、三套 UI 各 479/479、`pnpm build` 与 `pnpm check:release` 全部通过。
 
+#### AG-E34-CO-OCCURRENCE — 共同出席弱联系（E-34 推断关联）纯函数域模型与边生成
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+domain / M3；已完成基于多参与者同场互动事件的客观弱联系推断（`buildCoOccurrenceEdges`），自动跳过已有显式 related 正式关系的二人、按共同出席频次降序排序、支持最低门槛 `minCount` 过滤，并在 `tests/graph.test.ts` 中通过 27/27 完整单元测试。
+- **user_outcome / user_scenario：** 系统基于用户记录的笔记捕获或多人会议/聚会事件，客观推导经常在同一场合共同出现的联系人对；不改动已有双向关系事实源，查询纯 related 关系图不受污染；未来在图谱中可以虚线呈现引荐，供用户一键确认为正式双向关系。
+- **source_ids / current_evidence：** E-34、`docs/ACTIVE-BACKLOG.md`；`src/domain/graph.ts`、`src/domain/interactions.ts`、`tests/graph.test.ts`；单测全量通过。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3.1 / 纯函数域层计算，不修改持久化 JSON，不污染显式关系查询。
+- **allowed_files / forbidden_files：** graph 域与测试、interactions 域 / 保护文件。
+- **contract_change / host_or_spike_required：** `GraphEdge` 扩展 `kind: "co_occurrence"` 与可选 `coCount: number`；不写入属性视图或持久化 JSON。
+- **ordered_steps：** interactions 导出 occasionKey → GraphEdge 类型定义更新 → buildCoOccurrenceEdges 实现 → graph.test.ts 单元测试 → 门禁与提交。
+- **test_fixtures / test_commands / acceptance：** 纯函数同场多事件推导、已有正式关系跳过、共同频次降序排序、minCount 过滤；`pnpm check`、`pnpm test`（802/802）、`pnpm build` 与 `pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算，O(N) 场合聚类与 O(K^2) 组内配对（单场人数通常 < 20）；不发送外部网络或大模型。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/graph.ts`、`src/domain/interactions.ts`、`tests/graph.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 域层纯函数实现与测试全部通过；UI 虚线展示与一键建关系单独挂接。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 802/802 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
+
 #### AG-ISSUE-051-054-FIELDS — 重复资料与两层分组首版
 
 - **status / priority / type / milestone：** `host_pending` / P1 / feature+regression / M4；生产实现、隔离内核与隔离 Chrome 验收已完成，真实用户工作区、原生编辑器竞争、真机等边界继续由 Host Queue 守门；发布与 issue 关闭见 `AG-ISSUE-051-054-CLOSE`。

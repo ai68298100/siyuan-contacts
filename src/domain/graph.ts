@@ -3,8 +3,9 @@
  * 边的语义（D-0009）：relatedItemIds 是行 itemID，节点用 docId；
  * 换算在本层完成，指向未知目标的边丢弃（对端联系人已删等场景）。
  */
-import type { ContactSummary } from "./person";
-import type { OrgMembershipStatus } from "./org-membership";
+import type { ContactSummary } from "./person.ts";
+import type { OrgMembershipStatus } from "./org-membership.ts";
+import { occasionKey, type InteractionEvent } from "./interactions.ts";
 
 export interface GraphNode {
     /** 文档 ID（cytoscape 节点 id，点击即开文档） */
@@ -20,10 +21,12 @@ export interface GraphNode {
 export interface GraphEdge {
     source: string;
     target: string;
-    /** B14.6 边来源：related=显式关系（查询唯一依据）；member=组织成员（仅展示，不参与关系查询） */
-    kind?: "related" | "member" | "ref";
+    /** B14.6 边来源：related=显式关系（查询唯一依据）；member=组织成员（仅展示，不参与关系查询）；co_occurrence=共同出席弱联系（仅展示，不参与显式关系查询） */
+    kind?: "related" | "member" | "ref" | "co_occurrence";
     /** Member lifecycle on the derived organisation edge. Related/ref edges omit this field. */
     memberStatus?: "active" | "former" | "mixed";
+    /** 共同出席/共现次数（仅 kind="co_occurrence" 时使用） */
+    coCount?: number;
 }
 
 export interface PersonGraph {
@@ -151,6 +154,71 @@ export const GROUP_COLORS: Readonly<Record<string, string>> = {
 
 export function groupColor(group: string): string {
     return GROUP_COLORS[group] ?? "#8f8f8f";
+}
+
+/**
+ * E-34 基于多参与者互动事实的共同出席弱联系（推断关联）：
+ * 扫描全部事件中共同出席同场活动（同 externalRef/同日期）的联系人对；
+ * 仅连接图内已存在的联系人节点；已存在显式 related 关系的联系人对不再生成虚线边；
+ * 按共同出席次数降序排序，可设置最低门槛 minCount（默认 1 次）。
+ */
+export function buildCoOccurrenceEdges(
+    events: readonly InteractionEvent[],
+    people: readonly ContactSummary[],
+    minCount: number = 1,
+): GraphEdge[] {
+    const docIds = new Set(people.map((p) => p.docId));
+    const itemToDoc = new Map(people.map((p) => [p.itemId, p.docId]));
+    const existingRelated = new Set<string>();
+    for (const p of people) {
+        for (const relItemId of p.relatedItemIds) {
+            const otherDocId = itemToDoc.get(relItemId);
+            if (otherDocId && otherDocId !== p.docId) {
+                const key = [p.docId, otherDocId].sort().join("::");
+                existingRelated.add(key);
+            }
+        }
+    }
+
+    const occasionParticipants = new Map<string, Set<string>>();
+    for (const event of events) {
+        if (!docIds.has(event.personDocId)) continue;
+        const key = occasionKey(event);
+        if (!key) continue;
+        let set = occasionParticipants.get(key);
+        if (!set) {
+            set = new Set();
+            occasionParticipants.set(key, set);
+        }
+        set.add(event.personDocId);
+    }
+
+    const pairCounts = new Map<string, number>();
+    for (const participants of occasionParticipants.values()) {
+        if (participants.size < 2) continue;
+        const list = [...participants];
+        for (let i = 0; i < list.length; i++) {
+            for (let j = i + 1; j < list.length; j++) {
+                const pairKey = [list[i], list[j]].sort().join("::");
+                if (existingRelated.has(pairKey)) continue;
+                pairCounts.set(pairKey, (pairCounts.get(pairKey) ?? 0) + 1);
+            }
+        }
+    }
+
+    const edges: GraphEdge[] = [];
+    for (const [pairKey, count] of pairCounts.entries()) {
+        if (count < minCount) continue;
+        const [source, target] = pairKey.split("::");
+        edges.push({
+            source,
+            target,
+            kind: "co_occurrence",
+            coCount: count,
+        });
+    }
+
+    return edges.sort((a, b) => (b.coCount ?? 0) - (a.coCount ?? 0));
 }
 
 /* ---------- B14.6：组织节点与成员边增强（只进渲染层，不参与关系查询） ---------- */
