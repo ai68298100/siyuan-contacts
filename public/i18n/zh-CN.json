@@ -989,5 +989,12 @@
   "topicsConvertConfirmTitle": "替换互动备注草稿",
   "topicsConvertConfirmMsg": "当前已有未记录的互动备注草稿，转入谈资将替换当前草稿。确定继续吗？",
   "topicsConvertConfirmBtn": "确认替换",
-  "topicsConvertCancelBtn": "取消"
+  "topicsConvertCancelBtn": "取消",
+  "heatHot": "温热",
+  "heatWarm": "常温",
+  "heatCool": "微凉",
+  "heatCold": "渐冻",
+  "heatPaused": "已暂停",
+  "heatUnknown": "从未联系",
+  "heatScoreLabel": "关系温度 {score}%"
 }

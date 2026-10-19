@@ -97,6 +97,21 @@ evidence_paths / owner / last_updated / commit
 - **退出边界：** 隔离代码、单测、迁移和三套 UI 476/476 全部通过；真实思源跨窗口、真机与日常库保留 Host Queue。
 - **完成回报：** `pnpm check` 0 错误 0 警告、单测 794/794、三套 UI（桌面、390px、宿主样式）各 476/476、`pnpm build` 与 `pnpm check:release` 全部通过。
 
+#### AG-E29-HEALTH — 动态关系温度与联系紧迫度分级（E-29）纯函数域模型与算法
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+domain / M4；已完成纯函数域层（计算客观时间热度、分数 0–100、逾期天数、暂停语义）、双语国际化支持、B3 令牌样式类、完整单元测试（5/5）与三套 UI（477/477）回归。
+- **user_outcome / user_scenario：** 系统基于用户在人物身上设定的联系周期（1–365 天）和最近实际互动时间，客观、透明地计算关系温度（hot 温热/warm 常温/cool 微凉/cold 渐冻/paused 已暂停/unknown 从未联系）与百分比分数，提供给名册卡片、表格和详情页排序与展示，无黑盒算法。
+- **source_ids / current_evidence：** E-29、`docs/ACTIVE-BACKLOG.md`；`src/domain/cadence.ts`、`tests/cadence.test.ts`、`src/index.scss`、`public/i18n/`；单测全量通过。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3 person-cadences / 纯函数域层计算，不修改持久化 JSON schema，无新存储开销。
+- **allowed_files / forbidden_files：** cadence 域与测试、样式、i18n / 保护文件。
+- **contract_change / host_or_spike_required：** 无存储契约变更；完全基于已有 `person-cadences.json` 和 `interaction-events.json` 的客观时间推导。
+- **ordered_steps：** 纯函数域层类型与计算实现 → 单测覆盖极限值/逾期/暂停/未互动 → 双语 i18n 补充 → SCSS 变量映射 → 全量门禁。
+- **test_fixtures / test_commands / acceptance：** 纯函数不同周期、互动时间、逾期比例、边界值、无互动与暂停用例；`pnpm check`、`pnpm test`（795/795）、三套 UI（477/477）、`pnpm build` 与 `pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算，O(1) 复杂度；时间计算负值防御；不写入外部网络或大模型。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/cadence.ts`、`tests/cadence.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 域层纯函数实现与测试全部通过；界面控件展现接入由视图卡片单独推进。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 795/795 通过、`pnpm build` 与 `pnpm check:release` 全部通过。
+
 #### AG-ISSUE-051-054-FIELDS — 重复资料与两层分组首版
 
 - **status / priority / type / milestone：** `host_pending` / P1 / feature+regression / M4；生产实现、隔离内核与隔离 Chrome 验收已完成，真实用户工作区、原生编辑器竞争、真机等边界继续由 Host Queue 守门；发布与 issue 关闭见 `AG-ISSUE-051-054-CLOSE`。

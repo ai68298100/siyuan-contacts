@@ -989,5 +989,12 @@
   "topicsConvertConfirmTitle": "Replace Interaction Note Draft",
   "topicsConvertConfirmMsg": "You currently have an unsaved interaction note draft. Transferring this topic will replace your draft. Continue?",
   "topicsConvertConfirmBtn": "Replace Draft",
-  "topicsConvertCancelBtn": "Cancel"
+  "topicsConvertCancelBtn": "Cancel",
+  "heatHot": "Active",
+  "heatWarm": "Warm",
+  "heatCool": "Cooling",
+  "heatCold": "Cold",
+  "heatPaused": "Paused",
+  "heatUnknown": "Never",
+  "heatScoreLabel": "Relationship Heat {score}%"
 }

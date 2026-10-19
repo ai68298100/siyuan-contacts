@@ -8409,3 +8409,36 @@ html[data-theme-mode="dark"] .lvct-org-profile-editor__section {
 .lvct-people__open-doc {
     vertical-align: middle;
 }
+
+/* E-29 关系温度与紧迫度分级样式类 */
+.lvct-heat {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--lvct-sp-1, 4px);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    border-radius: var(--lvct-r-pill, 9999px);
+    padding: 2px 7px;
+
+    &--hot {
+        color: var(--b3-theme-primary);
+        background: color-mix(in srgb, var(--b3-theme-primary) 12%, transparent);
+    }
+    &--warm {
+        color: var(--b3-theme-on-surface);
+        background: color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent);
+    }
+    &--cool {
+        color: var(--b3-theme-secondary, #d97706);
+        background: color-mix(in srgb, var(--b3-theme-secondary, #d97706) 12%, transparent);
+    }
+    &--cold {
+        color: var(--b3-theme-error);
+        background: color-mix(in srgb, var(--b3-theme-error) 12%, transparent);
+    }
+    &--muted {
+        color: var(--b3-theme-on-surface-light);
+        background: color-mix(in srgb, var(--b3-theme-on-surface) 6%, transparent);
+    }
+}

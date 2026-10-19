@@ -15,6 +15,118 @@ export const CADENCE_STORE_VERSION = 1;
 export const CADENCE_DAYS_MIN = 1;
 export const CADENCE_DAYS_MAX = 365;
 
+export type RelationshipHeatLevel = "hot" | "warm" | "cool" | "cold" | "paused" | "unknown";
+
+export interface RelationshipHealthInput {
+    /** 目标周期天数（1–365） */
+    cadenceDays: number;
+    /** 最近一次互动发生的时间戳（毫秒）；未曾互动为 undefined 或 null */
+    lastInteractionTime?: number | null;
+    /** 计算基准当前时间戳（毫秒，缺省为调用时的 Date.now()） */
+    nowTime?: number;
+    /** 是否对该联系人暂停提醒 */
+    paused?: boolean;
+}
+
+export interface RelationshipHealth {
+    /** 紧迫度/热度分级：hot（温热/近期联系）| warm（常温/状态良好）| cool（微凉/已逾期）| cold（渐冻/深度疏远）| paused（已暂停）| unknown（从未联系） */
+    level: RelationshipHeatLevel;
+    /** 健康度/温度百分比：0–100 整数；越接近 100 表示联系越紧密；从未联系为 0；已暂停为 100 */
+    score: number;
+    /** 距离上次互动过去的天数；从未互动为 null */
+    elapsedDays: number | null;
+    /** 目标周期天数（1–365） */
+    cadenceDays: number;
+    /** 是否已超过目标联系周期 */
+    overdue: boolean;
+    /** 逾期天数（若未逾期为 0） */
+    overdueDays: number;
+}
+
+/**
+ * E-29：动态关系温度与联系紧迫度分级计算。
+ * 纯函数：完全基于客观时间推导，无黑盒、无外部 IO、无副作用。
+ */
+export function computeRelationshipHealth(input: RelationshipHealthInput): RelationshipHealth {
+    const rawCadence = typeof input.cadenceDays === "number" && Number.isFinite(input.cadenceDays)
+        ? Math.round(input.cadenceDays)
+        : 30;
+    const cadenceDays = Math.max(CADENCE_DAYS_MIN, Math.min(CADENCE_DAYS_MAX, rawCadence));
+
+    if (input.paused === true) {
+        return {
+            level: "paused",
+            score: 100,
+            elapsedDays: null,
+            cadenceDays,
+            overdue: false,
+            overdueDays: 0,
+        };
+    }
+
+    const lastTime = input.lastInteractionTime;
+    if (typeof lastTime !== "number" || !Number.isFinite(lastTime) || lastTime <= 0) {
+        return {
+            level: "unknown",
+            score: 0,
+            elapsedDays: null,
+            cadenceDays,
+            overdue: true,
+            overdueDays: 0,
+        };
+    }
+
+    const now = typeof input.nowTime === "number" && Number.isFinite(input.nowTime)
+        ? input.nowTime
+        : Date.now();
+    const elapsedMs = Math.max(0, now - lastTime);
+    const elapsedDays = Math.floor(elapsedMs / (86400 * 1000));
+    const overdue = elapsedDays > cadenceDays;
+    const overdueDays = Math.max(0, elapsedDays - cadenceDays);
+
+    const ratio = elapsedDays / cadenceDays;
+    let level: RelationshipHeatLevel;
+    if (ratio <= 0.5) {
+        level = "hot";
+    } else if (ratio <= 1.0) {
+        level = "warm";
+    } else if (ratio <= 2.0) {
+        level = "cool";
+    } else {
+        level = "cold";
+    }
+
+    const rawScore = Math.round((1 - ratio / 2) * 100);
+    const score = Math.max(0, Math.min(100, rawScore));
+
+    return {
+        level,
+        score,
+        elapsedDays,
+        cadenceDays,
+        overdue,
+        overdueDays,
+    };
+}
+
+/** 视觉展示样式类名（基于思源 b3 CSS 变量约定） */
+export function heatLevelColorClass(level: RelationshipHeatLevel): string {
+    switch (level) {
+        case "hot":
+            return "lvct-heat--hot";
+        case "warm":
+            return "lvct-heat--warm";
+        case "cool":
+            return "lvct-heat--cool";
+        case "cold":
+            return "lvct-heat--cold";
+        case "paused":
+        case "unknown":
+        default:
+            return "lvct-heat--muted";
+    }
+}
+
 import { StoreIntegrityError } from "./store-integrity.ts";
 
 /** 人物文档 ID（与 SQL 安全面同一校验） */
