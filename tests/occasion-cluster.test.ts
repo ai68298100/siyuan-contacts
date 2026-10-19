@@ -1,11 +1,28 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+    addOccasionToStore,
     deriveOccasionInteractionEvents,
+    emptyOccasionStore,
     newOccasionId,
+    normalizeOccasionStore,
+    normalizeOccasionStoreForWrite,
+    removeOccasionFromStore,
+    updateOccasionInStore,
     validateOccasion,
+    MAX_OCCASIONS,
     type OccasionEntity,
 } from "../src/domain/occasion-cluster.ts";
+import { StoreIntegrityError } from "../src/domain/store-integrity.ts";
+import {
+    listOccasionEntities,
+    loadOccasionStoreStrict,
+    removeOccasionEntity,
+    saveOccasionEntity,
+    updateOccasionEntity,
+    OCCASIONS_STORAGE_KEY,
+} from "../src/data/occasions.ts";
+import type { Plugin } from "siyuan";
 
 const doc1 = "20261019000000-doc0001";
 const doc2 = "20261019000000-doc0002";
@@ -105,4 +122,105 @@ test("E-30 occasion: deriveOccasionInteractionEvents 投影为各参与者互动
 test("E-30 occasion: newOccasionId 格式符合合法 ID", () => {
     const id = newOccasionId();
     assert.match(id, /^\d{14}-[0-9a-z]{7}$/);
+});
+
+function mockOccasion(partial: Partial<OccasionEntity> = {}): OccasionEntity {
+    return {
+        id: "20261019000000-occ0001",
+        title: "季度技术研讨",
+        type: "meeting",
+        date: "2026-10-19",
+        attendees: [{ personDocId: doc1, name: "张三" }],
+        createdAt: 1700000000000,
+        updatedAt: 1700000000000,
+        ...partial,
+    };
+}
+
+test("E-30 occasion store: add/update/remove 与全库上限保护", () => {
+    let store = emptyOccasionStore();
+
+    // 新增两条
+    store = addOccasionToStore(store, mockOccasion({ id: "o1", title: "会议 A" }));
+    store = addOccasionToStore(store, mockOccasion({ id: "o2", title: "聚餐 B", type: "meal" }));
+    assert.equal(store.occasions.length, 2);
+    assert.equal(store.occasions[0].id, "o2", "新增置顶");
+    assert.equal(store.occasions[0].type, "meal", "类型应保留");
+
+    // 更新
+    store = updateOccasionInStore(store, "o1", { title: "会议 A（改名）", place: "会议室 3" }, 1700000010000);
+    const updated = store.occasions.find((item) => item.id === "o1")!;
+    assert.equal(updated.title, "会议 A（改名）");
+    assert.equal(updated.place, "会议室 3");
+    assert.equal(updated.updatedAt, 1700000010000);
+
+    // 更新非法数据抛错
+    assert.throws(() => updateOccasionInStore(store, "o1", { title: "" }), /标题不能为空/);
+
+    // 移除
+    store = removeOccasionFromStore(store, "o1");
+    assert.equal(store.occasions.length, 1);
+    assert.equal(store.occasions[0].id, "o2");
+
+    // 全库上限保护
+    let fullStore = emptyOccasionStore();
+    for (let i = 0; i < MAX_OCCASIONS; i++) {
+        fullStore = addOccasionToStore(fullStore, mockOccasion({ id: `occ-${i}`, title: `场合 ${i}` }));
+    }
+    assert.throws(
+        () => addOccasionToStore(fullStore, mockOccasion({ id: "overflow", title: "溢出场合" })),
+        /最多保留 500 条/,
+    );
+});
+
+test("E-30 occasion store: 严格读写检查与容错归一化", () => {
+    assert.throws(() => normalizeOccasionStoreForWrite({ schemaVersion: 99, occasions: [] }), StoreIntegrityError);
+
+    assert.throws(() => normalizeOccasionStoreForWrite({
+        schemaVersion: 1,
+        occasions: [{ id: "o1", title: "", type: "meeting", date: "2026-10-19", attendees: [{ personDocId: doc1, name: "张三" }] }],
+    }), StoreIntegrityError);
+
+    assert.deepEqual(normalizeOccasionStore(null), emptyOccasionStore());
+    assert.deepEqual(normalizeOccasionStore({ schemaVersion: 2, occasions: [] }), emptyOccasionStore());
+    // 坏条目被容错过滤
+    const normalized = normalizeOccasionStore({
+        schemaVersion: 1,
+        occasions: [
+            { id: "good", title: "有效", type: "meeting", date: "2026-10-19", attendees: [{ personDocId: doc1, name: "张三" }], createdAt: 1, updatedAt: 1 },
+            { id: "bad", title: "", type: "meeting", date: "2026-10-19", attendees: [] },
+        ],
+    });
+    assert.equal(normalized.occasions.length, 1);
+    assert.equal(normalized.occasions[0].id, "good");
+});
+
+test("E-30 occasion 数据层：saveOccasionEntity、listOccasionEntities、update 与 remove 存储闭环", async () => {
+    const memory = new Map<string, unknown>();
+    const plugin = {
+        async loadData(key: string) {
+            return memory.has(key) ? structuredClone(memory.get(key)) : null;
+        },
+        async saveData(key: string, value: unknown) {
+            memory.set(key, structuredClone(value));
+        },
+    } as unknown as Plugin;
+
+    assert.deepEqual(await listOccasionEntities(plugin), []);
+
+    await saveOccasionEntity(plugin, mockOccasion({ id: "o1", title: "会议 A", date: "2026-10-18" }));
+    await saveOccasionEntity(plugin, mockOccasion({ id: "o2", title: "聚餐 B", type: "meal", date: "2026-10-20" }));
+
+    const listed = await listOccasionEntities(plugin);
+    assert.equal(listed.length, 2);
+    assert.equal(listed[0].id, "o2", "按日期倒序排列");
+
+    const afterUpdate = await updateOccasionEntity(plugin, "o1", { place: "线上会议" });
+    assert.equal(afterUpdate.find((item) => item.id === "o1")!.place, "线上会议");
+
+    const afterRemove = await removeOccasionEntity(plugin, "o2");
+    assert.equal(afterRemove.length, 1);
+
+    memory.set(OCCASIONS_STORAGE_KEY, { schemaVersion: 999, occasions: [] });
+    await assert.rejects(() => loadOccasionStoreStrict(plugin), StoreIntegrityError);
 });

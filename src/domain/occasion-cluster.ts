@@ -7,6 +7,7 @@
 
 import { isValidDateKey } from "./date-key.ts";
 import type { InteractionEvent } from "./interactions.ts";
+import { StoreIntegrityError } from "./store-integrity.ts";
 
 export type OccasionType = "meeting" | "meal" | "wedding" | "party" | "trip" | "conference" | "other";
 
@@ -170,4 +171,138 @@ export function deriveOccasionInteractionEvents(occasion: OccasionEntity): Inter
             note: `${summaryPrefix}${placeSuffix}${withOthers}${baseNote}`,
         };
     });
+}
+
+export const OCCASION_STORE_VERSION = 1;
+export const MAX_OCCASIONS = 500;
+
+export interface OccasionStore {
+    schemaVersion: 1;
+    occasions: OccasionEntity[];
+}
+
+export function emptyOccasionStore(): OccasionStore {
+    return { schemaVersion: OCCASION_STORE_VERSION, occasions: [] };
+}
+
+export function addOccasionToStore(store: OccasionStore, occasion: OccasionEntity): OccasionStore {
+    const errors = validateOccasion(occasion);
+    if (errors.length > 0) throw new Error(`场合数据无效：${errors.join("；")}`);
+
+    const existing = store.occasions.filter((item) => item.id !== occasion.id);
+    if (existing.length >= MAX_OCCASIONS) {
+        throw new Error(`全库最多保留 ${MAX_OCCASIONS} 条场合记录`);
+    }
+
+    const updated = [occasion, ...existing];
+    return {
+        schemaVersion: OCCASION_STORE_VERSION,
+        occasions: updated,
+    };
+}
+
+export function updateOccasionInStore(
+    store: OccasionStore,
+    occasionId: string,
+    patch: Partial<Omit<OccasionEntity, "id" | "createdAt">>,
+    nowTime: number = Date.now(),
+): OccasionStore {
+    const index = store.occasions.findIndex((item) => item.id === occasionId);
+    if (index === -1) return store;
+
+    const current = store.occasions[index];
+    const candidate: OccasionEntity = {
+        ...current,
+        ...patch,
+        updatedAt: nowTime,
+    };
+
+    const errors = validateOccasion(candidate);
+    if (errors.length > 0) throw new Error(`场合数据更新无效：${errors.join("；")}`);
+
+    const nextList = [...store.occasions];
+    nextList[index] = candidate;
+
+    return {
+        schemaVersion: OCCASION_STORE_VERSION,
+        occasions: nextList,
+    };
+}
+
+export function removeOccasionFromStore(store: OccasionStore, occasionId: string): OccasionStore {
+    const remaining = store.occasions.filter((item) => item.id !== occasionId);
+    if (remaining.length === store.occasions.length) return store;
+    return {
+        schemaVersion: OCCASION_STORE_VERSION,
+        occasions: remaining,
+    };
+}
+
+export function normalizeOccasionStore(raw: unknown): OccasionStore {
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return emptyOccasionStore();
+    const record = raw as Record<string, unknown>;
+    if (record.schemaVersion !== OCCASION_STORE_VERSION || !Array.isArray(record.occasions)) {
+        return emptyOccasionStore();
+    }
+
+    const validList: OccasionEntity[] = [];
+    const seen = new Set<string>();
+
+    for (const item of record.occasions) {
+        if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+        const candidate = item as Partial<OccasionEntity>;
+        if (typeof candidate.id !== "string" || !candidate.id || seen.has(candidate.id)) continue;
+        const errors = validateOccasion(candidate);
+        if (errors.length > 0) continue;
+
+        seen.add(candidate.id);
+        validList.push({
+            id: candidate.id,
+            title: candidate.title!.trim(),
+            type: candidate.type!,
+            date: candidate.date!,
+            endDate: candidate.endDate,
+            place: candidate.place?.trim() || undefined,
+            sourceDocId: candidate.sourceDocId,
+            attendees: candidate.attendees!,
+            exchangeIds: Array.isArray(candidate.exchangeIds) ? candidate.exchangeIds.filter((id): id is string => typeof id === "string") : undefined,
+            note: candidate.note?.trim() || undefined,
+            createdAt: typeof candidate.createdAt === "number" && Number.isFinite(candidate.createdAt) ? candidate.createdAt : Date.now(),
+            updatedAt: typeof candidate.updatedAt === "number" && Number.isFinite(candidate.updatedAt) ? candidate.updatedAt : Date.now(),
+        });
+
+        if (validList.length >= MAX_OCCASIONS) break;
+    }
+
+    return { schemaVersion: OCCASION_STORE_VERSION, occasions: validList };
+}
+
+export function normalizeOccasionStoreForWrite(raw: unknown): OccasionStore {
+    if (raw == null || raw === "") return emptyOccasionStore();
+    if (typeof raw !== "object" || Array.isArray(raw)) throw new StoreIntegrityError("场合记录", "需要版本化对象");
+    const record = raw as Record<string, unknown>;
+    if (record.schemaVersion !== OCCASION_STORE_VERSION) throw new StoreIntegrityError("场合记录", "版本不兼容");
+    if (!Array.isArray(record.occasions)) throw new StoreIntegrityError("场合记录", "条目容器必须为数组");
+
+    const seen = new Set<string>();
+    for (let i = 0; i < record.occasions.length; i++) {
+        const item = record.occasions[i];
+        if (!item || typeof item !== "object" || Array.isArray(item)) {
+            throw new StoreIntegrityError("场合记录", `条目结构无效（索引 ${i}）`, record.occasions.length, i);
+        }
+        const candidate = item as Partial<OccasionEntity>;
+        if (typeof candidate.id !== "string" || !candidate.id) {
+            throw new StoreIntegrityError("场合记录", `条目 ID 无效（索引 ${i}）`, record.occasions.length, i);
+        }
+        if (seen.has(candidate.id)) {
+            throw new StoreIntegrityError("场合记录", `存在重复条目 ID（${candidate.id}）`, record.occasions.length, i);
+        }
+        seen.add(candidate.id);
+        const errors = validateOccasion(candidate);
+        if (errors.length > 0) {
+            throw new StoreIntegrityError("场合记录", `字段校验失败（${errors[0]}）`, record.occasions.length, i);
+        }
+    }
+
+    return normalizeOccasionStore(raw);
 }
