@@ -9,6 +9,7 @@ import ImportDialog from "../../../src/components/people/ImportDialog.svelte";
 import DashboardView from "../../../src/components/dashboard/DashboardView.svelte";
 import PeopleView from "../../../src/components/people/PeopleView.svelte";
 import SettingsView from "../../../src/components/SettingsView.svelte";
+import ContactMergeWizard from "../../../src/components/people/ContactMergeWizard.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
 import { applyContactCandidateFields, batchUpdateContacts, createContact, retryContactFields, updateContactFields } from "../../../src/services/contacts";
@@ -7381,6 +7382,45 @@ await test("E-33 联系人回收站能力降级：facade 未提供时显示不�
     await tick();
     assert(fixture.textContent.includes("当前版本未提供回收站能力"), "缺少能力降级说明");
     assert(![...fixture.querySelectorAll("button")].some((node) => node.textContent.trim() === "清空回收站"), "无能力时仍渲染清空按钮");
+});
+
+await test("E-31 字段级安全合并向导：逐字段选择 + 自定义 + 验证 + 预览", async () => {
+    const personA = { itemId: "item-a", docId: "doc-a", name: "张三", phone: "13800000001", email: "zhangsan@a.com", wechat: "", website: "", birthday: "", isLunar: false, group: "朋友", tags: ["技术"], relatedItemIds: [] };
+    const personB = { itemId: "item-b", docId: "doc-b", name: "张三 (旧)", phone: "", email: "zhangsan@b.com", wechat: "wx-zhangsan", website: "", birthday: "", isLunar: false, group: "同事", tags: ["技术", "羽毛球"], relatedItemIds: [] };
+    // A.phone 优先、A.wechat 空 → 补 B、A.email 也非空应选 A；调整用例让 A.email 为空以验证补齐
+    let confirmed = null;
+    mounted = mount(ContactMergeWizard, { target: fixture, props: {
+        i18n: {},
+        primary: personA,
+        secondary: personB,
+        onConfirm: (params) => { confirmed = params; },
+        onClose: () => {},
+    } });
+
+    await until(() => fixture.querySelector(".lvct-merge__title"), "合并向导未渲染");
+    // 初始推荐：A 有值 → 选 A；B 有值 → 选 B
+    const primaryRadio = (name) => [...fixture.querySelectorAll(`input[name="merge-${name}"]`)].find((input) => input.getAttribute("value") === "primary");
+    const secondaryRadio = (name) => [...fixture.querySelectorAll(`input[name="merge-${name}"]`)].find((input) => input.getAttribute("value") === "secondary");
+    assert(primaryRadio("phone").checked, "默认应保留 A 的电话");
+    assert(primaryRadio("email").checked, "A 有邮箱时应保留 A");
+    assert(secondaryRadio("wechat").checked, "A 缺微信时默认补齐 B");
+    // 验证合并预览正确
+    const preview = fixture.querySelector(".lvct-merge__preview-grid");
+    assert(preview.textContent.includes("13800000001"), "预览电话应为 A 的号码");
+    assert(preview.textContent.includes("zhangsan@a.com"), "预览邮箱应为 A 的邮箱");
+    assert(preview.textContent.includes("wx-zhangsan"), "预览微信应补齐 B 的微信");
+    assert(preview.textContent.includes("技术, 羽毛球") || preview.textContent.includes("技术、羽毛球"), "预览标签应为并集去重");
+
+    // 用户手动覆盖姓名 → 自定义
+    [...fixture.querySelectorAll(`input[name="merge-name"]`)].find((input) => input.getAttribute("value") === "custom").click();
+    await until(() => fixture.querySelector(".lvct-merge__custom"), "自定义输入框未渲染");
+    const customInput = fixture.querySelector(".lvct-merge__custom");
+    customInput.value = "张三（合并后）";
+    customInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await until(() => fixture.querySelector(".lvct-merge__preview-grid")?.textContent.includes("张三（合并后）"), "自定义姓名未生效");
+
+    // 取消按钮
+    assert([...fixture.querySelectorAll("button")].some((b) => b.textContent.trim() === "取消"), "缺少取消按钮");
 });
 
 await pause(100);

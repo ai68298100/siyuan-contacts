@@ -27,6 +27,7 @@
     import VCardDialog from "./VCardDialog.svelte";
     import LvctDialog from "../LvctDialog.svelte";
     import ProfileCompletionDialog from "./ProfileCompletionDialog.svelte";
+    import ContactMergeWizard from "./ContactMergeWizard.svelte";
     import { PROFILE_GAPS } from "../../domain/people-filters";
     import ViewState from "../ViewState.svelte";
     import { useCloseGuard } from "../close-guard";
@@ -156,6 +157,7 @@
     let activeViewName = $state("");
     let viewHint = $state("");
     let dupOpen = $state(false);
+    let mergeTarget: DuplicatePair | null = $state(null);
     const duplicatePairs: DuplicatePair[] = $derived(findDuplicatePairs(people));
     const duplicatePairsCapped = $derived(duplicatePairs.length >= DUPLICATE_PAIRS_LIMIT);
     // svelte-ignore state_referenced_locally
@@ -2185,6 +2187,9 @@
                                 <small>{pair.b.phone || "—"} · {pair.b.email || "—"} · {pair.b.group || "无分组"}</small>
                                 <button class="b3-button b3-button--outline" onclick={() => { dupOpen = false; onOpenDetail(pair.b); }}>查看 {pair.b.name}</button>
                             </div>
+                            <div class="lvct-dup__actions">
+                                <button class="b3-button b3-button--cancel" onclick={() => (mergeTarget = pair)}>合并此对</button>
+                            </div>
                         </div>
                     {/each}
                 {/if}
@@ -2204,6 +2209,24 @@
                     completing = false;
                     refresh();
                 }}
+            />
+        </LvctDialog>
+    {/if}
+
+    {#if mergeTarget}
+        <LvctDialog title={`合并联系人 · ${mergeTarget.a.name} ↔ ${mergeTarget.b.name}`} wide onClose={() => (mergeTarget = null)}>
+            <ContactMergeWizard
+                {i18n}
+                primary={mergeTarget.a}
+                secondary={mergeTarget.b}
+                onConfirm={({ primaryDocId, draft, removedSecondaryDocId, auditSnapshot }) => {
+                    // 落库：先写回 primary，再解绑 secondary，再推数据变更广播。
+                    // 本轮不直接接 facade.updatePersonFields（避免与 PersonEditDialog 重复的字段写路径），
+                    // 通过 console + auditSnapshot 记录；后续轮次接真写库时再替换此处。
+                    console.info("[lvct] 合并已规划，等待接入真实写库", { primaryDocId, draft, removedSecondaryDocId, auditSnapshot });
+                    refresh();
+                }}
+                onClose={() => (mergeTarget = null)}
             />
         </LvctDialog>
     {/if}

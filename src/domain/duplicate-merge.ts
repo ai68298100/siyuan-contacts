@@ -154,9 +154,9 @@ export function resolveMergePlan(plan: ContactMergePlan, nowTime: number = Date.
         timestamp: nowTime,
         primaryDocId: primary.docId,
         secondaryDocId: secondary.docId,
-        primaryBefore: structuredClone(primary),
-        secondaryBefore: structuredClone(secondary),
-        mergedResult: structuredClone(draft),
+        primaryBefore: JSON.parse(JSON.stringify(primary)) as ContactSummary,
+        secondaryBefore: JSON.parse(JSON.stringify(secondary)) as ContactSummary,
+        mergedResult: JSON.parse(JSON.stringify(draft)) as ContactDraft,
     };
 
     return { draft, auditSnapshot };
