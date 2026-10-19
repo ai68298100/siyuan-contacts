@@ -30,6 +30,7 @@
     import ContactMergeWizard from "./ContactMergeWizard.svelte";
     import OccasionDialog from "../OccasionDialog.svelte";
     import { PROFILE_GAPS } from "../../domain/people-filters";
+import { createDebouncer } from "../../domain/debounce";
     import ViewState from "../ViewState.svelte";
     import { useCloseGuard } from "../close-guard";
     import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal, Bookmark, Pencil, Trash2, Calendar } from "@lucide/svelte";
@@ -146,6 +147,19 @@
     let tagFilter: string[] = $state([]);
     // svelte-ignore state_referenced_locally
     let extraFilter: PeopleFilterState = $state({ ...EMPTY_PEOPLE_FILTER });
+    // 高级筛选文本输入防抖：避免每次按键触发全量重算与分页重置
+    const extraFilterDebouncer = createDebouncer<string>({
+        waitMs: 220,
+        onCommit: (value) => {
+            extraFilter = { ...extraFilter, ...(JSON.parse(value) as Partial<PeopleFilterState>) };
+            page = 1;
+        },
+    });
+    /** 提交某个高级筛选字段（防抖） */
+    function commitExtraFilterField(field: keyof PeopleFilterState, value: string): void {
+        // 始终以最新 extraFilter 为基线合并，避免并发输入互相覆盖
+        extraFilterDebouncer.schedule(JSON.stringify({ ...extraFilter, [field]: value }));
+    }
     let moreOpen = $state(false);
     // svelte-ignore state_referenced_locally
     let localViews: SavedView[] = $state(normalizeSavedViews(preferences.savedViews));
@@ -395,6 +409,7 @@
     let rosterAbortController: AbortController | undefined;
     onDestroy(() => {
         peopleAlive = false;
+        extraFilterDebouncer.dispose();
         cancelContactFocus();
         refreshGeneration += 1;
         recentGeneration += 1;
