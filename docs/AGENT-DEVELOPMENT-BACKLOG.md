@@ -112,6 +112,21 @@ evidence_paths / owner / last_updated / commit
 - **退出边界：** 域层纯函数实现与测试全部通过；界面控件展现接入由视图卡片单独推进。
 - **完成回报：** `pnpm check` 0 错误 0 警告、单测 795/795 通过、`pnpm build` 与 `pnpm check:release` 全部通过。
 
+#### AG-E33-TRASH — 联系人软删除回收站缓冲（E-33）安全机制与纯函数域/存储层
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+data / M4；已完成 30 天元数据快照缓冲（`trash-bin.json`，版本 1）、纯函数域层（置顶、同人去重更新、过期自动清理、剩余天数计算、读写严格包络校验）、数据存储层（Web Lock + 写后回读），并经完整单测（3/3）与全量架构完整性测试（87/87）守门。
+- **user_outcome / user_scenario：** 联系人从人脉名册解绑/移除时，元数据快照自动进入 30 天回收站缓冲区；用户误删时可无损撤销还原原属性，无需重新扫描或手动补录电话/邮箱/标签；超过 30 天的条目自动静默清理。
+- **source_ids / current_evidence：** E-33、`docs/ACTIVE-BACKLOG.md`；`src/domain/trash.ts`、`src/data/trash.ts`、`tests/trash.test.ts`；单测全绿。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3 新增 `trash-bin.json` 键表 / 撤销与恢复交互接入 / trash / 独立自管 JSON，本工作区安全缓冲区，不跨工作区迁移。
+- **allowed_files / forbidden_files：** trash 域与测试、trash 数据层、package.json、契约与 backlog / 保护文件。
+- **contract_change / host_or_spike_required：** DATA-CONTRACT §3 新增 `trash-bin.json`（版本 1，条目含 id/docId/itemId/name/snapshot/removedAt/expiresAt，单库上限 200 条，严格读 + Web Lock + 写后回读）。
+- **ordered_steps：** 纯函数域层实现 → 数据存储层实现 → 单元测试与 package.json 门禁注册 → 架构守门验证 → 契约登记。
+- **test_fixtures / test_commands / acceptance：** 纯函数快照提取、30天过期推导、添加置顶与同人去重、超期清理、严格读写校验；`pnpm check`、`pnpm test`（799/799）、`pnpm build` 与 `pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 坏条目整体拒绝抛出 StoreIntegrityError；最多保留 200 条，过期自动修剪；仅存插件本地 JSON。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/trash.ts`、`src/data/trash.ts`、`tests/trash.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 域层与存储层隔离测试全部通过；UI 视图呈现与一键恢复交互后续单独挂接。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 799/799 全部通过、`pnpm build` 与 `pnpm check:release` 通过。
+
 #### AG-ISSUE-051-054-FIELDS — 重复资料与两层分组首版
 
 - **status / priority / type / milestone：** `host_pending` / P1 / feature+regression / M4；生产实现、隔离内核与隔离 Chrome 验收已完成，真实用户工作区、原生编辑器竞争、真机等边界继续由 Host Queue 守门；发布与 issue 关闭见 `AG-ISSUE-051-054-CLOSE`。
