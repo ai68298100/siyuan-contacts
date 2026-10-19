@@ -22,6 +22,7 @@
     import { useCloseGuard } from "../close-guard";
     import { onDestroy } from "svelte";
     import { requestErrorMessage } from "../../shared/error-presenter";
+    import { confirmDialog } from "../../libs/confirm-dialog";
 
     let {
         facade,
@@ -577,6 +578,41 @@
         onOpenPeople({ itemIds, label: "待办跟进", sort: "name" });
     }
 
+    async function startQuickRecord(person: ContactSummary): Promise<void> {
+        if (quickBusy) return;
+        if (quickPersonId === person.itemId) return;
+        if (quickPersonId && quickNote.trim()) {
+            const confirmed = await confirmDialog({
+                title: "放弃未记录的备注",
+                message: "当前互动备注草稿尚未记录，切换将放弃已输入的内容，确定切换吗？",
+                confirmLabel: "放弃并切换",
+                cancelLabel: "继续编辑",
+                danger: true,
+            });
+            if (!confirmed) return;
+        }
+        quickPersonId = person.itemId;
+        quickNote = "";
+        quickError = "";
+    }
+
+    async function cancelQuickRecord(): Promise<void> {
+        if (quickBusy) return;
+        if (quickNote.trim()) {
+            const confirmed = await confirmDialog({
+                title: "放弃未记录的备注",
+                message: "当前互动备注草稿尚未记录，取消将放弃已输入的内容，确定取消吗？",
+                confirmLabel: "放弃备注",
+                cancelLabel: "继续编辑",
+                danger: true,
+            });
+            if (!confirmed) return;
+        }
+        quickPersonId = "";
+        quickNote = "";
+        quickError = "";
+    }
+
     async function recordQuick(person: ContactSummary) {
         if (quickBusy) return;
         quickBusy = true;
@@ -1126,11 +1162,11 @@
                                 {#if quickPersonId === item.person.itemId}
                                     <div class="lvct-dash__quick-form">
                                         <input class="b3-text-field" type="text" aria-label={text("dashQuickNoteLabel", "与{name}互动的备注", { name: item.person.name })} placeholder={text("dashQuickNotePlaceholder", "备注（可选）")} bind:value={quickNote} disabled={quickBusy} />
-                                        <button class="b3-button b3-button--text" onclick={() => recordQuick(item.person)} disabled={quickBusy}>{quickBusy ? text("dashRecording", "记录中…") : text("dashRecord", "记录")}</button>
-                                        <button class="b3-button b3-button--cancel" onclick={() => { quickPersonId = ""; quickError = ""; }} disabled={quickBusy}>{text("dashCancel", "取消")}</button>
+                                        <button type="button" class="b3-button b3-button--text" onclick={() => void recordQuick(item.person)} disabled={quickBusy}>{quickBusy ? text("dashRecording", "记录中…") : text("dashRecord", "记录")}</button>
+                                        <button type="button" class="b3-button b3-button--cancel" onclick={() => void cancelQuickRecord()} disabled={quickBusy}>{text("dashCancel", "取消")}</button>
                                     </div>
                                 {:else}
-                                    <button class="b3-button b3-button--outline lvct-dash__quick-button" onclick={() => { quickPersonId = item.person.itemId; quickNote = ""; }} disabled={quickBusy || quickDoneId === item.person.itemId}>
+                                    <button type="button" class="b3-button b3-button--outline lvct-dash__quick-button" onclick={() => void startQuickRecord(item.person)} disabled={quickBusy || quickDoneId === item.person.itemId}>
                                         {quickDoneId === item.person.itemId ? text("dashRecordedDone", "已记录 ✓") : text("dashQuickRecord", "记一笔")}
                                     </button>
                                 {/if}
