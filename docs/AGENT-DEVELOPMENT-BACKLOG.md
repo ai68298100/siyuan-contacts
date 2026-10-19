@@ -142,6 +142,21 @@ evidence_paths / owner / last_updated / commit
 - **退出边界：** 域层纯函数实现与测试全部通过；UI 虚线展示与一键建关系单独挂接。
 - **完成回报：** `pnpm check` 0 错误 0 警告、单测 802/802 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
 
+#### AG-E31-MERGE — 重复人物字段级安全合并向导（E-31）纯函数域模型与算法
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+domain / M2；已完成字段级合并决策模型（`buildDefaultMergePlan` 自动按非空补齐）、安全约束校验（同一文档/同一行防御、本人不可作为次人物被销毁、姓名非空）、合并决议与标签去重并集、可逆审计快照（`resolveMergePlan`），经 3/3 单测与架构完整性守门全绿。
+- **user_outcome / user_scenario：** 用户在发现疑似重复联系人时，可进行字段级比对并定制合并计划（如保留 A 的手机与 B 的邮箱）；合并前受严格安全校验保护，绝不静默覆盖；生成可逆审计快照，记录合并前双方完整原始数据。
+- **source_ids / current_evidence：** E-31、`docs/ACTIVE-BACKLOG.md`；`src/domain/duplicate-merge.ts`、`tests/duplicate-merge.test.ts`；单测全量通过。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §1 / 纯函数域层模型，无新持久化 JSON，不破坏思源原生文档。
+- **allowed_files / forbidden_files：** duplicate-merge 域与测试、package.json / 保护文件。
+- **contract_change / host_or_spike_required：** 无存储结构变更；纯函数生成目标 ContactDraft 与审计快照。
+- **ordered_steps：** 纯函数类型与安全校验定义 → 默认推荐生成与非空优选算法 → 决议与可逆快照生成 → 单元测试与 package.json 门禁注册 → 门禁通过。
+- **test_fixtures / test_commands / acceptance：** 纯函数同文档/同行/本人防御校验、非空自动选 secondary、农历生日标志跟随、标签去重并集、自定义字段覆盖与完整快照对比；`pnpm check`、`pnpm test`（805/805）、`pnpm build` 与 `pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算，O(1) 决策复杂度；生成 MergeAuditSnapshot 供日后撤销使用；纯本地计算。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/duplicate-merge.ts`、`tests/duplicate-merge.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 域层纯函数实现与测试全部通过；UI 并排比对向导弹窗后续单独挂接。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 805/805 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
+
 #### AG-ISSUE-051-054-FIELDS — 重复资料与两层分组首版
 
 - **status / priority / type / milestone：** `host_pending` / P1 / feature+regression / M4；生产实现、隔离内核与隔离 Chrome 验收已完成，真实用户工作区、原生编辑器竞争、真机等边界继续由 Host Queue 守门；发布与 issue 关闭见 `AG-ISSUE-051-054-CLOSE`。
