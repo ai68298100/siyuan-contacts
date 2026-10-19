@@ -7306,6 +7306,83 @@ await runBatchSelectionRegression({ test, assert, kernel, settings, fixture, unt
 await runSearchCompletenessRegression({ test, assert, kernel, settings, fixture, until, button });
 await runRecentFilterBoundariesRegression({ test, assert, kernel, settings, fixture, until, button });
 
+await test("E-33 联系人回收站：列表渲染、一键恢复、清空确认与能力降级", async () => {
+    const now = Date.now();
+    const day = 86400 * 1000;
+    let entries = [
+        { id: "trash-1", docId: TEST_PERSON_DOC_IDS.a, itemId: "item-a", name: "误删甲", snapshot: { phone: "13800000000", tags: ["同事"], group: "同事", isLunar: false }, removedAt: now - 2 * day, expiresAt: now + 28 * day },
+        { id: "trash-2", docId: TEST_PERSON_DOC_IDS.b, itemId: "item-b", name: "误删乙", snapshot: { tags: [] }, removedAt: now - 5 * day, expiresAt: now + 25 * day },
+    ];
+    const restoredCalls = [];
+    let emptied = 0;
+    const facade = {
+        settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        listTrash: async () => [...entries],
+        restoreContactFromTrash: async (entryId) => {
+            restoredCalls.push(entryId);
+            const target = entries.find((entry) => entry.id === entryId);
+            entries = entries.filter((entry) => entry.id !== entryId);
+            return { docId: target.docId, itemId: `restored-${entryId}`, name: target.name };
+        },
+        emptyTrash: async () => { emptied += 1; entries = []; },
+    };
+    mounted = mount(SettingsView, { target: fixture, props: {
+        facade, settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {},
+    } });
+    navButton(["数据与字段"]).click();
+    await tick();
+
+    // 初始提示态
+    assert(fixture.textContent.includes("点击「刷新列表」查看缓冲中的联系人"), "未显示回收站初始提示");
+    button("刷新列表").click();
+    await until(() => fixture.textContent.includes("误删甲"), "回收站列表未渲染条目");
+
+    // 剩余天数展示
+    assert(fixture.textContent.includes("剩余 28 天"), "未显示剩余保留天数");
+    assert(fixture.textContent.includes("电话 13800000000"), "未显示快照联系方式");
+    assert(fixture.textContent.includes("标签 同事"), "未显示快照标签");
+
+    // 一键恢复
+    const listNames = () => [...fixture.querySelectorAll(".lvct-settings__missing li")]
+        .map((node) => node.querySelector("div")?.textContent?.trim() ?? "");
+    assert(listNames().length === 2, "回收站列表条目数应为 2");
+    const restoreButtons = [...fixture.querySelectorAll("button")].filter((node) => node.textContent.trim() === "恢复联系人");
+    assert(restoreButtons.length === 2, `恢复按钮数量应为 2，实际 ${restoreButtons.length}`);
+    restoreButtons[0].click();
+    await until(() => restoredCalls.length === 1 && !listNames().some((name) => name.startsWith("误删甲")), "恢复后条目未从列表移除");
+    assert(fixture.textContent.includes("已恢复「误删甲」"), "恢复成功提示缺失");
+    assert(listNames().some((name) => name.startsWith("误删乙")), "未恢复的条目被误删");
+
+    // 清空需确认；取消时不发送
+    const originalConfirm = window.confirm;
+    try {
+        window.confirm = () => false;
+        button("清空回收站").click();
+        await tick();
+        assert(emptied === 0, "取消确认仍清空");
+        window.confirm = (message) => { assert(message.includes("人物文档"), "清空确认未说明人物文档不受影响"); return true; };
+        button("清空回收站").click();
+        await until(() => emptied === 1, "确认后未清空");
+        await until(() => fixture.textContent.includes("回收站已清空"), "清空后未提示");
+        assert(fixture.textContent.includes("回收站是空的"), "清空后未回到空态");
+    } finally {
+        window.confirm = originalConfirm;
+    }
+});
+
+await test("E-33 联系人回收站能力降级：facade 未提供时显示不可用说明且不渲染操作", async () => {
+    mounted = mount(SettingsView, { target: fixture, props: {
+        facade: { settings, viewPreferences: DEFAULT_VIEW_PREFERENCES },
+        settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {},
+    } });
+    navButton(["数据与字段"]).click();
+    await tick();
+    assert(fixture.textContent.includes("当前版本未提供回收站能力"), "缺少能力降级说明");
+    assert(![...fixture.querySelectorAll("button")].some((node) => node.textContent.trim() === "清空回收站"), "无能力时仍渲染清空按钮");
+});
+
 await pause(100);
 results.push({ name: "无未处理异常及响应式循环", ok: runtimeErrors.length === 0, detail: runtimeErrors.join("\n") });
 document.querySelector("#results").textContent = JSON.stringify(results, null, 2);
