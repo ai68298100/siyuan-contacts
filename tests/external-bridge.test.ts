@@ -15,7 +15,7 @@ import {
 import type { BridgeDependencies } from "../src/services/external-bridge.ts";
 import type { BridgeRequestStore, BridgePerson } from "../src/domain/external-bridge.ts";
 import type { ContactsSettings } from "../src/domain/model.ts";
-import { detectCheckinBridge } from "../src/bridge/checkin.ts";
+import { detectCheckinBridge, recordCheckinForContact } from "../src/bridge/checkin.ts";
 
 const firstId = "20261004000000-person1";
 const secondId = "20261004000000-person2";
@@ -561,31 +561,80 @@ test("Epoch 6: detectCheckinBridge 支持多别名探测与状态自证", () => 
     try {
         // 1. No window -> unsupported
         delete (globalThis as any).window;
-        assert.deepEqual(detectCheckinBridge(), { state: "unsupported", protocol: null });
+        assert.deepEqual(detectCheckinBridge(), { state: "unsupported", protocol: null, capabilities: [], version: null });
 
         // 2. Window without checkin -> unsupported
         (globalThis as any).window = {};
-        assert.deepEqual(detectCheckinBridge(), { state: "unsupported", protocol: null });
+        assert.deepEqual(detectCheckinBridge(), { state: "unsupported", protocol: null, capabilities: [], version: null });
 
         // 3. Low protocol -> pending
         (globalThis as any).window = { siyuanCheckin: { protocol: 4 } };
-        assert.deepEqual(detectCheckinBridge(), { state: "pending", protocol: 4 });
+        assert.deepEqual(detectCheckinBridge(), { state: "pending", protocol: 4, capabilities: [], version: null });
 
         // 4. Standard siyuanCheckin ready
         (globalThis as any).window = { siyuanCheckin: { protocol: 5 } };
-        assert.deepEqual(detectCheckinBridge(), { state: "ready", protocol: 5 });
+        assert.deepEqual(detectCheckinBridge(), { state: "ready", protocol: 5, capabilities: [], version: null });
 
-        // 5. Multi-alias xiaolvCheckin fallback
-        (globalThis as any).window = { xiaolvCheckin: { protocol: 5 } };
-        assert.deepEqual(detectCheckinBridge(), { state: "ready", protocol: 5 });
+        // 5. Multi-alias xiaolvCheckin fallback with capabilities & version
+        (globalThis as any).window = { xiaolvCheckin: { protocol: 5, capabilities: ["recordItem"], version: "5.1.0" } };
+        assert.deepEqual(detectCheckinBridge(), { state: "ready", protocol: 5, capabilities: ["recordItem"], version: "5.1.0" });
 
         // 6. Multi-alias lvCheckin fallback
         (globalThis as any).window = { lvCheckin: { protocol: 6 } };
-        assert.deepEqual(detectCheckinBridge(), { state: "ready", protocol: 6 });
+        assert.deepEqual(detectCheckinBridge(), { state: "ready", protocol: 6, capabilities: [], version: null });
 
         // 7. Multi-alias LvCheckin fallback
         (globalThis as any).window = { LvCheckin: { protocol: 5 } };
-        assert.deepEqual(detectCheckinBridge(), { state: "ready", protocol: 5 });
+        assert.deepEqual(detectCheckinBridge(), { state: "ready", protocol: 5, capabilities: [], version: null });
+    } finally {
+        (globalThis as any).window = originalWindow;
+    }
+});
+
+test("recordCheckinForContact 生态委托：就绪时正确转发并附加人脉前缀，未就绪或故障时平滑降级", async () => {
+    const originalWindow = (globalThis as any).window;
+    try {
+        // 1. 未就绪平滑降级
+        (globalThis as any).window = {};
+        const unready = await recordCheckinForContact("item-1", "张三");
+        assert.equal(unready.recorded, false);
+        assert.ok(unready.reason?.includes("未就绪"));
+
+        // 2. 缺少 recordItem 能力平滑降级
+        (globalThis as any).window = { siyuanCheckin: { protocol: 5 } };
+        const noMethod = await recordCheckinForContact("item-1", "张三");
+        assert.equal(noMethod.recorded, false);
+        assert.ok(noMethod.reason?.includes("未提供 recordItem 能力"));
+
+        // 3. 正常委托打卡：参数附加 [小驴人脉] 前缀与来源标记
+        let passedParams: { itemId?: string; note?: string; options?: any } = {};
+        (globalThis as any).window = {
+            siyuanCheckin: {
+                protocol: 5,
+                capabilities: ["recordItem"],
+                recordItem: async (itemId: string, note?: string, options?: any) => {
+                    passedParams = { itemId, note, options };
+                    return { success: true, recordId: "rec-123" };
+                },
+            },
+        };
+        const ok = await recordCheckinForContact("item-1", "张三", "电话回访通过");
+        assert.equal(ok.recorded, true);
+        assert.equal(ok.recordId, "rec-123");
+        assert.equal(passedParams.itemId, "item-1");
+        assert.equal(passedParams.note, "[小驴人脉] 张三 · 电话回访通过");
+        assert.equal(passedParams.options?.source, "lv-contacts");
+
+        // 4. 调用抛错时不阻断宿主，返回错误原因
+        (globalThis as any).window = {
+            siyuanCheckin: {
+                protocol: 5,
+                recordItem: async () => { throw new Error("打卡项目已被归档"); },
+            },
+        };
+        const failed = await recordCheckinForContact("item-1", "张三");
+        assert.equal(failed.recorded, false);
+        assert.equal(failed.reason, "打卡项目已被归档");
     } finally {
         (globalThis as any).window = originalWindow;
     }
