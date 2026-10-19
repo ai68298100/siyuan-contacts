@@ -111,6 +111,11 @@ export interface ContactsPluginFacade {
     loadPersonTopics?(personDocId: string): Promise<import("./domain/topics").PersonTopicItem[]>;
     addPersonTopic?(personDocId: string, text: string): Promise<import("./domain/topics").PersonTopicItem[]>;
     removePersonTopic?(personDocId: string, topicId: string): Promise<import("./domain/topics").PersonTopicItem[]>;
+    /** E-33：联系人软删除回收站（Trash & Soft Delete Buffer） */
+    removeContactToTrash?(person: import("./domain/person").ContactSummary): Promise<void>;
+    listTrash?(): Promise<import("./domain/trash").TrashContactEntry[]>;
+    restoreContactFromTrash?(entryId: string): Promise<{ docId: string; itemId: string; name: string }>;
+    emptyTrash?(): Promise<void>;
     /** 交往回顾报表（F12）：区间互动统计（只读投影，人物条数与同场活动分口径） */
     buildReviewReport(from: string, to: string): Promise<ReviewReport>;
     /** 导出中心摘要：名册人数与活跃互动条数（展示用，容错读取） */

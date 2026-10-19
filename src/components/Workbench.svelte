@@ -855,6 +855,7 @@
             onLoadTopics={facade.loadPersonTopics ? (docId) => facade.loadPersonTopics!(docId) : undefined}
             onAddTopic={facade.addPersonTopic ? (docId, text) => facade.addPersonTopic!(docId, text) : undefined}
             onRemoveTopic={facade.removePersonTopic ? (docId, topicId) => facade.removePersonTopic!(docId, topicId) : undefined}
+            onRemoveContactToTrash={facade.removeContactToTrash ? (person) => facade.removeContactToTrash!(person) : undefined}
             {onOpenPersonDoc}
             onNavigate={showDetail}
             onNavigateDocId={(docId) => openPersonByDocId(docId)}

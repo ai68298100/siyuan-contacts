@@ -14,6 +14,15 @@ import {
 } from "../src/domain/trash.ts";
 import { StoreIntegrityError } from "../src/domain/store-integrity.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
+import {
+    clearTrashBin,
+    dropTrashEntry,
+    listTrashEntries,
+    loadTrashStoreStrict,
+    pushTrashEntry,
+    TRASH_STORAGE_KEY,
+} from "../src/data/trash.ts";
+import type { Plugin } from "siyuan";
 
 const personDocId = "20261019000000-doc0001";
 
@@ -98,4 +107,49 @@ test("E-33 trash: 存储读写严格校验与容错归一化", () => {
     assert.deepEqual(normalizeTrashStore(null), emptyTrashStore());
     assert.deepEqual(normalizeTrashStore("invalid"), emptyTrashStore());
     assert.deepEqual(normalizeTrashStore({ schemaVersion: 2, entries: [] }), emptyTrashStore());
+});
+
+test("E-33 trash 数据层：pushTrashEntry、listTrashEntries、dropTrashEntry 与 clearTrashBin 存储闭环", async () => {
+    const memory = new Map<string, unknown>();
+    const plugin = {
+        async loadData(key: string) {
+            return memory.has(key) ? structuredClone(memory.get(key)) : null;
+        },
+        async saveData(key: string, value: unknown) {
+            memory.set(key, structuredClone(value));
+        },
+    } as unknown as Plugin;
+
+    // 初始状态为空
+    assert.deepEqual(await listTrashEntries(plugin), []);
+
+    // 存入第一个联系人
+    const personA = mockPerson("20261019000000-doc0001", "联系人甲");
+    const list1 = await pushTrashEntry(plugin, personA);
+    assert.equal(list1.length, 1);
+    assert.equal(list1[0].name, "联系人甲");
+    assert.equal(list1[0].snapshot.phone, "13800138000");
+
+    // 存入第二个联系人
+    const personB = mockPerson("20261019000000-doc0002", "联系人乙");
+    const list2 = await pushTrashEntry(plugin, personB);
+    assert.equal(list2.length, 2);
+    assert.equal(list2[0].name, "联系人乙");
+
+    // 列表查询
+    const entries = await listTrashEntries(plugin);
+    assert.equal(entries.length, 2);
+
+    // 移除一条
+    const remaining = await dropTrashEntry(plugin, list1[0].id);
+    assert.equal(remaining.length, 1);
+    assert.equal(remaining[0].name, "联系人乙");
+
+    // 清空回收站
+    await clearTrashBin(plugin);
+    assert.deepEqual(await listTrashEntries(plugin), []);
+
+    // 验证严格读取遇到损坏数据抛错
+    memory.set(TRASH_STORAGE_KEY, { schemaVersion: 999, entries: [] });
+    await assert.rejects(() => loadTrashStoreStrict(plugin), StoreIntegrityError);
 });

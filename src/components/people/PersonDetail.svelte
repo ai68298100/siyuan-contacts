@@ -95,6 +95,7 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadTopics,
         onAddTopic,
         onRemoveTopic,
+        onRemoveContactToTrash,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
@@ -160,6 +161,8 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadTopics?: (personDocId: string) => Promise<import("../../domain/topics").PersonTopicItem[]>;
         onAddTopic?: (personDocId: string, text: string) => Promise<import("../../domain/topics").PersonTopicItem[]>;
         onRemoveTopic?: (personDocId: string, topicId: string) => Promise<import("../../domain/topics").PersonTopicItem[]>;
+        /** E-33 联系人回收站软删除（可选） */
+        onRemoveContactToTrash?: (person: import("../../domain/person").ContactSummary) => Promise<void>;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -809,7 +812,11 @@ import StatusNotice from "../StatusNotice.svelte";
         deleting = true;
         errorText = "";
         try {
-            await removeContact(settings, current);
+            if (onRemoveContactToTrash) {
+                await onRemoveContactToTrash(current);
+            } else {
+                await removeContact(settings, current);
+            }
             onDeleted();
         } catch (error) {
             errorText = requestErrorMessage(error);

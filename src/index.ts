@@ -88,6 +88,7 @@ import type { NoteTemplate } from "./domain/interaction-templates";
 import { loadPersonTopics, addPersonTopic, removePersonTopic } from "./data/topics";
 import { listPersonExchanges, createPersonExchange, updatePersonExchange, changePersonExchangeStatus } from "./services/exchanges";
 import { listPersonAliases, addPersonAlias, removePersonAlias, resolveAlias } from "./services/person-aliases";
+import { listTrash, restoreContactFromTrash, removeContactToTrash, emptyTrash } from "./services/trash";
 import { buildReview } from "./services/review-report";
 import { importInteractionJson, previewInteractionImport } from "./services/interaction-import";
 import { previewInteractionImportDiff } from "./services/interaction-import";
@@ -1428,6 +1429,31 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const result = await removePersonTopic(this, personDocId, topicId);
         emitDataChanged({ topics: ["people"] }, token);
         return result;
+    }
+
+    async removeContactToTrash(person: ContactSummary) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        const token = this.lifecycleToken;
+        await removeContactToTrash(this, this.settings, person);
+        emitDataChanged({ topics: ["people"] }, token);
+    }
+
+    async listTrash() {
+        return listTrash(this);
+    }
+
+    async restoreContactFromTrash(entryId: string) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        const token = this.lifecycleToken;
+        const result = await restoreContactFromTrash(this, this.settings, entryId);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async emptyTrash() {
+        const token = this.lifecycleToken;
+        await emptyTrash(this);
+        emitDataChanged({ topics: ["people"] }, token);
     }
 
     async buildReviewReport(from: string, to: string) {
