@@ -689,6 +689,7 @@
                     onAddOrgMembership={(personDocId, orgDocId, extra) => facade.addOrganizationMember(orgDocId, personDocId, extra)}
                     onCreateSelfProfile={() => facade.createSelfProfile()}
                     onLoadSelfCandidates={() => facade.listContacts()}
+                    onCreateOccasion={facade.createOccasion ? async (input) => { await facade.createOccasion!(input); } : undefined}
                     onPreviewSelfIdentityChange={(personItemId) => facade.previewSelfIdentityChange(personItemId)}
                     onApplySelfIdentityChange={(preview) => facade.applySelfIdentityChange(preview)}
                     onValidateExtended={async (details) => {

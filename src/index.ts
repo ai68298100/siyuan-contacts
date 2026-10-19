@@ -90,6 +90,7 @@ import { listPersonExchanges, createPersonExchange, updatePersonExchange, change
 import { listPersonAliases, addPersonAlias, removePersonAlias, resolveAlias } from "./services/person-aliases";
 import { listTrash, restoreContactFromTrash, removeContactToTrash, emptyTrash } from "./services/trash";
 import { loadPersonGiftIdeas, addPersonGiftIdea, updatePersonGiftIdea, removePersonGiftIdea } from "./data/gift-ideas";
+import { listOccasions, createOccasion, deleteOccasion } from "./services/occasions";
 import { buildReview } from "./services/review-report";
 import { importInteractionJson, previewInteractionImport } from "./services/interaction-import";
 import { previewInteractionImportDiff } from "./services/interaction-import";
@@ -1480,6 +1481,23 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const result = await removePersonGiftIdea(this, personDocId, ideaId);
         emitDataChanged({ topics: ["people"] }, token);
         return result;
+    }
+
+    async listOccasions() {
+        return listOccasions(this);
+    }
+
+    async createOccasion(input: import("./services/occasions").CreateOccasionInput) {
+        const token = this.lifecycleToken;
+        const result = await createOccasion(this, input);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async deleteOccasion(occasionId: string) {
+        const token = this.lifecycleToken;
+        await deleteOccasion(this, occasionId);
+        emitDataChanged({ topics: ["people"] }, token);
     }
 
     async buildReviewReport(from: string, to: string) {

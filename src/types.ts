@@ -121,6 +121,10 @@ export interface ContactsPluginFacade {
     addPersonGiftIdea?(item: import("./domain/gift-ideas").GiftIdeaItem): Promise<import("./domain/gift-ideas").GiftIdeaItem[]>;
     updatePersonGiftIdea?(personDocId: string, ideaId: string, patch: Partial<import("./domain/gift-ideas").GiftIdeaItem>): Promise<import("./domain/gift-ideas").GiftIdeaItem[]>;
     removePersonGiftIdea?(personDocId: string, ideaId: string): Promise<import("./domain/gift-ideas").GiftIdeaItem[]>;
+    /** E-30：群体活动与场合实体（Occasions & Multi-attendee Clustering） */
+    listOccasions?(): Promise<import("./domain/occasion-cluster").OccasionEntity[]>;
+    createOccasion?(input: import("./services/occasions").CreateOccasionInput): Promise<import("./domain/occasion-cluster").OccasionEntity>;
+    deleteOccasion?(occasionId: string): Promise<void>;
     /** 交往回顾报表（F12）：区间互动统计（只读投影，人物条数与同场活动分口径） */
     buildReviewReport(from: string, to: string): Promise<ReviewReport>;
     /** 导出中心摘要：名册人数与活跃互动条数（展示用，容错读取） */

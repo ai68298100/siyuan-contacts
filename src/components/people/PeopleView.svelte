@@ -28,10 +28,11 @@
     import LvctDialog from "../LvctDialog.svelte";
     import ProfileCompletionDialog from "./ProfileCompletionDialog.svelte";
     import ContactMergeWizard from "./ContactMergeWizard.svelte";
+    import OccasionDialog from "../OccasionDialog.svelte";
     import { PROFILE_GAPS } from "../../domain/people-filters";
     import ViewState from "../ViewState.svelte";
     import { useCloseGuard } from "../close-guard";
-    import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal, Bookmark, Pencil, Trash2 } from "@lucide/svelte";
+    import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal, Bookmark, Pencil, Trash2, Calendar } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
     import { isAbortError } from "../../shared/async";
     import { confirmDialog } from "../../libs/confirm-dialog";
@@ -66,6 +67,7 @@
         onAddOrgMembership,
         onCreateSelfProfile,
         onLoadSelfCandidates,
+        onCreateOccasion,
         onPreviewSelfIdentityChange,
         onApplySelfIdentityChange,
         onValidateExtended,
@@ -109,6 +111,7 @@
         onValidateExtended?: (details: ContactExtendedDraft) => Promise<void>;
         onSaveExtended?: (person: ContactSummary, details: ContactExtendedDraft) => Promise<void>;
         onPreferencesChange: (preferences: ViewPreferences, baseline?: ViewPreferences) => Promise<ViewPreferences>;
+        onCreateOccasion?: (input: import("../../services/occasions").CreateOccasionInput) => Promise<void>;
         /** B09-1：移动端工具栏收纳（常驻搜索/视图切换/新建，其余收进底部弹层） */
         isMobile?: boolean;
     } = $props();
@@ -158,6 +161,7 @@
     let viewHint = $state("");
     let dupOpen = $state(false);
     let mergeTarget: DuplicatePair | null = $state(null);
+    let occasioning = $state(false);
     const duplicatePairs: DuplicatePair[] = $derived(findDuplicatePairs(people));
     const duplicatePairsCapped = $derived(duplicatePairs.length >= DUPLICATE_PAIRS_LIMIT);
     // svelte-ignore state_referenced_locally
@@ -1640,6 +1644,7 @@
         </button>
         <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); importing = true; }}><FolderInput size={16}/>{text("peopleImportDocs", "导入已有文档")}</button>
         <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); vcarding = true; }}><ContactRound size={16}/>{text("peopleVcard", "vCard 导入/导出")}</button>
+        <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); occasioning = true; }}><Calendar size={16}/>{text("peopleOccasion", "记录活动")}</button>
     {/snippet}
     <div class="lvct-people__toolbar lvct-people__control-surface fn__flex">
         {#if isMobile}
@@ -2227,6 +2232,22 @@
                     refresh();
                 }}
                 onClose={() => (mergeTarget = null)}
+            />
+        </LvctDialog>
+    {/if}
+
+    {#if occasioning}
+        <LvctDialog title={text("occDialogTitle", "记录群体活动与场合")} wide onClose={() => (occasioning = false)}>
+            <OccasionDialog
+                {i18n}
+                {people}
+                onSave={async (input) => {
+                    if (onCreateOccasion) {
+                        await onCreateOccasion(input);
+                    }
+                    refresh();
+                }}
+                onClose={() => (occasioning = false)}
             />
         </LvctDialog>
     {/if}

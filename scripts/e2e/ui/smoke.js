@@ -10,6 +10,7 @@ import DashboardView from "../../../src/components/dashboard/DashboardView.svelt
 import PeopleView from "../../../src/components/people/PeopleView.svelte";
 import SettingsView from "../../../src/components/SettingsView.svelte";
 import ContactMergeWizard from "../../../src/components/people/ContactMergeWizard.svelte";
+import OccasionDialog from "../../../src/components/OccasionDialog.svelte";
 import FollowUpGroupList from "../../../src/components/FollowUpGroupList.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
@@ -7564,6 +7565,68 @@ await test("E-26 礼物点子与偏好：录入点子与偏好、状态推进、
     assert(removeBtn, "未找到移除按钮");
     removeBtn.click();
     await until(() => !fixture.textContent.includes("喜欢乌龙茶"), "偏好未被移除");
+});
+
+await test("E-30 群体活动与场合向导：多选参与人、表单校验、派生互动开关与保存", async () => {
+    let savedInput = null;
+    const testPeople = [
+        { itemId: "i-1", docId: "20261019000000-doc0001", name: "张三", phone: "13800000001", email: "", wechat: "", website: "", birthday: "", isLunar: false, group: "同事", tags: [], relatedItemIds: [] },
+        { itemId: "i-2", docId: "20261019000000-doc0002", name: "李四", phone: "13800000002", email: "", wechat: "", website: "", birthday: "", isLunar: false, group: "同事", tags: [], relatedItemIds: [] },
+    ];
+
+    mounted = mount(OccasionDialog, { target: fixture, props: {
+        i18n: {},
+        people: testPeople,
+        onSave: async (input) => { savedInput = input; },
+        onClose: () => {},
+    } });
+
+    await until(() => fixture.querySelector(".lvct-occ-dialog__title"), "活动对话框未渲染");
+
+    // 未填标题保存时校验拦截
+    const saveBtn = [...fixture.querySelectorAll("button")].find((b) => b.textContent.trim() === "保存活动");
+    assert(saveBtn, "未找到保存按钮");
+    saveBtn.click();
+    await until(() => fixture.textContent.includes("请输入活动标题"), "未拦截空标题");
+
+    // 填写标题
+    const titleInput = fixture.querySelector("#lvct-occ-input-title");
+    input(titleInput, "Q4 技术战略研讨会");
+
+    // 未选参与人时保存校验拦截
+    saveBtn.click();
+    await until(() => fixture.textContent.includes("请至少选择 1 位参与联系人"), "未拦截无参与人");
+
+    // 搜索并选择参与人
+    const searchInput = fixture.querySelector(".lvct-occ-dialog__picker input");
+    input(searchInput, "张");
+    await until(() => fixture.querySelector(".lvct-occ-dialog__candidates"), "候选列表未展开");
+    const candidateBtn = fixture.querySelector(".lvct-occ-dialog__candidates button");
+    assert(candidateBtn && candidateBtn.textContent.includes("张三"), "未展示匹配联系人张三");
+    candidateBtn.click();
+
+    // 验证已选芯片
+    await until(() => fixture.querySelector(".lvct-occ-dialog__chips"), "未渲染参与人芯片");
+    assert(fixture.textContent.includes("张三"), "芯片未显示张三");
+
+    // 再加李四
+    input(searchInput, "李");
+    await until(() => fixture.querySelector(".lvct-occ-dialog__candidates"), "候选列表未展开（李四）");
+    fixture.querySelector(".lvct-occ-dialog__candidates button").click();
+
+    await until(() => fixture.querySelectorAll(".lvct-occ-dialog__chips .lvct-chip").length === 2, "参与人芯片数应为 2");
+
+    // 填写地点
+    const placeInput = fixture.querySelector("#lvct-occ-input-place");
+    input(placeInput, "3号会议室");
+
+    // 提交保存
+    saveBtn.click();
+    await until(() => savedInput !== null, "未触发保存回调");
+    assert(savedInput.title === "Q4 技术战略研讨会", "标题不匹配");
+    assert(savedInput.place === "3号会议室", "地点不匹配");
+    assert(savedInput.attendees.length === 2, "参与人数不匹配");
+    assert(savedInput.deriveInteractions === true, "默认应开启派生互动事件");
 });
 
 await pause(100);

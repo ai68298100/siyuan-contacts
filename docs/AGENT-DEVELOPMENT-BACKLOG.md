@@ -159,7 +159,7 @@ evidence_paths / owner / last_updated / commit
 
 #### AG-E30-OCCASION — 群体活动与场合实体（E-30 聚类投影）纯函数域与存储层
 
-- **status / priority / type / milestone：** `done_isolated` / P1 / feature+data+service / M4；已完成场合实体数据模型（`OccasionEntity`，支持会议/聚餐/婚礼/聚会/出行/论坛/活动等类型、发生日期/跨天结束日期/地点/来源文档/多参与者/账本关联/备注）、严格安全校验（`validateOccasion` 防非法/倒挂日期、防路径穿越地点、防重复参与者）、参与者互动事件自动投影（`deriveOccasionInteractionEvents` 共享 `externalRef` 与同场前缀）、场合 store 域函数（`addOccasionToStore`/`updateOccasionInStore`/`removeOccasionFromStore`，全库 500 条上限）、数据存储层（`src/data/occasions.ts`，`occasions.json` 键表 + Web Lock + 写后回读 + StoreIntegrityError）与服务层（`createOccasion` 自动派生互动事件、`listOccasions`、`deleteOccasion`），DATA-CONTRACT §3 已登记，经 7/7 单测与架构完整性守门全绿。
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+data+service+ui / M4；已完成场合实体数据模型（`OccasionEntity`，支持会议/聚餐/婚礼/聚会/出行/论坛/活动等类型、发生日期/跨天结束日期/地点/来源文档/多参与者/账本关联/备注）、严格安全校验（`validateOccasion` 防非法/倒挂日期、防路径穿越地点、防重复参与者）、参与者互动事件自动投影（`deriveOccasionInteractionEvents` 共享 `externalRef` 与同场前缀）、场合 store 域函数（`addOccasionToStore`/`updateOccasionInStore`/`removeOccasionFromStore`，全库 500 条上限）、数据存储层（`src/data/occasions.ts`，`occasions.json` 键表 + Web Lock + 写后回读 + StoreIntegrityError）与服务层（`createOccasion` 自动派生互动事件、`listOccasions`、`deleteOccasion`），以及 `OccasionDialog` 向导对话框与 PeopleView 工具栏接入，DATA-CONTRACT §3 已登记，经 7/7 单测与三套 UI 各 483/483 守门全绿。
 - **user_outcome / user_scenario：** 面对包含多位联系人的群体活动（如团队聚餐、技术研讨会、朋友婚礼），系统允许抽象为统一场合实体，一次性生成参与者名单与关联；自动派生各参与者的时间线互动事件并标记同行人，使图谱与共同出席洞察无缝联动，无需对每个人重复手工录入。
 - **source_ids / current_evidence：** E-30、`docs/ACTIVE-BACKLOG.md`；`src/domain/occasion-cluster.ts`、`tests/occasion-cluster.test.ts`；单测全量通过。
 - **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3.1 / 纯函数域层计算，不修改底层持久化 schema，无新存储开销。
@@ -170,7 +170,7 @@ evidence_paths / owner / last_updated / commit
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算与本地存储，全库 500 条上限控制体积；坏条目拒绝抛出 StoreIntegrityError；纯本地存储。
 - **evidence_paths / owner / last_updated / commit：** `src/domain/occasion-cluster.ts`、`src/data/occasions.ts`、`src/services/occasions.ts`、`tests/occasion-cluster.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
 - **退出边界：** 域层、数据层与服务层测试全部通过；UI 创建弹窗与笔记捕获联动后续单独挂接。
-- **完成回报：** `pnpm check` 0 错误 0 警告、单测 819/819 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 819/819 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过；E-30 群体活动与场合向导 UI 已接入 `OccasionDialog` 与 PeopleView 工具栏「记录活动」（多选联系人/表单校验/自动派生时间线互动事件），双语 i18n 完整，三套 UI 各 483/483 守门。
 
 #### AG-E28-FOLLOWUP-GROUP — 跟进列表按组织/部门/来源文档分组（E-28）纯函数域投影
 
