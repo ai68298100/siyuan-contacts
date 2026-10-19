@@ -43,6 +43,7 @@ import { validateOrganizationProfile } from "../domain/organization-profile";
 import type { OrganizationProfileDraft } from "../domain/organization-profile";
 import { capturePeopleProfileLifetime, verifyRelationshipLabelReferences } from "./people-profiles";
 import { loadTopicsStoreStrict, mergeTopicsStore, TOPICS_STORAGE_KEY } from "../data/topics";
+import { TRASH_STORAGE_KEY } from "../data/trash";
 import { parseTopicStore } from "../domain/topics";
 import type { PersonTopicStore } from "../domain/topics";
 
@@ -74,6 +75,7 @@ export const MIGRATION_COVERAGE = [
     { key: "organization-operations.json", status: "excluded", reason: "本工作区组织创建/改名操作断点，不跨库重放" },
     { key: "bridge-requests.json", status: "excluded", reason: "本工作区外部桥请求断点，不跨库重放" },
     { key: "view-preferences.json", status: "excluded", reason: "个人界面配置" },
+    { key: TRASH_STORAGE_KEY, status: "excluded", reason: "本工作区软删除缓冲，跨库重放会误恢复已在新库重建的联系人" },
     { key: SETTINGS_STORAGE_KEY, status: "excluded", reason: "数据库锚点需显式重绑" },
 ] as const;
 

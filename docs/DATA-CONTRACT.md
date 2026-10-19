@@ -232,6 +232,7 @@ vCard 同名项默认跳过，但允许逐项人工确认“作为独立人物�
 | person-relationship-labels.json | relationshipLabels | 仅恢复当前本人参照且双方已核实绑定的称谓 |
 | person-topics.json | topics | 按人物文档 ID 和话题条目 ID 合并，现状优先；坏条目整批拒绝 |
 | view-preferences.json | 排除 | 个人界面配置，业务事实恢复不改偏好 |
+| trash-bin.json | 排除 | 本工作区软删除缓冲；跨库重放会误恢复已在新库重建的联系人，恢复动作须在新工作区重新判定 |
 | contacts-settings.json | 排除 | 数据库锚点需显式重绑，不能覆盖当前锚点 |
 | 思源原生文档、AV 字段、关系、任务块 | 不在插件 JSON 包内 | 必须另行备份/恢复思源工作区，插件包不得宣称字节级或全部事实完整备份 |
 

@@ -36,6 +36,7 @@ const { loadRelationshipLabelStore, RELATIONSHIP_LABEL_STORAGE_KEY } = await imp
 const { exportMigrationBundle, importMigrationBundle, previewMigrationImport, MIGRATION_BUNDLE_STORAGE_KEY, MIGRATION_COVERAGE } = await import("../src/services/migration-bundle.ts");
 const { TEMPLATES_STORAGE_KEY } = await import("../src/data/templates.ts");
 const { TOPICS_STORAGE_KEY, loadTopicsStoreStrict } = await import("../src/data/topics.ts");
+const { TRASH_STORAGE_KEY } = await import("../src/data/trash.ts");
 const { previewInteractionImportDiff } = await import("../src/services/interaction-import.ts");
 const { loadReminderDismissalsStrict } = await import("../src/data/reminder-dismissals.ts");
 const { invalidateRoster } = await import("../src/services/roster.ts");
@@ -843,6 +844,14 @@ test("有效称谓恢复逐项核实，明确空记录恢复且重复导入零�
     assert.equal(state.jsonWrites, 1);
     assert.deepEqual((await loadRelationshipLabelStore(plugin)).labels[0], incoming);
     assert.ok(MIGRATION_COVERAGE.some((module) => module.key === "bridge-requests.json" && module.status === "excluded"));
+});
+
+test("迁移覆盖矩阵把回收站列为排除项，避免跨库误恢复已重建联系人", () => {
+    const trashCoverage = MIGRATION_COVERAGE.find((m) => m.key === TRASH_STORAGE_KEY);
+    assert.ok(trashCoverage, "MIGRATION_COVERAGE 必须记录回收站键");
+    assert.equal(trashCoverage.status, "excluded");
+    assert.ok(String((trashCoverage as { reason?: string }).reason).includes("软删除缓冲"));
+    assert.equal(MIGRATION_COVERAGE.filter((m) => m.status === "excluded").length, 6, "排除项数量应随新增缓冲区同步");
 });
 
 test("迁移包包含谈资备忘 topics 模块，支持覆盖检查、预览计数与现状优先合并", async () => {
