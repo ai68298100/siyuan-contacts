@@ -10,6 +10,7 @@ import DashboardView from "../../../src/components/dashboard/DashboardView.svelt
 import PeopleView from "../../../src/components/people/PeopleView.svelte";
 import SettingsView from "../../../src/components/SettingsView.svelte";
 import ContactMergeWizard from "../../../src/components/people/ContactMergeWizard.svelte";
+import FollowUpGroupList from "../../../src/components/FollowUpGroupList.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
 import { applyContactCandidateFields, batchUpdateContacts, createContact, retryContactFields, updateContactFields } from "../../../src/services/contacts";
@@ -7421,6 +7422,67 @@ await test("E-31 字段级安全合并向导：逐字段选择 + 自定义 + 验
 
     // 取消按钮
     assert([...fixture.querySelectorAll("button")].some((b) => b.textContent.trim() === "取消"), "缺少取消按钮");
+});
+
+await test("E-28 跨人物跟进多视角分组：人物/组织/部门/来源四类分组与状态徽章", async () => {
+    const baseItem = { id: "f", personDocId: "p", title: "提醒联系", dueDate: "2026-10-20", status: "open", createdAt: 1700000000000, updatedAt: 1700000000000 };
+    const items = [
+        { ...baseItem, id: "f-zhang", personDocId: "doc-zhang" },
+        { ...baseItem, id: "f-li", personDocId: "doc-li" },
+        { ...baseItem, id: "f-done", personDocId: "doc-wang", status: "done", closedAt: 1700000010000 },
+    ];
+    const personNames = new Map([
+        ["doc-zhang", "张三"],
+        ["doc-li", "李四"],
+        ["doc-wang", "王五"],
+    ]);
+    const orgNames = new Map([
+        ["doc-zhang", "曙光科技"],
+        ["doc-li", "曙光科技"],
+    ]);
+    const deptNames = new Map([
+        ["doc-zhang", "前端组"],
+    ]);
+    const sourceLabels = new Map([
+        ["f-zhang", "Q3 OKR 评审"],
+        ["f-done", "Q3 OKR 评审"],
+    ]);
+
+    mounted = mount(FollowUpGroupList, { target: fixture, props: {
+        i18n: {},
+        items,
+        personNameByDocId: personNames,
+        orgNameByDocId: orgNames,
+        departmentByDocId: deptNames,
+        sourceLabelByFollowUpId: sourceLabels,
+        onOpenPerson: () => {},
+    } });
+
+    await until(() => fixture.querySelector(".lvct-followup-group"), "分组总览未渲染");
+
+    // 摘要展示
+    assert(fixture.textContent.includes("共 2 条待办 / 3 条"), "摘要计数错误");
+
+    // 4 个分组：人物×3 + 组织×1 + 部门×1 + 来源×1
+    const groupNodes = [...fixture.querySelectorAll(".lvct-followup-group__item")];
+    assert(groupNodes.length === 6, `应输出 6 个分组，实际 ${groupNodes.length}`);
+
+    // 曙光科技组织下应包含 张三 与 李四
+    const orgGroup = groupNodes.find((node) => node.textContent.includes("组织：曙光科技"));
+    assert(orgGroup, "组织分组缺失");
+    assert(orgGroup.querySelectorAll("li").length === 2, "组织分组应合并张三与李四");
+
+    // 来源分组 Q3 OKR 评审 应合并 张三 + 王五
+    const sourceGroup = groupNodes.find((node) => node.textContent.includes("来源：Q3 OKR 评审"));
+    assert(sourceGroup, "来源分组缺失");
+    assert(sourceGroup.querySelectorAll("li").length === 2, "来源分组应合并张三与王五");
+
+    // 状态徽章展示：同一事项可在多分组中出现，徽章计数按出现次数统计
+    // open=张三(人物/组织/来源+部门=4) + 李四(人物/组织=2) = 6；done=王五(人物/来源=2)
+    const openBadges = [...fixture.querySelectorAll(".lvct-followup-group__status--open")];
+    const doneBadges = [...fixture.querySelectorAll(".lvct-followup-group__status--done")];
+    assert(openBadges.length === 6, `open 徽章数量应为 6，实际 ${openBadges.length}`);
+    assert(doneBadges.length === 2, `done 徽章数量应为 2，实际 ${doneBadges.length}`);
 });
 
 await pause(100);

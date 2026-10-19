@@ -14,6 +14,7 @@
     import { detectCheckinBridge } from "../../bridge/checkin";
     import ViewState from "../ViewState.svelte";
     import StatusNotice from "../StatusNotice.svelte";
+    import FollowUpGroupList from "../FollowUpGroupList.svelte";
     import PersonProfileSummary from "../people/PersonProfileSummary.svelte";
     import LvctDialog from "../LvctDialog.svelte";
     import ReviewReportDialog from "./ReviewReportDialog.svelte";
@@ -109,6 +110,16 @@
     let showAllBirthdays = $state(false);
     let showAllStale = $state(false);
     let showAllFollowUps = $state(false);
+    // E-28：跟进多视角分组的姓名映射（由 dashboard 已持有的 followUps 卡片投影构造，不新增读取）
+    const followUpPersonNames = $derived.by<ReadonlyMap<string, string>>(() => {
+        const map = new Map<string, string>();
+        for (const card of data?.followUps ?? []) {
+            if (card.person?.name) {
+                map.set(card.item.personDocId, card.person.name);
+            }
+        }
+        return map;
+    });
     const previewList = <T>(all: readonly T[], expanded: boolean, limit: number): readonly T[] =>
         (expanded ? all : all.slice(0, limit));
     // B01：行动分组与折叠（会话内保持；「从未互动」默认折叠，组头计数即展开入口）
@@ -1226,6 +1237,15 @@
                         </button>
                     {/if}
                     <p class="ft__smaller ft__on-surface">{text("dashFuScopeNote", "完成或跳过不会自动记录互动；计划在人物详情里可重新打开。")}</p>
+                    <FollowUpGroupList
+                        {i18n}
+                        items={(data.followUps ?? []).map((card) => card.item)}
+                        personNameByDocId={followUpPersonNames}
+                        onOpenPerson={(docId) => {
+                            const card = (data?.followUps ?? []).find((entry) => entry.item.personDocId === docId);
+                            if (card?.person) onOpenDetail(card.person);
+                        }}
+                    />
                 {/if}
             </div>
         </div>

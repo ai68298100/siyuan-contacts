@@ -996,5 +996,14 @@
   "heatCold": "Cold",
   "heatPaused": "Paused",
   "heatUnknown": "Never",
-  "heatScoreLabel": "Relationship Heat {score}%"
+  "heatScoreLabel": "Relationship Heat {score}%",
+  "fuGroupTitle": "Group by Perspective",
+  "fuGroupCount": "{open} open / {total} total",
+  "fuGroupEmpty": "No follow-up items to group.",
+  "fuStatusOpen": "Open",
+  "fuStatusDone": "Done",
+  "fuStatusCancelled": "Cancelled",
+  "mergeConfirmTitle": "Confirm Merge",
+  "mergeConfirmBtn": "Execute Merge",
+  "mergeCancelBtn": "Cancel"
 }

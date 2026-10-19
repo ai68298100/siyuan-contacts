@@ -110,7 +110,7 @@ evidence_paths / owner / last_updated / commit
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算，O(1) 复杂度；时间计算负值防御；不写入外部网络或大模型。
 - **evidence_paths / owner / last_updated / commit：** `src/domain/cadence.ts`、`tests/cadence.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
 - **退出边界：** 域层纯函数实现与测试全部通过；界面控件展现接入由视图卡片单独推进。
-- **完成回报：** `pnpm check` 0 错误 0 警告、单测 795/795 通过、`pnpm build` 与 `pnpm check:release` 全部通过。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 795/795 通过、`pnpm build` 与 `pnpm check:release` 全部通过；E-29 温度 UI 已接入 PersonDetail「关系摘要」格与 PersonCard「最近互动」徽章（`scripts/e2e/ui/smoke.js` 477/477 守门）。
 
 #### AG-E33-TRASH — 联系人软删除回收站缓冲区（E-33）
 
@@ -125,7 +125,7 @@ evidence_paths / owner / last_updated / commit
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 坏条目整体拒绝抛出 StoreIntegrityError 并保护原库；恢复中途失败保留缓冲条目供重试，不重复绑行；最多 200 条、30 天过期自动修剪；仅存插件本地 JSON，不上传网络。
 - **evidence_paths / owner / last_updated / commit：** `src/domain/trash.ts`、`src/data/trash.ts`、`src/services/trash.ts`、`tests/trash.test.ts`、`scripts/e2e/ui/smoke.js` / Codex / 2026-10-19 / `6eb3633`、`81fdee5`、`bdfcc00`、`8ca47d3`。
 - **退出边界：** 隔离域/数据/服务/UI 全部通过；真实思源多窗口并发删除、真机与日常库恢复体验保留 Host Queue。批量删除入口是否接入回收站属后续独立决策。
-- **完成回报：** `pnpm check` 0 错误 0 警告、单测 801/801、三套 UI 各 479/479、`pnpm build` 与 `pnpm check:release` 全部通过。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 801/801、三套 UI 各 479/479、`pnpm build` 与 `pnpm check:release` 全部通过；E-31 字段级安全合并向导 UI 接入 `ContactMergeWizard`（`scripts/e2e/ui/smoke.js` 480/480 守门）。
 
 #### AG-E34-CO-OCCURRENCE — 共同出席弱联系（E-34 推断关联）纯函数域模型与边生成
 
@@ -155,7 +155,7 @@ evidence_paths / owner / last_updated / commit
 - **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算，O(1) 决策复杂度；生成 MergeAuditSnapshot 供日后撤销使用；纯本地计算。
 - **evidence_paths / owner / last_updated / commit：** `src/domain/duplicate-merge.ts`、`tests/duplicate-merge.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
 - **退出边界：** 域层纯函数实现与测试全部通过；UI 并排比对向导弹窗后续单独挂接。
-- **完成回报：** `pnpm check` 0 错误 0 警告、单测 805/805 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 805/805 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过；E-31 字段级并排比对弹窗 `ContactMergeWizard` 已接入 PeopleView「重复候选」面板，480/480 UI 守门。
 
 #### AG-E30-OCCASION — 群体活动与场合实体（E-30 聚类投影）纯函数域模型与算法
 

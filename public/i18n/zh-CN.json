@@ -996,5 +996,14 @@
   "heatCold": "渐冻",
   "heatPaused": "已暂停",
   "heatUnknown": "从未联系",
-  "heatScoreLabel": "关系温度 {score}%"
+  "heatScoreLabel": "关系温度 {score}%",
+  "fuGroupTitle": "按视角分组",
+  "fuGroupCount": "{open} 条待办 / {total} 条",
+  "fuGroupEmpty": "当前没有可分组的跟进事项。",
+  "fuStatusOpen": "待办",
+  "fuStatusDone": "已完成",
+  "fuStatusCancelled": "已取消",
+  "mergeConfirmTitle": "确认合并",
+  "mergeConfirmBtn": "执行合并",
+  "mergeCancelBtn": "取消"
 }
