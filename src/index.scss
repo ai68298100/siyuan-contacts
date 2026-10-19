@@ -4324,6 +4324,58 @@ html[data-theme-mode="dark"] .lvct-doc-strip {
     gap: var(--lvct-sp-2);
 }
 
+/* E-32：会面谈资与备忘（Conversation Starters） */
+.lvct-detail__topics-section {
+    gap: var(--lvct-sp-2);
+}
+
+.lvct-detail__topics-input-row {
+    display: flex;
+    gap: var(--lvct-sp-2);
+    align-items: center;
+}
+
+.lvct-detail__topics-empty {
+    margin: var(--lvct-sp-1) 0 0;
+    color: var(--lvct-text-3);
+}
+
+.lvct-detail__topics-list {
+    list-style: none;
+    margin: var(--lvct-sp-2) 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-1);
+}
+
+.lvct-detail__topic-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--lvct-sp-2);
+    padding: var(--lvct-sp-1) var(--lvct-sp-2);
+    border-radius: var(--lvct-radius-sm);
+    background: var(--lvct-bg-elevated);
+    border: 1px solid var(--lvct-border-subtle);
+    font-size: var(--lvct-fs-body);
+}
+
+.lvct-detail__topic-text {
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+    color: var(--lvct-text-1);
+    line-height: var(--lvct-lh-body);
+}
+
+.lvct-detail__topic-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--lvct-sp-1);
+    flex-shrink: 0;
+}
+
 .lvct-detail__section-head {
     display: flex;
     align-items: flex-start;

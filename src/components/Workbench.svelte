@@ -852,6 +852,9 @@
             onSaveCadence={(docId, cadence) => facade.savePersonCadence(docId, cadence)}
             onListTemplates={() => facade.listTemplates()}
             onSaveTemplates={(templates, expected) => facade.saveTemplates(templates, expected)}
+            onLoadTopics={facade.loadPersonTopics ? (docId) => facade.loadPersonTopics!(docId) : undefined}
+            onAddTopic={facade.addPersonTopic ? (docId, text) => facade.addPersonTopic!(docId, text) : undefined}
+            onRemoveTopic={facade.removePersonTopic ? (docId, topicId) => facade.removePersonTopic!(docId, topicId) : undefined}
             {onOpenPersonDoc}
             onNavigate={showDetail}
             onNavigateDocId={(docId) => openPersonByDocId(docId)}
