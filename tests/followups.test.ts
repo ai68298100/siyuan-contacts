@@ -7,6 +7,7 @@ import {
     dueLabel,
     emptyFollowUpStore,
     followUpsForPerson,
+    groupFollowUps,
     hasFollowUpDraft,
     isValidDateKey,
     nextMondayFrom,
@@ -137,6 +138,79 @@ test("到期文案与人物过滤：逾期/今天/还有 N 天；closed 置后",
     ];
     assert.deepEqual(followUpsForPerson(items, "doc-1").map((entry) => entry.id), ["open-soon", "open-later", "closed"]);
 });
+
+test("E-28 groupFollowUps 跨组织/部门/来源文档去重分组投影", () => {
+    const items: FollowUpItem[] = [
+        // 张三：曙光科技 + 前端组
+        item({ id: "i1", personDocId: "d-zhangsan", dueDate: "2026-09-30", status: "open" }),
+        item({ id: "i2", personDocId: "d-zhangsan", dueDate: "2026-09-21", status: "open" }),
+        // 李四：曙光科技 + 后端组
+        item({ id: "i3", personDocId: "d-lisi", dueDate: "2026-09-28", status: "open" }),
+        // 王五：独立联系人
+        item({ id: "i4", personDocId: "d-wangwu", dueDate: "2026-09-29", status: "open" }),
+    ];
+    const personNames = new Map<string, string>([
+        ["d-zhangsan", "张三"],
+        ["d-lisi", "李四"],
+        ["d-wangwu", "王五"],
+    ]);
+    const orgNames = new Map<string, string>([
+        ["d-zhangsan", "曙光科技"],
+        ["d-lisi", "曙光科技"],
+    ]);
+    const deptNames = new Map<string, string>([
+        ["d-zhangsan", "前端组"],
+        ["d-lisi", "后端组"],
+    ]);
+    const sourceLabels = new Map<string, string>([
+        ["i1", "Q3 OKR 评审"],
+        ["i3", "Q3 OKR 评审"],
+    ]);
+
+    const groups = groupFollowUps(items, personNames, {
+        orgNameByDocId: orgNames,
+        departmentByDocId: deptNames,
+        sourceLabelByFollowUpId: sourceLabels,
+    });
+
+    // 期望 7 个分组：3 人物 + 1 组织（曙光科技归一） + 2 部门（前端组/后端组） + 1 来源
+    assert.equal(groups.length, 7, `应输出 7 个分组，实际 ${groups.length}`);
+
+    // 人物分组：每人独立，组内按 open 升序与 createdAt 稳定排序
+    const personGroups = groups.filter((g) => g.key === "person");
+    assert.equal(personGroups.length, 3);
+    assert.deepEqual(personGroups.map((g) => g.label), ["人物：张三", "人物：李四", "人物：王五"]);
+    const zhangsanGroup = personGroups.find((g) => g.label === "人物：张三")!;
+    assert.deepEqual(zhangsanGroup.items.map((i) => i.id), ["i2", "i1"], "组内按 dueDate 升序（i2 9-21 早于 i1 9-30）");
+
+    // 组织分组：曙光科技合并张三与李四，组内按 dueDate 升序
+    const orgGroups = groups.filter((g) => g.key === "org");
+    assert.equal(orgGroups.length, 1, "独立联系人王五不挂任何组织，曙光科技按名归一为单组");
+    const sgb = orgGroups.find((g) => g.label === "组织：曙光科技")!;
+    assert.deepEqual(sgb.items.map((i) => i.id), ["i2", "i3", "i1"], "按 dueDate 升序（9-21 < 9-28 < 9-30）");
+
+    // 部门分组：每人独立
+    const deptGroups = groups.filter((g) => g.key === "department");
+    assert.equal(deptGroups.length, 2);
+    assert.deepEqual(deptGroups.map((g) => g.label), ["部门：前端组", "部门：后端组"]);
+
+    // 来源文档分组：Q3 OKR 评审 合并 i1 和 i3，去重后只出现一次
+    const sourceGroups = groups.filter((g) => g.key === "source");
+    assert.equal(sourceGroups.length, 1);
+    const sourceGroup = sourceGroups[0];
+    assert.equal(sourceGroup.label, "来源：Q3 OKR 评审");
+    assert.deepEqual(sourceGroup.items.map((i) => i.id), ["i3", "i1"], "同一来源合并去重，按 dueDate 升序");
+});
+
+test("E-28 groupFollowUps 边界：空数据、仅人物、无组织无来源", () => {
+    const personNames = new Map<string, string>([["d-a", "甲"]]);
+    assert.deepEqual(groupFollowUps([], personNames), [], "空数据应返回空数组");
+
+    const noOrg = groupFollowUps([item({ id: "i1", personDocId: "d-a" })], personNames);
+    assert.equal(noOrg.length, 1);
+    assert.equal(noOrg[0].key, "person");
+});
+
 
 test("B07-a 对账字段：updateFollowUp 支持 docBlockId/docMissing；归一化接受合法值、过滤非法值", () => {
     let store = normalizeFollowUpStore({ schemaVersion: 1, items: [item({ id: "a" })] });

@@ -172,6 +172,21 @@ evidence_paths / owner / last_updated / commit
 - **退出边界：** 域层纯函数实现与测试全部通过；UI 创建弹窗与笔记捕获联动后续单独挂接。
 - **完成回报：** `pnpm check` 0 错误 0 警告、单测 808/808 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
 
+#### AG-E28-FOLLOWUP-GROUP — 跟进列表按组织/部门/来源文档分组（E-28）纯函数域投影
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+domain / M3；已完成 `groupFollowUps` 纯函数投影，按人物/当前组织/部门/来源文档四类分组去重，同一跟进可在多组中出现但仅出现一次；组内按 open 优先再按 dueDate 与 createdAt 稳定排序。
+- **user_outcome / user_scenario：** 跟进列表提供「人物/当前组织/部门/来源文档」四个视角的并行分组视图，便于按「与某组织相关」「与某部门相关」「Q3 OKR 评审遗留」等上下文快速定位；同一跟进不会在多分组中重复出现。
+- **source_ids / current_evidence：** E-28、`docs/ACTIVE-BACKLOG.md`；`src/domain/followups.ts`、`tests/followups.test.ts`；单测全量通过。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3 follow-ups / 纯函数域层计算，不修改持久化 JSON。
+- **allowed_files / forbidden_files：** followups 域与测试 / 保护文件。
+- **contract_change / host_or_spike_required：** 无存储结构变更；纯函数返回 FollowUpGroup[]。
+- **ordered_steps：** FollowUpGroupKey 类型 → groupFollowUps 纯函数 → 单元测试 → 门禁通过。
+- **test_fixtures / test_commands / acceptance：** 跨组织/部门/来源文档去重分组、组内 open 优先与 dueDate 升序、空数据/仅人物/无组织无来源边界；`pnpm check`、`pnpm test`（810/810）、`pnpm build` 与 `pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算，O(N) 单次扫描；不发送外部网络或大模型。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/followups.ts`、`tests/followups.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 域层纯函数实现与测试全部通过；UI 跟进列表多视角分组视图后续单独挂接。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 810/810 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
+
 #### AG-ISSUE-051-054-FIELDS — 重复资料与两层分组首版
 
 - **status / priority / type / milestone：** `host_pending` / P1 / feature+regression / M4；生产实现、隔离内核与隔离 Chrome 验收已完成，真实用户工作区、原生编辑器竞争、真机等边界继续由 Host Queue 守门；发布与 issue 关闭见 `AG-ISSUE-051-054-CLOSE`。
