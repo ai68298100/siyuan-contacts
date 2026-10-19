@@ -40,6 +40,7 @@ import StatusNotice from "../StatusNotice.svelte";
     import { orgMembershipStatusLabel } from "../../domain/org-membership";
     import type { OrgAffiliationKind, OrgMembership, OrgMembershipPatch, OrgMembershipStatus } from "../../domain/org-membership";
     import { confirmDialog } from "../../libs/confirm-dialog";
+    import { copyPlainText } from "../../shared/clipboard";
 
     let {
         settings,
@@ -90,6 +91,9 @@ import StatusNotice from "../StatusNotice.svelte";
         onRemoveAlias,
         onLoadRelationshipLabels,
         onSaveRelationshipLabels,
+        onLoadTopics,
+        onAddTopic,
+        onRemoveTopic,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
@@ -151,6 +155,10 @@ import StatusNotice from "../StatusNotice.svelte";
         onRemoveAlias?: (id: string) => Promise<void>;
         onLoadRelationshipLabels?: (personDocId: string) => Promise<import("../../services/people-profiles").RelationshipLabelEditorState>;
         onSaveRelationshipLabels?: (personDocId: string, selfDocId: string, labels: string[], expected: import("../../domain/person-relationship-labels").PersonRelationshipLabels | null) => Promise<import("../../domain/person-relationship-labels").PersonRelationshipLabels>;
+        /** E-32 会面谈资与备忘（可选） */
+        onLoadTopics?: (personDocId: string) => Promise<import("../../domain/topics").PersonTopicItem[]>;
+        onAddTopic?: (personDocId: string, text: string) => Promise<import("../../domain/topics").PersonTopicItem[]>;
+        onRemoveTopic?: (personDocId: string, topicId: string) => Promise<import("../../domain/topics").PersonTopicItem[]>;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -654,6 +662,74 @@ import StatusNotice from "../StatusNotice.svelte";
         onChanged();
     }
 
+    // ---- E-32 会面谈资与备忘 ----
+    const topicsSupported = $derived(Boolean(onLoadTopics));
+    let topics = $state<import("../../domain/topics").PersonTopicItem[]>([]);
+    let topicsLoading = $state(false);
+    let topicsError = $state("");
+    let newTopicText = $state("");
+    let addingTopic = $state(false);
+    let copiedTopicId = $state("");
+
+    async function loadTopics() {
+        if (!onLoadTopics) return;
+        const docId = current.docId;
+        topicsLoading = true;
+        topicsError = "";
+        try {
+            const list = await onLoadTopics(docId);
+            if (detailAlive && current.docId === docId) topics = list;
+        } catch (error) {
+            if (detailAlive && current.docId === docId) topicsError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive && current.docId === docId) topicsLoading = false;
+        }
+    }
+    loadTopics();
+
+    async function handleAddTopic() {
+        if (!onAddTopic || addingTopic || !newTopicText.trim()) return;
+        addingTopic = true;
+        topicsError = "";
+        try {
+            const list = await onAddTopic(current.docId, newTopicText.trim());
+            if (detailAlive) {
+                topics = list;
+                newTopicText = "";
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) topicsError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive) addingTopic = false;
+        }
+    }
+
+    async function handleRemoveTopic(topicId: string) {
+        if (!onRemoveTopic) return;
+        try {
+            const list = await onRemoveTopic(current.docId, topicId);
+            if (detailAlive) {
+                topics = list;
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) topicsError = requestErrorMessage(error);
+        }
+    }
+
+    async function handleCopyTopic(topic: import("../../domain/topics").PersonTopicItem) {
+        try {
+            await copyPlainText(topic.text);
+            copiedTopicId = topic.id;
+            setTimeout(() => {
+                if (copiedTopicId === topic.id) copiedTopicId = "";
+            }, 1500);
+        } catch (err) {
+            console.warn("[lvct] 复制谈资备忘失败", err);
+        }
+    }
+
     // ---- 会面简报导出（F11） ----
     let briefingExportOpen = $state(false);
     let briefingLimit = $state(10);
@@ -674,6 +750,7 @@ import StatusNotice from "../StatusNotice.svelte";
             coAttendance: insights?.coAttendance ?? [],
             limit: briefingLimit,
             generatedAt: briefingGeneratedAt,
+            topics: topics.map((item) => item.text),
         });
     });
     function downloadBriefing() {
@@ -1087,6 +1164,7 @@ import StatusNotice from "../StatusNotice.svelte";
             void loadInsights();
             void loadFollowUps();
             void loadPersonNoteState(true);
+            void loadTopics();
             if (!cadenceDirty) void loadCadence();
         }
         if (orgRefreshPending && !addOrgBusy && !editingOrgMembershipId && !removingOrgMembershipId && !addOrgDocId) {
@@ -1347,6 +1425,65 @@ import StatusNotice from "../StatusNotice.svelte";
         {#if current.tags.length > 0}<div><dt>标签</dt><dd>{current.tags.join(" · ")}</dd></div>{/if}
         {#if birthday}<div><dt>下次生日</dt><dd>{birthday.date.toLocaleDateString("zh-CN")}（公历{current.isLunar ? `，对应${birthday.label}` : ""}） · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}</dd></div>{/if}
     </dl>
+
+    {#if topicsSupported}
+        <section class="lvct-detail__section lvct-detail__topics-section" aria-labelledby="lvct-topics-title">
+            <div class="lvct-detail__section-head">
+                <div>
+                    <h4 id="lvct-topics-title">会面谈资与备忘</h4>
+                    <p class="ft__smaller ft__on-surface">记录下次见面想聊的话题、承诺的事情或兴趣关注；导出简报时自动置顶。</p>
+                </div>
+                {#if topicsLoading}
+                    <span class="ft__smaller ft__on-surface">读取中…</span>
+                {/if}
+            </div>
+            {#if topicsError}
+                <p class="ft__smaller lvct-text-danger" role="alert">{topicsError} <button type="button" class="b3-button b3-button--text" onclick={loadTopics}>重试</button></p>
+            {/if}
+            <div class="lvct-detail__topics-input-row">
+                <input
+                    class="b3-text-field fn__flex-1"
+                    type="text"
+                    placeholder="添加一条下次见面想聊的话题或备忘…"
+                    aria-label="新增谈资备忘"
+                    bind:value={newTopicText}
+                    disabled={addingTopic || topicsLoading}
+                    onkeydown={(event) => { if (event.key === "Enter") { event.preventDefault(); void handleAddTopic(); } }}
+                />
+                <button
+                    type="button"
+                    class="b3-button b3-button--outline"
+                    disabled={addingTopic || topicsLoading || !newTopicText.trim()}
+                    onclick={handleAddTopic}
+                >{addingTopic ? "添加中…" : "添加备忘"}</button>
+            </div>
+            {#if topics.length === 0}
+                <p class="ft__smaller ft__on-surface lvct-detail__topics-empty">暂无谈资备忘。随手记下一两件想聊的事，会前不慌张。</p>
+            {:else}
+                <ul class="lvct-detail__topics-list" aria-label="会面谈资备忘列表">
+                    {#each topics as topic (topic.id)}
+                        <li class="lvct-detail__topic-item">
+                            <span class="lvct-detail__topic-text">📌 {topic.text}</span>
+                            <span class="lvct-detail__topic-actions">
+                                <button
+                                    type="button"
+                                    class="b3-button b3-button--text"
+                                    aria-label="复制话题内容"
+                                    onclick={() => void handleCopyTopic(topic)}
+                                >{copiedTopicId === topic.id ? "已复制 ✓" : "复制"}</button>
+                                <button
+                                    type="button"
+                                    class="b3-button b3-button--cancel"
+                                    aria-label="移除话题"
+                                    onclick={() => void handleRemoveTopic(topic.id)}
+                                >×</button>
+                            </span>
+                        </li>
+                    {/each}
+                </ul>
+            {/if}
+        </section>
+    {/if}
 
     {#if onLoadPersonNote && onSavePersonNote}
         <section class="lvct-detail__section lvct-detail__person-note">

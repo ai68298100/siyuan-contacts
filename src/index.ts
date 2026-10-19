@@ -85,6 +85,7 @@ import type { ReminderKind } from "./data/reminder-dismissals";
 import type { PersonCadence } from "./domain/cadence";
 import { listTemplates, saveTemplates } from "./services/templates";
 import type { NoteTemplate } from "./domain/interaction-templates";
+import { loadPersonTopics, addPersonTopic, removePersonTopic } from "./data/topics";
 import { listPersonExchanges, createPersonExchange, updatePersonExchange, changePersonExchangeStatus } from "./services/exchanges";
 import { listPersonAliases, addPersonAlias, removePersonAlias, resolveAlias } from "./services/person-aliases";
 import { buildReview } from "./services/review-report";
@@ -1409,6 +1410,24 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     async saveTemplates(templates: readonly NoteTemplate[], expected: readonly NoteTemplate[]) {
         return saveTemplates(this, templates, expected);
+    }
+
+    async loadPersonTopics(personDocId: string) {
+        return loadPersonTopics(this, personDocId);
+    }
+
+    async addPersonTopic(personDocId: string, text: string) {
+        const token = this.lifecycleToken;
+        const result = await addPersonTopic(this, personDocId, text);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async removePersonTopic(personDocId: string, topicId: string) {
+        const token = this.lifecycleToken;
+        const result = await removePersonTopic(this, personDocId, topicId);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
     }
 
     async buildReviewReport(from: string, to: string) {

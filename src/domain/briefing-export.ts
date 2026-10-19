@@ -33,6 +33,8 @@ export interface BriefingExportInput {
     limit: number;
     /** 生成时间文本（由调用方注入以保证确定性） */
     generatedAt: string;
+    /** E-32：会面谈资与备忘列表（置顶于简报中） */
+    topics?: readonly string[];
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -44,11 +46,21 @@ const SOURCE_LABELS: Record<string, string> = {
 /** Markdown 行内转义：防止用户文本（姓名/备注）破坏文档结构 */
 
 export function buildBriefingMarkdown(input: BriefingExportInput): string {
-    const { person, timeline, followUps, relatedNames, coAttendance, limit, generatedAt } = input;
+    const { person, timeline, followUps, relatedNames, coAttendance, limit, generatedAt, topics } = input;
     const lines: string[] = [];
     lines.push(`# 会面简报：${escapeMarkdown(person.name)}`);
     lines.push("");
     lines.push(`- 生成时间：${escapeMarkdown(generatedAt)}`);
+
+    // E-32 会面谈资与备忘：会前置顶提醒
+    const validTopics = (topics ?? []).filter((topic) => Boolean(topic && topic.trim()));
+    if (validTopics.length > 0) {
+        lines.push("");
+        lines.push(`## 会面谈资与备忘（${validTopics.length} 条）`);
+        for (const topic of validTopics) {
+            lines.push(`- 📌 ${escapeMarkdown(topic.trim())}`);
+        }
+    }
 
     // 基本资料
     const profile: string[] = [];

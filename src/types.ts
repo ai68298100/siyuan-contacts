@@ -107,6 +107,10 @@ export interface ContactsPluginFacade {
     /** 互动备注模板（F09）：空存储返回内置默认；全量保存必须核对编辑基线。 */
     listTemplates(): Promise<NoteTemplate[]>;
     saveTemplates(templates: readonly NoteTemplate[], expected: readonly NoteTemplate[]): Promise<NoteTemplate[]>;
+    /** E-32：会面谈资与备忘（Conversation Starters / Topics to Mention） */
+    loadPersonTopics?(personDocId: string): Promise<import("./domain/topics").PersonTopicItem[]>;
+    addPersonTopic?(personDocId: string, text: string): Promise<import("./domain/topics").PersonTopicItem[]>;
+    removePersonTopic?(personDocId: string, topicId: string): Promise<import("./domain/topics").PersonTopicItem[]>;
     /** 交往回顾报表（F12）：区间互动统计（只读投影，人物条数与同场活动分口径） */
     buildReviewReport(from: string, to: string): Promise<ReviewReport>;
     /** 导出中心摘要：名册人数与活跃互动条数（展示用，容错读取） */
