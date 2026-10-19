@@ -21,7 +21,8 @@ import StatusNotice from "../StatusNotice.svelte";
     import { dueLabel, hasFollowUpDraft } from "../../domain/followups";
     import type { FollowUpItem, SnoozeOption } from "../../domain/followups";
     import { newFollowUpRequestId } from "../../services/followups";
-    import type { PersonCadence } from "../../domain/cadence";
+    import { computeRelationshipHealth, heatLevelColorClass } from "../../domain/cadence";
+    import type { PersonCadence, RelationshipHealth } from "../../domain/cadence";
     import { renderTemplate } from "../../domain/interaction-templates";
     import type { NoteTemplate } from "../../domain/interaction-templates";
     import TemplateManager from "./TemplateManager.svelte";
@@ -1321,6 +1322,15 @@ import StatusNotice from "../StatusNotice.svelte";
         const first = insights?.timeline?.[0];
         return first?.localDate ?? "";
     });
+    const relationshipHealth = $derived.by<RelationshipHealth>(() => {
+        const lastTime = insights?.timeline?.[0]?.occurredAt;
+        const targetDays = cadenceMode === "custom" ? cadenceDays : 30;
+        return computeRelationshipHealth({
+            cadenceDays: targetDays,
+            lastInteractionTime: lastTime,
+            paused: cadenceMode === "paused",
+        });
+    });
 
     async function loadCadence() {
         if (!onGetCadence) return;
@@ -1435,6 +1445,23 @@ import StatusNotice from "../StatusNotice.svelte";
                 <dd>
                     {cadenceSupported && !cadenceLoaded ? "读取中…" : cadenceLoadError ? "读取失败" : !cadenceSupported ? "未启用" : cadenceMode === "paused" ? "已暂停" : cadenceMode === "custom" ? `每 ${cadenceDays} 天` : "跟随全局阈值"}
                     {#if cadenceLoadError}<button type="button" class="b3-button b3-button--text" onclick={loadCadence}>重试</button>{/if}
+                </dd>
+            </div>
+            <div>
+                <dt>关系温度</dt>
+                <dd>
+                    {#if insightsLoading || (cadenceSupported && !cadenceLoaded)}
+                        <span class="ft__smaller ft__on-surface">读取中…</span>
+                    {:else}
+                        <span class={`lvct-heat ${heatLevelColorClass(relationshipHealth.level)}`} title={text("heatScoreLabel", "关系温度 {score}%", { score: relationshipHealth.score })}>
+                            {relationshipHealth.level === "hot" ? text("heatHot", "温热")
+                            : relationshipHealth.level === "warm" ? text("heatWarm", "常温")
+                            : relationshipHealth.level === "cool" ? text("heatCool", "微凉")
+                            : relationshipHealth.level === "cold" ? text("heatCold", "渐冻")
+                            : relationshipHealth.level === "paused" ? text("heatPaused", "已暂停")
+                            : text("heatUnknown", "从未联系")} · {relationshipHealth.score}%
+                        </span>
+                    {/if}
                 </dd>
             </div>
             <div>
