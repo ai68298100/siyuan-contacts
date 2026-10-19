@@ -112,20 +112,20 @@ evidence_paths / owner / last_updated / commit
 - **退出边界：** 域层纯函数实现与测试全部通过；界面控件展现接入由视图卡片单独推进。
 - **完成回报：** `pnpm check` 0 错误 0 警告、单测 795/795 通过、`pnpm build` 与 `pnpm check:release` 全部通过。
 
-#### AG-E33-TRASH — 联系人软删除回收站缓冲（E-33）安全机制与纯函数域/存储层
+#### AG-E33-TRASH — 联系人软删除回收站缓冲区（E-33）
 
-- **status / priority / type / milestone：** `done_isolated` / P1 / feature+data / M4；已完成 30 天元数据快照缓冲（`trash-bin.json`，版本 1）、纯函数域层（置顶、同人去重更新、过期自动清理、剩余天数计算、读写严格包络校验）、数据存储层（Web Lock + 写后回读），并经完整单测（3/3）与全量架构完整性测试（87/87）守门。
-- **user_outcome / user_scenario：** 联系人从人脉名册解绑/移除时，元数据快照自动进入 30 天回收站缓冲区；用户误删时可无损撤销还原原属性，无需重新扫描或手动补录电话/邮箱/标签；超过 30 天的条目自动静默清理。
-- **source_ids / current_evidence：** E-33、`docs/ACTIVE-BACKLOG.md`；`src/domain/trash.ts`、`src/data/trash.ts`、`tests/trash.test.ts`；单测全绿。
-- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3 新增 `trash-bin.json` 键表 / 撤销与恢复交互接入 / trash / 独立自管 JSON，本工作区安全缓冲区，不跨工作区迁移。
-- **allowed_files / forbidden_files：** trash 域与测试、trash 数据层、package.json、契约与 backlog / 保护文件。
-- **contract_change / host_or_spike_required：** DATA-CONTRACT §3 新增 `trash-bin.json`（版本 1，条目含 id/docId/itemId/name/snapshot/removedAt/expiresAt，单库上限 200 条，严格读 + Web Lock + 写后回读）。
-- **ordered_steps：** 纯函数域层实现 → 数据存储层实现 → 单元测试与 package.json 门禁注册 → 架构守门验证 → 契约登记。
-- **test_fixtures / test_commands / acceptance：** 纯函数快照提取、30天过期推导、添加置顶与同人去重、超期清理、严格读写校验；`pnpm check`、`pnpm test`（799/799）、`pnpm build` 与 `pnpm check:release`。
-- **failure_retry_rollback / privacy_boundary / performance_budget：** 坏条目整体拒绝抛出 StoreIntegrityError；最多保留 200 条，过期自动修剪；仅存插件本地 JSON。
-- **evidence_paths / owner / last_updated / commit：** `src/domain/trash.ts`、`src/data/trash.ts`、`tests/trash.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
-- **退出边界：** 域层与存储层隔离测试全部通过；UI 视图呈现与一键恢复交互后续单独挂接。
-- **完成回报：** `pnpm check` 0 错误 0 警告、单测 799/799 全部通过、`pnpm build` 与 `pnpm check:release` 通过。
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+data+ui / M4；域层、数据层、服务层、facade 与设置页 UI 全部接通；30 天元数据快照缓冲（`trash-bin.json`，版本 1，上限 200 条），支持移入回收站并解绑、一键无损恢复（重绑数据库行并写回快照）、列表与清空；单测 4/4、三套 UI（桌面/390px/宿主样式）各 479/479。
+- **user_outcome / user_scenario：** 用户从人脉名册移除联系人（详情页「从人脉移除」）时，电话、邮箱、微信、标签、分组、生日等元数据自动存入回收站 30 天；误删后可在设置「数据与字段」分区看到缓冲条目与剩余保留天数，点「恢复联系人」无损还原；不需要时点「清空回收站」并确认即可永久清除。人物文档自始至终保留在思源中，不受影响。
+- **source_ids / current_evidence：** E-33、`docs/ACTIVE-BACKLOG.md`；`src/domain/trash.ts`、`src/data/trash.ts`、`src/services/trash.ts`、`SettingsView.svelte`、`PersonDetail.svelte`、`Workbench.svelte`、`src/index.ts`、`src/types.ts`。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3 `trash-bin.json` 契约、§3.3 迁移覆盖排除项 / 后续如需批量删除与真机交互另开卡 / trash / 独立自管 JSON；本工作区安全缓冲区，**明确排除**在迁移包之外。
+- **allowed_files / forbidden_files：** trash 域/数据/服务与测试、SettingsView、PersonDetail、Workbench、index/types、契约与 backlog / 版本号、CHANGELOG、README 徽章、PROGRESS.md、真实用户库。
+- **contract_change / host_or_spike_required：** DATA-CONTRACT §3 新增 `trash-bin.json`（版本 1，`{id, docId, itemId, name, snapshot, removedAt, expiresAt}`，单库 200 条上限，30 天自动过期，严格读 + Web Lock + 写后回读 + StoreIntegrityError）；§3.3 迁移覆盖表登记为排除项（跨库重放会误恢复已在新库重建的联系人）。
+- **ordered_steps：** 纯函数域层 → 数据存储层 → 服务层（移除入站/恢复重绑）→ facade 与详情删除路径接线 → 设置页回收站面板 → 迁移覆盖排除项与文档 → 三套 UI 回归。
+- **test_fixtures / test_commands / acceptance：** 快照完整保留、30 天过期推导与剩余天数、置顶与同人去重、超期清理、数据层 push/list/drop/clear 存储闭环、严格读取坏库抛错；UI 覆盖列表渲染、剩余天数与快照字段展示、一键恢复后条目移除与提示、清空需确认（取消零写入）、facade 缺能力时降级说明且不渲染操作。`pnpm check`、`pnpm test`（801/801）、`pnpm test:ui`/`:mobile`/`:host`（各 479/479）、`pnpm build`、`pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 坏条目整体拒绝抛出 StoreIntegrityError 并保护原库；恢复中途失败保留缓冲条目供重试，不重复绑行；最多 200 条、30 天过期自动修剪；仅存插件本地 JSON，不上传网络。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/trash.ts`、`src/data/trash.ts`、`src/services/trash.ts`、`tests/trash.test.ts`、`scripts/e2e/ui/smoke.js` / Codex / 2026-10-19 / `6eb3633`、`81fdee5`、`bdfcc00`、`8ca47d3`。
+- **退出边界：** 隔离域/数据/服务/UI 全部通过；真实思源多窗口并发删除、真机与日常库恢复体验保留 Host Queue。批量删除入口是否接入回收站属后续独立决策。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 801/801、三套 UI 各 479/479、`pnpm build` 与 `pnpm check:release` 全部通过。
 
 #### AG-ISSUE-051-054-FIELDS — 重复资料与两层分组首版
 
