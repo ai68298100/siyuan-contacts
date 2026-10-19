@@ -3,6 +3,7 @@
     import type { ContactSummary } from "../../domain/person";
     import { formatBirthdayDisplay, nextBirthday } from "../../domain/occasions";
     import { formatRelativeInteraction } from "../../domain/format";
+    import { computeRelationshipHealth, heatLevelColorClass } from "../../domain/cadence";
     import { ExternalLink, Phone, MessageCircle, Mail, Clock3 } from "@lucide/svelte";
     import PersonProfileSummary from "./PersonProfileSummary.svelte";
 
@@ -16,6 +17,8 @@
         recent,
         recentUnknown = false,
         orgLine = "",
+        cadenceDays = 30,
+        cadencePaused = false,
     }: {
         person: ContactSummary;
         onOpen: (person: ContactSummary) => void;
@@ -27,6 +30,8 @@
         recentUnknown?: boolean;
         /** B12：单位显示串（组织名 · 部门，来自成员索引投影） */
         orgLine?: string;
+        cadenceDays?: number;
+        cadencePaused?: boolean;
     } = $props();
 
     function telHref(phone: string): string {
@@ -45,6 +50,11 @@
         const then = new Date(`${recent.localDate}T00:00:00`).getTime();
         return formatRelativeInteraction(Math.round((day - then) / 86400000));
     });
+    const health = $derived(computeRelationshipHealth({
+        cadenceDays,
+        lastInteractionTime: recent?.occurredAt,
+        paused: cadencePaused,
+    }));
 </script>
 
 <!-- 卡片保留鼠标快捷打开；tabindex 仅用于关闭详情后恢复焦点，键盘入口是独立详情按钮。 -->
@@ -89,7 +99,15 @@
         {#if person.phone}<div><span aria-hidden="true"><Phone size={13}/></span><a class="lvct-person-card__meta-value" href={telHref(person.phone)} onclick={(event) => event.stopPropagation()}>{person.phone}</a></div>{/if}
         {#if person.wechat}<div><span aria-hidden="true"><MessageCircle size={13}/></span><span class="lvct-person-card__meta-value">{person.wechat}</span></div>{/if}
         {#if person.email}<div><span aria-hidden="true"><Mail size={13}/></span><a class="lvct-person-card__meta-value" href={mailHref(person.email)} onclick={(event) => event.stopPropagation()}>{person.email}</a></div>{/if}
-        <div><span aria-hidden="true"><Clock3 size={13}/></span><span class="lvct-person-card__meta-value">{recentLabel}</span></div>
+        <div>
+            <span aria-hidden="true"><Clock3 size={13}/></span>
+            <span class="lvct-person-card__meta-value">{recentLabel}</span>
+            {#if recent && health.level !== "unknown"}
+                <span class={`lvct-heat ${heatLevelColorClass(health.level)}`} style="font-size: 10px; padding: 1px 5px; margin-left: 4px;" title={`关系温度 ${health.score}%`}>
+                    {health.level === "hot" ? "温热" : health.level === "warm" ? "常温" : health.level === "cool" ? "微凉" : health.level === "cold" ? "渐冻" : "已暂停"}
+                </span>
+            {/if}
+        </div>
     </div>
     {#if person.group || person.tags.length > 0}
         <div class="lvct-person-card__tags">
