@@ -21,11 +21,11 @@ export interface Debouncer<T> {
     readonly pending: boolean;
 }
 
-export interface DebounceOptions {
+export interface DebounceOptions<T> {
     /** 稳定等待窗口（毫秒）；会被钳制到 [0, 5000] */
     waitMs?: number;
-    /** 提交回调 */
-    onCommit: (value: unknown) => void;
+    /** 提交回调，收到调用方 schedule 的同类型值 */
+    onCommit: (value: T) => void;
 }
 
 const MAX_WAIT_MS = 5000;
@@ -34,11 +34,11 @@ const MAX_WAIT_MS = 5000;
  * 创建可取消、可 flush 的防抖器。
  * 定时器句柄不对外暴露，避免调用方误用；dispose 后所有方法幂等。
  */
-export function createDebouncer<T>(options: DebounceOptions): Debouncer<T> {
+export function createDebouncer<T>(options: DebounceOptions<T>): Debouncer<T> {
     const waitMs = typeof options.waitMs === "number" && Number.isFinite(options.waitMs)
         ? Math.max(0, Math.min(MAX_WAIT_MS, Math.round(options.waitMs)))
         : 200;
-    const commit = options.onCommit as (value: T) => void;
+    const commit = options.onCommit;
 
     let timer: ReturnType<typeof setTimeout> | null = null;
     let pendingValue: T | undefined;
