@@ -25,8 +25,8 @@
         i18n?: Readonly<Record<string, string>>;
         primary: ContactSummary;
         secondary: ContactSummary;
-        /** 二次确认真正合并。返回修正后的 primary 资料，外部负责写回数据库。 */
-        onConfirm: (params: { primaryDocId: string; draft: ReturnType<typeof resolveMergePlan>["draft"]; auditSnapshot: MergeAuditSnapshot; removedSecondaryDocId: string }) => Promise<void> | void;
+        /** 二次确认真正合并。返回修正后的 primary 资料与合并计划，外部负责写回数据库与数据迁移。 */
+        onConfirm: (params: { primaryDocId: string; draft: ReturnType<typeof resolveMergePlan>["draft"]; auditSnapshot: MergeAuditSnapshot; removedSecondaryDocId: string; plan: ContactMergePlan }) => Promise<void> | void;
         onClose: () => void;
     } = $props();
 
@@ -101,6 +101,7 @@
                 draft: result.draft,
                 auditSnapshot: result.auditSnapshot,
                 removedSecondaryDocId: secondary.docId,
+                plan,
             });
             onClose();
         } catch (error) {

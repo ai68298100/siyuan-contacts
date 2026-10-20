@@ -89,6 +89,7 @@ import { loadPersonTopics, addPersonTopic, removePersonTopic } from "./data/topi
 import { listPersonExchanges, createPersonExchange, updatePersonExchange, changePersonExchangeStatus } from "./services/exchanges";
 import { listPersonAliases, addPersonAlias, removePersonAlias, resolveAlias } from "./services/person-aliases";
 import { listTrash, restoreContactFromTrash, removeContactToTrash, emptyTrash } from "./services/trash";
+import { executeContactMerge } from "./services/duplicate-merge";
 import { loadPersonGiftIdeas, addPersonGiftIdea, updatePersonGiftIdea, removePersonGiftIdea } from "./data/gift-ideas";
 import { listOccasions, createOccasion, deleteOccasion } from "./services/occasions";
 import { buildReview } from "./services/review-report";
@@ -1461,6 +1462,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const token = this.lifecycleToken;
         await emptyTrash(this);
         emitDataChanged({ topics: ["people"] }, token);
+    }
+
+    async executeContactMerge(plan: import("./domain/duplicate-merge").ContactMergePlan) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return executeContactMerge(this, this.settings, plan);
     }
 
     async loadPersonGiftIdeas(personDocId: string) {

@@ -118,6 +118,8 @@ export interface ContactsPluginFacade {
     listTrash?(): Promise<import("./domain/trash").TrashContactEntry[]>;
     restoreContactFromTrash?(entryId: string): Promise<{ docId: string; itemId: string; name: string }>;
     emptyTrash?(): Promise<void>;
+    /** E-31 重复联系人字段级安全合并并迁移关联自管数据 */
+    executeContactMerge?(plan: import("./domain/duplicate-merge").ContactMergePlan): Promise<import("./services/duplicate-merge").ExecuteMergeResult>;
     /** E-26：礼物点子与偏好清单（Gift Ideas & Preferences） */
     loadPersonGiftIdeas?(personDocId: string): Promise<import("./domain/gift-ideas").GiftIdeaItem[]>;
     addPersonGiftIdea?(item: import("./domain/gift-ideas").GiftIdeaItem): Promise<import("./domain/gift-ideas").GiftIdeaItem[]>;

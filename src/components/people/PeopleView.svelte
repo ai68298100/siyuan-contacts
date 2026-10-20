@@ -69,6 +69,7 @@
         onCreateSelfProfile,
         onLoadSelfCandidates,
         onCreateOccasion,
+        onExecuteMerge,
         onPreviewSelfIdentityChange,
         onApplySelfIdentityChange,
         onValidateExtended,
@@ -113,6 +114,7 @@
         onSaveExtended?: (person: ContactSummary, details: ContactExtendedDraft) => Promise<void>;
         onPreferencesChange: (preferences: ViewPreferences, baseline?: ViewPreferences) => Promise<ViewPreferences>;
         onCreateOccasion?: (input: import("../../services/occasions").CreateOccasionInput) => Promise<void>;
+        onExecuteMerge?: (plan: import("../../domain/duplicate-merge").ContactMergePlan) => Promise<unknown>;
         /** B09-1：移动端工具栏收纳（常驻搜索/视图切换/新建，其余收进底部弹层） */
         isMobile?: boolean;
     } = $props();
@@ -2256,11 +2258,11 @@
                 {i18n}
                 primary={mergeTarget.a}
                 secondary={mergeTarget.b}
-                onConfirm={({ primaryDocId, draft, removedSecondaryDocId, auditSnapshot }) => {
-                    // 落库：先写回 primary，再解绑 secondary，再推数据变更广播。
-                    // 本轮不直接接 facade.updatePersonFields（避免与 PersonEditDialog 重复的字段写路径），
-                    // 通过 console + auditSnapshot 记录；后续轮次接真写库时再替换此处。
-                    console.info("[lvct] 合并已规划，等待接入真实写库", { primaryDocId, draft, removedSecondaryDocId, auditSnapshot });
+                onConfirm={async ({ plan }) => {
+                    if (onExecuteMerge) {
+                        await onExecuteMerge(plan);
+                    }
+                    mergeTarget = null;
                     refresh();
                 }}
                 onClose={() => (mergeTarget = null)}
