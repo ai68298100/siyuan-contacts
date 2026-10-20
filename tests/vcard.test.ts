@@ -366,3 +366,54 @@ test("normalizeVcfDate / escapeVcf / unescapeVcf / splitUnescaped：边界行为
     assert.equal(unescapeVcf("a\\,b\\;c\\nd\\\\e"), "a,b;c\nd\\e");
     assert.deepEqual(splitUnescaped("a\\,b,c", ","), ["a\\,b", "c"]);
 });
+
+test("AG-VCF-ROBUST: QP 解码支持 Windows \\r\\n 软折行与字节序列完整保真", () => {
+    // 汉字 "你好" 的 UTF-8 编码为 =E4=BD=A0=E5=A5=BD，中间在 =E4=BD=A0 处软折行 =\r\n
+    const vcf = [
+        "BEGIN:VCARD",
+        "VERSION:2.1",
+        "FN;ENCODING=QUOTED-PRINTABLE;CHARSET=UTF-8:=E4=BD=A0=\r\n=E5=A5=BD",
+        "TEL:13800000000",
+        "END:VCARD",
+    ].join("\r\n");
+    const [contact] = parseVcf(vcf);
+    assert.equal(contact.name, "你好");
+    assert.equal(contact.phone, "13800000000");
+});
+
+test("AG-VCF-ROBUST: 无名卡片智能从 ORG 或 NICKNAME 兜底识别，纯电话卡片按契约安全跳过", () => {
+    const vcf = [
+        // 卡片 1：只有 ORG（公司客服，常见于小米/安卓通讯录导出）
+        "BEGIN:VCARD",
+        "VERSION:2.1",
+        "ORG:招商银行信用卡客服",
+        "TEL:95555",
+        "END:VCARD",
+
+        // 卡片 2：只有 NICKNAME
+        "BEGIN:VCARD",
+        "VERSION:3.0",
+        "NICKNAME:老王",
+        "TEL:13911112222",
+        "END:VCARD",
+
+        // 卡片 3：纯 TEL 无姓名无组织（按契约安全跳过，避免建立无名孤儿文档）
+        "BEGIN:VCARD",
+        "VERSION:3.0",
+        "TEL:10086",
+        "END:VCARD",
+
+        // 卡片 4：完全空白卡片
+        "BEGIN:VCARD",
+        "VERSION:3.0",
+        "END:VCARD",
+    ].join("\r\n");
+
+    const contacts = parseVcf(vcf);
+    assert.equal(contacts.length, 2, "仅含有效身份（ORG/NICKNAME）的卡片被保留，纯号码及空白卡片被丢弃");
+    assert.equal(contacts[0].name, "招商银行信用卡客服");
+    assert.equal(contacts[0].phone, "95555");
+
+    assert.equal(contacts[1].name, "老王");
+    assert.equal(contacts[1].phone, "13911112222");
+});

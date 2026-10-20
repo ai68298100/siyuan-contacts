@@ -188,8 +188,14 @@ function contactFromCard(lines: string[]): VCardContact | null {
 
     // Empty or whitespace-only FN values are not usable names; allow a valid
     // structured N value to serve as the fallback in that case.
+    // If both FN and N are missing, allow NICKNAME or ORG (company/organization name,
+    // frequently emitted by Xiaomi/Android contact exports) to serve as fallback.
+    // Pure phone-only cards without name or organization are discarded per contract.
     const fn = first("FN").trim();
-    const name = fn || structuredName(rawFirst("N")).trim();
+    const nickname = first("NICKNAME").trim();
+    const org = first("ORG").split(";")[0]?.trim() || "";
+
+    const name = fn || structuredName(rawFirst("N")).trim() || nickname || org;
     if (!name) return null;
 
     const phones = all("TEL")
@@ -370,6 +376,10 @@ function decodeQuotedPrintable(value: string, charset: string): string {
             const hex = value.slice(i + 1, i + 3);
             if (/^[0-9a-fA-F]{2}$/.test(hex)) {
                 bytes.push(parseInt(hex, 16));
+                i += 2;
+                continue;
+            }
+            if (value[i + 1] === "\r" && value[i + 2] === "\n") {
                 i += 2;
                 continue;
             }
