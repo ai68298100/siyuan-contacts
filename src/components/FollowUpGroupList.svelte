@@ -33,6 +33,11 @@
         sourceLabelByFollowUpId,
     }));
     const openCount = $derived(items.filter((item) => item.status === "open").length);
+    let selectedPerspective: "all" | "person" | "org" | "dept" | "source" = $state("all");
+    const displayedGroups = $derived.by(() => {
+        if (selectedPerspective === "all") return groups;
+        return groups.filter((g) => g.key === selectedPerspective);
+    });
 </script>
 
 <details class="lvct-fu-group" aria-label={text("fuGroupTitle", "按视角分组")}>
@@ -46,8 +51,56 @@
     {#if groups.length === 0}
         <p class="ft__smaller ft__on-surface">{text("fuGroupEmpty", "当前没有可分组的跟进事项。")}</p>
     {:else}
+        <div class="lvct-fu-group__perspectives" role="tablist" aria-label="切换分组视角">
+            <button
+                type="button"
+                role="tab"
+                class="b3-button b3-button--text lvct-fu-group__pill"
+                class:lvct-fu-group__pill--active={selectedPerspective === "all"}
+                aria-selected={selectedPerspective === "all"}
+                onclick={() => { selectedPerspective = "all"; }}
+            >全部</button>
+            <button
+                type="button"
+                role="tab"
+                class="b3-button b3-button--text lvct-fu-group__pill"
+                class:lvct-fu-group__pill--active={selectedPerspective === "person"}
+                aria-selected={selectedPerspective === "person"}
+                onclick={() => { selectedPerspective = "person"; }}
+            >按人物</button>
+            {#if orgNameByDocId && orgNameByDocId.size > 0}
+                <button
+                    type="button"
+                    role="tab"
+                    class="b3-button b3-button--text lvct-fu-group__pill"
+                    class:lvct-fu-group__pill--active={selectedPerspective === "org"}
+                    aria-selected={selectedPerspective === "org"}
+                    onclick={() => { selectedPerspective = "org"; }}
+                >按组织</button>
+            {/if}
+            {#if departmentByDocId && departmentByDocId.size > 0}
+                <button
+                    type="button"
+                    role="tab"
+                    class="b3-button b3-button--text lvct-fu-group__pill"
+                    class:lvct-fu-group__pill--active={selectedPerspective === "dept"}
+                    aria-selected={selectedPerspective === "dept"}
+                    onclick={() => { selectedPerspective = "dept"; }}
+                >按部门</button>
+            {/if}
+            {#if sourceLabelByFollowUpId && sourceLabelByFollowUpId.size > 0}
+                <button
+                    type="button"
+                    role="tab"
+                    class="b3-button b3-button--text lvct-fu-group__pill"
+                    class:lvct-fu-group__pill--active={selectedPerspective === "source"}
+                    aria-selected={selectedPerspective === "source"}
+                    onclick={() => { selectedPerspective = "source"; }}
+                >按文档</button>
+            {/if}
+        </div>
         <div class="lvct-fu-group__list">
-            {#each groups as group (group.key + ":" + group.label)}
+            {#each displayedGroups as group (group.key + ":" + group.label)}
                 <div class="lvct-fu-group__group">
                     <div class="lvct-fu-group__label">
                         {group.label}
@@ -88,6 +141,28 @@
     gap: 8px;
     cursor: pointer;
     padding: 4px 0;
+}
+.lvct-fu-group__perspectives {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0 8px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--b3-border-color, rgba(0,0,0,0.06));
+}
+.lvct-fu-group__pill {
+    padding: 2px 8px;
+    font-size: 11px;
+    border-radius: 12px;
+    color: var(--b3-theme-on-surface);
+    background: transparent;
+    opacity: 0.75;
+}
+.lvct-fu-group__pill--active {
+    background: var(--b3-theme-primary);
+    color: var(--b3-theme-on-primary, #fff);
+    opacity: 1;
+    font-weight: 600;
 }
 .lvct-fu-group__list {
     display: flex;
