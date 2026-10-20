@@ -5385,9 +5385,10 @@ await test("互动日期回顾：按月分组、日期范围与快捷项、历�
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
     };
     const mk = (localDate, note) => ({ eventId: `e-${localDate}-${note}`, localDate, source: "manual", note, groupSize: 1 });
+    const lastYearToday = `${now.getFullYear() - 1}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     const timeline = [
         mk(dateKey(0), "今天的事"),
-        mk("2025-09-28", "去年今天聚了个餐"),
+        mk(lastYearToday, "去年今天聚了个餐"),
         mk("2026-08-15", "八月的事"),
         mk("2026-07-20", "七月的事"),
     ];
@@ -5417,7 +5418,9 @@ await test("互动日期回顾：按月分组、日期范围与快捷项、历�
     await until(() => fixture.textContent.includes("今天的事"), "最近 30 天快捷项未生效");
     assert(!fixture.textContent.includes("七月的事"), "快捷项未排除范围外条目");
     // 清除日期
-    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "清除日期").click();
+    const clearBtn = [...fixture.querySelectorAll("button")].find((node) => ["清除筛选", "清除日期"].includes(node.textContent.trim()));
+    assert(clearBtn, "未找到清除筛选按钮");
+    clearBtn.click();
     await until(() => fixture.textContent.includes("七月的事"), "清除日期后未恢复全量");
 });
 

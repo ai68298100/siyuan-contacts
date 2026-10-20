@@ -2,7 +2,7 @@
     import { requestErrorMessage } from "../../shared/error-presenter";
     /** 人物详情窗口：档案字段、互动与关系列表（增删，内核自动维护双向回链） */
     import { onDestroy, tick, untrack } from "svelte";
-    import { CalendarDays } from "@lucide/svelte";
+    import { CalendarDays, Copy, ExternalLink } from "@lucide/svelte";
     import { listContacts, removeContact } from "../../services/contacts";
     import { addRelation, removeRelation, refreshPerson, retryRelationProjections } from "../../services/relations";
     import { resolveRelated } from "../../services/doc-section";
@@ -804,6 +804,26 @@ import StatusNotice from "../StatusNotice.svelte";
         pendingConvertedTopicId = topic.id;
         const noteInput = document.querySelector<HTMLInputElement>(".lvct-detail__record input");
         noteInput?.focus();
+    }
+
+    let copiedField = $state<string>("");
+    let copyFieldError = $state<string>("");
+
+    async function handleCopyField(value: string, fieldKey: string) {
+        if (!value) return;
+        try {
+            await copyPlainText(value);
+            copiedField = fieldKey;
+            copyFieldError = "";
+            setTimeout(() => {
+                if (copiedField === fieldKey) copiedField = "";
+            }, 1800);
+        } catch (err) {
+            copyFieldError = requestErrorMessage(err);
+            setTimeout(() => {
+                copyFieldError = "";
+            }, 2500);
+        }
     }
 
     // ---- E-26 礼物点子与偏好清单 ----
@@ -1791,13 +1811,106 @@ import StatusNotice from "../StatusNotice.svelte";
         </ViewState>
     {/if}
     <dl class="lvct-detail__fields">
-        {#if current.phone}<div><dt>电话</dt><dd><a href={`tel:${current.phone}`}>{current.phone}</a></dd></div>{/if}
-        {#if current.email}<div><dt>邮箱</dt><dd><a href={`mailto:${current.email}`}>{current.email}</a></dd></div>{/if}
-        {#if current.wechat}<div><dt>微信</dt><dd>{current.wechat}</dd></div>{/if}
-        {#if current.website}<div><dt>网站</dt><dd>{current.website}</dd></div>{/if}
+        {#if current.phone}
+            <div>
+                <dt>电话</dt>
+                <dd class="fn__flex fn__flex-1" style="align-items: center; gap: 6px;">
+                    <a href={`tel:${current.phone}`} title="拨打电话">{current.phone}</a>
+                    <button
+                        type="button"
+                        class="b3-button b3-button--text lvct-detail__copy-btn"
+                        title={copiedField === "phone" ? "已复制到剪贴板" : "复制电话号码"}
+                        aria-label="复制电话号码"
+                        onclick={() => handleCopyField(current.phone, "phone")}
+                    >
+                        {#if copiedField === "phone"}
+                            <span class="lvct-text-success ft__smaller">已复制 ✓</span>
+                        {:else}
+                            <Copy size={12} />
+                        {/if}
+                    </button>
+                </dd>
+            </div>
+        {/if}
+        {#if current.email}
+            <div>
+                <dt>邮箱</dt>
+                <dd class="fn__flex fn__flex-1" style="align-items: center; gap: 6px;">
+                    <a href={`mailto:${current.email}`} title="发送邮件">{current.email}</a>
+                    <button
+                        type="button"
+                        class="b3-button b3-button--text lvct-detail__copy-btn"
+                        title={copiedField === "email" ? "已复制到剪贴板" : "复制邮箱地址"}
+                        aria-label="复制邮箱地址"
+                        onclick={() => handleCopyField(current.email, "email")}
+                    >
+                        {#if copiedField === "email"}
+                            <span class="lvct-text-success ft__smaller">已复制 ✓</span>
+                        {:else}
+                            <Copy size={12} />
+                        {/if}
+                    </button>
+                </dd>
+            </div>
+        {/if}
+        {#if current.wechat}
+            <div>
+                <dt>微信</dt>
+                <dd class="fn__flex fn__flex-1" style="align-items: center; gap: 6px;">
+                    <span>{current.wechat}</span>
+                    <button
+                        type="button"
+                        class="b3-button b3-button--text lvct-detail__copy-btn"
+                        title={copiedField === "wechat" ? "已复制到剪贴板" : "复制微信号"}
+                        aria-label="复制微信号"
+                        onclick={() => handleCopyField(current.wechat, "wechat")}
+                    >
+                        {#if copiedField === "wechat"}
+                            <span class="lvct-text-success ft__smaller">已复制 ✓</span>
+                        {:else}
+                            <Copy size={12} />
+                        {/if}
+                    </button>
+                </dd>
+            </div>
+        {/if}
+        {#if current.website}
+            <div>
+                <dt>网站</dt>
+                <dd class="fn__flex fn__flex-1" style="align-items: center; gap: 6px;">
+                    <a
+                        class="fn__flex"
+                        style="align-items: center; gap: 4px;"
+                        href={current.website.startsWith("http") ? current.website : `https://${current.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="在浏览器中打开网址"
+                    >
+                        <span>{current.website}</span>
+                        <ExternalLink size={12} />
+                    </a>
+                    <button
+                        type="button"
+                        class="b3-button b3-button--text lvct-detail__copy-btn"
+                        title={copiedField === "website" ? "已复制到剪贴板" : "复制网址"}
+                        aria-label="复制网址"
+                        onclick={() => handleCopyField(current.website, "website")}
+                    >
+                        {#if copiedField === "website"}
+                            <span class="lvct-text-success ft__smaller">已复制 ✓</span>
+                        {:else}
+                            <Copy size={12} />
+                        {/if}
+                    </button>
+                </dd>
+            </div>
+        {/if}
         {#if current.tags.length > 0}<div><dt>标签</dt><dd>{current.tags.join(" · ")}</dd></div>{/if}
         {#if birthday}<div><dt>下次生日</dt><dd>{birthday.date.toLocaleDateString("zh-CN")}（公历{current.isLunar ? `，对应${birthday.label}` : ""}） · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}</dd></div>{/if}
     </dl>
+    {#if copyFieldError}
+        <p class="b3-label b3-label--error ft__smaller" style="margin: 4px 0;">{copyFieldError}</p>
+    {/if}
 
     {#if topicsSupported}
         <section class="lvct-detail__section lvct-detail__topics-section" aria-labelledby="lvct-topics-title">

@@ -4270,6 +4270,22 @@ html[data-theme-mode="dark"] .lvct-doc-strip {
     }
 }
 
+.lvct-detail__copy-btn {
+    padding: 1px 4px;
+    font-size: 11px;
+    opacity: 0.65;
+    cursor: pointer;
+    border-radius: var(--lvct-r-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    &:hover {
+        opacity: 1;
+        background: var(--b3-theme-surface);
+    }
+}
+
 .lvct-detail__section {
     padding-top: var(--lvct-sp-3);
     border-top: 1px solid var(--lvct-border-subtle);
