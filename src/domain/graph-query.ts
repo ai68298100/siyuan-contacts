@@ -1,9 +1,10 @@
-import { buildGraph, buildOrgAugmentation, capGraph, compareGraphIds, GRAPH_MAX_NODES, orderGraph, queryGraphRelations } from "./graph.ts";
+import { buildCoOccurrenceEdges, buildGraph, buildOrgAugmentation, capGraph, compareGraphIds, GRAPH_MAX_NODES, orderGraph, queryGraphRelations } from "./graph.ts";
 import { secondDegreeGraphIds, shortestGraphPath } from "./graph-path.ts";
 import type { GraphNode, PersonGraph } from "./graph.ts";
 import type { ContactSummary } from "./person.ts";
 import type { OrgMembership } from "./org-membership.ts";
 import type { GraphQueryKind } from "./graph-export.ts";
+import type { InteractionEvent } from "./interactions.ts";
 
 export type GraphReadStatus = "verified" | "unknown";
 export type GraphSourceKey = "roster" | "organizations" | "self" | "references";
@@ -23,6 +24,7 @@ export interface GraphSources {
     status: Record<Exclude<GraphSourceKey, "references">, GraphReadStatus>;
     errors: Partial<Record<GraphSourceKey, string>>;
     revision: number;
+    interactionEvents?: readonly InteractionEvent[];
 }
 
 export interface GraphQuery {
@@ -144,9 +146,12 @@ export function graphRegistry(sources: GraphSources): { people: ContactSummary[]
         // dangling person IDs against the verified roster.
         docId: org.docId, name: org.name, memberships: org.memberships,
     })), personIds);
+    const coOccurrenceEdges = sources.interactionEvents && sources.interactionEvents.length > 0
+        ? buildCoOccurrenceEdges(sources.interactionEvents, people)
+        : [];
     const related = buildGraph(people);
     return { people, organizations: overlay.nodes.sort((left, right) => compareGraphIds(left.id, right.id)),
-        graph: orderGraph({ nodes: [...related.nodes, ...overlay.nodes], edges: [...related.edges, ...overlay.edges] }), diagnostics };
+        graph: orderGraph({ nodes: [...related.nodes, ...overlay.nodes], edges: [...related.edges, ...overlay.edges, ...coOccurrenceEdges] }), diagnostics };
 }
 
 export function resolveGraphCenter(sources: GraphSources, query: GraphQuery): GraphCenter {

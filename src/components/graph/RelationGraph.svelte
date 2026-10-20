@@ -20,6 +20,8 @@
     import PersonPicker from "../people/PersonPicker.svelte";
     import type { PickerItem } from "../people/PersonPicker.svelte";
     import { requestErrorMessage } from "../../shared/error-presenter";
+    import { addRelation } from "../../services/relations";
+    import { emitDataChanged } from "../../libs/data-events";
 
     let {
         settings,
@@ -111,6 +113,9 @@
     let hoverCard: HTMLElement | undefined = $state();
     let hoverTimer: ReturnType<typeof setTimeout> | undefined;
     let clearHoverTimer: ReturnType<typeof setTimeout> | undefined;
+    let activeCoEdge: { sourceDocId: string; targetDocId: string; coCount: number; sourceName: string; targetName: string } | null = $state(null);
+    let establishingRelation = $state(false);
+    let establishRelationError = $state("");
     let refreshVersion = 0;
     // 同一视图只允许一个名册读取在途；显式重复点击直接忽略，外部 revision 可排队一次。
     let refreshInFlight = $state(false);
@@ -375,6 +380,7 @@
             const next = await loadGraphSources(settings, {
                 listOrganizations: facade?.listOrganizations ? () => facade.listOrganizations() : undefined,
                 loadSelfIdentity: facade?.loadSelfIdentity ? () => facade.loadSelfIdentity() : undefined,
+                loadInteractionEvents: facade?.loadInteractionEvents ? () => facade.loadInteractionEvents!() : undefined,
             }, version);
             if (!alive || version !== refreshVersion) return;
             sources = next;
@@ -758,6 +764,8 @@
         resizeObserver.observe(container);
 
         instance.on("tap", "node", (event: cytoscape.EventObject) => {
+            activeCoEdge = null;
+            establishRelationError = "";
             const docId = event.target.id();
             const person = allPeopleByDocId.get(docId);
             if (person) {
@@ -776,8 +784,32 @@
                 hoverPosition = { x: 12, y: 12 };
             }
         });
+        instance.on("tap", "edge", (event: cytoscape.EventObject) => {
+            const edge = event.target;
+            if (edge.data("kind") === "co_occurrence") {
+                const sourceDocId = edge.data("source");
+                const targetDocId = edge.data("target");
+                const coCount = edge.data("coCount") ?? 1;
+                const personA = allPeopleByDocId.get(sourceDocId);
+                const personB = allPeopleByDocId.get(targetDocId);
+                if (personA && personB) {
+                    clearHover();
+                    selectedOrgId = "";
+                    establishRelationError = "";
+                    activeCoEdge = {
+                        sourceDocId,
+                        targetDocId,
+                        coCount,
+                        sourceName: personA.name,
+                        targetName: personB.name,
+                    };
+                    const pos = event.renderedPosition ?? { x: 24, y: 24 };
+                    hoverPosition = { x: Math.max(12, Math.round(pos.x)), y: Math.max(12, Math.round(pos.y)) };
+                }
+            }
+        });
         instance.on("tap", (event: cytoscape.EventObject) => {
-            if (event.target === instance) { selectedOrgId = ""; clearHover(); }
+            if (event.target === instance) { selectedOrgId = ""; clearHover(); activeCoEdge = null; }
         });
         instance.on("mouseover", "node", scheduleHover);
         instance.on("mouseout", "node", scheduleClearHover);
@@ -802,6 +834,26 @@
         const person = hoveredPerson;
         clearHover();
         if (person) openSnapshotPerson(person);
+    }
+
+    async function establishCoRelation() {
+        if (!activeCoEdge || establishingRelation) return;
+        const { sourceDocId, targetDocId } = activeCoEdge;
+        const personA = allPeopleByDocId.get(sourceDocId);
+        const personB = allPeopleByDocId.get(targetDocId);
+        if (!personA || !personB) return;
+        establishingRelation = true;
+        establishRelationError = "";
+        try {
+            await addRelation(settings, personA, personB);
+            activeCoEdge = null;
+            emitDataChanged({ topics: ["people"], docIds: [personA.docId, personB.docId] });
+            await refresh(true);
+        } catch (error) {
+            establishRelationError = requestErrorMessage(error);
+        } finally {
+            establishingRelation = false;
+        }
     }
 
     function focusOrganization(id: string) {
@@ -1330,7 +1382,44 @@
                 <button class="lvct-graph__fab-btn" title={graphExpanded ? "收起大图" : "展开大图"} aria-label={graphExpanded ? "收起大图" : "展开大图"} aria-pressed={graphExpanded} onclick={() => void toggleGraphExpanded()}>{#if graphExpanded}<Minimize2 size={16} />{:else}<Maximize2 size={16} />{/if}</button>
                 <button class="lvct-graph__fab-btn" title={text("graphRefresh", "刷新")} aria-label={text("graphRefresh", "刷新")} disabled={loading || refreshInFlight} aria-busy={refreshInFlight} onclick={() => void refresh()}><RefreshCw size={15} /></button>
             </div>
-            {#if displayedOrg}
+            {#if activeCoEdge}
+                <div
+                    class="lvct-graph-view__hover-card"
+                    role="dialog"
+                    aria-modal="false"
+                    aria-label="共同出席推断关联"
+                    tabindex="-1"
+                    style={`left:${hoverPosition.x}px;top:${hoverPosition.y}px`}
+                >
+                    <div class="lvct-graph-view__hover-name">
+                        <b>{activeCoEdge.sourceName} & {activeCoEdge.targetName}</b>
+                        <span class="lvct-chip lvct-chip--group">共同出席 {activeCoEdge.coCount} 次</span>
+                    </div>
+                    <div class="ft__smaller ft__on-surface" style="margin: 6px 0;">
+                        基于多参与者同场互动事件推断出的弱联系。是否将其升级为正式相关人？
+                    </div>
+                    {#if establishRelationError}
+                        <div class="b3-label b3-label--error ft__smaller" style="margin-bottom: 6px;">{establishRelationError}</div>
+                    {/if}
+                    <div style="display: flex; gap: 8px; margin-top: 4px;">
+                        <button
+                            type="button"
+                            class="b3-button b3-button--text ft__smaller"
+                            disabled={establishingRelation}
+                            onclick={establishCoRelation}
+                        >
+                            {establishingRelation ? "正在建立…" : "建立双向关系"}
+                        </button>
+                        <button
+                            type="button"
+                            class="b3-button b3-button--text ft__smaller"
+                            onclick={() => { activeCoEdge = null; }}
+                        >
+                            关闭
+                        </button>
+                    </div>
+                </div>
+            {:else if displayedOrg}
                 <div
                     class="lvct-graph-view__hover-card"
                     bind:this={hoverCard}

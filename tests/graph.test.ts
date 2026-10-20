@@ -460,3 +460,51 @@ test("E-34 co_occurrence: 从同场多参与者事件推断弱关联，跳过已
     assert.equal(strictEdges[0].target, "p3");
     assert.equal(strictEdges[0].coCount, 2);
 });
+
+test("图谱查询快照：co_occurrence 弱联系边进入渲染图层，但不污染相关人深度遍历与关系查询", () => {
+    const people = [
+        person({ docId: "p1", itemId: "i1", name: "张三", relatedItemIds: ["i2"] }),
+        person({ docId: "p2", itemId: "i2", name: "李四", relatedItemIds: ["i1"] }),
+        person({ docId: "p3", itemId: "i3", name: "王五", relatedItemIds: [] }),
+    ];
+    const events: InteractionEvent[] = [
+        { id: "e1", personDocId: "p1", occurredAt: 1000, localDate: "2026-10-18", source: "note", externalRef: "meeting-alpha" },
+        { id: "e2", personDocId: "p3", occurredAt: 1000, localDate: "2026-10-18", source: "note", externalRef: "meeting-alpha" },
+    ];
+    const sources: GraphSources = {
+        people,
+        organizations: [],
+        selfDocId: "p1",
+        interactionEvents: events,
+        status: { roster: "verified", organizations: "verified", self: "verified" },
+        errors: {},
+        revision: 1,
+    };
+    const query: GraphQuery = {
+        mode: "relations",
+        scope: "global",
+        centerDocId: "p1",
+        orgDocId: "",
+        search: "",
+        group: "",
+        isolatedOnly: false,
+        showOrgs: true,
+        depth: "direct",
+        focusId: "",
+        compareId: "",
+        queryMode: "common",
+    };
+    const snapshot = buildGraphQuerySnapshot(sources, query);
+
+    // 渲染边中必须包含 p1-p2 (related) 与 p1-p3 (co_occurrence)
+    const coEdge = snapshot.graph.edges.find((e) => e.kind === "co_occurrence");
+    assert.ok(coEdge, "图谱中应包含 co_occurrence 弱联系边");
+    assert.equal(coEdge?.source, "p1");
+    assert.equal(coEdge?.target, "p3");
+    assert.equal(coEdge?.coCount, 1);
+
+    // 验证核心关系查询：p1 的直接邻居依然只有李四（p2），王五（p3）因只是弱联系而不算入 related 邻居
+    const p1Neighbors = queryGraphRelations(snapshot.relationGraph, "p1").neighborIds;
+    assert.deepEqual(p1Neighbors, ["p2"]);
+    assert.ok(!p1Neighbors.includes("p3"), "弱联系对象不得进入显式关系邻居");
+});

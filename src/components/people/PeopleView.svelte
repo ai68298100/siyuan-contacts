@@ -40,6 +40,7 @@
     import { requestErrorMessage } from "../../shared/error-presenter";
     import type { ContactExtendedDraft } from "../../domain/contact-create";
     import { buildVirtualRows, estimateVirtualHeight, virtualRowAtOffset, virtualRowRange } from "../../domain/virtual-list";
+    import { createDebouncer } from "../../domain/debounce";
 
     let {
         settings,
@@ -137,8 +138,32 @@
     }
     let errorText: string = $state("");
     let searchText: string = $state("");
+    let searchInput: string = $state("");
+    const searchDebouncer = createDebouncer<string>({
+        waitMs: 200,
+        onCommit: (val) => {
+            searchText = val;
+            visibleCount = PAGE_SIZE;
+            onExternalSearchChange?.(val);
+        },
+    });
+    function handleSearchInput(val: string): void {
+        searchInput = val;
+        if (!val.trim()) {
+            searchDebouncer.cancel();
+            searchText = "";
+            visibleCount = PAGE_SIZE;
+            onExternalSearchChange?.("");
+        } else {
+            searchDebouncer.schedule(val);
+        }
+    }
     let selectedPeopleCache: Record<string, ContactSummary> = $state({});
-    $effect(() => { searchText = externalSearch; });
+    $effect(() => {
+        searchInput = externalSearch;
+        searchText = externalSearch;
+        searchDebouncer.cancel();
+    });
     $effect(() => { if (createRequested > 0) adding = true; });
     $effect(() => { if (importRequested > 0) importing = true; });
     $effect(() => { if (vcardRequested > 0) vcarding = true; });
@@ -395,6 +420,7 @@
     let rosterAbortController: AbortController | undefined;
     onDestroy(() => {
         peopleAlive = false;
+        searchDebouncer.dispose();
         cancelContactFocus();
         refreshGeneration += 1;
         recentGeneration += 1;
@@ -793,7 +819,9 @@
             return;
         }
         if (key === "search") {
+            searchInput = "";
             searchText = "";
+            searchDebouncer.cancel();
             onExternalSearchCleared?.();
         }
         else if (key === "group") groupFilter = "";
@@ -806,7 +834,9 @@
     }
 
     function clearAllConditions() {
+        searchInput = "";
         searchText = "";
+        searchDebouncer.cancel();
         onExternalSearchCleared?.();
         groupFilter = "";
         tagFilter = [];
@@ -881,7 +911,9 @@
     });
 
     function applyQueryToState(query: SavedViewQuery) {
+        searchInput = query.search;
         searchText = query.search;
+        searchDebouncer.cancel();
         groupFilter = query.group;
         tagFilter = [...query.tags];
         extraFilter = { ...extraFilter, tagMatch: query.tagMatch, recentFrom: query.recentFrom, recentTo: query.recentTo, neverContacted: query.neverContacted,
@@ -1653,8 +1685,8 @@
                 type="text"
                 aria-label={text("peopleSearchPlaceholder", "搜索联系人")}
                 placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
-                value={searchText}
-                oninput={(event) => { searchText = (event.currentTarget as HTMLInputElement).value; onExternalSearchChange?.(searchText); }}
+                value={searchInput}
+                oninput={(event) => handleSearchInput((event.currentTarget as HTMLInputElement).value)}
             />
         {/if}
         {#if !isMobile}
@@ -1664,8 +1696,8 @@
                 type="text"
                 aria-label={text("peopleSearchPlaceholder", "搜索联系人")}
                 placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
-                value={searchText}
-                oninput={(event) => { searchText = (event.currentTarget as HTMLInputElement).value; onExternalSearchChange?.(searchText); }}
+                value={searchInput}
+                oninput={(event) => handleSearchInput((event.currentTarget as HTMLInputElement).value)}
             />
             {@render filterControls()}
         {/if}

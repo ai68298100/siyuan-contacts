@@ -56,6 +56,8 @@ export interface ContactsPluginFacade {
     loadPersonFields(personDocId: string): Promise<import("./domain/person-fields").PersonFieldsState>;
     savePersonFields(personDocId: string, snapshot: import("./domain/person-fields").PersonFieldsSnapshot, expected: import("./domain/person-fields").PersonFieldsState): Promise<import("./domain/person-fields").PersonFieldsState>;
     loadRecentInteractions(): Promise<Record<string, { occurredAt: number; localDate: string }>>;
+    /** 读取全量有效互动事件列表（供图谱推断共同出席弱联系等） */
+    loadInteractionEvents?(): Promise<readonly import("./domain/interactions").InteractionEvent[]>;
     /** 个人往来账本：金钱、物品、人情均按人物独立记录 */
     listPersonExchanges(personDocId: string): Promise<ExchangeRecord[]>;
     createPersonExchange(input: CreatePersonExchangeInput): Promise<ExchangeRecord>;

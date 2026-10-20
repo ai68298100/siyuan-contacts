@@ -1240,6 +1240,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         return latest;
     }
 
+    async loadInteractionEvents() {
+        const store = await loadInteractionStoreStrict(this);
+        return store.events;
+    }
+
     async checkSettingsHealth() {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
         return checkSettingsHealth(this.settings);

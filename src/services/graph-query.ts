@@ -5,20 +5,24 @@ import { mapNativeGraph } from "../domain/native-graph";
 import { requestErrorMessage } from "../shared/error-presenter";
 import type { ContactsSettings } from "../domain/model";
 import type { GraphOrganization, GraphQuery, GraphReferenceSource, GraphSources } from "../domain/graph-query";
+import type { InteractionEvent } from "../domain/interactions";
 
 export async function loadGraphSources(settings: ContactsSettings, reads: {
     listOrganizations?: () => Promise<readonly GraphOrganization[]>;
     loadSelfIdentity?: () => Promise<{ selfDocId: string } | null>;
+    loadInteractionEvents?: () => Promise<readonly InteractionEvent[]>;
 }, revision: number): Promise<GraphSources> {
-    const [roster, organizations, self] = await Promise.allSettled([
+    const [roster, organizations, self, events] = await Promise.allSettled([
         Promise.resolve().then(() => listContacts(settings)).then((people) => structuredClone(people)),
         Promise.resolve().then(() => { if (!reads.listOrganizations) throw new Error("组织读取能力不可用"); return reads.listOrganizations(); }).then((organizations) => structuredClone(organizations)),
         Promise.resolve().then(() => { if (!reads.loadSelfIdentity) throw new Error("本人身份读取能力不可用"); return reads.loadSelfIdentity(); }),
+        Promise.resolve().then(() => { if (!reads.loadInteractionEvents) return []; return reads.loadInteractionEvents(); }).then((events) => structuredClone(events)),
     ]);
     const sources: GraphSources = {
         people: roster.status === "fulfilled" ? roster.value : [],
         organizations: organizations.status === "fulfilled" ? organizations.value : [],
         selfDocId: self.status === "fulfilled" ? self.value?.selfDocId ?? null : null,
+        interactionEvents: events.status === "fulfilled" ? events.value : [],
         status: { roster: roster.status === "fulfilled" ? "verified" : "unknown",
             organizations: organizations.status === "fulfilled" ? "verified" : "unknown", self: self.status === "fulfilled" ? "verified" : "unknown" },
         errors: {}, revision,
