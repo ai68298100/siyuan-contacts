@@ -129,6 +129,12 @@ export interface ContactsPluginFacade {
     listOccasions?(): Promise<import("./domain/occasion-cluster").OccasionEntity[]>;
     createOccasion?(input: import("./services/occasions").CreateOccasionInput): Promise<import("./domain/occasion-cluster").OccasionEntity>;
     deleteOccasion?(occasionId: string): Promise<void>;
+    /** E-36：重要日期与周年纪念日（Anniversaries & Milestones） */
+    loadPersonAnniversaries?(personDocId: string): Promise<import("./domain/anniversaries").AnniversaryItem[]>;
+    addPersonAnniversary?(item: import("./domain/anniversaries").AnniversaryItem): Promise<import("./domain/anniversaries").AnniversaryItem[]>;
+    updatePersonAnniversary?(personDocId: string, annivId: string, patch: Partial<import("./domain/anniversaries").AnniversaryItem>): Promise<import("./domain/anniversaries").AnniversaryItem[]>;
+    removePersonAnniversary?(personDocId: string, annivId: string): Promise<import("./domain/anniversaries").AnniversaryItem[]>;
+    listUpcomingAnniversaries?(windowDays?: number): Promise<import("./domain/anniversaries").AnniversaryProjection[]>;
     /** 交往回顾报表（F12）：区间互动统计（只读投影，人物条数与同场活动分口径） */
     buildReviewReport(from: string, to: string): Promise<ReviewReport>;
     /** 导出中心摘要：名册人数与活跃互动条数（展示用，容错读取） */

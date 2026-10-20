@@ -92,6 +92,7 @@ import { listTrash, restoreContactFromTrash, removeContactToTrash, emptyTrash } 
 import { executeContactMerge } from "./services/duplicate-merge";
 import { loadPersonGiftIdeas, addPersonGiftIdea, updatePersonGiftIdea, removePersonGiftIdea } from "./data/gift-ideas";
 import { listOccasions, createOccasion, deleteOccasion } from "./services/occasions";
+import { loadPersonAnniversaries, addPersonAnniversary, updatePersonAnniversary, removePersonAnniversary, listUpcomingAnniversaries } from "./data/anniversaries.ts";
 import { buildReview } from "./services/review-report";
 import { importInteractionJson, previewInteractionImport } from "./services/interaction-import";
 import { previewInteractionImportDiff } from "./services/interaction-import";
@@ -1509,6 +1510,35 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const token = this.lifecycleToken;
         await deleteOccasion(this, occasionId);
         emitDataChanged({ topics: ["people"] }, token);
+    }
+
+    async loadPersonAnniversaries(personDocId: string) {
+        return loadPersonAnniversaries(this, personDocId);
+    }
+
+    async addPersonAnniversary(item: import("./domain/anniversaries").AnniversaryItem) {
+        const token = this.lifecycleToken;
+        const result = await addPersonAnniversary(this, item);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async updatePersonAnniversary(personDocId: string, annivId: string, patch: Partial<import("./domain/anniversaries").AnniversaryItem>) {
+        const token = this.lifecycleToken;
+        const result = await updatePersonAnniversary(this, personDocId, annivId, patch);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async removePersonAnniversary(personDocId: string, annivId: string) {
+        const token = this.lifecycleToken;
+        const result = await removePersonAnniversary(this, personDocId, annivId);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async listUpcomingAnniversaries(windowDays?: number) {
+        return listUpcomingAnniversaries(this, windowDays);
     }
 
     async buildReviewReport(from: string, to: string) {

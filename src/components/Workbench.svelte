@@ -862,6 +862,9 @@
             onAddGiftIdea={facade.addPersonGiftIdea ? (item) => facade.addPersonGiftIdea!(item) : undefined}
             onUpdateGiftIdea={facade.updatePersonGiftIdea ? (docId, ideaId, patch) => facade.updatePersonGiftIdea!(docId, ideaId, patch) : undefined}
             onRemoveGiftIdea={facade.removePersonGiftIdea ? (docId, ideaId) => facade.removePersonGiftIdea!(docId, ideaId) : undefined}
+            onLoadAnniversaries={facade.loadPersonAnniversaries ? (docId) => facade.loadPersonAnniversaries!(docId) : undefined}
+            onAddAnniversary={facade.addPersonAnniversary ? (item) => facade.addPersonAnniversary!(item) : undefined}
+            onRemoveAnniversary={facade.removePersonAnniversary ? (docId, annivId) => facade.removePersonAnniversary!(docId, annivId) : undefined}
             {onOpenPersonDoc}
             onNavigate={showDetail}
             onNavigateDocId={(docId) => openPersonByDocId(docId)}

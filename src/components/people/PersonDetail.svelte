@@ -43,6 +43,14 @@ import StatusNotice from "../StatusNotice.svelte";
     import { confirmDialog } from "../../libs/confirm-dialog";
     import { copyPlainText } from "../../shared/clipboard";
     import { convertGiftIdeaToExchange, newGiftIdeaId, type GiftIdeaItem, type GiftIdeaStatus, type GiftIdeaType } from "../../domain/gift-ideas";
+    import {
+        ANNIVERSARY_CATEGORIES,
+        ANNIVERSARY_CATEGORY_LABELS,
+        newAnniversaryId,
+        nextAnniversary,
+        type AnniversaryCategory,
+        type AnniversaryItem,
+    } from "../../domain/anniversaries";
     import { newExchangeRequestId } from "../../services/exchanges";
 
     let {
@@ -102,6 +110,9 @@ import StatusNotice from "../StatusNotice.svelte";
         onAddGiftIdea,
         onUpdateGiftIdea,
         onRemoveGiftIdea,
+        onLoadAnniversaries,
+        onAddAnniversary,
+        onRemoveAnniversary,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
@@ -174,6 +185,10 @@ import StatusNotice from "../StatusNotice.svelte";
         onAddGiftIdea?: (item: import("../../domain/gift-ideas").GiftIdeaItem) => Promise<import("../../domain/gift-ideas").GiftIdeaItem[]>;
         onUpdateGiftIdea?: (personDocId: string, ideaId: string, patch: Partial<import("../../domain/gift-ideas").GiftIdeaItem>) => Promise<import("../../domain/gift-ideas").GiftIdeaItem[]>;
         onRemoveGiftIdea?: (personDocId: string, ideaId: string) => Promise<import("../../domain/gift-ideas").GiftIdeaItem[]>;
+        /** E-36 重要日期与周年纪念日（可选） */
+        onLoadAnniversaries?: (personDocId: string) => Promise<import("../../domain/anniversaries").AnniversaryItem[]>;
+        onAddAnniversary?: (item: import("../../domain/anniversaries").AnniversaryItem) => Promise<import("../../domain/anniversaries").AnniversaryItem[]>;
+        onRemoveAnniversary?: (personDocId: string, annivId: string) => Promise<import("../../domain/anniversaries").AnniversaryItem[]>;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -886,6 +901,75 @@ import StatusNotice from "../StatusNotice.svelte";
             }
         } catch (error) {
             if (detailAlive) giftIdeasError = requestErrorMessage(error);
+        }
+    }
+
+    // ---- E-36 重要日期与周年纪念日 ----
+    const anniversariesSupported = $derived(Boolean(onLoadAnniversaries));
+    let anniversaries = $state<AnniversaryItem[]>([]);
+    let anniversariesLoading = $state(false);
+    let anniversariesError = $state("");
+    let newAnnivTitle = $state("");
+    let newAnnivCategory = $state<AnniversaryCategory>("wedding");
+    let newAnnivDate = $state(toLocalDateKey(new Date()));
+    let newAnnivLunar = $state(false);
+    let addingAnniv = $state(false);
+
+    async function loadAnniversaries() {
+        if (!onLoadAnniversaries) return;
+        const docId = current.docId;
+        anniversariesLoading = true;
+        anniversariesError = "";
+        try {
+            const list = await onLoadAnniversaries(docId);
+            if (detailAlive && current.docId === docId) anniversaries = list;
+        } catch (error) {
+            if (detailAlive && current.docId === docId) anniversariesError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive && current.docId === docId) anniversariesLoading = false;
+        }
+    }
+    loadAnniversaries();
+
+    async function handleAddAnniversary() {
+        if (!onAddAnniversary || addingAnniv || !newAnnivTitle.trim()) return;
+        addingAnniv = true;
+        anniversariesError = "";
+        try {
+            const item: AnniversaryItem = {
+                id: newAnniversaryId(),
+                personDocId: current.docId,
+                title: newAnnivTitle.trim(),
+                category: newAnnivCategory,
+                date: newAnnivDate,
+                isLunar: newAnnivLunar,
+                remindDaysBefore: 7,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            };
+            const list = await onAddAnniversary(item);
+            if (detailAlive) {
+                anniversaries = list;
+                newAnnivTitle = "";
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) anniversariesError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive) addingAnniv = false;
+        }
+    }
+
+    async function handleRemoveAnniversary(annivId: string) {
+        if (!onRemoveAnniversary) return;
+        try {
+            const list = await onRemoveAnniversary(current.docId, annivId);
+            if (detailAlive) {
+                anniversaries = list;
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) anniversariesError = requestErrorMessage(error);
         }
     }
 
@@ -1770,6 +1854,86 @@ import StatusNotice from "../StatusNotice.svelte";
                                     class="b3-button b3-button--cancel"
                                     aria-label={text("giftsRemoveAria", "删除")}
                                     onclick={() => void handleRemoveGiftIdea(idea.id)}
+                                >×</button>
+                            </span>
+                        </li>
+                    {/each}
+                </ul>
+            {/if}
+        </section>
+    {/if}
+
+    {#if anniversariesSupported}
+        <section class="lvct-detail__section lvct-detail__anniversaries">
+            <div class="lvct-detail__section-head">
+                <div>
+                    <h4>重要日期与纪念日</h4>
+                    <p class="ft__smaller ft__on-surface">登记结婚、相识、入职等周年纪念，到期自动提醒。</p>
+                </div>
+                {#if anniversariesLoading}
+                    <span class="ft__smaller ft__on-surface">读取中…</span>
+                {/if}
+            </div>
+            {#if anniversariesError}
+                <p class="ft__smaller lvct-text-danger" role="alert">{anniversariesError} <button type="button" class="b3-button b3-button--text" onclick={loadAnniversaries}>重试</button></p>
+            {/if}
+            <div class="lvct-detail__anniv-form fn__flex" style="flex-wrap: wrap; gap: 6px; margin: 6px 0;">
+                <input
+                    class="b3-text-field fn__flex-1"
+                    type="text"
+                    placeholder="纪念日名称（如：结婚十周年、相识纪念）"
+                    bind:value={newAnnivTitle}
+                    disabled={addingAnniv || anniversariesLoading}
+                    onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleAddAnniversary(); } }}
+                />
+                <select class="b3-select" bind:value={newAnnivCategory} disabled={addingAnniv || anniversariesLoading}>
+                    {#each ANNIVERSARY_CATEGORIES as cat}
+                        <option value={cat}>{ANNIVERSARY_CATEGORY_LABELS[cat].icon} {ANNIVERSARY_CATEGORY_LABELS[cat].label}</option>
+                    {/each}
+                </select>
+                <input
+                    class="b3-text-field"
+                    type="date"
+                    style="width: 140px;"
+                    bind:value={newAnnivDate}
+                    disabled={addingAnniv || anniversariesLoading}
+                />
+                <label class="b3-label" style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                    <input type="checkbox" bind:checked={newAnnivLunar} disabled={addingAnniv || anniversariesLoading} />
+                    <span class="ft__smaller">农历</span>
+                </label>
+                <button
+                    type="button"
+                    class="b3-button b3-button--outline"
+                    disabled={addingAnniv || anniversariesLoading || !newAnnivTitle.trim()}
+                    onclick={handleAddAnniversary}
+                >添加纪念日</button>
+            </div>
+            {#if anniversaries.length === 0}
+                <p class="ft__smaller ft__on-surface">暂未登记特殊纪念日。</p>
+            {:else}
+                <ul class="lvct-detail__topic-list">
+                    {#each anniversaries as anniv (anniv.id)}
+                        {@const proj = nextAnniversary(anniv)}
+                        <li class="lvct-detail__topic-item">
+                            <span class="lvct-detail__topic-text">
+                                <span class="lvct-chip lvct-bucket--soon">
+                                    {ANNIVERSARY_CATEGORY_LABELS[anniv.category]?.icon ?? "📅"} {ANNIVERSARY_CATEGORY_LABELS[anniv.category]?.label ?? "纪念日"}
+                                </span>
+                                <b>{anniv.title}</b> · {anniv.date}{anniv.isLunar ? "（农历）" : ""}
+                                {#if proj}
+                                    <span class="ft__smaller ft__on-surface">
+                                        · 还有 {proj.daysUntil} 天（{proj.displayDate}
+                                        {#if proj.yearsCount}，第 {proj.yearsCount} 周年{/if}）
+                                    </span>
+                                {/if}
+                            </span>
+                            <span class="lvct-detail__topic-actions">
+                                <button
+                                    type="button"
+                                    class="b3-button b3-button--cancel"
+                                    aria-label="删除纪念日"
+                                    onclick={() => void handleRemoveAnniversary(anniv.id)}
                                 >×</button>
                             </span>
                         </li>
