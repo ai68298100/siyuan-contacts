@@ -14,6 +14,7 @@ import { VCARD_REQUEST_ATTR } from "../api/blocks";
 import { ensurePersonRequestDocument, PersonCreationUnknownError } from "./person-document";
 import { ATTRIBUTE_VIEW_BATCH_SIZE, bindDocsAsRows, mapBoundDocIds } from "../api/av";
 import { getRoster, invalidateRoster } from "./roster";
+import { profileText } from "../domain/people-profiles";
 import { assertContactWriteReady, previewContactCreation } from "./contacts";
 import { withStoreLock } from "../data/storage";
 import { draftImportMappings, importAnchor } from "../domain/import.ts";
@@ -362,15 +363,24 @@ export async function exportVcfText(
     } else {
         exportPeople = await getRoster(settings);
     }
-    const contacts: VCardContact[] = exportPeople.map((person) => ({
-        name: person.name,
-        phone: person.phone,
-        email: person.email,
-        website: person.website,
-        birthday: person.birthday,
-        isLunar: person.isLunar,
-        tags: person.tags,
-    }));
+    const contacts: VCardContact[] = exportPeople.map((person) => {
+        const contact: VCardContact = {
+            name: person.name,
+            phone: person.phone,
+            email: person.email,
+            website: person.website,
+            birthday: person.birthday,
+            isLunar: person.isLunar,
+            tags: person.tags,
+        };
+        if (person.profile) {
+            const work = profileText(person.profile, "work");
+            if (work && work !== "未填写" && work !== "尚未核实" && work !== "组织归属尚未核实") {
+                contact.org = work;
+            }
+        }
+        return contact;
+    });
     return serializeVcf(contacts);
 }
 

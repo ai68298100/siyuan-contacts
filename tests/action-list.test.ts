@@ -110,3 +110,38 @@ test("groupActionCards：neverOrder 提供时「从未互动」组按最近收�
     const plain = groupActionCards(cards);
     assert.deepEqual(plain.find((group) => group.key === "never")!.cards.map((card) => card.person.name), ["晚收编", "早收编"]);
 });
+
+test("AG-E36 行动清单：纪念日纳入今天/本周行动卡，并标注周年数", () => {
+    const cards = buildActionCards([
+        input({
+            name: "纪念日甲",
+            anniversaries: [
+                { id: "a1", title: "结婚十周年", daysUntil: 0, date: TODAY, yearsCount: 10 },
+            ],
+        }),
+        input({
+            name: "纪念日乙",
+            anniversaries: [
+                { id: "a2", title: "相识纪念", daysUntil: 4, date: "2026-10-02" },
+            ],
+        }),
+        input({
+            name: "纪念日远丙",
+            anniversaries: [
+                { id: "a3", title: "太远的周年", daysUntil: 15, date: "2026-10-13" },
+            ],
+        }),
+    ], TODAY);
+
+    // 只有 7 天内的甲和乙生成行动卡，15 天外的丙不产生行动卡
+    assert.equal(cards.length, 2);
+    assert.equal(cards[0].person.name, "纪念日甲");
+    assert.equal(cards[0].bucket, "today");
+    assert.equal(cards[0].reasons[0].kind, "anniversary");
+    assert.equal(cards[0].reasons[0].label, "今天纪念日「结婚十周年」");
+
+    assert.equal(cards[1].person.name, "纪念日乙");
+    assert.equal(cards[1].bucket, "week");
+    assert.equal(cards[1].reasons[0].kind, "anniversary");
+    assert.equal(cards[1].reasons[0].label, "4 天后「相识纪念」");
+});

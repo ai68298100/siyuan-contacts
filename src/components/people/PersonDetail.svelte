@@ -994,6 +994,26 @@ import StatusNotice from "../StatusNotice.svelte";
             limit: briefingLimit,
             generatedAt: briefingGeneratedAt,
             topics: topics.map((item) => item.text),
+            anniversaries: anniversaries.map((a) => {
+                const proj = nextAnniversary(a);
+                return {
+                    title: a.title,
+                    category: a.category,
+                    date: a.date,
+                    isLunar: a.isLunar,
+                    daysUntil: proj?.daysUntil,
+                    yearsCount: proj?.yearsCount,
+                    displayDate: proj?.displayDate,
+                };
+            }),
+            commonOrgs: commonOrgs.map((org) => ({
+                orgName: org.orgName,
+                peers: org.peers.map((p) => ({
+                    name: p.name,
+                    samePeriod: p.samePeriod,
+                    overlapText: p.overlapText,
+                })),
+            })),
         });
     });
     function downloadBriefing() {

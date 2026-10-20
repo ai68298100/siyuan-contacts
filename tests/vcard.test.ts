@@ -433,3 +433,33 @@ test("AG-E35-VCARD-EXPORT-SCOPE: serializeVcf 支持多联系人范围子集导�
     assert.equal(vcf.split("BEGIN:VCARD").length - 1, 2);
     assert.ok(vcf.endsWith("END:VCARD\r\n"));
 });
+
+test("AG-E20-METHODS-EXPORT: serializeVcf 支持多电话/邮箱/网址及 ORG/TITLE/NOTE 保真序列化", () => {
+    const person: VCardContact = base({
+        name: "李四",
+        phone: "13800000001 / 010-88888888",
+        extraPhones: [
+            { value: "13800000001", type: "CELL" },
+            { value: "010-88888888", type: "WORK" },
+            { value: "010-66666666", type: "FAX" },
+        ],
+        extraEmails: [
+            { value: "lisi@work.com", type: "WORK" },
+            { value: "lisi@home.com", type: "HOME" },
+        ],
+        org: "思源科技",
+        title: "首席架构师",
+        note: "项目核心负责人",
+    });
+
+    const vcf = serializeVcf([person]);
+    assert.match(vcf, /FN:李四/);
+    assert.match(vcf, /ORG:思源科技/);
+    assert.match(vcf, /TITLE:首席架构师/);
+    assert.match(vcf, /NOTE:项目核心负责人/);
+    assert.match(vcf, /TEL;TYPE=CELL:13800000001/);
+    assert.match(vcf, /TEL;TYPE=WORK:010-88888888/);
+    assert.match(vcf, /TEL;TYPE=FAX:010-66666666/);
+    assert.match(vcf, /EMAIL;TYPE=WORK:lisi@work\.com/);
+    assert.match(vcf, /EMAIL;TYPE=HOME:lisi@home\.com/);
+});

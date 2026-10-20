@@ -19,22 +19,39 @@ export interface VCardMethodPreview {
     disabled: boolean;
 }
 
+export interface VCardMethodExportEntry {
+    value: string;
+    type?: string;
+}
+
 export interface VCardContact {
     name: string;
     /** 多号码以 " / " 连接（电话是单值文本字段，保留数据优先） */
     phone: string;
     /** 解析阶段保留全部 TEL，供导入预览显示；不属于联系人持久化字段。 */
     phoneValues?: string[];
+    /** 导出时可选的多电话详细列表（带 TYPE=WORK/HOME/CELL 标签） */
+    extraPhones?: readonly VCardMethodExportEntry[];
     /** 取首个（邮箱字段有格式校验，不做多值拼接） */
     email: string;
     /** 解析阶段保留全部 EMAIL，供导入预览显示；当前只写入首项。 */
     emailValues?: string[];
+    /** 导出时可选的多邮箱列表（带 TYPE=WORK/HOME 标签） */
+    extraEmails?: readonly VCardMethodExportEntry[];
     /** 取首个 */
     website: string;
     /** 解析阶段保留全部 URL，供导入预览显示；当前只写入首项。 */
     websiteValues?: string[];
+    /** 导出时可选的多网址列表 */
+    extraWebsites?: readonly VCardMethodExportEntry[];
     /** 原卡含重复 TEL/EMAIL/URL 时保留全部候选；只在解析内存中使用。 */
     methodPreview?: VCardMethodPreview[];
+    /** 组织/公司名称 */
+    org?: string;
+    /** 职位/头衔 */
+    title?: string;
+    /** 备注说明 */
+    note?: string;
     /** YYYY-MM-DD；无法表示的（无年份、文本形式）为空串 */
     birthday: string;
     /** 仅当读入 X-LVCT-BDAY-LUNAR（本插件导出的农历回写）时为 true；外部 vCard 一律公历 */
@@ -440,18 +457,62 @@ export function serializeVcf(people: readonly VCardContact[]): string {
         const name = person.name.trim();
         if (!name) continue;
         lines.push("BEGIN:VCARD", "VERSION:3.0", `N:;${escapeVcf(name)};;;`, `FN:${escapeVcf(name)}`);
-        const phone = person.phone.trim();
-        if (phone) lines.push(`TEL;TYPE=CELL:${escapeVcf(phone)}`);
-        const email = person.email.trim();
-        if (email) lines.push(`EMAIL;TYPE=INTERNET:${escapeVcf(email)}`);
-        const website = person.website.trim();
-        if (website) lines.push(`URL:${escapeVcf(website)}`);
+
+        // 组织与职位
+        if (person.org?.trim()) {
+            lines.push(`ORG:${escapeVcf(person.org.trim())}`);
+        }
+        if (person.title?.trim()) {
+            lines.push(`TITLE:${escapeVcf(person.title.trim())}`);
+        }
+
+        // 电话多值与 TYPE 标签保真导出
+        if (person.extraPhones && person.extraPhones.length > 0) {
+            for (const ep of person.extraPhones) {
+                const val = ep.value.trim();
+                if (!val) continue;
+                const typeTag = ep.type?.trim().toUpperCase() || "CELL";
+                lines.push(`TEL;TYPE=${escapeVcf(typeTag)}:${escapeVcf(val)}`);
+            }
+        } else {
+            const phone = person.phone.trim();
+            if (phone) lines.push(`TEL;TYPE=CELL:${escapeVcf(phone)}`);
+        }
+
+        // 邮箱多值与 TYPE 标签保真导出
+        if (person.extraEmails && person.extraEmails.length > 0) {
+            for (const ee of person.extraEmails) {
+                const val = ee.value.trim();
+                if (!val) continue;
+                const typeTag = ee.type?.trim().toUpperCase() || "INTERNET";
+                lines.push(`EMAIL;TYPE=${escapeVcf(typeTag)}:${escapeVcf(val)}`);
+            }
+        } else {
+            const email = person.email.trim();
+            if (email) lines.push(`EMAIL;TYPE=INTERNET:${escapeVcf(email)}`);
+        }
+
+        // 网址多值保真导出
+        if (person.extraWebsites && person.extraWebsites.length > 0) {
+            for (const ew of person.extraWebsites) {
+                const val = ew.value.trim();
+                if (!val) continue;
+                lines.push(`URL:${escapeVcf(val)}`);
+            }
+        } else {
+            const website = person.website.trim();
+            if (website) lines.push(`URL:${escapeVcf(website)}`);
+        }
+
         if (person.birthday) {
             if (person.isLunar) lines.push(`X-LVCT-BDAY-LUNAR:${person.birthday}`);
             else lines.push(`BDAY:${person.birthday}`);
         }
         if (person.tags.length > 0) {
             lines.push(`CATEGORIES:${person.tags.map((tag) => escapeVcf(tag)).join(",")}`);
+        }
+        if (person.note?.trim()) {
+            lines.push(`NOTE:${escapeVcf(person.note.trim())}`);
         }
         lines.push("END:VCARD");
     }
