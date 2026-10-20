@@ -1747,7 +1747,7 @@ import StatusNotice from "../StatusNotice.svelte";
                                         type="button"
                                         class="b3-button b3-button--text"
                                         onclick={() => void handleToggleGiftStatus(idea)}
-                                        title={text("giftsStatusAria", "点击切换送礼状态")}
+                                        title={idea.status === "given" ? text("giftsStatusGivenHint", "已送出并同步至互动时间线，点击可流转") : text("giftsStatusAria", "点击切换送礼状态")}
                                     >
                                         {idea.status === "idea" ? text("giftsStatusIdea", "构思中")
                                         : idea.status === "purchased" ? text("giftsStatusPurchased", "已采购待送")

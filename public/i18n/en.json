@@ -1028,6 +1028,7 @@
   "giftsStatusIdea": "Planning",
   "giftsStatusPurchased": "Purchased",
   "giftsStatusGiven": "Given ✓",
+  "giftsStatusGivenHint": "Given and synced to interaction timeline; click to toggle",
   "giftsConvertToExchange": "To Ledger",
   "giftsRemoveAria": "Delete",
   "occErrNoTitle": "Please enter an occasion title",

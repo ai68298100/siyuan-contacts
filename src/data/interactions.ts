@@ -3,10 +3,10 @@
  * 键：interaction-events.json（契约见 docs/DATA-CONTRACT.md §3）。
  */
 import type { Plugin } from "siyuan";
-import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage";
-import { appendEvent, emptyStore, normalizeInteractionStore, normalizeInteractionStoreForWrite, removeEvent, toLocalDateKey } from "../domain/interactions";
-import type { InteractionEvent, InteractionStore } from "../domain/interactions";
-import { newNodeId } from "../api/client";
+import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage.ts";
+import { appendEvent, emptyStore, normalizeInteractionStore, normalizeInteractionStoreForWrite, removeEvent, toLocalDateKey } from "../domain/interactions.ts";
+import type { InteractionEvent, InteractionStore } from "../domain/interactions.ts";
+import { newNodeId } from "../domain/format.ts";
 
 function assertPersonDocId(value: unknown): asserts value is string {
     if (typeof value !== "string" || !/^\d{14}-[0-9a-z]{7}$/.test(value)) throw new Error("人物文档 ID 无效，未记录互动");
@@ -104,6 +104,27 @@ export async function appendInteractionBatch(
             await saveJsonVerified(plugin, INTERACTION_STORAGE_KEY, current);
         }
         return { added, total: current.events.length };
+    });
+}
+
+/** 按 externalRef 移除互动事件（例如赠礼撤回或删除时清理），在单个存储锁内完成并写后回读 */
+export async function removeInteractionsByExternalRef(
+    plugin: Plugin,
+    personDocId: string,
+    externalRef: string,
+): Promise<InteractionStore> {
+    return withStoreLock(INTERACTION_STORAGE_KEY, async () => {
+        const store = normalizeInteractionStoreForWrite(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY));
+        const matching = store.events.filter(
+            (event) => event.personDocId === personDocId && event.externalRef === externalRef,
+        );
+        if (matching.length === 0) return store;
+        let current = store;
+        for (const item of matching) {
+            current = removeEvent(current, item.id);
+        }
+        await saveJsonVerified(plugin, INTERACTION_STORAGE_KEY, current);
+        return current;
     });
 }
 

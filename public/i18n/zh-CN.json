@@ -1028,6 +1028,7 @@
   "giftsStatusIdea": "构思中",
   "giftsStatusPurchased": "已采购待送",
   "giftsStatusGiven": "已送出 ✓",
+  "giftsStatusGivenHint": "已送出并同步至互动时间线，点击可流转",
   "giftsConvertToExchange": "转入账本",
   "giftsRemoveAria": "删除",
   "occErrNoTitle": "请输入活动标题",

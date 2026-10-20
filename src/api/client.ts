@@ -6,7 +6,7 @@
  */
 import { fetchPost } from "siyuan";
 import { AsyncAbortError, AsyncTimeoutError, withTimeout } from "../shared/async";
-import { validateDocumentTitle } from "../domain/format";
+import { newNodeId, validateDocumentTitle } from "../domain/format.ts";
 import {
     assertKernelArray,
     assertKernelRecord,
@@ -231,20 +231,7 @@ export {
     decodeStringMap,
 };
 
-/**
- * 生成合法节点 ID（yyyyMMddHHmmss-xxxxxxx，同 Lute.NewNodeID 格式）。
- * 仅作标识符使用，无加密语义，随机性要求与内核同源。
- */
-export function newNodeId(now: Date = new Date()): string {
-    const pad = (value: number, width: number) => String(value).padStart(width, "0");
-    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1, 2)}${pad(now.getDate(), 2)}${pad(now.getHours(), 2)}${pad(now.getMinutes(), 2)}${pad(now.getSeconds(), 2)}`;
-    const charset = "0123456789abcdefghijklmnopqrstuvwxyz";
-    let rand = "";
-    for (let i = 0; i < 7; i += 1) {
-        rand += charset[Math.floor(Math.random() * charset.length)];
-    }
-    return `${stamp}-${rand}`;
-}
+export { newNodeId };
 
 /* ---------- notebook / filetree ---------- */
 

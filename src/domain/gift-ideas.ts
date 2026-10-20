@@ -7,6 +7,8 @@
 
 import { StoreIntegrityError } from "./store-integrity.ts";
 import type { ExchangeRecord } from "./exchanges.ts";
+import type { InteractionEvent } from "./interactions.ts";
+import { toLocalDateKey } from "./interactions.ts";
 
 export const GIFT_IDEA_STORE_VERSION = 1;
 export const MAX_GIFT_IDEAS_PER_PERSON = 30;
@@ -224,6 +226,37 @@ export function convertGiftIdeaToExchange(idea: GiftIdeaItem, occurredOn: string
         note: idea.note ?? "",
         createdAt: nowTime,
         updatedAt: nowTime,
+    };
+}
+
+/**
+ * 将已送出的礼物点子投影为对应联系人的互动时间线事件（InteractionEvent）：
+ * 互动事件中记录赠送标题、预估/实际金额与场合备注，
+ * externalRef 绑定 gift.id，保证幂等与撤销时精准溯源。
+ */
+export function deriveGiftInteractionEvent(
+    idea: GiftIdeaItem,
+    occurredAt: number = Date.now(),
+): InteractionEvent {
+    const occasionPrefix = idea.targetOccasion?.trim()
+        ? `[赠礼 · ${idea.targetOccasion.trim()}]`
+        : `[赠礼]`;
+    let note = `${occasionPrefix} ${idea.title.trim()}`;
+    if (idea.priceEstimate !== undefined && idea.priceEstimate > 0) {
+        note += `（金额: ¥${idea.priceEstimate}）`;
+    }
+    if (idea.note?.trim()) {
+        note += ` · ${idea.note.trim()}`;
+    }
+
+    return {
+        id: `gift-${idea.id}-${occurredAt}`,
+        personDocId: idea.personDocId,
+        occurredAt,
+        localDate: toLocalDateKey(new Date(occurredAt)),
+        source: "manual",
+        externalRef: idea.id,
+        note,
     };
 }
 

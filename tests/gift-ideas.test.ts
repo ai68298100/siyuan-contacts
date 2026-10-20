@@ -3,6 +3,7 @@ import test from "node:test";
 import {
     addGiftIdeaToStore,
     convertGiftIdeaToExchange,
+    deriveGiftInteractionEvent,
     emptyGiftIdeaStore,
     filterPendingGiftIdeas,
     filterPreferences,
@@ -180,4 +181,68 @@ test("E-26 gift 数据层：addPersonGiftIdea、loadPersonGiftIdeas、update 与
     // 损坏数据严格拒绝
     memory.set(GIFT_IDEAS_STORAGE_KEY, { schemaVersion: 999, ideas: {} });
     await assert.rejects(() => loadGiftIdeaStoreStrict(plugin), StoreIntegrityError);
+});
+
+test("E-27 gift-interaction: deriveGiftInteractionEvent 派生时间线互动事件", () => {
+    const item = mockIdea({
+        id: "20261020000000-gift001",
+        title: "降噪耳机",
+        priceEstimate: 1299,
+        targetOccasion: "生日",
+        note: "白色降噪款",
+    });
+    const now = 1729425600000; // 2024-10-20
+    const event = deriveGiftInteractionEvent(item, now);
+
+    assert.equal(event.id, `gift-20261020000000-gift001-${now}`);
+    assert.equal(event.personDocId, personDocId);
+    assert.equal(event.occurredAt, now);
+    assert.equal(event.externalRef, "20261020000000-gift001");
+    assert.equal(event.source, "manual");
+    assert.match(event.note ?? "", /\[赠礼 · 生日\] 降噪耳机/);
+    assert.match(event.note ?? "", /金额: ¥1299/);
+    assert.match(event.note ?? "", /白色降噪款/);
+});
+
+test("E-27 gift-interaction 服务与数据层：送出礼物自动同步互动时间线，撤回与删除自动联动清理", async () => {
+    const memory = new Map<string, unknown>();
+    const plugin = {
+        async loadData(key: string) {
+            return memory.has(key) ? structuredClone(memory.get(key)) : null;
+        },
+        async saveData(key: string, value: unknown) {
+            memory.set(key, structuredClone(value));
+        },
+    } as unknown as Plugin;
+
+    // 初始创建点子
+    const gift = mockIdea({ id: "20261020000000-g001", title: "机械键盘", priceEstimate: 599, status: "purchased" });
+    await addPersonGiftIdea(plugin, gift);
+
+    // 尚未送出时，不增加互动事件
+    const emptyInteractions = memory.get("interaction-events.json") as { events: unknown[] } | undefined;
+    assert.equal(emptyInteractions, undefined);
+
+    // 状态变更为 given：触发自动同步写入互动事件
+    await updatePersonGiftIdea(plugin, personDocId, gift.id, { status: "given" });
+    const storeAfterGiven = memory.get("interaction-events.json") as { events: Array<{ id: string; note?: string }> } | undefined;
+    assert.ok(storeAfterGiven);
+    assert.equal(storeAfterGiven.events.length, 1);
+    assert.match(storeAfterGiven.events[0].id, new RegExp(`^gift-${gift.id}`));
+    assert.equal(storeAfterGiven.events[0].externalRef, gift.id);
+    assert.match(storeAfterGiven.events[0].note ?? "", /机械键盘/);
+
+    // 状态回退为 purchased：自动从互动事件中清理
+    await updatePersonGiftIdea(plugin, personDocId, gift.id, { status: "purchased" });
+    const storeAfterRevert = memory.get("interaction-events.json") as { events: Array<{ id: string }> };
+    assert.equal(storeAfterRevert.events.length, 0);
+
+    // 重新送出，然后再彻底删除该点子：互动事件随之安全清理
+    await updatePersonGiftIdea(plugin, personDocId, gift.id, { status: "given" });
+    const storeAfterRegiven = memory.get("interaction-events.json") as { events: Array<{ id: string }> };
+    assert.equal(storeAfterRegiven.events.length, 1);
+
+    await removePersonGiftIdea(plugin, personDocId, gift.id);
+    const storeAfterDelete = memory.get("interaction-events.json") as { events: Array<{ id: string }> };
+    assert.equal(storeAfterDelete.events.length, 0);
 });
