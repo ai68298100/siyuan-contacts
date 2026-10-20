@@ -296,7 +296,7 @@
 - E-12：checkin 桥协议只读生日投影/能力协商 spike；没有对端能力和隐私契约前不承诺同步。
 - E-13（✅ 已完成，2026-10-20，AG-E35）：统一联系人页与 `VCardDialog` 导出范围，支持「全量 / 当前筛选结果 / 已选联系人」三级单选与前 3 位姓名/卡片数预览核算，文件名动态增加范围标识，杜绝隐私全库误导出。证据提交 `a3f6731`。
 - E-14（展示偏好候选，参考 Monica）：人物/组织详情各区块允许折叠、排序和隐藏空区，优先考虑超长详情的组织、互动、跟进和关系区；配置仅影响展示，按桌面/移动合理继承，重新打开保持，数据不因隐藏而丢失。
-- E-15（低成本交互候选，参考 Dex）：电话、邮箱、微信和网址增加清晰的复制/打开动作与首选渠道标识；已有 `tel:`/`mailto:` 保持，复制结果、权限失败和移动误触有反馈，空字段不出现无效按钮。首选渠道若需持久化，先定事实源与导出语义。
+- E-15（✅ 已完成，2026-10-20，AG-E15）：电话、邮箱、微信和网址增加清晰的复制/打开动作与轻量反馈；`tel:`、`mailto:` 及外部链接直接唤起对应应用，一键复制提供「已复制 ✓」1.8s 视觉反馈，权限失败优雅提示，空字段不渲染多余按钮。证据提交 `5b26c24`。
 - E-16（先定契约，参考 Google Contacts 可恢复整理）：联系人“归档/恢复”独立于“从数据库解绑”，可从活跃列表和提醒中隐藏但保留人物文档、互动、组织历史、双链和稳定 ID；归档影响零写入预览，恢复后同一对象回读。不照搬外部产品的自动清理期限；先定义事实源、关系/统计投影及备份迁移。
 - E-17（✅ 已完成，2026-10-20，AG-E17）：互动的“见面/电话/消息/聚餐/邮件/其他”语义类型（`InteractionType`）与技术来源（`manual|diary|api`）解耦；时间线顶部增加类型过滤药丸（全部/见面/电话/消息/聚餐/邮件），快速记录支持类型快捷单选，旧记录依据前缀/关键词优雅推导，写前严格校验合法类型。证据提交 `91871af`。
 - E-18（先定契约，参考 Google Contacts）：插件内字段级资料变更历史与定点撤销，记录字段、旧/新值、时间、入口和可达性；外部 AV 编辑只能标“来源未知”，不伪造操作人。撤销前版本核对，只恢复目标字段，不能覆盖另一窗口更新；需先定隐私保留期和跨模块写入包装。
@@ -317,9 +317,9 @@
 - E-33（✅ 已完成，2026-10-19，AG-E33）：联系人软删除回收站与误删时光机（Trash & Soft Delete Buffer）。从名册解绑或删除联系人时进入 30 天插件软回收站缓冲区（`trash-bin.json`），期间保留完整元数据快照，支持一键无损重绑恢复与清空，绝不物理删除思源文档。
 - E-34（✅ 已完成，2026-10-19/20，AG-E34）：基于同场互动事件的共同出席弱联系智能推导（Inferred Co-occurrence Connections）。纯函数提取同场联系人对，在 RelationGraph 中以虚线弱联系图层呈现并显示共同出席频次，提供一键升级为正式双向 `related` 关系操作。证据提交 `1d2d781`。
 - E-35（✅ 已完成，2026-10-20，AG-E35）：vCard 导出范围细化（全量 / 当前筛选结果 / 已选联系人）与卡片数量/姓名摘要预览，支持 RFC 6350 保真导出。证据提交 `a3f6731`。
-- E-36（候选，参考 Monica/Google Contacts）：重要日期与周年纪念日（Anniversaries & Milestones）。除生日外，支持登记结婚纪念、相识周年、入职周年等重要事件，支持公历与农历循环提醒，并整合进首页行动清单与会前简报。
-- E-37（候选，参考 Dex/Obsidian Bases）：人物多项目/协作主题双向关联（Project & Initiative Collaborators）。在人物档案中关联其参与的思源项目或主题文档（稳定 docId），支持从项目页反查参与人、从人物页跳转项目，不改动思源原生反链。
-- E-38（候选，参考 Folk/Streak）：会前简报 Markdown 自定义模块配置。支持在设置中自定义导出简报的章节排序与包含模块（如：基础资料、会面谈资、共同组织、未完成待办、近期交往历史）。
+- E-36（✅ 已完成，2026-10-20，AG-E36）：重要日期与周年纪念日（Anniversaries & Milestones）。除生日外，支持登记结婚纪念、相识周年、入职周年等重要事件，支持公历与农历循环提醒，并整合进首页行动清单与会前简报。证据提交 `c398d1c`。
+- E-37（✅ 已完成，2026-10-20，AG-E37）：人物多项目/协作主题双向关联（Project & Initiative Collaborators）。在人物档案中关联其参与的思源项目或主题文档（稳定 docId），支持从项目页反查参与人、从人物页跳转项目，不改动思源原生反链。证据提交 `19c1eaa`。
+- E-38（✅ 已完成，2026-10-20，AG-E38）：会前简报 Markdown 自定义模块配置。支持在设置中自定义导出简报的章节排序与包含模块（如：基础资料、会面谈资、共同组织、未完成待办、近期交往历史）。证据提交 `e147f25`。
 
 本轮外部参照仅用于提炼交互和数据需求，不复用其它插件代码，也不代表已有集成：[Monica 功能清单](https://github.com/monicahq/monica)、[Google Contacts 导出](https://support.google.com/contacts/answer/7199294?hl=en)、[Google Contacts 合并](https://support.google.com/contacts/answer/7078226?hl=en)、[Google Contacts 恢复](https://support.google.com/contacts/answer/7280886?hl=en)、[Dex 产品说明](https://www.getdex.com/product-overview)、[Clay 产品说明](https://clay.earth)、[Obsidian Bases](https://help.obsidian.md/bases)、[思源 Database Properties Panel](https://github.com/Macavity/siyuan-database-properties-panel)、[Another Graph](https://github.com/CherryGS/sy-another-graph)、[Sidebar Hub](https://github.com/gowithmoon/siyuan-plugin-sidebar-hub)、[Table Master](https://github.com/famotime/siyuan-table-master)、[SiYuan Tasks](https://github.com/Macavity/siyuan-tasks)、[小驴雷切](https://github.com/ai68298100/siyuan-speed-switch)、[小驴打卡](https://github.com/ai68298100/siyuan-checkin)。
 
