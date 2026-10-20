@@ -4,6 +4,8 @@ import {
     appendEvent,
     buildCoAttendance,
     buildTimeline,
+    filterTimelineByType,
+    inferInteractionType,
     isDuplicateEvent,
     lastInteractionByPerson,
     normalizeInteractionStore,
@@ -11,6 +13,7 @@ import {
     removeEvent,
     staleContacts,
     toLocalDateKey,
+    INTERACTION_TYPES,
 } from "../src/domain/interactions.ts";
 import type { InteractionEvent, InteractionStore } from "../src/domain/interactions.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
@@ -224,4 +227,48 @@ test("M-10：buildTimeline 同日事件按 occurredAt 倒序与 eventId tie-brea
         ["e-newer-b", "e-newer-a", "e-older", "e-yesterday"],
         "先按日期倒序，同日按 occurredAt 倒序，再次按 eventId 倒序",
     );
+});
+
+test("AG-E17-INTERACTION-TYPE: 语义分类推导、时间线过滤与非法类型写入校验", () => {
+    // 1. 显式指定的 type 优先
+    assert.equal(inferInteractionType({ source: "manual", note: "[聚餐] 吃了火锅", type: "meeting" }), "meeting");
+
+    // 2. 备注前缀推导
+    assert.equal(inferInteractionType({ source: "manual", note: "[会议] 季度战略复盘" }), "meeting");
+    assert.equal(inferInteractionType({ source: "manual", note: "[电话] 讨论合作细节" }), "call");
+    assert.equal(inferInteractionType({ source: "manual", note: "[微信] 约了周末聚聚" }), "message");
+    assert.equal(inferInteractionType({ source: "manual", note: "[聚餐] 团队聚餐" }), "meal");
+    assert.equal(inferInteractionType({ source: "manual", note: "[邮件] 发送了合同" }), "email");
+    assert.equal(inferInteractionType({ source: "manual", note: "日常聊天" }), "other");
+
+    // 3. 时间线项自动推导并支持按类型过滤
+    const events: InteractionEvent[] = [
+        event({ id: "e1", note: "[会议] 复盘", localDate: "2026-10-01" }),
+        event({ id: "e2", note: "[电话] 通话", localDate: "2026-10-02" }),
+        event({ id: "e3", note: "[聚餐] 吃饭", localDate: "2026-10-03" }),
+    ];
+    const timeline = buildTimeline(events, "d1");
+    assert.equal(timeline.find((t) => t.eventId === "e1")?.type, "meeting");
+    assert.equal(timeline.find((t) => t.eventId === "e2")?.type, "call");
+    assert.equal(timeline.find((t) => t.eventId === "e3")?.type, "meal");
+
+    assert.equal(filterTimelineByType(timeline, "all").length, 3);
+    assert.equal(filterTimelineByType(timeline, "call").length, 1);
+    assert.equal(filterTimelineByType(timeline, "call")[0].eventId, "e2");
+    assert.equal(filterTimelineByType(timeline, "email").length, 0);
+
+    // 4. 写前校验支持合法 type，拒绝非法未知类型
+    const validStore = {
+        schemaVersion: 1,
+        events: [event({ id: "e-ok", type: "meeting" })],
+        tombstones: [],
+    };
+    assert.doesNotThrow(() => normalizeInteractionStoreForWrite(validStore));
+
+    const invalidStore = {
+        schemaVersion: 1,
+        events: [event({ id: "e-bad", type: "invalid_type" as unknown as InteractionEvent["type"] })],
+        tombstones: [],
+    };
+    assert.throws(() => normalizeInteractionStoreForWrite(invalidStore), /互动存储内容损坏/);
 });

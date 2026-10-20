@@ -892,8 +892,8 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         return loadDashboard(this, this.settings, { ...DEFAULT_DASHBOARD_OPTIONS, ...options });
     }
 
-    async recordInteraction(personDocId: string, note?: string): Promise<void> {
-        await recordInteraction(this, { personDocId, note });
+    async recordInteraction(personDocId: string, note?: string, type?: import("./domain/interactions").InteractionType): Promise<void> {
+        await recordInteraction(this, { personDocId, note, type });
     }
 
     async deleteInteraction(personDocId: string, eventId: string): Promise<void> {

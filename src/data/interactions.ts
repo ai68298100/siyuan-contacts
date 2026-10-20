@@ -29,6 +29,7 @@ export async function loadInteractionStoreStrict(plugin: Plugin): Promise<Intera
 export interface RecordInteractionInput {
     personDocId: string;
     note?: string;
+    type?: InteractionEvent["type"];
     source?: InteractionEvent["source"];
     externalRef?: string;
     occurredAt?: number;
@@ -57,6 +58,7 @@ export async function recordInteractionWithResult(
             occurredAt,
             localDate: toLocalDateKey(new Date(occurredAt)),
             source: input.source ?? "manual",
+            ...(input.type !== undefined ? { type: input.type } : {}),
             ...(input.externalRef !== undefined ? { externalRef: input.externalRef } : {}),
             ...(input.note !== undefined && input.note.length > 0 ? { note: input.note } : {}),
         };

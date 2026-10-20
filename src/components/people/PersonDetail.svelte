@@ -35,7 +35,7 @@ import StatusNotice from "../StatusNotice.svelte";
     import type { LegacyPersonNoteSnapshot } from "../../domain/person-note";
     import { buildBriefingMarkdown, buildBriefingFilename } from "../../domain/briefing-export";
     import { addReviewDays, groupByMonth, inDateRange, onThisDay } from "../../domain/date-review";
-    import { toLocalDateKey } from "../../domain/interactions";
+    import { toLocalDateKey, INTERACTION_TYPES, INTERACTION_TYPE_LABELS, type InteractionType } from "../../domain/interactions";
     import OrgMembershipResult from "../org/OrgMembershipResult.svelte";
     import type { OrgMembershipWriteReport } from "../../services/org-member-writes";
     import { orgMembershipStatusLabel } from "../../domain/org-membership";
@@ -110,7 +110,7 @@ import StatusNotice from "../StatusNotice.svelte";
         availableGroups?: readonly string[];
         revision?: number;
         /** 记一笔互动（facade.recordInteraction） */
-        onRecord: (personDocId: string, note?: string) => Promise<void>;
+        onRecord: (personDocId: string, note?: string, type?: import("../../domain/interactions").InteractionType) => Promise<void>;
         onDeleteInteraction?: (personDocId: string, eventId: string) => Promise<void>;
         /** 人物洞察（时间线+共同出席） */
         onLoadInsights: (docId: string) => Promise<import("../../services/insights").PersonInsights>;
@@ -244,7 +244,7 @@ import StatusNotice from "../StatusNotice.svelte";
     // B06：互动备注草稿给出明细与「保存并离开」（保存=记录这条互动）
     async function persistNote(): Promise<void> {
         if (!current) throw new Error("当前没有人物");
-        await onRecord(current.docId, noteText.trim() || undefined);
+        await onRecord(current.docId, noteText.trim() || undefined, recordType);
         recorded = true;
         if (pendingConvertedTopicId && onRemoveTopic) {
             const topicIdToRemove = pendingConvertedTopicId;
@@ -461,6 +461,8 @@ import StatusNotice from "../StatusNotice.svelte";
     }
     let activitySearch = $state("");
     let activitySource = $state("");
+    let activityType = $state<InteractionType | "all">("all");
+    let recordType = $state<InteractionType>("meeting");
     let activityLimit = $state(20);
     // 日期回顾（F10）
     let activityFrom = $state("");
@@ -471,7 +473,8 @@ import StatusNotice from "../StatusNotice.svelte";
         return (insights?.timeline ?? [])
             .filter((item) => inDateRange(item.localDate, activityFrom, activityTo))
             .filter((item) => (!activitySource || item.source === activitySource) &&
-                (!query || `${item.localDate} ${item.note ?? ""}`.toLowerCase().includes(query)));
+                (!query || `${item.localDate} ${item.note ?? ""}`.toLowerCase().includes(query)) &&
+                (activityType === "all" || item.type === activityType));
     });
     const pagedTimeline = $derived(filteredTimeline.slice(0, activityLimit));
     const monthGroups = $derived(groupByMonth(pagedTimeline));
@@ -490,6 +493,7 @@ import StatusNotice from "../StatusNotice.svelte";
     function clearDateRange() {
         activityFrom = "";
         activityTo = "";
+        activityType = "all";
         activityLimit = 20;
     }
 
@@ -1877,6 +1881,20 @@ import StatusNotice from "../StatusNotice.svelte";
                 <button class="b3-button b3-button--outline" onclick={() => (templateManagerOpen = true)} disabled={busy}>{text("tplManage", "管理模板")}</button>
             </div>
         {/if}
+        <div class="lvct-detail__record-types" role="radiogroup" aria-label="互动类型" style="display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px 0;">
+            {#each INTERACTION_TYPES as itype}
+                <button
+                    type="button"
+                    class="b3-button b3-button--text"
+                    style="padding: 2px 8px; font-size: 11px; border-radius: 12px; {recordType === itype ? 'background: var(--b3-theme-primary); color: #fff; font-weight: 600;' : 'opacity: 0.8;'}"
+                    aria-checked={recordType === itype}
+                    role="radio"
+                    onclick={() => { recordType = itype; }}
+                >
+                    {INTERACTION_TYPE_LABELS[itype].icon} {INTERACTION_TYPE_LABELS[itype].label}
+                </button>
+            {/each}
+        </div>
         <div class="lvct-detail__record fn__flex">
             <input
                 class="b3-text-field fn__flex-1"
@@ -2242,9 +2260,31 @@ import StatusNotice from "../StatusNotice.svelte";
             <input type="date" class="b3-text-field" aria-label="互动结束日期" bind:value={activityTo} onchange={() => (activityLimit = 20)} />
             <button type="button" class="b3-button b3-button--outline" onclick={() => setQuickRange(30)}>最近 30 天</button>
             <button type="button" class="b3-button b3-button--outline" onclick={() => setQuickRange(90)}>最近 90 天</button>
-            {#if activityFrom || activityTo}
-                <button type="button" class="b3-button b3-button--text" onclick={clearDateRange}>清除日期</button>
+            {#if activityFrom || activityTo || activityType !== "all"}
+                <button type="button" class="b3-button b3-button--text" onclick={clearDateRange}>清除筛选</button>
             {/if}
+        </div>
+        <div class="lvct-detail__type-filters" role="tablist" aria-label="按互动类型筛选" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
+            <button
+                type="button"
+                role="tab"
+                class="b3-button b3-button--text"
+                style="padding: 2px 8px; font-size: 11px; border-radius: 12px; {activityType === 'all' ? 'background: var(--b3-theme-primary); color: #fff; font-weight: 600;' : 'opacity: 0.8;'}"
+                aria-selected={activityType === "all"}
+                onclick={() => { activityType = "all"; activityLimit = 20; }}
+            >全部</button>
+            {#each INTERACTION_TYPES as itype}
+                <button
+                    type="button"
+                    role="tab"
+                    class="b3-button b3-button--text"
+                    style="padding: 2px 8px; font-size: 11px; border-radius: 12px; {activityType === itype ? 'background: var(--b3-theme-primary); color: #fff; font-weight: 600;' : 'opacity: 0.8;'}"
+                    aria-selected={activityType === itype}
+                    onclick={() => { activityType = itype; activityLimit = 20; }}
+                >
+                    {INTERACTION_TYPE_LABELS[itype].icon} {INTERACTION_TYPE_LABELS[itype].label}
+                </button>
+            {/each}
         </div>
         {#if insights && insights.coAttendance.length > 0}
             <div class="lvct-strip__chips" style="margin-bottom: 6px;">
@@ -2266,7 +2306,12 @@ import StatusNotice from "../StatusNotice.svelte";
                     {#each group.items as item (item.eventId)}
                         <div class="lvct-detail__timeline-row">
                             <span class="ft__on-surface">{item.localDate}</span>
-                            <span class="lvct-detail__timeline-note">{item.note || "互动"}</span>
+                            <span class="lvct-detail__timeline-note">
+                                <span class="lvct-chip" style="margin-right: 4px; padding: 1px 6px; font-size: 11px;">
+                                    {INTERACTION_TYPE_LABELS[item.type]?.icon ?? "📝"} {INTERACTION_TYPE_LABELS[item.type]?.label ?? "其他"}
+                                </span>
+                                {item.note || "互动"}
+                            </span>
                             <span class="lvct-detail__timeline-source">{sourceLabels[item.source]}</span>
                             {#if item.groupSize > 1}<span class="lvct-chip">{item.groupSize} 人同场</span>{/if}
                             {#if onDeleteInteraction}

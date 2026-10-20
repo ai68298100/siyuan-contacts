@@ -43,7 +43,7 @@ export interface ContactsPluginFacade {
     /** 仪表盘聚合（近期生日/久未联系/统计） */
     loadDashboard(options?: Partial<DashboardOptions>): Promise<DashboardData>;
     /** 记一笔互动（幂等） */
-    recordInteraction(personDocId: string, note?: string): Promise<void>;
+    recordInteraction(personDocId: string, note?: string, type?: import("./domain/interactions").InteractionType): Promise<void>;
     deleteInteraction(personDocId: string, eventId: string): Promise<void>;
     /** 人物洞察：互动时间线 + 共同出席统计 */
     loadPersonInsights(docId: string): Promise<PersonInsights>;

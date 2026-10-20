@@ -819,7 +819,7 @@
             person={detailPerson}
             availableGroups={peopleGroups}
             revision={dataRevision}
-            onRecord={(personDocId, note) => facade.recordInteraction(personDocId, note)}
+            onRecord={(personDocId, note, type) => facade.recordInteraction(personDocId, note, type)}
             onDeleteInteraction={(personDocId, eventId) => facade.deleteInteraction(personDocId, eventId)}
             onLoadInsights={(docId) => facade.loadPersonInsights(docId)}
             onLoadPersonNote={(docId) => facade.loadPersonNote(docId)}
