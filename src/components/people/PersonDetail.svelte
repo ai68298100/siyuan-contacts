@@ -51,6 +51,10 @@ import StatusNotice from "../StatusNotice.svelte";
         type AnniversaryCategory,
         type AnniversaryItem,
     } from "../../domain/anniversaries";
+    import {
+        newProjectId,
+        type PersonProjectItem,
+    } from "../../domain/projects";
     import { newExchangeRequestId } from "../../services/exchanges";
 
     let {
@@ -113,6 +117,9 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadAnniversaries,
         onAddAnniversary,
         onRemoveAnniversary,
+        onLoadProjects,
+        onAddProject,
+        onRemoveProject,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
@@ -189,6 +196,10 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadAnniversaries?: (personDocId: string) => Promise<import("../../domain/anniversaries").AnniversaryItem[]>;
         onAddAnniversary?: (item: import("../../domain/anniversaries").AnniversaryItem) => Promise<import("../../domain/anniversaries").AnniversaryItem[]>;
         onRemoveAnniversary?: (personDocId: string, annivId: string) => Promise<import("../../domain/anniversaries").AnniversaryItem[]>;
+        /** E-37 协作项目与主题关联（可选） */
+        onLoadProjects?: (personDocId: string) => Promise<import("../../domain/projects").PersonProjectItem[]>;
+        onAddProject?: (item: import("../../domain/projects").PersonProjectItem) => Promise<import("../../domain/projects").PersonProjectItem[]>;
+        onRemoveProject?: (personDocId: string, projectId: string) => Promise<import("../../domain/projects").PersonProjectItem[]>;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -970,6 +981,75 @@ import StatusNotice from "../StatusNotice.svelte";
             }
         } catch (error) {
             if (detailAlive) anniversariesError = requestErrorMessage(error);
+        }
+    }
+
+    // ---- E-37 协作项目与主题 ----
+    const projectsSupported = $derived(Boolean(onLoadProjects));
+    let projects = $state<PersonProjectItem[]>([]);
+    let projectsLoading = $state(false);
+    let projectsError = $state("");
+    let newProjTitle = $state("");
+    let newProjRole = $state("");
+    let newProjDocId = $state("");
+    let addingProj = $state(false);
+
+    async function loadProjects() {
+        if (!onLoadProjects) return;
+        const docId = current.docId;
+        projectsLoading = true;
+        projectsError = "";
+        try {
+            const list = await onLoadProjects(docId);
+            if (detailAlive && current.docId === docId) projects = list;
+        } catch (error) {
+            if (detailAlive && current.docId === docId) projectsError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive && current.docId === docId) projectsLoading = false;
+        }
+    }
+    loadProjects();
+
+    async function handleAddProject() {
+        if (!onAddProject || addingProj || !newProjTitle.trim()) return;
+        addingProj = true;
+        projectsError = "";
+        try {
+            const item: PersonProjectItem = {
+                id: newProjectId(),
+                personDocId: current.docId,
+                title: newProjTitle.trim(),
+                docId: newProjDocId.trim() || undefined,
+                status: "active",
+                role: newProjRole.trim() || undefined,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            };
+            const list = await onAddProject(item);
+            if (detailAlive) {
+                projects = list;
+                newProjTitle = "";
+                newProjRole = "";
+                newProjDocId = "";
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) projectsError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive) addingProj = false;
+        }
+    }
+
+    async function handleRemoveProject(projectId: string) {
+        if (!onRemoveProject) return;
+        try {
+            const list = await onRemoveProject(current.docId, projectId);
+            if (detailAlive) {
+                projects = list;
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) projectsError = requestErrorMessage(error);
         }
     }
 
@@ -1954,6 +2034,87 @@ import StatusNotice from "../StatusNotice.svelte";
                                     class="b3-button b3-button--cancel"
                                     aria-label="删除纪念日"
                                     onclick={() => void handleRemoveAnniversary(anniv.id)}
+                                >×</button>
+                            </span>
+                        </li>
+                    {/each}
+                </ul>
+            {/if}
+        </section>
+    {/if}
+
+    {#if projectsSupported}
+        <section class="lvct-detail__section lvct-detail__projects">
+            <div class="lvct-detail__section-head">
+                <div>
+                    <h4>协作项目与主题</h4>
+                    <p class="ft__smaller ft__on-surface">记录共同协作的思源项目、主题讨论与角色分工。</p>
+                </div>
+                {#if projectsLoading}
+                    <span class="ft__smaller ft__on-surface">读取中…</span>
+                {/if}
+            </div>
+            {#if projectsError}
+                <p class="ft__smaller lvct-text-danger" role="alert">{projectsError} <button type="button" class="b3-button b3-button--text" onclick={loadProjects}>重试</button></p>
+            {/if}
+            <div class="lvct-detail__anniv-form fn__flex" style="flex-wrap: wrap; gap: 6px; margin: 6px 0;">
+                <input
+                    class="b3-text-field fn__flex-1"
+                    type="text"
+                    placeholder="项目或主题名称（如：Q4 战略复盘、开源人脉）"
+                    bind:value={newProjTitle}
+                    disabled={addingProj || projectsLoading}
+                    onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleAddProject(); } }}
+                />
+                <input
+                    class="b3-text-field"
+                    type="text"
+                    style="width: 130px;"
+                    placeholder="角色分工（可选）"
+                    bind:value={newProjRole}
+                    disabled={addingProj || projectsLoading}
+                />
+                <input
+                    class="b3-text-field"
+                    type="text"
+                    style="width: 170px;"
+                    placeholder="关联文档 ID（可选）"
+                    bind:value={newProjDocId}
+                    disabled={addingProj || projectsLoading}
+                />
+                <button
+                    type="button"
+                    class="b3-button b3-button--outline"
+                    disabled={addingProj || projectsLoading || !newProjTitle.trim()}
+                    onclick={handleAddProject}
+                >添加项目</button>
+            </div>
+            {#if projects.length === 0}
+                <p class="ft__smaller ft__on-surface">暂未关联协作项目。</p>
+            {:else}
+                <ul class="lvct-detail__topic-list">
+                    {#each projects as proj (proj.id)}
+                        <li class="lvct-detail__topic-item">
+                            <span class="lvct-detail__topic-text">
+                                <span class="lvct-chip lvct-bucket--soon">
+                                    📁 {proj.role || "项目"}
+                                </span>
+                                <b>{proj.title}</b>
+                                {#if proj.docId}
+                                    <button
+                                        type="button"
+                                        class="b3-button b3-button--text ft__smaller"
+                                        style="padding: 0 4px; margin-left: 4px;"
+                                        onclick={() => onOpenPersonDoc(proj.docId!)}
+                                    >打开项目文档 ↗</button>
+                                {/if}
+                            </span>
+                            <span class="lvct-detail__topic-actions">
+                                <button
+                                    type="button"
+                                    class="b3-button b3-button--cancel"
+                                    aria-label="删除项目关联"
+                                    onclick={() => void handleRemoveProject(proj.id)}
                                 >×</button>
                             </span>
                         </li>

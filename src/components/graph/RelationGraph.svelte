@@ -113,7 +113,18 @@
     let hoverCard: HTMLElement | undefined = $state();
     let hoverTimer: ReturnType<typeof setTimeout> | undefined;
     let clearHoverTimer: ReturnType<typeof setTimeout> | undefined;
-    let activeCoEdge: { sourceDocId: string; targetDocId: string; coCount: number; sourceName: string; targetName: string } | null = $state(null);
+    interface EdgeEvidence {
+        kind: "related" | "member" | "ref" | "co_occurrence";
+        sourceId: string;
+        targetId: string;
+        sourceName: string;
+        targetName: string;
+        memberStatus?: "active" | "former" | "mixed";
+        coCount?: number;
+        commonOrgNames?: string[];
+        coAttendanceCount?: number;
+    }
+    let activeEvidence: EdgeEvidence | null = $state(null);
     let establishingRelation = $state(false);
     let establishRelationError = $state("");
     let refreshVersion = 0;
@@ -764,7 +775,7 @@
         resizeObserver.observe(container);
 
         instance.on("tap", "node", (event: cytoscape.EventObject) => {
-            activeCoEdge = null;
+            activeEvidence = null;
             establishRelationError = "";
             const docId = event.target.id();
             const person = allPeopleByDocId.get(docId);
@@ -786,30 +797,70 @@
         });
         instance.on("tap", "edge", (event: cytoscape.EventObject) => {
             const edge = event.target;
-            if (edge.data("kind") === "co_occurrence") {
-                const sourceDocId = edge.data("source");
-                const targetDocId = edge.data("target");
+            const kind = (edge.data("kind") as EdgeEvidence["kind"]) || "related";
+            const sourceId = edge.data("source");
+            const targetId = edge.data("target");
+
+            clearHover();
+            selectedOrgId = "";
+            establishRelationError = "";
+
+            if (kind === "co_occurrence") {
                 const coCount = edge.data("coCount") ?? 1;
-                const personA = allPeopleByDocId.get(sourceDocId);
-                const personB = allPeopleByDocId.get(targetDocId);
+                const personA = allPeopleByDocId.get(sourceId);
+                const personB = allPeopleByDocId.get(targetId);
                 if (personA && personB) {
-                    clearHover();
-                    selectedOrgId = "";
-                    establishRelationError = "";
-                    activeCoEdge = {
-                        sourceDocId,
-                        targetDocId,
+                    activeEvidence = {
+                        kind: "co_occurrence",
+                        sourceId,
+                        targetId,
                         coCount,
                         sourceName: personA.name,
                         targetName: personB.name,
                     };
-                    const pos = event.renderedPosition ?? { x: 24, y: 24 };
-                    hoverPosition = { x: Math.max(12, Math.round(pos.x)), y: Math.max(12, Math.round(pos.y)) };
                 }
+            } else if (kind === "related") {
+                const personA = allPeopleByDocId.get(sourceId);
+                const personB = allPeopleByDocId.get(targetId);
+                if (personA && personB) {
+                    activeEvidence = {
+                        kind: "related",
+                        sourceId,
+                        targetId,
+                        sourceName: personA.name,
+                        targetName: personB.name,
+                        commonOrgNames: findSharedOrgs(sourceId, targetId),
+                        coAttendanceCount: countSharedOccasions(sourceId, targetId),
+                    };
+                }
+            } else if (kind === "member") {
+                const org = sources.organizations.find((o) => o.docId === sourceId || o.docId === targetId);
+                const person = allPeopleByDocId.get(sourceId === org?.docId ? targetId : sourceId);
+                activeEvidence = {
+                    kind: "member",
+                    sourceId,
+                    targetId,
+                    sourceName: person?.name || "成员",
+                    targetName: org?.name || "组织",
+                    memberStatus: edge.data("memberStatus") || "active",
+                };
+            } else if (kind === "ref") {
+                const nodeA = nodeById.get(sourceId);
+                const nodeB = nodeById.get(targetId);
+                activeEvidence = {
+                    kind: "ref",
+                    sourceId,
+                    targetId,
+                    sourceName: nodeA?.label || sourceId,
+                    targetName: nodeB?.label || targetId,
+                };
             }
+
+            const pos = event.renderedPosition ?? { x: 24, y: 24 };
+            hoverPosition = { x: Math.max(12, Math.round(pos.x)), y: Math.max(12, Math.round(pos.y)) };
         });
         instance.on("tap", (event: cytoscape.EventObject) => {
-            if (event.target === instance) { selectedOrgId = ""; clearHover(); activeCoEdge = null; }
+            if (event.target === instance) { selectedOrgId = ""; clearHover(); activeEvidence = null; }
         });
         instance.on("mouseover", "node", scheduleHover);
         instance.on("mouseout", "node", scheduleClearHover);
@@ -836,17 +887,44 @@
         if (person) openSnapshotPerson(person);
     }
 
+    function findSharedOrgs(docA: string, docB: string): string[] {
+        const names: string[] = [];
+        for (const org of sources.organizations) {
+            const hasA = org.memberships.some((m) => m.personDocId === docA);
+            const hasB = org.memberships.some((m) => m.personDocId === docB);
+            if (hasA && hasB) names.push(org.name);
+        }
+        return names;
+    }
+
+    function countSharedOccasions(docA: string, docB: string): number {
+        if (!sources.interactionEvents || sources.interactionEvents.length === 0) return 0;
+        const occsA = new Set<string>();
+        for (const e of sources.interactionEvents) {
+            if (e.personDocId === docA && e.externalRef) occsA.add(e.externalRef);
+        }
+        let count = 0;
+        const seenB = new Set<string>();
+        for (const e of sources.interactionEvents) {
+            if (e.personDocId === docB && e.externalRef && occsA.has(e.externalRef) && !seenB.has(e.externalRef)) {
+                seenB.add(e.externalRef);
+                count += 1;
+            }
+        }
+        return count;
+    }
+
     async function establishCoRelation() {
-        if (!activeCoEdge || establishingRelation) return;
-        const { sourceDocId, targetDocId } = activeCoEdge;
-        const personA = allPeopleByDocId.get(sourceDocId);
-        const personB = allPeopleByDocId.get(targetDocId);
+        if (!activeEvidence || activeEvidence.kind !== "co_occurrence" || establishingRelation) return;
+        const { sourceId, targetId } = activeEvidence;
+        const personA = allPeopleByDocId.get(sourceId);
+        const personB = allPeopleByDocId.get(targetId);
         if (!personA || !personB) return;
         establishingRelation = true;
         establishRelationError = "";
         try {
             await addRelation(settings, personA, personB);
-            activeCoEdge = null;
+            activeEvidence = null;
             emitDataChanged({ topics: ["people"], docIds: [personA.docId, personB.docId] });
             await refresh(true);
         } catch (error) {
@@ -1382,41 +1460,85 @@
                 <button class="lvct-graph__fab-btn" title={graphExpanded ? "收起大图" : "展开大图"} aria-label={graphExpanded ? "收起大图" : "展开大图"} aria-pressed={graphExpanded} onclick={() => void toggleGraphExpanded()}>{#if graphExpanded}<Minimize2 size={16} />{:else}<Maximize2 size={16} />{/if}</button>
                 <button class="lvct-graph__fab-btn" title={text("graphRefresh", "刷新")} aria-label={text("graphRefresh", "刷新")} disabled={loading || refreshInFlight} aria-busy={refreshInFlight} onclick={() => void refresh()}><RefreshCw size={15} /></button>
             </div>
-            {#if activeCoEdge}
+            {#if activeEvidence}
                 <div
                     class="lvct-graph-view__hover-card"
                     role="dialog"
                     aria-modal="false"
-                    aria-label="共同出席推断关联"
+                    aria-label="图谱连接事实证据"
                     tabindex="-1"
                     style={`left:${hoverPosition.x}px;top:${hoverPosition.y}px`}
                 >
                     <div class="lvct-graph-view__hover-name">
-                        <b>{activeCoEdge.sourceName} & {activeCoEdge.targetName}</b>
-                        <span class="lvct-chip lvct-chip--group">共同出席 {activeCoEdge.coCount} 次</span>
+                        <b>{activeEvidence.sourceName} ↔ {activeEvidence.targetName}</b>
+                        <span class="lvct-chip lvct-chip--group">
+                            {activeEvidence.kind === "related" ? "显式相关人" :
+                             activeEvidence.kind === "member" ? (activeEvidence.memberStatus === "former" ? "历史归属" : "当前归属") :
+                             activeEvidence.kind === "co_occurrence" ? `同场 ${activeEvidence.coCount} 次` : "文档引用"}
+                        </span>
                     </div>
-                    <div class="ft__smaller ft__on-surface" style="margin: 6px 0;">
-                        基于多参与者同场互动事件推断出的弱联系。是否将其升级为正式相关人？
-                    </div>
-                    {#if establishRelationError}
-                        <div class="b3-label b3-label--error ft__smaller" style="margin-bottom: 6px;">{establishRelationError}</div>
-                    {/if}
-                    <div style="display: flex; gap: 8px; margin-top: 4px;">
+
+                    {#if activeEvidence.kind === "related"}
+                        <div class="ft__smaller ft__on-surface" style="margin: 6px 0;">
+                            已在人脉数据库中登记为正式双向关系。
+                            {#if activeEvidence.commonOrgNames && activeEvidence.commonOrgNames.length > 0}
+                                <div>🏢 共同组织：{activeEvidence.commonOrgNames.join("、")}</div>
+                            {/if}
+                            {#if activeEvidence.coAttendanceCount && activeEvidence.coAttendanceCount > 0}
+                                <div>👥 同场活动：{activeEvidence.coAttendanceCount} 次</div>
+                            {/if}
+                        </div>
+                    {:else if activeEvidence.kind === "member"}
+                        <div class="ft__smaller ft__on-surface" style="margin: 6px 0;">
+                            {activeEvidence.sourceName} 属于组织【{activeEvidence.targetName}】（状态：{activeEvidence.memberStatus === "former" ? "历史成员/校友" : "在职成员"}）。
+                        </div>
+                    {:else if activeEvidence.kind === "co_occurrence"}
+                        <div class="ft__smaller ft__on-surface" style="margin: 6px 0;">
+                            基于多参与者同场活动推断出的弱联系（共同出席 {activeEvidence.coCount} 次）。
+                        </div>
+                        {#if establishRelationError}
+                            <div class="b3-label b3-label--error ft__smaller" style="margin-bottom: 6px;">{establishRelationError}</div>
+                        {/if}
                         <button
                             type="button"
                             class="b3-button b3-button--text ft__smaller"
                             disabled={establishingRelation}
                             onclick={establishCoRelation}
                         >
-                            {establishingRelation ? "正在建立…" : "建立双向关系"}
+                            {establishingRelation ? "正在建立…" : "升级为正式相关人"}
                         </button>
+                    {:else if activeEvidence.kind === "ref"}
+                        <div class="ft__smaller ft__on-surface" style="margin: 6px 0;">
+                            由思源笔记正文中的块链接或反链所构成的原生文档引用。
+                        </div>
+                    {/if}
+
+                    <div style="display: flex; gap: 8px; margin-top: 6px;">
+                        {#if allPeopleByDocId.has(activeEvidence.sourceId)}
+                            <button
+                                type="button"
+                                class="b3-button b3-button--text ft__smaller"
+                                onclick={() => {
+                                    const p = allPeopleByDocId.get(activeEvidence!.sourceId);
+                                    if (p) openSnapshotPerson(p);
+                                }}
+                            >查看 {activeEvidence.sourceName}</button>
+                        {/if}
+                        {#if allPeopleByDocId.has(activeEvidence.targetId)}
+                            <button
+                                type="button"
+                                class="b3-button b3-button--text ft__smaller"
+                                onclick={() => {
+                                    const p = allPeopleByDocId.get(activeEvidence!.targetId);
+                                    if (p) openSnapshotPerson(p);
+                                }}
+                            >查看 {activeEvidence.targetName}</button>
+                        {/if}
                         <button
                             type="button"
                             class="b3-button b3-button--text ft__smaller"
-                            onclick={() => { activeCoEdge = null; }}
-                        >
-                            关闭
-                        </button>
+                            onclick={() => { activeEvidence = null; }}
+                        >关闭</button>
                     </div>
                 </div>
             {:else if displayedOrg}

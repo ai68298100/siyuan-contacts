@@ -135,6 +135,12 @@ export interface ContactsPluginFacade {
     updatePersonAnniversary?(personDocId: string, annivId: string, patch: Partial<import("./domain/anniversaries").AnniversaryItem>): Promise<import("./domain/anniversaries").AnniversaryItem[]>;
     removePersonAnniversary?(personDocId: string, annivId: string): Promise<import("./domain/anniversaries").AnniversaryItem[]>;
     listUpcomingAnniversaries?(windowDays?: number): Promise<import("./domain/anniversaries").AnniversaryProjection[]>;
+    /** E-37：人物协作项目与主题双向关联（Project & Initiative Collaborators） */
+    loadPersonProjects?(personDocId: string): Promise<import("./domain/projects").PersonProjectItem[]>;
+    addPersonProject?(item: import("./domain/projects").PersonProjectItem): Promise<import("./domain/projects").PersonProjectItem[]>;
+    updatePersonProject?(personDocId: string, projectId: string, patch: Partial<import("./domain/projects").PersonProjectItem>): Promise<import("./domain/projects").PersonProjectItem[]>;
+    removePersonProject?(personDocId: string, projectId: string): Promise<import("./domain/projects").PersonProjectItem[]>;
+    findCollaboratorsByProject?(matcher: { title?: string; docId?: string }): Promise<Array<{ personDocId: string; role?: string; status: import("./domain/projects").ProjectStatus; title: string }>>;
     /** 交往回顾报表（F12）：区间互动统计（只读投影，人物条数与同场活动分口径） */
     buildReviewReport(from: string, to: string): Promise<ReviewReport>;
     /** 导出中心摘要：名册人数与活跃互动条数（展示用，容错读取） */

@@ -93,6 +93,7 @@ import { executeContactMerge } from "./services/duplicate-merge";
 import { loadPersonGiftIdeas, addPersonGiftIdea, updatePersonGiftIdea, removePersonGiftIdea } from "./data/gift-ideas";
 import { listOccasions, createOccasion, deleteOccasion } from "./services/occasions";
 import { loadPersonAnniversaries, addPersonAnniversary, updatePersonAnniversary, removePersonAnniversary, listUpcomingAnniversaries } from "./data/anniversaries.ts";
+import { loadPersonProjects, addPersonProject, updatePersonProject, removePersonProject, findCollaboratorsByProject } from "./data/projects.ts";
 import { buildReview } from "./services/review-report";
 import { importInteractionJson, previewInteractionImport } from "./services/interaction-import";
 import { previewInteractionImportDiff } from "./services/interaction-import";
@@ -1539,6 +1540,35 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     async listUpcomingAnniversaries(windowDays?: number) {
         return listUpcomingAnniversaries(this, windowDays);
+    }
+
+    async loadPersonProjects(personDocId: string) {
+        return loadPersonProjects(this, personDocId);
+    }
+
+    async addPersonProject(item: import("./domain/projects").PersonProjectItem) {
+        const token = this.lifecycleToken;
+        const result = await addPersonProject(this, item);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async updatePersonProject(personDocId: string, projectId: string, patch: Partial<import("./domain/projects").PersonProjectItem>) {
+        const token = this.lifecycleToken;
+        const result = await updatePersonProject(this, personDocId, projectId, patch);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async removePersonProject(personDocId: string, projectId: string) {
+        const token = this.lifecycleToken;
+        const result = await removePersonProject(this, personDocId, projectId);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async findCollaboratorsByProject(matcher: { title?: string; docId?: string }) {
+        return findCollaboratorsByProject(this, matcher);
     }
 
     async buildReviewReport(from: string, to: string) {
