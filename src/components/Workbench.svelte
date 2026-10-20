@@ -819,6 +819,17 @@
             person={detailPerson}
             availableGroups={peopleGroups}
             revision={dataRevision}
+            collapsedSections={currentPreferences.detailCollapsedSections}
+            onToggleSection={(sectionKey, collapsed) => {
+                const nextSections = {
+                    ...currentPreferences.detailCollapsedSections,
+                    [sectionKey]: collapsed,
+                };
+                void savePreferences({
+                    ...currentPreferences,
+                    detailCollapsedSections: nextSections,
+                });
+            }}
             onRecord={(personDocId, note, type) => facade.recordInteraction(personDocId, note, type)}
             onDeleteInteraction={(personDocId, eventId) => facade.deleteInteraction(personDocId, eventId)}
             onLoadInsights={(docId) => facade.loadPersonInsights(docId)}
