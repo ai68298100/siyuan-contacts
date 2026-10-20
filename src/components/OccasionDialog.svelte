@@ -10,11 +10,13 @@
     let {
         i18n,
         people = [],
+        initialDocId = "",
         onSave,
         onClose,
     }: {
         i18n?: Readonly<Record<string, string>>;
-        people: readonly ContactSummary[];
+        people?: readonly ContactSummary[];
+        initialDocId?: string;
         onSave: (input: CreateOccasionInput) => Promise<void>;
         onClose: () => void;
     } = $props();
@@ -26,6 +28,9 @@
     let type = $state<OccasionType>("meeting");
     let date = $state(toLocalDateKey(new Date()));
     let place = $state("");
+    // svelte-ignore state_referenced_locally — 仅在对话框实例化时取初值，后续由用户输入驱动
+    let sourceDocId = $state(initialDocId);
+    let syncDocumentBlock = $state(true);
     let note = $state("");
     let deriveInteractions = $state(true);
 
@@ -72,6 +77,8 @@
                 attendees: selectedAttendees,
                 note: note.trim() || undefined,
                 deriveInteractions,
+                sourceDocId: sourceDocId.trim() || undefined,
+                syncDocumentBlock: Boolean(sourceDocId.trim()) && syncDocumentBlock,
             });
             onClose();
         } catch (error) {
@@ -198,6 +205,27 @@
                 <span>{text("occDeriveCheckbox", "自动为所有参与者生成互动时间线并标记同场出席")}</span>
             </label>
         </div>
+
+        <div class="lvct-occ-dialog__row">
+            <label for="lvct-occ-input-source" class="lvct-occ-dialog__label">{text("occFieldSourceDoc", "关联思源笔记文档 ID（可选）")}</label>
+            <input
+                id="lvct-occ-input-source"
+                class="b3-text-field fn__block"
+                type="text"
+                placeholder={text("occSourceDocPlaceholder", "如 20261020120000-xxxxxxx，支持在笔记正文插入人脉双链摘要块")}
+                bind:value={sourceDocId}
+                disabled={submitting}
+            />
+        </div>
+
+        {#if sourceDocId.trim()}
+            <div class="lvct-occ-dialog__row">
+                <label class="b3-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" bind:checked={syncDocumentBlock} disabled={submitting} />
+                    <span>{text("occSyncBlockCheckbox", "在关联思源笔记中同步插入/更新受控人脉双链摘要块")}</span>
+                </label>
+            </div>
+        {/if}
 
         <div class="lvct-occ-dialog__row">
             <label for="lvct-occ-input-note" class="lvct-occ-dialog__label">{text("occFieldNote", "活动备注")}</label>

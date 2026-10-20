@@ -229,7 +229,6 @@ test("E-30 occasion 数据层：saveOccasionEntity、listOccasionEntities、upda
             memory.set(key, structuredClone(value));
         },
     } as unknown as Plugin;
-
     assert.deepEqual(await listOccasionEntities(plugin), []);
 
     await saveOccasionEntity(plugin, mockOccasion({ id: "o1", title: "会议 A", date: "2026-10-18" }));

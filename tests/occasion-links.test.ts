@@ -57,3 +57,32 @@ test("C-14：escapeLinkLabel 链接标签转义方括号、反斜杠与换行，
     assert.equal(escapeLinkLabel("公司\\分部"), "公司\\\\分部");
     assert.equal(escapeLinkLabel("第一行\r\n第二行"), "第一行 第二行");
 });
+
+test("E-30 场合受控投影：备注自动追加与无地点/无备注场景安全降级", () => {
+    const people = [
+        { docId: "20261002000000-per0001", name: "张三" },
+        { docId: "20261002000000-per0002", name: "李四" },
+    ];
+    const withNote = buildOccasionMarkdown("source", {
+        sourceDocId: "20261002000000-src0001",
+        date: "2026-10-20",
+        place: "望京茶室 [二楼]",
+        note: "讨论了合作细节\n以及下次碰面时间",
+        people,
+    });
+    // 地点为纯文本时不生成链接，但应正确转义
+    assert.match(withNote, /\*\*地点\*\*：望京茶室 \\\[二楼\\\]/);
+    // 备注多行折叠为单行并转义
+    assert.match(withNote, /\*\*备注\*\*：讨论了合作细节 以及下次碰面时间/);
+
+    const minimal = buildOccasionMarkdown("person", {
+        sourceDocId: "20261002000000-src0001",
+        date: "2026-10-20",
+        people,
+    }, "20261002000000-per0001");
+    assert.match(minimal, /\*\*共同事项\*\*/);
+    assert.doesNotMatch(minimal, /\*\*地点\*\*/);
+    assert.doesNotMatch(minimal, /\*\*备注\*\*/);
+    assert.doesNotMatch(minimal, /20261002000000-per0001/);
+    assert.match(minimal, /20261002000000-per0002/);
+});

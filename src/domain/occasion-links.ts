@@ -18,6 +18,7 @@ export interface OccasionProjectionInput {
     place?: string;
     diaryDocId?: string;
     placeDocId?: string;
+    note?: string;
     people: readonly OccasionPersonLink[];
 }
 
@@ -117,7 +118,14 @@ export function buildOccasionMarkdown(
     if (kind === "source") {
         const lines = [`**参与人员**（${date}）：${personLinks.join("、") || "无"}`];
         if (input.diaryDocId) lines.push(`**当日日记**：${link(date, input.diaryDocId)}`);
-        if (place && input.placeDocId) lines.push(`**地点**：${link(place, input.placeDocId)}`);
+        if (place && input.placeDocId) {
+            lines.push(`**地点**：${link(place, input.placeDocId)}`);
+        } else if (place) {
+            lines.push(`**地点**：${escapeLinkLabel(place)}`);
+        }
+        if (input.note?.trim()) {
+            lines.push(`**备注**：${escapeLinkLabel(input.note.trim())}`);
+        }
         return lines.join("\n");
     }
 
