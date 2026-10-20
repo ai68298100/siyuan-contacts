@@ -6,7 +6,7 @@
 import { parseVcfForImport, serializeVcf } from "../domain/vcard.ts";
 import type { VCardContact, VcfDocumentCheckpoint } from "../domain/vcard.ts";
 import { emptyDraft, validateDraft } from "../domain/person";
-import type { ContactDraft } from "../domain/person";
+import type { ContactDraft, ContactSummary } from "../domain/person";
 import type { WritableContactField } from "../domain/contact-write.ts";
 import { buildContactWritePlan } from "../domain/contact-write.ts";
 import type { ContactsSettings } from "../domain/model";
@@ -330,11 +330,38 @@ async function retryVcfContactsLocked(
     return results;
 }
 
+export interface VcfExportOptions {
+    itemIds?: readonly string[];
+    explicitPeople?: readonly ContactSummary[];
+}
+
+function isVcfExportOptions(value: unknown): value is VcfExportOptions {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 /** 名册 → vCard 3.0 文本（微信号无标准 vCard 属性，不导出） */
-export async function exportVcfText(settings: ContactsSettings, selectedItemIds?: readonly string[]): Promise<string> {
-    const people = await getRoster(settings);
-    const selected = selectedItemIds ? new Set(selectedItemIds) : null;
-    const exportPeople = selected ? people.filter((person) => selected.has(person.itemId)) : people;
+export async function exportVcfText(
+    settings: ContactsSettings,
+    selectedItemIdsOrOptions?: readonly string[] | VcfExportOptions,
+): Promise<string> {
+    let exportPeople: ContactSummary[];
+    if (isVcfExportOptions(selectedItemIdsOrOptions)) {
+        if (selectedItemIdsOrOptions.explicitPeople) {
+            exportPeople = [...selectedItemIdsOrOptions.explicitPeople];
+        } else if (selectedItemIdsOrOptions.itemIds) {
+            const people = await getRoster(settings);
+            const selected = new Set(selectedItemIdsOrOptions.itemIds);
+            exportPeople = people.filter((person) => selected.has(person.itemId));
+        } else {
+            exportPeople = await getRoster(settings);
+        }
+    } else if (Array.isArray(selectedItemIdsOrOptions)) {
+        const people = await getRoster(settings);
+        const selected = new Set(selectedItemIdsOrOptions);
+        exportPeople = people.filter((person) => selected.has(person.itemId));
+    } else {
+        exportPeople = await getRoster(settings);
+    }
     const contacts: VCardContact[] = exportPeople.map((person) => ({
         name: person.name,
         phone: person.phone,

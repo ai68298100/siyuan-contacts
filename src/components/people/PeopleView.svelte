@@ -2105,6 +2105,10 @@
         <LvctDialog title="vCard 通讯录导入/导出" wide onClose={() => (vcarding = false)}>
             <VCardDialog
                 {settings}
+                {i18n}
+                filteredPeople={filtered}
+                selectedPeople={selectedPeople}
+                hasActiveFilter={conditionChips.length > 0}
                 onImported={(count) => {
                     if (count > 0) refresh();
                 }}

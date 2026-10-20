@@ -417,3 +417,19 @@ test("AG-VCF-ROBUST: 无名卡片智能从 ORG 或 NICKNAME 兜底识别，纯�
     assert.equal(contacts[1].name, "老王");
     assert.equal(contacts[1].phone, "13911112222");
 });
+
+test("AG-E35-VCARD-EXPORT-SCOPE: serializeVcf 支持多联系人范围子集导出，CRLF 与 RFC 6350 保真", () => {
+    const people = [
+        base({ name: "联系人甲", phone: "13800000001" }),
+        base({ name: "联系人乙", phone: "13800000002" }),
+        base({ name: "联系人丙", phone: "13800000003" }),
+    ];
+    // 局部子集导出（如筛选后的甲和丙）
+    const subset = [people[0], people[2]];
+    const vcf = serializeVcf(subset);
+    assert.match(vcf, /FN:联系人甲/);
+    assert.match(vcf, /FN:联系人丙/);
+    assert.doesNotMatch(vcf, /FN:联系人乙/);
+    assert.equal(vcf.split("BEGIN:VCARD").length - 1, 2);
+    assert.ok(vcf.endsWith("END:VCARD\r\n"));
+});
