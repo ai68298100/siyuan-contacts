@@ -1724,25 +1724,35 @@
         <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); occasioning = true; }}><Calendar size={16}/>{text("peopleOccasion", "记录活动")}</button>
         <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); regionExploring = true; }}><Compass size={16}/>{text("peopleRegionExplorer", "城市与出差")}</button>
     {/snippet}
-    <div class="lvct-people__toolbar lvct-people__control-surface fn__flex">
+    <div class="lvct-people__toolbar lvct-people__control-surface fn__flex" style="flex-direction: column; align-items: stretch; gap: 8px;">
         {#if isMobile}
-            <input
-                class="b3-text-field lvct-people__mobile-search"
-                type="text"
-                aria-label={text("peopleSearchPlaceholder", "搜索联系人")}
-                placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
-                value={searchInput}
-                oninput={(event) => handleSearchInput((event.currentTarget as HTMLInputElement).value)}
-            />
-        {/if}
-        {#if !isMobile}
-            {@render viewMenuControl()}
+            <div class="fn__flex" style="width: 100%; align-items: center; gap: 8px;">
+                <input
+                    class="b3-text-field fn__flex-1 lvct-people__mobile-search"
+                    type="text"
+                    aria-label={text("peopleSearchPlaceholder", "搜索联系人")}
+                    placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
+                    value={searchInput}
+                    oninput={(event) => handleSearchInput((event.currentTarget as HTMLInputElement).value)}
+                />
+                <button class="b3-button" onclick={() => (adding = true)} aria-label={text("peopleCreate", "新建联系人")}><UserPlus size={16}/>{text("peopleCreate", "新建")}</button>
+                <button
+                    class="b3-button b3-button--outline"
+                    aria-label={text("peopleMobileTools", "筛选与整理")}
+                    aria-expanded={mobileSheetOpen}
+                    aria-controls={mobileSheetOpen ? "lvct-people-mobile-tools-sheet" : undefined}
+                    bind:this={mobileSheetTrigger}
+                    onclick={openMobileSheet}
+                ><SlidersHorizontal size={16}/>{text("peopleMobileTools", "筛选与整理")}{isExtraFilterActive(extraFilter) || duplicatePairs.length > 0 ? " ·" : ""}</button>
+            </div>
+        {:else}
+            <!-- 桌面端第一行：搜索主输入框（独占整行，输入体验流畅） -->
             <input
                 bind:this={searchInputElement}
                 class="b3-text-field fn__flex-1 lvct-people__desktop-search"
                 type="text"
                 aria-label={text("peopleSearchPlaceholder", "搜索联系人")}
-                placeholder={text("peopleSearchPlaceholder", "搜索姓名/拼音/电话/微信… (按 / 聚焦)")}
+                placeholder={text("peopleSearchPlaceholder", "搜索姓名/拼音/电话/微信… (按 / 聚焦，Esc 清空)")}
                 value={searchInput}
                 oninput={(event) => handleSearchInput((event.currentTarget as HTMLInputElement).value)}
                 onkeydown={(event) => {
@@ -1756,102 +1766,99 @@
                     }
                 }}
             />
-            {@render filterControls()}
-        {/if}
-        <span class="lvct-people__viewtoggle">
-            {#if viewMode === "cards"}
-                <span class="lvct-seg" role="group" aria-label="卡片密度" title="卡片密度">
-                    <button
-                        type="button"
-                        class="lvct-seg__item"
-                        class:lvct-seg__item--active={cardDensity === "comfortable"}
-                        aria-pressed={cardDensity === "comfortable"}
-                        onclick={() => (cardDensity = "comfortable")}
-                        title="舒适卡片视图"
-                    >舒适</button>
-                    <button
-                        type="button"
-                        class="lvct-seg__item"
-                        class:lvct-seg__item--active={cardDensity === "compact"}
-                        aria-pressed={cardDensity === "compact"}
-                        onclick={() => (cardDensity = "compact")}
-                        title="紧凑卡片视图：一屏浏览更多联系人"
-                    >紧凑</button>
-                </span>
-            {/if}
-            <span class="lvct-seg" role="group" aria-label="切换卡片/表格" title="切换卡片/表格">
-                <button
-                    type="button"
-                    class="lvct-seg__item"
-                    class:lvct-seg__item--active={viewMode === "cards"}
-                    aria-pressed={viewMode === "cards"}
-                    onclick={() => setViewMode("cards")}
-                ><LayoutGrid size={14}/>{text("peopleCards", "卡片")}</button>
-                <button
-                    type="button"
-                    class="lvct-seg__item"
-                    class:lvct-seg__item--active={viewMode === "table"}
-                    aria-pressed={viewMode === "table"}
-                    onclick={() => setViewMode("table")}
-                ><List size={14}/>{text("peopleTable", "表格")}</button>
-            </span>
-            {#if viewMode === "table"}
-                <span id="lvct-people-colmenu" bind:this={colMenuWrap} style="position:relative; display:inline-flex">
-                    <button
-                        class="b3-button b3-button--outline"
-                        aria-expanded={colMenuOpen}
-                        aria-controls={colMenuOpen ? "lvct-people-colmenu-panel" : undefined}
-                        aria-label="表格列设置"
-                        title="表格列设置"
-                        onclick={() => (colMenuOpen = !colMenuOpen)}
-                    ><Columns3 size={16}/>{text("peopleColumnSettings", "列设置")}</button>
-                    {#if colMenuOpen}
-                        <div id="lvct-people-colmenu-panel" class="lvct-people__colmenu" bind:this={colMenuPanel} role="group" aria-label="表格列显隐与顺序">
-                            <p class="lvct-people__menu-title">显示字段</p>
-                            <p class="lvct-people__menu-hint">拖动顺序只影响当前表格。</p>
-                            <label class="lvct-people__colmenu-row" title="姓名列固定显示">
-                                <input type="checkbox" checked disabled />
-                                <span>{text("peopleName", "姓名")}</span>
-                                <small>固定</small>
-                            </label>
-                            {#each PEOPLE_TABLE_COLUMNS as key (key)}
-                                <div class="lvct-people__colmenu-row">
-                                    <input
-                                        type="checkbox"
-                                        aria-label={`显示${columnLabel(key)}列`}
-                                        checked={tableColumns.includes(key)}
-                                        onchange={(event) => toggleColumn(key, (event.currentTarget as HTMLInputElement).checked)}
-                                    />
-                                    <span>{columnLabel(key)}</span>
-                                    <span class="lvct-people__colmenu-actions">
-                                        <button type="button" aria-label={`上移${columnLabel(key)}列`} title={tableColumns.indexOf(key) <= 0 ? "已经是第一列" : undefined} disabled={tableColumns.indexOf(key) <= 0} onclick={() => moveColumn(key, -1)}>↑</button>
-                                        <button type="button" aria-label={`下移${columnLabel(key)}列`} title={tableColumns.indexOf(key) < 0 || tableColumns.indexOf(key) >= tableColumns.length - 1 ? "已经是最后一列" : undefined} disabled={tableColumns.indexOf(key) < 0 || tableColumns.indexOf(key) >= tableColumns.length - 1} onclick={() => moveColumn(key, 1)}>↓</button>
-                                    </span>
-                                </div>
-                            {/each}
-                            <div class="lvct-people__colmenu-footer">
-                                <button type="button" class="b3-button b3-button--text" onclick={resetDisplayPreferences}>恢复默认显示</button>
-                            </div>
-                        </div>
-                    {/if}
-                </span>
-            {/if}
-        </span>
-        {#if !isMobile}
-            <button class="b3-button lvct-people__create" onclick={() => (adding = true)}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
-            <span class="lvct-people__toolbar-actions">
-                {@render actionControls()}
-            </span>
-        {:else}
-            <button class="b3-button" onclick={() => (adding = true)} aria-label={text("peopleCreate", "新建联系人")}><UserPlus size={16}/>{text("peopleCreate", "新建")}</button>
-            <button
-                class="b3-button b3-button--outline"
-                aria-label={text("peopleMobileTools", "筛选与整理")}
-                aria-expanded={mobileSheetOpen}
-                aria-controls={mobileSheetOpen ? "lvct-people-mobile-tools-sheet" : undefined}
-                bind:this={mobileSheetTrigger}
-                onclick={openMobileSheet}
-            ><SlidersHorizontal size={16}/>{text("peopleMobileTools", "筛选与整理")}{isExtraFilterActive(extraFilter) || duplicatePairs.length > 0 ? " ·" : ""}</button>
+
+            <!-- 桌面端第二行：筛选与操作整合条（左侧筛选，右侧视图与操作） -->
+            <div class="lvct-people__toolbar-subrow fn__flex">
+                <div class="lvct-people__row-left fn__flex">
+                    {@render viewMenuControl()}
+                    {@render filterControls()}
+                </div>
+                <div class="lvct-people__row-right fn__flex">
+                    <span class="lvct-people__viewtoggle">
+                        {#if viewMode === "cards"}
+                            <span class="lvct-seg" role="group" aria-label="卡片密度" title="卡片密度">
+                                <button
+                                    type="button"
+                                    class="lvct-seg__item"
+                                    class:lvct-seg__item--active={cardDensity === "comfortable"}
+                                    aria-pressed={cardDensity === "comfortable"}
+                                    onclick={() => (cardDensity = "comfortable")}
+                                    title="舒适卡片视图"
+                                >舒适</button>
+                                <button
+                                    type="button"
+                                    class="lvct-seg__item"
+                                    class:lvct-seg__item--active={cardDensity === "compact"}
+                                    aria-pressed={cardDensity === "compact"}
+                                    onclick={() => (cardDensity = "compact")}
+                                    title="紧凑卡片视图：一屏浏览更多联系人"
+                                >紧凑</button>
+                            </span>
+                        {/if}
+                        <span class="lvct-seg" role="group" aria-label="切换卡片/表格" title="切换卡片/表格">
+                            <button
+                                type="button"
+                                class="lvct-seg__item"
+                                class:lvct-seg__item--active={viewMode === "cards"}
+                                aria-pressed={viewMode === "cards"}
+                                onclick={() => setViewMode("cards")}
+                            ><LayoutGrid size={14}/>{text("peopleCards", "卡片")}</button>
+                            <button
+                                type="button"
+                                class="lvct-seg__item"
+                                class:lvct-seg__item--active={viewMode === "table"}
+                                aria-pressed={viewMode === "table"}
+                                onclick={() => setViewMode("table")}
+                            ><List size={14}/>{text("peopleTable", "表格")}</button>
+                        </span>
+                        {#if viewMode === "table"}
+                            <span id="lvct-people-colmenu" bind:this={colMenuWrap} style="position:relative; display:inline-flex">
+                                <button
+                                    class="b3-button b3-button--outline"
+                                    aria-expanded={colMenuOpen}
+                                    aria-controls={colMenuOpen ? "lvct-people-colmenu-panel" : undefined}
+                                    aria-label="表格列设置"
+                                    title="表格列设置"
+                                    onclick={() => (colMenuOpen = !colMenuOpen)}
+                                ><Columns3 size={16}/>{text("peopleColumnSettings", "列设置")}</button>
+                                {#if colMenuOpen}
+                                    <div id="lvct-people-colmenu-panel" class="lvct-people__colmenu" bind:this={colMenuPanel} role="group" aria-label="表格列显隐与顺序">
+                                        <p class="lvct-people__menu-title">显示字段</p>
+                                        <p class="lvct-people__menu-hint">拖动顺序只影响当前表格。</p>
+                                        <label class="lvct-people__colmenu-row" title="姓名列固定显示">
+                                            <input type="checkbox" checked disabled />
+                                            <span>{text("peopleName", "姓名")}</span>
+                                            <small>固定</small>
+                                        </label>
+                                        {#each PEOPLE_TABLE_COLUMNS as key (key)}
+                                            <div class="lvct-people__colmenu-row">
+                                                <input
+                                                    type="checkbox"
+                                                    aria-label={`显示${columnLabel(key)}列`}
+                                                    checked={tableColumns.includes(key)}
+                                                    onchange={(event) => toggleColumn(key, (event.currentTarget as HTMLInputElement).checked)}
+                                                />
+                                                <span>{columnLabel(key)}</span>
+                                                <span class="lvct-people__colmenu-actions">
+                                                    <button type="button" aria-label={`上移${columnLabel(key)}列`} title={tableColumns.indexOf(key) <= 0 ? "已经是第一列" : undefined} disabled={tableColumns.indexOf(key) <= 0} onclick={() => moveColumn(key, -1)}>↑</button>
+                                                    <button type="button" aria-label={`下移${columnLabel(key)}列`} title={tableColumns.indexOf(key) < 0 || tableColumns.indexOf(key) >= tableColumns.length - 1 ? "已经是最后一列" : undefined} disabled={tableColumns.indexOf(key) < 0 || tableColumns.indexOf(key) >= tableColumns.length - 1} onclick={() => moveColumn(key, 1)}>↓</button>
+                                                </span>
+                                            </div>
+                                        {/each}
+                                        <div class="lvct-people__colmenu-footer">
+                                            <button type="button" class="b3-button b3-button--text" onclick={resetDisplayPreferences}>恢复默认显示</button>
+                                        </div>
+                                    </div>
+                                {/if}
+                            </span>
+                        {/if}
+                    </span>
+                    <button class="b3-button b3-button--primary lvct-people__create" onclick={() => (adding = true)}><UserPlus size={16}/>{text("peopleCreate", "新建联系人")}</button>
+                    <span class="lvct-people__toolbar-actions">
+                        {@render actionControls()}
+                    </span>
+                </div>
+            </div>
         {/if}
     </div>
 

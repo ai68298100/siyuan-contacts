@@ -756,6 +756,38 @@ html[data-theme-mode="dark"] .lvct-wizard {
     }
 }
 
+.lvct-people__row {
+    width: 100%;
+    align-items: center;
+    gap: var(--lvct-sp-2);
+
+    &--primary {
+        margin-bottom: var(--lvct-sp-2);
+        flex-wrap: wrap;
+    }
+
+    &--secondary {
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        row-gap: var(--lvct-sp-2);
+    }
+}
+
+.lvct-people__toolbar-subrow {
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--lvct-sp-2);
+}
+
+.lvct-people__row-left, .lvct-people__row-right {
+    align-items: center;
+    gap: var(--lvct-sp-2);
+    flex-wrap: wrap;
+}
+
 .lvct-people__mobile-search {
     flex: 1 0 100%;
     min-height: var(--lvct-control-h-compact);
@@ -5107,10 +5139,13 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
 /* 首页人脉温度与城市联动图表 */
 .lvct-dash__charts-grid {
     display: grid;
-    grid-template-columns: 3fr 2fr;
-    gap: var(--lvct-sp-4);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--lvct-sp-3);
 
-    @media (max-width: 768px) {
+    @container (max-width: 960px) {
+        grid-template-columns: 1fr;
+    }
+    @media (max-width: 960px) {
         grid-template-columns: 1fr;
     }
 }
@@ -5118,12 +5153,21 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
 .lvct-dash__chart-card {
     display: flex;
     flex-direction: column;
-    gap: var(--lvct-sp-3);
-    padding: var(--lvct-sp-4);
+    justify-content: space-between;
+    gap: var(--lvct-sp-2);
+    padding: 12px 14px;
     background: var(--lvct-bg-surface);
     border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
     border-radius: var(--lvct-r-lg);
     box-shadow: var(--lvct-shadow-card);
+    min-height: 110px;
+    box-sizing: border-box;
+    transition: transform var(--lvct-dur-fast) var(--lvct-ease), box-shadow var(--lvct-dur-fast) var(--lvct-ease);
+
+    &:hover {
+        border-color: color-mix(in srgb, var(--lvct-accent) 35%, var(--lvct-border-subtle));
+        box-shadow: var(--lvct-shadow-card-hover);
+    }
 }
 
 .lvct-dash__chart-header {
@@ -6865,7 +6909,7 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
 .lvct-orgs-view {
     display: flex;
     flex-direction: column;
-    gap: var(--lvct-sp-4);
+    gap: var(--lvct-sp-3);
     min-height: 0;
     min-width: 0;
 
@@ -6880,8 +6924,8 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
 
     &__grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-        gap: var(--lvct-sp-4);
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+        gap: var(--lvct-sp-3);
         align-content: start;
         align-items: stretch;
         min-width: 0;
@@ -7015,6 +7059,40 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
             &:focus-visible { background: var(--lvct-accent-soft); }
         }
     }
+}
+
+.lvct-orgs-overview-bar {
+    align-items: center;
+    gap: var(--lvct-sp-4);
+    padding: 10px var(--lvct-sp-4);
+    background: var(--lvct-bg-surface);
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
+    border-radius: var(--lvct-r-lg);
+    box-shadow: var(--lvct-shadow-card);
+}
+
+.lvct-orgs-overview-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.lvct-orgs-overview-num {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--b3-theme-on-background);
+    line-height: 1.1;
+}
+
+.lvct-orgs-overview-label {
+    font-size: 11.5px;
+    color: var(--b3-theme-on-surface);
+}
+
+.lvct-orgs-overview-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--b3-theme-surface-lighter);
 }
 
 /* B13.6 共同背景 */
