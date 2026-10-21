@@ -2567,7 +2567,6 @@ html[data-theme-mode="dark"] .lvct-settings__nav-item--active {
 /* 拼音首字母 A-Z 跳跃条 */
 .lvct-people__alphabet-bar {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: 3px;
     padding: 4px 8px;
@@ -2575,6 +2574,14 @@ html[data-theme-mode="dark"] .lvct-settings__nav-item--active {
     border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 80%, transparent);
     border-radius: var(--lvct-r-md, 6px);
     margin-bottom: var(--lvct-sp-2);
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
 }
 
 .lvct-people__alphabet-btn {
@@ -2590,6 +2597,7 @@ html[data-theme-mode="dark"] .lvct-settings__nav-item--active {
     background: transparent;
     color: var(--b3-theme-on-surface);
     cursor: pointer;
+    flex-shrink: 0;
     transition: all 0.15s ease;
 
     &:hover:not(:disabled) {
@@ -2612,10 +2620,33 @@ html[data-theme-mode="dark"] .lvct-settings__nav-item--active {
 /* 常用分组切换条 */
 .lvct-people__group-tabs {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
     margin-bottom: var(--lvct-sp-2);
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+
+    .b3-chip {
+        flex-shrink: 0;
+    }
+}
+
+.lvct-person-card__star-btn {
+    transition: transform 0.15s ease, opacity 0.15s ease;
+
+    &:hover {
+        transform: scale(1.18);
+    }
+
+    &:active {
+        transform: scale(0.92);
+    }
 }
 .lvct-person-card__top { display: flex; align-items: center; gap: var(--lvct-sp-2); min-width: 0; }
 .lvct-person-card__details {
@@ -8890,10 +8921,17 @@ html[data-theme-mode="dark"] .lvct-home__card,
 html[data-theme-mode="dark"] .lvct-dash__quickstart,
 html[data-theme-mode="dark"] .lvct-dash__actions,
 html[data-theme-mode="dark"] .lvct-dash__stat,
+html[data-theme-mode="dark"] .lvct-dash__chart-card,
 html[data-theme-mode="dark"] .lvct-settings__panel,
 html[data-theme-mode="dark"] .lvct-orgs-view__card,
+html[data-theme-mode="dark"] .lvct-orgs-overview-bar,
 html[data-theme-mode="dark"] .lvct-person-card,
 html[data-theme-mode="dark"] .lvct-people__control-surface,
+html[data-theme-mode="dark"] .lvct-people__alphabet-bar,
+html[data-theme-mode="dark"] .lvct-detail__quick-bar,
+html[data-theme-mode="dark"] .lvct-org-manager__member-toolbar,
+html[data-theme-mode="dark"] .lvct-org-manager__batch-bar,
+html[data-theme-mode="dark"] .lvct-org-manager__member-list--grid .lvct-org-manager__member,
 html[data-theme-mode="dark"] .lvct-org-profile-editor__section {
     border-color: rgba(255, 255, 255, 0.08);
     box-shadow: var(--lvct-shadow-card);
