@@ -69,6 +69,100 @@
     let memberSearchTimer: ReturnType<typeof setTimeout> | undefined;
     let showAddMember = $state(false);
     let expandedMemberId = $state("");
+    let memberViewMode: "grid" | "list" = $state("grid");
+    let selectedMemberIds = $state<string[]>([]);
+    let batchOperating = $state(false);
+    let batchActionError = $state("");
+    let batchActionMessage = $state("");
+    let batchRemoveConfirm = $state(false);
+
+    const allCurrentPageSelected = $derived(
+        members.length > 0 && members.every((m) => selectedMemberIds.includes(m.id))
+    );
+
+    function toggleSelectAllCurrentPage(checked: boolean) {
+        if (checked) {
+            const currentIds = new Set(selectedMemberIds);
+            for (const m of members) currentIds.add(m.id);
+            selectedMemberIds = Array.from(currentIds);
+        } else {
+            const pageIdSet = new Set(members.map((m) => m.id));
+            selectedMemberIds = selectedMemberIds.filter((id) => !pageIdSet.has(id));
+        }
+    }
+
+    function toggleMemberSelected(id: string, checked: boolean) {
+        if (checked) {
+            if (!selectedMemberIds.includes(id)) {
+                selectedMemberIds = [...selectedMemberIds, id];
+            }
+        } else {
+            selectedMemberIds = selectedMemberIds.filter((item) => item !== id);
+        }
+    }
+
+    async function batchUpdateStatus(targetStatus: "active" | "former") {
+        if (selectedMemberIds.length === 0 || busy || batchOperating) return;
+        if (currentOrg?.archived && targetStatus === "active") {
+            errorMessage = "组织已归档，不能恢复为在职成员";
+            return;
+        }
+        batchOperating = true;
+        batchActionError = "";
+        batchActionMessage = "";
+        try {
+            const today = toLocalDateKey(new Date());
+            const targetMembers = members.filter((m) => selectedMemberIds.includes(m.id));
+            for (const m of targetMembers) {
+                if (m.status === targetStatus) continue;
+                const patch = {
+                    status: targetStatus,
+                    ...(targetStatus === "former" && !m.leftOn ? { leftOn: today } : {}),
+                    ...(targetStatus === "active" ? { leftOn: "" } : {}),
+                };
+                await facade.updateOrganizationMember(m.id, patch, m);
+            }
+            batchActionMessage = `已将选中的 ${targetMembers.length} 位成员状态更新为「${targetStatus === "active" ? "在职/在读" : "已离开"}」`;
+            selectedMemberIds = [];
+            await loadOrgs(true);
+        } catch (error) {
+            batchActionError = requestErrorMessage(error);
+        } finally {
+            batchOperating = false;
+        }
+    }
+
+    async function batchRemoveSelected() {
+        if (selectedMemberIds.length === 0 || busy || batchOperating) return;
+        batchOperating = true;
+        batchActionError = "";
+        batchActionMessage = "";
+        try {
+            const targetMembers = members.filter((m) => selectedMemberIds.includes(m.id));
+            for (const m of targetMembers) {
+                await facade.removeOrganizationMember(m.id, m);
+            }
+            batchActionMessage = `已移除选中的 ${targetMembers.length} 条成员经历记录`;
+            selectedMemberIds = [];
+            batchRemoveConfirm = false;
+            await loadOrgs(true);
+        } catch (error) {
+            batchActionError = requestErrorMessage(error);
+        } finally {
+            batchOperating = false;
+        }
+    }
+
+    async function exportSelectedMembersTsv() {
+        if (selectedMemberIds.length === 0) return;
+        const targetMembers = members.filter((m) => selectedMemberIds.includes(m.id));
+        const orgName = currentOrg?.name ?? "";
+        const rows = targetMembers.map((m) => toMemberExportRow(m, orgName));
+        const tsv = buildOrganizationMemberTsv(rows, { includeBom: false });
+        await copyPlainText(tsv);
+        batchActionMessage = `已复制选中的 ${targetMembers.length} 位成员记录（TSV）`;
+        setTimeout(() => { if (alive) batchActionMessage = ""; }, 2500);
+    }
     let memberLoading = $state(false);
     let memberError = $state("");
     let membersRequest = 0;
@@ -959,6 +1053,9 @@
 <svelte:window onpointerdown={dismissMemberActions} />
 
 {#snippet memberIdentity(member: OrganizationMember)}
+    <span class="lvct-org-manager__member-avatar" aria-hidden="true">
+        {member.personName.slice(0, 1)}
+    </span>
     <span class="lvct-org-manager__member-name">
         <span class="lvct-org-manager__member-primary"><strong>{member.personName}</strong>
             <span class="lvct-org-manager__member-status" class:lvct-org-manager__member-status--active={member.status === "active"}>{orgMembershipStatusLabel(member)}</span>
@@ -1182,18 +1279,94 @@
                             onclick={toggleAddMember}>
                             {showAddMember ? text("orgMemberAddCollapse", "收起添加") : text("orgMemberAdd", "添加成员")}</button>
                     </div>
-                    <div class="fn__flex" style="gap: 8px; margin: 8px 0; flex-wrap: wrap;">
+                    <div class="fn__flex lvct-org-manager__member-controls" style="gap: 8px; margin: 8px 0; align-items: center; flex-wrap: wrap;">
+                        <label class="lvct-org-manager__select-all" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <input
+                                type="checkbox"
+                                checked={allCurrentPageSelected}
+                                onchange={(event) => toggleSelectAllCurrentPage((event.currentTarget as HTMLInputElement).checked)}
+                                disabled={members.length === 0 || busy}
+                            />
+                            <span class="ft__smaller">全选本页</span>
+                        </label>
                         <input class="b3-text-field fn__flex-1" type="search" bind:value={memberQuery}
                             placeholder={text("orgMemberSearch", "搜索姓名、部门、职位、状态或备注")}
                             aria-label={text("orgMemberSearch", "搜索姓名、部门、职位、状态或备注")}
                             oninput={() => reloadMembers(true)} disabled={busy || hasDraft || selectionGuardBusy} />
                         <select class="b3-select" bind:value={memberStatus} onchange={() => reloadMembers()} disabled={busy || hasDraft || selectionGuardBusy}
                             aria-label={text("orgMemberStatusFilter", "成员状态") }>
-                            <option value="all">{text("orgMemberStatusAll", "全部")}</option>
+                            <option value="all">{text("orgMemberStatusAll", "全部状态")}</option>
                             <option value="active">{text("orgStatusActive", "在职/在读")}</option>
                             <option value="former">{text("orgStatusFormer", "已离开")}</option>
                         </select>
+                        <span class="lvct-seg" role="group" aria-label="成员视图切换">
+                            <button
+                                type="button"
+                                class="lvct-seg__item"
+                                class:lvct-seg__item--active={memberViewMode === "grid"}
+                                onclick={() => (memberViewMode = "grid")}
+                                title="网格小卡片视图"
+                            >卡片</button>
+                            <button
+                                type="button"
+                                class="lvct-seg__item"
+                                class:lvct-seg__item--active={memberViewMode === "list"}
+                                onclick={() => (memberViewMode = "list")}
+                                title="精简单列列表视图"
+                            >列表</button>
+                        </span>
                     </div>
+
+                    <!-- 批量操作栏（当有选中成员时出现） -->
+                    {#if selectedMemberIds.length > 0}
+                        <div class="lvct-org-manager__batch-bar fn__flex" role="toolbar" aria-label="批量成员操作">
+                            <span class="lvct-org-manager__batch-count">已选 <b>{selectedMemberIds.length}</b> 人</span>
+                            <button
+                                type="button"
+                                class="b3-button b3-button--outline b3-button--small"
+                                disabled={busy || batchOperating || currentOrg?.archived}
+                                onclick={() => void batchUpdateStatus("active")}
+                                title="批量设为在职/在读状态"
+                            >设为在职</button>
+                            <button
+                                type="button"
+                                class="b3-button b3-button--outline b3-button--small"
+                                disabled={busy || batchOperating}
+                                onclick={() => void batchUpdateStatus("former")}
+                                title="批量设为已离开状态"
+                            >设为离开</button>
+                            <button
+                                type="button"
+                                class="b3-button b3-button--outline b3-button--small"
+                                disabled={busy || batchOperating}
+                                onclick={exportSelectedMembersTsv}
+                                title="复制选中成员的 TSV 格式表格"
+                            >复制 TSV</button>
+                            <button
+                                type="button"
+                                class="b3-button b3-button--cancel b3-button--small"
+                                disabled={busy || batchOperating}
+                                onclick={() => (batchRemoveConfirm = !batchRemoveConfirm)}
+                            >批量移除</button>
+                            <button
+                                type="button"
+                                class="b3-button b3-button--text b3-button--small"
+                                disabled={busy || batchOperating}
+                                onclick={() => { selectedMemberIds = []; batchRemoveConfirm = false; }}
+                            >取消选择</button>
+                        </div>
+                        {#if batchActionMessage}<p class="ft__smaller lvct-text-success" style="margin: 4px 0;" role="status">{batchActionMessage}</p>{/if}
+                        {#if batchActionError}<p class="lvct-form__error" style="margin: 4px 0;" role="alert">{batchActionError}</p>{/if}
+                        {#if batchRemoveConfirm}
+                            <div class="lvct-org-manager__member-confirm" role="group" aria-label="确认批量移除">
+                                <p>确定批量移除选中的 {selectedMemberIds.length} 条成员历史记录吗？将删除成员关系并重建双链，人物和组织文档均完整保留。</p>
+                                <button class="b3-button b3-button--cancel" disabled={batchOperating || busy} onclick={batchRemoveSelected}>
+                                    {batchOperating ? "批量移除中…" : `确认移除选中的 ${selectedMemberIds.length} 条记录`}
+                                </button>
+                                <button class="b3-button b3-button--outline" disabled={batchOperating || busy} onclick={() => (batchRemoveConfirm = false)}>取消</button>
+                            </div>
+                        {/if}
+                    {/if}
                     {#if memberExportMessage}<p class="ft__smaller ft__on-surface" role="status" aria-live="polite">{memberExportMessage}</p>{/if}
                     {#if memberExportError}<p class="lvct-form__error" role="alert">{memberExportError}</p>{/if}
                     {#if showAddMember}
@@ -1253,9 +1426,9 @@
                     {:else if members.length === 0 && !memberError}
                         <p class="ft__smaller ft__on-surface">{memberQuery.trim() || memberStatus !== "all" ? text("orgMembersNoMatch", "当前筛选没有匹配成员。") : text("orgMembersEmpty", "暂无成员。从下方添加。")}</p>
                     {:else if members.length > 0}
-                        <ul class="lvct-org-manager__member-list">
+                        <ul class="lvct-org-manager__member-list" class:lvct-org-manager__member-list--grid={memberViewMode === "grid"}>
                             {#each members as member (member.id)}
-                                <li class="lvct-org-manager__member" data-membership-id={member.id} data-person-doc-id={member.personDocId}>
+                                <li class="lvct-org-manager__member" class:lvct-org-manager__member--selected={selectedMemberIds.includes(member.id)} data-membership-id={member.id} data-person-doc-id={member.personDocId}>
                                     {#if replacingMemberId === member.id}
                                         <div class="lvct-org-manager__member-edit">
                                             <p class="ft__smaller ft__on-surface">{text("orgMemberReplaceHint", "关闭原成员的在职记录，并以一次原子操作登记接替成员。")}</p>
@@ -1357,7 +1530,19 @@
                                             </div>
                                         </div>
                                     {:else}
-                                        {@render memberIdentity(member)}
+                                        <div class="lvct-org-manager__member-card-body fn__flex" style="align-items: flex-start; gap: 8px; width: 100%;">
+                                            <span class="lvct-org-manager__member-checkbox-wrap" role="presentation" onclick={(event) => event.stopPropagation()} style="margin-top: 3px;">
+                                                <input
+                                                    type="checkbox"
+                                                    class="lvct-org-manager__member-checkbox"
+                                                    checked={selectedMemberIds.includes(member.id)}
+                                                    aria-label={`选择 ${member.personName}`}
+                                                    onclick={(event) => event.stopPropagation()}
+                                                    onchange={(event) => toggleMemberSelected(member.id, (event.currentTarget as HTMLInputElement).checked)}
+                                                />
+                                            </span>
+                                            {@render memberIdentity(member)}
+                                        </div>
                                         <span class="lvct-org-manager__member-actions" data-member-actions>
                                             {#if onOpenPerson}
                                                 <button type="button" class="b3-button b3-button--text" disabled={busy || memberLoading || organizationsRefreshing || hasDraft || selectionGuardBusy || !!movingMemberId}
