@@ -2,7 +2,8 @@
     import { requestErrorMessage } from "../../shared/error-presenter";
     /** 人物详情窗口：档案字段、互动与关系列表（增删，内核自动维护双向回链） */
     import { onDestroy, tick, untrack } from "svelte";
-    import { CalendarDays, Copy, ExternalLink, ChevronDown, ChevronRight, Network, Check, Link, FileText } from "@lucide/svelte";
+    import { CalendarDays, Copy, ExternalLink, ChevronDown, ChevronRight, Network, Check, Link, FileText, Star } from "@lucide/svelte";
+    import { isPersonStarred, togglePersonStarred, type ViewPreferences } from "../../domain/preferences";
     import { extractNormalizedRegion } from "../../domain/region.ts";
     import type { DetailSectionKey, DetailCollapsedSections } from "../../domain/preferences";
     import { listContacts, removeContact } from "../../services/contacts";
@@ -62,6 +63,8 @@ import StatusNotice from "../StatusNotice.svelte";
     let {
         settings,
         i18n,
+        preferences,
+        onPreferencesChange,
         person,
         availableGroups = [],
         /** FUNC-01.7-a：数据变化代际（Workbench 广播）；变化时原地重载洞察与跟进（写入/编辑中跳过） */
@@ -129,6 +132,8 @@ import StatusNotice from "../StatusNotice.svelte";
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
+        preferences?: ViewPreferences;
+        onPreferencesChange?: (preferences: ViewPreferences) => Promise<ViewPreferences>;
         person: ContactSummary;
         /** 当前名册中已使用的分组，供详情编辑复用已有选项。 */
         availableGroups?: readonly string[];
@@ -1783,6 +1788,24 @@ import StatusNotice from "../StatusNotice.svelte";
         <div class="lvct-detail__id">
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <h3 style="margin: 0;">{current.name}</h3>
+                {#if preferences && onPreferencesChange}
+                    {@const isStarred = isPersonStarred(preferences, current.docId)}
+                    <button
+                        type="button"
+                        class="b3-button b3-button--text b3-button--small"
+                        style="padding: 0 4px; height: auto; line-height: 1;"
+                        title={isStarred ? "取消星标常用" : "设为星标常用"}
+                        aria-label={isStarred ? `取消 ${current.name} 的星标` : `将 ${current.name} 设为星标`}
+                        onclick={() => {
+                            if (preferences && onPreferencesChange) {
+                                const next = togglePersonStarred(preferences, current.docId);
+                                void onPreferencesChange(next);
+                            }
+                        }}
+                    >
+                        <Star size={16} fill={isStarred ? "#f59e0b" : "none"} color={isStarred ? "#f59e0b" : "currentColor"} />
+                    </button>
+                {/if}
                 {#if current.isSelf}
                     <span class="lvct-chip lvct-bucket--today">本人</span>
                 {/if}

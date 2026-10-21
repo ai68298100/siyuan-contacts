@@ -12,7 +12,7 @@
     import { emptyDraft, type ContactDraft, type ContactSummary } from "../../domain/person";
     import type { WritableContactField } from "../../domain/contact-write.ts";
     import type { ContactsSettings } from "../../domain/model";
-    import { DEFAULT_VIEW_PREFERENCES, normalizeTableColumns, normalizeViewPreferences, PEOPLE_TABLE_COLUMNS } from "../../domain/preferences";
+    import { DEFAULT_VIEW_PREFERENCES, normalizeTableColumns, normalizeViewPreferences, PEOPLE_TABLE_COLUMNS, isPersonStarred, togglePersonStarred } from "../../domain/preferences";
     import type { PeopleTableColumn, ViewPreferences } from "../../domain/preferences";
     import { applyPeopleFilters, EMPTY_PEOPLE_FILTER, isExtraFilterActive, matchTags } from "../../domain/people-filters";
     import type { PeopleFilterState } from "../../domain/people-filters";
@@ -196,7 +196,17 @@
     let regionExploring = $state(false);
     let cardDensity: "comfortable" | "compact" = $state("comfortable");
     let activeLetterFilter = $state("");
+    let filterStarredOnly = $state(false);
     let addPersonInitial = $state<ContactDraft | undefined>(undefined);
+
+    const starredCount = $derived(people.filter((p) => isPersonStarred(preferences, p.docId)).length);
+
+    async function handleToggleStarred(docId: string) {
+        if (onPreferencesChange) {
+            const next = togglePersonStarred(preferences, docId);
+            await onPreferencesChange(next);
+        }
+    }
     let searchInputElement: HTMLInputElement | undefined = $state();
 
     function openAddWithName(name: string) {
@@ -591,6 +601,7 @@
         const focus = new Set(focusIds);
         const result = filterContactSearch(people, searchText, groupFilter)
             .filter((person) => !focusLabel || focus.has(person.itemId))
+            .filter((person) => !filterStarredOnly || isPersonStarred(preferences, person.docId))
             .filter((person) => matchTags(person, tagFilter, extraFilter.tagMatch));
         // 最近互动尚未核实时，不能把空快照解释成“从未联系”；暂时暂停受影响条件，
         // 保留联系人列表和其它筛选，待用户重试成功后再恢复条件。
@@ -1863,21 +1874,30 @@
     </div>
 
     <!-- 常用分组快捷切换胶囊栏 -->
-    {#if !isMobile && (groups.length > 0 || people.length > 0)}
+    {#if !isMobile && (groups.length > 0 || people.length > 0 || starredCount > 0)}
         <div class="lvct-people__group-tabs" role="tablist" aria-label="快捷分组">
+            {#if starredCount > 0}
+                <button
+                    type="button"
+                    class="b3-chip"
+                    style={filterStarredOnly ? "background: #f59e0b; color: #fff; font-weight: 600;" : "color: #d97706; border-color: rgba(245, 158, 11, 0.4);"}
+                    onclick={() => { filterStarredOnly = !filterStarredOnly; visibleCount = PAGE_SIZE; }}
+                    title="只看星标常用联系人"
+                >⭐ 常用 ({starredCount})</button>
+            {/if}
             <button
                 type="button"
                 class="b3-chip"
-                class:b3-chip--primary={groupFilter === ""}
-                onclick={() => { groupFilter = ""; visibleCount = PAGE_SIZE; }}
+                class:b3-chip--primary={groupFilter === "" && !filterStarredOnly}
+                onclick={() => { groupFilter = ""; filterStarredOnly = false; visibleCount = PAGE_SIZE; }}
             >全部 ({people.length})</button>
             {#each groups as g}
                 {@const count = people.filter((p) => p.group === g).length}
                 <button
                     type="button"
                     class="b3-chip"
-                    class:b3-chip--primary={groupFilter === g}
-                    onclick={() => { groupFilter = groupFilter === g ? "" : g; visibleCount = PAGE_SIZE; }}
+                    class:b3-chip--primary={groupFilter === g && !filterStarredOnly}
+                    onclick={() => { groupFilter = groupFilter === g ? "" : g; filterStarredOnly = false; visibleCount = PAGE_SIZE; }}
                 >{g} ({count})</button>
             {/each}
         </div>
@@ -2147,6 +2167,8 @@
                 <PersonCard
                     {person}
                     compact={cardDensity === "compact"}
+                    starred={isPersonStarred(preferences, person.docId)}
+                    onToggleStarred={() => void handleToggleStarred(person.docId)}
                     {onOpenGraphPerson}
                     selected={selectedIdSet.has(person.itemId)}
                     active={activePersonId === person.itemId}
