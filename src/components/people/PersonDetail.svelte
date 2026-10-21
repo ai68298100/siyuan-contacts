@@ -1780,19 +1780,23 @@ import StatusNotice from "../StatusNotice.svelte";
     }
 
     const personRegion = $derived(extractNormalizedRegion(current));
+    const isStarred = $derived(preferences ? isPersonStarred(preferences, current.docId) : false);
 </script>
 
 <div class="lvct-detail">
-    <div class="lvct-detail__header">
-        <div class="lvct-detail__avatar" data-group={current.group || "未分组"}>{current.name.slice(0, 1)}</div>
+    <div class="lvct-detail__header" class:lvct-detail__header--starred={isStarred}>
+        <div class="lvct-detail__avatar" data-group={current.group || "未分组"}>
+            {current.name.slice(0, 1)}
+            {#if isStarred}<span class="lvct-detail__avatar-star" title="星标联系人">⭐</span>{/if}
+        </div>
         <div class="lvct-detail__id">
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <h3 style="margin: 0;">{current.name}</h3>
                 {#if preferences && onPreferencesChange}
-                    {@const isStarred = isPersonStarred(preferences, current.docId)}
                     <button
                         type="button"
-                        class="b3-button b3-button--text b3-button--small"
+                        class="b3-button b3-button--text b3-button--small lvct-detail__star-btn"
+                        class:lvct-detail__star-btn--active={isStarred}
                         style="padding: 0 4px; height: auto; line-height: 1;"
                         title={isStarred ? "取消星标常用" : "设为星标常用"}
                         aria-label={isStarred ? `取消 ${current.name} 的星标` : `将 ${current.name} 设为星标`}
@@ -1821,6 +1825,9 @@ import StatusNotice from "../StatusNotice.svelte";
                 {/if}
             </div>
             <div class="lvct-detail__meta">
+                {#if isStarred}
+                    <span class="lvct-badge-pill lvct-badge-pill--star">⭐ 核心星标</span>
+                {/if}
                 {#if current.group}<span class="lvct-detail__group-chip">{current.group}</span>{/if}
                 {#if current.birthday}<span class="ft__smaller ft__on-surface">生日 {formatBirthdayDisplay(current.birthday, current.isLunar)}</span>{/if}
                 {#if personRegion.city && personRegion.city !== "未知"}
