@@ -22,6 +22,7 @@ export interface SavedViewQuery {
     workQuery?: string;
     educationQuery?: string;
     relationshipLabel?: string;
+    region?: string;
 }
 
 export interface SavedView {
@@ -70,6 +71,7 @@ function normalizeQuery(raw: unknown): SavedViewQuery | null {
         ...(typeof record.workQuery === "string" && record.workQuery.trim() ? { workQuery: record.workQuery.trim().slice(0, 200) } : {}),
         ...(typeof record.educationQuery === "string" && record.educationQuery.trim() ? { educationQuery: record.educationQuery.trim().slice(0, 200) } : {}),
         ...(typeof record.relationshipLabel === "string" && record.relationshipLabel.trim() ? { relationshipLabel: record.relationshipLabel.trim().slice(0, 80) } : {}),
+        ...(typeof record.region === "string" && record.region.trim() ? { region: record.region.trim().slice(0, 50) } : {}),
     };
 }
 

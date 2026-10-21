@@ -418,6 +418,30 @@ test("AG-VCF-ROBUST: 无名卡片智能从 ORG 或 NICKNAME 兜底识别，纯�
     assert.equal(contacts[1].phone, "13911112222");
 });
 
+test("Issue #35 攻坚：parseVcfForImport 对纯号码及无FN/N小米卡片智能以电话暂代命名，避免整包被拒", () => {
+    const vcf = [
+        "BEGIN:VCARD",
+        "VERSION:2.1",
+        "N:;;;;",
+        "FN:",
+        "TEL;CELL:13800138000",
+        "END:VCARD",
+    ].join("\r\n");
+
+    // parseVcf 默认跳过保持原有契约
+    assert.equal(parseVcf(vcf).length, 0);
+
+    // 未开启兜底时，全无名卡片抛出契约错误
+    assert.throws(() => parseVcfForImport(vcf), /文件没有有效 vCard 卡片/);
+
+    // 开启智能暂代兜底时，成功解析出联系人
+    const contacts = parseVcfForImport(vcf, { fallbackToPhoneOrEmail: true });
+    assert.equal(contacts.length, 1);
+    assert.equal(contacts[0].name, "未命名 (13800138000)");
+    assert.equal(contacts[0].phone, "13800138000");
+    assert.ok(contacts[0].needsReview?.some((msg) => msg.includes("智能暂代")));
+});
+
 test("AG-E35-VCARD-EXPORT-SCOPE: serializeVcf 支持多联系人范围子集导出，CRLF 与 RFC 6350 保真", () => {
     const people = [
         base({ name: "联系人甲", phone: "13800000001" }),

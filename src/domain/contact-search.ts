@@ -1,15 +1,21 @@
 /** 联系人搜索投影：关键词命中自身或其显式 related 关系两端。 */
 import type { ContactSummary } from "./person";
 import { profileText } from "./people-profiles.ts";
+import { getPinyinInitials } from "./pinyin.ts";
 
 function matchesOwnFields(person: ContactSummary, keyword: string): boolean {
+    const isAsciiKeyword = /^[a-z0-9]+$/i.test(keyword);
+    const nameInitials = isAsciiKeyword ? getPinyinInitials(person.name) : "";
+
     return Boolean(
         person.name.toLowerCase().includes(keyword) ||
-        person.aliasProfile?.state === "known" && person.aliasProfile.values.some((alias) => alias.toLowerCase().includes(keyword)) ||
+        (isAsciiKeyword && nameInitials.includes(keyword)) ||
+        (person.aliasProfile?.state === "known" && person.aliasProfile.values.some((alias) =>
+            alias.toLowerCase().includes(keyword) || (isAsciiKeyword && getPinyinInitials(alias).includes(keyword)))) ||
         person.phone.includes(keyword) ||
         person.wechat.toLowerCase().includes(keyword) ||
         person.email.toLowerCase().includes(keyword) ||
-        person.tags.some((tag) => tag.toLowerCase().includes(keyword)) ||
+        person.tags.some((tag) => tag.toLowerCase().includes(keyword) || (isAsciiKeyword && getPinyinInitials(tag).includes(keyword))) ||
         (person.profile ? ["family", "work", "education", "relationship"].some((field) =>
             (field === "relationship" ? person.profile?.relationship.state === "known" && person.profile.relationship.labels.length > 0
                 : person.profile?.affiliations.state === "known" && person.profile.affiliations.value[field as "family" | "work" | "education"].length > 0)

@@ -3,7 +3,8 @@ import test from "node:test";
 import { loadPersonCadence } from "../src/data/cadences.ts";
 import {
     computeRelationshipHealth,
-    heatLevelColorClass,
+    computeRelationshipHealthDistribution,
+    relationshipHeatColorClass as heatLevelColorClass,
     normalizeCadenceMap,
     normalizeCadenceMapForWrite,
 } from "../src/domain/cadence.ts";
@@ -191,4 +192,49 @@ test("E-29 关系健康度与热度分级：客观推导热度、分数、逾期
     assert.equal(pausedResult.overdue, false);
     assert.equal(pausedResult.overdueDays, 0);
     assert.equal(heatLevelColorClass(pausedResult.level), "lvct-heat--muted");
+});
+
+test("computeRelationshipHealthDistribution: 全库关系温度分布统计与人员归集", () => {
+    const baseNow = 1700000000000;
+    const dayMs = 86400 * 1000;
+    const people = [
+        { docId: "20261019000001-1111111", itemId: "item-1" }, // hot (5天前)
+        { docId: "20261019000002-2222222", itemId: "item-2" }, // warm (20天前)
+        { docId: "20261019000003-3333333", itemId: "item-3" }, // cool (40天前)
+        { docId: "20261019000004-4444444", itemId: "item-4" }, // cold (80天前)
+        { docId: "20261019000005-5555555", itemId: "item-5" }, // unknown (无互动)
+        { docId: "20261019000006-6666666", itemId: "item-6" }, // paused (已暂停)
+    ];
+
+    const recentInteractions = {
+        "20261019000001-1111111": { occurredAt: baseNow - 5 * dayMs },
+        "20261019000002-2222222": { occurredAt: baseNow - 20 * dayMs },
+        "20261019000003-3333333": { occurredAt: baseNow - 40 * dayMs },
+        "20261019000004-4444444": { occurredAt: baseNow - 80 * dayMs },
+    };
+
+    const cadences = {
+        "20261019000006-6666666": { days: 30, paused: true },
+    };
+
+    const dist = computeRelationshipHealthDistribution(people, recentInteractions, cadences, 30, baseNow);
+
+    assert.equal(dist.total, 6);
+    assert.equal(dist.hot.count, 1);
+    assert.deepEqual(dist.hot.itemIds, ["item-1"]);
+
+    assert.equal(dist.warm.count, 1);
+    assert.deepEqual(dist.warm.itemIds, ["item-2"]);
+
+    assert.equal(dist.cool.count, 1);
+    assert.deepEqual(dist.cool.itemIds, ["item-3"]);
+
+    assert.equal(dist.cold.count, 1);
+    assert.deepEqual(dist.cold.itemIds, ["item-4"]);
+
+    assert.equal(dist.unknown.count, 1);
+    assert.deepEqual(dist.unknown.itemIds, ["item-5"]);
+
+    assert.equal(dist.paused.count, 1);
+    assert.deepEqual(dist.paused.itemIds, ["item-6"]);
 });

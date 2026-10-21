@@ -2,7 +2,8 @@
     import { requestErrorMessage } from "../../shared/error-presenter";
     /** 人物详情窗口：档案字段、互动与关系列表（增删，内核自动维护双向回链） */
     import { onDestroy, tick, untrack } from "svelte";
-    import { CalendarDays, Copy, ExternalLink, ChevronDown, ChevronRight } from "@lucide/svelte";
+    import { CalendarDays, Copy, ExternalLink, ChevronDown, ChevronRight, Network, Check, Link, FileText } from "@lucide/svelte";
+    import { extractNormalizedRegion } from "../../domain/region.ts";
     import type { DetailSectionKey, DetailCollapsedSections } from "../../domain/preferences";
     import { listContacts, removeContact } from "../../services/contacts";
     import { addRelation, removeRelation, refreshPerson, retryRelationProjections } from "../../services/relations";
@@ -84,6 +85,8 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadPersonFields,
         onSavePersonFields,
         onOpenPersonDoc,
+        onOpenGraphPerson,
+        onOpenPeople,
         onNavigate,
         onNavigateDocId,
         closeLabel,
@@ -158,6 +161,8 @@ import StatusNotice from "../StatusNotice.svelte";
         /** B13.6：共同背景投影（同组织联系人；未接线时隐藏该区） */
         onLoadCommonOrgs?: (docId: string) => Promise<import("../../domain/org-membership").CommonOrgBackground[]>;
         onOpenPersonDoc: (docId: string) => void;
+        onOpenGraphPerson?: (docId: string) => void;
+        onOpenPeople?: (focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" | "recent" }) => void;
         onNavigate: (person: ContactSummary) => void;
         onNavigateDocId?: (docId: string) => Promise<void>;
         closeLabel?: string;
@@ -1099,6 +1104,35 @@ import StatusNotice from "../StatusNotice.svelte";
     let briefingExportOpen = $state(false);
     let briefingLimit = $state(10);
     let briefingGeneratedAt = $state("");
+    let briefingCopied = $state(false);
+    let briefingCopyTimer: ReturnType<typeof setTimeout> | null = null;
+    let siyuanRefCopied = $state(false);
+    let siyuanRefTimer: ReturnType<typeof setTimeout> | null = null;
+
+    async function copySiyuanRef() {
+        const refText = `(( ${current.docId} "${current.name}" ))`;
+        await copyPlainText(refText);
+        siyuanRefCopied = true;
+        if (siyuanRefTimer) clearTimeout(siyuanRefTimer);
+        siyuanRefTimer = setTimeout(() => {
+            siyuanRefCopied = false;
+        }, 2000);
+    }
+
+    async function copyBriefing() {
+        if (!briefingPreview) return;
+        await copyPlainText(briefingPreview);
+        briefingCopied = true;
+        if (briefingCopyTimer) clearTimeout(briefingCopyTimer);
+        briefingCopyTimer = setTimeout(() => {
+            briefingCopied = false;
+        }, 2000);
+    }
+
+    onDestroy(() => {
+        if (briefingCopyTimer) clearTimeout(briefingCopyTimer);
+        if (siyuanRefTimer) clearTimeout(siyuanRefTimer);
+    });
     function openBriefingExport() {
         const now = new Date();
         const pad = (value: number) => String(value).padStart(2, "0");
@@ -1739,16 +1773,55 @@ import StatusNotice from "../StatusNotice.svelte";
             cadenceSaving = false;
         }
     }
+
+    const personRegion = $derived(extractNormalizedRegion(current));
 </script>
 
 <div class="lvct-detail">
     <div class="lvct-detail__header">
         <div class="lvct-detail__avatar" data-group={current.group || "未分组"}>{current.name.slice(0, 1)}</div>
         <div class="lvct-detail__id">
-            <h3>{current.name}</h3>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <h3 style="margin: 0;">{current.name}</h3>
+                {#if current.isSelf}
+                    <span class="lvct-chip lvct-bucket--today">本人</span>
+                {/if}
+                {#if relationshipHealth.level !== "unknown"}
+                    <span class={`lvct-heat ${heatLevelColorClass(relationshipHealth.level)}`} style="font-size: 11px; padding: 2px 7px; border-radius: 9999px;" title={text("heatScoreLabel", "关系温度 {score}%", { score: relationshipHealth.score })}>
+                        {relationshipHealth.level === "hot" ? text("heatHot", "温热")
+                        : relationshipHealth.level === "warm" ? text("heatWarm", "常温")
+                        : relationshipHealth.level === "cool" ? text("heatCool", "微凉")
+                        : relationshipHealth.level === "cold" ? text("heatCold", "渐冻")
+                        : relationshipHealth.level === "paused" ? text("heatPaused", "已暂停")
+                        : text("heatUnknown", "从未联系")} · {relationshipHealth.score}%
+                    </span>
+                {/if}
+            </div>
             <div class="lvct-detail__meta">
                 {#if current.group}<span class="lvct-detail__group-chip">{current.group}</span>{/if}
                 {#if current.birthday}<span class="ft__smaller ft__on-surface">生日 {formatBirthdayDisplay(current.birthday, current.isLunar)}</span>{/if}
+                {#if personRegion.city && personRegion.city !== "未知"}
+                    <span class="lvct-detail__group-chip" title="所在城市">
+                        <span>📍 {personRegion.province && personRegion.province !== personRegion.city ? `${personRegion.province} · ` : ""}{personRegion.city}</span>
+                        {#if onOpenPeople}
+                            <button
+                                type="button"
+                                class="b3-button b3-button--text b3-button--small"
+                                style="padding: 0 4px; height: auto; line-height: 1; margin-left: 2px;"
+                                onclick={() => {
+                                    void (async () => {
+                                        if (await canLeave.requestClose()) {
+                                            onClose();
+                                            const matched = others.filter((p) => extractNormalizedRegion(p).city === personRegion.city);
+                                            onOpenPeople?.({ itemIds: [current.itemId, ...matched.map((p) => p.itemId)], label: `同城人脉 · ${personRegion.city}` });
+                                        }
+                                    })();
+                                }}
+                                title={`筛选 ${personRegion.city} 的同城联系人`}
+                            >同城人脉 &gt;</button>
+                        {/if}
+                    </span>
+                {/if}
             </div>
         </div>
         <div class="lvct-detail__header-actions">
@@ -1756,6 +1829,48 @@ import StatusNotice from "../StatusNotice.svelte";
             <button class="b3-button b3-button--outline" onclick={() => navigate(previousPerson)} disabled={!previousPerson || busy}>{text("detailPrevious", "上一位")}</button>
             <button class="b3-button b3-button--outline" onclick={() => navigate(nextPerson)} disabled={!nextPerson || busy}>{text("detailNext", "下一位")}</button>
         </div>
+    </div>
+
+    <!-- 顶部思源笔记与外部快捷联动操作条 -->
+    <div class="lvct-detail__quick-bar" role="toolbar" aria-label="快捷操作">
+        <button
+            type="button"
+            class="b3-button b3-button--outline b3-button--small"
+            onclick={copySiyuanRef}
+            title="复制可在思源笔记正文中粘贴的锚文本双链引用 ((docId '姓名'))"
+        >
+            {#if siyuanRefCopied}
+                <Check size={13} class="lvct-text-success" /> {text("detailSiyuanRefCopied", "已复制双链引用 ✓")}
+            {:else}
+                <Link size={13} /> {text("detailCopySiyuanRef", "复制双链引用")}
+            {/if}
+        </button>
+        <button
+            type="button"
+            class="b3-button b3-button--outline b3-button--small"
+            onclick={() => onOpenPersonDoc(current.docId)}
+            title="在思源中打开该联系人的独立文档"
+        >
+            <FileText size={13} /> {text("detailOpenNoteDoc", "打开笔记文档")}
+        </button>
+        {#if onOpenGraphPerson}
+            <button
+                type="button"
+                class="b3-button b3-button--outline b3-button--small"
+                onclick={() => void (async () => { if (await canLeave.requestClose()) { onClose(); onOpenGraphPerson?.(current.docId); } })()}
+                title="在关系图谱中聚焦该联系人的一度/二度网络"
+            >
+                <Network size={13} /> {text("detailOpenGraph", "图谱聚焦")}
+            </button>
+        {/if}
+        <button
+            type="button"
+            class="b3-button b3-button--outline b3-button--small"
+            onclick={openBriefingExport}
+            title="一键导出会前备忘、背景资料与谈资简报"
+        >
+            <CalendarDays size={13} /> 导出会前简报
+        </button>
     </div>
 
     <div class="lvct-detail__tabs" role="tablist" tabindex="-1" aria-label="人物详情内容" onkeydown={handleTabKeydown}>
@@ -2605,6 +2720,74 @@ import StatusNotice from "../StatusNotice.svelte";
     </section>
     {/if}
 
+    {#if (onLoadExchanges && onCreateExchange && onChangeExchangeStatus) || (onLoadAliases && onAddAlias && onRemoveAlias)}
+        <details class="lvct-detail__advanced">
+            <summary>
+                <span>更多资料与辅助记录</span>
+                <span class="ft__smaller ft__on-surface">往来账本 · 别名</span>
+            </summary>
+            {#if onLoadExchanges && onCreateExchange && onChangeExchangeStatus}
+                <ExchangeLedger
+                    personDocId={current.docId}
+                    {i18n}
+                    onLoad={onLoadExchanges}
+                    onCreate={onCreateExchange}
+                    onChangeStatus={onChangeExchangeStatus}
+                    onChanged={onChanged}
+                />
+            {/if}
+            {#if onLoadAliases && onAddAlias && onRemoveAlias}
+                <PersonAliases
+                    personDocId={current.docId}
+                    {i18n}
+                    onLoad={onLoadAliases}
+                    onAdd={onAddAlias}
+                    onRemove={onRemoveAlias}
+                    {onChanged}
+                />
+            {/if}
+        </details>
+    {/if}
+    </section>
+    {:else if activeTab === "activity"}
+
+    <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
+    <section id="lvct-detail-panel-activity" role="tabpanel" aria-labelledby="lvct-detail-tab-activity" tabindex="0">
+
+    {#if cadenceSupported}
+    <section class="lvct-detail__section">
+        <h4>{text("cadenceSectionTitle", "联系节奏")}</h4>
+        {#if cadenceLoadError}
+            <ViewState compact error title={text("cadenceLoadFailTitle", "联系节奏读取失败")} description={cadenceLoadError}>
+                <button type="button" class="b3-button b3-button--outline" onclick={loadCadence}>{text("commonRetry", "重试")}</button>
+            </ViewState>
+        {:else if !cadenceLoaded}
+            <ViewState compact loading title={text("cadenceLoading", "正在读取联系节奏")} />
+        {:else}
+            {#if cadenceError}<div class="lvct-form__error" role="alert">{cadenceError}</div>{/if}
+            <p class="ft__smaller ft__on-surface">
+                {text("cadenceLastLabel", "上次互动：")}{lastContactLabel || text("cadenceNoInteraction", "还没有互动记录")} · {text("cadenceCurrentLabel", "当前：")}
+                {cadenceMode === "paused" ? text("cadencePausedDesc", "已暂停提醒") : cadenceMode === "custom" ? text("cadenceCustomDesc", "自定义 {n} 天", { n: cadenceDays }) : text("cadenceGlobalDesc", "跟随全局阈值")}
+            </p>
+            <div class="lvct-detail__record fn__flex">
+                <select class="b3-select fn__flex-1" aria-label={text("cadenceModeLabel", "联系节奏模式")} bind:value={cadenceMode} disabled={cadenceSaving}>
+                    <option value="global">{text("cadenceOptionGlobal", "跟随全局阈值")}</option>
+                    <option value="custom">{text("cadenceOptionCustom", "自定义天数")}</option>
+                    <option value="paused">{text("cadenceOptionPaused", "暂停提醒")}</option>
+                </select>
+                {#if cadenceMode === "custom"}
+                    <input type="number" class="b3-text-field" min="1" max="365" aria-label="自定义天数" bind:value={cadenceDays} disabled={cadenceSaving} />
+                {/if}
+                <button class="b3-button b3-button--text" onclick={() => void saveCadence()} disabled={cadenceSaving}>
+                    {cadenceSaving ? text("cadenceSaving", "保存中…") : text("cadenceSave", "保存节奏")}
+                </button>
+            </div>
+            <StatusNotice message={cadenceMessage} onDismiss={() => (cadenceMessage = "")} />
+            <p class="ft__smaller ft__on-surface">{text("cadenceNote", "仅影响首页「久未联系」提醒，不写入联系人的数据库字段。")}</p>
+        {/if}
+    </section>
+    {/if}
+
     {#if followUpSupported}
     <section class="lvct-detail__section">
         <h4>{text("fuSectionTitle", "跟进计划")}</h4>
@@ -2679,77 +2862,10 @@ import StatusNotice from "../StatusNotice.svelte";
             {#if followUpFailedRequest && followUpFailedRequest.title === followUpTitle.trim() && followUpFailedRequest.dueDate === followUpDate}
                 <StatusNotice error message="该跟进请求尚未完全核实。使用原请求重试会先核对已有记录，避免重复创建。" actionLabel="用原请求重试" onAction={retryFailedFollowUp} actionDisabled={followUpBusy} />
             {/if}
-            <p class="ft__smaller ft__on-surface">到期的计划会出现在首页待办；完成计划不会自动记为互动。需要更新最近联系日期时，请在上方“记一笔互动”中单独记录。</p>
+            <p class="ft__smaller ft__on-surface">到期的计划会出现在首页待办；完成计划不会自动记为互动。需要更新最近联系日期时，请在下方“记一笔互动”中单独记录。</p>
         {/if}
     </section>
     {/if}
-
-    {#if cadenceSupported}
-    <section class="lvct-detail__section">
-        <h4>{text("cadenceSectionTitle", "联系节奏")}</h4>
-        {#if cadenceLoadError}
-            <ViewState compact error title={text("cadenceLoadFailTitle", "联系节奏读取失败")} description={cadenceLoadError}>
-                <button type="button" class="b3-button b3-button--outline" onclick={loadCadence}>{text("commonRetry", "重试")}</button>
-            </ViewState>
-        {:else if !cadenceLoaded}
-            <ViewState compact loading title={text("cadenceLoading", "正在读取联系节奏")} />
-        {:else}
-            {#if cadenceError}<div class="lvct-form__error" role="alert">{cadenceError}</div>{/if}
-            <p class="ft__smaller ft__on-surface">
-                {text("cadenceLastLabel", "上次互动：")}{lastContactLabel || text("cadenceNoInteraction", "还没有互动记录")} · {text("cadenceCurrentLabel", "当前：")}
-                {cadenceMode === "paused" ? text("cadencePausedDesc", "已暂停提醒") : cadenceMode === "custom" ? text("cadenceCustomDesc", "自定义 {n} 天", { n: cadenceDays }) : text("cadenceGlobalDesc", "跟随全局阈值")}
-            </p>
-            <div class="lvct-detail__record fn__flex">
-                <select class="b3-select fn__flex-1" aria-label={text("cadenceModeLabel", "联系节奏模式")} bind:value={cadenceMode} disabled={cadenceSaving}>
-                    <option value="global">{text("cadenceOptionGlobal", "跟随全局阈值")}</option>
-                    <option value="custom">{text("cadenceOptionCustom", "自定义天数")}</option>
-                    <option value="paused">{text("cadenceOptionPaused", "暂停提醒")}</option>
-                </select>
-                {#if cadenceMode === "custom"}
-                    <input type="number" class="b3-text-field" min="1" max="365" aria-label="自定义天数" bind:value={cadenceDays} disabled={cadenceSaving} />
-                {/if}
-                <button class="b3-button b3-button--text" onclick={() => void saveCadence()} disabled={cadenceSaving}>
-                    {cadenceSaving ? text("cadenceSaving", "保存中…") : text("cadenceSave", "保存节奏")}
-                </button>
-            </div>
-            <StatusNotice message={cadenceMessage} onDismiss={() => (cadenceMessage = "")} />
-            <p class="ft__smaller ft__on-surface">{text("cadenceNote", "仅影响首页「久未联系」提醒，不写入联系人的数据库字段。")}</p>
-        {/if}
-    </section>
-    {/if}
-    {#if (onLoadExchanges && onCreateExchange && onChangeExchangeStatus) || (onLoadAliases && onAddAlias && onRemoveAlias)}
-        <details class="lvct-detail__advanced">
-            <summary>
-                <span>更多资料与辅助记录</span>
-                <span class="ft__smaller ft__on-surface">往来账本 · 别名</span>
-            </summary>
-            {#if onLoadExchanges && onCreateExchange && onChangeExchangeStatus}
-                <ExchangeLedger
-                    personDocId={current.docId}
-                    {i18n}
-                    onLoad={onLoadExchanges}
-                    onCreate={onCreateExchange}
-                    onChangeStatus={onChangeExchangeStatus}
-                    onChanged={onChanged}
-                />
-            {/if}
-            {#if onLoadAliases && onAddAlias && onRemoveAlias}
-                <PersonAliases
-                    personDocId={current.docId}
-                    {i18n}
-                    onLoad={onLoadAliases}
-                    onAdd={onAddAlias}
-                    onRemove={onRemoveAlias}
-                    {onChanged}
-                />
-            {/if}
-        </details>
-    {/if}
-    </section>
-    {:else if activeTab === "activity"}
-
-    <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
-    <section id="lvct-detail-panel-activity" role="tabpanel" aria-labelledby="lvct-detail-tab-activity" tabindex="0">
 
     <section class="lvct-detail__section">
         <h4>互动与共同出席{insights ? `（共 ${insights.totalEvents} 条）` : ""}</h4>
@@ -2928,6 +3044,9 @@ import StatusNotice from "../StatusNotice.svelte";
 
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--cancel" onclick={() => void (async () => { if (await canLeave.requestClose()) onClose(); })()} disabled={busy || deleting}>{closeLabel ?? text("closeDialog", "关闭")}</button>
+        {#if onOpenGraphPerson}
+            <button class="b3-button b3-button--outline" onclick={() => void (async () => { if (await canLeave.requestClose()) { onClose(); onOpenGraphPerson?.(current.docId); } })()}><Network size={14}/>{text("detailOpenGraph", "图谱聚焦")}</button>
+        {/if}
         <button class="b3-button b3-button--text" onclick={() => onOpenPersonDoc(current.docId)}>{text("detailOpenDoc", "打开文档")}</button>
         <button class="b3-button b3-button--cancel lvct-detail__delete" onclick={confirmDelete} disabled={busy || deleting}>{deleting ? text("detailRemoving", "移除中…") : text("detailRemove", "从人脉移除")}</button>
     </div>
@@ -2975,6 +3094,13 @@ import StatusNotice from "../StatusNotice.svelte";
             <pre class="lvct-briefing-preview">{briefingPreview}</pre>
             <div class="lvct-form__actions">
                 <button class="b3-button b3-button--cancel" onclick={() => (briefingExportOpen = false)}>关闭</button>
+                <button class="b3-button b3-button--primary" onclick={copyBriefing}>
+                    {#if briefingCopied}
+                        <Check size={14} /> 已复制简报全文 ✓
+                    {:else}
+                        <Copy size={14} /> 复制简报全文
+                    {/if}
+                </button>
                 <button class="b3-button b3-button--text" onclick={downloadBriefing}>下载 .md</button>
             </div>
             <p class="ft__smaller ft__on-surface">预览与下载内容一致；仅含本地记录的事实，交往次数不代表关系亲疏。</p>

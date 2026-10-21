@@ -1,7 +1,7 @@
 <script lang="ts">
     /** B13.5a 组织视图：组织卡片列表（活跃/归档），管理动作经组织管理弹窗承载。
      *  数据经 facade（listOrganizations），读取失败显式错误可重试（读故障显式化）。 */
-    import { Building2, Plus } from "@lucide/svelte";
+    import { Building2, Plus, Users, Network } from "@lucide/svelte";
     import ViewState from "../ViewState.svelte";
     import { translateText } from "../../domain/translation";
     import type { ContactsPluginFacade } from "../../types";
@@ -17,6 +17,8 @@
         onOpenOrgManager,
         onCreateOrganization,
         onEditOrganization,
+        onOpenPeople,
+        onOpenGraphOrg,
     }: {
         facade: ContactsPluginFacade;
         revision?: number;
@@ -24,6 +26,8 @@
         onOpenOrgManager: (docId?: string) => void;
         onCreateOrganization?: () => void;
         onEditOrganization?: (docId: string) => void;
+        onOpenPeople?: (focus?: { itemIds?: readonly string[]; label?: string; workQuery?: string }) => void;
+        onOpenGraphOrg?: (orgDocId: string) => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -241,6 +245,14 @@
                             title={loading ? "组织列表正在读取，请稍候" : errorText ? "组织列表读取失败，请先重新加载" : undefined}
                             onclick={() => onEditOrganization?.(org.docId)}>
                             {text("orgsEditProfile", "编辑资料")}</button>{/if}
+                        {#if onOpenPeople}<button type="button" class="b3-button b3-button--text" disabled={loading || !!errorText}
+                            title="在名册中筛选属于该组织的成员"
+                            onclick={() => onOpenPeople?.({ workQuery: org.name, label: `组织 · ${org.name}` })}>
+                            <Users size={13} /> {text("orgsViewMembers", "成员")}</button>{/if}
+                        {#if onOpenGraphOrg}<button type="button" class="b3-button b3-button--text" disabled={loading || !!errorText}
+                            title="在关系图谱中聚焦该组织的人脉网络"
+                            onclick={() => onOpenGraphOrg?.(org.docId)}>
+                            <Network size={13} /> {text("orgsViewGraph", "图谱")}</button>{/if}
                     </div>
                 </div>
             {/each}

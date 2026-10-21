@@ -34,6 +34,8 @@
         onOpenPeople,
         onOpenCreatePerson,
         onOpenOrgs,
+        initialCenterDocId = "",
+        initialOrgDocId = "",
     }: {
         settings: ContactsSettings;
         revision?: number;
@@ -43,11 +45,15 @@
         preferences: ViewPreferences;
         onPreferencesChange: (next: ViewPreferences) => Promise<ViewPreferences>;
         onOpenDetail: (person: ContactSummary) => void;
-        onOpenPeople: () => void;
+        onOpenPeople: (focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" | "recent" }) => void;
         /** 空图谱时直接进入新建联系人流程；未接线时回退到联系人列表。 */
         onOpenCreatePerson?: () => void;
         /** B14 组织入口（可选）：点击组织节点跳转组织视图；未接线时组织节点点击无动作 */
         onOpenOrgs?: (orgDocId?: string) => void;
+        /** 外部显式指定聚焦的联系人中心（双向闭环联动） */
+        initialCenterDocId?: string;
+        /** 外部显式指定聚焦收窄的组织（双向闭环联动） */
+        initialOrgDocId?: string;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -76,6 +82,24 @@
     let showOrgs = $state(true);
     let relationScope: GraphScope = $state("global");
     let relationCenterDocId = $state("");
+
+    $effect(() => {
+        if (initialCenterDocId) {
+            relationScope = "person";
+            relationCenterDocId = initialCenterDocId;
+            if (graphMode === "native") {
+                nativeScope = "person";
+                nativeCenterDocId = initialCenterDocId;
+            }
+        }
+    });
+
+    $effect(() => {
+        if (initialOrgDocId) {
+            orgNarrowId = initialOrgDocId;
+            showOrgs = true;
+        }
+    });
     let presentation: "canvas" | "text" = $state("canvas");
     let graphFiltersOpen = $state(false);
     let graphExploreOpen = $state(false);
@@ -1371,6 +1395,24 @@
                         <option value="org">{text("graphScopeOrganization", "以组织为中心")}</option>
                     </select>
                     {#if relationScope === "person"}<PersonPicker items={graphPickerItems} value={relationCenterDocId} ariaLabel={text("graphScopeCenter", "范围中心人物")} onSelect={(id) => (relationCenterDocId = id)} />{/if}
+                    {#if relationScope === "person" || relationScope === "self"}
+                        <div class="lvct-graph-toolbar__depth-tabs" style="display: inline-flex; gap: 4px; margin-left: 6px;">
+                            <button
+                                type="button"
+                                class="b3-chip"
+                                class:b3-chip--primary={relationDepth === "direct"}
+                                onclick={() => (relationDepth = "direct")}
+                                title="仅展示直接相关的一度联系人"
+                            >{text("graphDepthDirect", "直接关系")}</button>
+                            <button
+                                type="button"
+                                class="b3-chip"
+                                class:b3-chip--primary={relationDepth === "second"}
+                                onclick={() => (relationDepth = "second")}
+                                title="拓展展示二度关联人脉（朋友的朋友）"
+                            >{text("graphDepthSecond", "二度关系")}</button>
+                        </div>
+                    {/if}
                 {/if}
             </div>
             {#if graphMode === "relations"}
@@ -1388,7 +1430,23 @@
             <div class="lvct-graph-toolbar__filter-group lvct-graph-toolbar__filter-group--legend">
                 <span class="ft__smaller ft__on-surface lvct-graph-legend">
                     {#each groupLegend as group (group.label)}
-                        <span class={`lvct-graph-legend__item lvct-graph-legend__item--${group.className}`}><i></i>{group.label}</span>
+                        {@const isActive = group.className === "org" ? showOrgs : groupFilter === group.label}
+                        <button
+                            type="button"
+                            class={`lvct-graph-legend__item lvct-graph-legend__item--${group.className}`}
+                            class:lvct-graph-legend__item--active={isActive}
+                            class:lvct-graph-legend__item--dimmed={group.className === "org" ? !showOrgs : groupFilter && groupFilter !== group.label}
+                            onclick={() => {
+                                if (group.className === "org") {
+                                    showOrgs = !showOrgs;
+                                } else {
+                                    groupFilter = groupFilter === group.label ? "" : group.label;
+                                }
+                            }}
+                            title={group.className === "org" ? (showOrgs ? "点击隐藏组织节点" : "点击显示组织节点") : (groupFilter === group.label ? `点击清除 ${group.label} 分组筛选` : `点击只看 ${group.label} 分组`)}
+                        >
+                            <i></i>{group.label}
+                        </button>
                     {/each}
                 </span>
             </div>
@@ -1426,7 +1484,7 @@
             {#if people.length === 0 && onOpenCreatePerson}
                 <button class="b3-button b3-button--outline" onclick={onOpenCreatePerson}>{text("graphCreatePerson", "新建联系人")}</button>
             {/if}
-            <button class="b3-button b3-button--text" onclick={onOpenPeople}>{text("graphGoContacts", "前往联系人")}</button>
+            <button class="b3-button b3-button--text" onclick={() => onOpenPeople()}>{text("graphGoContacts", "前往联系人")}</button>
         </ViewState>
     {:else if presentation === "text"}
         <section class="lvct-graph-text" aria-label={text("graphTextResults", "图谱文本结果")}>
@@ -1534,6 +1592,19 @@
                                 }}
                             >查看 {activeEvidence.targetName}</button>
                         {/if}
+                        {#if allPeopleByDocId.has(activeEvidence.sourceId) && allPeopleByDocId.has(activeEvidence.targetId)}
+                            {@const p1 = allPeopleByDocId.get(activeEvidence.sourceId)}
+                            {@const p2 = allPeopleByDocId.get(activeEvidence.targetId)}
+                            {#if p1 && p2}
+                                <button
+                                    type="button"
+                                    class="b3-button b3-button--text ft__smaller"
+                                    onclick={() => {
+                                        onOpenPeople({ itemIds: [p1.itemId, p2.itemId], label: `关联核对 · ${activeEvidence?.sourceName} 与 ${activeEvidence?.targetName}` });
+                                    }}
+                                >{text("graphCompareInPeople", "在名册中比对二人")}</button>
+                            {/if}
+                        {/if}
                         <button
                             type="button"
                             class="b3-button b3-button--text ft__smaller"
@@ -1599,6 +1670,7 @@
                         </div>
                     {/if}
                     <button class="b3-button b3-button--text" onclick={openHoveredPerson}>{text("graphOpenDetail", "查看人物详情")}</button>
+                    <button class="b3-button b3-button--text" onclick={() => { if (hoveredPerson) onOpenPeople({ itemIds: [hoveredPerson.itemId], label: `图谱定位 · ${hoveredPerson.name}` }); }}>{text("graphFocusInPeople", "在名册中定位")}</button>
                     {#if facade?.openDoc}<button class="b3-button b3-button--text" disabled={Boolean(sourceOpeningDocId)} aria-busy={sourceOpeningDocId === hoveredPerson.docId} onclick={() => { if (hoveredPerson) void openSourceDocument(hoveredPerson.docId); }}>{sourceOpeningDocId === hoveredPerson.docId ? "正在打开…" : "打开来源文档"}</button>{/if}
                 </div>
             {/if}

@@ -344,3 +344,83 @@ export function buildCoAttendance(
         .map(([otherDocId, occasions]) => ({ otherDocId, count: occasions.size }))
         .sort((a, b) => b.count - a.count);
 }
+
+export interface MonthlyInteractionTrendItem {
+    /** 形如 "2026-10" */
+    monthKey: string;
+    /** 显示名，形如 "10月" */
+    label: string;
+    /** 该月互动事件数 */
+    count: number;
+    /** 该月互动的独立联系人 docId 列表 */
+    personDocIds: string[];
+}
+
+export interface MonthlyInteractionTrend {
+    months: MonthlyInteractionTrendItem[];
+    maxCount: number;
+    totalCount: number;
+}
+
+/**
+ * 计算最近 N 个月（默认 6 个月）的互动频次与人脉活跃走势
+ */
+export function computeMonthlyInteractionTrend(
+    events: readonly InteractionEvent[],
+    monthsCount = 6,
+    now: Date = new Date(),
+): MonthlyInteractionTrend {
+    const months: MonthlyInteractionTrendItem[] = [];
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    for (let i = monthsCount - 1; i >= 0; i--) {
+        const d = new Date(currentYear, currentMonth - i, 1);
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const monthKey = `${y}-${String(m).padStart(2, "0")}`;
+        const label = `${m}月`;
+        months.push({
+            monthKey,
+            label,
+            count: 0,
+            personDocIds: [],
+        });
+    }
+
+    const monthMap = new Map<string, { count: number; personDocIds: Set<string> }>();
+    for (const m of months) {
+        monthMap.set(m.monthKey, { count: 0, personDocIds: new Set() });
+    }
+
+    let totalCount = 0;
+    for (const event of events) {
+        const d = new Date(event.occurredAt);
+        if (Number.isNaN(d.getTime())) continue;
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const key = `${y}-${String(m).padStart(2, "0")}`;
+        const slot = monthMap.get(key);
+        if (slot) {
+            slot.count += 1;
+            slot.personDocIds.add(event.personDocId);
+            totalCount += 1;
+        }
+    }
+
+    let maxCount = 0;
+    for (const m of months) {
+        const slot = monthMap.get(m.monthKey);
+        if (slot) {
+            m.count = slot.count;
+            m.personDocIds = Array.from(slot.personDocIds);
+            if (m.count > maxCount) maxCount = m.count;
+        }
+    }
+
+    return {
+        months,
+        maxCount,
+        totalCount,
+    };
+}

@@ -168,6 +168,8 @@
         focusContact: (itemId: string) => Promise<"restored" | "cancelled" | "missing">;
         cancelContactFocus: () => void;
     } | undefined = $state();
+    let graphInitialCenterDocId = $state("");
+    let graphInitialOrgDocId = $state("");
     let navigationError = $state("");
     let navigationRequest = 0;
     type ReturnDom = { trigger: HTMLElement | null; personItemId: string | null; scrolls: Array<{ element: HTMLElement; top: number; left: number }> };
@@ -456,7 +458,7 @@
         await selectView("people");
     }
 
-    async function openPeople(focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" | "recent" }) {
+    async function openPeople(focus?: { itemIds?: readonly string[]; label?: string; sort?: "name" | "group" | "birthday" | "recent"; workQuery?: string }) {
         if (!lifecycleToken.isAlive()) return;
         if (current !== "people" && !(await canLeave.requestClose())) return;
         if (!lifecycleToken.isAlive()) return;
@@ -466,6 +468,24 @@
         peopleFocusIds = focus?.itemIds ? [...focus.itemIds] : [];
         peopleFocusLabel = focus?.label ?? "";
         peopleFocusSort = focus?.sort;
+    }
+
+    async function openGraphPerson(docId: string) {
+        if (!lifecycleToken.isAlive()) return;
+        if (detailPerson && !(await canLeave.requestClose())) return;
+        detailPerson = null;
+        graphInitialCenterDocId = docId;
+        graphInitialOrgDocId = "";
+        await selectView("graph");
+    }
+
+    async function openGraphOrg(orgDocId: string) {
+        if (!lifecycleToken.isAlive()) return;
+        if (detailPerson && !(await canLeave.requestClose())) return;
+        detailPerson = null;
+        graphInitialCenterDocId = "";
+        graphInitialOrgDocId = orgDocId;
+        await selectView("graph");
     }
 
     onMount(() => {
@@ -684,6 +704,7 @@
                     }}
                     onPreferencesChange={savePreferences}
                     {onOpenPersonDoc}
+                    onOpenGraphPerson={openGraphPerson}
                     onLoadOrgCandidates={async () => (await facade.listOrganizations()).map((org) => ({ docId: org.docId, name: org.name, archived: org.archived }))}
                     onCreateOrganization={openCreateOrganizationForContact}
                     onAddOrgMembership={(personDocId, orgDocId, extra) => facade.addOrganizationMember(orgDocId, personDocId, extra)}
@@ -764,9 +785,11 @@
                     preferences={currentPreferences}
                     onPreferencesChange={savePreferences}
                     onOpenDetail={openDetail}
-                    onOpenPeople={() => selectView("people")}
+                    onOpenPeople={(focus) => void openPeople(focus)}
                     onOpenCreatePerson={() => void requestPeopleAction("create")}
                     onOpenOrgs={(docId) => docId ? void openOrganization(docId) : selectView("orgs")}
+                    initialCenterDocId={graphInitialCenterDocId}
+                    initialOrgDocId={graphInitialOrgDocId}
                 />
             {:else if current === "orgs"}
                 <OrgsView
@@ -776,6 +799,8 @@
                     onOpenOrgManager={(docId) => void openOrganization(docId)}
                     onCreateOrganization={() => void openCreateOrganization()}
                     onEditOrganization={(docId) => void openEditOrganizationProfile(docId)}
+                    onOpenPeople={(focus) => void openPeople(focus)}
+                    onOpenGraphOrg={openGraphOrg}
                 />
             {:else if current === "settings"}
                 <SettingsView
@@ -880,6 +905,8 @@
             onAddProject={facade.addPersonProject ? (item) => facade.addPersonProject!(item) : undefined}
             onRemoveProject={facade.removePersonProject ? (docId, projId) => facade.removePersonProject!(docId, projId) : undefined}
             {onOpenPersonDoc}
+            onOpenGraphPerson={openGraphPerson}
+            onOpenPeople={openPeople}
             onNavigate={showDetail}
             onNavigateDocId={(docId) => openPersonByDocId(docId)}
             closeLabel={detailCloseLabel}

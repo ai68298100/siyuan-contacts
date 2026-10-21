@@ -24,6 +24,9 @@
     import { onDestroy } from "svelte";
     import { requestErrorMessage } from "../../shared/error-presenter";
     import { confirmDialog } from "../../libs/confirm-dialog";
+import type { RelationshipHeatLevel } from "../../domain/cadence";
+import RegionExplorerDialog from "../people/RegionExplorerDialog.svelte";
+import { filterPeopleByRegion } from "../../domain/region";
 
     let {
         facade,
@@ -110,6 +113,43 @@
     let showAllBirthdays = $state(false);
     let showAllStale = $state(false);
     let showAllFollowUps = $state(false);
+    let regionExplorerOpen = $state(false);
+
+    function openHeatPeople(level: RelationshipHeatLevel, label: string) {
+        if (!data?.heatDistribution) return;
+        const itemIds = data.heatDistribution[level].itemIds;
+        if (itemIds.length === 0) {
+            onOpenPeople();
+            return;
+        }
+        onOpenPeople({ itemIds, label: `关系温度 · ${label}`, sort: "recent" });
+    }
+
+    function openRegionPeople(city: string, itemIds: string[]) {
+        if (!itemIds || itemIds.length === 0) {
+            onOpenPeople();
+            return;
+        }
+        onOpenPeople({ itemIds, label: `城市 · ${city}` });
+    }
+
+    function openMonthTrendPeople(monthLabel: string, personDocIds: string[]) {
+        if (!personDocIds || personDocIds.length === 0 || !data?.allPeople) {
+            onOpenPeople();
+            return;
+        }
+        const docSet = new Set(personDocIds);
+        const matched = data.allPeople.filter((p) => docSet.has(p.docId));
+        if (matched.length === 0) {
+            onOpenPeople();
+            return;
+        }
+        onOpenPeople({
+            itemIds: matched.map((p) => p.itemId),
+            label: `${monthLabel}互动联系人（${matched.length}人）`,
+            sort: "recent",
+        });
+    }
     // E-28：跟进多视角分组的姓名映射（由 dashboard 已持有的 followUps 卡片投影构造，不新增读取）
     const followUpPersonNames = $derived.by<ReadonlyMap<string, string>>(() => {
         const map = new Map<string, string>();
@@ -893,6 +933,174 @@
             </button>
         </div>
 
+        {#if data.heatDistribution && data.heatDistribution.total > 0}
+            <div class="lvct-dash__charts-grid">
+                <!-- 关系温度与紧迫度图表 -->
+                <div class="lvct-home__card lvct-dash__chart-card">
+                    <div class="lvct-dash__chart-header">
+                        <div class="lvct-dash__chart-title-wrap">
+                            <span class="lvct-dash__chart-icon">🌡️</span>
+                            <span class="lvct-dash__chart-title">人脉温度分布</span>
+                            <span class="lvct-text-muted font-size-12">（共 {data.heatDistribution.total} 人）</span>
+                        </div>
+                        <span class="lvct-text-muted font-size-11">点击标签或色块联动筛选</span>
+                    </div>
+
+                    <!-- 多色比例条 -->
+                    <div class="lvct-heat-bar" role="progressbar" aria-label="人脉健康温度分布">
+                        {#if data.heatDistribution.hot.count > 0}
+                            <button
+                                type="button"
+                                class="lvct-heat-bar__segment lvct-heat-bar__segment--hot"
+                                style={`width: ${data.heatDistribution.hot.percentage}%`}
+                                title={`温热（近期常联系）：${data.heatDistribution.hot.count} 人 (${data.heatDistribution.hot.percentage}%)`}
+                                onclick={() => openHeatPeople("hot", "温热")}
+                            ></button>
+                        {/if}
+                        {#if data.heatDistribution.warm.count > 0}
+                            <button
+                                type="button"
+                                class="lvct-heat-bar__segment lvct-heat-bar__segment--warm"
+                                style={`width: ${data.heatDistribution.warm.percentage}%`}
+                                title={`常温（状态良好）：${data.heatDistribution.warm.count} 人 (${data.heatDistribution.warm.percentage}%)`}
+                                onclick={() => openHeatPeople("warm", "常温")}
+                            ></button>
+                        {/if}
+                        {#if data.heatDistribution.cool.count > 0}
+                            <button
+                                type="button"
+                                class="lvct-heat-bar__segment lvct-heat-bar__segment--cool"
+                                style={`width: ${data.heatDistribution.cool.percentage}%`}
+                                title={`微凉（轻度逾期）：${data.heatDistribution.cool.count} 人 (${data.heatDistribution.cool.percentage}%)`}
+                                onclick={() => openHeatPeople("cool", "微凉")}
+                            ></button>
+                        {/if}
+                        {#if data.heatDistribution.cold.count > 0}
+                            <button
+                                type="button"
+                                class="lvct-heat-bar__segment lvct-heat-bar__segment--cold"
+                                style={`width: ${data.heatDistribution.cold.percentage}%`}
+                                title={`渐冻（深度疏远）：${data.heatDistribution.cold.count} 人 (${data.heatDistribution.cold.percentage}%)`}
+                                onclick={() => openHeatPeople("cold", "渐冻")}
+                            ></button>
+                        {/if}
+                        {#if data.heatDistribution.unknown.count > 0}
+                            <button
+                                type="button"
+                                class="lvct-heat-bar__segment lvct-heat-bar__segment--unknown"
+                                style={`width: ${data.heatDistribution.unknown.percentage}%`}
+                                title={`未互动：${data.heatDistribution.unknown.count} 人 (${data.heatDistribution.unknown.percentage}%)`}
+                                onclick={() => openHeatPeople("unknown", "未互动")}
+                            ></button>
+                        {/if}
+                        {#if data.heatDistribution.paused.count > 0}
+                            <button
+                                type="button"
+                                class="lvct-heat-bar__segment lvct-heat-bar__segment--paused"
+                                style={`width: ${data.heatDistribution.paused.percentage}%`}
+                                title={`已暂停提醒：${data.heatDistribution.paused.count} 人 (${data.heatDistribution.paused.percentage}%)`}
+                                onclick={() => openHeatPeople("paused", "已暂停")}
+                            ></button>
+                        {/if}
+                    </div>
+
+                    <!-- 交互点击胶囊 -->
+                    <div class="lvct-heat-chips">
+                        <button type="button" class="b3-chip lvct-chip--hot" onclick={() => openHeatPeople("hot", "温热")} title="点击在名册中查看温热人脉">
+                            🔥 温热 {data.heatDistribution.hot.count}
+                        </button>
+                        <button type="button" class="b3-chip lvct-chip--warm" onclick={() => openHeatPeople("warm", "常温")} title="点击在名册中查看常温人脉">
+                            🌿 常温 {data.heatDistribution.warm.count}
+                        </button>
+                        <button type="button" class="b3-chip lvct-chip--cool" onclick={() => openHeatPeople("cool", "微凉")} title="点击在名册中查看微凉人脉">
+                            🍂 微凉 {data.heatDistribution.cool.count}
+                        </button>
+                        <button type="button" class="b3-chip lvct-chip--cold" onclick={() => openHeatPeople("cold", "渐冻")} title="点击在名册中查看渐冻人脉">
+                            ❄️ 渐冻 {data.heatDistribution.cold.count}
+                        </button>
+                        {#if data.heatDistribution.unknown.count > 0}
+                            <button type="button" class="b3-chip" onclick={() => openHeatPeople("unknown", "未互动")} title="点击在名册中查看未曾互动的联系人">
+                                ⚪ 未互动 {data.heatDistribution.unknown.count}
+                            </button>
+                        {/if}
+                        {#if data.heatDistribution.paused.count > 0}
+                            <button type="button" class="b3-chip b3-chip--dashed" onclick={() => openHeatPeople("paused", "已暂停")} title="点击在名册中查看已暂停提醒的人脉">
+                                ⏸️ 暂停 {data.heatDistribution.paused.count}
+                            </button>
+                        {/if}
+                    </div>
+                </div>
+
+                <!-- 城市人脉与出差规划图表 -->
+                {#if data.topRegions && data.topRegions.length > 0}
+                    <div class="lvct-home__card lvct-dash__chart-card">
+                        <div class="lvct-dash__chart-header">
+                            <div class="lvct-dash__chart-title-wrap">
+                                <span class="lvct-dash__chart-icon">📍</span>
+                                <span class="lvct-dash__chart-title">核心城市与出差</span>
+                            </div>
+                            <button
+                                type="button"
+                                class="b3-button b3-button--text b3-button--small"
+                                onclick={() => (regionExplorerOpen = true)}
+                            >
+                                出差规划 &gt;
+                            </button>
+                        </div>
+                        <div class="lvct-region-chips">
+                            {#each data.topRegions as reg}
+                                {@const isUnknown = reg.city === "未知"}
+                                <button
+                                    type="button"
+                                    class="b3-chip"
+                                    class:b3-chip--dashed={isUnknown}
+                                    onclick={() => openRegionPeople(isUnknown ? "未填写" : reg.city, reg.people.map((p) => p.itemId))}
+                                    title={`点击在名册中筛选 ${reg.city} 联系人`}
+                                >
+                                    {reg.city} ({reg.count}人)
+                                </button>
+                            {/each}
+                        </div>
+                    </div>
+                {/if}
+
+                <!-- 近6个月互动活跃走势微图表 -->
+                {#if data.monthlyTrend && data.monthlyTrend.totalCount > 0}
+                    <div class="lvct-home__card lvct-dash__chart-card lvct-dash__chart-card--span">
+                        <div class="lvct-dash__chart-header">
+                            <div class="lvct-dash__chart-title-wrap">
+                                <span class="lvct-dash__chart-icon">📈</span>
+                                <span class="lvct-dash__chart-title">近半年互动活跃走势</span>
+                                <span class="lvct-text-muted font-size-12">（共 {data.monthlyTrend.totalCount} 次互动）</span>
+                            </div>
+                            <span class="lvct-text-muted font-size-11">点击柱子联动查看对应联系人</span>
+                        </div>
+                        <div class="lvct-trend-bars">
+                            {#each data.monthlyTrend.months as m}
+                                {@const heightPercent = data.monthlyTrend.maxCount > 0 ? Math.max(12, Math.round((m.count / data.monthlyTrend.maxCount) * 100)) : 12}
+                                <button
+                                    type="button"
+                                    class="lvct-trend-bar__col"
+                                    class:lvct-trend-bar__col--active={m.count > 0}
+                                    title={`${m.monthKey}：${m.count} 次互动（${m.personDocIds.length} 位联系人）`}
+                                    onclick={() => openMonthTrendPeople(m.label, m.personDocIds)}
+                                >
+                                    <div class="lvct-trend-bar__track">
+                                        <div class="lvct-trend-bar__fill" style={`height: ${heightPercent}%`}>
+                                            {#if m.count > 0}
+                                                <span class="lvct-trend-bar__val">{m.count}</span>
+                                            {/if}
+                                        </div>
+                                    </div>
+                                    <span class="lvct-trend-bar__label">{m.label}</span>
+                                </button>
+                            {/each}
+                        </div>
+                    </div>
+                {/if}
+            </div>
+        {/if}
+
         <div class="lvct-home__card lvct-dash__actions">
             <div class="lvct-dash__actions-head">
                 <div class="lvct-dash__actions-title">
@@ -1282,6 +1490,28 @@
 
 {#if reviewOpen}
     <LvctDialog title="交往回顾报表" wide onClose={() => (reviewOpen = false)}>
-        <ReviewReportDialog i18n={facade.i18n} buildReport={(range) => facade.buildReviewReport(range.from, range.to)} />
+        <ReviewReportDialog
+            i18n={facade.i18n}
+            buildReport={(range) => facade.buildReviewReport(range.from, range.to)}
+            onOpenPeople={(focus) => {
+                reviewOpen = false;
+                onOpenPeople(focus);
+            }}
+        />
+    </LvctDialog>
+{/if}
+
+{#if regionExplorerOpen && data?.allPeople}
+    <LvctDialog title={text("regionExplorerTitle", "城市分布与出差规划")} wide onClose={() => (regionExplorerOpen = false)}>
+        <RegionExplorerDialog
+            contacts={data.allPeople}
+            {i18n}
+            onApplyRegionFilter={(region) => {
+                regionExplorerOpen = false;
+                const matched = data?.allPeople ? filterPeopleByRegion(data.allPeople, region) : [];
+                onOpenPeople({ itemIds: matched.map((p) => p.itemId), label: `城市 · ${region}` });
+            }}
+            onClose={() => (regionExplorerOpen = false)}
+        />
     </LvctDialog>
 {/if}

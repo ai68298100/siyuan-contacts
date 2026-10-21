@@ -134,7 +134,7 @@ export function unfoldVcfLines(text: string): string[] {
 }
 
 /** 解析 .vcf 文本为联系人列表；容错：坏行跳过，无姓名的卡片丢弃，永不抛错 */
-export function parseVcf(text: string): VCardContact[] {
+export function parseVcf(text: string, options: ContactFromCardOptions = {}): VCardContact[] {
     const lines = unfoldVcfLines(text);
     const cards: string[][] = [];
     let current: string[] | null = null;
@@ -153,13 +153,13 @@ export function parseVcf(text: string): VCardContact[] {
     }
     const contacts: VCardContact[] = [];
     for (const card of cards) {
-        const contact = contactFromCard(card);
+        const contact = contactFromCard(card, options);
         if (contact) contacts.push(contact);
     }
     return contacts;
 }
 
-export function parseVcfForImport(text: string): VCardContact[] {
+export function parseVcfForImport(text: string, options: ContactFromCardOptions = {}): VCardContact[] {
     if (!text.trim()) throw new Error("vCard 文件为空，请选择包含姓名的通讯录文件");
     let current: string[] | null = null;
     let cardNumber = 0;
@@ -172,7 +172,7 @@ export function parseVcfForImport(text: string): VCardContact[] {
             cardNumber += 1;
         } else if (marker === "END:VCARD") {
             if (!current) throw new Error("vCard 的开始/结束标记不匹配，请修复文件后重试");
-            const contact = contactFromCard(current);
+            const contact = contactFromCard(current, options);
             // Android/AOSP exporters may emit a valid phone-only card with
             // empty FN/N.  The vCard contract says such cards are discarded;
             // do that per card so a later named contact can still be imported.
@@ -190,7 +190,15 @@ export function parseVcfForImport(text: string): VCardContact[] {
     return contacts;
 }
 
-function contactFromCard(lines: string[]): VCardContact | null {
+export interface ContactFromCardOptions {
+    /**
+     * 当无 FN/N/NICKNAME/ORG 时，是否允许以主要电话或邮箱智能暂代姓名，
+     * 避免特定手机通讯录导出纯号码卡片或无名名片时导致整包文件导入被拒（解决 Issue #35）。
+     */
+    fallbackToPhoneOrEmail?: boolean;
+}
+
+function contactFromCard(lines: string[], options: ContactFromCardOptions = {}): VCardContact | null {
     const props: VCardProperty[] = [];
     for (const line of lines) {
         const prop = parsePropertyLine(line);
@@ -207,17 +215,25 @@ function contactFromCard(lines: string[]): VCardContact | null {
     // structured N value to serve as the fallback in that case.
     // If both FN and N are missing, allow NICKNAME or ORG (company/organization name,
     // frequently emitted by Xiaomi/Android contact exports) to serve as fallback.
-    // Pure phone-only cards without name or organization are discarded per contract.
     const fn = first("FN").trim();
     const nickname = first("NICKNAME").trim();
     const org = first("ORG").split(";")[0]?.trim() || "";
 
-    const name = fn || structuredName(rawFirst("N")).trim() || nickname || org;
-    if (!name) return null;
-
     const phones = all("TEL")
         .map((value) => unescapeVcf(value).trim())
         .filter((value) => value.length > 0);
+    const emails = all("EMAIL").map((value) => unescapeVcf(value).trim()).filter((value) => value.length > 0);
+
+    let name = fn || structuredName(rawFirst("N")).trim() || nickname || org;
+    const isFallbackName = !name && Boolean(options.fallbackToPhoneOrEmail);
+    if (!name && options.fallbackToPhoneOrEmail) {
+        const title = first("TITLE").trim();
+        const rawNote = first("NOTE").trim();
+        const noteFirstLine = rawNote ? rawNote.split("\n")[0].trim().slice(0, 30) : "";
+        name = title || noteFirstLine || (phones.length > 0 ? `未命名 (${phones[0]})` : emails.length > 0 ? `未命名 (${emails[0]})` : "");
+    }
+    if (!name) return null;
+
     const tags = all("CATEGORIES")
         .flatMap((value) => splitUnescaped(value, ","))
         .map((value) => unescapeVcf(value).trim())
@@ -240,6 +256,7 @@ function contactFromCard(lines: string[]): VCardContact | null {
         if (all(property).length > 1) unsupportedProperties.push(`${property}（第 2 项起）`);
     }
     const needsReview: string[] = [];
+    if (isFallbackName) needsReview.push("姓名：原卡片缺少姓名属性，已智能暂代");
     if (first("BDAY") && !bday) needsReview.push("BDAY");
     if (first("X-LVCT-BDAY-LUNAR") && !isLunar && !birthday) needsReview.push("X-LVCT-BDAY-LUNAR");
 
@@ -247,7 +264,6 @@ function contactFromCard(lines: string[]): VCardContact | null {
     // legacy scalar phone field still de-duplicates before joining, so this
     // does not change the existing AV-compatible value.
     const uniquePhones = [...new Set(phones)];
-    const emails = all("EMAIL").map((value) => unescapeVcf(value).trim()).filter((value) => value.length > 0);
     const websites = all("URL").map((value) => unescapeVcf(value).trim()).filter((value) => value.length > 0);
     const methodPreview = contactMethodPreview(props);
     if (phones.length > 1) needsReview.push("TEL（多项已合并到电话字段）");

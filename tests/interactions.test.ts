@@ -4,6 +4,7 @@ import {
     appendEvent,
     buildCoAttendance,
     buildTimeline,
+    computeMonthlyInteractionTrend,
     filterTimelineByType,
     inferInteractionType,
     isDuplicateEvent,
@@ -271,4 +272,34 @@ test("AG-E17-INTERACTION-TYPE: 语义分类推导、时间线过滤与非法类�
         tombstones: [],
     };
     assert.throws(() => normalizeInteractionStoreForWrite(invalidStore), /互动存储内容损坏/);
+});
+
+test("computeMonthlyInteractionTrend: 正确按月统计互动走势与参与联系人", () => {
+    const fixedNow = new Date("2026-10-21T12:00:00Z");
+    const events: InteractionEvent[] = [
+        event({ id: "e1", personDocId: "d1", occurredAt: new Date("2026-10-15T10:00:00Z").getTime() }),
+        event({ id: "e2", personDocId: "d2", occurredAt: new Date("2026-10-05T10:00:00Z").getTime() }),
+        event({ id: "e3", personDocId: "d1", occurredAt: new Date("2026-09-20T10:00:00Z").getTime() }),
+        event({ id: "e4", personDocId: "d3", occurredAt: new Date("2026-08-10T10:00:00Z").getTime() }),
+        event({ id: "e5", personDocId: "d2", occurredAt: new Date("2026-05-01T10:00:00Z").getTime() }),
+    ];
+
+    const trend = computeMonthlyInteractionTrend(events, 6, fixedNow);
+    assert.equal(trend.months.length, 6);
+    assert.equal(trend.totalCount, 5);
+
+    // 最后一个月是 2026-10，有 2 次互动（d1, d2）
+    const oct = trend.months[trend.months.length - 1];
+    assert.equal(oct.monthKey, "2026-10");
+    assert.equal(oct.label, "10月");
+    assert.equal(oct.count, 2);
+    assert.deepEqual(oct.personDocIds.sort(), ["d1", "d2"].sort());
+
+    // 倒数第二个月是 2026-09，有 1 次互动（d1）
+    const sep = trend.months[trend.months.length - 2];
+    assert.equal(sep.monthKey, "2026-09");
+    assert.equal(sep.count, 1);
+    assert.deepEqual(sep.personDocIds, ["d1"]);
+
+    assert.equal(trend.maxCount, 2);
 });

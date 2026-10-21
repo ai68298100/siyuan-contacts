@@ -28,6 +28,11 @@ import { emptyStore } from "../domain/interactions";
 import { emptyFollowUpStore } from "../domain/followups";
 import type { RegistryStore } from "../domain/registry";
 import type { ContactsSettings } from "../domain/model";
+import { computeRelationshipHealthDistribution } from "../domain/cadence.ts";
+import type { RelationshipHealthDistribution } from "../domain/cadence.ts";
+import { groupContactsByRegion } from "../domain/region.ts";
+import { computeMonthlyInteractionTrend } from "../domain/interactions.ts";
+import type { MonthlyInteractionTrend } from "../domain/interactions.ts";
 
 export interface DashboardOptions {
     /** 多少天未互动算"久未联系" */
@@ -69,6 +74,14 @@ export interface DashboardData {
     actions: ActionCard[];
     /** C02：「从未互动」行动卡的收编日期映射（docId → YYYY-MM-DD），组内最近收编优先 */
     neverOrder: Record<string, string>;
+    /** E-29：人脉全库关系温度与紧迫度分布 */
+    heatDistribution?: RelationshipHealthDistribution;
+    /** E-25：人脉核心城市分布与热度 */
+    topRegions?: { city: string; province?: string; count: number; people: import("../domain/person.ts").ContactSummary[] }[];
+    /** 近 6 个月互动频次与人脉活跃走势 */
+    monthlyTrend?: MonthlyInteractionTrend;
+    /** 名册快照（已排除本人），供仪表盘快速筛选与出差规划联动 */
+    allPeople?: import("../domain/person.ts").ContactSummary[];
     /**
      * FUNC-01.12：读取失败的插件存储模块（仅非空时携带）。
      * 受影响模块以空数据参与投影并在 UI 显式提示，绝不把故障静默呈现为正常空态。
@@ -227,6 +240,18 @@ export async function loadDashboard(
         if (registeredAt) neverOrder[card.person.docId] = registeredAt;
     }
 
+    const lastInteractionMap: Record<string, { occurredAt: number }> = {};
+    for (const event of store.events) {
+        const cur = lastInteractionMap[event.personDocId];
+        if (!cur || event.occurredAt > cur.occurredAt) {
+            lastInteractionMap[event.personDocId] = { occurredAt: event.occurredAt };
+        }
+    }
+    const heatDistribution = computeRelationshipHealthDistribution(people, lastInteractionMap, cadences, options.staleThresholdDays, now.getTime());
+    const regionGroups = groupContactsByRegion(people);
+    const topRegions = regionGroups.slice(0, 6);
+    const monthlyTrend = computeMonthlyInteractionTrend(store.events, 6, now);
+
     return {
         people: people.length,
         relations: Math.round(people.reduce((sum, person) => sum + person.relatedItemIds.length, 0) / 2),
@@ -239,6 +264,10 @@ export async function loadDashboard(
         followUps,
         actions,
         neverOrder,
+        heatDistribution,
+        topRegions,
+        monthlyTrend,
+        allPeople: people,
         ...(ordinaryScopeUnknown ? { ordinaryScopeUnknown: true } : {}),
         ...(identity && !ordinaryScopeUnknown ? { excludedSelfDocId: identity.selfDocId } : {}),
         ...(readFailures.length > 0 ? { readFailures } : {}),

@@ -9,7 +9,7 @@
     import { exportVcfText } from "../../services/vcard";
     import { formatBirthdayDisplay, nextBirthday } from "../../domain/occasions";
     import GroupField from "./GroupField.svelte";
-    import type { ContactSummary } from "../../domain/person";
+    import { emptyDraft, type ContactDraft, type ContactSummary } from "../../domain/person";
     import type { WritableContactField } from "../../domain/contact-write.ts";
     import type { ContactsSettings } from "../../domain/model";
     import { DEFAULT_VIEW_PREFERENCES, normalizeTableColumns, normalizeViewPreferences, PEOPLE_TABLE_COLUMNS } from "../../domain/preferences";
@@ -29,10 +29,11 @@
     import ProfileCompletionDialog from "./ProfileCompletionDialog.svelte";
     import ContactMergeWizard from "./ContactMergeWizard.svelte";
     import OccasionDialog from "../OccasionDialog.svelte";
+    import RegionExplorerDialog from "./RegionExplorerDialog.svelte";
     import { PROFILE_GAPS } from "../../domain/people-filters";
     import ViewState from "../ViewState.svelte";
     import { useCloseGuard } from "../close-guard";
-    import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal, Bookmark, Pencil, Trash2, Calendar } from "@lucide/svelte";
+    import { LayoutGrid, List, FolderInput, ContactRound, UserPlus, ExternalLink, Columns3, SlidersHorizontal, Bookmark, Pencil, Trash2, Calendar, Compass, Network } from "@lucide/svelte";
     import { translateText } from "../../domain/translation";
     import { isAbortError } from "../../shared/async";
     import { confirmDialog } from "../../libs/confirm-dialog";
@@ -41,6 +42,7 @@
     import type { ContactExtendedDraft } from "../../domain/contact-create";
     import { buildVirtualRows, estimateVirtualHeight, virtualRowAtOffset, virtualRowRange } from "../../domain/virtual-list";
     import { createDebouncer } from "../../domain/debounce";
+    import { groupPeopleByAlphabet, getPersonNameInitial, ALPHABET_LETTERS } from "../../domain/pinyin.ts";
 
     let {
         settings,
@@ -63,6 +65,7 @@
         onOrderChange,
         onGroupsChange,
         onOpenPersonDoc,
+        onOpenGraphPerson,
         onLoadOrgCandidates,
         onCreateOrganization,
         onAddOrgMembership,
@@ -102,6 +105,7 @@
         /** 完整名册的分组候选；不随当前搜索结果缩小。 */
         onGroupsChange?: (groups: string[]) => void;
         onOpenPersonDoc?: (docId: string) => void;
+        onOpenGraphPerson?: (docId: string) => void;
         onLoadOrgCandidates?: () => Promise<ReadonlyArray<{ docId: string; name: string; archived?: boolean }>>;
         onCreateOrganization?: (initialName?: string) => void | { docId: string; name: string } | Promise<void | { docId: string; name: string }>;
         /** B13.3：批量将已选联系人登记为目标组织的当前成员。 */
@@ -189,6 +193,38 @@
     let dupOpen = $state(false);
     let mergeTarget: DuplicatePair | null = $state(null);
     let occasioning = $state(false);
+    let regionExploring = $state(false);
+    let cardDensity: "comfortable" | "compact" = $state("comfortable");
+    let activeLetterFilter = $state("");
+    let addPersonInitial = $state<ContactDraft | undefined>(undefined);
+    let searchInputElement: HTMLInputElement | undefined = $state();
+
+    function openAddWithName(name: string) {
+        addPersonInitial = { ...emptyDraft(), name };
+        adding = true;
+    }
+
+    onDestroy(() => {
+        if (typeof window !== "undefined") {
+            window.removeEventListener("keydown", handleGlobalSlashKey);
+        }
+    });
+
+    function handleGlobalSlashKey(event: KeyboardEvent) {
+        if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            const active = document.activeElement;
+            const isEditing = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement || (active as HTMLElement)?.isContentEditable;
+            if (!isEditing) {
+                event.preventDefault();
+                searchInputElement?.focus();
+                searchInputElement?.select();
+            }
+        }
+    }
+
+    if (typeof window !== "undefined") {
+        window.addEventListener("keydown", handleGlobalSlashKey);
+    }
     const duplicatePairs: DuplicatePair[] = $derived(findDuplicatePairs(people));
     const duplicatePairsCapped = $derived(duplicatePairs.length >= DUPLICATE_PAIRS_LIMIT);
     // svelte-ignore state_referenced_locally
@@ -575,7 +611,9 @@
         });
         return final;
     });
-    const visible = $derived(filtered.slice(0, visibleCount));
+    const alphabetData = $derived(groupPeopleByAlphabet(people));
+    const letterFiltered = $derived(activeLetterFilter ? filtered.filter((person) => getPersonNameInitial(person.name) === activeLetterFilter) : filtered);
+    const visible = $derived(letterFiltered.slice(0, visibleCount));
     const virtualized = $derived(visible.length > VIRTUAL_LIST_THRESHOLD);
     const virtualRowSize = $derived(viewMode === "table" ? TABLE_ROW_ESTIMATE : CARD_ROW_ESTIMATE);
     const virtualColumnCount = $derived(viewMode === "table"
@@ -810,6 +848,7 @@
         if (extraFilter.workQuery?.trim()) chips.push({ key: "workQuery", label: `工作单位：${extraFilter.workQuery.trim()}` });
         if (extraFilter.educationQuery?.trim()) chips.push({ key: "educationQuery", label: `学校：${extraFilter.educationQuery.trim()}` });
         if (extraFilter.relationshipLabel?.trim()) chips.push({ key: "relationshipLabel", label: `与我的关系：${extraFilter.relationshipLabel.trim()}` });
+        if (extraFilter.region?.trim()) chips.push({ key: "region", label: `地区/城市：${extraFilter.region.trim()}` });
         return chips;
     });
 
@@ -831,7 +870,7 @@
         else if (key === "recentRange") extraFilter = { ...extraFilter, recentFrom: "", recentTo: "" };
         else if (key === "neverContacted") extraFilter = { ...extraFilter, neverContacted: false };
         else if (key === "profileGap") extraFilter = { ...extraFilter, profileGap: "" };
-        else if (["workQuery", "educationQuery", "relationshipLabel"].includes(key)) extraFilter = { ...extraFilter, [key]: "" };
+        else if (["workQuery", "educationQuery", "relationshipLabel", "region"].includes(key)) extraFilter = { ...extraFilter, [key]: "" };
         visibleCount = PAGE_SIZE;
     }
 
@@ -894,6 +933,7 @@
             ...(extraFilter.workQuery?.trim() ? { workQuery: extraFilter.workQuery.trim() } : {}),
             ...(extraFilter.educationQuery?.trim() ? { educationQuery: extraFilter.educationQuery.trim() } : {}),
             ...(extraFilter.relationshipLabel?.trim() ? { relationshipLabel: extraFilter.relationshipLabel.trim() } : {}),
+            ...(extraFilter.region?.trim() ? { region: extraFilter.region.trim() } : {}),
         };
     }
 
@@ -920,7 +960,8 @@
         tagFilter = [...query.tags];
         extraFilter = { ...extraFilter, tagMatch: query.tagMatch, recentFrom: query.recentFrom, recentTo: query.recentTo, neverContacted: query.neverContacted,
             profileGap: query.profileGap ?? "",
-            workQuery: query.workQuery ?? "", educationQuery: query.educationQuery ?? "", relationshipLabel: query.relationshipLabel ?? "" };
+            workQuery: query.workQuery ?? "", educationQuery: query.educationQuery ?? "", relationshipLabel: query.relationshipLabel ?? "",
+            region: query.region ?? "" };
         sortMode = query.sort;
         visibleCount = PAGE_SIZE;
     }
@@ -1021,6 +1062,7 @@
         void extraFilter.recentFrom;
         void extraFilter.recentTo;
         void extraFilter.neverContacted;
+        void extraFilter.region;
         visibleCount = PAGE_SIZE;
     });
     /*
@@ -1639,6 +1681,7 @@
                         <input type="checkbox" bind:checked={extraFilter.neverContacted} disabled={recentState !== "ready"} title={recentState !== "ready" ? "最近互动尚未核实，读取成功后才能筛选从未联系" : undefined} />
                         <span>只看从未联系的人</span>
                     </label>
+                    <label class="lvct-form__item">城市/地区关键词<input class="b3-text-field" type="text" maxlength="80" placeholder="如：北京、上海、杭州、未填写" value={extraFilter.region ?? ""} oninput={(event) => { extraFilter = { ...extraFilter, region: event.currentTarget.value }; visibleCount = PAGE_SIZE; }} /></label>
                     <label class="lvct-form__item">工作单位关键词<input class="b3-text-field" type="text" maxlength="200" value={extraFilter.workQuery ?? ""} oninput={(event) => { extraFilter = { ...extraFilter, workQuery: event.currentTarget.value }; visibleCount = PAGE_SIZE; }} /></label>
                     <label class="lvct-form__item">学校关键词<input class="b3-text-field" type="text" maxlength="200" value={extraFilter.educationQuery ?? ""} oninput={(event) => { extraFilter = { ...extraFilter, educationQuery: event.currentTarget.value }; visibleCount = PAGE_SIZE; }} /></label>
                     <label class="lvct-form__item">与我的关系称谓<input class="b3-text-field" type="text" maxlength="80" value={extraFilter.relationshipLabel ?? ""} oninput={(event) => { extraFilter = { ...extraFilter, relationshipLabel: event.currentTarget.value }; visibleCount = PAGE_SIZE; }} /></label>
@@ -1679,6 +1722,7 @@
         <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); importing = true; }}><FolderInput size={16}/>{text("peopleImportDocs", "导入已有文档")}</button>
         <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); vcarding = true; }}><ContactRound size={16}/>{text("peopleVcard", "vCard 导入/导出")}</button>
         <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); occasioning = true; }}><Calendar size={16}/>{text("peopleOccasion", "记录活动")}</button>
+        <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); regionExploring = true; }}><Compass size={16}/>{text("peopleRegionExplorer", "城市与出差")}</button>
     {/snippet}
     <div class="lvct-people__toolbar lvct-people__control-surface fn__flex">
         {#if isMobile}
@@ -1694,16 +1738,47 @@
         {#if !isMobile}
             {@render viewMenuControl()}
             <input
+                bind:this={searchInputElement}
                 class="b3-text-field fn__flex-1 lvct-people__desktop-search"
                 type="text"
                 aria-label={text("peopleSearchPlaceholder", "搜索联系人")}
-                placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
+                placeholder={text("peopleSearchPlaceholder", "搜索姓名/拼音/电话/微信… (按 / 聚焦)")}
                 value={searchInput}
                 oninput={(event) => handleSearchInput((event.currentTarget as HTMLInputElement).value)}
+                onkeydown={(event) => {
+                    if (event.key === "Escape") {
+                        if (searchInput) {
+                            event.preventDefault();
+                            handleSearchInput("");
+                        } else {
+                            (event.currentTarget as HTMLInputElement).blur();
+                        }
+                    }
+                }}
             />
             {@render filterControls()}
         {/if}
         <span class="lvct-people__viewtoggle">
+            {#if viewMode === "cards"}
+                <span class="lvct-seg" role="group" aria-label="卡片密度" title="卡片密度">
+                    <button
+                        type="button"
+                        class="lvct-seg__item"
+                        class:lvct-seg__item--active={cardDensity === "comfortable"}
+                        aria-pressed={cardDensity === "comfortable"}
+                        onclick={() => (cardDensity = "comfortable")}
+                        title="舒适卡片视图"
+                    >舒适</button>
+                    <button
+                        type="button"
+                        class="lvct-seg__item"
+                        class:lvct-seg__item--active={cardDensity === "compact"}
+                        aria-pressed={cardDensity === "compact"}
+                        onclick={() => (cardDensity = "compact")}
+                        title="紧凑卡片视图：一屏浏览更多联系人"
+                    >紧凑</button>
+                </span>
+            {/if}
             <span class="lvct-seg" role="group" aria-label="切换卡片/表格" title="切换卡片/表格">
                 <button
                     type="button"
@@ -1779,6 +1854,66 @@
             ><SlidersHorizontal size={16}/>{text("peopleMobileTools", "筛选与整理")}{isExtraFilterActive(extraFilter) || duplicatePairs.length > 0 ? " ·" : ""}</button>
         {/if}
     </div>
+
+    <!-- 常用分组快捷切换胶囊栏 -->
+    {#if !isMobile && (groups.length > 0 || people.length > 0)}
+        <div class="lvct-people__group-tabs" role="tablist" aria-label="快捷分组">
+            <button
+                type="button"
+                class="b3-chip"
+                class:b3-chip--primary={groupFilter === ""}
+                onclick={() => { groupFilter = ""; visibleCount = PAGE_SIZE; }}
+            >全部 ({people.length})</button>
+            {#each groups as g}
+                {@const count = people.filter((p) => p.group === g).length}
+                <button
+                    type="button"
+                    class="b3-chip"
+                    class:b3-chip--primary={groupFilter === g}
+                    onclick={() => { groupFilter = groupFilter === g ? "" : g; visibleCount = PAGE_SIZE; }}
+                >{g} ({count})</button>
+            {/each}
+        </div>
+    {/if}
+
+    <!-- 拼音首字母 A-Z 跳跃索引条 -->
+    {#if !isMobile && people.length > 8}
+        <div class="lvct-people__alphabet-bar" role="navigation" aria-label="首字母拼音快速跳转">
+            <button
+                type="button"
+                class="lvct-people__alphabet-btn"
+                class:lvct-people__alphabet-btn--active={activeLetterFilter === ""}
+                onclick={() => { activeLetterFilter = ""; visibleCount = PAGE_SIZE; }}
+                title="查看全部联系人"
+            >全部</button>
+            {#each ALPHABET_LETTERS as letter}
+                {@const hasItems = alphabetData.activeLetters.has(letter)}
+                <button
+                    type="button"
+                    class="lvct-people__alphabet-btn"
+                    class:lvct-people__alphabet-btn--active={activeLetterFilter === letter}
+                    disabled={!hasItems}
+                    onclick={() => {
+                        activeLetterFilter = activeLetterFilter === letter ? "" : letter;
+                        visibleCount = PAGE_SIZE;
+                    }}
+                    title={hasItems ? `只看首字母为 ${letter} 的联系人` : `暂无首字母为 ${letter} 的联系人`}
+                >{letter}</button>
+            {/each}
+            {#if alphabetData.activeLetters.has("#")}
+                <button
+                    type="button"
+                    class="lvct-people__alphabet-btn"
+                    class:lvct-people__alphabet-btn--active={activeLetterFilter === "#"}
+                    onclick={() => {
+                        activeLetterFilter = activeLetterFilter === "#" ? "" : "#";
+                        visibleCount = PAGE_SIZE;
+                    }}
+                    title="其它非字母开头的联系人"
+                >#</button>
+            {/if}
+        </div>
+    {/if}
     {#if !isMobile && localViews.length > 0}
         <div class="lvct-people__savedviews" aria-label="已保存视图">
             <span class="lvct-people__savedviews-label">已保存视图</span>
@@ -1878,6 +2013,17 @@
             <span>{selectionScopeLabel}；筛选外 {hiddenSelectionCount} 人</span>
             <button class="b3-button b3-button--outline" onclick={openBatch} disabled={batchBusy || batchOrgBusy || exportingSelected || selectionScopePending} title={selectionScopePending ? pendingScopeMessage : batchBusy || batchOrgBusy || exportingSelected ? "批量操作进行中，请稍候" : undefined}>批量编辑</button>
             <button class="b3-button b3-button--outline" onclick={() => void openBatchOrganization()} disabled={batchBusy || batchOrgBusy || exportingSelected || selectionScopePending} title={selectionScopePending ? pendingScopeMessage : batchBusy || batchOrgBusy || exportingSelected ? "批量操作进行中，请稍候" : undefined}>加入组织</button>
+            {#if onOpenGraphPerson}
+                <button
+                    class="b3-button b3-button--outline"
+                    onclick={() => {
+                        const target = people.find((p) => selectedIdSet.has(p.itemId));
+                        if (target) onOpenGraphPerson?.(target.docId);
+                    }}
+                    disabled={batchBusy || batchOrgBusy || exportingSelected || selectionScopePending}
+                    title="在关系图谱中聚焦已选联系人"
+                ><Network size={14}/> {text("peopleBatchViewInGraph", "在图谱中查看")}</button>
+            {/if}
             <button class="b3-button b3-button--outline" onclick={exportSelected} disabled={batchBusy || batchOrgBusy || exportingSelected || selectionScopePending} title={selectionScopePending ? pendingScopeMessage : batchBusy || batchOrgBusy || exportingSelected ? "批量操作进行中，请稍候" : undefined}>导出 vCard</button>
             <button class="b3-button b3-button--cancel lvct-people__remove" onclick={removeSelected} disabled={batchBusy || batchOrgBusy || exportingSelected || selectionScopePending} title={selectionScopePending ? pendingScopeMessage : batchBusy || batchOrgBusy || exportingSelected ? "批量操作进行中，请稍候" : undefined}>从人脉移除</button>
             <button class="b3-button b3-button--text" onclick={() => (selectedIds = [])} disabled={batchBusy || batchOrgBusy || exportingSelected} title={batchBusy || batchOrgBusy || exportingSelected ? "批量操作进行中，请稍候" : undefined}>取消选择</button>
@@ -1978,6 +2124,11 @@
                 </div>
             {:else}
                 <div class="lvct-empty__actions">
+                    {#if searchText.trim()}
+                        <button class="b3-button b3-button--primary" onclick={() => openAddWithName(searchText.trim())}>
+                            <UserPlus size={15} /> 以“{searchText.trim()}”新建联系人
+                        </button>
+                    {/if}
                     <button class="b3-button b3-button--outline" onclick={clearAllConditions}>清除所有筛选</button>
                 </div>
             {/if}
@@ -1988,6 +2139,8 @@
             {#each renderedVisible as person (person.itemId)}
                 <PersonCard
                     {person}
+                    compact={cardDensity === "compact"}
+                    {onOpenGraphPerson}
                     selected={selectedIdSet.has(person.itemId)}
                     active={activePersonId === person.itemId}
                     recent={recent[person.docId]}
@@ -2038,6 +2191,7 @@
                                 <button type="button" class="lvct-people__name-btn" aria-label={`查看 ${person.name} 的详情`} onclick={(event) => { event.stopPropagation(); onOpenDetail(person); }}>
                                     <b>{person.name}</b>
                                 </button>
+                                {#if onOpenGraphPerson}<button type="button" class="lvct-people__open-doc" title={`在关系图谱中查看 ${person.name}`} aria-label={`在关系图谱中查看 ${person.name}`} onclick={(event) => { event.stopPropagation(); onOpenGraphPerson?.(person.docId); }}><Network size={16}/></button>{/if}
                                 {#if onOpenPersonDoc}<button type="button" class="lvct-people__open-doc" title={`打开 ${person.name} 的文档`} aria-label={`打开 ${person.name} 的文档`} onclick={(event) => { event.stopPropagation(); onOpenPersonDoc(person.docId); }}><ExternalLink size={16}/></button>{/if}
                             </td>
                             {#each tableColumns as column (column)}
@@ -2068,12 +2222,13 @@
     {/if}
 
     {#if adding}
-        <LvctDialog title="新建联系人" onClose={() => (adding = false)}>
+        <LvctDialog title="新建联系人" onClose={() => { adding = false; addPersonInitial = undefined; }}>
             <AddPersonDialog
                 {settings}
                 {i18n}
+                initial={addPersonInitial}
                 availableGroups={groups}
-                onCreated={() => refresh()}
+                onCreated={() => { refresh(); addPersonInitial = undefined; }}
                 {onLoadOrgCandidates}
                 {onCreateOrganization}
                 {onCreateSelfProfile}
@@ -2082,7 +2237,7 @@
                 {onApplySelfIdentityChange}
                 {onValidateExtended}
                 {onSaveExtended}
-                onClose={() => (adding = false)}
+                onClose={() => { adding = false; addPersonInitial = undefined; }}
             />
         </LvctDialog>
     {/if}
@@ -2286,6 +2441,20 @@
                     refresh();
                 }}
                 onClose={() => (occasioning = false)}
+            />
+        </LvctDialog>
+    {/if}
+
+    {#if regionExploring}
+        <LvctDialog title={text("regionExplorerTitle", "城市分布与出差规划")} wide onClose={() => (regionExploring = false)}>
+            <RegionExplorerDialog
+                contacts={people}
+                {i18n}
+                onApplyRegionFilter={(region) => {
+                    extraFilter = { ...extraFilter, region };
+                    visibleCount = PAGE_SIZE;
+                }}
+                onClose={() => (regionExploring = false)}
             />
         </LvctDialog>
     {/if}

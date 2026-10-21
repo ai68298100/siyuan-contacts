@@ -127,6 +127,67 @@ export function heatLevelColorClass(level: RelationshipHeatLevel): string {
     }
 }
 
+export const relationshipHeatColorClass = heatLevelColorClass;
+
+export interface RelationshipHealthDistribution {
+    hot: { count: number; percentage: number; itemIds: string[] };
+    warm: { count: number; percentage: number; itemIds: string[] };
+    cool: { count: number; percentage: number; itemIds: string[] };
+    cold: { count: number; percentage: number; itemIds: string[] };
+    paused: { count: number; percentage: number; itemIds: string[] };
+    unknown: { count: number; percentage: number; itemIds: string[] };
+    total: number;
+}
+
+/**
+ * 计算全库联系人的关系温度分布统计，供仪表盘图表与全局下钻联动消费
+ */
+export function computeRelationshipHealthDistribution(
+    people: readonly { docId: string; itemId: string }[],
+    recentInteractions: Readonly<Record<string, { occurredAt: number }>>,
+    cadences: Readonly<Record<string, PersonCadence>> = {},
+    defaultCadenceDays = 30,
+    nowTime = Date.now(),
+): RelationshipHealthDistribution {
+    const buckets: Record<RelationshipHeatLevel, string[]> = {
+        hot: [],
+        warm: [],
+        cool: [],
+        cold: [],
+        paused: [],
+        unknown: [],
+    };
+
+    for (const person of people) {
+        const cadence = cadences[person.docId];
+        const last = recentInteractions[person.docId]?.occurredAt;
+        const health = computeRelationshipHealth({
+            cadenceDays: cadence?.days ?? defaultCadenceDays,
+            lastInteractionTime: last,
+            paused: cadence?.paused,
+            nowTime,
+        });
+        buckets[health.level].push(person.itemId);
+    }
+
+    const total = people.length;
+    const calc = (level: RelationshipHeatLevel) => {
+        const count = buckets[level].length;
+        const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+        return { count, percentage, itemIds: buckets[level] };
+    };
+
+    return {
+        hot: calc("hot"),
+        warm: calc("warm"),
+        cool: calc("cool"),
+        cold: calc("cold"),
+        paused: calc("paused"),
+        unknown: calc("unknown"),
+        total,
+    };
+}
+
 import { StoreIntegrityError } from "./store-integrity.ts";
 
 /** 人物文档 ID（与 SQL 安全面同一校验） */

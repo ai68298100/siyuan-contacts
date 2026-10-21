@@ -76,7 +76,17 @@ export interface VcfImportReport {
 
 /** 解析 vCard 文本并对名册查重，产出可预览勾选的导入计划 */
 export async function buildVcfImportPlan(settings: ContactsSettings, text: string): Promise<VcfImportPlan[]> {
-    const parsed = parseVcfForImport(text);
+    let parsed: VCardContact[];
+    try {
+        parsed = parseVcfForImport(text);
+    } catch (error) {
+        // Issue #35 攻坚：若由于全文件缺少标准 FN/N 姓名导致严格导入失败，尝试以电话/邮箱智能暂代挽救
+        try {
+            parsed = parseVcfForImport(text, { fallbackToPhoneOrEmail: true });
+        } catch {
+            throw error;
+        }
+    }
     invalidateRoster();
     const roster = await getRoster(settings);
     const existingNames = new Set(roster.map((person) => person.name));
