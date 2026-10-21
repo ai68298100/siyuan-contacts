@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BRAND_AVATAR_IMAGE_MAX_LENGTH, DEFAULT_VIEW_PREFERENCES, isValidBrandAvatarImage, isValidPreferenceDays, normalizeDetailCollapsedSections, normalizeTableColumns, normalizeViewPreferences } from "../src/domain/preferences.ts";
+import {
+    BRAND_AVATAR_IMAGE_MAX_LENGTH,
+    DEFAULT_VIEW_PREFERENCES,
+    isPersonStarred,
+    isValidBrandAvatarImage,
+    isValidPreferenceDays,
+    normalizeDetailCollapsedSections,
+    normalizeTableColumns,
+    normalizeViewPreferences,
+    togglePersonStarred,
+} from "../src/domain/preferences.ts";
 import type { ViewPreferences } from "../src/domain/preferences.ts";
 import type { Plugin } from "siyuan";
 import { applyPreferencePatch, decodeViewPreferences, diffViewPreferences, rebasePreferenceDraft } from "../src/domain/preferences-concurrency.ts";
@@ -72,6 +82,24 @@ test("视图偏好：非法枚举回退，数值限制在 0-365", () => {
     assert.equal(result.aiEnabled, true);
     assert.equal(result.birthdayWindowDays, 365);
     assert.equal(result.staleThresholdDays, 0);
+});
+
+test("视图偏好：星标联系人列表归一化与切换", () => {
+    const empty = normalizeViewPreferences({});
+    assert.deepEqual(empty.starredDocIds, []);
+
+    const customized = normalizeViewPreferences({
+        starredDocIds: ["doc-1", "doc-2", "doc-1", "", 123, null],
+    });
+    assert.deepEqual(customized.starredDocIds, ["doc-1", "doc-2"]);
+    assert.equal(isPersonStarred(customized, "doc-1"), true);
+    assert.equal(isPersonStarred(customized, "doc-3"), false);
+
+    const toggledOff = togglePersonStarred(customized, "doc-1");
+    assert.deepEqual(toggledOff.starredDocIds, ["doc-2"]);
+
+    const toggledOn = togglePersonStarred(toggledOff, "doc-3");
+    assert.deepEqual(toggledOn.starredDocIds, ["doc-2", "doc-3"]);
 });
 
 test("显示偏好：旧偏好缺字段回退默认形态与全列", () => {

@@ -841,6 +841,8 @@
         <PersonDetail
             settings={currentSettings}
             i18n={facade.i18n}
+            preferences={currentPreferences}
+            onPreferencesChange={savePreferences}
             person={detailPerson}
             availableGroups={peopleGroups}
             revision={dataRevision}

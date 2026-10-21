@@ -109,6 +109,8 @@ export interface ViewPreferences {
     readonly brandAvatarImage: string;
     /** 人物详情各区块的折叠偏好（E-14）：true 表示折叠，缺省或 false 表示展开 */
     readonly detailCollapsedSections: DetailCollapsedSections;
+    /** 星标常用联系人文档 ID 列表（收藏置顶） */
+    readonly starredDocIds: readonly string[];
 }
 
 export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
@@ -133,6 +135,7 @@ export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
     brandAvatar: "驴",
     brandAvatarImage: "",
     detailCollapsedSections: {},
+    starredDocIds: [],
 };
 
 /** 设置页数字输入的保存前校验：必须是 0–365 的整数。 */
@@ -212,6 +215,29 @@ export function normalizeViewPreferences(raw: unknown): ViewPreferences {
         detailCollapsedSections: record.detailCollapsedSections === undefined
             ? DEFAULT_VIEW_PREFERENCES.detailCollapsedSections
             : normalizeDetailCollapsedSections(record.detailCollapsedSections),
+        starredDocIds: normalizeStarredDocIds(record.starredDocIds),
+    };
+}
+
+function normalizeStarredDocIds(raw: unknown): readonly string[] {
+    if (!Array.isArray(raw)) return [];
+    return Array.from(new Set(raw.filter((id): id is string => typeof id === "string" && id.trim().length > 0)));
+}
+
+export function isPersonStarred(preferences: ViewPreferences, docId: string): boolean {
+    return preferences.starredDocIds ? preferences.starredDocIds.includes(docId) : false;
+}
+
+export function togglePersonStarred(preferences: ViewPreferences, docId: string): ViewPreferences {
+    const set = new Set(preferences.starredDocIds || []);
+    if (set.has(docId)) {
+        set.delete(docId);
+    } else {
+        set.add(docId);
+    }
+    return {
+        ...preferences,
+        starredDocIds: Array.from(set),
     };
 }
 

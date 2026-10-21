@@ -4,7 +4,7 @@
     import { formatBirthdayDisplay, nextBirthday } from "../../domain/occasions";
     import { formatRelativeInteraction } from "../../domain/format";
     import { computeRelationshipHealth, heatLevelColorClass } from "../../domain/cadence";
-    import { ExternalLink, Phone, MessageCircle, Mail, Clock3, Network } from "@lucide/svelte";
+    import { ExternalLink, Phone, MessageCircle, Mail, Clock3, Network, Star } from "@lucide/svelte";
     import PersonProfileSummary from "./PersonProfileSummary.svelte";
 
     let {
@@ -15,6 +15,8 @@
         onToggleSelected,
         onOpenPersonDoc,
         onOpenGraphPerson,
+        starred = false,
+        onToggleStarred,
         recent,
         recentUnknown = false,
         orgLine = "",
@@ -29,6 +31,8 @@
         onToggleSelected?: (selected: boolean) => void;
         onOpenPersonDoc?: (docId: string) => void;
         onOpenGraphPerson?: (docId: string) => void;
+        starred?: boolean;
+        onToggleStarred?: (starred: boolean) => void;
         recent?: { occurredAt: number; localDate: string };
         recentUnknown?: boolean;
         /** B12：单位显示串（组织名 · 部门，来自成员索引投影） */
@@ -111,6 +115,18 @@
                 </span>
             {/if}
             <span class="lvct-person-card__compact-actions" role="presentation" onclick={(event) => event.stopPropagation()}>
+                {#if onToggleStarred}
+                    <button
+                        type="button"
+                        class="lvct-person-card__open-doc lvct-person-card__star-btn"
+                        class:lvct-person-card__star-btn--active={starred}
+                        title={starred ? "取消星标" : "设为星标常用"}
+                        aria-label={starred ? `取消 ${person.name} 的星标` : `将 ${person.name} 设为星标`}
+                        onclick={(event) => { event.stopPropagation(); onToggleStarred?.(!starred); }}
+                    >
+                        <Star size={14} fill={starred ? "#f59e0b" : "none"} color={starred ? "#f59e0b" : "currentColor"} />
+                    </button>
+                {/if}
                 {#if onOpenGraphPerson}<button type="button" class="lvct-person-card__open-doc" title={`在关系图谱中查看 ${person.name}`} aria-label={`在关系图谱中查看 ${person.name}`} onclick={() => onOpenGraphPerson?.(person.docId)}><Network size={14}/></button>{/if}
                 {#if onOpenPersonDoc}<button type="button" class="lvct-person-card__open-doc" title={`打开 ${person.name} 的文档`} aria-label={`打开 ${person.name} 的文档`} onclick={() => onOpenPersonDoc(person.docId)}><ExternalLink size={14}/></button>{/if}
             </span>
@@ -144,6 +160,18 @@
                     </span>
                 </span>
             </button>
+            {#if onToggleStarred}
+                <button
+                    type="button"
+                    class="lvct-person-card__open-doc lvct-person-card__star-btn"
+                    class:lvct-person-card__star-btn--active={starred}
+                    title={starred ? "取消星标" : "设为星标常用"}
+                    aria-label={starred ? `取消 ${person.name} 的星标` : `将 ${person.name} 设为星标`}
+                    onclick={(event) => { event.stopPropagation(); onToggleStarred?.(!starred); }}
+                >
+                    <Star size={16} fill={starred ? "#f59e0b" : "none"} color={starred ? "#f59e0b" : "currentColor"} />
+                </button>
+            {/if}
             {#if onOpenGraphPerson}<button type="button" class="lvct-person-card__open-doc" title={`在关系图谱中查看 ${person.name}`} aria-label={`在关系图谱中查看 ${person.name}`} onclick={(event) => { event.stopPropagation(); onOpenGraphPerson?.(person.docId); }}><Network size={16}/></button>{/if}
             {#if onOpenPersonDoc}<button type="button" class="lvct-person-card__open-doc" title={`打开 ${person.name} 的文档`} aria-label={`打开 ${person.name} 的文档`} onclick={(event) => { event.stopPropagation(); onOpenPersonDoc(person.docId); }}><ExternalLink size={16}/></button>{/if}
         </div>
