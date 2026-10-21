@@ -3,10 +3,10 @@
  * 键：interaction-events.json（契约见 docs/DATA-CONTRACT.md §3）。
  */
 import type { Plugin } from "siyuan";
-import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage";
-import { appendEvent, emptyStore, normalizeInteractionStore, normalizeInteractionStoreForWrite, removeEvent, toLocalDateKey } from "../domain/interactions";
-import type { InteractionEvent, InteractionStore } from "../domain/interactions";
-import { newNodeId } from "../api/client";
+import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage.ts";
+import { appendEvent, emptyStore, normalizeInteractionStore, normalizeInteractionStoreForWrite, removeEvent, toLocalDateKey } from "../domain/interactions.ts";
+import type { InteractionEvent, InteractionStore } from "../domain/interactions.ts";
+import { newNodeId } from "../domain/format.ts";
 
 function assertPersonDocId(value: unknown): asserts value is string {
     if (typeof value !== "string" || !/^\d{14}-[0-9a-z]{7}$/.test(value)) throw new Error("人物文档 ID 无效，未记录互动");
@@ -29,6 +29,7 @@ export async function loadInteractionStoreStrict(plugin: Plugin): Promise<Intera
 export interface RecordInteractionInput {
     personDocId: string;
     note?: string;
+    type?: InteractionEvent["type"];
     source?: InteractionEvent["source"];
     externalRef?: string;
     occurredAt?: number;
@@ -57,6 +58,7 @@ export async function recordInteractionWithResult(
             occurredAt,
             localDate: toLocalDateKey(new Date(occurredAt)),
             source: input.source ?? "manual",
+            ...(input.type !== undefined ? { type: input.type } : {}),
             ...(input.externalRef !== undefined ? { externalRef: input.externalRef } : {}),
             ...(input.note !== undefined && input.note.length > 0 ? { note: input.note } : {}),
         };
@@ -81,6 +83,50 @@ export async function deleteInteraction(plugin: Plugin, eventId: string, expecte
             await saveJsonVerified(plugin, INTERACTION_STORAGE_KEY, next);
         }
         return next;
+    });
+}
+
+/** 批量追加多条互动事件（例如群体活动投影），在单个存储锁内完成并写后回读 */
+export async function appendInteractionBatch(
+    plugin: Plugin,
+    events: readonly InteractionEvent[],
+): Promise<{ added: number; total: number }> {
+    if (events.length === 0) return { added: 0, total: 0 };
+    return withStoreLock(INTERACTION_STORAGE_KEY, async () => {
+        let current = normalizeInteractionStoreForWrite(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY));
+        let added = 0;
+        for (const event of events) {
+            const next = appendEvent(current, event);
+            if (next !== current) {
+                current = next;
+                added += 1;
+            }
+        }
+        if (added > 0) {
+            await saveJsonVerified(plugin, INTERACTION_STORAGE_KEY, current);
+        }
+        return { added, total: current.events.length };
+    });
+}
+
+/** 按 externalRef 移除互动事件（例如赠礼撤回或删除时清理），在单个存储锁内完成并写后回读 */
+export async function removeInteractionsByExternalRef(
+    plugin: Plugin,
+    personDocId: string,
+    externalRef: string,
+): Promise<InteractionStore> {
+    return withStoreLock(INTERACTION_STORAGE_KEY, async () => {
+        const store = normalizeInteractionStoreForWrite(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY));
+        const matching = store.events.filter(
+            (event) => event.personDocId === personDocId && event.externalRef === externalRef,
+        );
+        if (matching.length === 0) return store;
+        let current = store;
+        for (const item of matching) {
+            current = removeEvent(current, item.id);
+        }
+        await saveJsonVerified(plugin, INTERACTION_STORAGE_KEY, current);
+        return current;
     });
 }
 

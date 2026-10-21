@@ -82,6 +82,126 @@ evidence_paths / owner / last_updated / commit
 
 2026-10-16 未解决 Issue 研究筛选保留为历史：#35 的三处合成解析缺口已修复并通过 17/17 矩阵，但不等于小米根因已确认；#51/#54 的完整联系方式投影、搜索与迁移研究继续保留为后续候选。重复资料与两层分组已有独立生产契约和实现，不再沿用“母子条目排在完整联系方式契约之后”的旧顺序。历史研究来源见 [OPEN-ISSUE-RESEARCH-PLAN-2026-10-16](verification/OPEN-ISSUE-RESEARCH-PLAN-2026-10-16.md)，当前交付范围见 [首版实现](verification/MULTI-CONTACT-MINIMAL-PATH-2026-10-17.md)。
 
+#### AG-E32-TOPICS — 会面谈资与备忘（E-32）收口与保真
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+migration / M4；已完成纯函数域层、持久化存储、严格写前检查、迁移包往返与覆盖、双语国际化（14键）、简报导出置顶及桌面/移动/宿主样式 UI 476/476 回归；真实思源多窗口与日常工作区待 Host Queue。
+- **user_outcome / user_scenario：** 用户在人物详情可随时记录与联系人下次见面想聊的话题、承诺或兴趣点；新增话题自动置顶，支持一键复制反馈与移除；导出会面简报 Markdown 时自动置顶呈现；跨设备/工作区迁移时谈资备忘完整保留，不因迁移丢失。
+- **source_ids / current_evidence：** E-32、PR #62；`src/domain/topics.ts`、`src/data/topics.ts`、`src/services/migration-bundle.ts`、`src/components/people/PersonDetail.svelte`、`public/i18n/`；单测 794/794 全绿，UI 回归 476/476。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3 键表更新 / 迁移覆盖与 i18n 完整性 / topics / 独立自管 JSON，无 AV 字段变化。
+- **allowed_files / forbidden_files：** topics 域/数据/服务、PersonDetail、i18n、migration-bundle、测试、相关契约与回归文档 / 版本号、CHANGELOG、README 徽章、PROGRESS.md、真实用户库。
+- **contract_change / host_or_spike_required：** DATA-CONTRACT §3 新增 `person-topics.json`（版本 1，单人最多 15 条，单条 140 字符，docId 正则，严格读 + Web Lock + 写后回读），迁移包模块数 12 → 13 并入 `MIGRATION_COVERAGE`。
+- **ordered_steps：** 注册单测至 package.json → 补充 DATA-CONTRACT 契约 → 迁移 bundle 导出/导入/预览支持与往返测试 → 双语国际化与 text() 改造 → smoke UI 夹具与 476/476 回归 → 任务卡与状态归档。
+- **test_fixtures / test_commands / acceptance：** 纯函数新增/置顶/移除/规范化/超长超限/严格校验、简报置顶导出、迁移合并现状优先与去重、MIGRATION_COVERAGE 包含、smoke UI 空态/新增/置顶/复制/移除；`pnpm check`、`pnpm test`（794/794）、`pnpm test:ui`（476/476）、`pnpm build`、`pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 坏条目整体拒绝抛出 StoreIntegrityError；写失败保留草稿；单人最多 15 条、单条 140 字符；纯本地插件 JSON，不发送网络或外部 AI。
+- **evidence_paths / owner / last_updated / commit：** `tests/topics.test.ts`、`tests/contact-write-services.test.ts`、`scripts/e2e/ui/smoke.js`、`scripts/e2e/ui/migration-regression.js` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 隔离代码、单测、迁移和三套 UI 476/476 全部通过；真实思源跨窗口、真机与日常库保留 Host Queue。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 794/794、三套 UI（桌面、390px、宿主样式）各 476/476、`pnpm build` 与 `pnpm check:release` 全部通过。
+
+#### AG-E29-HEALTH — 动态关系温度与联系紧迫度分级（E-29）纯函数域模型与算法
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+domain / M4；已完成纯函数域层（计算客观时间热度、分数 0–100、逾期天数、暂停语义）、双语国际化支持、B3 令牌样式类、完整单元测试（5/5）与三套 UI（477/477）回归。
+- **user_outcome / user_scenario：** 系统基于用户在人物身上设定的联系周期（1–365 天）和最近实际互动时间，客观、透明地计算关系温度（hot 温热/warm 常温/cool 微凉/cold 渐冻/paused 已暂停/unknown 从未联系）与百分比分数，提供给名册卡片、表格和详情页排序与展示，无黑盒算法。
+- **source_ids / current_evidence：** E-29、`docs/ACTIVE-BACKLOG.md`；`src/domain/cadence.ts`、`tests/cadence.test.ts`、`src/index.scss`、`public/i18n/`；单测全量通过。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3 person-cadences / 纯函数域层计算，不修改持久化 JSON schema，无新存储开销。
+- **allowed_files / forbidden_files：** cadence 域与测试、样式、i18n / 保护文件。
+- **contract_change / host_or_spike_required：** 无存储契约变更；完全基于已有 `person-cadences.json` 和 `interaction-events.json` 的客观时间推导。
+- **ordered_steps：** 纯函数域层类型与计算实现 → 单测覆盖极限值/逾期/暂停/未互动 → 双语 i18n 补充 → SCSS 变量映射 → 全量门禁。
+- **test_fixtures / test_commands / acceptance：** 纯函数不同周期、互动时间、逾期比例、边界值、无互动与暂停用例；`pnpm check`、`pnpm test`（795/795）、三套 UI（477/477）、`pnpm build` 与 `pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算，O(1) 复杂度；时间计算负值防御；不写入外部网络或大模型。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/cadence.ts`、`tests/cadence.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 域层纯函数实现与测试全部通过；界面控件展现接入由视图卡片单独推进。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 795/795 通过、`pnpm build` 与 `pnpm check:release` 全部通过；E-29 温度 UI 已接入 PersonDetail「关系摘要」格与 PersonCard「最近互动」徽章（`scripts/e2e/ui/smoke.js` 477/477 守门）。
+
+#### AG-E33-TRASH — 联系人软删除回收站缓冲区（E-33）
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+data+ui / M4；域层、数据层、服务层、facade 与设置页 UI 全部接通；30 天元数据快照缓冲（`trash-bin.json`，版本 1，上限 200 条），支持移入回收站并解绑、一键无损恢复（重绑数据库行并写回快照）、列表与清空；单测 4/4、三套 UI（桌面/390px/宿主样式）各 479/479。
+- **user_outcome / user_scenario：** 用户从人脉名册移除联系人（详情页「从人脉移除」）时，电话、邮箱、微信、标签、分组、生日等元数据自动存入回收站 30 天；误删后可在设置「数据与字段」分区看到缓冲条目与剩余保留天数，点「恢复联系人」无损还原；不需要时点「清空回收站」并确认即可永久清除。人物文档自始至终保留在思源中，不受影响。
+- **source_ids / current_evidence：** E-33、`docs/ACTIVE-BACKLOG.md`；`src/domain/trash.ts`、`src/data/trash.ts`、`src/services/trash.ts`、`SettingsView.svelte`、`PersonDetail.svelte`、`Workbench.svelte`、`src/index.ts`、`src/types.ts`。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3 `trash-bin.json` 契约、§3.3 迁移覆盖排除项 / 后续如需批量删除与真机交互另开卡 / trash / 独立自管 JSON；本工作区安全缓冲区，**明确排除**在迁移包之外。
+- **allowed_files / forbidden_files：** trash 域/数据/服务与测试、SettingsView、PersonDetail、Workbench、index/types、契约与 backlog / 版本号、CHANGELOG、README 徽章、PROGRESS.md、真实用户库。
+- **contract_change / host_or_spike_required：** DATA-CONTRACT §3 新增 `trash-bin.json`（版本 1，`{id, docId, itemId, name, snapshot, removedAt, expiresAt}`，单库 200 条上限，30 天自动过期，严格读 + Web Lock + 写后回读 + StoreIntegrityError）；§3.3 迁移覆盖表登记为排除项（跨库重放会误恢复已在新库重建的联系人）。
+- **ordered_steps：** 纯函数域层 → 数据存储层 → 服务层（移除入站/恢复重绑）→ facade 与详情删除路径接线 → 设置页回收站面板 → 迁移覆盖排除项与文档 → 三套 UI 回归。
+- **test_fixtures / test_commands / acceptance：** 快照完整保留、30 天过期推导与剩余天数、置顶与同人去重、超期清理、数据层 push/list/drop/clear 存储闭环、严格读取坏库抛错；UI 覆盖列表渲染、剩余天数与快照字段展示、一键恢复后条目移除与提示、清空需确认（取消零写入）、facade 缺能力时降级说明且不渲染操作。`pnpm check`、`pnpm test`（801/801）、`pnpm test:ui`/`:mobile`/`:host`（各 479/479）、`pnpm build`、`pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 坏条目整体拒绝抛出 StoreIntegrityError 并保护原库；恢复中途失败保留缓冲条目供重试，不重复绑行；最多 200 条、30 天过期自动修剪；仅存插件本地 JSON，不上传网络。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/trash.ts`、`src/data/trash.ts`、`src/services/trash.ts`、`tests/trash.test.ts`、`scripts/e2e/ui/smoke.js` / Codex / 2026-10-19 / `6eb3633`、`81fdee5`、`bdfcc00`、`8ca47d3`。
+- **退出边界：** 隔离域/数据/服务/UI 全部通过；真实思源多窗口并发删除、真机与日常库恢复体验保留 Host Queue。批量删除入口是否接入回收站属后续独立决策。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 801/801、三套 UI 各 479/479、`pnpm build` 与 `pnpm check:release` 全部通过；E-31 字段级安全合并向导 UI 接入 `ContactMergeWizard`（`scripts/e2e/ui/smoke.js` 480/480 守门）。
+
+#### AG-E34-CO-OCCURRENCE — 共同出席弱联系（E-34 推断关联）纯函数域模型与边生成
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+domain / M3；已完成基于多参与者同场互动事件的客观弱联系推断（`buildCoOccurrenceEdges`），自动跳过已有显式 related 正式关系的二人、按共同出席频次降序排序、支持最低门槛 `minCount` 过滤，并在 `tests/graph.test.ts` 中通过 27/27 完整单元测试。
+- **user_outcome / user_scenario：** 系统基于用户记录的笔记捕获或多人会议/聚会事件，客观推导经常在同一场合共同出现的联系人对；不改动已有双向关系事实源，查询纯 related 关系图不受污染；未来在图谱中可以虚线呈现引荐，供用户一键确认为正式双向关系。
+- **source_ids / current_evidence：** E-34、`docs/ACTIVE-BACKLOG.md`；`src/domain/graph.ts`、`src/domain/interactions.ts`、`tests/graph.test.ts`；单测全量通过。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3.1 / 纯函数域层计算，不修改持久化 JSON，不污染显式关系查询。
+- **allowed_files / forbidden_files：** graph 域与测试、interactions 域 / 保护文件。
+- **contract_change / host_or_spike_required：** `GraphEdge` 扩展 `kind: "co_occurrence"` 与可选 `coCount: number`；不写入属性视图或持久化 JSON。
+- **ordered_steps：** interactions 导出 occasionKey → GraphEdge 类型定义更新 → buildCoOccurrenceEdges 实现 → graph.test.ts 单元测试 → 门禁与提交。
+- **test_fixtures / test_commands / acceptance：** 纯函数同场多事件推导、已有正式关系跳过、共同频次降序排序、minCount 过滤；`pnpm check`、`pnpm test`（802/802）、`pnpm build` 与 `pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算，O(N) 场合聚类与 O(K^2) 组内配对（单场人数通常 < 20）；不发送外部网络或大模型。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/graph.ts`、`src/domain/interactions.ts`、`tests/graph.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 域层纯函数实现与测试全部通过；UI 虚线展示与一键建关系单独挂接。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 802/802 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
+
+#### AG-E31-MERGE — 重复人物字段级安全合并向导（E-31）纯函数域模型与算法
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+domain / M2；已完成字段级合并决策模型（`buildDefaultMergePlan` 自动按非空补齐）、安全约束校验（同一文档/同一行防御、本人不可作为次人物被销毁、姓名非空）、合并决议与标签去重并集、可逆审计快照（`resolveMergePlan`），经 3/3 单测与架构完整性守门全绿。
+- **user_outcome / user_scenario：** 用户在发现疑似重复联系人时，可进行字段级比对并定制合并计划（如保留 A 的手机与 B 的邮箱）；合并前受严格安全校验保护，绝不静默覆盖；生成可逆审计快照，记录合并前双方完整原始数据。
+- **source_ids / current_evidence：** E-31、`docs/ACTIVE-BACKLOG.md`；`src/domain/duplicate-merge.ts`、`tests/duplicate-merge.test.ts`；单测全量通过。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §1 / 纯函数域层模型，无新持久化 JSON，不破坏思源原生文档。
+- **allowed_files / forbidden_files：** duplicate-merge 域与测试、package.json / 保护文件。
+- **contract_change / host_or_spike_required：** 无存储结构变更；纯函数生成目标 ContactDraft 与审计快照。
+- **ordered_steps：** 纯函数类型与安全校验定义 → 默认推荐生成与非空优选算法 → 决议与可逆快照生成 → 单元测试与 package.json 门禁注册 → 门禁通过。
+- **test_fixtures / test_commands / acceptance：** 纯函数同文档/同行/本人防御校验、非空自动选 secondary、农历生日标志跟随、标签去重并集、自定义字段覆盖与完整快照对比；`pnpm check`、`pnpm test`（805/805）、`pnpm build` 与 `pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算，O(1) 决策复杂度；生成 MergeAuditSnapshot 供日后撤销使用；纯本地计算。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/duplicate-merge.ts`、`tests/duplicate-merge.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 域层纯函数实现与测试全部通过；UI 并排比对向导弹窗后续单独挂接。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 805/805 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过；E-31 字段级并排比对弹窗 `ContactMergeWizard` 已接入 PeopleView「重复候选」面板，480/480 UI 守门。
+
+#### AG-E30-OCCASION — 群体活动与场合实体（E-30 聚类投影）纯函数域与存储层
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+data+service+ui / M4；已完成场合实体数据模型（`OccasionEntity`，支持会议/聚餐/婚礼/聚会/出行/论坛/活动等类型、发生日期/跨天结束日期/地点/来源文档/多参与者/账本关联/备注）、严格安全校验（`validateOccasion` 防非法/倒挂日期、防路径穿越地点、防重复参与者）、参与者互动事件自动投影（`deriveOccasionInteractionEvents` 共享 `externalRef` 与同场前缀）、场合 store 域函数（`addOccasionToStore`/`updateOccasionInStore`/`removeOccasionFromStore`，全库 500 条上限）、数据存储层（`src/data/occasions.ts`，`occasions.json` 键表 + Web Lock + 写后回读 + StoreIntegrityError）与服务层（`createOccasion` 自动派生互动事件、`listOccasions`、`deleteOccasion`），以及 `OccasionDialog` 向导对话框与 PeopleView 工具栏接入，DATA-CONTRACT §3 已登记，经 7/7 单测与三套 UI 各 483/483 守门全绿。
+- **user_outcome / user_scenario：** 面对包含多位联系人的群体活动（如团队聚餐、技术研讨会、朋友婚礼），系统允许抽象为统一场合实体，一次性生成参与者名单与关联；自动派生各参与者的时间线互动事件并标记同行人，使图谱与共同出席洞察无缝联动，无需对每个人重复手工录入。
+- **source_ids / current_evidence：** E-30、`docs/ACTIVE-BACKLOG.md`；`src/domain/occasion-cluster.ts`、`tests/occasion-cluster.test.ts`；单测全量通过。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3.1 / 纯函数域层计算，不修改底层持久化 schema，无新存储开销。
+- **allowed_files / forbidden_files：** occasion-cluster 域与测试、package.json / 保护文件。
+- **contract_change / host_or_spike_required：** DATA-CONTRACT §3 新增 `occasions.json`（版本 1，全库最多 500 条，严格读 + Web Lock + 写后回读 + StoreIntegrityError）。
+- **ordered_steps：** 场合实体数据结构设计 → validateOccasion 严格校验规则 → deriveOccasionInteractionEvents 投影算法 → 场合 store 域函数 → 数据存储层实现 → 服务层自动派生互动 → 契约登记 → 单元/存储/服务测试 → 门禁通过。
+- **test_fixtures / test_commands / acceptance：** 纯函数标题/类型/日期/跨天/地点/参与者合法性与安全防御、多参与者互动事件派生（共享 externalRef、包含同行人名单）、ID 格式校验、store add/update/remove 与 500 条上限、数据层存储闭环回读与坏库严格抛错、服务层创建自动派生互动事件（可关闭）与幂等删除；`pnpm check`、`pnpm test`（819/819）、`pnpm build` 与 `pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算与本地存储，全库 500 条上限控制体积；坏条目拒绝抛出 StoreIntegrityError；纯本地存储。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/occasion-cluster.ts`、`src/data/occasions.ts`、`src/services/occasions.ts`、`tests/occasion-cluster.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 域层、数据层与服务层测试全部通过；UI 创建弹窗与笔记捕获联动后续单独挂接。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 819/819 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过；E-30 群体活动与场合向导 UI 已接入 `OccasionDialog` 与 PeopleView 工具栏「记录活动」（多选联系人/表单校验/自动派生时间线互动事件），双语 i18n 完整，三套 UI 各 483/483 守门。
+
+#### AG-E28-FOLLOWUP-GROUP — 跟进列表按组织/部门/来源文档分组（E-28）纯函数域投影
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+domain / M3；已完成 `groupFollowUps` 纯函数投影，按人物/当前组织/部门/来源文档四类分组去重，同一跟进可在多组中出现但仅出现一次；组内按 open 优先再按 dueDate 与 createdAt 稳定排序。
+- **user_outcome / user_scenario：** 跟进列表提供「人物/当前组织/部门/来源文档」四个视角的并行分组视图，便于按「与某组织相关」「与某部门相关」「Q3 OKR 评审遗留」等上下文快速定位；同一跟进不会在多分组中重复出现。
+- **source_ids / current_evidence：** E-28、`docs/ACTIVE-BACKLOG.md`；`src/domain/followups.ts`、`tests/followups.test.ts`；单测全量通过。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3 follow-ups / 纯函数域层计算，不修改持久化 JSON。
+- **allowed_files / forbidden_files：** followups 域与测试 / 保护文件。
+- **contract_change / host_or_spike_required：** 无存储结构变更；纯函数返回 FollowUpGroup[]。
+- **ordered_steps：** FollowUpGroupKey 类型 → groupFollowUps 纯函数 → 单元测试 → 门禁通过。
+- **test_fixtures / test_commands / acceptance：** 跨组织/部门/来源文档去重分组、组内 open 优先与 dueDate 升序、空数据/仅人物/无组织无来源边界；`pnpm check`、`pnpm test`（810/810）、`pnpm build` 与 `pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算，O(N) 单次扫描；不发送外部网络或大模型。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/followups.ts`、`tests/followups.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 域层纯函数实现与测试全部通过；UI 跟进列表多视角分组视图后续单独挂接。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 810/810 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过。
+
+#### AG-E26-GIFT-IDEAS — 礼物点子与偏好清单（E-26）纯函数域与存储层
+
+- **status / priority / type / milestone：** `done_isolated` / P1 / feature+data / M3；已完成礼物点子与喜好偏好数据模型（`GiftIdeaItem` / `GiftIdeaStore`，支持 idea/preference 类别、idea/purchased/given 状态、预算、链接、场合与规格备注）、单人 30 条上限与安全校验（`validateGiftIdea`）、已送出点子转正式往来账本记录投影（`convertGiftIdeaToExchange`，作为 payable/settled 支出），以及数据存储层（`src/data/gift-ideas.ts`，`gift-ideas.json` 键表与 Web Lock + 写后回读，DATA-CONTRACT §3 登记），经 5/5 单测与架构完整性守门全绿。
+- **user_outcome / user_scenario：** 用户可随手记录联系人的喜好偏好（如“喜欢黑咖啡无糖”）或送礼点子（如“生日送降噪耳机”），跟踪构思/已采购/已送出状态；未送点子绝不计入人情往来或财务统计；礼物实际送出后可一键转换为正式往来账本记录，账目与点子清晰解耦。
+- **source_ids / current_evidence：** E-26、`docs/ACTIVE-BACKLOG.md`；`src/domain/gift-ideas.ts`、`src/data/gift-ideas.ts`、`tests/gift-ideas.test.ts`；单测全量通过。
+- **depends_on / blocks / parallel_group / preconditions：** DATA-CONTRACT §3 gift-ideas / 独立自管 JSON，Web Lock + 写后回读，未送出不污染往来账本财务统计。
+- **allowed_files / forbidden_files：** gift-ideas 域/数据与测试、package.json、契约 / 保护文件。
+- **contract_change / host_or_spike_required：** DATA-CONTRACT §3 新增 `gift-ideas.json`（版本 1，单人最多 30 条，严格读 + Web Lock + 写后回读校验）。
+- **ordered_steps：** 礼物点子与偏好类型设计 → 校验与单人上限算法 → 转往来账本投影实现 → 数据存储层实现 → 契约登记 → 单元与存储测试 → 门禁通过。
+- **test_fixtures / test_commands / acceptance：** 纯函数标题/文档ID/金额非负校验、add/update/remove 与 30 条上限、活跃点子与偏好过滤、转正式往来记录（金额/日期/支出方向/结清状态/场合描述匹配）、数据层存储闭环回读、坏库严格抛错；`pnpm check`、`pnpm test`（815/815）、`pnpm build` 与 `pnpm check:release`。
+- **failure_retry_rollback / privacy_boundary / performance_budget：** 纯内存计算与本地存储，单人 30 条上限控制体积；坏条目拒绝抛出 StoreIntegrityError；纯本地存储。
+- **evidence_paths / owner / last_updated / commit：** `src/domain/gift-ideas.ts`、`src/data/gift-ideas.ts`、`tests/gift-ideas.test.ts` / Codex / 2026-10-19 / 分支 `fix/e32-topics-closeout`。
+- **退出边界：** 域层纯函数实现与数据存储层测试全部通过；UI 点子面板与转账本按钮后续单独挂接。
+- **完成回报：** `pnpm check` 0 错误 0 警告、单测 815/815 全部通过、`pnpm build` 与 `pnpm check:release` 全部通过；E-26 礼物点子与偏好 UI 已接入 PersonDetail（录入/状态推进/已送出转往来账本/移除），双语 i18n 完整，三套 UI 各 482/482 守门。
+
 #### AG-ISSUE-051-054-FIELDS — 重复资料与两层分组首版
 
 - **status / priority / type / milestone：** `host_pending` / P1 / feature+regression / M4；生产实现、隔离内核与隔离 Chrome 验收已完成，真实用户工作区、原生编辑器竞争、真机等边界继续由 Host Queue 守门；发布与 issue 关闭见 `AG-ISSUE-051-054-CLOSE`。

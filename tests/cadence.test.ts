@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { loadPersonCadence } from "../src/data/cadences.ts";
-import { normalizeCadenceMap, normalizeCadenceMapForWrite } from "../src/domain/cadence.ts";
+import {
+    computeRelationshipHealth,
+    computeRelationshipHealthDistribution,
+    relationshipHeatColorClass as heatLevelColorClass,
+    normalizeCadenceMap,
+    normalizeCadenceMapForWrite,
+} from "../src/domain/cadence.ts";
 import { staleContacts } from "../src/domain/interactions.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
 import type { InteractionEvent } from "../src/domain/interactions.ts";
@@ -87,4 +93,148 @@ test("久未联系：覆盖阈值生效、暂停整体隐藏、从未互动保�
     // 甲暂停：从未互动也隐藏
     const paused = staleContacts(store, people, 30, now, { [DOC_A]: { days: 30, paused: true } });
     assert.deepEqual(paused.map((info) => info.person.docId), []);
+});
+
+test("E-29 关系健康度与热度分级：客观推导热度、分数、逾期天数与暂停语义", () => {
+    const baseNow = 1700000000000;
+    const dayMs = 86400 * 1000;
+
+    // 1. hot: 刚刚联系 (5天 / 30天) -> ratio ~ 0.167
+    const hotResult = computeRelationshipHealth({
+        cadenceDays: 30,
+        lastInteractionTime: baseNow - 5 * dayMs,
+        nowTime: baseNow,
+    });
+    assert.equal(hotResult.level, "hot");
+    assert.equal(hotResult.elapsedDays, 5);
+    assert.equal(hotResult.cadenceDays, 30);
+    assert.equal(hotResult.overdue, false);
+    assert.equal(hotResult.overdueDays, 0);
+    assert.equal(hotResult.score, 92); // (1 - 5/60) * 100 = 91.67 -> 92
+    assert.equal(heatLevelColorClass(hotResult.level), "lvct-heat--hot");
+
+    // 2. hot 边界: 刚好周期一半 (15天 / 30天) -> ratio = 0.5
+    const halfResult = computeRelationshipHealth({
+        cadenceDays: 30,
+        lastInteractionTime: baseNow - 15 * dayMs,
+        nowTime: baseNow,
+    });
+    assert.equal(halfResult.level, "hot");
+    assert.equal(halfResult.score, 75); // (1 - 0.25) * 100 = 75
+
+    // 3. warm: 周期过半但未到期 (20天 / 30天) -> ratio ~ 0.667
+    const warmResult = computeRelationshipHealth({
+        cadenceDays: 30,
+        lastInteractionTime: baseNow - 20 * dayMs,
+        nowTime: baseNow,
+    });
+    assert.equal(warmResult.level, "warm");
+    assert.equal(warmResult.overdue, false);
+    assert.equal(warmResult.score, 67); // (1 - 20/60) * 100 = 66.67 -> 67
+    assert.equal(heatLevelColorClass(warmResult.level), "lvct-heat--warm");
+
+    // 4. warm 到期日: (30天 / 30天) -> ratio = 1.0
+    const dueResult = computeRelationshipHealth({
+        cadenceDays: 30,
+        lastInteractionTime: baseNow - 30 * dayMs,
+        nowTime: baseNow,
+    });
+    assert.equal(dueResult.level, "warm");
+    assert.equal(dueResult.overdue, false);
+    assert.equal(dueResult.score, 50);
+
+    // 5. cool: 轻度逾期 (40天 / 30天) -> ratio = 1.333
+    const coolResult = computeRelationshipHealth({
+        cadenceDays: 30,
+        lastInteractionTime: baseNow - 40 * dayMs,
+        nowTime: baseNow,
+    });
+    assert.equal(coolResult.level, "cool");
+    assert.equal(coolResult.overdue, true);
+    assert.equal(coolResult.overdueDays, 10);
+    assert.equal(coolResult.score, 33); // (1 - 40/60) * 100 = 33.33 -> 33
+    assert.equal(heatLevelColorClass(coolResult.level), "lvct-heat--cool");
+
+    // 6. cold: 深度逾期 (75天 / 30天) -> ratio = 2.5
+    const coldResult = computeRelationshipHealth({
+        cadenceDays: 30,
+        lastInteractionTime: baseNow - 75 * dayMs,
+        nowTime: baseNow,
+    });
+    assert.equal(coldResult.level, "cold");
+    assert.equal(coldResult.overdue, true);
+    assert.equal(coldResult.overdueDays, 45);
+    assert.equal(coldResult.score, 0); // 截断到 0
+    assert.equal(heatLevelColorClass(coldResult.level), "lvct-heat--cold");
+
+    // 7. unknown: 从未联系
+    const neverResult = computeRelationshipHealth({
+        cadenceDays: 30,
+        lastInteractionTime: null,
+        nowTime: baseNow,
+    });
+    assert.equal(neverResult.level, "unknown");
+    assert.equal(neverResult.score, 0);
+    assert.equal(neverResult.elapsedDays, null);
+    assert.equal(neverResult.overdue, true);
+    assert.equal(neverResult.overdueDays, 0);
+    assert.equal(heatLevelColorClass(neverResult.level), "lvct-heat--muted");
+
+    // 8. paused: 已暂停
+    const pausedResult = computeRelationshipHealth({
+        cadenceDays: 30,
+        lastInteractionTime: baseNow - 100 * dayMs,
+        nowTime: baseNow,
+        paused: true,
+    });
+    assert.equal(pausedResult.level, "paused");
+    assert.equal(pausedResult.score, 100);
+    assert.equal(pausedResult.overdue, false);
+    assert.equal(pausedResult.overdueDays, 0);
+    assert.equal(heatLevelColorClass(pausedResult.level), "lvct-heat--muted");
+});
+
+test("computeRelationshipHealthDistribution: 全库关系温度分布统计与人员归集", () => {
+    const baseNow = 1700000000000;
+    const dayMs = 86400 * 1000;
+    const people = [
+        { docId: "20261019000001-1111111", itemId: "item-1" }, // hot (5天前)
+        { docId: "20261019000002-2222222", itemId: "item-2" }, // warm (20天前)
+        { docId: "20261019000003-3333333", itemId: "item-3" }, // cool (40天前)
+        { docId: "20261019000004-4444444", itemId: "item-4" }, // cold (80天前)
+        { docId: "20261019000005-5555555", itemId: "item-5" }, // unknown (无互动)
+        { docId: "20261019000006-6666666", itemId: "item-6" }, // paused (已暂停)
+    ];
+
+    const recentInteractions = {
+        "20261019000001-1111111": { occurredAt: baseNow - 5 * dayMs },
+        "20261019000002-2222222": { occurredAt: baseNow - 20 * dayMs },
+        "20261019000003-3333333": { occurredAt: baseNow - 40 * dayMs },
+        "20261019000004-4444444": { occurredAt: baseNow - 80 * dayMs },
+    };
+
+    const cadences = {
+        "20261019000006-6666666": { days: 30, paused: true },
+    };
+
+    const dist = computeRelationshipHealthDistribution(people, recentInteractions, cadences, 30, baseNow);
+
+    assert.equal(dist.total, 6);
+    assert.equal(dist.hot.count, 1);
+    assert.deepEqual(dist.hot.itemIds, ["item-1"]);
+
+    assert.equal(dist.warm.count, 1);
+    assert.deepEqual(dist.warm.itemIds, ["item-2"]);
+
+    assert.equal(dist.cool.count, 1);
+    assert.deepEqual(dist.cool.itemIds, ["item-3"]);
+
+    assert.equal(dist.cold.count, 1);
+    assert.deepEqual(dist.cold.itemIds, ["item-4"]);
+
+    assert.equal(dist.unknown.count, 1);
+    assert.deepEqual(dist.unknown.itemIds, ["item-5"]);
+
+    assert.equal(dist.paused.count, 1);
+    assert.deepEqual(dist.paused.itemIds, ["item-6"]);
 });

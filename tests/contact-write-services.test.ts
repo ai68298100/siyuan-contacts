@@ -35,6 +35,10 @@ const { withStoreLock } = await import("../src/data/storage.ts");
 const { loadRelationshipLabelStore, RELATIONSHIP_LABEL_STORAGE_KEY } = await import("../src/data/person-relationship-labels.ts");
 const { exportMigrationBundle, importMigrationBundle, previewMigrationImport, MIGRATION_BUNDLE_STORAGE_KEY, MIGRATION_COVERAGE } = await import("../src/services/migration-bundle.ts");
 const { TEMPLATES_STORAGE_KEY } = await import("../src/data/templates.ts");
+const { TOPICS_STORAGE_KEY, loadTopicsStoreStrict } = await import("../src/data/topics.ts");
+const { TRASH_STORAGE_KEY } = await import("../src/data/trash.ts");
+const { GIFT_IDEAS_STORAGE_KEY } = await import("../src/data/gift-ideas.ts");
+const { OCCASIONS_STORAGE_KEY } = await import("../src/data/occasions.ts");
 const { previewInteractionImportDiff } = await import("../src/services/interaction-import.ts");
 const { loadReminderDismissalsStrict } = await import("../src/data/reminder-dismissals.ts");
 const { invalidateRoster } = await import("../src/services/roster.ts");
@@ -44,6 +48,8 @@ const { FIELD_SPECS } = await import("../src/domain/fields.ts");
 const { emptyDraft } = await import("../src/domain/person.ts");
 const { changedContactWriteFields } = await import("../src/domain/contact-write.ts");
 const { MigrationWriteUnknownError } = await import("../src/domain/migration-records.ts");
+const { executeContactMerge } = await import("../src/services/duplicate-merge.ts");
+const { buildDefaultMergePlan } = await import("../src/domain/duplicate-merge.ts");
 test.after(() => hooks.deregister());
 
 test("互动差异预览读取失败时不按空库虚报新增，损坏当前库零写入", async () => {
@@ -177,6 +183,11 @@ function fixture(options: { wrappedSetterResponse?: boolean; pageCap?: number; u
                 : accepted(options.wrappedSetterResponse ? { value } : null);
         }
         if (route === "/api/sqlite/flushTransaction") return accepted();
+        if (route === "/api/av/removeAttributeViewBlocks") {
+            const ids = Array.isArray(body.srcIDs) ? body.srcIDs : [];
+            state.rows = state.rows.filter((row) => !ids.includes(row.id));
+            return accepted();
+        }
         if (route === "/api/query/sql") {
             state.sqlReads += 1;
             if (state.failDocuments) throw new Error("文档事实读取断开");
@@ -844,6 +855,78 @@ test("有效称谓恢复逐项核实，明确空记录恢复且重复导入零�
     assert.ok(MIGRATION_COVERAGE.some((module) => module.key === "bridge-requests.json" && module.status === "excluded"));
 });
 
+test("迁移覆盖矩阵把回收站列为排除项，并包含礼物点子与群体活动场合", () => {
+    const trashCoverage = MIGRATION_COVERAGE.find((m) => m.key === TRASH_STORAGE_KEY);
+    assert.ok(trashCoverage, "MIGRATION_COVERAGE 必须记录回收站键");
+    assert.equal(trashCoverage.status, "excluded");
+    assert.ok(String((trashCoverage as { reason?: string }).reason).includes("软删除缓冲"));
+    assert.equal(MIGRATION_COVERAGE.filter((m) => m.status === "excluded").length, 6, "排除项数量应随新增缓冲区同步");
+
+    const giftCoverage = MIGRATION_COVERAGE.find((m) => m.key === GIFT_IDEAS_STORAGE_KEY);
+    assert.ok(giftCoverage, "MIGRATION_COVERAGE 必须包含 GIFT_IDEAS_STORAGE_KEY");
+    assert.equal(giftCoverage.status, "included");
+    assert.equal(giftCoverage.module, "giftIdeas");
+
+    const occCoverage = MIGRATION_COVERAGE.find((m) => m.key === OCCASIONS_STORAGE_KEY);
+    assert.ok(occCoverage, "MIGRATION_COVERAGE 必须包含 OCCASIONS_STORAGE_KEY");
+    assert.equal(occCoverage.status, "included");
+    assert.equal(occCoverage.module, "occasions");
+});
+
+test("迁移包包含谈资备忘 topics 模块，支持覆盖检查、预览计数与现状优先合并", async () => {
+    const { state, plugin } = fixture();
+    const topicCoverage = MIGRATION_COVERAGE.find((m) => m.key === TOPICS_STORAGE_KEY);
+    assert.ok(topicCoverage, "MIGRATION_COVERAGE 必须包含 TOPICS_STORAGE_KEY");
+    assert.equal(topicCoverage.status, "included");
+    assert.equal(topicCoverage.module, "topics");
+
+    const docId = "20261019000000-doc0001";
+    const existingTopicId = "20261019000000-top0001";
+    state.store.set(TOPICS_STORAGE_KEY, {
+        schemaVersion: 1,
+        topics: {
+            [docId]: [{ id: existingTopicId, text: "当前库已有话题", createdAt: 1000 }],
+        },
+    });
+
+    const exported = await exportMigrationBundle(plugin);
+    const parsedExport = JSON.parse(exported);
+    assert.ok(parsedExport.modules.topics, "导出包必须包含 topics 模块");
+    assert.equal(parsedExport.modules.topics.topics[docId].length, 1);
+
+    const incomingBundle = JSON.stringify({
+        schemaVersion: 1,
+        storageKey: MIGRATION_BUNDLE_STORAGE_KEY,
+        modules: {
+            topics: {
+                schemaVersion: 1,
+                topics: {
+                    [docId]: [
+                        { id: existingTopicId, text: "覆盖文本（应被现状优先忽略）", createdAt: 2000 },
+                        { id: "20261019000000-top0002", text: "新导入话题", createdAt: 3000 },
+                    ],
+                },
+            },
+        },
+    });
+
+    const preview = previewMigrationImport(incomingBundle);
+    const topicPreview = preview.find((p) => p.key === "topics");
+    assert.ok(topicPreview);
+    assert.equal(topicPreview.count, 2);
+
+    const importResult = await importMigrationBundle(plugin, incomingBundle);
+    const topicModuleResult = importResult.modules.find((m) => m.key === "topics");
+    assert.ok(topicModuleResult);
+    assert.equal(topicModuleResult.merged, 1);
+    assert.equal(topicModuleResult.skipped, 1);
+
+    const currentStore = await loadTopicsStoreStrict(plugin);
+    assert.equal(currentStore.topics[docId].length, 2);
+    assert.equal(currentStore.topics[docId][0].text, "当前库已有话题");
+    assert.equal(currentStore.topics[docId][1].text, "新导入话题");
+});
+
 test("称谓恢复可达与旧本人记录混合时，成功项写后仅核实自己的原参照", async () => {
     const { state, plugin } = fixture();
     const otherDocId = "20261004000000-other01";
@@ -1192,4 +1275,137 @@ test("独立桥 E2E 导出在纯服务夹具执行：并发、重挂载、逐项
         if (previousWindow === undefined) delete (globalThis as unknown as { window?: Record<string, unknown> }).window;
         else (globalThis as unknown as { window: Record<string, unknown> }).window = previousWindow;
     }
+});
+
+test("E-31 merge service: executeContactMerge 完整合并主次人物，迁移互动/跟进/谈资/礼物/账本/组织并移入回收站", async () => {
+    const { state, settings, plugin } = fixture();
+    const secondaryDocId = "20261004000000-doc0002";
+    const secondaryItemId = "20261004000000-row0002";
+
+    state.docs.add(secondaryDocId);
+    state.rows.push({
+        id: secondaryItemId,
+        cells: [
+            { valueType: "block", value: { keyID: "primary", type: "block", block: { id: secondaryDocId, content: "次要人物" } } },
+            { valueType: "phone", value: { keyID: "phone", type: "phone", phone: { content: "13900002222" } } },
+            { valueType: "email", value: { keyID: "email", type: "email", email: { content: "sec@example.com" } } },
+            { valueType: "mSelect", value: { keyID: "tags", type: "mSelect", mSelect: [{ content: "旧标签" }] } },
+        ],
+    } as AvRow);
+
+    // 预填次要人物的自管数据
+    state.store.set("interaction-events.json", {
+        schemaVersion: 1,
+        events: [
+            { id: "e-sec-1", personDocId: secondaryDocId, occurredAt: 1000, localDate: "2026-10-18", source: "manual", note: "次人物互动" },
+        ],
+        tombstones: [],
+    });
+    state.store.set("follow-ups.json", {
+        schemaVersion: 1,
+        items: [
+            { id: "20261004000000-req0001", personDocId: secondaryDocId, title: "跟进次人物", dueDate: "2026-10-25", status: "open", createdAt: 1000, updatedAt: 1000 },
+        ],
+    });
+    state.store.set(TOPICS_STORAGE_KEY, {
+        schemaVersion: 1,
+        topics: {
+            [secondaryDocId]: [{ id: "t-1", text: "次人物喜欢登山", createdAt: 1000 }],
+        },
+    });
+    state.store.set(GIFT_IDEAS_STORAGE_KEY, {
+        schemaVersion: 1,
+        ideas: {
+            [secondaryDocId]: [{ id: "g-1", type: "idea", status: "idea", title: "送登山杖", personDocId: secondaryDocId, createdAt: 1000, updatedAt: 1000 }],
+        },
+    });
+    state.store.set("exchange-records.json", {
+        schemaVersion: 1,
+        records: [
+            { id: "20261004000000-exch001", personDocId: secondaryDocId, kind: "money", direction: "receivable", amount: 100, currency: "CNY", note: "", description: "借款", occurredOn: "2026-10-18", dueOn: "", settledOn: "", status: "open", createdAt: 1000, updatedAt: 1000 },
+        ],
+    });
+    state.store.set("org-membership.json", {
+        schemaVersion: 1,
+        memberships: [
+            { id: "20261004000000-memb001", orgDocId: "20261004000000-org0001", personDocId: secondaryDocId, status: "active", title: "总监", createdAt: "2026-10-04", updatedAt: "2026-10-04" },
+        ],
+    });
+
+    const primaryContact: ContactSummary = {
+        docId: personDocId,
+        itemId: personItemId,
+        name: "主要人物",
+        phone: "13800001111",
+        email: "",
+        wechat: "wx-primary",
+        website: "",
+        birthday: "",
+        isLunar: false,
+        group: "同事",
+        tags: ["架构师"],
+        relatedItemIds: [],
+    };
+
+    const secondaryContact: ContactSummary = {
+        docId: secondaryDocId,
+        itemId: secondaryItemId,
+        name: "次要人物",
+        phone: "13900002222",
+        email: "sec@example.com",
+        wechat: "",
+        website: "",
+        birthday: "1995-01-01",
+        isLunar: false,
+        group: "",
+        tags: ["旧标签"],
+        relatedItemIds: [],
+    };
+
+    const plan = buildDefaultMergePlan(primaryContact, secondaryContact);
+    const result = await executeContactMerge(plugin, settings, plan);
+
+    // 断言迁移统计
+    assert.equal(result.primaryDocId, personDocId);
+    assert.equal(result.secondaryDocId, secondaryDocId);
+    assert.equal(result.migrated.interactions, 1);
+    assert.equal(result.migrated.followUps, 1);
+    assert.equal(result.migrated.topics, 1);
+    assert.equal(result.migrated.giftIdeas, 1);
+    assert.equal(result.migrated.exchanges, 1);
+    assert.equal(result.migrated.memberships, 1);
+
+    // 验证互动事件已迁移给 primary
+    const intStore = state.store.get("interaction-events.json") as { events: { personDocId: string }[] };
+    assert.equal(intStore.events[0].personDocId, personDocId);
+
+    // 验证跟进已迁移给 primary
+    const fuStore = state.store.get("follow-ups.json") as { items: { personDocId: string }[] };
+    assert.equal(fuStore.items[0].personDocId, personDocId);
+
+    // 验证谈资已迁移给 primary，secondary 键已移除
+    const topStore = state.store.get(TOPICS_STORAGE_KEY) as { topics: Record<string, unknown[]> };
+    assert.ok(topStore.topics[personDocId]);
+    assert.equal(topStore.topics[personDocId].length, 1);
+    assert.equal(topStore.topics[secondaryDocId], undefined);
+
+    // 验证礼物已迁移给 primary，secondary 键已移除
+    const giftStore = state.store.get(GIFT_IDEAS_STORAGE_KEY) as { ideas: Record<string, { personDocId: string }[]> };
+    assert.ok(giftStore.ideas[personDocId]);
+    assert.equal(giftStore.ideas[personDocId][0].personDocId, personDocId);
+    assert.equal(giftStore.ideas[secondaryDocId], undefined);
+
+    // 验证账本已迁移给 primary
+    const exStore = state.store.get("exchange-records.json") as { records: { personDocId: string }[] };
+    assert.equal(exStore.records[0].personDocId, personDocId);
+
+    // 验证组织已迁移给 primary
+    const orgStore = state.store.get("org-membership.json") as { memberships: { personDocId: string }[] };
+    assert.equal(orgStore.memberships[0].personDocId, personDocId);
+
+    // 验证次要人物已进入回收站
+    const trashStore = state.store.get(TRASH_STORAGE_KEY) as { entries: { docId: string; name: string }[] };
+    assert.ok(trashStore && trashStore.entries.length === 1);
+    assert.equal(trashStore.entries[0].docId, secondaryDocId);
+    assert.equal(trashStore.entries[0].name, "次要人物");
 });

@@ -7,6 +7,7 @@ import type { Plugin } from "siyuan";
 import { loadJson, loadJsonStrict, saveJsonVerified, withStoreLock } from "./storage.ts";
 import {
     addTopicToStore,
+    mergeTopicStore,
     normalizeTopicStore,
     normalizeTopicStoreForWrite,
     removeTopicFromStore,
@@ -56,5 +57,20 @@ export async function removePersonTopic(
         const updated = removeTopicFromStore(store, personDocId, topicId);
         await saveJsonVerified(plugin, TOPICS_STORAGE_KEY, updated);
         return updated.topics[personDocId] ? [...updated.topics[personDocId]] : [];
+    });
+}
+
+/** 迁移合并谈资备忘存储（现状优先） */
+export async function mergeTopicsStore(
+    plugin: Plugin,
+    incoming: PersonTopicStore,
+): Promise<{ merged: number; skipped: number }> {
+    return withStoreLock(TOPICS_STORAGE_KEY, async () => {
+        const current = normalizeTopicStoreForWrite(await loadJsonStrict(plugin, TOPICS_STORAGE_KEY));
+        const { store: updated, merged, skipped } = mergeTopicStore(current, incoming);
+        if (merged > 0) {
+            await saveJsonVerified(plugin, TOPICS_STORAGE_KEY, updated);
+        }
+        return { merged, skipped };
     });
 }

@@ -1,9 +1,10 @@
-import { buildGraph, buildOrgAugmentation, capGraph, compareGraphIds, GRAPH_MAX_NODES, orderGraph, queryGraphRelations } from "./graph.ts";
+import { buildCoOccurrenceEdges, buildGraph, buildOrgAugmentation, capGraph, compareGraphIds, GRAPH_MAX_NODES, orderGraph, queryGraphRelations } from "./graph.ts";
 import { secondDegreeGraphIds, shortestGraphPath } from "./graph-path.ts";
 import type { GraphNode, PersonGraph } from "./graph.ts";
 import type { ContactSummary } from "./person.ts";
 import type { OrgMembership } from "./org-membership.ts";
 import type { GraphQueryKind } from "./graph-export.ts";
+import type { InteractionEvent } from "./interactions.ts";
 
 export type GraphReadStatus = "verified" | "unknown";
 export type GraphSourceKey = "roster" | "organizations" | "self" | "references";
@@ -23,6 +24,7 @@ export interface GraphSources {
     status: Record<Exclude<GraphSourceKey, "references">, GraphReadStatus>;
     errors: Partial<Record<GraphSourceKey, string>>;
     revision: number;
+    interactionEvents?: readonly InteractionEvent[];
 }
 
 export interface GraphQuery {
@@ -144,9 +146,12 @@ export function graphRegistry(sources: GraphSources): { people: ContactSummary[]
         // dangling person IDs against the verified roster.
         docId: org.docId, name: org.name, memberships: org.memberships,
     })), personIds);
+    const coOccurrenceEdges = sources.interactionEvents && sources.interactionEvents.length > 0
+        ? buildCoOccurrenceEdges(sources.interactionEvents, people)
+        : [];
     const related = buildGraph(people);
     return { people, organizations: overlay.nodes.sort((left, right) => compareGraphIds(left.id, right.id)),
-        graph: orderGraph({ nodes: [...related.nodes, ...overlay.nodes], edges: [...related.edges, ...overlay.edges] }), diagnostics };
+        graph: orderGraph({ nodes: [...related.nodes, ...overlay.nodes], edges: [...related.edges, ...overlay.edges, ...coOccurrenceEdges] }), diagnostics };
 }
 
 export function resolveGraphCenter(sources: GraphSources, query: GraphQuery): GraphCenter {
@@ -276,10 +281,13 @@ export function buildGraphQuerySnapshot(sources: GraphSources, query: GraphQuery
         result: { kind, status: resultStatus, ids: [...resultIds].sort(compareGraphIds), pathIds, neighborIds: relations.neighborIds, reason } };
 }
 
-export function graphEdgeLabel(kind: "related" | "member" | "ref" | undefined, memberStatus?: "active" | "former" | "mixed"): string {
+export function graphEdgeLabel(kind: "related" | "member" | "ref" | "co_occurrence" | undefined, memberStatus?: "active" | "former" | "mixed"): string {
     if (kind === "member") {
         const lifecycle = memberStatus === "active" ? "当前" : memberStatus === "former" ? "历史" : memberStatus === "mixed" ? "当前+历史" : "";
         return `组织成员（member）${lifecycle ? `·${lifecycle}` : ""}`;
+    }
+    if (kind === "co_occurrence") {
+        return "共同出席推断（co_occurrence）";
     }
     return kind === "ref" ? "文档块引用（ref）" : "显式人物关系（related）";
 }

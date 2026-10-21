@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildGraph, buildOrgAugmentation, capGraph, groupColor, orderGraph, queryGraphRelations } from "../src/domain/graph.ts";
+import { buildCoOccurrenceEdges, buildGraph, buildOrgAugmentation, capGraph, groupColor, orderGraph, queryGraphRelations } from "../src/domain/graph.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
+import type { InteractionEvent } from "../src/domain/interactions.ts";
 import { shortestGraphPath, secondDegreeGraphIds } from "../src/domain/graph-path.ts";
 import { buildGraphQuerySnapshot, resolveGraphCenter } from "../src/domain/graph-query.ts";
 import type { GraphQuery, GraphSources } from "../src/domain/graph-query.ts";
@@ -412,4 +413,98 @@ test("组织增强不污染 related 图：成员边不进 buildGraph 产物，�
     const merged = [...related.edges, ...augmentation.edges];
     assert.equal(merged.filter((edge) => edge.kind === "member").length, 2);
     assert.equal(merged.filter((edge) => edge.kind === "related").length, 0);
+});
+
+test("E-34 co_occurrence: 从同场多参与者事件推断弱关联，跳过已有正式关系并按频次降序", () => {
+    const people = [
+        person({ itemId: "item-1", docId: "p1", name: "张三", relatedItemIds: ["item-2"] }), // p1 与 p2 有显式关系
+        person({ itemId: "item-2", docId: "p2", name: "李四", relatedItemIds: ["item-1"] }),
+        person({ itemId: "item-3", docId: "p3", name: "王五", relatedItemIds: [] }),
+        person({ itemId: "item-4", docId: "p4", name: "赵六", relatedItemIds: [] }),
+    ];
+
+    const events: InteractionEvent[] = [
+        // 场合 1：p1, p2, p3 同场
+        { id: "e1", personDocId: "p1", occurredAt: 1000, localDate: "2026-10-18", source: "note", externalRef: "note-meeting-1" },
+        { id: "e2", personDocId: "p2", occurredAt: 1000, localDate: "2026-10-18", source: "note", externalRef: "note-meeting-1" },
+        { id: "e3", personDocId: "p3", occurredAt: 1000, localDate: "2026-10-18", source: "note", externalRef: "note-meeting-1" },
+
+        // 场合 2：p1 与 p3 再次同场
+        { id: "e4", personDocId: "p1", occurredAt: 2000, localDate: "2026-10-19", source: "note", externalRef: "note-meeting-2" },
+        { id: "e5", personDocId: "p3", occurredAt: 2000, localDate: "2026-10-19", source: "note", externalRef: "note-meeting-2" },
+
+        // 场合 3：p3 与 p4 同场 1 次
+        { id: "e6", personDocId: "p3", occurredAt: 3000, localDate: "2026-10-19", source: "note", externalRef: "note-lunch" },
+        { id: "e7", personDocId: "p4", occurredAt: 3000, localDate: "2026-10-19", source: "note", externalRef: "note-lunch" },
+    ];
+
+    // p1 与 p2 虽在场合 1 同场，但因为已有显式 related 关系，不会生成推断边！
+    // p1 与 p3 在场合 1、2 共同出席，频次 = 2
+    // p2 与 p3 在场合 1 共同出席，频次 = 1
+    // p3 与 p4 在场合 3 共同出席，频次 = 1
+    const edges = buildCoOccurrenceEdges(events, people, 1);
+    assert.equal(edges.length, 3);
+
+    // 首条边必须是频次最高的 p1-p3
+    assert.deepEqual(edges[0], {
+        source: "p1",
+        target: "p3",
+        kind: "co_occurrence",
+        coCount: 2,
+    });
+
+    // 过滤 minCount = 2 时，仅保留频次 >= 2 的边
+    const strictEdges = buildCoOccurrenceEdges(events, people, 2);
+    assert.equal(strictEdges.length, 1);
+    assert.equal(strictEdges[0].source, "p1");
+    assert.equal(strictEdges[0].target, "p3");
+    assert.equal(strictEdges[0].coCount, 2);
+});
+
+test("图谱查询快照：co_occurrence 弱联系边进入渲染图层，但不污染相关人深度遍历与关系查询", () => {
+    const people = [
+        person({ docId: "p1", itemId: "i1", name: "张三", relatedItemIds: ["i2"] }),
+        person({ docId: "p2", itemId: "i2", name: "李四", relatedItemIds: ["i1"] }),
+        person({ docId: "p3", itemId: "i3", name: "王五", relatedItemIds: [] }),
+    ];
+    const events: InteractionEvent[] = [
+        { id: "e1", personDocId: "p1", occurredAt: 1000, localDate: "2026-10-18", source: "note", externalRef: "meeting-alpha" },
+        { id: "e2", personDocId: "p3", occurredAt: 1000, localDate: "2026-10-18", source: "note", externalRef: "meeting-alpha" },
+    ];
+    const sources: GraphSources = {
+        people,
+        organizations: [],
+        selfDocId: "p1",
+        interactionEvents: events,
+        status: { roster: "verified", organizations: "verified", self: "verified" },
+        errors: {},
+        revision: 1,
+    };
+    const query: GraphQuery = {
+        mode: "relations",
+        scope: "global",
+        centerDocId: "p1",
+        orgDocId: "",
+        search: "",
+        group: "",
+        isolatedOnly: false,
+        showOrgs: true,
+        depth: "direct",
+        focusId: "",
+        compareId: "",
+        queryMode: "common",
+    };
+    const snapshot = buildGraphQuerySnapshot(sources, query);
+
+    // 渲染边中必须包含 p1-p2 (related) 与 p1-p3 (co_occurrence)
+    const coEdge = snapshot.graph.edges.find((e) => e.kind === "co_occurrence");
+    assert.ok(coEdge, "图谱中应包含 co_occurrence 弱联系边");
+    assert.equal(coEdge?.source, "p1");
+    assert.equal(coEdge?.target, "p3");
+    assert.equal(coEdge?.coCount, 1);
+
+    // 验证核心关系查询：p1 的直接邻居依然只有李四（p2），王五（p3）因只是弱联系而不算入 related 邻居
+    const p1Neighbors = queryGraphRelations(snapshot.relationGraph, "p1").neighborIds;
+    assert.deepEqual(p1Neighbors, ["p2"]);
+    assert.ok(!p1Neighbors.includes("p3"), "弱联系对象不得进入显式关系邻居");
 });

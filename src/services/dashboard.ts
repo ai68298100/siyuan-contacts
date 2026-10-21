@@ -19,6 +19,8 @@ import { excludeSelf } from "../domain/self-identity";
 import { isWithinGrace } from "../domain/registry";
 import { buildActionCards } from "../domain/action-list";
 import type { ActionCard, ActionPersonInput } from "../domain/action-list";
+import { loadAnniversaryStore } from "../data/anniversaries.ts";
+import { emptyAnniversaryStore, nextAnniversary } from "../domain/anniversaries.ts";
 import { upcomingBirthdays } from "../domain/occasions";
 import type { UpcomingBirthday } from "../domain/occasions";
 import type { StalenessInfo } from "../domain/interactions";
@@ -26,6 +28,11 @@ import { emptyStore } from "../domain/interactions";
 import { emptyFollowUpStore } from "../domain/followups";
 import type { RegistryStore } from "../domain/registry";
 import type { ContactsSettings } from "../domain/model";
+import { computeRelationshipHealthDistribution } from "../domain/cadence.ts";
+import type { RelationshipHealthDistribution } from "../domain/cadence.ts";
+import { groupContactsByRegion } from "../domain/region.ts";
+import { computeMonthlyInteractionTrend } from "../domain/interactions.ts";
+import type { MonthlyInteractionTrend } from "../domain/interactions.ts";
 
 export interface DashboardOptions {
     /** 多少天未互动算"久未联系" */
@@ -67,6 +74,14 @@ export interface DashboardData {
     actions: ActionCard[];
     /** C02：「从未互动」行动卡的收编日期映射（docId → YYYY-MM-DD），组内最近收编优先 */
     neverOrder: Record<string, string>;
+    /** E-29：人脉全库关系温度与紧迫度分布 */
+    heatDistribution?: RelationshipHealthDistribution;
+    /** E-25：人脉核心城市分布与热度 */
+    topRegions?: { city: string; province?: string; count: number; people: import("../domain/person.ts").ContactSummary[] }[];
+    /** 近 6 个月互动频次与人脉活跃走势 */
+    monthlyTrend?: MonthlyInteractionTrend;
+    /** 名册快照（已排除本人），供仪表盘快速筛选与出差规划联动 */
+    allPeople?: import("../domain/person.ts").ContactSummary[];
     /**
      * FUNC-01.12：读取失败的插件存储模块（仅非空时携带）。
      * 受影响模块以空数据参与投影并在 UI 显式提示，绝不把故障静默呈现为正常空态。
@@ -116,13 +131,14 @@ export async function loadDashboard(
     options: DashboardOptions = DEFAULT_DASHBOARD_OPTIONS,
 ): Promise<DashboardData> {
     const readFailures: string[] = [];
-    const [peopleAll, store, followUpStore, cadences, dismissals, identity] = await Promise.all([
+    const [peopleAll, store, followUpStore, cadences, dismissals, identity, anniversaryStore] = await Promise.all([
         listContacts(settings),
         readModule(readFailures, "interactions", () => loadInteractionStoreStrict(plugin), emptyStore()),
         readModule(readFailures, "followUps", () => loadFollowUpStoreStrict(plugin), emptyFollowUpStore()),
         readModule(readFailures, "cadences", () => loadCadenceMapStrict(plugin), {}),
         readModule(readFailures, "dismissals", () => loadReminderDismissalsStrict(plugin), []),
         readModule(readFailures, "self", () => loadSelfIdentity(plugin), null),
+        readModule(readFailures, "anniversaries", () => loadAnniversaryStore(plugin), emptyAnniversaryStore()),
     ]);
     /* B11.4：本人不是"待联系对象"——首页统计与行动清单排除本人（名册本身仍保留并标识）。
        身份读取失败按模块降级（readFailures 指名 self，横幅提示），不静默按无本人处理 */
@@ -182,6 +198,26 @@ export async function loadDashboard(
     }
     const birthdaysByDocId = new Map(birthdays.map((item) => [item.person.docId, item]));
     const staleByDocId = new Map(staleRemindable.map((info) => [info.person.docId, info]));
+    const annivsByDoc = new Map<string, { id: string; title: string; daysUntil: number; date: string; yearsCount?: number }[]>();
+    for (const [docId, list] of Object.entries(anniversaryStore.anniversaries ?? {})) {
+        if (!Array.isArray(list)) continue;
+        const validProjs: { id: string; title: string; daysUntil: number; date: string; yearsCount?: number }[] = [];
+        for (const item of list) {
+            const proj = nextAnniversary(item, now);
+            if (proj && proj.daysUntil >= 0 && proj.daysUntil <= (item.remindDaysBefore ?? 7)) {
+                validProjs.push({
+                    id: item.id,
+                    title: item.title,
+                    daysUntil: proj.daysUntil,
+                    date: toLocalDateKey(proj.nextDate),
+                    yearsCount: proj.yearsCount,
+                });
+            }
+        }
+        if (validProjs.length > 0) {
+            annivsByDoc.set(docId, validProjs);
+        }
+    }
 
     const inputs: ActionPersonInput[] = people.map((person) => {
         const birthday = birthdaysByDocId.get(person.docId);
@@ -192,6 +228,7 @@ export async function loadDashboard(
             ...(birthday ? { birthdayDaysUntil: birthday.projection.daysUntil, birthdayDate: toLocalDateKey(birthday.projection.date) } : {}),
             ...(staleInfo ? { lastDaysAgo: staleInfo.lastDaysAgo, staleThreshold: cadences[person.docId]?.days ?? options.staleThresholdDays } : {}),
             followUps: followUpsByDoc.get(person.docId) ?? [],
+            anniversaries: annivsByDoc.get(person.docId) ?? [],
         };
     });
 
@@ -202,6 +239,18 @@ export async function loadDashboard(
         const registeredAt = registry.registeredAt[card.person.docId];
         if (registeredAt) neverOrder[card.person.docId] = registeredAt;
     }
+
+    const lastInteractionMap: Record<string, { occurredAt: number }> = {};
+    for (const event of store.events) {
+        const cur = lastInteractionMap[event.personDocId];
+        if (!cur || event.occurredAt > cur.occurredAt) {
+            lastInteractionMap[event.personDocId] = { occurredAt: event.occurredAt };
+        }
+    }
+    const heatDistribution = computeRelationshipHealthDistribution(people, lastInteractionMap, cadences, options.staleThresholdDays, now.getTime());
+    const regionGroups = groupContactsByRegion(people);
+    const topRegions = regionGroups.slice(0, 6);
+    const monthlyTrend = computeMonthlyInteractionTrend(store.events, 6, now);
 
     return {
         people: people.length,
@@ -215,6 +264,10 @@ export async function loadDashboard(
         followUps,
         actions,
         neverOrder,
+        heatDistribution,
+        topRegions,
+        monthlyTrend,
+        allPeople: people,
         ...(ordinaryScopeUnknown ? { ordinaryScopeUnknown: true } : {}),
         ...(identity && !ordinaryScopeUnknown ? { excludedSelfDocId: identity.selfDocId } : {}),
         ...(readFailures.length > 0 ? { readFailures } : {}),

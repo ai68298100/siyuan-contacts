@@ -21,6 +21,42 @@ export type GraphViewMode = "relations" | "native";
 /** 文档引用图范围（B14.8/B14.4）：self=以本人为中心一度；person=以指定联系人为中心一度；global=全部登记文档 */
 export type NativeGraphScope = "self" | "person" | "global";
 
+/** 人物详情可选折叠区块键值（E-14） */
+export type DetailSectionKey =
+    | "topics"
+    | "projects"
+    | "anniversaries"
+    | "gifts"
+    | "commonOrgs"
+    | "notes"
+    | "followUps"
+    | "exchanges";
+
+export const DETAIL_SECTION_KEYS: readonly DetailSectionKey[] = [
+    "topics",
+    "projects",
+    "anniversaries",
+    "gifts",
+    "commonOrgs",
+    "notes",
+    "followUps",
+    "exchanges",
+] as const;
+
+export type DetailCollapsedSections = Partial<Record<DetailSectionKey, boolean>>;
+
+export function normalizeDetailCollapsedSections(raw: unknown): DetailCollapsedSections {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    const record = raw as Record<string, unknown>;
+    const result: DetailCollapsedSections = {};
+    for (const key of DETAIL_SECTION_KEYS) {
+        if (typeof record[key] === "boolean" && record[key] === true) {
+            result[key] = true;
+        }
+    }
+    return result;
+}
+
 /** 仅接受可内嵌的常见位图，避免把远程资源或任意内容写进偏好。 */
 export function isValidBrandAvatarImage(value: unknown): boolean {
     return typeof value === "string"
@@ -71,6 +107,8 @@ export interface ViewPreferences {
     readonly brandAvatar: string;
     /** 工作台左上角品牌头像图片；仅接受受限 data URL，空串表示使用文字头像。 */
     readonly brandAvatarImage: string;
+    /** 人物详情各区块的折叠偏好（E-14）：true 表示折叠，缺省或 false 表示展开 */
+    readonly detailCollapsedSections: DetailCollapsedSections;
 }
 
 export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
@@ -94,6 +132,7 @@ export const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
     onboardingDismissed: false,
     brandAvatar: "驴",
     brandAvatarImage: "",
+    detailCollapsedSections: {},
 };
 
 /** 设置页数字输入的保存前校验：必须是 0–365 的整数。 */
@@ -170,6 +209,9 @@ export function normalizeViewPreferences(raw: unknown): ViewPreferences {
             : DEFAULT_VIEW_PREFERENCES.onboardingDismissed,
         brandAvatar: normalizeBrandAvatarText(record.brandAvatar),
         brandAvatarImage: isValidBrandAvatarImage(record.brandAvatarImage) ? record.brandAvatarImage as string : "",
+        detailCollapsedSections: record.detailCollapsedSections === undefined
+            ? DEFAULT_VIEW_PREFERENCES.detailCollapsedSections
+            : normalizeDetailCollapsedSections(record.detailCollapsedSections),
     };
 }
 

@@ -106,3 +106,23 @@ test("联系人搜索：保留输入顺序与对象身份，筛选不改写原�
     assert.equal(results[1], direct);
 });
 
+test("联系人搜索：支持拼音首字母模糊检索命中姓名与别名", () => {
+    const p1 = person("p1", "张三");
+    const p2 = person("p2", "李四");
+    const p3 = { ...person("p3", "王五"), aliasProfile: { state: "known" as const, values: ["欧阳六"] } };
+    const p4 = person("p4", "赵六");
+    const people = [p1, p2, p3, p4];
+
+    // 输入 "zs" 命中 "张三"
+    assert.deepEqual(filterContactSearch(people, "zs").map((p) => p.docId), ["p1"]);
+
+    // 输入 "ls" 命中 "李四"
+    assert.deepEqual(filterContactSearch(people, "ls").map((p) => p.docId), ["p2"]);
+
+    // 输入 "oy" 命中别名 "欧阳六"
+    assert.deepEqual(filterContactSearch(people, "oy").map((p) => p.docId), ["p3"]);
+
+    // 输入 "z" 前缀命中 "张三" 与 "赵六"
+    assert.deepEqual(filterContactSearch(people, "z").map((p) => p.docId), ["p1", "p4"]);
+});
+

@@ -9,7 +9,7 @@ import type { ContactSummary } from "./person";
 export type ActionBucket = "overdue" | "today" | "week" | "stale";
 
 export interface ActionReason {
-    kind: "birthday" | "stale" | "followup";
+    kind: "birthday" | "stale" | "followup" | "anniversary";
     label: string;
     bucket: ActionBucket;
     /** 相关的具体日期（YYYY-MM-DD）；持续关注类无日期 */
@@ -29,6 +29,14 @@ export interface ActionCard {
     earliestDate?: string;
 }
 
+export interface ActionAnniversaryInput {
+    id: string;
+    title: string;
+    daysUntil: number;
+    date: string;
+    yearsCount?: number;
+}
+
 export interface ActionPersonInput {
     person: ContactSummary;
     /** 距下次生日天数（今天=0）；undefined = 7 天窗口外或未填生日 */
@@ -40,6 +48,8 @@ export interface ActionPersonInput {
     staleThreshold?: number;
     /** 到期日在今天或未来的跟进事项（逾期也传入） */
     followUps: readonly { id: string; title: string; dueDate: string }[];
+    /** E-36 即将到来的重要纪念日 */
+    anniversaries?: readonly ActionAnniversaryInput[];
 }
 
 const BUCKET_PRIORITY: Record<ActionBucket, number> = { overdue: 0, today: 1, week: 2, stale: 3 };
@@ -59,6 +69,19 @@ export function buildActionCards(
                 label: input.birthdayDaysUntil === 0 ? "今天生日" : `${input.birthdayDaysUntil} 天后生日`,
                 dueDate: input.birthdayDate,
             });
+        }
+        if (input.anniversaries && input.anniversaries.length > 0) {
+            for (const anniv of input.anniversaries) {
+                if (anniv.daysUntil > WEEK_HORIZON) continue;
+                const bucket: ActionBucket = anniv.daysUntil === 0 ? "today" : "week";
+                const yearsTag = anniv.yearsCount ? ` (第 ${anniv.yearsCount} 周年)` : "";
+                reasons.push({
+                    kind: "anniversary",
+                    bucket,
+                    label: anniv.daysUntil === 0 ? `今天纪念日「${anniv.title}」` : `${anniv.daysUntil} 天后「${anniv.title}」${yearsTag}`,
+                    dueDate: anniv.date,
+                });
+            }
         }
         if (input.staleThreshold !== undefined) {
             const never = input.lastDaysAgo === undefined;

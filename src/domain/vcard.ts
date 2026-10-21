@@ -19,22 +19,39 @@ export interface VCardMethodPreview {
     disabled: boolean;
 }
 
+export interface VCardMethodExportEntry {
+    value: string;
+    type?: string;
+}
+
 export interface VCardContact {
     name: string;
     /** 多号码以 " / " 连接（电话是单值文本字段，保留数据优先） */
     phone: string;
     /** 解析阶段保留全部 TEL，供导入预览显示；不属于联系人持久化字段。 */
     phoneValues?: string[];
+    /** 导出时可选的多电话详细列表（带 TYPE=WORK/HOME/CELL 标签） */
+    extraPhones?: readonly VCardMethodExportEntry[];
     /** 取首个（邮箱字段有格式校验，不做多值拼接） */
     email: string;
     /** 解析阶段保留全部 EMAIL，供导入预览显示；当前只写入首项。 */
     emailValues?: string[];
+    /** 导出时可选的多邮箱列表（带 TYPE=WORK/HOME 标签） */
+    extraEmails?: readonly VCardMethodExportEntry[];
     /** 取首个 */
     website: string;
     /** 解析阶段保留全部 URL，供导入预览显示；当前只写入首项。 */
     websiteValues?: string[];
+    /** 导出时可选的多网址列表 */
+    extraWebsites?: readonly VCardMethodExportEntry[];
     /** 原卡含重复 TEL/EMAIL/URL 时保留全部候选；只在解析内存中使用。 */
     methodPreview?: VCardMethodPreview[];
+    /** 组织/公司名称 */
+    org?: string;
+    /** 职位/头衔 */
+    title?: string;
+    /** 备注说明 */
+    note?: string;
     /** YYYY-MM-DD；无法表示的（无年份、文本形式）为空串 */
     birthday: string;
     /** 仅当读入 X-LVCT-BDAY-LUNAR（本插件导出的农历回写）时为 true；外部 vCard 一律公历 */
@@ -117,7 +134,7 @@ export function unfoldVcfLines(text: string): string[] {
 }
 
 /** 解析 .vcf 文本为联系人列表；容错：坏行跳过，无姓名的卡片丢弃，永不抛错 */
-export function parseVcf(text: string): VCardContact[] {
+export function parseVcf(text: string, options: ContactFromCardOptions = {}): VCardContact[] {
     const lines = unfoldVcfLines(text);
     const cards: string[][] = [];
     let current: string[] | null = null;
@@ -136,13 +153,13 @@ export function parseVcf(text: string): VCardContact[] {
     }
     const contacts: VCardContact[] = [];
     for (const card of cards) {
-        const contact = contactFromCard(card);
+        const contact = contactFromCard(card, options);
         if (contact) contacts.push(contact);
     }
     return contacts;
 }
 
-export function parseVcfForImport(text: string): VCardContact[] {
+export function parseVcfForImport(text: string, options: ContactFromCardOptions = {}): VCardContact[] {
     if (!text.trim()) throw new Error("vCard 文件为空，请选择包含姓名的通讯录文件");
     let current: string[] | null = null;
     let cardNumber = 0;
@@ -155,7 +172,7 @@ export function parseVcfForImport(text: string): VCardContact[] {
             cardNumber += 1;
         } else if (marker === "END:VCARD") {
             if (!current) throw new Error("vCard 的开始/结束标记不匹配，请修复文件后重试");
-            const contact = contactFromCard(current);
+            const contact = contactFromCard(current, options);
             // Android/AOSP exporters may emit a valid phone-only card with
             // empty FN/N.  The vCard contract says such cards are discarded;
             // do that per card so a later named contact can still be imported.
@@ -173,7 +190,15 @@ export function parseVcfForImport(text: string): VCardContact[] {
     return contacts;
 }
 
-function contactFromCard(lines: string[]): VCardContact | null {
+export interface ContactFromCardOptions {
+    /**
+     * 当无 FN/N/NICKNAME/ORG 时，是否允许以主要电话或邮箱智能暂代姓名，
+     * 避免特定手机通讯录导出纯号码卡片或无名名片时导致整包文件导入被拒（解决 Issue #35）。
+     */
+    fallbackToPhoneOrEmail?: boolean;
+}
+
+function contactFromCard(lines: string[], options: ContactFromCardOptions = {}): VCardContact | null {
     const props: VCardProperty[] = [];
     for (const line of lines) {
         const prop = parsePropertyLine(line);
@@ -188,13 +213,27 @@ function contactFromCard(lines: string[]): VCardContact | null {
 
     // Empty or whitespace-only FN values are not usable names; allow a valid
     // structured N value to serve as the fallback in that case.
+    // If both FN and N are missing, allow NICKNAME or ORG (company/organization name,
+    // frequently emitted by Xiaomi/Android contact exports) to serve as fallback.
     const fn = first("FN").trim();
-    const name = fn || structuredName(rawFirst("N")).trim();
-    if (!name) return null;
+    const nickname = first("NICKNAME").trim();
+    const org = first("ORG").split(";")[0]?.trim() || "";
 
     const phones = all("TEL")
         .map((value) => unescapeVcf(value).trim())
         .filter((value) => value.length > 0);
+    const emails = all("EMAIL").map((value) => unescapeVcf(value).trim()).filter((value) => value.length > 0);
+
+    let name = fn || structuredName(rawFirst("N")).trim() || nickname || org;
+    const isFallbackName = !name && Boolean(options.fallbackToPhoneOrEmail);
+    if (!name && options.fallbackToPhoneOrEmail) {
+        const title = first("TITLE").trim();
+        const rawNote = first("NOTE").trim();
+        const noteFirstLine = rawNote ? rawNote.split("\n")[0].trim().slice(0, 30) : "";
+        name = title || noteFirstLine || (phones.length > 0 ? `未命名 (${phones[0]})` : emails.length > 0 ? `未命名 (${emails[0]})` : "");
+    }
+    if (!name) return null;
+
     const tags = all("CATEGORIES")
         .flatMap((value) => splitUnescaped(value, ","))
         .map((value) => unescapeVcf(value).trim())
@@ -217,6 +256,7 @@ function contactFromCard(lines: string[]): VCardContact | null {
         if (all(property).length > 1) unsupportedProperties.push(`${property}（第 2 项起）`);
     }
     const needsReview: string[] = [];
+    if (isFallbackName) needsReview.push("姓名：原卡片缺少姓名属性，已智能暂代");
     if (first("BDAY") && !bday) needsReview.push("BDAY");
     if (first("X-LVCT-BDAY-LUNAR") && !isLunar && !birthday) needsReview.push("X-LVCT-BDAY-LUNAR");
 
@@ -224,7 +264,6 @@ function contactFromCard(lines: string[]): VCardContact | null {
     // legacy scalar phone field still de-duplicates before joining, so this
     // does not change the existing AV-compatible value.
     const uniquePhones = [...new Set(phones)];
-    const emails = all("EMAIL").map((value) => unescapeVcf(value).trim()).filter((value) => value.length > 0);
     const websites = all("URL").map((value) => unescapeVcf(value).trim()).filter((value) => value.length > 0);
     const methodPreview = contactMethodPreview(props);
     if (phones.length > 1) needsReview.push("TEL（多项已合并到电话字段）");
@@ -373,6 +412,10 @@ function decodeQuotedPrintable(value: string, charset: string): string {
                 i += 2;
                 continue;
             }
+            if (value[i + 1] === "\r" && value[i + 2] === "\n") {
+                i += 2;
+                continue;
+            }
             if (value[i + 1] === "\n" || value[i + 1] === "\r") {
                 i += 1;
                 continue;
@@ -430,18 +473,62 @@ export function serializeVcf(people: readonly VCardContact[]): string {
         const name = person.name.trim();
         if (!name) continue;
         lines.push("BEGIN:VCARD", "VERSION:3.0", `N:;${escapeVcf(name)};;;`, `FN:${escapeVcf(name)}`);
-        const phone = person.phone.trim();
-        if (phone) lines.push(`TEL;TYPE=CELL:${escapeVcf(phone)}`);
-        const email = person.email.trim();
-        if (email) lines.push(`EMAIL;TYPE=INTERNET:${escapeVcf(email)}`);
-        const website = person.website.trim();
-        if (website) lines.push(`URL:${escapeVcf(website)}`);
+
+        // 组织与职位
+        if (person.org?.trim()) {
+            lines.push(`ORG:${escapeVcf(person.org.trim())}`);
+        }
+        if (person.title?.trim()) {
+            lines.push(`TITLE:${escapeVcf(person.title.trim())}`);
+        }
+
+        // 电话多值与 TYPE 标签保真导出
+        if (person.extraPhones && person.extraPhones.length > 0) {
+            for (const ep of person.extraPhones) {
+                const val = ep.value.trim();
+                if (!val) continue;
+                const typeTag = ep.type?.trim().toUpperCase() || "CELL";
+                lines.push(`TEL;TYPE=${escapeVcf(typeTag)}:${escapeVcf(val)}`);
+            }
+        } else {
+            const phone = person.phone.trim();
+            if (phone) lines.push(`TEL;TYPE=CELL:${escapeVcf(phone)}`);
+        }
+
+        // 邮箱多值与 TYPE 标签保真导出
+        if (person.extraEmails && person.extraEmails.length > 0) {
+            for (const ee of person.extraEmails) {
+                const val = ee.value.trim();
+                if (!val) continue;
+                const typeTag = ee.type?.trim().toUpperCase() || "INTERNET";
+                lines.push(`EMAIL;TYPE=${escapeVcf(typeTag)}:${escapeVcf(val)}`);
+            }
+        } else {
+            const email = person.email.trim();
+            if (email) lines.push(`EMAIL;TYPE=INTERNET:${escapeVcf(email)}`);
+        }
+
+        // 网址多值保真导出
+        if (person.extraWebsites && person.extraWebsites.length > 0) {
+            for (const ew of person.extraWebsites) {
+                const val = ew.value.trim();
+                if (!val) continue;
+                lines.push(`URL:${escapeVcf(val)}`);
+            }
+        } else {
+            const website = person.website.trim();
+            if (website) lines.push(`URL:${escapeVcf(website)}`);
+        }
+
         if (person.birthday) {
             if (person.isLunar) lines.push(`X-LVCT-BDAY-LUNAR:${person.birthday}`);
             else lines.push(`BDAY:${person.birthday}`);
         }
         if (person.tags.length > 0) {
             lines.push(`CATEGORIES:${person.tags.map((tag) => escapeVcf(tag)).join(",")}`);
+        }
+        if (person.note?.trim()) {
+            lines.push(`NOTE:${escapeVcf(person.note.trim())}`);
         }
         lines.push("END:VCARD");
     }

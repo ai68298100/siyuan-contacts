@@ -17,6 +17,9 @@
         settings,
         i18n,
         hostCloseChannel,
+        filteredPeople = [],
+        selectedPeople = [],
+        hasActiveFilter = false,
         onImported,
         onClose,
     }: {
@@ -24,6 +27,9 @@
         i18n?: Readonly<Record<string, string>>;
         /** D-40：libs/dialog 注入的宿主关闭通道（X/Esc/遮罩经守卫路由）；缺省保持宿主原行为 */
         hostCloseChannel?: { request?: (close: () => void) => void };
+        filteredPeople?: readonly import("../../domain/person").ContactSummary[];
+        selectedPeople?: readonly import("../../domain/person").ContactSummary[];
+        hasActiveFilter?: boolean;
         onImported: (count: number) => void;
         onClose: () => void;
     } = $props();
@@ -32,6 +38,26 @@
 
     let plans: VcfImportPlan[] | null = $state(null);
     let selected: Record<number, boolean> = $state({});
+    type ExportScope = "all" | "filtered" | "selected";
+    // svelte-ignore state_referenced_locally — 弹窗初始化时依据当前传入的名册状态赋默认值
+    let exportScope: ExportScope = $state(
+        selectedPeople.length > 0 ? "selected" : hasActiveFilter && filteredPeople.length > 0 ? "filtered" : "all"
+    );
+
+    const targetExportCount = $derived.by(() => {
+        if (exportScope === "selected") return selectedPeople.length;
+        if (exportScope === "filtered") return filteredPeople.length;
+        return undefined; // 全量从主名册获取
+    });
+
+    const exportSampleNames = $derived.by(() => {
+        let list: readonly import("../../domain/person").ContactSummary[] = [];
+        if (exportScope === "selected") list = selectedPeople;
+        else if (exportScope === "filtered") list = filteredPeople;
+        if (list.length === 0) return "";
+        const sample = list.slice(0, 3).map((p) => p.name).join("、");
+        return list.length > 3 ? `${sample} 等 ${list.length} 人` : sample;
+    });
     let parsing: boolean = $state(false);
     let importing: boolean = $state(false);
     let exporting: boolean = $state(false);
@@ -283,14 +309,26 @@
         errorText = "";
         statusText = "";
         try {
-            const text = await exportVcfText(settings);
+            let text: string;
+            let countLabel = "";
+            if (exportScope === "selected" && selectedPeople.length > 0) {
+                text = await exportVcfText(settings, { explicitPeople: selectedPeople });
+                countLabel = `${selectedPeople.length} 位已选`;
+            } else if (exportScope === "filtered" && filteredPeople.length > 0) {
+                text = await exportVcfText(settings, { explicitPeople: filteredPeople });
+                countLabel = `${filteredPeople.length} 位筛选`;
+            } else {
+                text = await exportVcfText(settings);
+                countLabel = "全部";
+            }
             if (!alive) return;
             if (!text) {
                 statusText = "还没有可导出的联系人。";
                 return;
             }
-            downloadVcf(text);
-            statusText = "已导出 vCard 文件（浏览器下载）。";
+            const scopeTag = exportScope === "selected" ? "已选" : exportScope === "filtered" ? "当前筛选" : "全量";
+            downloadVcf(text, scopeTag);
+            statusText = `已成功导出 ${countLabel}联系人为 vCard 文件（浏览器下载）。`;
         } catch (error) {
             if (alive) errorText = requestErrorMessage(error);
         } finally {
@@ -298,11 +336,12 @@
         }
     }
 
-    function downloadVcf(text: string) {
+    function downloadVcf(text: string, scopeTag: string = "") {
         const pad = (value: number) => String(value).padStart(2, "0");
         const now = new Date();
         const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
-        downloadText(text, `小驴人脉_${stamp}.vcf`, "text/vcard;charset=utf-8");
+        const tag = scopeTag ? `_${scopeTag}` : "";
+        downloadText(text, `小驴人脉${tag}_${stamp}.vcf`, "text/vcard;charset=utf-8");
     }
 
     function downloadDiagnostics() {
@@ -352,12 +391,43 @@
         </div>
     </details>
     <div class="lvct-vcard__export">
-        <div class="lvct-vcard__section-title">{text("vcardExportTitle", "导出")}</div>
-        <div class="fn__flex">
-            <button class="b3-button b3-button--outline" onclick={runExport} disabled={exporting || parsing || importing || retrying}>
-                {exporting ? text("vcardExporting", "导出中…") : text("vcardExportAll", "导出全部联系人为 .vcf")}
-            </button>
-            <span class="ft__smaller ft__on-surface lvct-vcard__note">{text("vcardExportNote", "含电话/邮箱/网站/生日/标签；微信不导出（无标准属性）。当前多值电话会作为一个文本字段导出，请核对。")}</span>
+        <div class="lvct-vcard__section-title">{text("vcardExportTitle", "导出联系人")}</div>
+        <div class="lvct-vcard__export-options">
+            <div class="lvct-vcard__scope-radio-group" role="radiogroup" aria-label="导出范围选择" style="display: flex; flex-wrap: wrap; gap: 12px; margin: 4px 0;">
+                <label class="b3-label" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="radio" name="vcard-export-scope" value="all" bind:group={exportScope} disabled={exporting} />
+                    <span>全部联系人</span>
+                </label>
+                {#if hasActiveFilter && filteredPeople.length > 0}
+                    <label class="b3-label" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <input type="radio" name="vcard-export-scope" value="filtered" bind:group={exportScope} disabled={exporting} />
+                        <span>当前筛选结果（{filteredPeople.length} 人）</span>
+                    </label>
+                {/if}
+                {#if selectedPeople.length > 0}
+                    <label class="b3-label" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <input type="radio" name="vcard-export-scope" value="selected" bind:group={exportScope} disabled={exporting} />
+                        <span>已选中的联系人（{selectedPeople.length} 人）</span>
+                    </label>
+                {/if}
+            </div>
+            {#if exportSampleNames}
+                <div class="ft__smaller ft__on-surface" style="margin-top: 2px;">
+                    包含：{exportSampleNames}
+                </div>
+            {/if}
+            <div class="fn__flex" style="align-items: center; gap: 8px; margin-top: 6px;">
+                <button
+                    class="b3-button b3-button--outline"
+                    onclick={runExport}
+                    disabled={exporting || parsing || importing || retrying || targetExportCount === 0}
+                >
+                    {exporting ? text("vcardExporting", "导出中…") : `导出 .vcf（${exportScope === "all" ? "全部" : targetExportCount + " 人"}）`}
+                </button>
+                <span class="ft__smaller ft__on-surface lvct-vcard__note">
+                    {text("vcardExportNote", "含电话/邮箱/网站/生日/标签；微信不导出（无标准属性）。")}
+                </span>
+            </div>
         </div>
     </div>
 

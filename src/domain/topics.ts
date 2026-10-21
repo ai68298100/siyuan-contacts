@@ -160,3 +160,53 @@ export function removeTopicFromStore(store: PersonTopicStore, personDocId: strin
         topics: updated,
     };
 }
+
+/** 严格解析供迁移包与写前校验使用 */
+export function parseTopicStore(raw: unknown): PersonTopicStore {
+    return normalizeTopicStoreForWrite(raw);
+}
+
+export interface TopicMergeResult {
+    store: PersonTopicStore;
+    merged: number;
+    skipped: number;
+}
+
+/** 现状优先合并两个谈资备忘存储 */
+export function mergeTopicStore(current: PersonTopicStore, incoming: PersonTopicStore): TopicMergeResult {
+    const updated: Record<string, PersonTopicItem[]> = { ...current.topics };
+    let merged = 0;
+    let skipped = 0;
+
+    for (const [docId, incomingList] of Object.entries(incoming.topics)) {
+        const currentList = updated[docId] ? [...updated[docId]] : [];
+        const existingIds = new Set(currentList.map((item) => item.id));
+
+        for (const item of incomingList) {
+            if (existingIds.has(item.id)) {
+                skipped += 1;
+                continue;
+            }
+            if (currentList.length < MAX_TOPICS_PER_PERSON) {
+                currentList.push(item);
+                existingIds.add(item.id);
+                merged += 1;
+            } else {
+                skipped += 1;
+            }
+        }
+
+        if (currentList.length > 0) {
+            updated[docId] = currentList;
+        }
+    }
+
+    return {
+        store: {
+            schemaVersion: TOPIC_STORE_VERSION,
+            topics: updated,
+        },
+        merged,
+        skipped,
+    };
+}

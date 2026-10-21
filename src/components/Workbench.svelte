@@ -168,6 +168,8 @@
         focusContact: (itemId: string) => Promise<"restored" | "cancelled" | "missing">;
         cancelContactFocus: () => void;
     } | undefined = $state();
+    let graphInitialCenterDocId = $state("");
+    let graphInitialOrgDocId = $state("");
     let navigationError = $state("");
     let navigationRequest = 0;
     type ReturnDom = { trigger: HTMLElement | null; personItemId: string | null; scrolls: Array<{ element: HTMLElement; top: number; left: number }> };
@@ -456,7 +458,7 @@
         await selectView("people");
     }
 
-    async function openPeople(focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" | "recent" }) {
+    async function openPeople(focus?: { itemIds?: readonly string[]; label?: string; sort?: "name" | "group" | "birthday" | "recent"; workQuery?: string }) {
         if (!lifecycleToken.isAlive()) return;
         if (current !== "people" && !(await canLeave.requestClose())) return;
         if (!lifecycleToken.isAlive()) return;
@@ -466,6 +468,24 @@
         peopleFocusIds = focus?.itemIds ? [...focus.itemIds] : [];
         peopleFocusLabel = focus?.label ?? "";
         peopleFocusSort = focus?.sort;
+    }
+
+    async function openGraphPerson(docId: string) {
+        if (!lifecycleToken.isAlive()) return;
+        if (detailPerson && !(await canLeave.requestClose())) return;
+        detailPerson = null;
+        graphInitialCenterDocId = docId;
+        graphInitialOrgDocId = "";
+        await selectView("graph");
+    }
+
+    async function openGraphOrg(orgDocId: string) {
+        if (!lifecycleToken.isAlive()) return;
+        if (detailPerson && !(await canLeave.requestClose())) return;
+        detailPerson = null;
+        graphInitialCenterDocId = "";
+        graphInitialOrgDocId = orgDocId;
+        await selectView("graph");
     }
 
     onMount(() => {
@@ -684,11 +704,14 @@
                     }}
                     onPreferencesChange={savePreferences}
                     {onOpenPersonDoc}
+                    onOpenGraphPerson={openGraphPerson}
                     onLoadOrgCandidates={async () => (await facade.listOrganizations()).map((org) => ({ docId: org.docId, name: org.name, archived: org.archived }))}
                     onCreateOrganization={openCreateOrganizationForContact}
                     onAddOrgMembership={(personDocId, orgDocId, extra) => facade.addOrganizationMember(orgDocId, personDocId, extra)}
                     onCreateSelfProfile={() => facade.createSelfProfile()}
                     onLoadSelfCandidates={() => facade.listContacts()}
+                    onCreateOccasion={facade.createOccasion ? async (input) => { await facade.createOccasion!(input); } : undefined}
+                    onExecuteMerge={facade.executeContactMerge ? (plan) => facade.executeContactMerge!(plan) : undefined}
                     onPreviewSelfIdentityChange={(personItemId) => facade.previewSelfIdentityChange(personItemId)}
                     onApplySelfIdentityChange={(preview) => facade.applySelfIdentityChange(preview)}
                     onValidateExtended={async (details) => {
@@ -762,9 +785,11 @@
                     preferences={currentPreferences}
                     onPreferencesChange={savePreferences}
                     onOpenDetail={openDetail}
-                    onOpenPeople={() => selectView("people")}
+                    onOpenPeople={(focus) => void openPeople(focus)}
                     onOpenCreatePerson={() => void requestPeopleAction("create")}
                     onOpenOrgs={(docId) => docId ? void openOrganization(docId) : selectView("orgs")}
+                    initialCenterDocId={graphInitialCenterDocId}
+                    initialOrgDocId={graphInitialOrgDocId}
                 />
             {:else if current === "orgs"}
                 <OrgsView
@@ -774,6 +799,8 @@
                     onOpenOrgManager={(docId) => void openOrganization(docId)}
                     onCreateOrganization={() => void openCreateOrganization()}
                     onEditOrganization={(docId) => void openEditOrganizationProfile(docId)}
+                    onOpenPeople={(focus) => void openPeople(focus)}
+                    onOpenGraphOrg={openGraphOrg}
                 />
             {:else if current === "settings"}
                 <SettingsView
@@ -817,7 +844,18 @@
             person={detailPerson}
             availableGroups={peopleGroups}
             revision={dataRevision}
-            onRecord={(personDocId, note) => facade.recordInteraction(personDocId, note)}
+            collapsedSections={currentPreferences.detailCollapsedSections}
+            onToggleSection={(sectionKey, collapsed) => {
+                const nextSections = {
+                    ...currentPreferences.detailCollapsedSections,
+                    [sectionKey]: collapsed,
+                };
+                void savePreferences({
+                    ...currentPreferences,
+                    detailCollapsedSections: nextSections,
+                });
+            }}
+            onRecord={(personDocId, note, type) => facade.recordInteraction(personDocId, note, type)}
             onDeleteInteraction={(personDocId, eventId) => facade.deleteInteraction(personDocId, eventId)}
             onLoadInsights={(docId) => facade.loadPersonInsights(docId)}
             onLoadPersonNote={(docId) => facade.loadPersonNote(docId)}
@@ -855,7 +893,20 @@
             onLoadTopics={facade.loadPersonTopics ? (docId) => facade.loadPersonTopics!(docId) : undefined}
             onAddTopic={facade.addPersonTopic ? (docId, text) => facade.addPersonTopic!(docId, text) : undefined}
             onRemoveTopic={facade.removePersonTopic ? (docId, topicId) => facade.removePersonTopic!(docId, topicId) : undefined}
+            onRemoveContactToTrash={facade.removeContactToTrash ? (person) => facade.removeContactToTrash!(person) : undefined}
+            onLoadGiftIdeas={facade.loadPersonGiftIdeas ? (docId) => facade.loadPersonGiftIdeas!(docId) : undefined}
+            onAddGiftIdea={facade.addPersonGiftIdea ? (item) => facade.addPersonGiftIdea!(item) : undefined}
+            onUpdateGiftIdea={facade.updatePersonGiftIdea ? (docId, ideaId, patch) => facade.updatePersonGiftIdea!(docId, ideaId, patch) : undefined}
+            onRemoveGiftIdea={facade.removePersonGiftIdea ? (docId, ideaId) => facade.removePersonGiftIdea!(docId, ideaId) : undefined}
+            onLoadAnniversaries={facade.loadPersonAnniversaries ? (docId) => facade.loadPersonAnniversaries!(docId) : undefined}
+            onAddAnniversary={facade.addPersonAnniversary ? (item) => facade.addPersonAnniversary!(item) : undefined}
+            onRemoveAnniversary={facade.removePersonAnniversary ? (docId, annivId) => facade.removePersonAnniversary!(docId, annivId) : undefined}
+            onLoadProjects={facade.loadPersonProjects ? (docId) => facade.loadPersonProjects!(docId) : undefined}
+            onAddProject={facade.addPersonProject ? (item) => facade.addPersonProject!(item) : undefined}
+            onRemoveProject={facade.removePersonProject ? (docId, projId) => facade.removePersonProject!(docId, projId) : undefined}
             {onOpenPersonDoc}
+            onOpenGraphPerson={openGraphPerson}
+            onOpenPeople={openPeople}
             onNavigate={showDetail}
             onNavigateDocId={(docId) => openPersonByDocId(docId)}
             closeLabel={detailCloseLabel}

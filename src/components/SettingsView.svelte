@@ -20,6 +20,9 @@ import type { ViewPreferences } from "../domain/preferences";
     import type { HealthAuditReport } from "../domain/health-audit";
     import ReviewReportDialog from "./dashboard/ReviewReportDialog.svelte";
     import type { ReminderDismissal } from "../domain/reminder-dismissals";
+    import type { TrashContactEntry } from "../domain/trash";
+    import { daysUntilTrashExpiration } from "../domain/trash";
+    import { confirmDialog } from "../libs/confirm-dialog";
     import { subscribeDataChanged } from "../libs/data-events";
     import type { SelfIdentityChangePreview } from "../domain/self-identity";
     import OrgProjectionRepair from "./org/OrgProjectionRepair.svelte";
@@ -275,6 +278,73 @@ import type { ViewPreferences } from "../domain/preferences";
     let rebindPreview = $state.raw<SettingsRebindPreview | null>(null);
     let rebuildPreviewElement: HTMLElement | undefined = $state();
     let rebindPreviewElement: HTMLElement | undefined = $state();
+    // E-33 联系人回收站：软删除缓冲区列表 + 一键恢复 + 清空
+    let trashEntries: TrashContactEntry[] | null = $state(null);
+    let trashLoading = $state(false);
+    let trashBusy = $state(false);
+    let trashError = $state("");
+    let trashMessage = $state("");
+    let trashRequest = 0;
+    onDestroy(() => { trashRequest += 1; });
+    async function loadTrash(): Promise<void> {
+        if (!facade.listTrash || trashLoading || trashBusy) return;
+        const request = ++trashRequest;
+        trashLoading = true;
+        trashError = "";
+        try {
+            const result = await facade.listTrash();
+            if (!selfAlive || request !== trashRequest) return;
+            trashEntries = result;
+        } catch (error) {
+            if (selfAlive && request === trashRequest) trashError = requestErrorMessage(error);
+        } finally {
+            if (selfAlive) trashLoading = false;
+        }
+    }
+    async function restoreTrashEntry(entryId: string): Promise<void> {
+        if (!facade.restoreContactFromTrash || trashBusy || trashLoading) return;
+        const request = ++trashRequest;
+        trashBusy = true;
+        trashError = "";
+        trashMessage = "";
+        try {
+            const restored = await facade.restoreContactFromTrash(entryId);
+            const result = facade.listTrash ? await facade.listTrash() : [];
+            if (!selfAlive || request !== trashRequest) return;
+            trashEntries = result;
+            trashMessage = `已恢复「${restored.name}」，资料按移除时的快照写回。`;
+        } catch (error) {
+            if (selfAlive && request === trashRequest) trashError = requestErrorMessage(error);
+        } finally {
+            if (selfAlive) trashBusy = false;
+        }
+    }
+    async function emptyTrashBin(): Promise<void> {
+        if (!facade.emptyTrash || trashBusy || trashLoading) return;
+        const confirmed = await confirmDialog({
+            title: "清空回收站",
+            message: "将永久删除回收站中的全部缓冲记录（人物文档与资料不受影响，仅清除撤销能力）。确定继续吗？",
+            confirmLabel: "清空",
+            cancelLabel: "取消",
+            danger: true,
+        });
+        if (!confirmed) return;
+        const request = ++trashRequest;
+        trashBusy = true;
+        trashError = "";
+        trashMessage = "";
+        try {
+            await facade.emptyTrash();
+            const result = facade.listTrash ? await facade.listTrash() : [];
+            if (!selfAlive || request !== trashRequest) return;
+            trashEntries = result;
+            trashMessage = "回收站已清空。";
+        } catch (error) {
+            if (selfAlive && request === trashRequest) trashError = requestErrorMessage(error);
+        } finally {
+            if (selfAlive) trashBusy = false;
+        }
+    }
     let savingPreferences = $state(false);
     let preferencesMessage = $state("");
     type PreferenceDayField = "birthdayWindowDays" | "staleThresholdDays" | "reminderGraceDays";
@@ -1313,6 +1383,50 @@ import type { ViewPreferences } from "../domain/preferences";
                                     </div>
                                 </section>
                             {/if}
+                        </div>
+                    {/if}
+
+                    <div class="lvct-settings__sub-heading">
+                        <b>联系人回收站</b>
+                        <button class="b3-button b3-button--outline" onclick={loadTrash} disabled={!facade.listTrash || trashLoading || trashBusy}>
+                            {trashLoading ? "读取中…" : "刷新列表"}
+                        </button>
+                    </div>
+                    <p class="lvct-settings__fine-print">从人脉名册移除联系人时，联系方式与标签等元数据会在此保留 30 天，可一键无损恢复；人物文档始终保留，不受影响。</p>
+                    {#if trashError}<div class="lvct-form__error" role="alert">{trashError}</div>{/if}
+                    {#if trashMessage}<StatusNotice message={trashMessage} onDismiss={() => (trashMessage = "")} />{/if}
+                    {#if !facade.listTrash}
+                        <p class="lvct-settings__inline-hint">当前版本未提供回收站能力。</p>
+                    {:else if trashEntries === null}
+                        <p class="lvct-settings__inline-hint">点击「刷新列表」查看缓冲中的联系人；移除后 30 天内可在此恢复。</p>
+                    {:else if trashEntries.length === 0}
+                        <p class="lvct-settings__inline-hint" role="status">回收站是空的。移除联系人后会在这里出现，30 天后自动清理。</p>
+                    {:else}
+                        <ul class="lvct-settings__missing">
+                            {#each trashEntries as entry (entry.id)}
+                                <li>
+                                    <div>
+                                        {entry.name}
+                                        {#if entry.snapshot.group} · {entry.snapshot.group}{/if}
+                                        <span class="ft__smaller ft__on-surface">（剩余 {daysUntilTrashExpiration(entry)} 天）</span>
+                                    </div>
+                                    <div class="ft__smaller ft__on-surface">
+                                        {#if entry.snapshot.phone}电话 {entry.snapshot.phone}{/if}
+                                        {#if entry.snapshot.tags.length > 0} · 标签 {entry.snapshot.tags.join("、")}{/if}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="b3-button b3-button--outline"
+                                        disabled={trashBusy || trashLoading || !facade.restoreContactFromTrash}
+                                        onclick={() => void restoreTrashEntry(entry.id)}
+                                    >恢复联系人</button>
+                                </li>
+                            {/each}
+                        </ul>
+                        <div class="lvct-settings__actions">
+                            <button class="b3-button b3-button--cancel" onclick={() => void emptyTrashBin()} disabled={trashBusy || trashLoading || !facade.emptyTrash}>
+                                {trashBusy ? "处理中…" : "清空回收站"}
+                            </button>
                         </div>
                     {/if}
 

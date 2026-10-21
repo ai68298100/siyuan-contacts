@@ -4,6 +4,9 @@ import {
     appendEvent,
     buildCoAttendance,
     buildTimeline,
+    computeMonthlyInteractionTrend,
+    filterTimelineByType,
+    inferInteractionType,
     isDuplicateEvent,
     lastInteractionByPerson,
     normalizeInteractionStore,
@@ -11,6 +14,7 @@ import {
     removeEvent,
     staleContacts,
     toLocalDateKey,
+    INTERACTION_TYPES,
 } from "../src/domain/interactions.ts";
 import type { InteractionEvent, InteractionStore } from "../src/domain/interactions.ts";
 import type { ContactSummary } from "../src/domain/person.ts";
@@ -224,4 +228,78 @@ test("M-10：buildTimeline 同日事件按 occurredAt 倒序与 eventId tie-brea
         ["e-newer-b", "e-newer-a", "e-older", "e-yesterday"],
         "先按日期倒序，同日按 occurredAt 倒序，再次按 eventId 倒序",
     );
+});
+
+test("AG-E17-INTERACTION-TYPE: 语义分类推导、时间线过滤与非法类型写入校验", () => {
+    // 1. 显式指定的 type 优先
+    assert.equal(inferInteractionType({ source: "manual", note: "[聚餐] 吃了火锅", type: "meeting" }), "meeting");
+
+    // 2. 备注前缀推导
+    assert.equal(inferInteractionType({ source: "manual", note: "[会议] 季度战略复盘" }), "meeting");
+    assert.equal(inferInteractionType({ source: "manual", note: "[电话] 讨论合作细节" }), "call");
+    assert.equal(inferInteractionType({ source: "manual", note: "[微信] 约了周末聚聚" }), "message");
+    assert.equal(inferInteractionType({ source: "manual", note: "[聚餐] 团队聚餐" }), "meal");
+    assert.equal(inferInteractionType({ source: "manual", note: "[邮件] 发送了合同" }), "email");
+    assert.equal(inferInteractionType({ source: "manual", note: "日常聊天" }), "other");
+
+    // 3. 时间线项自动推导并支持按类型过滤
+    const events: InteractionEvent[] = [
+        event({ id: "e1", note: "[会议] 复盘", localDate: "2026-10-01" }),
+        event({ id: "e2", note: "[电话] 通话", localDate: "2026-10-02" }),
+        event({ id: "e3", note: "[聚餐] 吃饭", localDate: "2026-10-03" }),
+    ];
+    const timeline = buildTimeline(events, "d1");
+    assert.equal(timeline.find((t) => t.eventId === "e1")?.type, "meeting");
+    assert.equal(timeline.find((t) => t.eventId === "e2")?.type, "call");
+    assert.equal(timeline.find((t) => t.eventId === "e3")?.type, "meal");
+
+    assert.equal(filterTimelineByType(timeline, "all").length, 3);
+    assert.equal(filterTimelineByType(timeline, "call").length, 1);
+    assert.equal(filterTimelineByType(timeline, "call")[0].eventId, "e2");
+    assert.equal(filterTimelineByType(timeline, "email").length, 0);
+
+    // 4. 写前校验支持合法 type，拒绝非法未知类型
+    const validStore = {
+        schemaVersion: 1,
+        events: [event({ id: "e-ok", type: "meeting" })],
+        tombstones: [],
+    };
+    assert.doesNotThrow(() => normalizeInteractionStoreForWrite(validStore));
+
+    const invalidStore = {
+        schemaVersion: 1,
+        events: [event({ id: "e-bad", type: "invalid_type" as unknown as InteractionEvent["type"] })],
+        tombstones: [],
+    };
+    assert.throws(() => normalizeInteractionStoreForWrite(invalidStore), /互动存储内容损坏/);
+});
+
+test("computeMonthlyInteractionTrend: 正确按月统计互动走势与参与联系人", () => {
+    const fixedNow = new Date("2026-10-21T12:00:00Z");
+    const events: InteractionEvent[] = [
+        event({ id: "e1", personDocId: "d1", occurredAt: new Date("2026-10-15T10:00:00Z").getTime() }),
+        event({ id: "e2", personDocId: "d2", occurredAt: new Date("2026-10-05T10:00:00Z").getTime() }),
+        event({ id: "e3", personDocId: "d1", occurredAt: new Date("2026-09-20T10:00:00Z").getTime() }),
+        event({ id: "e4", personDocId: "d3", occurredAt: new Date("2026-08-10T10:00:00Z").getTime() }),
+        event({ id: "e5", personDocId: "d2", occurredAt: new Date("2026-05-01T10:00:00Z").getTime() }),
+    ];
+
+    const trend = computeMonthlyInteractionTrend(events, 6, fixedNow);
+    assert.equal(trend.months.length, 6);
+    assert.equal(trend.totalCount, 5);
+
+    // 最后一个月是 2026-10，有 2 次互动（d1, d2）
+    const oct = trend.months[trend.months.length - 1];
+    assert.equal(oct.monthKey, "2026-10");
+    assert.equal(oct.label, "10月");
+    assert.equal(oct.count, 2);
+    assert.deepEqual(oct.personDocIds.sort(), ["d1", "d2"].sort());
+
+    // 倒数第二个月是 2026-09，有 1 次互动（d1）
+    const sep = trend.months[trend.months.length - 2];
+    assert.equal(sep.monthKey, "2026-09");
+    assert.equal(sep.count, 1);
+    assert.deepEqual(sep.personDocIds, ["d1"]);
+
+    assert.equal(trend.maxCount, 2);
 });

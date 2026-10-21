@@ -8,6 +8,26 @@ import { isValidDateKey } from "./date-key.ts";
 
 export type InteractionSource = "manual" | "diary" | "api";
 
+export type InteractionType = "meeting" | "call" | "message" | "meal" | "email" | "other";
+
+export const INTERACTION_TYPES: readonly InteractionType[] = [
+    "meeting",
+    "call",
+    "message",
+    "meal",
+    "email",
+    "other",
+] as const;
+
+export const INTERACTION_TYPE_LABELS: Record<InteractionType, { label: string; icon: string }> = {
+    meeting: { label: "见面", icon: "🤝" },
+    call: { label: "电话", icon: "📞" },
+    message: { label: "消息", icon: "💬" },
+    meal: { label: "聚餐", icon: "🍽️" },
+    email: { label: "邮件", icon: "✉️" },
+    other: { label: "其他", icon: "📝" },
+};
+
 export interface InteractionEvent {
     id: string;
     personDocId: string;
@@ -16,6 +36,8 @@ export interface InteractionEvent {
     /** 用户本地日 YYYY-MM-DD（全库日期契约，禁止用毫秒差取整推算） */
     localDate: string;
     source: InteractionSource;
+    /** 语义分类类型（见面、电话、消息、聚餐、邮件、其他；缺省通过 inferInteractionType 优雅推导） */
+    type?: InteractionType;
     /** 场合标识（与人物 ID、source 配合构成幂等身份） */
     externalRef?: string;
     note?: string;
@@ -38,6 +60,7 @@ function isInteractionEvent(raw: unknown): raw is InteractionEvent {
         typeof event.occurredAt === "number" && Number.isFinite(event.occurredAt) &&
         isValidDateKey(event.localDate) &&
         (event.source === "manual" || event.source === "diary" || event.source === "api") &&
+        (event.type === undefined || INTERACTION_TYPES.includes(event.type as InteractionType)) &&
         (event.externalRef === undefined || typeof event.externalRef === "string") &&
         (event.note === undefined || typeof event.note === "string");
 }
@@ -202,12 +225,40 @@ export interface TimelineItem {
     localDate: string;
     note?: string;
     source: InteractionSource;
+    type: InteractionType;
     /** 同场人数（含本人）；同场事件才 >1 */
     groupSize: number;
     occurredAt?: number;
 }
 
-function occasionKey(event: InteractionEvent): string | undefined {
+/**
+ * 优雅推导互动事件的语义类型：
+ * 优先取显式指定的 type；若缺省，依据备注前缀或关键词（如 [会议]、[聚餐]、[电话]）推导；未匹配归为 other。
+ */
+export function inferInteractionType(event: Pick<InteractionEvent, "source" | "note" | "type">): InteractionType {
+    if (event.type && INTERACTION_TYPES.includes(event.type)) {
+        return event.type;
+    }
+    const note = event.note?.trim() ?? "";
+    if (/^\[(?:会议|研讨|沟通|会面|拜访)\]/i.test(note) || /面谈|拜访|碰面|闭门会/.test(note)) {
+        return "meeting";
+    }
+    if (/^\[(?:电话|通话|语音)\]/i.test(note) || /电话|致电|语音通话/.test(note)) {
+        return "call";
+    }
+    if (/^\[(?:消息|微信|短信|私信)\]/i.test(note) || /微信|短信|回复消息/.test(note)) {
+        return "message";
+    }
+    if (/^\[(?:聚餐|吃饭|午餐|晚餐|下午茶|宴请|婚礼)\]/i.test(note) || /聚餐|吃饭|小酌|宴请|婚礼/.test(note)) {
+        return "meal";
+    }
+    if (/^\[(?:邮件|email)\]/i.test(note) || /邮件|发送邮件/.test(note)) {
+        return "email";
+    }
+    return "other";
+}
+
+export function occasionKey(event: InteractionEvent): string | undefined {
     return event.externalRef ? JSON.stringify([event.source, event.externalRef]) : undefined;
 }
 
@@ -236,6 +287,7 @@ export function buildTimeline(
                 localDate: event.localDate,
                 ...(event.note ? { note: event.note } : {}),
                 source: event.source,
+                type: inferInteractionType(event),
                 groupSize: key === undefined ? 1 : participants.get(key)?.size ?? 1,
                 occurredAt: event.occurredAt,
             };
@@ -245,6 +297,15 @@ export function buildTimeline(
             || (b.occurredAt ?? 0) - (a.occurredAt ?? 0)
             || b.eventId.localeCompare(a.eventId)
         ));
+}
+
+/** 按语义类型过滤时间线 */
+export function filterTimelineByType(
+    items: readonly TimelineItem[],
+    selectedType: InteractionType | "all" = "all",
+): TimelineItem[] {
+    if (!selectedType || selectedType === "all") return [...items];
+    return items.filter((item) => item.type === selectedType);
 }
 
 export interface CoAttendance {
@@ -282,4 +343,84 @@ export function buildCoAttendance(
     return [...sharedOccasions.entries()]
         .map(([otherDocId, occasions]) => ({ otherDocId, count: occasions.size }))
         .sort((a, b) => b.count - a.count);
+}
+
+export interface MonthlyInteractionTrendItem {
+    /** 形如 "2026-10" */
+    monthKey: string;
+    /** 显示名，形如 "10月" */
+    label: string;
+    /** 该月互动事件数 */
+    count: number;
+    /** 该月互动的独立联系人 docId 列表 */
+    personDocIds: string[];
+}
+
+export interface MonthlyInteractionTrend {
+    months: MonthlyInteractionTrendItem[];
+    maxCount: number;
+    totalCount: number;
+}
+
+/**
+ * 计算最近 N 个月（默认 6 个月）的互动频次与人脉活跃走势
+ */
+export function computeMonthlyInteractionTrend(
+    events: readonly InteractionEvent[],
+    monthsCount = 6,
+    now: Date = new Date(),
+): MonthlyInteractionTrend {
+    const months: MonthlyInteractionTrendItem[] = [];
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    for (let i = monthsCount - 1; i >= 0; i--) {
+        const d = new Date(currentYear, currentMonth - i, 1);
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const monthKey = `${y}-${String(m).padStart(2, "0")}`;
+        const label = `${m}月`;
+        months.push({
+            monthKey,
+            label,
+            count: 0,
+            personDocIds: [],
+        });
+    }
+
+    const monthMap = new Map<string, { count: number; personDocIds: Set<string> }>();
+    for (const m of months) {
+        monthMap.set(m.monthKey, { count: 0, personDocIds: new Set() });
+    }
+
+    let totalCount = 0;
+    for (const event of events) {
+        const d = new Date(event.occurredAt);
+        if (Number.isNaN(d.getTime())) continue;
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const key = `${y}-${String(m).padStart(2, "0")}`;
+        const slot = monthMap.get(key);
+        if (slot) {
+            slot.count += 1;
+            slot.personDocIds.add(event.personDocId);
+            totalCount += 1;
+        }
+    }
+
+    let maxCount = 0;
+    for (const m of months) {
+        const slot = monthMap.get(m.monthKey);
+        if (slot) {
+            m.count = slot.count;
+            m.personDocIds = Array.from(slot.personDocIds);
+            if (m.count > maxCount) maxCount = m.count;
+        }
+    }
+
+    return {
+        months,
+        maxCount,
+        totalCount,
+    };
 }

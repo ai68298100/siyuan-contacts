@@ -9,6 +9,9 @@ import ImportDialog from "../../../src/components/people/ImportDialog.svelte";
 import DashboardView from "../../../src/components/dashboard/DashboardView.svelte";
 import PeopleView from "../../../src/components/people/PeopleView.svelte";
 import SettingsView from "../../../src/components/SettingsView.svelte";
+import ContactMergeWizard from "../../../src/components/people/ContactMergeWizard.svelte";
+import OccasionDialog from "../../../src/components/OccasionDialog.svelte";
+import FollowUpGroupList from "../../../src/components/FollowUpGroupList.svelte";
 import { svelteDialog } from "../../../src/libs/dialog";
 import { getRoster, invalidateRoster } from "../../../src/services/roster";
 import { applyContactCandidateFields, batchUpdateContacts, createContact, retryContactFields, updateContactFields } from "../../../src/services/contacts";
@@ -5382,9 +5385,10 @@ await test("互动日期回顾：按月分组、日期范围与快捷项、历�
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
     };
     const mk = (localDate, note) => ({ eventId: `e-${localDate}-${note}`, localDate, source: "manual", note, groupSize: 1 });
+    const lastYearToday = `${now.getFullYear() - 1}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     const timeline = [
         mk(dateKey(0), "今天的事"),
-        mk("2025-09-28", "去年今天聚了个餐"),
+        mk(lastYearToday, "去年今天聚了个餐"),
         mk("2026-08-15", "八月的事"),
         mk("2026-07-20", "七月的事"),
     ];
@@ -5414,7 +5418,9 @@ await test("互动日期回顾：按月分组、日期范围与快捷项、历�
     await until(() => fixture.textContent.includes("今天的事"), "最近 30 天快捷项未生效");
     assert(!fixture.textContent.includes("七月的事"), "快捷项未排除范围外条目");
     // 清除日期
-    [...fixture.querySelectorAll("button")].find((node) => node.textContent.trim() === "清除日期").click();
+    const clearBtn = [...fixture.querySelectorAll("button")].find((node) => ["清除筛选", "清除日期"].includes(node.textContent.trim()));
+    assert(clearBtn, "未找到清除筛选按钮");
+    clearBtn.click();
     await until(() => fixture.textContent.includes("七月的事"), "清除日期后未恢复全量");
 });
 
@@ -7160,6 +7166,116 @@ await test("读取故障显式化：跟进计划读取失败显示错误态与�
     assert(!fixture.textContent.includes("跟进计划加载失败"), "成功后错误态未清除");
 });
 
+await test("E-32 会面谈资与备忘：空态、添加置顶、复制反馈与移除话题", async () => {
+    let topicsList = [];
+    let loadCount = 0;
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async () => {},
+        onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onDeleted() {}, onClose() {}, onChanged() {},
+        onLoadTopics: async () => {
+            loadCount++;
+            return [...topicsList];
+        },
+        onAddTopic: async (_docId, text) => {
+            const newItem = { id: `top-${Date.now()}-${Math.random()}`, text, createdAt: Date.now() };
+            topicsList = [newItem, ...topicsList];
+            return [...topicsList];
+        },
+        onRemoveTopic: async (_docId, topicId) => {
+            topicsList = topicsList.filter((item) => item.id !== topicId);
+            return [...topicsList];
+        },
+    } });
+
+    await until(() => fixture.querySelector(".lvct-detail__topics-section"), "未渲染谈资备忘分区");
+    assert(fixture.textContent.includes("暂无谈资备忘"), "初始空列表未显示空态文案");
+
+    // 添加一条
+    const inputEl = fixture.querySelector(".lvct-detail__topics-input-row input");
+    assert(inputEl, "未找到话题输入框");
+    input(inputEl, "测试话题 A");
+
+    const addBtn = fixture.querySelector(".lvct-detail__topics-input-row button");
+    assert(addBtn, "未找到添加备忘按钮");
+    await until(() => !addBtn.disabled, "输入后添加按钮未启用");
+    addBtn.click();
+
+    await until(() => fixture.textContent.includes("测试话题 A"), "添加后未渲染话题 A");
+    assert(!fixture.textContent.includes("暂无谈资备忘"), "添加后仍显示空态");
+
+    // 添加第二条，必须置顶在最前
+    input(inputEl, "置顶话题 B");
+    await until(() => !addBtn.disabled, "第二条输入后添加按钮未启用");
+    addBtn.click();
+
+    await until(() => fixture.textContent.includes("置顶话题 B"), "未渲染话题 B");
+    const topicItems = fixture.querySelectorAll(".lvct-detail__topic-item");
+    assert(topicItems.length === 2, "话题数量应为 2");
+    assert(topicItems[0].textContent.includes("置顶话题 B"), "新添加的话题未置顶在首位");
+
+    // 复制按钮
+    const copyBtn = topicItems[0].querySelector(".lvct-detail__topic-actions button:first-child");
+    assert(copyBtn, "未找到复制按钮");
+    copyBtn.click();
+    await until(() => copyBtn.textContent.includes("已复制"), "点击复制后未展示已复制反馈");
+
+    // 移除第一条（测试话题 A，位于索引 1）
+    const removeBtn = topicItems[1].querySelector(".lvct-detail__topic-actions button:last-child");
+    assert(removeBtn, "未找到移除按钮");
+    removeBtn.click();
+
+    await until(() => fixture.querySelectorAll(".lvct-detail__topic-item").length === 1, "移除后列表未更新");
+    assert(!fixture.textContent.includes("测试话题 A"), "已移除的话题仍残留在界面");
+    assert(fixture.textContent.includes("置顶话题 B"), "保留的话题消失了");
+});
+
+await test("E-32 会面谈资转互动备注：一键填入草稿、防覆盖守卫确认与记录后自动移除谈资", async () => {
+    let recordedNote = "";
+    let topicsList = [
+        { id: "top-101", text: "聊聊开源组件", createdAt: 1000 },
+    ];
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async (_docId, note) => {
+            recordedNote = note;
+        },
+        onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onDeleted() {}, onClose() {}, onChanged() {},
+        onLoadTopics: async () => [...topicsList],
+        onAddTopic: async () => [...topicsList],
+        onRemoveTopic: async (_docId, topicId) => {
+            topicsList = topicsList.filter((item) => item.id !== topicId);
+            return [...topicsList];
+        },
+    } });
+
+    await until(() => fixture.querySelector(".lvct-detail__topics-section"), "未渲染谈资备忘分区");
+    await until(() => fixture.textContent.includes("聊聊开源组件"), "未加载初始话题");
+
+    // 点击「转互动」按钮
+    const convertBtn = fixture.querySelector(".lvct-detail__topic-actions button:nth-child(2)");
+    assert(convertBtn, "未找到转互动按钮");
+    assert(convertBtn.textContent.includes("转互动"), "按钮文案应为转互动");
+    convertBtn.click();
+
+    // 检查互动输入框是否已填入话题内容
+    const noteInput = fixture.querySelector(".lvct-detail__record input");
+    assert(noteInput, "未找到互动备注输入框");
+    await until(() => noteInput.value === "聊聊开源组件", "转互动未将话题内容填入输入框");
+    await until(() => convertBtn.textContent.includes("已转入草稿"), "转入后按钮未更新为已转入草稿");
+
+    // 点击「记录」按钮完成互动记录
+    const recordBtn = fixture.querySelector(".lvct-detail__record button");
+    assert(recordBtn, "未找到记录按钮");
+    recordBtn.click();
+
+    await until(() => recordedNote === "聊聊开源组件", "未记录填入的谈资互动备注");
+    await until(() => fixture.querySelectorAll(".lvct-detail__topic-item").length === 0, "互动记录完成后谈资未被移除");
+    assert(fixture.textContent.includes("暂无谈资备忘"), "谈资移除后未恢复空态");
+});
+
 await runMigrationRegression({ test, assert, person, settings, kernel, fixture, until, button });
 await runPeopleProfileRegression({ test, assert, kernel, settings, fixture, until, button });
 await runProfileCardRegression({ test, assert, fixture });
@@ -7195,6 +7311,326 @@ await runOpenDocumentRegression({ test, assert });
 await runBatchSelectionRegression({ test, assert, kernel, settings, fixture, until, button });
 await runSearchCompletenessRegression({ test, assert, kernel, settings, fixture, until, button });
 await runRecentFilterBoundariesRegression({ test, assert, kernel, settings, fixture, until, button });
+
+await test("E-33 联系人回收站：列表渲染、一键恢复、清空确认与能力降级", async () => {
+    const now = Date.now();
+    const day = 86400 * 1000;
+    let entries = [
+        { id: "trash-1", docId: TEST_PERSON_DOC_IDS.a, itemId: "item-a", name: "误删甲", snapshot: { phone: "13800000000", tags: ["同事"], group: "同事", isLunar: false }, removedAt: now - 2 * day, expiresAt: now + 28 * day },
+        { id: "trash-2", docId: TEST_PERSON_DOC_IDS.b, itemId: "item-b", name: "误删乙", snapshot: { tags: [] }, removedAt: now - 5 * day, expiresAt: now + 25 * day },
+    ];
+    const restoredCalls = [];
+    let emptied = 0;
+    const facade = {
+        settings, viewPreferences: DEFAULT_VIEW_PREFERENCES,
+        listTrash: async () => [...entries],
+        restoreContactFromTrash: async (entryId) => {
+            restoredCalls.push(entryId);
+            const target = entries.find((entry) => entry.id === entryId);
+            entries = entries.filter((entry) => entry.id !== entryId);
+            return { docId: target.docId, itemId: `restored-${entryId}`, name: target.name };
+        },
+        emptyTrash: async () => { emptied += 1; entries = []; },
+    };
+    mounted = mount(SettingsView, { target: fixture, props: {
+        facade, settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {},
+    } });
+    navButton(["数据与字段"]).click();
+    await tick();
+
+    // 初始提示态
+    assert(fixture.textContent.includes("点击「刷新列表」查看缓冲中的联系人"), "未显示回收站初始提示");
+    button("刷新列表").click();
+    await until(() => fixture.textContent.includes("误删甲"), "回收站列表未渲染条目");
+
+    // 剩余天数展示
+    assert(fixture.textContent.includes("剩余 28 天"), "未显示剩余保留天数");
+    assert(fixture.textContent.includes("电话 13800000000"), "未显示快照联系方式");
+    assert(fixture.textContent.includes("标签 同事"), "未显示快照标签");
+
+    // 一键恢复
+    const listNames = () => [...fixture.querySelectorAll(".lvct-settings__missing li")]
+        .map((node) => node.querySelector("div")?.textContent?.trim() ?? "");
+    assert(listNames().length === 2, "回收站列表条目数应为 2");
+    const restoreButtons = [...fixture.querySelectorAll("button")].filter((node) => node.textContent.trim() === "恢复联系人");
+    assert(restoreButtons.length === 2, `恢复按钮数量应为 2，实际 ${restoreButtons.length}`);
+    restoreButtons[0].click();
+    await until(() => restoredCalls.length === 1 && !listNames().some((name) => name.startsWith("误删甲")), "恢复后条目未从列表移除");
+    assert(fixture.textContent.includes("已恢复「误删甲」"), "恢复成功提示缺失");
+    assert(listNames().some((name) => name.startsWith("误删乙")), "未恢复的条目被误删");
+
+    // 清空需确认；取消时不发送
+    const originalConfirm = window.confirm;
+    try {
+        window.confirm = () => false;
+        button("清空回收站").click();
+        await tick();
+        assert(emptied === 0, "取消确认仍清空");
+        window.confirm = (message) => { assert(message.includes("人物文档"), "清空确认未说明人物文档不受影响"); return true; };
+        button("清空回收站").click();
+        await until(() => emptied === 1, "确认后未清空");
+        await until(() => fixture.textContent.includes("回收站已清空"), "清空后未提示");
+        assert(fixture.textContent.includes("回收站是空的"), "清空后未回到空态");
+    } finally {
+        window.confirm = originalConfirm;
+    }
+});
+
+await test("E-33 联系人回收站能力降级：facade 未提供时显示不可用说明且不渲染操作", async () => {
+    mounted = mount(SettingsView, { target: fixture, props: {
+        facade: { settings, viewPreferences: DEFAULT_VIEW_PREFERENCES },
+        settings, preferences: DEFAULT_VIEW_PREFERENCES,
+        onSettingsUpdated() {}, onPreferencesUpdated() {}, onBack() {},
+    } });
+    navButton(["数据与字段"]).click();
+    await tick();
+    assert(fixture.textContent.includes("当前版本未提供回收站能力"), "缺少能力降级说明");
+    assert(![...fixture.querySelectorAll("button")].some((node) => node.textContent.trim() === "清空回收站"), "无能力时仍渲染清空按钮");
+});
+
+await test("E-31 字段级安全合并向导：逐字段选择 + 自定义 + 验证 + 预览", async () => {
+    const personA = { itemId: "item-a", docId: "doc-a", name: "张三", phone: "13800000001", email: "zhangsan@a.com", wechat: "", website: "", birthday: "", isLunar: false, group: "朋友", tags: ["技术"], relatedItemIds: [] };
+    const personB = { itemId: "item-b", docId: "doc-b", name: "张三 (旧)", phone: "", email: "zhangsan@b.com", wechat: "wx-zhangsan", website: "", birthday: "", isLunar: false, group: "同事", tags: ["技术", "羽毛球"], relatedItemIds: [] };
+    // A.phone 优先、A.wechat 空 → 补 B、A.email 也非空应选 A；调整用例让 A.email 为空以验证补齐
+    let confirmed = null;
+    mounted = mount(ContactMergeWizard, { target: fixture, props: {
+        i18n: {},
+        primary: personA,
+        secondary: personB,
+        onConfirm: (params) => { confirmed = params; },
+        onClose: () => {},
+    } });
+
+    await until(() => fixture.querySelector(".lvct-merge__title"), "合并向导未渲染");
+    // 初始推荐：A 有值 → 选 A；B 有值 → 选 B
+    const primaryRadio = (name) => [...fixture.querySelectorAll(`input[name="merge-${name}"]`)].find((input) => input.getAttribute("value") === "primary");
+    const secondaryRadio = (name) => [...fixture.querySelectorAll(`input[name="merge-${name}"]`)].find((input) => input.getAttribute("value") === "secondary");
+    assert(primaryRadio("phone").checked, "默认应保留 A 的电话");
+    assert(primaryRadio("email").checked, "A 有邮箱时应保留 A");
+    assert(secondaryRadio("wechat").checked, "A 缺微信时默认补齐 B");
+    // 验证合并预览正确
+    const preview = fixture.querySelector(".lvct-merge__preview-grid");
+    assert(preview.textContent.includes("13800000001"), "预览电话应为 A 的号码");
+    assert(preview.textContent.includes("zhangsan@a.com"), "预览邮箱应为 A 的邮箱");
+    assert(preview.textContent.includes("wx-zhangsan"), "预览微信应补齐 B 的微信");
+    assert(preview.textContent.includes("技术, 羽毛球") || preview.textContent.includes("技术、羽毛球"), "预览标签应为并集去重");
+
+    // 用户手动覆盖姓名 → 自定义
+    [...fixture.querySelectorAll(`input[name="merge-name"]`)].find((input) => input.getAttribute("value") === "custom").click();
+    await until(() => fixture.querySelector(".lvct-merge__custom"), "自定义输入框未渲染");
+    const customInput = fixture.querySelector(".lvct-merge__custom");
+    customInput.value = "张三（合并后）";
+    customInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await until(() => fixture.querySelector(".lvct-merge__preview-grid")?.textContent.includes("张三（合并后）"), "自定义姓名未生效");
+
+    // 取消按钮
+    assert([...fixture.querySelectorAll("button")].some((b) => b.textContent.trim() === "取消"), "缺少取消按钮");
+});
+
+await test("E-28 跨人物跟进多视角分组：人物/组织/部门/来源四类分组与状态徽章", async () => {
+    const baseItem = { id: "f", personDocId: "p", title: "提醒联系", dueDate: "2026-10-20", status: "open", createdAt: 1700000000000, updatedAt: 1700000000000 };
+    const items = [
+        { ...baseItem, id: "f-zhang", personDocId: "doc-zhang" },
+        { ...baseItem, id: "f-li", personDocId: "doc-li" },
+        { ...baseItem, id: "f-done", personDocId: "doc-wang", status: "done", closedAt: 1700000010000 },
+    ];
+    const personNames = new Map([
+        ["doc-zhang", "张三"],
+        ["doc-li", "李四"],
+        ["doc-wang", "王五"],
+    ]);
+    const orgNames = new Map([
+        ["doc-zhang", "曙光科技"],
+        ["doc-li", "曙光科技"],
+    ]);
+    const deptNames = new Map([
+        ["doc-zhang", "前端组"],
+    ]);
+    const sourceLabels = new Map([
+        ["f-zhang", "Q3 OKR 评审"],
+        ["f-done", "Q3 OKR 评审"],
+    ]);
+
+    mounted = mount(FollowUpGroupList, { target: fixture, props: {
+        i18n: {},
+        items,
+        personNameByDocId: personNames,
+        orgNameByDocId: orgNames,
+        departmentByDocId: deptNames,
+        sourceLabelByFollowUpId: sourceLabels,
+        onOpenPerson: () => {},
+    } });
+
+    await until(() => fixture.querySelector(".lvct-fu-group"), "分组总览未渲染");
+
+    // 摘要展示
+    assert(fixture.textContent.includes("2 条待办 / 3 条"), "摘要计数错误");
+
+    // 4 类分组：人物×3 + 组织×1 + 部门×1 + 来源×1 = 6 个分组块
+    const groupNodes = [...fixture.querySelectorAll(".lvct-fu-group__group")];
+    assert(groupNodes.length === 6, `应输出 6 个分组，实际 ${groupNodes.length}`);
+
+    // 曙光科技组织下应包含 张三 与 李四
+    const orgGroup = groupNodes.find((node) => node.textContent.includes("组织：曙光科技"));
+    assert(orgGroup, "组织分组缺失");
+    assert(orgGroup.querySelectorAll("li").length === 2, "组织分组应合并张三与李四");
+
+    // 来源分组 Q3 OKR 评审 应合并 张三 + 王五
+    const sourceGroup = groupNodes.find((node) => node.textContent.includes("来源：Q3 OKR 评审"));
+    assert(sourceGroup, "来源分组缺失");
+    assert(sourceGroup.querySelectorAll("li").length === 2, "来源分组应合并张三与王五");
+
+    // 状态徽章展示：同一事项可在多分组中出现，徽章计数按出现次数统计
+    // open=张三(人物/组织/来源+部门=4) + 李四(人物/组织=2) = 6；done=王五(人物/来源=2)
+    const openBadges = [...fixture.querySelectorAll(".lvct-fu-group__status--open")];
+    const doneBadges = [...fixture.querySelectorAll(".lvct-fu-group__status--done")];
+    assert(openBadges.length === 6, `open 徽章数量应为 6，实际 ${openBadges.length}`);
+    assert(doneBadges.length === 2, `done 徽章数量应为 2，实际 ${doneBadges.length}`);
+});
+
+await test("E-26 礼物点子与偏好：录入点子与偏好、状态推进、已送出转入往来账本与移除", async () => {
+    let gifts = [];
+    let exchangeCreated = null;
+    mounted = mount(PersonDetail, { target: fixture, props: {
+        settings, person,
+        onRecord: async () => {},
+        onLoadInsights: async () => emptyInsights(),
+        onOpenPersonDoc() {}, onNavigate() {}, onDeleted() {}, onClose() {}, onChanged() {},
+        onLoadGiftIdeas: async () => [...gifts],
+        onAddGiftIdea: async (item) => { gifts = [item, ...gifts]; return [...gifts]; },
+        onUpdateGiftIdea: async (_docId, ideaId, patch) => {
+            gifts = gifts.map((item) => item.id === ideaId ? { ...item, ...patch } : item);
+            return [...gifts];
+        },
+        onRemoveGiftIdea: async (_docId, ideaId) => { gifts = gifts.filter((item) => item.id !== ideaId); return [...gifts]; },
+        onCreateExchange: async (input) => { exchangeCreated = input; return { ...input, id: "ex-1" }; },
+    } });
+
+    await until(() => fixture.querySelector(".lvct-detail__gifts-section"), "礼物点子分区未渲染");
+    assert(fixture.textContent.includes("暂无送礼点子或喜好偏好"), "初始空态未显示");
+
+    // 录入一条送礼点子（含预算）
+    const titleInput = fixture.querySelector(".lvct-detail__gifts-section .lvct-detail__topics-input-row input[type='text']");
+    assert(titleInput, "未找到名称输入框");
+    input(titleInput, "思源定制手账本");
+    const priceInput = fixture.querySelector(".lvct-detail__gifts-section input[type='number']");
+    assert(priceInput, "未找到预算输入框（点子类型下应可见）");
+    input(priceInput, "128");
+    const addBtn = [...fixture.querySelectorAll(".lvct-detail__gifts-section button")].find((b) => b.textContent.trim() === "添加");
+    assert(addBtn, "未找到添加按钮");
+    await until(() => !addBtn.disabled, "输入后添加按钮未启用");
+    addBtn.click();
+    await until(() => fixture.textContent.includes("思源定制手账本"), "添加点子后未渲染");
+    assert(fixture.textContent.includes("￥128"), "预算未展示");
+    assert(fixture.textContent.includes("构思中"), "默认状态应为构思中");
+
+    // 状态推进：构思中 → 已采购待送
+    const statusBtn = [...fixture.querySelectorAll(".lvct-detail__gifts-section button")].find((b) => b.textContent.includes("构思中"));
+    assert(statusBtn, "未找到状态按钮");
+    statusBtn.click();
+    await until(() => fixture.textContent.includes("已采购待送"), "状态未推进到已采购");
+
+    // 状态推进：已采购 → 已送出，出现「转入账本」
+    const purchasedBtn = [...fixture.querySelectorAll(".lvct-detail__gifts-section button")].find((b) => b.textContent.includes("已采购待送"));
+    purchasedBtn.click();
+    await until(() => fixture.textContent.includes("已送出"), "状态未推进到已送出");
+    const convertBtn = [...fixture.querySelectorAll(".lvct-detail__gifts-section button")].find((b) => b.textContent.trim() === "转入账本");
+    assert(convertBtn, "已送出后未出现转入账本按钮");
+
+    // 转入往来账本
+    convertBtn.click();
+    await until(() => exchangeCreated !== null, "未调用往来账本创建");
+    assert(exchangeCreated.kind === "item", "账目类型应为物品");
+    assert(exchangeCreated.direction === "payable", "我方赠出应为支出方向");
+    assert(exchangeCreated.amount === 128, "账目金额应取预估值");
+    assert(exchangeCreated.description.includes("赠礼"), "账目描述应带赠礼前缀");
+
+    // 切换到偏好类型录入
+    const typeSelect = fixture.querySelector(".lvct-detail__gifts-section select");
+    assert(typeSelect, "未找到类型选择器");
+    typeSelect.value = "preference";
+    typeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    const prefInput = fixture.querySelector(".lvct-detail__gifts-section .lvct-detail__topics-input-row input[type='text']");
+    input(prefInput, "喜欢乌龙茶");
+    const addBtn2 = [...fixture.querySelectorAll(".lvct-detail__gifts-section button")].find((b) => b.textContent.trim() === "添加");
+    await until(() => !addBtn2.disabled, "偏好输入后添加按钮未启用");
+    addBtn2.click();
+    await until(() => fixture.textContent.includes("喜欢乌龙茶"), "偏好未渲染");
+    assert(fixture.textContent.includes("偏好"), "偏好徽章未展示");
+
+    // 移除偏好
+    const giftItems = [...fixture.querySelectorAll(".lvct-detail__gifts-section .lvct-detail__topic-item")];
+    const prefItem = giftItems.find((node) => node.textContent.includes("喜欢乌龙茶"));
+    assert(prefItem, "未找到偏好条目");
+    const removeBtn = [...prefItem.querySelectorAll("button")].find((b) => b.textContent.trim() === "×");
+    assert(removeBtn, "未找到移除按钮");
+    removeBtn.click();
+    await until(() => !fixture.textContent.includes("喜欢乌龙茶"), "偏好未被移除");
+});
+
+await test("E-30 群体活动与场合向导：多选参与人、表单校验、派生互动开关与保存", async () => {
+    let savedInput = null;
+    const testPeople = [
+        { itemId: "i-1", docId: "20261019000000-doc0001", name: "张三", phone: "13800000001", email: "", wechat: "", website: "", birthday: "", isLunar: false, group: "同事", tags: [], relatedItemIds: [] },
+        { itemId: "i-2", docId: "20261019000000-doc0002", name: "李四", phone: "13800000002", email: "", wechat: "", website: "", birthday: "", isLunar: false, group: "同事", tags: [], relatedItemIds: [] },
+    ];
+
+    mounted = mount(OccasionDialog, { target: fixture, props: {
+        i18n: {},
+        people: testPeople,
+        onSave: async (input) => { savedInput = input; },
+        onClose: () => {},
+    } });
+
+    await until(() => fixture.querySelector(".lvct-occ-dialog__title"), "活动对话框未渲染");
+
+    // 未填标题保存时校验拦截
+    const saveBtn = [...fixture.querySelectorAll("button")].find((b) => b.textContent.trim() === "保存活动");
+    assert(saveBtn, "未找到保存按钮");
+    saveBtn.click();
+    await until(() => fixture.textContent.includes("请输入活动标题"), "未拦截空标题");
+
+    // 填写标题
+    const titleInput = fixture.querySelector("#lvct-occ-input-title");
+    input(titleInput, "Q4 技术战略研讨会");
+
+    // 未选参与人时保存校验拦截
+    saveBtn.click();
+    await until(() => fixture.textContent.includes("请至少选择 1 位参与联系人"), "未拦截无参与人");
+
+    // 搜索并选择参与人
+    const searchInput = fixture.querySelector(".lvct-occ-dialog__picker input");
+    input(searchInput, "张");
+    await until(() => fixture.querySelector(".lvct-occ-dialog__candidates"), "候选列表未展开");
+    const candidateBtn = fixture.querySelector(".lvct-occ-dialog__candidates button");
+    assert(candidateBtn && candidateBtn.textContent.includes("张三"), "未展示匹配联系人张三");
+    candidateBtn.click();
+
+    // 验证已选芯片
+    await until(() => fixture.querySelector(".lvct-occ-dialog__chips"), "未渲染参与人芯片");
+    assert(fixture.textContent.includes("张三"), "芯片未显示张三");
+
+    // 再加李四
+    input(searchInput, "李");
+    await until(() => fixture.querySelector(".lvct-occ-dialog__candidates"), "候选列表未展开（李四）");
+    fixture.querySelector(".lvct-occ-dialog__candidates button").click();
+
+    await until(() => fixture.querySelectorAll(".lvct-occ-dialog__chips .lvct-chip").length === 2, "参与人芯片数应为 2");
+
+    // 填写地点
+    const placeInput = fixture.querySelector("#lvct-occ-input-place");
+    input(placeInput, "3号会议室");
+
+    // 提交保存
+    saveBtn.click();
+    await until(() => savedInput !== null, "未触发保存回调");
+    assert(savedInput.title === "Q4 技术战略研讨会", "标题不匹配");
+    assert(savedInput.place === "3号会议室", "地点不匹配");
+    assert(savedInput.attendees.length === 2, "参与人数不匹配");
+    assert(savedInput.deriveInteractions === true, "默认应开启派生互动事件");
+});
 
 await pause(100);
 results.push({ name: "无未处理异常及响应式循环", ok: runtimeErrors.length === 0, detail: runtimeErrors.join("\n") });

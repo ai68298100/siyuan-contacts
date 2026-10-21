@@ -265,3 +265,92 @@ export function followUpsForPerson(items: readonly FollowUpItem[], personDocId: 
     closed.sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0));
     return [...open, ...closed.slice(0, 5)];
 }
+
+/**
+ * E-28 跟进列表按组织/部门/来源文档分组投影：
+ * 同一个 item 可同时出现在「人物」「当前组织」「部门」「来源文档」四个分组中。
+ * 每组内部按 open 在前 closed 在后，再按 dueDate 与 createdAt 稳定排序。
+ * 重复条目去重（保持首次出现分组优先），不输出同一个 item 两次。
+ */
+export type FollowUpGroupKey = "person" | "org" | "department" | "source";
+
+export interface FollowUpGroup {
+    key: FollowUpGroupKey;
+    /** 分组标题，例如："人物：黎明"、"组织：曙光科技"、"部门：前端组"、"来源文档：Q1 评审" */
+    label: string;
+    items: FollowUpItem[];
+}
+
+export interface FollowUpGroupingContext {
+    /** 当前文档 ID -> 组织名（null/undefined 表示未组织） */
+    orgNameByDocId?: ReadonlyMap<string, string>;
+    /** 当前文档 ID -> 部门名（null/undefined 表示无部门） */
+    departmentByDocId?: ReadonlyMap<string, string>;
+    /** 跟进 item.id -> 来源文档标题（笔记任务块的来源） */
+    sourceLabelByFollowUpId?: ReadonlyMap<string, string>;
+}
+
+export function groupFollowUps(
+    items: readonly FollowUpItem[],
+    personNameByDocId: ReadonlyMap<string, string>,
+    context: FollowUpGroupingContext = {},
+): FollowUpGroup[] {
+    const personGroups = new Map<string, FollowUpGroup>();
+    const orgGroups = new Map<string, FollowUpGroup>();
+    const departmentGroups = new Map<string, FollowUpGroup>();
+    const sourceGroups = new Map<string, FollowUpGroup>();
+    const seenItemIds = new Set<string>();
+
+    const sortByRule = (a: FollowUpItem, b: FollowUpItem) => {
+        if (a.status !== b.status) {
+            if (a.status === "open") return -1;
+            if (b.status === "open") return 1;
+        }
+        return a.dueDate.localeCompare(b.dueDate) || a.createdAt - b.createdAt;
+    };
+
+    for (const item of items) {
+        if (seenItemIds.has(item.id)) continue;
+        seenItemIds.add(item.id);
+
+        // 人物分组：按人物文档 ID
+        const personName = personNameByDocId.get(item.personDocId) ?? "未命名";
+        const personKey = `person:${item.personDocId}`;
+        const personGroup = personGroups.get(personKey) ?? { key: "person" as const, label: `人物：${personName}`, items: [] };
+        personGroup.items.push(item);
+        personGroups.set(personKey, personGroup);
+
+        // 当前组织分组：按组织名归一，所有同组织人员共享
+        const orgName = context.orgNameByDocId?.get(item.personDocId);
+        if (orgName) {
+            const orgKey = `org:${orgName}`;
+            const orgGroup = orgGroups.get(orgKey) ?? { key: "org" as const, label: `组织：${orgName}`, items: [] };
+            orgGroup.items.push(item);
+            orgGroups.set(orgKey, orgGroup);
+
+            const deptName = context.departmentByDocId?.get(item.personDocId);
+            if (deptName) {
+                const deptKey = `dept:${deptName}`;
+                const deptGroup = departmentGroups.get(deptKey) ?? { key: "department" as const, label: `部门：${deptName}`, items: [] };
+                deptGroup.items.push(item);
+                departmentGroups.set(deptKey, deptGroup);
+            }
+        }
+
+        // 来源文档分组
+        const sourceLabel = context.sourceLabelByFollowUpId?.get(item.id);
+        if (sourceLabel) {
+            const sourceKey = `source:${sourceLabel}`;
+            const sourceGroup = sourceGroups.get(sourceKey) ?? { key: "source" as const, label: `来源：${sourceLabel}`, items: [] };
+            sourceGroup.items.push(item);
+            sourceGroups.set(sourceKey, sourceGroup);
+        }
+    }
+
+    for (const group of personGroups.values()) group.items.sort(sortByRule);
+    for (const group of orgGroups.values()) group.items.sort(sortByRule);
+    for (const group of departmentGroups.values()) group.items.sort(sortByRule);
+    for (const group of sourceGroups.values()) group.items.sort(sortByRule);
+
+    return [...personGroups.values(), ...orgGroups.values(), ...departmentGroups.values(), ...sourceGroups.values()];
+}

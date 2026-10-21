@@ -103,3 +103,42 @@ test("K-11：简报文件名跨平台清洗、Windows保留名与超长截断保
     const fallbackFilename = buildBriefingFilename('   ', '2026-10-19');
     assert.equal(fallbackFilename, "小驴人脉_简报_联系人_2026-10-19.md");
 });
+
+test("AG-E38: 简报导出支持共同组织、纪念日、人情账本与谈资备忘完整输出及章节排他", () => {
+    const fullInput: BriefingExportInput = {
+        ...base,
+        topics: ["下次见面确认 Q4 目标", "借给他的一本书归还了吗"],
+        anniversaries: [
+            { title: "结婚十周年", category: "wedding", date: "2016-10-25", isLunar: false, daysUntil: 5, yearsCount: 10, displayDate: "10月25日" },
+        ],
+        commonOrgs: [
+            { orgName: "思源开源社区", peers: [{ name: "周子昂", samePeriod: true, overlapText: "2023 ~ 至今" }, "小王"] },
+        ],
+        exchanges: [
+            { kind: "money", direction: "receivable", description: "项目垫付款", amount: 1200, currency: "CNY", occurredOn: "2026-10-10", status: "open" },
+        ],
+    };
+
+    const fullMd = buildBriefingMarkdown(fullInput);
+    assert.ok(fullMd.includes("## 会面谈资与备忘（2 条）"));
+    assert.ok(fullMd.includes("📌 下次见面确认 Q4 目标"));
+    assert.ok(fullMd.includes("## 共同组织背景（1 个组织）"));
+    assert.ok(fullMd.includes("思源开源社区"));
+    assert.ok(fullMd.includes("同期经历"));
+    assert.ok(fullMd.includes("## 重要日期与纪念日"));
+    assert.ok(fullMd.includes("🌟 结婚十周年：2016-10-25（第 10 周年） · 5 天后"));
+    assert.ok(fullMd.includes("## 人情往来备忘（1 笔）"));
+    assert.ok(fullMd.includes("对方欠我"));
+    assert.ok(fullMd.includes("项目垫付款"));
+    assert.ok(fullMd.includes("¥1200"));
+
+    // 验证章节排除
+    const excludedMd = buildBriefingMarkdown({
+        ...fullInput,
+        excludedSections: ["topics", "exchanges"],
+    });
+    assert.ok(!excludedMd.includes("## 会面谈资与备忘"));
+    assert.ok(!excludedMd.includes("## 人情往来备忘"));
+    assert.ok(excludedMd.includes("## 共同组织背景"));
+    assert.ok(excludedMd.includes("## 重要日期与纪念日"));
+});

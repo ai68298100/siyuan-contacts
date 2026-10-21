@@ -133,3 +133,28 @@ test("全 src 禁运行期动态 import（v0.4.0 事故防线：CJS 产物会拆
         );
     }
 });
+
+test("测试套件完整性守门：tests/ 目录下的全部测试文件必须在 package.json 的 test 脚本中登记（防静默遗漏）", () => {
+    const pkgPath = path.resolve(import.meta.dirname, "..", "package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+    const testScript = pkg.scripts?.test ?? "";
+    const registered = new Set(testScript.split(/\s+/).filter((item: string) => item.startsWith("tests/")));
+
+    const testsDir = path.resolve(import.meta.dirname, "..", "tests");
+    const actualTestFiles = fs.readdirSync(testsDir)
+        .filter((file) => /\.test\.(ts|mjs)$/.test(file))
+        .map((file) => `tests/${file}`);
+
+    for (const testFile of actualTestFiles) {
+        assert.ok(
+            registered.has(testFile),
+            `${testFile} 存在但未在 package.json 的 test 脚本中登记；请加入 "test" 清单以确保 CI 与单测全量运行`,
+        );
+    }
+
+    assert.equal(
+        registered.size,
+        actualTestFiles.length,
+        `package.json test 脚本登记的测试文件数（${registered.size}）与 tests/ 目录下实际文件数（${actualTestFiles.length}）不一致`,
+    );
+});

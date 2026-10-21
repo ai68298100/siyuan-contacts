@@ -7,6 +7,7 @@
 import type { ContactSummary } from "./person";
 import { matchesProfileFilters } from "./people-profiles.ts";
 import { isValidDateKey } from "./followups.ts";
+import { filterPeopleByRegion } from "./region.ts";
 
 export type TagMatchMode = "all" | "any";
 
@@ -33,6 +34,7 @@ export interface PeopleFilterState {
     workQuery?: string;
     educationQuery?: string;
     relationshipLabel?: string;
+    region?: string;
 }
 
 export const EMPTY_PEOPLE_FILTER: PeopleFilterState = {
@@ -41,9 +43,10 @@ export const EMPTY_PEOPLE_FILTER: PeopleFilterState = {
     recentTo: "",
     neverContacted: false,
     profileGap: "",
+    region: "",
 };
 
-export type ExtraFilterChipKey = "tagMatch" | "recentRange" | "neverContacted" | "profileGap";
+export type ExtraFilterChipKey = "tagMatch" | "recentRange" | "neverContacted" | "profileGap" | "region";
 
 export interface ExtraFilterChip {
     key: ExtraFilterChipKey;
@@ -78,7 +81,7 @@ export function hasProfileGap(person: ContactSummary, gap: ProfileGap): boolean 
 /** 附加筛选（标签模式之外的部分）是否生效 */
 export function isExtraFilterActive(filter: PeopleFilterState): boolean {
     return filter.tagMatch !== "all" || !!filter.recentFrom || !!filter.recentTo || filter.neverContacted || !!filter.profileGap
-        || !!filter.workQuery || !!filter.educationQuery || !!filter.relationshipLabel;
+        || !!filter.workQuery || !!filter.educationQuery || !!filter.relationshipLabel || !!filter.region;
 }
 
 /** 当前生效的附加条件（固定顺序），供生效条件行渲染与单项清除 */
@@ -88,10 +91,11 @@ export function extraFilterChips(filter: PeopleFilterState): ExtraFilterChip[] {
     if (filter.recentFrom || filter.recentTo) chips.push({ key: "recentRange" });
     if (filter.neverContacted) chips.push({ key: "neverContacted" });
     if (filter.profileGap) chips.push({ key: "profileGap" });
+    if (filter.region) chips.push({ key: "region" });
     return chips;
 }
 
-/** 最近互动范围 + 从未联系 + 资料完整度过滤（标签匹配请先用 matchTags） */
+/** 最近互动范围 + 从未联系 + 资料完整度 + 地域过滤（标签匹配请先用 matchTags） */
 export function applyPeopleFilters(
     people: readonly ContactSummary[],
     recent: Readonly<Record<string, { occurredAt: number; localDate: string }>>,
@@ -100,7 +104,8 @@ export function applyPeopleFilters(
     const from = isDateKey(filter.recentFrom) ? filter.recentFrom : "";
     const to = isDateKey(filter.recentTo) ? filter.recentTo : "";
     const rangeActive = !!(from || to);
-    return people.filter((person) => {
+    const regionFiltered = filter.region ? filterPeopleByRegion(people, filter.region) : people;
+    return regionFiltered.filter((person) => {
         if (!matchesProfileFilters(person.profile, filter)) return false;
         if (filter.profileGap && !hasProfileGap(person, filter.profileGap)) return false;
         const last = recent[person.docId];

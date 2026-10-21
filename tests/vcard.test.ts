@@ -366,3 +366,124 @@ test("normalizeVcfDate / escapeVcf / unescapeVcf / splitUnescaped：边界行为
     assert.equal(unescapeVcf("a\\,b\\;c\\nd\\\\e"), "a,b;c\nd\\e");
     assert.deepEqual(splitUnescaped("a\\,b,c", ","), ["a\\,b", "c"]);
 });
+
+test("AG-VCF-ROBUST: QP 解码支持 Windows \\r\\n 软折行与字节序列完整保真", () => {
+    // 汉字 "你好" 的 UTF-8 编码为 =E4=BD=A0=E5=A5=BD，中间在 =E4=BD=A0 处软折行 =\r\n
+    const vcf = [
+        "BEGIN:VCARD",
+        "VERSION:2.1",
+        "FN;ENCODING=QUOTED-PRINTABLE;CHARSET=UTF-8:=E4=BD=A0=\r\n=E5=A5=BD",
+        "TEL:13800000000",
+        "END:VCARD",
+    ].join("\r\n");
+    const [contact] = parseVcf(vcf);
+    assert.equal(contact.name, "你好");
+    assert.equal(contact.phone, "13800000000");
+});
+
+test("AG-VCF-ROBUST: 无名卡片智能从 ORG 或 NICKNAME 兜底识别，纯电话卡片按契约安全跳过", () => {
+    const vcf = [
+        // 卡片 1：只有 ORG（公司客服，常见于小米/安卓通讯录导出）
+        "BEGIN:VCARD",
+        "VERSION:2.1",
+        "ORG:招商银行信用卡客服",
+        "TEL:95555",
+        "END:VCARD",
+
+        // 卡片 2：只有 NICKNAME
+        "BEGIN:VCARD",
+        "VERSION:3.0",
+        "NICKNAME:老王",
+        "TEL:13911112222",
+        "END:VCARD",
+
+        // 卡片 3：纯 TEL 无姓名无组织（按契约安全跳过，避免建立无名孤儿文档）
+        "BEGIN:VCARD",
+        "VERSION:3.0",
+        "TEL:10086",
+        "END:VCARD",
+
+        // 卡片 4：完全空白卡片
+        "BEGIN:VCARD",
+        "VERSION:3.0",
+        "END:VCARD",
+    ].join("\r\n");
+
+    const contacts = parseVcf(vcf);
+    assert.equal(contacts.length, 2, "仅含有效身份（ORG/NICKNAME）的卡片被保留，纯号码及空白卡片被丢弃");
+    assert.equal(contacts[0].name, "招商银行信用卡客服");
+    assert.equal(contacts[0].phone, "95555");
+
+    assert.equal(contacts[1].name, "老王");
+    assert.equal(contacts[1].phone, "13911112222");
+});
+
+test("Issue #35 攻坚：parseVcfForImport 对纯号码及无FN/N小米卡片智能以电话暂代命名，避免整包被拒", () => {
+    const vcf = [
+        "BEGIN:VCARD",
+        "VERSION:2.1",
+        "N:;;;;",
+        "FN:",
+        "TEL;CELL:13800138000",
+        "END:VCARD",
+    ].join("\r\n");
+
+    // parseVcf 默认跳过保持原有契约
+    assert.equal(parseVcf(vcf).length, 0);
+
+    // 未开启兜底时，全无名卡片抛出契约错误
+    assert.throws(() => parseVcfForImport(vcf), /文件没有有效 vCard 卡片/);
+
+    // 开启智能暂代兜底时，成功解析出联系人
+    const contacts = parseVcfForImport(vcf, { fallbackToPhoneOrEmail: true });
+    assert.equal(contacts.length, 1);
+    assert.equal(contacts[0].name, "未命名 (13800138000)");
+    assert.equal(contacts[0].phone, "13800138000");
+    assert.ok(contacts[0].needsReview?.some((msg) => msg.includes("智能暂代")));
+});
+
+test("AG-E35-VCARD-EXPORT-SCOPE: serializeVcf 支持多联系人范围子集导出，CRLF 与 RFC 6350 保真", () => {
+    const people = [
+        base({ name: "联系人甲", phone: "13800000001" }),
+        base({ name: "联系人乙", phone: "13800000002" }),
+        base({ name: "联系人丙", phone: "13800000003" }),
+    ];
+    // 局部子集导出（如筛选后的甲和丙）
+    const subset = [people[0], people[2]];
+    const vcf = serializeVcf(subset);
+    assert.match(vcf, /FN:联系人甲/);
+    assert.match(vcf, /FN:联系人丙/);
+    assert.doesNotMatch(vcf, /FN:联系人乙/);
+    assert.equal(vcf.split("BEGIN:VCARD").length - 1, 2);
+    assert.ok(vcf.endsWith("END:VCARD\r\n"));
+});
+
+test("AG-E20-METHODS-EXPORT: serializeVcf 支持多电话/邮箱/网址及 ORG/TITLE/NOTE 保真序列化", () => {
+    const person: VCardContact = base({
+        name: "李四",
+        phone: "13800000001 / 010-88888888",
+        extraPhones: [
+            { value: "13800000001", type: "CELL" },
+            { value: "010-88888888", type: "WORK" },
+            { value: "010-66666666", type: "FAX" },
+        ],
+        extraEmails: [
+            { value: "lisi@work.com", type: "WORK" },
+            { value: "lisi@home.com", type: "HOME" },
+        ],
+        org: "思源科技",
+        title: "首席架构师",
+        note: "项目核心负责人",
+    });
+
+    const vcf = serializeVcf([person]);
+    assert.match(vcf, /FN:李四/);
+    assert.match(vcf, /ORG:思源科技/);
+    assert.match(vcf, /TITLE:首席架构师/);
+    assert.match(vcf, /NOTE:项目核心负责人/);
+    assert.match(vcf, /TEL;TYPE=CELL:13800000001/);
+    assert.match(vcf, /TEL;TYPE=WORK:010-88888888/);
+    assert.match(vcf, /TEL;TYPE=FAX:010-66666666/);
+    assert.match(vcf, /EMAIL;TYPE=WORK:lisi@work\.com/);
+    assert.match(vcf, /EMAIL;TYPE=HOME:lisi@home\.com/);
+});

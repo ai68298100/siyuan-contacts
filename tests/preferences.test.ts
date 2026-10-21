@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BRAND_AVATAR_IMAGE_MAX_LENGTH, DEFAULT_VIEW_PREFERENCES, isValidBrandAvatarImage, isValidPreferenceDays, normalizeTableColumns, normalizeViewPreferences } from "../src/domain/preferences.ts";
+import { BRAND_AVATAR_IMAGE_MAX_LENGTH, DEFAULT_VIEW_PREFERENCES, isValidBrandAvatarImage, isValidPreferenceDays, normalizeDetailCollapsedSections, normalizeTableColumns, normalizeViewPreferences } from "../src/domain/preferences.ts";
 import type { ViewPreferences } from "../src/domain/preferences.ts";
 import type { Plugin } from "siyuan";
 import { applyPreferencePatch, decodeViewPreferences, diffViewPreferences, rebasePreferenceDraft } from "../src/domain/preferences-concurrency.ts";
@@ -454,4 +454,31 @@ test("P0-009：版本通知防抖、拒绝旧事件，销毁后定时器和订�
         if (descriptor) Object.defineProperty(globalThis, "window", descriptor);
         else Reflect.deleteProperty(globalThis, "window");
     }
+});
+
+test("E-14 视图偏好：人物详情区块折叠展开偏好归一化、diff 与合并", () => {
+    // 1. 空或非法回退
+    assert.deepEqual(normalizeDetailCollapsedSections(null), {});
+    assert.deepEqual(normalizeDetailCollapsedSections("bad"), {});
+    assert.deepEqual(normalizeDetailCollapsedSections({ unknownKey: true, topics: true, projects: false }), { topics: true });
+
+    // 2. normalizeViewPreferences 包含 detailCollapsedSections
+    const pref = normalizeViewPreferences({
+        detailCollapsedSections: { topics: true, anniversaries: true },
+    });
+    assert.deepEqual(pref.detailCollapsedSections, { topics: true, anniversaries: true });
+
+    // 3. diffViewPreferences 能够检出折叠偏好变更
+    const baseline = DEFAULT_VIEW_PREFERENCES;
+    const next = {
+        ...baseline,
+        detailCollapsedSections: { projects: true },
+    };
+    const diff = diffViewPreferences(baseline, next);
+    assert.deepEqual(diff, { detailCollapsedSections: { projects: true } });
+
+    // 4. applyPreferencePatch 正确合并
+    const patched = applyPreferencePatch(baseline, diff);
+    assert.deepEqual(patched.detailCollapsedSections, { projects: true });
+    assert.equal(patched.revision, baseline.revision + 1);
 });

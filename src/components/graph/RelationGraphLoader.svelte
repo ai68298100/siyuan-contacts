@@ -15,6 +15,8 @@
         onOpenPeople,
         onOpenCreatePerson,
         onOpenOrgs,
+        initialCenterDocId = "",
+        initialOrgDocId = "",
     }: {
         settings: ContactsSettings;
         revision?: number;
@@ -22,9 +24,11 @@
         preferences: ViewPreferences;
         onPreferencesChange: (next: ViewPreferences) => Promise<ViewPreferences>;
         onOpenDetail: (person: ContactSummary) => void;
-        onOpenPeople: () => void;
+        onOpenPeople: (focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" | "recent" }) => void;
         onOpenCreatePerson?: () => void;
         onOpenOrgs: (orgDocId?: string) => void;
+        initialCenterDocId?: string;
+        initialOrgDocId?: string;
     } = $props();
 
 </script>
@@ -41,4 +45,6 @@
     {onOpenPeople}
     {onOpenCreatePerson}
     {onOpenOrgs}
+    {initialCenterDocId}
+    {initialOrgDocId}
 /> 

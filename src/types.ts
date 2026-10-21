@@ -43,7 +43,7 @@ export interface ContactsPluginFacade {
     /** 仪表盘聚合（近期生日/久未联系/统计） */
     loadDashboard(options?: Partial<DashboardOptions>): Promise<DashboardData>;
     /** 记一笔互动（幂等） */
-    recordInteraction(personDocId: string, note?: string): Promise<void>;
+    recordInteraction(personDocId: string, note?: string, type?: import("./domain/interactions").InteractionType): Promise<void>;
     deleteInteraction(personDocId: string, eventId: string): Promise<void>;
     /** 人物洞察：互动时间线 + 共同出席统计 */
     loadPersonInsights(docId: string): Promise<PersonInsights>;
@@ -56,6 +56,8 @@ export interface ContactsPluginFacade {
     loadPersonFields(personDocId: string): Promise<import("./domain/person-fields").PersonFieldsState>;
     savePersonFields(personDocId: string, snapshot: import("./domain/person-fields").PersonFieldsSnapshot, expected: import("./domain/person-fields").PersonFieldsState): Promise<import("./domain/person-fields").PersonFieldsState>;
     loadRecentInteractions(): Promise<Record<string, { occurredAt: number; localDate: string }>>;
+    /** 读取全量有效互动事件列表（供图谱推断共同出席弱联系等） */
+    loadInteractionEvents?(): Promise<readonly import("./domain/interactions").InteractionEvent[]>;
     /** 个人往来账本：金钱、物品、人情均按人物独立记录 */
     listPersonExchanges(personDocId: string): Promise<ExchangeRecord[]>;
     createPersonExchange(input: CreatePersonExchangeInput): Promise<ExchangeRecord>;
@@ -111,6 +113,34 @@ export interface ContactsPluginFacade {
     loadPersonTopics?(personDocId: string): Promise<import("./domain/topics").PersonTopicItem[]>;
     addPersonTopic?(personDocId: string, text: string): Promise<import("./domain/topics").PersonTopicItem[]>;
     removePersonTopic?(personDocId: string, topicId: string): Promise<import("./domain/topics").PersonTopicItem[]>;
+    /** E-33：联系人软删除回收站（Trash & Soft Delete Buffer） */
+    removeContactToTrash?(person: import("./domain/person").ContactSummary): Promise<void>;
+    listTrash?(): Promise<import("./domain/trash").TrashContactEntry[]>;
+    restoreContactFromTrash?(entryId: string): Promise<{ docId: string; itemId: string; name: string }>;
+    emptyTrash?(): Promise<void>;
+    /** E-31 重复联系人字段级安全合并并迁移关联自管数据 */
+    executeContactMerge?(plan: import("./domain/duplicate-merge").ContactMergePlan): Promise<import("./services/duplicate-merge").ExecuteMergeResult>;
+    /** E-26：礼物点子与偏好清单（Gift Ideas & Preferences） */
+    loadPersonGiftIdeas?(personDocId: string): Promise<import("./domain/gift-ideas").GiftIdeaItem[]>;
+    addPersonGiftIdea?(item: import("./domain/gift-ideas").GiftIdeaItem): Promise<import("./domain/gift-ideas").GiftIdeaItem[]>;
+    updatePersonGiftIdea?(personDocId: string, ideaId: string, patch: Partial<import("./domain/gift-ideas").GiftIdeaItem>): Promise<import("./domain/gift-ideas").GiftIdeaItem[]>;
+    removePersonGiftIdea?(personDocId: string, ideaId: string): Promise<import("./domain/gift-ideas").GiftIdeaItem[]>;
+    /** E-30：群体活动与场合实体（Occasions & Multi-attendee Clustering） */
+    listOccasions?(): Promise<import("./domain/occasion-cluster").OccasionEntity[]>;
+    createOccasion?(input: import("./services/occasions").CreateOccasionInput): Promise<import("./domain/occasion-cluster").OccasionEntity>;
+    deleteOccasion?(occasionId: string): Promise<void>;
+    /** E-36：重要日期与周年纪念日（Anniversaries & Milestones） */
+    loadPersonAnniversaries?(personDocId: string): Promise<import("./domain/anniversaries").AnniversaryItem[]>;
+    addPersonAnniversary?(item: import("./domain/anniversaries").AnniversaryItem): Promise<import("./domain/anniversaries").AnniversaryItem[]>;
+    updatePersonAnniversary?(personDocId: string, annivId: string, patch: Partial<import("./domain/anniversaries").AnniversaryItem>): Promise<import("./domain/anniversaries").AnniversaryItem[]>;
+    removePersonAnniversary?(personDocId: string, annivId: string): Promise<import("./domain/anniversaries").AnniversaryItem[]>;
+    listUpcomingAnniversaries?(windowDays?: number): Promise<import("./domain/anniversaries").AnniversaryProjection[]>;
+    /** E-37：人物协作项目与主题双向关联（Project & Initiative Collaborators） */
+    loadPersonProjects?(personDocId: string): Promise<import("./domain/projects").PersonProjectItem[]>;
+    addPersonProject?(item: import("./domain/projects").PersonProjectItem): Promise<import("./domain/projects").PersonProjectItem[]>;
+    updatePersonProject?(personDocId: string, projectId: string, patch: Partial<import("./domain/projects").PersonProjectItem>): Promise<import("./domain/projects").PersonProjectItem[]>;
+    removePersonProject?(personDocId: string, projectId: string): Promise<import("./domain/projects").PersonProjectItem[]>;
+    findCollaboratorsByProject?(matcher: { title?: string; docId?: string }): Promise<Array<{ personDocId: string; role?: string; status: import("./domain/projects").ProjectStatus; title: string }>>;
     /** 交往回顾报表（F12）：区间互动统计（只读投影，人物条数与同场活动分口径） */
     buildReviewReport(from: string, to: string): Promise<ReviewReport>;
     /** 导出中心摘要：名册人数与活跃互动条数（展示用，容错读取） */

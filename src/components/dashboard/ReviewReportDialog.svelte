@@ -287,12 +287,38 @@
             <div class="lvct-review__cell"><b>{report.bySource.api}</b><span>{sourceLabels.api}</span></div>
         </div>
 
+        {#if report.total > 0}
+            {@const manualPct = Math.round((report.bySource.manual / report.total) * 100)}
+            {@const diaryPct = Math.round((report.bySource.diary / report.total) * 100)}
+            {@const apiPct = Math.max(0, 100 - manualPct - diaryPct)}
+            <div class="lvct-review__ratio-bar" role="progressbar" aria-label="互动来源比例">
+                {#if manualPct > 0}
+                    <div class="lvct-review__ratio-seg lvct-review__ratio-seg--manual" style={`width:${manualPct}%`} title={`手动记录: ${report.bySource.manual} 次 (${manualPct}%)`}></div>
+                {/if}
+                {#if diaryPct > 0}
+                    <div class="lvct-review__ratio-seg lvct-review__ratio-seg--diary" style={`width:${diaryPct}%`} title={`笔记捕获: ${report.bySource.diary} 次 (${diaryPct}%)`}></div>
+                {/if}
+                {#if apiPct > 0}
+                    <div class="lvct-review__ratio-seg lvct-review__ratio-seg--api" style={`width:${apiPct}%`} title={`外部联动: ${report.bySource.api} 次 (${apiPct}%)`}></div>
+                {/if}
+            </div>
+        {/if}
+
         {#if report.topPeople.length > 0}
             <div class="lvct-review__section">
                 <b>{text("reviewTopTitle", "最常联系 Top {n}", { n: report.topPeople.length })}</b>
                 <ol class="lvct-review__top">
                     {#each report.topPeople as item (item.personDocId)}
-                        <li>{text("reviewTopEntry", "{name} · {count} 次", { name: item.name || text("reviewUnknownPerson", "（未知名下人物）"), count: item.count })}</li>
+                        <li class="lvct-review__top-item">
+                            <span>{item.name || text("reviewUnknownPerson", "（未知名下人物）")} · <b>{item.count}</b> 次</span>
+                            {#if onOpenPeople && item.name}
+                                <button
+                                    type="button"
+                                    class="b3-button b3-button--text b3-button--small"
+                                    onclick={() => onOpenPeople?.({ itemIds: [], label: `最常联系 · ${item.name}` })}
+                                >在名册中查看</button>
+                            {/if}
+                        </li>
                     {/each}
                 </ol>
             </div>

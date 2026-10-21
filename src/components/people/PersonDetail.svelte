@@ -2,7 +2,9 @@
     import { requestErrorMessage } from "../../shared/error-presenter";
     /** 人物详情窗口：档案字段、互动与关系列表（增删，内核自动维护双向回链） */
     import { onDestroy, tick, untrack } from "svelte";
-    import { CalendarDays } from "@lucide/svelte";
+    import { CalendarDays, Copy, ExternalLink, ChevronDown, ChevronRight, Network, Check, Link, FileText } from "@lucide/svelte";
+    import { extractNormalizedRegion } from "../../domain/region.ts";
+    import type { DetailSectionKey, DetailCollapsedSections } from "../../domain/preferences";
     import { listContacts, removeContact } from "../../services/contacts";
     import { addRelation, removeRelation, refreshPerson, retryRelationProjections } from "../../services/relations";
     import { resolveRelated } from "../../services/doc-section";
@@ -21,7 +23,8 @@ import StatusNotice from "../StatusNotice.svelte";
     import { dueLabel, hasFollowUpDraft } from "../../domain/followups";
     import type { FollowUpItem, SnoozeOption } from "../../domain/followups";
     import { newFollowUpRequestId } from "../../services/followups";
-    import type { PersonCadence } from "../../domain/cadence";
+    import { computeRelationshipHealth, heatLevelColorClass } from "../../domain/cadence";
+    import type { PersonCadence, RelationshipHealth } from "../../domain/cadence";
     import { renderTemplate } from "../../domain/interaction-templates";
     import type { NoteTemplate } from "../../domain/interaction-templates";
     import TemplateManager from "./TemplateManager.svelte";
@@ -34,13 +37,27 @@ import StatusNotice from "../StatusNotice.svelte";
     import type { LegacyPersonNoteSnapshot } from "../../domain/person-note";
     import { buildBriefingMarkdown, buildBriefingFilename } from "../../domain/briefing-export";
     import { addReviewDays, groupByMonth, inDateRange, onThisDay } from "../../domain/date-review";
-    import { toLocalDateKey } from "../../domain/interactions";
+    import { toLocalDateKey, INTERACTION_TYPES, INTERACTION_TYPE_LABELS, type InteractionType } from "../../domain/interactions";
     import OrgMembershipResult from "../org/OrgMembershipResult.svelte";
     import type { OrgMembershipWriteReport } from "../../services/org-member-writes";
     import { orgMembershipStatusLabel } from "../../domain/org-membership";
     import type { OrgAffiliationKind, OrgMembership, OrgMembershipPatch, OrgMembershipStatus } from "../../domain/org-membership";
     import { confirmDialog } from "../../libs/confirm-dialog";
     import { copyPlainText } from "../../shared/clipboard";
+    import { convertGiftIdeaToExchange, newGiftIdeaId, type GiftIdeaItem, type GiftIdeaStatus, type GiftIdeaType } from "../../domain/gift-ideas";
+    import {
+        ANNIVERSARY_CATEGORIES,
+        ANNIVERSARY_CATEGORY_LABELS,
+        newAnniversaryId,
+        nextAnniversary,
+        type AnniversaryCategory,
+        type AnniversaryItem,
+    } from "../../domain/anniversaries";
+    import {
+        newProjectId,
+        type PersonProjectItem,
+    } from "../../domain/projects";
+    import { newExchangeRequestId } from "../../services/exchanges";
 
     let {
         settings,
@@ -68,6 +85,8 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadPersonFields,
         onSavePersonFields,
         onOpenPersonDoc,
+        onOpenGraphPerson,
+        onOpenPeople,
         onNavigate,
         onNavigateDocId,
         closeLabel,
@@ -94,6 +113,19 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadTopics,
         onAddTopic,
         onRemoveTopic,
+        onRemoveContactToTrash,
+        onLoadGiftIdeas,
+        onAddGiftIdea,
+        onUpdateGiftIdea,
+        onRemoveGiftIdea,
+        onLoadAnniversaries,
+        onAddAnniversary,
+        onRemoveAnniversary,
+        onLoadProjects,
+        onAddProject,
+        onRemoveProject,
+        collapsedSections,
+        onToggleSection,
     }: {
         settings: ContactsSettings;
         i18n?: Readonly<Record<string, string>>;
@@ -102,7 +134,7 @@ import StatusNotice from "../StatusNotice.svelte";
         availableGroups?: readonly string[];
         revision?: number;
         /** 记一笔互动（facade.recordInteraction） */
-        onRecord: (personDocId: string, note?: string) => Promise<void>;
+        onRecord: (personDocId: string, note?: string, type?: import("../../domain/interactions").InteractionType) => Promise<void>;
         onDeleteInteraction?: (personDocId: string, eventId: string) => Promise<void>;
         /** 人物洞察（时间线+共同出席） */
         onLoadInsights: (docId: string) => Promise<import("../../services/insights").PersonInsights>;
@@ -129,6 +161,8 @@ import StatusNotice from "../StatusNotice.svelte";
         /** B13.6：共同背景投影（同组织联系人；未接线时隐藏该区） */
         onLoadCommonOrgs?: (docId: string) => Promise<import("../../domain/org-membership").CommonOrgBackground[]>;
         onOpenPersonDoc: (docId: string) => void;
+        onOpenGraphPerson?: (docId: string) => void;
+        onOpenPeople?: (focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" | "recent" }) => void;
         onNavigate: (person: ContactSummary) => void;
         onNavigateDocId?: (docId: string) => Promise<void>;
         closeLabel?: string;
@@ -159,6 +193,24 @@ import StatusNotice from "../StatusNotice.svelte";
         onLoadTopics?: (personDocId: string) => Promise<import("../../domain/topics").PersonTopicItem[]>;
         onAddTopic?: (personDocId: string, text: string) => Promise<import("../../domain/topics").PersonTopicItem[]>;
         onRemoveTopic?: (personDocId: string, topicId: string) => Promise<import("../../domain/topics").PersonTopicItem[]>;
+        /** E-33 联系人回收站软删除（可选） */
+        onRemoveContactToTrash?: (person: import("../../domain/person").ContactSummary) => Promise<void>;
+        /** E-26 礼物点子与偏好清单（可选） */
+        onLoadGiftIdeas?: (personDocId: string) => Promise<import("../../domain/gift-ideas").GiftIdeaItem[]>;
+        onAddGiftIdea?: (item: import("../../domain/gift-ideas").GiftIdeaItem) => Promise<import("../../domain/gift-ideas").GiftIdeaItem[]>;
+        onUpdateGiftIdea?: (personDocId: string, ideaId: string, patch: Partial<import("../../domain/gift-ideas").GiftIdeaItem>) => Promise<import("../../domain/gift-ideas").GiftIdeaItem[]>;
+        onRemoveGiftIdea?: (personDocId: string, ideaId: string) => Promise<import("../../domain/gift-ideas").GiftIdeaItem[]>;
+        /** E-36 重要日期与周年纪念日（可选） */
+        onLoadAnniversaries?: (personDocId: string) => Promise<import("../../domain/anniversaries").AnniversaryItem[]>;
+        onAddAnniversary?: (item: import("../../domain/anniversaries").AnniversaryItem) => Promise<import("../../domain/anniversaries").AnniversaryItem[]>;
+        onRemoveAnniversary?: (personDocId: string, annivId: string) => Promise<import("../../domain/anniversaries").AnniversaryItem[]>;
+        /** E-37 协作项目与主题关联（可选） */
+        onLoadProjects?: (personDocId: string) => Promise<import("../../domain/projects").PersonProjectItem[]>;
+        onAddProject?: (item: import("../../domain/projects").PersonProjectItem) => Promise<import("../../domain/projects").PersonProjectItem[]>;
+        onRemoveProject?: (personDocId: string, projectId: string) => Promise<import("../../domain/projects").PersonProjectItem[]>;
+        /** E-14 人物详情区块折叠展开偏好与更新回调 */
+        collapsedSections?: import("../../domain/preferences").DetailCollapsedSections;
+        onToggleSection?: (sectionKey: import("../../domain/preferences").DetailSectionKey, collapsed: boolean) => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -229,8 +281,21 @@ import StatusNotice from "../StatusNotice.svelte";
     // B06：互动备注草稿给出明细与「保存并离开」（保存=记录这条互动）
     async function persistNote(): Promise<void> {
         if (!current) throw new Error("当前没有人物");
-        await onRecord(current.docId, noteText.trim() || undefined);
+        await onRecord(current.docId, noteText.trim() || undefined, recordType);
         recorded = true;
+        if (pendingConvertedTopicId && onRemoveTopic) {
+            const topicIdToRemove = pendingConvertedTopicId;
+            pendingConvertedTopicId = "";
+            try {
+                const list = await onRemoveTopic(current.docId, topicIdToRemove);
+                if (detailAlive) {
+                    topics = list;
+                    onChanged();
+                }
+            } catch (err) {
+                console.warn("[lvct] 互动记录后移除已转换谈资失败", err);
+            }
+        }
         noteText = "";
         await loadInsights();
     }
@@ -433,6 +498,8 @@ import StatusNotice from "../StatusNotice.svelte";
     }
     let activitySearch = $state("");
     let activitySource = $state("");
+    let activityType = $state<InteractionType | "all">("all");
+    let recordType = $state<InteractionType>("meeting");
     let activityLimit = $state(20);
     // 日期回顾（F10）
     let activityFrom = $state("");
@@ -443,7 +510,8 @@ import StatusNotice from "../StatusNotice.svelte";
         return (insights?.timeline ?? [])
             .filter((item) => inDateRange(item.localDate, activityFrom, activityTo))
             .filter((item) => (!activitySource || item.source === activitySource) &&
-                (!query || `${item.localDate} ${item.note ?? ""}`.toLowerCase().includes(query)));
+                (!query || `${item.localDate} ${item.note ?? ""}`.toLowerCase().includes(query)) &&
+                (activityType === "all" || item.type === activityType));
     });
     const pagedTimeline = $derived(filteredTimeline.slice(0, activityLimit));
     const monthGroups = $derived(groupByMonth(pagedTimeline));
@@ -462,6 +530,7 @@ import StatusNotice from "../StatusNotice.svelte";
     function clearDateRange() {
         activityFrom = "";
         activityTo = "";
+        activityType = "all";
         activityLimit = 20;
     }
 
@@ -670,6 +739,7 @@ import StatusNotice from "../StatusNotice.svelte";
     let newTopicText = $state("");
     let addingTopic = $state(false);
     let copiedTopicId = $state("");
+    let pendingConvertedTopicId = $state("");
 
     async function loadTopics() {
         if (!onLoadTopics) return;
@@ -730,10 +800,339 @@ import StatusNotice from "../StatusNotice.svelte";
         }
     }
 
+    async function handleConvertToInteraction(topic: import("../../domain/topics").PersonTopicItem) {
+        if (noteText.trim() && noteText.trim() !== topic.text) {
+            const ok = await confirmDialog({
+                title: text("topicsConvertConfirmTitle", "替换互动备注草稿"),
+                message: text("topicsConvertConfirmMsg", "当前已有未记录的互动备注草稿，转入谈资将替换当前草稿。确定继续吗？"),
+                confirmLabel: text("topicsConvertConfirmBtn", "确认替换"),
+                cancelLabel: text("topicsConvertCancelBtn", "取消"),
+            });
+            if (!ok) return;
+        }
+        noteText = topic.text;
+        recorded = false;
+        pendingConvertedTopicId = topic.id;
+        const noteInput = document.querySelector<HTMLInputElement>(".lvct-detail__record input");
+        noteInput?.focus();
+    }
+
+    let copiedField = $state<string>("");
+    let copyFieldError = $state<string>("");
+
+    async function handleCopyField(value: string, fieldKey: string) {
+        if (!value) return;
+        try {
+            await copyPlainText(value);
+            copiedField = fieldKey;
+            copyFieldError = "";
+            setTimeout(() => {
+                if (copiedField === fieldKey) copiedField = "";
+            }, 1800);
+        } catch (err) {
+            copyFieldError = requestErrorMessage(err);
+            setTimeout(() => {
+                copyFieldError = "";
+            }, 2500);
+        }
+    }
+
+    // ---- E-14 人物详情各区块折叠偏好 ----
+    let localCollapsed = $state<DetailCollapsedSections>({});
+    $effect(() => {
+        localCollapsed = { ...(collapsedSections ?? {}) };
+    });
+
+    function isSectionCollapsed(key: DetailSectionKey): boolean {
+        return Boolean(localCollapsed[key]);
+    }
+
+    function toggleSection(key: DetailSectionKey) {
+        const next = !isSectionCollapsed(key);
+        localCollapsed = { ...localCollapsed, [key]: next };
+        onToggleSection?.(key, next);
+    }
+
+    // ---- E-26 礼物点子与偏好清单 ----
+    const giftIdeasSupported = $derived(Boolean(onLoadGiftIdeas));
+    let giftIdeas = $state<GiftIdeaItem[]>([]);
+    let giftIdeasLoading = $state(false);
+    let giftIdeasError = $state("");
+    let newGiftTitle = $state("");
+    let newGiftType = $state<GiftIdeaType>("idea");
+    let newGiftPrice = $state<string | number>("");
+    let newGiftOccasion = $state("");
+    let addingGift = $state(false);
+
+    async function loadGiftIdeas() {
+        if (!onLoadGiftIdeas) return;
+        const docId = current.docId;
+        giftIdeasLoading = true;
+        giftIdeasError = "";
+        try {
+            const list = await onLoadGiftIdeas(docId);
+            if (detailAlive && current.docId === docId) giftIdeas = list;
+        } catch (error) {
+            if (detailAlive && current.docId === docId) giftIdeasError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive && current.docId === docId) giftIdeasLoading = false;
+        }
+    }
+    loadGiftIdeas();
+
+    async function handleAddGiftIdea() {
+        if (!onAddGiftIdea || addingGift || !newGiftTitle.trim()) return;
+        addingGift = true;
+        giftIdeasError = "";
+        try {
+            const rawPrice = typeof newGiftPrice === "number" ? newGiftPrice : newGiftPrice.trim() ? Number(newGiftPrice.trim()) : undefined;
+            const item: GiftIdeaItem = {
+                id: newGiftIdeaId(),
+                personDocId: current.docId,
+                type: newGiftType,
+                status: "idea",
+                title: newGiftTitle.trim(),
+                priceEstimate: typeof rawPrice === "number" && Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : undefined,
+                targetOccasion: newGiftOccasion.trim() || undefined,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            };
+            const list = await onAddGiftIdea(item);
+            if (detailAlive) {
+                giftIdeas = list;
+                newGiftTitle = "";
+                newGiftPrice = "";
+                newGiftOccasion = "";
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) giftIdeasError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive) addingGift = false;
+        }
+    }
+
+    async function handleToggleGiftStatus(item: GiftIdeaItem) {
+        if (!onUpdateGiftIdea) return;
+        const nextStatus: GiftIdeaStatus = item.status === "idea" ? "purchased" : item.status === "purchased" ? "given" : "idea";
+        try {
+            const list = await onUpdateGiftIdea(current.docId, item.id, { status: nextStatus });
+            if (detailAlive) {
+                giftIdeas = list;
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) giftIdeasError = requestErrorMessage(error);
+        }
+    }
+
+    async function handleConvertGiftToExchange(item: GiftIdeaItem) {
+        if (!onCreateExchange) return;
+        const todayStr = toLocalDateKey(new Date());
+        const exchange = convertGiftIdeaToExchange(item, todayStr);
+        try {
+            await onCreateExchange({
+                requestId: newExchangeRequestId(),
+                personDocId: exchange.personDocId,
+                kind: exchange.kind,
+                direction: exchange.direction,
+                description: exchange.description,
+                amount: exchange.amount,
+                currency: exchange.currency,
+                occurredOn: exchange.occurredOn,
+                dueOn: exchange.dueOn,
+                note: exchange.note,
+            });
+            onChanged();
+        } catch (error) {
+            if (detailAlive) giftIdeasError = requestErrorMessage(error);
+        }
+    }
+
+    async function handleRemoveGiftIdea(ideaId: string) {
+        if (!onRemoveGiftIdea) return;
+        try {
+            const list = await onRemoveGiftIdea(current.docId, ideaId);
+            if (detailAlive) {
+                giftIdeas = list;
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) giftIdeasError = requestErrorMessage(error);
+        }
+    }
+
+    // ---- E-36 重要日期与周年纪念日 ----
+    const anniversariesSupported = $derived(Boolean(onLoadAnniversaries));
+    let anniversaries = $state<AnniversaryItem[]>([]);
+    let anniversariesLoading = $state(false);
+    let anniversariesError = $state("");
+    let newAnnivTitle = $state("");
+    let newAnnivCategory = $state<AnniversaryCategory>("wedding");
+    let newAnnivDate = $state(toLocalDateKey(new Date()));
+    let newAnnivLunar = $state(false);
+    let addingAnniv = $state(false);
+
+    async function loadAnniversaries() {
+        if (!onLoadAnniversaries) return;
+        const docId = current.docId;
+        anniversariesLoading = true;
+        anniversariesError = "";
+        try {
+            const list = await onLoadAnniversaries(docId);
+            if (detailAlive && current.docId === docId) anniversaries = list;
+        } catch (error) {
+            if (detailAlive && current.docId === docId) anniversariesError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive && current.docId === docId) anniversariesLoading = false;
+        }
+    }
+    loadAnniversaries();
+
+    async function handleAddAnniversary() {
+        if (!onAddAnniversary || addingAnniv || !newAnnivTitle.trim()) return;
+        addingAnniv = true;
+        anniversariesError = "";
+        try {
+            const item: AnniversaryItem = {
+                id: newAnniversaryId(),
+                personDocId: current.docId,
+                title: newAnnivTitle.trim(),
+                category: newAnnivCategory,
+                date: newAnnivDate,
+                isLunar: newAnnivLunar,
+                remindDaysBefore: 7,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            };
+            const list = await onAddAnniversary(item);
+            if (detailAlive) {
+                anniversaries = list;
+                newAnnivTitle = "";
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) anniversariesError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive) addingAnniv = false;
+        }
+    }
+
+    async function handleRemoveAnniversary(annivId: string) {
+        if (!onRemoveAnniversary) return;
+        try {
+            const list = await onRemoveAnniversary(current.docId, annivId);
+            if (detailAlive) {
+                anniversaries = list;
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) anniversariesError = requestErrorMessage(error);
+        }
+    }
+
+    // ---- E-37 协作项目与主题 ----
+    const projectsSupported = $derived(Boolean(onLoadProjects));
+    let projects = $state<PersonProjectItem[]>([]);
+    let projectsLoading = $state(false);
+    let projectsError = $state("");
+    let newProjTitle = $state("");
+    let newProjRole = $state("");
+    let newProjDocId = $state("");
+    let addingProj = $state(false);
+
+    async function loadProjects() {
+        if (!onLoadProjects) return;
+        const docId = current.docId;
+        projectsLoading = true;
+        projectsError = "";
+        try {
+            const list = await onLoadProjects(docId);
+            if (detailAlive && current.docId === docId) projects = list;
+        } catch (error) {
+            if (detailAlive && current.docId === docId) projectsError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive && current.docId === docId) projectsLoading = false;
+        }
+    }
+    loadProjects();
+
+    async function handleAddProject() {
+        if (!onAddProject || addingProj || !newProjTitle.trim()) return;
+        addingProj = true;
+        projectsError = "";
+        try {
+            const item: PersonProjectItem = {
+                id: newProjectId(),
+                personDocId: current.docId,
+                title: newProjTitle.trim(),
+                docId: newProjDocId.trim() || undefined,
+                status: "active",
+                role: newProjRole.trim() || undefined,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            };
+            const list = await onAddProject(item);
+            if (detailAlive) {
+                projects = list;
+                newProjTitle = "";
+                newProjRole = "";
+                newProjDocId = "";
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) projectsError = requestErrorMessage(error);
+        } finally {
+            if (detailAlive) addingProj = false;
+        }
+    }
+
+    async function handleRemoveProject(projectId: string) {
+        if (!onRemoveProject) return;
+        try {
+            const list = await onRemoveProject(current.docId, projectId);
+            if (detailAlive) {
+                projects = list;
+                onChanged();
+            }
+        } catch (error) {
+            if (detailAlive) projectsError = requestErrorMessage(error);
+        }
+    }
+
     // ---- 会面简报导出（F11） ----
     let briefingExportOpen = $state(false);
     let briefingLimit = $state(10);
     let briefingGeneratedAt = $state("");
+    let briefingCopied = $state(false);
+    let briefingCopyTimer: ReturnType<typeof setTimeout> | null = null;
+    let siyuanRefCopied = $state(false);
+    let siyuanRefTimer: ReturnType<typeof setTimeout> | null = null;
+
+    async function copySiyuanRef() {
+        const refText = `(( ${current.docId} "${current.name}" ))`;
+        await copyPlainText(refText);
+        siyuanRefCopied = true;
+        if (siyuanRefTimer) clearTimeout(siyuanRefTimer);
+        siyuanRefTimer = setTimeout(() => {
+            siyuanRefCopied = false;
+        }, 2000);
+    }
+
+    async function copyBriefing() {
+        if (!briefingPreview) return;
+        await copyPlainText(briefingPreview);
+        briefingCopied = true;
+        if (briefingCopyTimer) clearTimeout(briefingCopyTimer);
+        briefingCopyTimer = setTimeout(() => {
+            briefingCopied = false;
+        }, 2000);
+    }
+
+    onDestroy(() => {
+        if (briefingCopyTimer) clearTimeout(briefingCopyTimer);
+        if (siyuanRefTimer) clearTimeout(siyuanRefTimer);
+    });
     function openBriefingExport() {
         const now = new Date();
         const pad = (value: number) => String(value).padStart(2, "0");
@@ -751,6 +1150,26 @@ import StatusNotice from "../StatusNotice.svelte";
             limit: briefingLimit,
             generatedAt: briefingGeneratedAt,
             topics: topics.map((item) => item.text),
+            anniversaries: anniversaries.map((a) => {
+                const proj = nextAnniversary(a);
+                return {
+                    title: a.title,
+                    category: a.category,
+                    date: a.date,
+                    isLunar: a.isLunar,
+                    daysUntil: proj?.daysUntil,
+                    yearsCount: proj?.yearsCount,
+                    displayDate: proj?.displayDate,
+                };
+            }),
+            commonOrgs: commonOrgs.map((org) => ({
+                orgName: org.orgName,
+                peers: org.peers.map((p) => ({
+                    name: p.name,
+                    samePeriod: p.samePeriod,
+                    overlapText: p.overlapText,
+                })),
+            })),
         });
     });
     function downloadBriefing() {
@@ -777,7 +1196,11 @@ import StatusNotice from "../StatusNotice.svelte";
         deleting = true;
         errorText = "";
         try {
-            await removeContact(settings, current);
+            if (onRemoveContactToTrash) {
+                await onRemoveContactToTrash(current);
+            } else {
+                await removeContact(settings, current);
+            }
             onDeleted();
         } catch (error) {
             errorText = requestErrorMessage(error);
@@ -1290,6 +1713,15 @@ import StatusNotice from "../StatusNotice.svelte";
         const first = insights?.timeline?.[0];
         return first?.localDate ?? "";
     });
+    const relationshipHealth = $derived.by<RelationshipHealth>(() => {
+        const lastTime = insights?.timeline?.[0]?.occurredAt;
+        const targetDays = cadenceMode === "custom" ? cadenceDays : 30;
+        return computeRelationshipHealth({
+            cadenceDays: targetDays,
+            lastInteractionTime: lastTime,
+            paused: cadenceMode === "paused",
+        });
+    });
 
     async function loadCadence() {
         if (!onGetCadence) return;
@@ -1341,16 +1773,55 @@ import StatusNotice from "../StatusNotice.svelte";
             cadenceSaving = false;
         }
     }
+
+    const personRegion = $derived(extractNormalizedRegion(current));
 </script>
 
 <div class="lvct-detail">
     <div class="lvct-detail__header">
         <div class="lvct-detail__avatar" data-group={current.group || "未分组"}>{current.name.slice(0, 1)}</div>
         <div class="lvct-detail__id">
-            <h3>{current.name}</h3>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <h3 style="margin: 0;">{current.name}</h3>
+                {#if current.isSelf}
+                    <span class="lvct-chip lvct-bucket--today">本人</span>
+                {/if}
+                {#if relationshipHealth.level !== "unknown"}
+                    <span class={`lvct-heat ${heatLevelColorClass(relationshipHealth.level)}`} style="font-size: 11px; padding: 2px 7px; border-radius: 9999px;" title={text("heatScoreLabel", "关系温度 {score}%", { score: relationshipHealth.score })}>
+                        {relationshipHealth.level === "hot" ? text("heatHot", "温热")
+                        : relationshipHealth.level === "warm" ? text("heatWarm", "常温")
+                        : relationshipHealth.level === "cool" ? text("heatCool", "微凉")
+                        : relationshipHealth.level === "cold" ? text("heatCold", "渐冻")
+                        : relationshipHealth.level === "paused" ? text("heatPaused", "已暂停")
+                        : text("heatUnknown", "从未联系")} · {relationshipHealth.score}%
+                    </span>
+                {/if}
+            </div>
             <div class="lvct-detail__meta">
                 {#if current.group}<span class="lvct-detail__group-chip">{current.group}</span>{/if}
                 {#if current.birthday}<span class="ft__smaller ft__on-surface">生日 {formatBirthdayDisplay(current.birthday, current.isLunar)}</span>{/if}
+                {#if personRegion.city && personRegion.city !== "未知"}
+                    <span class="lvct-detail__group-chip" title="所在城市">
+                        <span>📍 {personRegion.province && personRegion.province !== personRegion.city ? `${personRegion.province} · ` : ""}{personRegion.city}</span>
+                        {#if onOpenPeople}
+                            <button
+                                type="button"
+                                class="b3-button b3-button--text b3-button--small"
+                                style="padding: 0 4px; height: auto; line-height: 1; margin-left: 2px;"
+                                onclick={() => {
+                                    void (async () => {
+                                        if (await canLeave.requestClose()) {
+                                            onClose();
+                                            const matched = others.filter((p) => extractNormalizedRegion(p).city === personRegion.city);
+                                            onOpenPeople?.({ itemIds: [current.itemId, ...matched.map((p) => p.itemId)], label: `同城人脉 · ${personRegion.city}` });
+                                        }
+                                    })();
+                                }}
+                                title={`筛选 ${personRegion.city} 的同城联系人`}
+                            >同城人脉 &gt;</button>
+                        {/if}
+                    </span>
+                {/if}
             </div>
         </div>
         <div class="lvct-detail__header-actions">
@@ -1358,6 +1829,48 @@ import StatusNotice from "../StatusNotice.svelte";
             <button class="b3-button b3-button--outline" onclick={() => navigate(previousPerson)} disabled={!previousPerson || busy}>{text("detailPrevious", "上一位")}</button>
             <button class="b3-button b3-button--outline" onclick={() => navigate(nextPerson)} disabled={!nextPerson || busy}>{text("detailNext", "下一位")}</button>
         </div>
+    </div>
+
+    <!-- 顶部思源笔记与外部快捷联动操作条 -->
+    <div class="lvct-detail__quick-bar" role="toolbar" aria-label="快捷操作">
+        <button
+            type="button"
+            class="b3-button b3-button--outline b3-button--small"
+            onclick={copySiyuanRef}
+            title="复制可在思源笔记正文中粘贴的锚文本双链引用 ((docId '姓名'))"
+        >
+            {#if siyuanRefCopied}
+                <Check size={13} class="lvct-text-success" /> {text("detailSiyuanRefCopied", "已复制双链引用 ✓")}
+            {:else}
+                <Link size={13} /> {text("detailCopySiyuanRef", "复制双链引用")}
+            {/if}
+        </button>
+        <button
+            type="button"
+            class="b3-button b3-button--outline b3-button--small"
+            onclick={() => onOpenPersonDoc(current.docId)}
+            title="在思源中打开该联系人的独立文档"
+        >
+            <FileText size={13} /> {text("detailOpenNoteDoc", "打开笔记文档")}
+        </button>
+        {#if onOpenGraphPerson}
+            <button
+                type="button"
+                class="b3-button b3-button--outline b3-button--small"
+                onclick={() => void (async () => { if (await canLeave.requestClose()) { onClose(); onOpenGraphPerson?.(current.docId); } })()}
+                title="在关系图谱中聚焦该联系人的一度/二度网络"
+            >
+                <Network size={13} /> {text("detailOpenGraph", "图谱聚焦")}
+            </button>
+        {/if}
+        <button
+            type="button"
+            class="b3-button b3-button--outline b3-button--small"
+            onclick={openBriefingExport}
+            title="一键导出会前备忘、背景资料与谈资简报"
+        >
+            <CalendarDays size={13} /> 导出会前简报
+        </button>
     </div>
 
     <div class="lvct-detail__tabs" role="tablist" tabindex="-1" aria-label="人物详情内容" onkeydown={handleTabKeydown}>
@@ -1407,6 +1920,23 @@ import StatusNotice from "../StatusNotice.svelte";
                 </dd>
             </div>
             <div>
+                <dt>关系温度</dt>
+                <dd>
+                    {#if insightsLoading || (cadenceSupported && !cadenceLoaded)}
+                        <span class="ft__smaller ft__on-surface">读取中…</span>
+                    {:else}
+                        <span class={`lvct-heat ${heatLevelColorClass(relationshipHealth.level)}`} title={text("heatScoreLabel", "关系温度 {score}%", { score: relationshipHealth.score })}>
+                            {relationshipHealth.level === "hot" ? text("heatHot", "温热")
+                            : relationshipHealth.level === "warm" ? text("heatWarm", "常温")
+                            : relationshipHealth.level === "cool" ? text("heatCool", "微凉")
+                            : relationshipHealth.level === "cold" ? text("heatCold", "渐冻")
+                            : relationshipHealth.level === "paused" ? text("heatPaused", "已暂停")
+                            : text("heatUnknown", "从未联系")} · {relationshipHealth.score}%
+                        </span>
+                    {/if}
+                </dd>
+            </div>
+            <div>
                 <dt>相关人</dt>
                 <dd>{current.relatedItemIds.length > 0 ? `${current.relatedItemIds.length} 位` : "尚未建立"}</dd>
             </div>
@@ -1418,145 +1948,543 @@ import StatusNotice from "../StatusNotice.svelte";
         </ViewState>
     {/if}
     <dl class="lvct-detail__fields">
-        {#if current.phone}<div><dt>电话</dt><dd><a href={`tel:${current.phone}`}>{current.phone}</a></dd></div>{/if}
-        {#if current.email}<div><dt>邮箱</dt><dd><a href={`mailto:${current.email}`}>{current.email}</a></dd></div>{/if}
-        {#if current.wechat}<div><dt>微信</dt><dd>{current.wechat}</dd></div>{/if}
-        {#if current.website}<div><dt>网站</dt><dd>{current.website}</dd></div>{/if}
+        {#if current.phone}
+            <div>
+                <dt>电话</dt>
+                <dd class="fn__flex fn__flex-1" style="align-items: center; gap: 6px;">
+                    <a href={`tel:${current.phone}`} title="拨打电话">{current.phone}</a>
+                    <button
+                        type="button"
+                        class="b3-button b3-button--text lvct-detail__copy-btn"
+                        title={copiedField === "phone" ? "已复制到剪贴板" : "复制电话号码"}
+                        aria-label="复制电话号码"
+                        onclick={() => handleCopyField(current.phone, "phone")}
+                    >
+                        {#if copiedField === "phone"}
+                            <span class="lvct-text-success ft__smaller">已复制 ✓</span>
+                        {:else}
+                            <Copy size={12} />
+                        {/if}
+                    </button>
+                </dd>
+            </div>
+        {/if}
+        {#if current.email}
+            <div>
+                <dt>邮箱</dt>
+                <dd class="fn__flex fn__flex-1" style="align-items: center; gap: 6px;">
+                    <a href={`mailto:${current.email}`} title="发送邮件">{current.email}</a>
+                    <button
+                        type="button"
+                        class="b3-button b3-button--text lvct-detail__copy-btn"
+                        title={copiedField === "email" ? "已复制到剪贴板" : "复制邮箱地址"}
+                        aria-label="复制邮箱地址"
+                        onclick={() => handleCopyField(current.email, "email")}
+                    >
+                        {#if copiedField === "email"}
+                            <span class="lvct-text-success ft__smaller">已复制 ✓</span>
+                        {:else}
+                            <Copy size={12} />
+                        {/if}
+                    </button>
+                </dd>
+            </div>
+        {/if}
+        {#if current.wechat}
+            <div>
+                <dt>微信</dt>
+                <dd class="fn__flex fn__flex-1" style="align-items: center; gap: 6px;">
+                    <span>{current.wechat}</span>
+                    <button
+                        type="button"
+                        class="b3-button b3-button--text lvct-detail__copy-btn"
+                        title={copiedField === "wechat" ? "已复制到剪贴板" : "复制微信号"}
+                        aria-label="复制微信号"
+                        onclick={() => handleCopyField(current.wechat, "wechat")}
+                    >
+                        {#if copiedField === "wechat"}
+                            <span class="lvct-text-success ft__smaller">已复制 ✓</span>
+                        {:else}
+                            <Copy size={12} />
+                        {/if}
+                    </button>
+                </dd>
+            </div>
+        {/if}
+        {#if current.website}
+            <div>
+                <dt>网站</dt>
+                <dd class="fn__flex fn__flex-1" style="align-items: center; gap: 6px;">
+                    <a
+                        class="fn__flex"
+                        style="align-items: center; gap: 4px;"
+                        href={current.website.startsWith("http") ? current.website : `https://${current.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="在浏览器中打开网址"
+                    >
+                        <span>{current.website}</span>
+                        <ExternalLink size={12} />
+                    </a>
+                    <button
+                        type="button"
+                        class="b3-button b3-button--text lvct-detail__copy-btn"
+                        title={copiedField === "website" ? "已复制到剪贴板" : "复制网址"}
+                        aria-label="复制网址"
+                        onclick={() => handleCopyField(current.website, "website")}
+                    >
+                        {#if copiedField === "website"}
+                            <span class="lvct-text-success ft__smaller">已复制 ✓</span>
+                        {:else}
+                            <Copy size={12} />
+                        {/if}
+                    </button>
+                </dd>
+            </div>
+        {/if}
         {#if current.tags.length > 0}<div><dt>标签</dt><dd>{current.tags.join(" · ")}</dd></div>{/if}
         {#if birthday}<div><dt>下次生日</dt><dd>{birthday.date.toLocaleDateString("zh-CN")}（公历{current.isLunar ? `，对应${birthday.label}` : ""}） · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}</dd></div>{/if}
     </dl>
+    {#if copyFieldError}
+        <p class="b3-label b3-label--error ft__smaller" style="margin: 4px 0;">{copyFieldError}</p>
+    {/if}
 
     {#if topicsSupported}
         <section class="lvct-detail__section lvct-detail__topics-section" aria-labelledby="lvct-topics-title">
-            <div class="lvct-detail__section-head">
-                <div>
-                    <h4 id="lvct-topics-title">会面谈资与备忘</h4>
-                    <p class="ft__smaller ft__on-surface">记录下次见面想聊的话题、承诺的事情或兴趣关注；导出简报时自动置顶。</p>
+            <div class="lvct-detail__section-head" role="button" tabindex="0" onclick={() => toggleSection("topics")} onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSection("topics"); } }} style="cursor: pointer; user-select: none;">
+                <div class="fn__flex" style="align-items: center; gap: 6px;">
+                    {#if isSectionCollapsed("topics")}
+                        <ChevronRight size={14} />
+                    {:else}
+                        <ChevronDown size={14} />
+                    {/if}
+                    <h4 id="lvct-topics-title" style="margin: 0;">{text("topicsTitle", "会面谈资与备忘")}</h4>
+                    <span class="lvct-chip lvct-chip--neutral" style="font-size: 11px; padding: 1px 6px;">{topics.length}</span>
                 </div>
                 {#if topicsLoading}
+                    <span class="ft__smaller ft__on-surface">{text("topicsLoading", "读取中…")}</span>
+                {/if}
+            </div>
+            {#if !isSectionCollapsed("topics")}
+                <p class="ft__smaller ft__on-surface" style="margin: 4px 0 6px 0;">{text("topicsDesc", "记录下次见面想聊的话题、承诺的事情或兴趣关注；导出简报时自动置顶。")}</p>
+                {#if topicsError}
+                    <p class="ft__smaller lvct-text-danger" role="alert">{topicsError} <button type="button" class="b3-button b3-button--text" onclick={loadTopics}>{text("topicsRetry", "重试")}</button></p>
+                {/if}
+                <div class="lvct-detail__topics-input-row">
+                    <input
+                        class="b3-text-field fn__flex-1"
+                        type="text"
+                        placeholder={text("topicsPlaceholder", "添加一条下次见面想聊的话题或备忘…")}
+                        aria-label={text("topicsAddAria", "新增谈资备忘")}
+                        bind:value={newTopicText}
+                        disabled={addingTopic || topicsLoading}
+                        onkeydown={(event) => { if (event.key === "Enter") { event.preventDefault(); void handleAddTopic(); } }}
+                    />
+                    <button
+                        type="button"
+                        class="b3-button b3-button--outline"
+                        disabled={addingTopic || topicsLoading || !newTopicText.trim()}
+                        onclick={handleAddTopic}
+                    >{addingTopic ? text("topicsAdding", "添加中…") : text("topicsAddBtn", "添加备忘")}</button>
+                </div>
+                {#if topics.length === 0}
+                    <p class="ft__smaller ft__on-surface lvct-detail__topics-empty">{text("topicsEmpty", "暂无谈资备忘。随手记下一两件想聊的事，会前不慌张。")}</p>
+                {:else}
+                    <ul class="lvct-detail__topics-list" aria-label={text("topicsListAria", "会面谈资备忘列表")}>
+                        {#each topics as topic (topic.id)}
+                            <li class="lvct-detail__topic-item">
+                                <span class="lvct-detail__topic-text">📌 {topic.text}</span>
+                                <span class="lvct-detail__topic-actions">
+                                    <button
+                                        type="button"
+                                        class="b3-button b3-button--text"
+                                        aria-label={text("topicsCopyAria", "复制话题内容")}
+                                        onclick={() => void handleCopyTopic(topic)}
+                                    >{copiedTopicId === topic.id ? text("topicsCopied", "已复制 ✓") : text("topicsCopy", "复制")}</button>
+                                    <button
+                                        type="button"
+                                        class="b3-button b3-button--text"
+                                        aria-label={text("topicsConvertAria", "将谈资转为互动备注")}
+                                        onclick={() => void handleConvertToInteraction(topic)}
+                                    >{pendingConvertedTopicId === topic.id ? text("topicsConverted", "已转入草稿") : text("topicsConvertBtn", "转互动")}</button>
+                                    <button
+                                        type="button"
+                                        class="b3-button b3-button--cancel"
+                                        aria-label={text("topicsRemoveAria", "移除话题")}
+                                        onclick={() => void handleRemoveTopic(topic.id)}
+                                    >×</button>
+                                </span>
+                            </li>
+                        {/each}
+                    </ul>
+                {/if}
+            {/if}
+        </section>
+    {/if}
+
+    {#if giftIdeasSupported}
+        <section class="lvct-detail__section lvct-detail__gifts-section" aria-labelledby="lvct-gifts-title">
+            <div class="lvct-detail__section-head" role="button" tabindex="0" onclick={() => toggleSection("gifts")} onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSection("gifts"); } }} style="cursor: pointer; user-select: none;">
+                <div class="fn__flex" style="align-items: center; gap: 6px;">
+                    {#if isSectionCollapsed("gifts")}
+                        <ChevronRight size={14} />
+                    {:else}
+                        <ChevronDown size={14} />
+                    {/if}
+                    <h4 id="lvct-gifts-title" style="margin: 0;">{text("giftsTitle", "礼物点子与偏好")}</h4>
+                    <span class="lvct-chip lvct-chip--neutral" style="font-size: 11px; padding: 1px 6px;">{giftIdeas.length}</span>
+                </div>
+                {#if giftIdeasLoading}
+                    <span class="ft__smaller ft__on-surface">{text("giftsLoading", "读取中…")}</span>
+                {/if}
+            </div>
+            {#if !isSectionCollapsed("gifts")}
+                <p class="ft__smaller ft__on-surface" style="margin: 4px 0 6px 0;">{text("giftsDesc", "记录送礼想法与喜好偏好；送出后可一键转为往来账本，未送前不计入账目。")}</p>
+                {#if giftIdeasError}
+                    <p class="ft__smaller lvct-text-danger" role="alert">{giftIdeasError} <button type="button" class="b3-button b3-button--text" onclick={loadGiftIdeas}>{text("giftsRetry", "重试")}</button></p>
+                {/if}
+                <div class="lvct-detail__topics-input-row">
+                    <select class="b3-select" bind:value={newGiftType} aria-label={text("giftsTypeAria", "点子类型")}>
+                        <option value="idea">{text("giftsTypeIdea", "送礼点子")}</option>
+                        <option value="preference">{text("giftsTypePref", "喜好偏好")}</option>
+                    </select>
+                    <input
+                        class="b3-text-field fn__flex-1"
+                        type="text"
+                        placeholder={newGiftType === "idea" ? text("giftsPlaceholderIdea", "礼物名称，如：思源定制手账本") : text("giftsPlaceholderPref", "喜好偏好，如：喜欢黑咖啡无糖")}
+                        aria-label={text("giftsTitleAria", "礼物或偏好名称")}
+                        bind:value={newGiftTitle}
+                        disabled={addingGift || giftIdeasLoading}
+                        onkeydown={(event) => { if (event.key === "Enter") { event.preventDefault(); void handleAddGiftIdea(); } }}
+                    />
+                    {#if newGiftType === "idea"}
+                        <input
+                            class="b3-text-field"
+                            style="width: 80px;"
+                            type="number"
+                            min="0"
+                            placeholder={text("giftsPricePlaceholder", "预算￥")}
+                            aria-label={text("giftsPriceAria", "预估预算")}
+                            bind:value={newGiftPrice}
+                            disabled={addingGift || giftIdeasLoading}
+                        />
+                    {/if}
+                    <button
+                        type="button"
+                        class="b3-button b3-button--outline"
+                        disabled={addingGift || giftIdeasLoading || !newGiftTitle.trim()}
+                        onclick={handleAddGiftIdea}
+                    >{addingGift ? text("giftsAdding", "添加中…") : text("giftsAddBtn", "添加")}</button>
+                </div>
+                {#if giftIdeas.length === 0}
+                    <p class="ft__smaller ft__on-surface lvct-detail__topics-empty">{text("giftsEmpty", "暂无送礼点子或喜好偏好。记录下来，重要时刻不再为选礼物发愁。")}</p>
+                {:else}
+                    <ul class="lvct-detail__topics-list" aria-label={text("giftsListAria", "礼物点子与偏好列表")}>
+                        {#each giftIdeas as idea (idea.id)}
+                            <li class="lvct-detail__topic-item">
+                                <span class="lvct-detail__topic-text">
+                                    <span class={`lvct-chip ${idea.type === "idea" ? "lvct-bucket--soon" : "lvct-bucket--today"}`}>
+                                        {idea.type === "idea" ? text("giftsBadgeIdea", "点子") : text("giftsBadgePref", "偏好")}
+                                    </span>
+                                    {idea.title}
+                                    {#if idea.priceEstimate}
+                                        <span class="ft__smaller ft__on-surface">（￥{idea.priceEstimate}）</span>
+                                    {/if}
+                                    {#if idea.targetOccasion}
+                                        <span class="ft__smaller ft__on-surface">· {idea.targetOccasion}</span>
+                                    {/if}
+                                </span>
+                                <span class="lvct-detail__topic-actions">
+                                    {#if idea.type === "idea"}
+                                        <button
+                                            type="button"
+                                            class="b3-button b3-button--text"
+                                            onclick={() => void handleToggleGiftStatus(idea)}
+                                            title={idea.status === "given" ? text("giftsStatusGivenHint", "已送出并同步至互动时间线，点击可流转") : text("giftsStatusAria", "点击切换送礼状态")}
+                                        >
+                                            {idea.status === "idea" ? text("giftsStatusIdea", "构思中")
+                                            : idea.status === "purchased" ? text("giftsStatusPurchased", "已采购待送")
+                                            : text("giftsStatusGiven", "已送出 ✓")}
+                                        </button>
+                                        {#if idea.status === "given" && onCreateExchange}
+                                            <button
+                                                type="button"
+                                                class="b3-button b3-button--outline"
+                                                onclick={() => void handleConvertGiftToExchange(idea)}
+                                            >{text("giftsConvertToExchange", "转入账本")}</button>
+                                        {/if}
+                                    {/if}
+                                    <button
+                                        type="button"
+                                        class="b3-button b3-button--cancel"
+                                        aria-label={text("giftsRemoveAria", "删除")}
+                                        onclick={() => void handleRemoveGiftIdea(idea.id)}
+                                    >×</button>
+                                </span>
+                            </li>
+                        {/each}
+                    </ul>
+                {/if}
+            {/if}
+        </section>
+    {/if}
+
+    {#if anniversariesSupported}
+        <section class="lvct-detail__section lvct-detail__anniversaries">
+            <div class="lvct-detail__section-head" role="button" tabindex="0" onclick={() => toggleSection("anniversaries")} onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSection("anniversaries"); } }} style="cursor: pointer; user-select: none;">
+                <div class="fn__flex" style="align-items: center; gap: 6px;">
+                    {#if isSectionCollapsed("anniversaries")}
+                        <ChevronRight size={14} />
+                    {:else}
+                        <ChevronDown size={14} />
+                    {/if}
+                    <h4 style="margin: 0;">重要日期与纪念日</h4>
+                    <span class="lvct-chip lvct-chip--neutral" style="font-size: 11px; padding: 1px 6px;">{anniversaries.length}</span>
+                </div>
+                {#if anniversariesLoading}
                     <span class="ft__smaller ft__on-surface">读取中…</span>
                 {/if}
             </div>
-            {#if topicsError}
-                <p class="ft__smaller lvct-text-danger" role="alert">{topicsError} <button type="button" class="b3-button b3-button--text" onclick={loadTopics}>重试</button></p>
+            {#if !isSectionCollapsed("anniversaries")}
+                <p class="ft__smaller ft__on-surface" style="margin: 4px 0 6px 0;">登记结婚、相识、入职等周年纪念，到期自动提醒。</p>
+                {#if anniversariesError}
+                    <p class="ft__smaller lvct-text-danger" role="alert">{anniversariesError} <button type="button" class="b3-button b3-button--text" onclick={loadAnniversaries}>重试</button></p>
+                {/if}
+                <div class="lvct-detail__anniv-form fn__flex" style="flex-wrap: wrap; gap: 6px; margin: 6px 0;">
+                    <input
+                        class="b3-text-field fn__flex-1"
+                        type="text"
+                        placeholder="纪念日名称（如：结婚十周年、相识纪念）"
+                        bind:value={newAnnivTitle}
+                        disabled={addingAnniv || anniversariesLoading}
+                        onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleAddAnniversary(); } }}
+                    />
+                    <select class="b3-select" bind:value={newAnnivCategory} disabled={addingAnniv || anniversariesLoading}>
+                        {#each ANNIVERSARY_CATEGORIES as cat}
+                            <option value={cat}>{ANNIVERSARY_CATEGORY_LABELS[cat].icon} {ANNIVERSARY_CATEGORY_LABELS[cat].label}</option>
+                        {/each}
+                    </select>
+                    <input
+                        class="b3-text-field"
+                        type="date"
+                        style="width: 140px;"
+                        bind:value={newAnnivDate}
+                        disabled={addingAnniv || anniversariesLoading}
+                    />
+                    <label class="b3-label" style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="checkbox" bind:checked={newAnnivLunar} disabled={addingAnniv || anniversariesLoading} />
+                        <span class="ft__smaller">农历</span>
+                    </label>
+                    <button
+                        type="button"
+                        class="b3-button b3-button--outline"
+                        disabled={addingAnniv || anniversariesLoading || !newAnnivTitle.trim()}
+                        onclick={handleAddAnniversary}
+                    >添加纪念日</button>
+                </div>
+                {#if anniversaries.length === 0}
+                    <p class="ft__smaller ft__on-surface">暂未登记特殊纪念日。</p>
+                {:else}
+                    <ul class="lvct-detail__topic-list">
+                        {#each anniversaries as anniv (anniv.id)}
+                            {@const proj = nextAnniversary(anniv)}
+                            <li class="lvct-detail__topic-item">
+                                <span class="lvct-detail__topic-text">
+                                    <span class="lvct-chip lvct-bucket--soon">
+                                        {ANNIVERSARY_CATEGORY_LABELS[anniv.category]?.icon ?? "📅"} {ANNIVERSARY_CATEGORY_LABELS[anniv.category]?.label ?? "纪念日"}
+                                    </span>
+                                    <b>{anniv.title}</b> · {anniv.date}{anniv.isLunar ? "（农历）" : ""}
+                                    {#if proj}
+                                        <span class="ft__smaller ft__on-surface">
+                                            · 还有 {proj.daysUntil} 天（{proj.displayDate}
+                                            {#if proj.yearsCount}，第 {proj.yearsCount} 周年{/if}）
+                                        </span>
+                                    {/if}
+                                </span>
+                                <span class="lvct-detail__topic-actions">
+                                    <button
+                                        type="button"
+                                        class="b3-button b3-button--cancel"
+                                        aria-label="删除纪念日"
+                                        onclick={() => void handleRemoveAnniversary(anniv.id)}
+                                    >×</button>
+                                </span>
+                            </li>
+                        {/each}
+                    </ul>
+                {/if}
             {/if}
-            <div class="lvct-detail__topics-input-row">
-                <input
-                    class="b3-text-field fn__flex-1"
-                    type="text"
-                    placeholder="添加一条下次见面想聊的话题或备忘…"
-                    aria-label="新增谈资备忘"
-                    bind:value={newTopicText}
-                    disabled={addingTopic || topicsLoading}
-                    onkeydown={(event) => { if (event.key === "Enter") { event.preventDefault(); void handleAddTopic(); } }}
-                />
-                <button
-                    type="button"
-                    class="b3-button b3-button--outline"
-                    disabled={addingTopic || topicsLoading || !newTopicText.trim()}
-                    onclick={handleAddTopic}
-                >{addingTopic ? "添加中…" : "添加备忘"}</button>
+        </section>
+    {/if}
+
+    {#if projectsSupported}
+        <section class="lvct-detail__section lvct-detail__projects">
+            <div class="lvct-detail__section-head" role="button" tabindex="0" onclick={() => toggleSection("projects")} onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSection("projects"); } }} style="cursor: pointer; user-select: none;">
+                <div class="fn__flex" style="align-items: center; gap: 6px;">
+                    {#if isSectionCollapsed("projects")}
+                        <ChevronRight size={14} />
+                    {:else}
+                        <ChevronDown size={14} />
+                    {/if}
+                    <h4 style="margin: 0;">协作项目与主题</h4>
+                    <span class="lvct-chip lvct-chip--neutral" style="font-size: 11px; padding: 1px 6px;">{projects.length}</span>
+                </div>
+                {#if projectsLoading}
+                    <span class="ft__smaller ft__on-surface">读取中…</span>
+                {/if}
             </div>
-            {#if topics.length === 0}
-                <p class="ft__smaller ft__on-surface lvct-detail__topics-empty">暂无谈资备忘。随手记下一两件想聊的事，会前不慌张。</p>
-            {:else}
-                <ul class="lvct-detail__topics-list" aria-label="会面谈资备忘列表">
-                    {#each topics as topic (topic.id)}
-                        <li class="lvct-detail__topic-item">
-                            <span class="lvct-detail__topic-text">📌 {topic.text}</span>
-                            <span class="lvct-detail__topic-actions">
-                                <button
-                                    type="button"
-                                    class="b3-button b3-button--text"
-                                    aria-label="复制话题内容"
-                                    onclick={() => void handleCopyTopic(topic)}
-                                >{copiedTopicId === topic.id ? "已复制 ✓" : "复制"}</button>
-                                <button
-                                    type="button"
-                                    class="b3-button b3-button--cancel"
-                                    aria-label="移除话题"
-                                    onclick={() => void handleRemoveTopic(topic.id)}
-                                >×</button>
-                            </span>
-                        </li>
-                    {/each}
-                </ul>
+            {#if !isSectionCollapsed("projects")}
+                <p class="ft__smaller ft__on-surface" style="margin: 4px 0 6px 0;">记录共同协作的思源项目、主题讨论与角色分工。</p>
+                {#if projectsError}
+                    <p class="ft__smaller lvct-text-danger" role="alert">{projectsError} <button type="button" class="b3-button b3-button--text" onclick={loadProjects}>重试</button></p>
+                {/if}
+                <div class="lvct-detail__anniv-form fn__flex" style="flex-wrap: wrap; gap: 6px; margin: 6px 0;">
+                    <input
+                        class="b3-text-field fn__flex-1"
+                        type="text"
+                        placeholder="项目或主题名称（如：Q4 战略复盘、开源人脉）"
+                        bind:value={newProjTitle}
+                        disabled={addingProj || projectsLoading}
+                        onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleAddProject(); } }}
+                    />
+                    <input
+                        class="b3-text-field"
+                        type="text"
+                        style="width: 130px;"
+                        placeholder="角色分工（可选）"
+                        bind:value={newProjRole}
+                        disabled={addingProj || projectsLoading}
+                    />
+                    <input
+                        class="b3-text-field"
+                        type="text"
+                        style="width: 170px;"
+                        placeholder="关联文档 ID（可选）"
+                        bind:value={newProjDocId}
+                        disabled={addingProj || projectsLoading}
+                    />
+                    <button
+                        type="button"
+                        class="b3-button b3-button--outline"
+                        disabled={addingProj || projectsLoading || !newProjTitle.trim()}
+                        onclick={handleAddProject}
+                    >添加项目</button>
+                </div>
+                {#if projects.length === 0}
+                    <p class="ft__smaller ft__on-surface">暂未关联协作项目。</p>
+                {:else}
+                    <ul class="lvct-detail__topic-list">
+                        {#each projects as proj (proj.id)}
+                            <li class="lvct-detail__topic-item">
+                                <span class="lvct-detail__topic-text">
+                                    <span class="lvct-chip lvct-bucket--soon">
+                                        📁 {proj.role || "项目"}
+                                    </span>
+                                    <b>{proj.title}</b>
+                                    {#if proj.docId}
+                                        <button
+                                            type="button"
+                                            class="b3-button b3-button--text ft__smaller"
+                                            style="padding: 0 4px; margin-left: 4px;"
+                                            onclick={() => onOpenPersonDoc(proj.docId!)}
+                                        >打开项目文档 ↗</button>
+                                    {/if}
+                                </span>
+                                <span class="lvct-detail__topic-actions">
+                                    <button
+                                        type="button"
+                                        class="b3-button b3-button--cancel"
+                                        aria-label="删除项目关联"
+                                        onclick={() => void handleRemoveProject(proj.id)}
+                                    >×</button>
+                                </span>
+                            </li>
+                        {/each}
+                    </ul>
+                {/if}
             {/if}
         </section>
     {/if}
 
     {#if onLoadPersonNote && onSavePersonNote}
         <section class="lvct-detail__section lvct-detail__person-note">
-            <div class="lvct-detail__section-head">
-                <div>
-                    <h4>个人备注</h4>
-                    <p class="ft__smaller ft__on-surface">记录特殊情况、偏好或下次见面要注意的事。写入该人物文档，不计入互动次数。</p>
+            <div class="lvct-detail__section-head" role="button" tabindex="0" onclick={() => toggleSection("notes")} onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSection("notes"); } }} style="cursor: pointer; user-select: none;">
+                <div class="fn__flex" style="align-items: center; gap: 6px;">
+                    {#if isSectionCollapsed("notes")}
+                        <ChevronRight size={14} />
+                    {:else}
+                        <ChevronDown size={14} />
+                    {/if}
+                    <h4 style="margin: 0;">个人备注</h4>
                 </div>
                 {#if personNoteSaved}<span class="lvct-chip lvct-bucket--today">已保存</span>{/if}
             </div>
-            {#if personNoteLoading}
-                <p class="ft__smaller ft__on-surface" role="status">正在读取个人备注…</p>
-            {:else}
-                <textarea
-                    class="b3-text-field lvct-detail__person-note-input"
-                    rows="4"
-                    maxlength="5000"
-                    aria-label="个人备注"
-                    placeholder="例如：偏好安静的环境，下次见面前提醒准备资料"
-                    bind:value={personNoteDraft}
-                    oninput={() => { personNoteDraftRevision += 1; personNoteSaved = false; personNoteError = ""; personNoteErrorKind = ""; }}
-                    disabled={personNoteSaving || personNoteLegacyBusy}
-                ></textarea>
-                <div class="lvct-detail__person-note-actions">
-                    <span class="ft__smaller ft__on-surface">{personNoteDraft.length} / 5000</span>
-                    <button type="button" class="b3-button b3-button--text" disabled={personNoteSaving || personNoteLegacyBusy || Boolean(personNoteLegacySnapshot) || personNoteReloadConfirm || personNoteDraft === personNote} onclick={() => void savePersonNoteState()}>
-                        {personNoteSaving ? "保存中…" : "保存备注"}
-                    </button>
-                    <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving || personNoteLegacyBusy || personNoteReloadConfirm} onclick={requestPersonNoteReload}>重新读取</button>
-                </div>
-            {/if}
-            {#if personNoteReloadConfirm}
-                <div class="lvct-person-fields__confirm" role="group" aria-label="重新读取个人备注前确认草稿">
-                    <p>个人备注有未保存的草稿。重新读取最新备注时如何处理？其他区域的草稿会保留。</p>
-                    <div class="lvct-person-fields__actions">
-                        <button type="button" class="b3-button b3-button--outline" onclick={() => void reloadPersonNote(true)}>保留草稿并读取最新</button>
-                        <button type="button" class="b3-button b3-button--cancel" onclick={() => void reloadPersonNote(false)}>放弃草稿并读取最新</button>
-                        <button type="button" class="b3-button b3-button--text" onclick={() => (personNoteReloadConfirm = false)}>取消</button>
+            {#if !isSectionCollapsed("notes")}
+                <p class="ft__smaller ft__on-surface" style="margin: 4px 0 6px 0;">记录特殊情况、偏好或下次见面要注意的事。写入该人物文档，不计入互动次数。</p>
+                {#if personNoteLoading}
+                    <p class="ft__smaller ft__on-surface" role="status">正在读取个人备注…</p>
+                {:else}
+                    <textarea
+                        class="b3-text-field lvct-detail__person-note-input"
+                        rows="4"
+                        maxlength="5000"
+                        aria-label="个人备注"
+                        placeholder="例如：偏好安静的环境，下次见面前提醒准备资料"
+                        bind:value={personNoteDraft}
+                        oninput={() => { personNoteDraftRevision += 1; personNoteSaved = false; personNoteError = ""; personNoteErrorKind = ""; }}
+                        disabled={personNoteSaving || personNoteLegacyBusy}
+                    ></textarea>
+                    <div class="lvct-detail__person-note-actions">
+                        <span class="ft__smaller ft__on-surface">{personNoteDraft.length} / 5000</span>
+                        <button type="button" class="b3-button b3-button--text" disabled={personNoteSaving || personNoteLegacyBusy || Boolean(personNoteLegacySnapshot) || personNoteReloadConfirm || personNoteDraft === personNote} onclick={() => void savePersonNoteState()}>
+                            {personNoteSaving ? "保存中…" : "保存备注"}
+                        </button>
+                        <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving || personNoteLegacyBusy || personNoteReloadConfirm} onclick={requestPersonNoteReload}>重新读取</button>
                     </div>
-                </div>
-            {/if}
-            {#if personNoteLatestVisible && personNoteDraft !== personNote}
-                <div class="lvct-detail__person-note-latest">
-                    <p class="ft__smaller" role="status">已读取最新备注，当前草稿已保留，尚未合并。请核对下方已存内容；再次保存会用当前草稿替换这些内容。</p>
-                    <strong>最新已存备注</strong>
-                    <pre style="white-space:pre-wrap;overflow-wrap:anywhere;margin:var(--lvct-sp-2) 0" aria-label="最新已存个人备注">{personNote || "（空）"}</pre>
-                </div>
-            {/if}
-            {#if personNoteError}
-                <div class="lvct-form__error" role="alert">个人备注{personNoteErrorKind === "load" ? "读取" : "保存"}失败：{personNoteError}</div>
-                {#if personNoteErrorKind === "save"}
-                    <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving || personNoteLegacyBusy || Boolean(personNoteLegacySnapshot) || personNoteReloadConfirm} onclick={() => void savePersonNoteState()}>重试保存</button>
                 {/if}
-            {/if}
-            {#if onInspectLegacyPersonNote && onDetachLegacyPersonNote && personNoteErrorKind === "load" && !personNoteLegacyDetached}
-                <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving || personNoteLegacyBusy || personNoteReloadConfirm} onclick={() => void inspectPersonNoteLegacy()}>核对旧备注</button>
-            {/if}
-            {#if personNoteLegacyBusy}<p class="ft__smaller ft__on-surface" role="status">正在核对旧备注关联，请稍候…</p>{/if}
-            {#if personNoteLegacySnapshot}
-                <div class="lvct-person-fields__confirm lvct-detail__person-note-legacy" role="group" aria-label="核对旧备注关联">
-                    <p>这里只显示带旧标记的末段，不能代表整份备注。请打开人物文档，核对并复制完整备注。解除关联会保留全部原文，不会自动拼接、删除或覆盖原块。</p>
-                    <strong>带旧标记的末段原文</strong>
-                    <pre style="white-space:pre-wrap;overflow-wrap:anywhere;margin:var(--lvct-sp-2) 0" aria-label="旧备注末段原文">{personNoteLegacySnapshot.content || "（空段落）"}</pre>
-                    <div class="lvct-person-fields__actions">
-                        <button type="button" class="b3-button b3-button--outline" disabled={personNoteLegacyBusy} onclick={() => onOpenPersonDoc(current.docId)}>打开人物文档核对</button>
-                        <button type="button" class="b3-button b3-button--outline" disabled={personNoteLegacyBusy} onclick={() => void detachPersonNoteLegacy()}>保留原文并解除旧备注关联</button>
-                        <button type="button" class="b3-button b3-button--text" disabled={personNoteLegacyBusy} onclick={() => { personNoteLegacySnapshot = null; personNoteLegacyError = ""; }}>取消核对</button>
+                {#if personNoteReloadConfirm}
+                    <div class="lvct-person-fields__confirm" role="group" aria-label="重新读取个人备注前确认草稿">
+                        <p>个人备注有未保存的草稿。重新读取最新备注时如何处理？其他区域的草稿会保留。</p>
+                        <div class="lvct-person-fields__actions">
+                            <button type="button" class="b3-button b3-button--outline" onclick={() => void reloadPersonNote(true)}>保留草稿并读取最新</button>
+                            <button type="button" class="b3-button b3-button--cancel" onclick={() => void reloadPersonNote(false)}>放弃草稿并读取最新</button>
+                            <button type="button" class="b3-button b3-button--text" onclick={() => (personNoteReloadConfirm = false)}>取消</button>
+                        </div>
                     </div>
-                </div>
-            {/if}
-            {#if personNoteLegacyError}<p class="lvct-form__error" role="alert">{personNoteLegacyError}</p>{/if}
-            {#if personNoteLegacyDetached}
-                <p class="ft__smaller lvct-detail__person-note-legacy-detached" role="status">已解除旧备注关联，全部原文仍在人物文档中，当前草稿已保留。请核对并将完整备注粘贴到上方后保存。</p>
+                {/if}
+                {#if personNoteLatestVisible && personNoteDraft !== personNote}
+                    <div class="lvct-detail__person-note-latest">
+                        <p class="ft__smaller" role="status">已读取最新备注，当前草稿已保留，尚未合并。请核对下方已存内容；再次保存会用当前草稿替换这些内容。</p>
+                        <strong>最新已存备注</strong>
+                        <pre style="white-space:pre-wrap;overflow-wrap:anywhere;margin:var(--lvct-sp-2) 0" aria-label="最新已存个人备注">{personNote || "（空）"}</pre>
+                    </div>
+                {/if}
+                {#if personNoteError}
+                    <div class="lvct-form__error" role="alert">个人备注{personNoteErrorKind === "load" ? "读取" : "保存"}失败：{personNoteError}</div>
+                    {#if personNoteErrorKind === "save"}
+                        <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving || personNoteLegacyBusy || Boolean(personNoteLegacySnapshot) || personNoteReloadConfirm} onclick={() => void savePersonNoteState()}>重试保存</button>
+                    {/if}
+                {/if}
+                {#if onInspectLegacyPersonNote && onDetachLegacyPersonNote && personNoteErrorKind === "load" && !personNoteLegacyDetached}
+                    <button type="button" class="b3-button b3-button--outline" disabled={personNoteLoading || personNoteSaving || personNoteLegacyBusy || personNoteReloadConfirm} onclick={() => void inspectPersonNoteLegacy()}>核对旧备注</button>
+                {/if}
+                {#if personNoteLegacyBusy}<p class="ft__smaller ft__on-surface" role="status">正在核对旧备注关联，请稍候…</p>{/if}
+                {#if personNoteLegacySnapshot}
+                    <div class="lvct-person-fields__confirm lvct-detail__person-note-legacy" role="group" aria-label="核对旧备注关联">
+                        <p>这里只显示带旧标记的末段，不能代表整份备注。请打开人物文档，核对并复制完整备注。解除关联会保留全部原文，不会自动拼接、删除或覆盖原块。</p>
+                        <strong>带旧标记的末段原文</strong>
+                        <pre style="white-space:pre-wrap;overflow-wrap:anywhere;margin:var(--lvct-sp-2) 0" aria-label="旧备注末段原文">{personNoteLegacySnapshot.content || "（空段落）"}</pre>
+                        <div class="lvct-person-fields__actions">
+                            <button type="button" class="b3-button b3-button--outline" disabled={personNoteLegacyBusy} onclick={() => onOpenPersonDoc(current.docId)}>打开人物文档核对</button>
+                            <button type="button" class="b3-button b3-button--outline" disabled={personNoteLegacyBusy} onclick={() => void detachPersonNoteLegacy()}>保留原文并解除旧备注关联</button>
+                            <button type="button" class="b3-button b3-button--text" disabled={personNoteLegacyBusy} onclick={() => { personNoteLegacySnapshot = null; personNoteLegacyError = ""; }}>取消核对</button>
+                        </div>
+                    </div>
+                {/if}
+                {#if personNoteLegacyError}<p class="lvct-form__error" role="alert">{personNoteLegacyError}</p>{/if}
+                {#if personNoteLegacyDetached}
+                    <p class="ft__smaller lvct-detail__person-note-legacy-detached" role="status">已解除旧备注关联，全部原文仍在人物文档中，当前草稿已保留。请核对并将完整备注粘贴到上方后保存。</p>
+                {/if}
             {/if}
         </section>
     {/if}
@@ -1587,6 +2515,20 @@ import StatusNotice from "../StatusNotice.svelte";
                 <button class="b3-button b3-button--outline" onclick={() => (templateManagerOpen = true)} disabled={busy}>{text("tplManage", "管理模板")}</button>
             </div>
         {/if}
+        <div class="lvct-detail__record-types" role="radiogroup" aria-label="互动类型" style="display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px 0;">
+            {#each INTERACTION_TYPES as itype}
+                <button
+                    type="button"
+                    class="b3-button b3-button--text"
+                    style="padding: 2px 8px; font-size: 11px; border-radius: 12px; {recordType === itype ? 'background: var(--b3-theme-primary); color: #fff; font-weight: 600;' : 'opacity: 0.8;'}"
+                    aria-checked={recordType === itype}
+                    role="radio"
+                    onclick={() => { recordType = itype; }}
+                >
+                    {INTERACTION_TYPE_LABELS[itype].icon} {INTERACTION_TYPE_LABELS[itype].label}
+                </button>
+            {/each}
+        </div>
         <div class="lvct-detail__record fn__flex">
             <input
                 class="b3-text-field fn__flex-1"
@@ -1890,6 +2832,7 @@ import StatusNotice from "../StatusNotice.svelte";
         {/if}
     </section>
     {/if}
+
     {#if (onLoadExchanges && onCreateExchange && onChangeExchangeStatus) || (onLoadAliases && onAddAlias && onRemoveAlias)}
         <details class="lvct-detail__advanced">
             <summary>
@@ -1924,6 +2867,119 @@ import StatusNotice from "../StatusNotice.svelte";
     <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -- tabpanel semantics are required for the tablist contract. -->
     <section id="lvct-detail-panel-activity" role="tabpanel" aria-labelledby="lvct-detail-tab-activity" tabindex="0">
 
+    {#if cadenceSupported}
+    <section class="lvct-detail__section">
+        <h4>{text("cadenceSectionTitle", "联系节奏")}</h4>
+        {#if cadenceLoadError}
+            <ViewState compact error title={text("cadenceLoadFailTitle", "联系节奏读取失败")} description={cadenceLoadError}>
+                <button type="button" class="b3-button b3-button--outline" onclick={loadCadence}>{text("commonRetry", "重试")}</button>
+            </ViewState>
+        {:else if !cadenceLoaded}
+            <ViewState compact loading title={text("cadenceLoading", "正在读取联系节奏")} />
+        {:else}
+            {#if cadenceError}<div class="lvct-form__error" role="alert">{cadenceError}</div>{/if}
+            <p class="ft__smaller ft__on-surface">
+                {text("cadenceLastLabel", "上次互动：")}{lastContactLabel || text("cadenceNoInteraction", "还没有互动记录")} · {text("cadenceCurrentLabel", "当前：")}
+                {cadenceMode === "paused" ? text("cadencePausedDesc", "已暂停提醒") : cadenceMode === "custom" ? text("cadenceCustomDesc", "自定义 {n} 天", { n: cadenceDays }) : text("cadenceGlobalDesc", "跟随全局阈值")}
+            </p>
+            <div class="lvct-detail__record fn__flex">
+                <select class="b3-select fn__flex-1" aria-label={text("cadenceModeLabel", "联系节奏模式")} bind:value={cadenceMode} disabled={cadenceSaving}>
+                    <option value="global">{text("cadenceOptionGlobal", "跟随全局阈值")}</option>
+                    <option value="custom">{text("cadenceOptionCustom", "自定义天数")}</option>
+                    <option value="paused">{text("cadenceOptionPaused", "暂停提醒")}</option>
+                </select>
+                {#if cadenceMode === "custom"}
+                    <input type="number" class="b3-text-field" min="1" max="365" aria-label="自定义天数" bind:value={cadenceDays} disabled={cadenceSaving} />
+                {/if}
+                <button class="b3-button b3-button--text" onclick={() => void saveCadence()} disabled={cadenceSaving}>
+                    {cadenceSaving ? text("cadenceSaving", "保存中…") : text("cadenceSave", "保存节奏")}
+                </button>
+            </div>
+            <StatusNotice message={cadenceMessage} onDismiss={() => (cadenceMessage = "")} />
+            <p class="ft__smaller ft__on-surface">{text("cadenceNote", "仅影响首页「久未联系」提醒，不写入联系人的数据库字段。")}</p>
+        {/if}
+    </section>
+    {/if}
+
+    {#if followUpSupported}
+    <section class="lvct-detail__section">
+        <h4>{text("fuSectionTitle", "跟进计划")}</h4>
+        {#if followUpActionError}
+            <div class="lvct-form__error" role="alert">{text("fuActionFail", "跟进操作失败：{msg}", { msg: followUpActionError })}</div>
+            {#if followUpFailedRequest}
+                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={retryFailedFollowUp}>
+                    使用原请求重试
+                </button>
+            {/if}
+        {/if}
+        {#if followUpRefreshWarning}
+            <StatusNotice error message={followUpRefreshWarning} actionLabel={text("commonRetry", "重试")} onAction={() => void loadFollowUps()} />
+        {/if}
+        {#if followUpError}
+            <!-- FUNC-01.12：读取失败显式报错并可重试，不与「没有跟进计划」空态同时呈现 -->
+            <ViewState compact error title={text("fuLoadFailTitle", "跟进计划加载失败")} description={followUpError}>
+                <button type="button" class="b3-button b3-button--outline" onclick={loadFollowUps}>{text("commonRetry", "重试")}</button>
+            </ViewState>
+        {:else if followUpsLoading}
+            <ViewState compact loading title={text("fuLoading", "正在加载跟进计划")} />
+        {:else}
+            {#if openFollowUps.length === 0}
+                <p class="ft__smaller ft__on-surface">{text("fuEmpty", "没有进行中的跟进计划。安排一个日期，到时来联系 TA。")}</p>
+            {:else}
+                <div class="lvct-detail__timeline">
+                    {#each openFollowUps as item (item.id)}
+                        <div class="lvct-detail__timeline-row">
+                            <span class="ft__on-surface">{item.dueDate}</span>
+                            <span class="lvct-detail__timeline-note">{item.title || text("fuKeepInTouch", "保持联系")}</span>
+                            {#if item.docMissing}<span class="lvct-chip lvct-bucket--stale">{text("fuDocMissing", "任务块已移除")}</span>{/if}
+                            <span class="lvct-chip {item.dueDate < todayKey ? "lvct-bucket--stale" : ""}">{dueLabel(item.dueDate, todayKey)}</span>
+                        </div>
+                        {#if snoozeForId === item.id}
+                            <div class="lvct-detail__snooze">
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "tomorrow")}>{text("fuSnoozeTomorrow", "明天")}</button>
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "threeDays")}>{text("fuSnoozeThreeDays", "三天后")}</button>
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "nextMonday")}>{text("fuSnoozeNextMonday", "下周一")}</button>
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "nextMonth")}>{text("fuSnoozeNextMonth", "一个月后")}</button>
+                                <span class="lvct-detail__snooze-custom">
+                                    <input type="date" class="b3-text-field" aria-label={text("fuSnoozeDateLabel", "指定日期")} bind:value={snoozeCustomDate} />
+                                    <button type="button" class="b3-button b3-button--text" disabled={followUpBusy || !snoozeCustomDate} onclick={() => snooze(item, "custom")}>{text("fuSnoozeByDate", "按指定日期推迟")}</button>
+                                </span>
+                            </div>
+                        {/if}
+                        <div class="lvct-detail__followup-actions">
+                            <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => { snoozeForId = snoozeForId === item.id ? "" : item.id; snoozeCustomDate = ""; }} aria-expanded={snoozeForId === item.id}>{text("fuPostpone", "推迟")}</button>
+                            <button type="button" class="b3-button b3-button--text" aria-label="完成跟进" title="完成跟进；不会自动记录互动" disabled={followUpBusy} onclick={() => completeFollowUp(item)}>{text("fuComplete", "完成")}</button>
+                            <button type="button" class="b3-button b3-button--cancel" disabled={followUpBusy} onclick={() => cancelFollowUp(item)}>{text("fuCancelPlan", "取消计划")}</button>
+                        </div>
+                    {/each}
+                </div>
+            {/if}
+            {#if closedFollowUps.length > 0}
+                <p class="ft__smaller ft__on-surface">{text("fuRecentlyClosed", "最近关闭：")}{closedFollowUps.slice(0, 3).map((item) => `${item.title || text("fuKeepInTouch", "保持联系")}（${item.status === "done" ? "已完成" : "已取消"}）`).join("、")}</p>
+            {/if}
+            <div class="lvct-detail__record fn__flex">
+                <input
+                    class="b3-text-field fn__flex-1"
+                    type="text"
+                    placeholder={text("fuTitlePlaceholder", "这次想联系什么？（可选，如：问问面试结果）")}
+                    aria-label={text("fuTitleLabel", "跟进标题")}
+                    bind:value={followUpTitle}
+                    oninput={clearFailedFollowUpRequest}
+                    disabled={followUpBusy}
+                />
+                <input type="date" class="b3-text-field" aria-label={text("fuDateLabel", "计划日期")} bind:value={followUpDate} onchange={clearFailedFollowUpRequest} disabled={followUpBusy} />
+                <button class="b3-button b3-button--text" disabled={followUpBusy} onclick={createFollowUp}>
+                    {followUpBusy ? text("fuAdding", "添加中…") : followUpRecorded ? text("fuAddAnother", "再加一条") : text("fuAddPlan", "添加计划")}
+                </button>
+            </div>
+            {#if followUpFailedRequest && followUpFailedRequest.title === followUpTitle.trim() && followUpFailedRequest.dueDate === followUpDate}
+                <StatusNotice error message="该跟进请求尚未完全核实。使用原请求重试会先核对已有记录，避免重复创建。" actionLabel="用原请求重试" onAction={retryFailedFollowUp} actionDisabled={followUpBusy} />
+            {/if}
+            <p class="ft__smaller ft__on-surface">到期的计划会出现在首页待办；完成计划不会自动记为互动。需要更新最近联系日期时，请在下方“记一笔互动”中单独记录。</p>
+        {/if}
+    </section>
+    {/if}
+
     <section class="lvct-detail__section">
         <h4>互动与共同出席{insights ? `（共 ${insights.totalEvents} 条）` : ""}</h4>
         {#if historyToday.length > 0}
@@ -1952,9 +3008,31 @@ import StatusNotice from "../StatusNotice.svelte";
             <input type="date" class="b3-text-field" aria-label="互动结束日期" bind:value={activityTo} onchange={() => (activityLimit = 20)} />
             <button type="button" class="b3-button b3-button--outline" onclick={() => setQuickRange(30)}>最近 30 天</button>
             <button type="button" class="b3-button b3-button--outline" onclick={() => setQuickRange(90)}>最近 90 天</button>
-            {#if activityFrom || activityTo}
-                <button type="button" class="b3-button b3-button--text" onclick={clearDateRange}>清除日期</button>
+            {#if activityFrom || activityTo || activityType !== "all"}
+                <button type="button" class="b3-button b3-button--text" onclick={clearDateRange}>清除筛选</button>
             {/if}
+        </div>
+        <div class="lvct-detail__type-filters" role="tablist" aria-label="按互动类型筛选" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
+            <button
+                type="button"
+                role="tab"
+                class="b3-button b3-button--text"
+                style="padding: 2px 8px; font-size: 11px; border-radius: 12px; {activityType === 'all' ? 'background: var(--b3-theme-primary); color: #fff; font-weight: 600;' : 'opacity: 0.8;'}"
+                aria-selected={activityType === "all"}
+                onclick={() => { activityType = "all"; activityLimit = 20; }}
+            >全部</button>
+            {#each INTERACTION_TYPES as itype}
+                <button
+                    type="button"
+                    role="tab"
+                    class="b3-button b3-button--text"
+                    style="padding: 2px 8px; font-size: 11px; border-radius: 12px; {activityType === itype ? 'background: var(--b3-theme-primary); color: #fff; font-weight: 600;' : 'opacity: 0.8;'}"
+                    aria-selected={activityType === itype}
+                    onclick={() => { activityType = itype; activityLimit = 20; }}
+                >
+                    {INTERACTION_TYPE_LABELS[itype].icon} {INTERACTION_TYPE_LABELS[itype].label}
+                </button>
+            {/each}
         </div>
         {#if insights && insights.coAttendance.length > 0}
             <div class="lvct-strip__chips" style="margin-bottom: 6px;">
@@ -1976,7 +3054,12 @@ import StatusNotice from "../StatusNotice.svelte";
                     {#each group.items as item (item.eventId)}
                         <div class="lvct-detail__timeline-row">
                             <span class="ft__on-surface">{item.localDate}</span>
-                            <span class="lvct-detail__timeline-note">{item.note || "互动"}</span>
+                            <span class="lvct-detail__timeline-note">
+                                <span class="lvct-chip" style="margin-right: 4px; padding: 1px 6px; font-size: 11px;">
+                                    {INTERACTION_TYPE_LABELS[item.type]?.icon ?? "📝"} {INTERACTION_TYPE_LABELS[item.type]?.label ?? "其他"}
+                                </span>
+                                {item.note || "互动"}
+                            </span>
                             <span class="lvct-detail__timeline-source">{sourceLabels[item.source]}</span>
                             {#if item.groupSize > 1}<span class="lvct-chip">{item.groupSize} 人同场</span>{/if}
                             {#if onDeleteInteraction}
@@ -2074,6 +3157,9 @@ import StatusNotice from "../StatusNotice.svelte";
 
     <div class="lvct-form__actions">
         <button class="b3-button b3-button--cancel" onclick={() => void (async () => { if (await canLeave.requestClose()) onClose(); })()} disabled={busy || deleting}>{closeLabel ?? text("closeDialog", "关闭")}</button>
+        {#if onOpenGraphPerson}
+            <button class="b3-button b3-button--outline" onclick={() => void (async () => { if (await canLeave.requestClose()) { onClose(); onOpenGraphPerson?.(current.docId); } })()}><Network size={14}/>{text("detailOpenGraph", "图谱聚焦")}</button>
+        {/if}
         <button class="b3-button b3-button--text" onclick={() => onOpenPersonDoc(current.docId)}>{text("detailOpenDoc", "打开文档")}</button>
         <button class="b3-button b3-button--cancel lvct-detail__delete" onclick={confirmDelete} disabled={busy || deleting}>{deleting ? text("detailRemoving", "移除中…") : text("detailRemove", "从人脉移除")}</button>
     </div>
@@ -2121,6 +3207,13 @@ import StatusNotice from "../StatusNotice.svelte";
             <pre class="lvct-briefing-preview">{briefingPreview}</pre>
             <div class="lvct-form__actions">
                 <button class="b3-button b3-button--cancel" onclick={() => (briefingExportOpen = false)}>关闭</button>
+                <button class="b3-button b3-button--primary" onclick={copyBriefing}>
+                    {#if briefingCopied}
+                        <Check size={14} /> 已复制简报全文 ✓
+                    {:else}
+                        <Copy size={14} /> 复制简报全文
+                    {/if}
+                </button>
                 <button class="b3-button b3-button--text" onclick={downloadBriefing}>下载 .md</button>
             </div>
             <p class="ft__smaller ft__on-surface">预览与下载内容一致；仅含本地记录的事实，交往次数不代表关系亲疏。</p>

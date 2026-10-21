@@ -23,6 +23,37 @@ export interface BriefingFollowUp {
     dueDate: string;
 }
 
+export interface BriefingAnniversary {
+    title: string;
+    category?: string;
+    date: string;
+    isLunar?: boolean;
+    daysUntil?: number;
+    yearsCount?: number;
+    displayDate?: string;
+}
+
+export interface BriefingExchange {
+    kind: string;
+    direction: string;
+    description: string;
+    amount?: number;
+    currency?: string;
+    occurredOn: string;
+    status: string;
+}
+
+export interface BriefingCommonOrgPeer {
+    name: string;
+    samePeriod?: boolean;
+    overlapText?: string;
+}
+
+export interface BriefingCommonOrg {
+    orgName: string;
+    peers?: readonly (string | BriefingCommonOrgPeer)[];
+}
+
 export interface BriefingExportInput {
     person: ContactSummary;
     timeline: readonly BriefingTimelineEntry[];
@@ -35,6 +66,14 @@ export interface BriefingExportInput {
     generatedAt: string;
     /** E-32：会面谈资与备忘列表（置顶于简报中） */
     topics?: readonly string[];
+    /** E-36：重要日期与周年纪念日列表 */
+    anniversaries?: readonly BriefingAnniversary[];
+    /** 人情往来与账目记录 */
+    exchanges?: readonly BriefingExchange[];
+    /** 共同组织背景（同单位/同学校同窗） */
+    commonOrgs?: readonly BriefingCommonOrg[];
+    /** 可选排除的章节 ID 集合 */
+    excludedSections?: readonly string[];
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -46,7 +85,21 @@ const SOURCE_LABELS: Record<string, string> = {
 /** Markdown 行内转义：防止用户文本（姓名/备注）破坏文档结构 */
 
 export function buildBriefingMarkdown(input: BriefingExportInput): string {
-    const { person, timeline, followUps, relatedNames, coAttendance, limit, generatedAt, topics } = input;
+    const {
+        person,
+        timeline,
+        followUps,
+        relatedNames,
+        coAttendance,
+        limit,
+        generatedAt,
+        topics,
+        anniversaries,
+        exchanges,
+        commonOrgs,
+        excludedSections = [],
+    } = input;
+    const isExcluded = (sectionId: string) => excludedSections.includes(sectionId);
     const lines: string[] = [];
     lines.push(`# 会面简报：${escapeMarkdown(person.name)}`);
     lines.push("");
@@ -54,7 +107,7 @@ export function buildBriefingMarkdown(input: BriefingExportInput): string {
 
     // E-32 会面谈资与备忘：会前置顶提醒
     const validTopics = (topics ?? []).filter((topic) => Boolean(topic && topic.trim()));
-    if (validTopics.length > 0) {
+    if (!isExcluded("topics") && validTopics.length > 0) {
         lines.push("");
         lines.push(`## 会面谈资与备忘（${validTopics.length} 条）`);
         for (const topic of validTopics) {
@@ -63,27 +116,46 @@ export function buildBriefingMarkdown(input: BriefingExportInput): string {
     }
 
     // 基本资料
-    const profile: string[] = [];
-    if (person.group) profile.push(`- 分组：${escapeMarkdown(person.group)}`);
-    if (person.phone) profile.push(`- 电话：${escapeMarkdown(person.phone)}`);
-    if (person.email) profile.push(`- 邮箱：${escapeMarkdown(person.email)}`);
-    if (person.wechat) profile.push(`- 微信：${escapeMarkdown(person.wechat)}`);
-    if (person.tags.length > 0) profile.push(`- 标签：${person.tags.map(escapeMarkdown).join("、")}`);
-    if (person.profile) {
-        profile.push(`- 工作单位：${escapeMarkdown(profileText(person.profile, "work"))}`);
-        profile.push(`- 学校：${escapeMarkdown(profileText(person.profile, "education"))}`);
-        profile.push(`- 与我的关系：${escapeMarkdown(profileText(person.profile, "relationship"))}`);
-        profile.push("- 来源：组织成员分类与当前本人参照下的人工称谓；历史任职另见组织归属");
+    if (!isExcluded("profile")) {
+        const profile: string[] = [];
+        if (person.group) profile.push(`- 分组：${escapeMarkdown(person.group)}`);
+        if (person.phone) profile.push(`- 电话：${escapeMarkdown(person.phone)}`);
+        if (person.email) profile.push(`- 邮箱：${escapeMarkdown(person.email)}`);
+        if (person.wechat) profile.push(`- 微信：${escapeMarkdown(person.wechat)}`);
+        if (person.tags.length > 0) profile.push(`- 标签：${person.tags.map(escapeMarkdown).join("、")}`);
+        if (person.profile) {
+            profile.push(`- 工作单位：${escapeMarkdown(profileText(person.profile, "work"))}`);
+            profile.push(`- 学校：${escapeMarkdown(profileText(person.profile, "education"))}`);
+            profile.push(`- 与我的关系：${escapeMarkdown(profileText(person.profile, "relationship"))}`);
+            profile.push("- 来源：组织成员分类与当前本人参照下的人工称谓；历史任职另见组织归属");
+        }
+        if (profile.length > 0) {
+            lines.push("");
+            lines.push("## 基本资料");
+            lines.push(...profile);
+        }
     }
-    if (profile.length > 0) {
+
+    // 共同组织背景
+    const validCommonOrgs = (commonOrgs ?? []).filter((org) => Boolean(org.orgName?.trim()));
+    if (!isExcluded("commonOrgs") && validCommonOrgs.length > 0) {
         lines.push("");
-        lines.push("## 基本资料");
-        lines.push(...profile);
+        lines.push(`## 共同组织背景（${validCommonOrgs.length} 个组织）`);
+        for (const org of validCommonOrgs) {
+            const peerLabels = (org.peers ?? []).map((p) => {
+                if (typeof p === "string") return p;
+                const periodTag = p.samePeriod ? "（同期经历）" : "";
+                const overlap = p.overlapText && p.overlapText !== "—" ? ` [${p.overlapText}]` : "";
+                return `${p.name}${periodTag}${overlap}`;
+            });
+            const peerStr = peerLabels.length > 0 ? ` · 同伴: ${peerLabels.join("、")}` : "";
+            lines.push(`- 🏢 **${escapeMarkdown(org.orgName)}**${peerStr}`);
+        }
     }
 
     // 上次互动与最近互动（范围由 limit 决定）
     const listed = timeline.slice(0, limit > 0 ? limit : timeline.length);
-    if (listed.length > 0) {
+    if (!isExcluded("timeline") && listed.length > 0) {
         lines.push("");
         lines.push(`## 最近互动（${listed.length} 条${limit > 0 && timeline.length > listed.length ? `，共 ${timeline.length} 条` : ""}）`);
         for (const item of listed) {
@@ -95,7 +167,7 @@ export function buildBriefingMarkdown(input: BriefingExportInput): string {
     }
 
     // 未完成跟进
-    if (followUps.length > 0) {
+    if (!isExcluded("followUps") && followUps.length > 0) {
         lines.push("");
         lines.push(`## 未完成跟进（${followUps.length} 条）`);
         for (const item of followUps) {
@@ -103,29 +175,57 @@ export function buildBriefingMarkdown(input: BriefingExportInput): string {
         }
     }
 
-    // 重要日期
-    const birthday = nextBirthday(person.birthday, person.isLunar);
-    if (birthday) {
-        const lunar = person.isLunar ? " · 农历" : "";
+    // 重要日期与周年纪念日
+    if (!isExcluded("anniversaries")) {
+        const birthday = nextBirthday(person.birthday, person.isLunar);
+        const validAnnivs = (anniversaries ?? []).filter((a) => Boolean(a.title?.trim()));
+        if (birthday || validAnnivs.length > 0) {
+            lines.push("");
+            lines.push("## 重要日期与纪念日");
+            if (birthday) {
+                const lunar = person.isLunar ? " · 农历" : "";
+                lines.push(`- 🎂 生日：${formatBirthdayDisplay(person.birthday, person.isLunar)}${lunar}；下次为 ${birthday.date.toLocaleDateString("zh-CN")}（${birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}）`);
+            }
+            for (const a of validAnnivs) {
+                const lunarTag = a.isLunar ? "（农历）" : "";
+                const daysTag = a.daysUntil !== undefined ? (a.daysUntil === 0 ? " · 今天" : ` · ${a.daysUntil} 天后`) : "";
+                const yearsTag = a.yearsCount !== undefined ? `（第 ${a.yearsCount} 周年）` : "";
+                lines.push(`- 🌟 ${escapeMarkdown(a.title)}：${a.date}${lunarTag}${yearsTag}${daysTag}`);
+            }
+        }
+    }
+
+    // 人情往来账本备忘
+    const validExchanges = (exchanges ?? []).filter((ex) => Boolean(ex.description?.trim()));
+    if (!isExcluded("exchanges") && validExchanges.length > 0) {
         lines.push("");
-        lines.push("## 重要日期");
-        lines.push(`- 生日：${formatBirthdayDisplay(person.birthday, person.isLunar)}${lunar}；下次为 ${birthday.date.toLocaleDateString("zh-CN")}（${birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}）`);
+        lines.push(`## 人情往来备忘（${validExchanges.length} 笔）`);
+        for (const ex of validExchanges) {
+            const dirLabel = ex.direction === "receivable" ? "对方欠我" : "我欠对方";
+            const amtStr = ex.amount !== undefined ? ` ¥${ex.amount} ${ex.currency || "CNY"}` : "";
+            const statusLabel = ex.status === "settled" ? "已结清" : ex.status === "cancelled" ? "已作废" : "待处理";
+            lines.push(`- ${ex.occurredOn} · [${dirLabel}] ${escapeMarkdown(ex.description)}${amtStr}（${statusLabel}）`);
+        }
     }
 
     // 相关人物
-    const names = relatedNames.filter(Boolean);
-    if (names.length > 0) {
-        lines.push("");
-        lines.push("## 相关人物");
-        for (const name of names) lines.push(`- ${escapeMarkdown(name)}`);
+    if (!isExcluded("related")) {
+        const names = relatedNames.filter(Boolean);
+        if (names.length > 0) {
+            lines.push("");
+            lines.push("## 相关人物");
+            for (const name of names) lines.push(`- ${escapeMarkdown(name)}`);
+        }
     }
 
     // 共同出席
-    const attendance = coAttendance.filter((item) => item.name);
-    if (attendance.length > 0) {
-        lines.push("");
-        lines.push("## 共同出席");
-        for (const item of attendance) lines.push(`- 与 ${escapeMarkdown(item.name)} 同场 ${item.count} 次`);
+    if (!isExcluded("coAttendance")) {
+        const attendance = coAttendance.filter((item) => item.name);
+        if (attendance.length > 0) {
+            lines.push("");
+            lines.push("## 共同出席");
+            for (const item of attendance) lines.push(`- 与 ${escapeMarkdown(item.name)} 同场 ${item.count} 次`);
+        }
     }
 
     lines.push("");

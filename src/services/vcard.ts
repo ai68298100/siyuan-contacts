@@ -6,7 +6,7 @@
 import { parseVcfForImport, serializeVcf } from "../domain/vcard.ts";
 import type { VCardContact, VcfDocumentCheckpoint } from "../domain/vcard.ts";
 import { emptyDraft, validateDraft } from "../domain/person";
-import type { ContactDraft } from "../domain/person";
+import type { ContactDraft, ContactSummary } from "../domain/person";
 import type { WritableContactField } from "../domain/contact-write.ts";
 import { buildContactWritePlan } from "../domain/contact-write.ts";
 import type { ContactsSettings } from "../domain/model";
@@ -14,6 +14,7 @@ import { VCARD_REQUEST_ATTR } from "../api/blocks";
 import { ensurePersonRequestDocument, PersonCreationUnknownError } from "./person-document";
 import { ATTRIBUTE_VIEW_BATCH_SIZE, bindDocsAsRows, mapBoundDocIds } from "../api/av";
 import { getRoster, invalidateRoster } from "./roster";
+import { profileText } from "../domain/people-profiles";
 import { assertContactWriteReady, previewContactCreation } from "./contacts";
 import { withStoreLock } from "../data/storage";
 import { draftImportMappings, importAnchor } from "../domain/import.ts";
@@ -75,7 +76,17 @@ export interface VcfImportReport {
 
 /** 解析 vCard 文本并对名册查重，产出可预览勾选的导入计划 */
 export async function buildVcfImportPlan(settings: ContactsSettings, text: string): Promise<VcfImportPlan[]> {
-    const parsed = parseVcfForImport(text);
+    let parsed: VCardContact[];
+    try {
+        parsed = parseVcfForImport(text);
+    } catch (error) {
+        // Issue #35 攻坚：若由于全文件缺少标准 FN/N 姓名导致严格导入失败，尝试以电话/邮箱智能暂代挽救
+        try {
+            parsed = parseVcfForImport(text, { fallbackToPhoneOrEmail: true });
+        } catch {
+            throw error;
+        }
+    }
     invalidateRoster();
     const roster = await getRoster(settings);
     const existingNames = new Set(roster.map((person) => person.name));
@@ -330,20 +341,56 @@ async function retryVcfContactsLocked(
     return results;
 }
 
+export interface VcfExportOptions {
+    itemIds?: readonly string[];
+    explicitPeople?: readonly ContactSummary[];
+}
+
+function isVcfExportOptions(value: unknown): value is VcfExportOptions {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 /** 名册 → vCard 3.0 文本（微信号无标准 vCard 属性，不导出） */
-export async function exportVcfText(settings: ContactsSettings, selectedItemIds?: readonly string[]): Promise<string> {
-    const people = await getRoster(settings);
-    const selected = selectedItemIds ? new Set(selectedItemIds) : null;
-    const exportPeople = selected ? people.filter((person) => selected.has(person.itemId)) : people;
-    const contacts: VCardContact[] = exportPeople.map((person) => ({
-        name: person.name,
-        phone: person.phone,
-        email: person.email,
-        website: person.website,
-        birthday: person.birthday,
-        isLunar: person.isLunar,
-        tags: person.tags,
-    }));
+export async function exportVcfText(
+    settings: ContactsSettings,
+    selectedItemIdsOrOptions?: readonly string[] | VcfExportOptions,
+): Promise<string> {
+    let exportPeople: ContactSummary[];
+    if (isVcfExportOptions(selectedItemIdsOrOptions)) {
+        if (selectedItemIdsOrOptions.explicitPeople) {
+            exportPeople = [...selectedItemIdsOrOptions.explicitPeople];
+        } else if (selectedItemIdsOrOptions.itemIds) {
+            const people = await getRoster(settings);
+            const selected = new Set(selectedItemIdsOrOptions.itemIds);
+            exportPeople = people.filter((person) => selected.has(person.itemId));
+        } else {
+            exportPeople = await getRoster(settings);
+        }
+    } else if (Array.isArray(selectedItemIdsOrOptions)) {
+        const people = await getRoster(settings);
+        const selected = new Set(selectedItemIdsOrOptions);
+        exportPeople = people.filter((person) => selected.has(person.itemId));
+    } else {
+        exportPeople = await getRoster(settings);
+    }
+    const contacts: VCardContact[] = exportPeople.map((person) => {
+        const contact: VCardContact = {
+            name: person.name,
+            phone: person.phone,
+            email: person.email,
+            website: person.website,
+            birthday: person.birthday,
+            isLunar: person.isLunar,
+            tags: person.tags,
+        };
+        if (person.profile) {
+            const work = profileText(person.profile, "work");
+            if (work && work !== "未填写" && work !== "尚未核实" && work !== "组织归属尚未核实") {
+                contact.org = work;
+            }
+        }
+        return contact;
+    });
     return serializeVcf(contacts);
 }
 

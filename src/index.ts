@@ -88,6 +88,12 @@ import type { NoteTemplate } from "./domain/interaction-templates";
 import { loadPersonTopics, addPersonTopic, removePersonTopic } from "./data/topics";
 import { listPersonExchanges, createPersonExchange, updatePersonExchange, changePersonExchangeStatus } from "./services/exchanges";
 import { listPersonAliases, addPersonAlias, removePersonAlias, resolveAlias } from "./services/person-aliases";
+import { listTrash, restoreContactFromTrash, removeContactToTrash, emptyTrash } from "./services/trash";
+import { executeContactMerge } from "./services/duplicate-merge";
+import { loadPersonGiftIdeas, addPersonGiftIdea, updatePersonGiftIdea, removePersonGiftIdea } from "./data/gift-ideas";
+import { listOccasions, createOccasion, deleteOccasion } from "./services/occasions";
+import { loadPersonAnniversaries, addPersonAnniversary, updatePersonAnniversary, removePersonAnniversary, listUpcomingAnniversaries } from "./data/anniversaries.ts";
+import { loadPersonProjects, addPersonProject, updatePersonProject, removePersonProject, findCollaboratorsByProject } from "./data/projects.ts";
 import { buildReview } from "./services/review-report";
 import { importInteractionJson, previewInteractionImport } from "./services/interaction-import";
 import { previewInteractionImportDiff } from "./services/interaction-import";
@@ -888,8 +894,8 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         return loadDashboard(this, this.settings, { ...DEFAULT_DASHBOARD_OPTIONS, ...options });
     }
 
-    async recordInteraction(personDocId: string, note?: string): Promise<void> {
-        await recordInteraction(this, { personDocId, note });
+    async recordInteraction(personDocId: string, note?: string, type?: import("./domain/interactions").InteractionType): Promise<void> {
+        await recordInteraction(this, { personDocId, note, type });
     }
 
     async deleteInteraction(personDocId: string, eventId: string): Promise<void> {
@@ -1237,6 +1243,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         return latest;
     }
 
+    async loadInteractionEvents() {
+        const store = await loadInteractionStoreStrict(this);
+        return store.events;
+    }
+
     async checkSettingsHealth() {
         if (!this.settings) throw new Error("人脉工作空间尚未初始化");
         return checkSettingsHealth(this.settings);
@@ -1428,6 +1439,136 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const result = await removePersonTopic(this, personDocId, topicId);
         emitDataChanged({ topics: ["people"] }, token);
         return result;
+    }
+
+    async removeContactToTrash(person: ContactSummary) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        const token = this.lifecycleToken;
+        await removeContactToTrash(this, this.settings, person);
+        emitDataChanged({ topics: ["people"] }, token);
+    }
+
+    async listTrash() {
+        return listTrash(this);
+    }
+
+    async restoreContactFromTrash(entryId: string) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        const token = this.lifecycleToken;
+        const result = await restoreContactFromTrash(this, this.settings, entryId);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async emptyTrash() {
+        const token = this.lifecycleToken;
+        await emptyTrash(this);
+        emitDataChanged({ topics: ["people"] }, token);
+    }
+
+    async executeContactMerge(plan: import("./domain/duplicate-merge").ContactMergePlan) {
+        if (!this.settings) throw new Error("人脉工作空间尚未初始化");
+        return executeContactMerge(this, this.settings, plan);
+    }
+
+    async loadPersonGiftIdeas(personDocId: string) {
+        return loadPersonGiftIdeas(this, personDocId);
+    }
+
+    async addPersonGiftIdea(item: import("./domain/gift-ideas").GiftIdeaItem) {
+        const token = this.lifecycleToken;
+        const result = await addPersonGiftIdea(this, item);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async updatePersonGiftIdea(personDocId: string, ideaId: string, patch: Partial<import("./domain/gift-ideas").GiftIdeaItem>) {
+        const token = this.lifecycleToken;
+        const result = await updatePersonGiftIdea(this, personDocId, ideaId, patch);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async removePersonGiftIdea(personDocId: string, ideaId: string) {
+        const token = this.lifecycleToken;
+        const result = await removePersonGiftIdea(this, personDocId, ideaId);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async listOccasions() {
+        return listOccasions(this);
+    }
+
+    async createOccasion(input: import("./services/occasions").CreateOccasionInput) {
+        const token = this.lifecycleToken;
+        const result = await createOccasion(this, input);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async deleteOccasion(occasionId: string) {
+        const token = this.lifecycleToken;
+        await deleteOccasion(this, occasionId);
+        emitDataChanged({ topics: ["people"] }, token);
+    }
+
+    async loadPersonAnniversaries(personDocId: string) {
+        return loadPersonAnniversaries(this, personDocId);
+    }
+
+    async addPersonAnniversary(item: import("./domain/anniversaries").AnniversaryItem) {
+        const token = this.lifecycleToken;
+        const result = await addPersonAnniversary(this, item);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async updatePersonAnniversary(personDocId: string, annivId: string, patch: Partial<import("./domain/anniversaries").AnniversaryItem>) {
+        const token = this.lifecycleToken;
+        const result = await updatePersonAnniversary(this, personDocId, annivId, patch);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async removePersonAnniversary(personDocId: string, annivId: string) {
+        const token = this.lifecycleToken;
+        const result = await removePersonAnniversary(this, personDocId, annivId);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async listUpcomingAnniversaries(windowDays?: number) {
+        return listUpcomingAnniversaries(this, windowDays);
+    }
+
+    async loadPersonProjects(personDocId: string) {
+        return loadPersonProjects(this, personDocId);
+    }
+
+    async addPersonProject(item: import("./domain/projects").PersonProjectItem) {
+        const token = this.lifecycleToken;
+        const result = await addPersonProject(this, item);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async updatePersonProject(personDocId: string, projectId: string, patch: Partial<import("./domain/projects").PersonProjectItem>) {
+        const token = this.lifecycleToken;
+        const result = await updatePersonProject(this, personDocId, projectId, patch);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async removePersonProject(personDocId: string, projectId: string) {
+        const token = this.lifecycleToken;
+        const result = await removePersonProject(this, personDocId, projectId);
+        emitDataChanged({ topics: ["people"] }, token);
+        return result;
+    }
+
+    async findCollaboratorsByProject(matcher: { title?: string; docId?: string }) {
+        return findCollaboratorsByProject(this, matcher);
     }
 
     async buildReviewReport(from: string, to: string) {

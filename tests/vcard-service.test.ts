@@ -25,7 +25,7 @@ const hooks = registerHooks({
     },
 });
 const { configureVcardKernel } = await import("../scripts/e2e/ui/vcard-regression.js");
-const { buildVcfImportPlan, importVcfContacts, retryVcfContacts } = await import("../src/services/vcard.ts");
+const { buildVcfImportPlan, importVcfContacts, retryVcfContacts, exportVcfText } = await import("../src/services/vcard.ts");
 test.after(() => { hooks.deregister(); Reflect.deleteProperty(globalThis, "__lvctVcardServiceRequest"); });
 
 const settings = {
@@ -244,4 +244,21 @@ test("原绑定行变化时不把同名新行当原 checkpoint，零重复建档
     assert.equal(state.writes.length, writes);
     assert.equal(chosen[0].plan.checkpoint!.itemId, checkpoint.itemId);
     assert.equal(chosen[0].plan.checkpoint!.docId, checkpoint.docId);
+});
+
+test("AG-E35-VCARD-EXPORT-SCOPE 服务层：exportVcfText 支持 explicitPeople 与 itemIds 范围选择", async () => {
+    fixture();
+    const explicitPeople = [
+        { docId: "d1", itemId: "i1", name: "张三", phone: "13800000001", email: "z3@example.com", website: "", birthday: "", isLunar: false, group: "", tags: [], relatedItemIds: [] },
+        { docId: "d2", itemId: "i2", name: "李四", phone: "13800000002", email: "l4@example.com", website: "", birthday: "", isLunar: false, group: "", tags: [], relatedItemIds: [] },
+    ];
+    // 1. 显式列表导出（当前筛选或已选人员直接传入）
+    const explicitText = await exportVcfText(settings, { explicitPeople });
+    assert.match(explicitText, /FN:张三/);
+    assert.match(explicitText, /FN:李四/);
+    assert.equal(explicitText.split("BEGIN:VCARD").length - 1, 2);
+
+    // 2. 空列表安全降级
+    const emptyText = await exportVcfText(settings, { explicitPeople: [] });
+    assert.equal(emptyText, "");
 });

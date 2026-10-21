@@ -180,8 +180,12 @@ vCard 同名项默认跳过，但允许逐项人工确认“作为独立人物�
 | `reminder-dismissals.json` | 1 | 提醒暂缓（B08）：`{schemaVersion, dismissals: [{personDocId, kind, until}]}`。`kind ∈ birthday\|stale`；`until` 为 `YYYY-MM-DD` 或空串（空串=长期，直到手动恢复）。**只屏蔽提醒呈现，不改变统计与名单口径**——生日 `until` ≥ 当天（含空串）时该人生日不出现在近期生日/行动清单（「跳过本年」写入当年 `12-31`，跨年自动恢复）；stale 命中时该人的久未联系/从未互动**提醒行**隐藏，首页久未联系统计卡与名单计数保持真实。键必须通过人物文档 ID 校验，非法条目归一化丢弃；同一 `personDocId+kind` 仅一条（重复写入覆盖）。写入在存储锁内严格读取，损坏或未知版本拒绝写入不覆盖；恢复即删除对应条目；设置页「提醒」分区提供已暂缓列表与一键恢复 |
 | `organization-profiles.json` | 1 | 组织资料：`{schemaVersion: 1, profiles: {"<orgDocId>": {name, shortName, qccUrl, logoUrl, logoDataUrl, description, departments: [{id, name, parentId, description}], customFields: [{id, label, value}]}}}`。组织文档 ID 必须合法；名称必填且需与组织文档标题一致；企查查链接限定 `qcc.com` 的 http(s) 地址，Logo 支持 http(s) 外链或受限图片 data URL；部门层级拒绝悬空引用和循环；自定义字段 ID 在组织内唯一。读取和写入均严格校验，写入使用存储锁并写后回读，损坏不按空资料处理。该资料是组织文档与成员事实的补充，不替代 `custom-lvct-org` 标记或 `org-membership.json`。 |
 | `self-identity.json` | 1 | 本人身份标记（B11）：`{schemaVersion, selfDocId, selfItemId, createdAt}`——**本人身份的唯一事实源**（按稳定文档 ID 识别，不经设置锚点，重绑设置不改身份）。初始化向导在数据库确认后默认建立「我自己」人物文档并写入标记（幂等续建：标记已存在即跳过并核验名册仍含；残留未绑定同名文档按 FUNC-01.15 断点语义复用；同名已绑定联系人复用该行不改资料）。读取为严格展示读（FUNC-01.12：失败显式降级不按无本人处理）。**使用规则（B11.4）**：本人在名册保留并标识；首页统计（联系人数量/生日/久未联系/从未互动）与行动清单、普通联系人资料体检默认**排除本人**（本人不是"待联系对象"）。改动本人身份（换绑/清除）属 B11.5 修复流程，需显式操作并预览影响，不静默改绑——`saveSelfIdentity` 对已有**不同** selfDocId 的覆写直接拒绝 |
+| `person-topics.json` | 1 | 会面谈资与备忘（E-32）：`{schemaVersion: 1, topics: {"<personDocId>": [{id, text, createdAt}]}}`。记录下次与联系人见面时想聊的话题、承诺的事情或兴趣关注；单人最多 15 条，单条 1–140 字符；`personDocId` 必须满足 `^\d{14}-[0-9a-z]{7}$`。严格读取 + Web Lock 临界区 + 写后回读校验；坏版本或损坏条目抛出 `StoreIntegrityError` 拒绝写入并保护原库；缺键或空串作为合法空态处理；简报导出时按人提取并置顶输出。 |
+| `trash-bin.json` | 1 | 联系人软删除回收站（E-33）：`{schemaVersion: 1, entries: [{id, docId, itemId, name, snapshot, removedAt, expiresAt}]}`。联系人从名册移除时保留完整元数据快照 30 天，支持一键撤销与无损恢复；最多保留 200 条，过期自动清理；严格读取 + Web Lock + 写后回读校验；坏数据抛出 `StoreIntegrityError` 保护原库。属于本工作区安全缓冲区，不跨工作区迁移。 |
+| `gift-ideas.json` | 1 | 礼物点子与喜好偏好（E-26）：`{schemaVersion: 1, ideas: {"<personDocId>": [{id, type, status, title, priceEstimate?, url?, note?, targetOccasion?, createdAt, updatedAt}]}}`。记录联系人的喜好偏好与送礼点子（构思中/已采购/已送出）；单人最多 30 条；未送出点子不计入往来账本财务统计；送出后可一键转换为正式往来账本记录；严格读 + Web Lock + 写后回读校验；坏数据抛出 `StoreIntegrityError` 保护原库。 |
+| `occasions.json` | 1 | 群体活动与场合实体（E-30）：`{schemaVersion: 1, occasions: [{id, title, type, date, endDate?, place?, sourceDocId?, attendees: [{personDocId, name, role?}], exchangeIds?, note?, createdAt, updatedAt}]}`。记录多参与者群体活动（会议、聚餐、婚礼、聚会等），一次性关联参与者名单、往来账本与笔记双链；自动派生各参与者的时间线互动事件；全库最多保留 500 条；严格读 + Web Lock + 写后回读校验；坏数据抛出 `StoreIntegrityError` 保护原库。 |
 | 人物独立备注 | 原生人物文档标记块 `custom-lvct-person-note="1"` | 每个人物文档最多一个备注标记块；备注为独立自由文本，不属于 AV 字段、互动事件或 `follow-ups.json`，不计入首页统计。读取要求标记块唯一，重复/格式未知/文档不可达均报告未知，不按空备注处理。保存先核实当前备注（可带 expected），写后回读精确核对；空备注只删除该标记块，保留人物正文和原生跟进任务。备注随人物文档保留，当前迁移 JSON 不单独导出。 |
-| （导出包）`lvct-migration-bundle` | 1 | 插件数据迁移包（C08/FUNC-01.6，**导出文件而非存储键**）：`{schemaVersion: 1, exportedAt, storageKey: "lvct-migration-bundle", coverage?, modules: {interactions?, followUps?, cadences?, reminderDismissals?, registry?, templates?, exchanges?, aliases?, selfIdentity?, orgMemberships?, organizationProfiles?, relationshipLabels?}}`。12 个可迁移模块分别覆盖互动、跟进、联系节奏、提醒暂缓、收编索引、模板、往来账本、人物别名、本人身份、组织成员、组织资料和与我的关系；`coverage` 记录本包实际包含及排除的插件存储项。互动/跟进沿用各自导出对象；其余模块按对应 store/schema 读取与校验。**不含**数据库锚点、`view-preferences.json`、本工作区的组织投影/创建操作断点和外部桥请求断点；人物备注在原生人物文档中，不单独复制进迁移包。迁移包不包含联系人文档或原生数据库，跨工作区仍须先通过思源迁移文档与数据库，再重绑数据库锚点。恢复先预览（零写入），确认后逐模块合并；显示每个模块结果和失败原因，不把部分失败报告为整包成功。互动/跟进按 ID、现状和墓碑规则合并；其他模块遵循各自存储的冲突策略。所有 JSON 写入仍遵循对应存储锁与写后回读纪律；这不是思源原生数据的字节级备份。 |
+| （导出包）`lvct-migration-bundle` | 1 | 插件数据迁移包（C08/FUNC-01.6，**导出文件而非存储键**）：`{schemaVersion: 1, exportedAt, storageKey: "lvct-migration-bundle", coverage?, modules: {interactions?, followUps?, cadences?, reminderDismissals?, registry?, templates?, exchanges?, aliases?, selfIdentity?, orgMemberships?, organizationProfiles?, relationshipLabels?, topics?, giftIdeas?, occasions?}}`。15 个可迁移模块分别覆盖互动、跟进、联系节奏、提醒暂缓、收编索引、模板、往来账本、人物别名、本人身份、组织成员、组织资料、与我的关系、会面谈资备忘、礼物点子偏好和群体活动场合；`coverage` 记录本包实际包含及排除的插件存储项。互动/跟进沿用各自导出对象；其余模块按对应 store/schema 读取与校验。**不含**数据库锚点、`view-preferences.json`、本工作区的组织投影/创建操作断点和外部桥请求断点；人物备注在原生人物文档中，不单独复制进迁移包。迁移包不包含联系人文档或原生数据库，跨工作区仍须先通过思源迁移文档与数据库，再重绑数据库锚点。恢复先预览（零写入），确认后逐模块合并；显示每个模块结果和失败原因，不把部分失败报告为整包成功。互动/跟进按 ID、现状和墓碑规则合并；其他模块遵循各自存储的冲突策略。所有 JSON 写入仍遵循对应存储锁与写后回读纪律；这不是思源原生数据的字节级备份。 |
 
 **跟进恢复的严格边界（2026-10-16 横向审查）**：`follow-ups.json` 的严格展示与写入读取遇到重复事项 ID 也整体报错，不按首项去重后覆盖。独立跟进备份的裸库、字符串 `rawStore`、对象 `rawStore` 与迁移包共用严格条目校验；任一损坏条目、重复事项 ID 或非法 `personDocId` 都整批拒绝，预览和确认均不部分过滤。数据合并入口再次校验后才进入存储锁；合法输入仍按现有事项 ID 优先跳过，新增与跳过数之和等于输入条数。
 
@@ -217,7 +221,7 @@ vCard 同名项默认跳过，但允许逐项人工确认“作为独立人物�
 
 本人排除投影（AG-B11-004）：首页统一由 `excludeSelf` 确定普通联系人范围，生日、联系节奏、行动及跟进提醒排除本人；本人跟进仍保留在人物详情，不伪装成“人物不可达”。当前身份与名册唯一绑定行失配或读取失败时普通范围为 unknown，暂停普通提醒和统计并显示尚未核实，不把本人当普通联系人，也不把未知展示成 0/无待办。本人缺键则合法无身份；名册保留本人及标识。清除/换绑后的投影按最新身份重算，不修改互动或跟进事实。
 
-迁移包为 schema 1，当前实现包含下表中的 12 个插件数据模块；缺少后续模块的旧包仍可导入，各模块自身 schema 也为 1。各模块版本仍为 1。账本包含全部 open/settled/cancelled 历史；别名支持可选 `tombstones: string[]`，旧文件缺字段视为空墓碑，显式删除同时保存记录 ID 墓碑。双方墓碑合并，删除优先，旧备份不得复活已删除别名。取消账目保留原记录，不另设账本墓碑。所有模块严格校验，未知版本和坏条目在零写入预览时拒绝。
+迁移包为 schema 1，当前实现包含下表中的 15 个插件数据模块；缺少后续模块的旧包仍可导入，各模块自身 schema 也为 1。各模块版本仍为 1。账本包含全部 open/settled/cancelled 历史；别名支持可选 `tombstones: string[]`，旧文件缺字段视为空墓碑，显式删除同时保存记录 ID 墓碑。双方墓碑合并，删除优先，旧备份不得复活已删除别名。取消账目保留原记录，不另设账本墓碑。所有模块严格校验，未知版本和坏条目在零写入预览时拒绝。
 
 | 自管键 | 本轮迁移范围 | 恢复策略/排除理由 |
 |---|---|---|
@@ -228,7 +232,11 @@ vCard 同名项默认跳过，但允许逐项人工确认“作为独立人物�
 | org-membership.json | orgMemberships | 按成员记录 ID、当前名册和组织文档身份核实恢复；不按名称猜测对应文档 |
 | organization-profiles.json | organizationProfiles | 按组织文档 ID、组织资料 schema 和部门/自定义字段身份核实恢复；不按名称猜测对应组织 |
 | person-relationship-labels.json | relationshipLabels | 仅恢复当前本人参照且双方已核实绑定的称谓 |
+| person-topics.json | topics | 按人物文档 ID 和话题条目 ID 合并，现状优先；坏条目整批拒绝 |
+| gift-ideas.json | giftIdeas | 按人物文档 ID 和点子 ID 合并，现状优先；坏条目整批拒绝 |
+| occasions.json | occasions | 按场合实体 ID 合并，现状优先；全库上限 500 条 |
 | view-preferences.json | 排除 | 个人界面配置，业务事实恢复不改偏好 |
+| trash-bin.json | 排除 | 本工作区软删除缓冲；跨库重放会误恢复已在新库重建的联系人，恢复动作须在新工作区重新判定 |
 | contacts-settings.json | 排除 | 数据库锚点需显式重绑，不能覆盖当前锚点 |
 | 思源原生文档、AV 字段、关系、任务块 | 不在插件 JSON 包内 | 必须另行备份/恢复思源工作区，插件包不得宣称字节级或全部事实完整备份 |
 

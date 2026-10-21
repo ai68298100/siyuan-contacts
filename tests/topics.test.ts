@@ -3,10 +3,12 @@ import test from "node:test";
 import {
     addTopicToStore,
     emptyTopicStore,
+    mergeTopicStore,
     newTopicId,
     normalizeTopicStore,
     normalizeTopicStoreForWrite,
     normalizeTopicText,
+    parseTopicStore,
     removeTopicFromStore,
     MAX_TOPICS_PER_PERSON,
     MAX_TOPIC_TEXT_LENGTH,
@@ -132,4 +134,55 @@ test("E-32 会面简报置顶导出：当包含谈资备忘时高亮输出", () 
         topics: [],
     });
     assert.ok(!cleanMarkdown.includes("## 会面谈资与备忘"), "空话题不生成该节");
+});
+
+test("E-32 topics 迁移合并：现状优先、条目去重与上限保护", () => {
+    const current = addTopicToStore(emptyTopicStore(), personDocId, "已存话题 A");
+    const existingId = current.topics[personDocId][0].id;
+
+    const incoming = {
+        schemaVersion: 1 as const,
+        topics: {
+            [personDocId]: [
+                { id: existingId, text: "已存话题 A（修改版）", createdAt: Date.now() },
+                { id: "20261019000000-newtop1", text: "新导入话题 B", createdAt: Date.now() },
+            ],
+            "20261019000000-other01": [
+                { id: "20261019000000-othertp", text: "其他人物话题 C", createdAt: Date.now() },
+            ],
+        },
+    };
+
+    const result = mergeTopicStore(current, incoming);
+    assert.equal(result.merged, 2, "新话题 B 和 C 应该合并成功");
+    assert.equal(result.skipped, 1, "同 ID 的已有话题 A 应该跳过（现状优先）");
+
+    // 现状优先：personDocId 的第一个话题文本仍是未修改的原值
+    assert.equal(result.store.topics[personDocId][0].text, "已存话题 A");
+    assert.equal(result.store.topics[personDocId].length, 2);
+    assert.equal(result.store.topics["20261019000000-other01"].length, 1);
+});
+
+test("E-32 topics parseTopicStore 严格解析：合法包解析与坏数据防御", () => {
+    const valid = {
+        schemaVersion: 1,
+        topics: {
+            [personDocId]: [
+                { id: "20261019000000-top0001", text: "话题 1", createdAt: 1700000000000 },
+            ],
+        },
+    };
+    const parsed = parseTopicStore(valid);
+    assert.equal(parsed.schemaVersion, 1);
+    assert.equal(parsed.topics[personDocId].length, 1);
+    assert.equal(parsed.topics[personDocId][0].text, "话题 1");
+
+    // 坏版本抛出 StoreIntegrityError
+    assert.throws(() => parseTopicStore({ schemaVersion: 2, topics: {} }), StoreIntegrityError);
+
+    // 坏 docId 抛出 StoreIntegrityError
+    assert.throws(() => parseTopicStore({
+        schemaVersion: 1,
+        topics: { "invalid-id": [] },
+    }), StoreIntegrityError);
 });

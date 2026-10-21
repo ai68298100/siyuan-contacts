@@ -20,6 +20,8 @@
     import PersonPicker from "../people/PersonPicker.svelte";
     import type { PickerItem } from "../people/PersonPicker.svelte";
     import { requestErrorMessage } from "../../shared/error-presenter";
+    import { addRelation } from "../../services/relations";
+    import { emitDataChanged } from "../../libs/data-events";
 
     let {
         settings,
@@ -32,6 +34,8 @@
         onOpenPeople,
         onOpenCreatePerson,
         onOpenOrgs,
+        initialCenterDocId = "",
+        initialOrgDocId = "",
     }: {
         settings: ContactsSettings;
         revision?: number;
@@ -41,11 +45,15 @@
         preferences: ViewPreferences;
         onPreferencesChange: (next: ViewPreferences) => Promise<ViewPreferences>;
         onOpenDetail: (person: ContactSummary) => void;
-        onOpenPeople: () => void;
+        onOpenPeople: (focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" | "recent" }) => void;
         /** 空图谱时直接进入新建联系人流程；未接线时回退到联系人列表。 */
         onOpenCreatePerson?: () => void;
         /** B14 组织入口（可选）：点击组织节点跳转组织视图；未接线时组织节点点击无动作 */
         onOpenOrgs?: (orgDocId?: string) => void;
+        /** 外部显式指定聚焦的联系人中心（双向闭环联动） */
+        initialCenterDocId?: string;
+        /** 外部显式指定聚焦收窄的组织（双向闭环联动） */
+        initialOrgDocId?: string;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -74,6 +82,24 @@
     let showOrgs = $state(true);
     let relationScope: GraphScope = $state("global");
     let relationCenterDocId = $state("");
+
+    $effect(() => {
+        if (initialCenterDocId) {
+            relationScope = "person";
+            relationCenterDocId = initialCenterDocId;
+            if (graphMode === "native") {
+                nativeScope = "person";
+                nativeCenterDocId = initialCenterDocId;
+            }
+        }
+    });
+
+    $effect(() => {
+        if (initialOrgDocId) {
+            orgNarrowId = initialOrgDocId;
+            showOrgs = true;
+        }
+    });
     let presentation: "canvas" | "text" = $state("canvas");
     let graphFiltersOpen = $state(false);
     let graphExploreOpen = $state(false);
@@ -111,6 +137,20 @@
     let hoverCard: HTMLElement | undefined = $state();
     let hoverTimer: ReturnType<typeof setTimeout> | undefined;
     let clearHoverTimer: ReturnType<typeof setTimeout> | undefined;
+    interface EdgeEvidence {
+        kind: "related" | "member" | "ref" | "co_occurrence";
+        sourceId: string;
+        targetId: string;
+        sourceName: string;
+        targetName: string;
+        memberStatus?: "active" | "former" | "mixed";
+        coCount?: number;
+        commonOrgNames?: string[];
+        coAttendanceCount?: number;
+    }
+    let activeEvidence: EdgeEvidence | null = $state(null);
+    let establishingRelation = $state(false);
+    let establishRelationError = $state("");
     let refreshVersion = 0;
     // 同一视图只允许一个名册读取在途；显式重复点击直接忽略，外部 revision 可排队一次。
     let refreshInFlight = $state(false);
@@ -375,6 +415,7 @@
             const next = await loadGraphSources(settings, {
                 listOrganizations: facade?.listOrganizations ? () => facade.listOrganizations() : undefined,
                 loadSelfIdentity: facade?.loadSelfIdentity ? () => facade.loadSelfIdentity() : undefined,
+                loadInteractionEvents: facade?.loadInteractionEvents ? () => facade.loadInteractionEvents!() : undefined,
             }, version);
             if (!alive || version !== refreshVersion) return;
             sources = next;
@@ -671,7 +712,7 @@
                     classes: searchNeedle ? "lvct-graph-hit" : "",
                 })),
                 ...graph.edges.map((edge) => ({
-                    data: { source: edge.source, target: edge.target, kind: edge.kind ?? "related", memberStatus: edge.memberStatus, themeEdge: palette.edge },
+                    data: { source: edge.source, target: edge.target, kind: edge.kind ?? "related", memberStatus: edge.memberStatus, coCount: edge.coCount, themeEdge: palette.edge },
                 })),
             ],
             // 同步完成布局，避免筛选/切页销毁画布后动画帧继续访问 renderer。
@@ -728,6 +769,8 @@
                 { selector: 'edge[kind = "member"][memberStatus = "mixed"]', style: { "line-style": "dashed", width: 3 } },
                 // 引用是双向连接投影，不画方向箭头，以免把无向去重后的端点误作引用方向。
                 { selector: 'edge[kind = "ref"]', style: { "line-style": "dotted", width: 3 } },
+                // E-34：共同出席弱联系（推断关联），细虚线与半透明强调，仅展示，不参与关系查询
+                { selector: 'edge[kind = "co_occurrence"]', style: { "line-style": "dashed", "line-dash-pattern": [4, 4], width: 2, opacity: 0.7 } },
             ],
         });
         graphInstance = instance;
@@ -756,6 +799,8 @@
         resizeObserver.observe(container);
 
         instance.on("tap", "node", (event: cytoscape.EventObject) => {
+            activeEvidence = null;
+            establishRelationError = "";
             const docId = event.target.id();
             const person = allPeopleByDocId.get(docId);
             if (person) {
@@ -774,8 +819,72 @@
                 hoverPosition = { x: 12, y: 12 };
             }
         });
+        instance.on("tap", "edge", (event: cytoscape.EventObject) => {
+            const edge = event.target;
+            const kind = (edge.data("kind") as EdgeEvidence["kind"]) || "related";
+            const sourceId = edge.data("source");
+            const targetId = edge.data("target");
+
+            clearHover();
+            selectedOrgId = "";
+            establishRelationError = "";
+
+            if (kind === "co_occurrence") {
+                const coCount = edge.data("coCount") ?? 1;
+                const personA = allPeopleByDocId.get(sourceId);
+                const personB = allPeopleByDocId.get(targetId);
+                if (personA && personB) {
+                    activeEvidence = {
+                        kind: "co_occurrence",
+                        sourceId,
+                        targetId,
+                        coCount,
+                        sourceName: personA.name,
+                        targetName: personB.name,
+                    };
+                }
+            } else if (kind === "related") {
+                const personA = allPeopleByDocId.get(sourceId);
+                const personB = allPeopleByDocId.get(targetId);
+                if (personA && personB) {
+                    activeEvidence = {
+                        kind: "related",
+                        sourceId,
+                        targetId,
+                        sourceName: personA.name,
+                        targetName: personB.name,
+                        commonOrgNames: findSharedOrgs(sourceId, targetId),
+                        coAttendanceCount: countSharedOccasions(sourceId, targetId),
+                    };
+                }
+            } else if (kind === "member") {
+                const org = sources.organizations.find((o) => o.docId === sourceId || o.docId === targetId);
+                const person = allPeopleByDocId.get(sourceId === org?.docId ? targetId : sourceId);
+                activeEvidence = {
+                    kind: "member",
+                    sourceId,
+                    targetId,
+                    sourceName: person?.name || "成员",
+                    targetName: org?.name || "组织",
+                    memberStatus: edge.data("memberStatus") || "active",
+                };
+            } else if (kind === "ref") {
+                const nodeA = nodeById.get(sourceId);
+                const nodeB = nodeById.get(targetId);
+                activeEvidence = {
+                    kind: "ref",
+                    sourceId,
+                    targetId,
+                    sourceName: nodeA?.label || sourceId,
+                    targetName: nodeB?.label || targetId,
+                };
+            }
+
+            const pos = event.renderedPosition ?? { x: 24, y: 24 };
+            hoverPosition = { x: Math.max(12, Math.round(pos.x)), y: Math.max(12, Math.round(pos.y)) };
+        });
         instance.on("tap", (event: cytoscape.EventObject) => {
-            if (event.target === instance) { selectedOrgId = ""; clearHover(); }
+            if (event.target === instance) { selectedOrgId = ""; clearHover(); activeEvidence = null; }
         });
         instance.on("mouseover", "node", scheduleHover);
         instance.on("mouseout", "node", scheduleClearHover);
@@ -800,6 +909,53 @@
         const person = hoveredPerson;
         clearHover();
         if (person) openSnapshotPerson(person);
+    }
+
+    function findSharedOrgs(docA: string, docB: string): string[] {
+        const names: string[] = [];
+        for (const org of sources.organizations) {
+            const hasA = org.memberships.some((m) => m.personDocId === docA);
+            const hasB = org.memberships.some((m) => m.personDocId === docB);
+            if (hasA && hasB) names.push(org.name);
+        }
+        return names;
+    }
+
+    function countSharedOccasions(docA: string, docB: string): number {
+        if (!sources.interactionEvents || sources.interactionEvents.length === 0) return 0;
+        const occsA = new Set<string>();
+        for (const e of sources.interactionEvents) {
+            if (e.personDocId === docA && e.externalRef) occsA.add(e.externalRef);
+        }
+        let count = 0;
+        const seenB = new Set<string>();
+        for (const e of sources.interactionEvents) {
+            if (e.personDocId === docB && e.externalRef && occsA.has(e.externalRef) && !seenB.has(e.externalRef)) {
+                seenB.add(e.externalRef);
+                count += 1;
+            }
+        }
+        return count;
+    }
+
+    async function establishCoRelation() {
+        if (!activeEvidence || activeEvidence.kind !== "co_occurrence" || establishingRelation) return;
+        const { sourceId, targetId } = activeEvidence;
+        const personA = allPeopleByDocId.get(sourceId);
+        const personB = allPeopleByDocId.get(targetId);
+        if (!personA || !personB) return;
+        establishingRelation = true;
+        establishRelationError = "";
+        try {
+            await addRelation(settings, personA, personB);
+            activeEvidence = null;
+            emitDataChanged({ topics: ["people"], docIds: [personA.docId, personB.docId] });
+            await refresh(true);
+        } catch (error) {
+            establishRelationError = requestErrorMessage(error);
+        } finally {
+            establishingRelation = false;
+        }
     }
 
     function focusOrganization(id: string) {
@@ -1239,6 +1395,24 @@
                         <option value="org">{text("graphScopeOrganization", "以组织为中心")}</option>
                     </select>
                     {#if relationScope === "person"}<PersonPicker items={graphPickerItems} value={relationCenterDocId} ariaLabel={text("graphScopeCenter", "范围中心人物")} onSelect={(id) => (relationCenterDocId = id)} />{/if}
+                    {#if relationScope === "person" || relationScope === "self"}
+                        <div class="lvct-graph-toolbar__depth-tabs" style="display: inline-flex; gap: 4px; margin-left: 6px;">
+                            <button
+                                type="button"
+                                class="b3-chip"
+                                class:b3-chip--primary={relationDepth === "direct"}
+                                onclick={() => (relationDepth = "direct")}
+                                title="仅展示直接相关的一度联系人"
+                            >{text("graphDepthDirect", "直接关系")}</button>
+                            <button
+                                type="button"
+                                class="b3-chip"
+                                class:b3-chip--primary={relationDepth === "second"}
+                                onclick={() => (relationDepth = "second")}
+                                title="拓展展示二度关联人脉（朋友的朋友）"
+                            >{text("graphDepthSecond", "二度关系")}</button>
+                        </div>
+                    {/if}
                 {/if}
             </div>
             {#if graphMode === "relations"}
@@ -1256,7 +1430,23 @@
             <div class="lvct-graph-toolbar__filter-group lvct-graph-toolbar__filter-group--legend">
                 <span class="ft__smaller ft__on-surface lvct-graph-legend">
                     {#each groupLegend as group (group.label)}
-                        <span class={`lvct-graph-legend__item lvct-graph-legend__item--${group.className}`}><i></i>{group.label}</span>
+                        {@const isActive = group.className === "org" ? showOrgs : groupFilter === group.label}
+                        <button
+                            type="button"
+                            class={`lvct-graph-legend__item lvct-graph-legend__item--${group.className}`}
+                            class:lvct-graph-legend__item--active={isActive}
+                            class:lvct-graph-legend__item--dimmed={group.className === "org" ? !showOrgs : groupFilter && groupFilter !== group.label}
+                            onclick={() => {
+                                if (group.className === "org") {
+                                    showOrgs = !showOrgs;
+                                } else {
+                                    groupFilter = groupFilter === group.label ? "" : group.label;
+                                }
+                            }}
+                            title={group.className === "org" ? (showOrgs ? "点击隐藏组织节点" : "点击显示组织节点") : (groupFilter === group.label ? `点击清除 ${group.label} 分组筛选` : `点击只看 ${group.label} 分组`)}
+                        >
+                            <i></i>{group.label}
+                        </button>
                     {/each}
                 </span>
             </div>
@@ -1294,7 +1484,7 @@
             {#if people.length === 0 && onOpenCreatePerson}
                 <button class="b3-button b3-button--outline" onclick={onOpenCreatePerson}>{text("graphCreatePerson", "新建联系人")}</button>
             {/if}
-            <button class="b3-button b3-button--text" onclick={onOpenPeople}>{text("graphGoContacts", "前往联系人")}</button>
+            <button class="b3-button b3-button--text" onclick={() => onOpenPeople()}>{text("graphGoContacts", "前往联系人")}</button>
         </ViewState>
     {:else if presentation === "text"}
         <section class="lvct-graph-text" aria-label={text("graphTextResults", "图谱文本结果")}>
@@ -1311,7 +1501,7 @@
                 {/each}
             </ul>
             <h3>{text("graphTextEdges", "边及来源")}（{snapshot.graph.edges.length}）</h3>
-            <ul>{#each snapshot.graph.edges.slice(0, textLimit) as edge}<li title={`${edge.source} — ${edge.target}（无向展示）`}>{nodeName(edge.source)} — {nodeName(edge.target)} · {graphEdgeLabel(edge.kind, edge.memberStatus)}</li>{/each}</ul>
+            <ul>{#each snapshot.graph.edges.slice(0, textLimit) as edge}<li title={`${edge.source} — ${edge.target}（无向展示）`}>{nodeName(edge.source)} — {nodeName(edge.target)} · {graphEdgeLabel(edge.kind, edge.memberStatus)}{edge.coCount ? `（同场 ${edge.coCount} 次）` : ""}</li>{/each}</ul>
             {#if snapshot.result.pathIds.length}<h3>{text("graphTextPath", "related 路径链")}</h3><ol>{#each snapshot.result.pathIds as id}<li title={id}>{nodeName(id)}</li>{/each}</ol>{/if}
             <p role="status">文本已列出 {Math.min(textLimit, snapshot.graph.nodes.length)} / {snapshot.graph.nodes.length} 节点，{Math.min(textLimit, snapshot.graph.edges.length)} / {snapshot.graph.edges.length} 边；导出包含完整展示快照。</p>
             {#if textLimit < Math.max(snapshot.graph.nodes.length, snapshot.graph.edges.length)}<button class="b3-button b3-button--outline" onclick={() => (textLimit += 100)}>{text("graphTextMore", "继续列出节点与边")}</button>{/if}
@@ -1328,7 +1518,101 @@
                 <button class="lvct-graph__fab-btn" title={graphExpanded ? "收起大图" : "展开大图"} aria-label={graphExpanded ? "收起大图" : "展开大图"} aria-pressed={graphExpanded} onclick={() => void toggleGraphExpanded()}>{#if graphExpanded}<Minimize2 size={16} />{:else}<Maximize2 size={16} />{/if}</button>
                 <button class="lvct-graph__fab-btn" title={text("graphRefresh", "刷新")} aria-label={text("graphRefresh", "刷新")} disabled={loading || refreshInFlight} aria-busy={refreshInFlight} onclick={() => void refresh()}><RefreshCw size={15} /></button>
             </div>
-            {#if displayedOrg}
+            {#if activeEvidence}
+                <div
+                    class="lvct-graph-view__hover-card"
+                    role="dialog"
+                    aria-modal="false"
+                    aria-label="图谱连接事实证据"
+                    tabindex="-1"
+                    style={`left:${hoverPosition.x}px;top:${hoverPosition.y}px`}
+                >
+                    <div class="lvct-graph-view__hover-name">
+                        <b>{activeEvidence.sourceName} ↔ {activeEvidence.targetName}</b>
+                        <span class="lvct-chip lvct-chip--group">
+                            {activeEvidence.kind === "related" ? "显式相关人" :
+                             activeEvidence.kind === "member" ? (activeEvidence.memberStatus === "former" ? "历史归属" : "当前归属") :
+                             activeEvidence.kind === "co_occurrence" ? `同场 ${activeEvidence.coCount} 次` : "文档引用"}
+                        </span>
+                    </div>
+
+                    {#if activeEvidence.kind === "related"}
+                        <div class="ft__smaller ft__on-surface" style="margin: 6px 0;">
+                            已在人脉数据库中登记为正式双向关系。
+                            {#if activeEvidence.commonOrgNames && activeEvidence.commonOrgNames.length > 0}
+                                <div>🏢 共同组织：{activeEvidence.commonOrgNames.join("、")}</div>
+                            {/if}
+                            {#if activeEvidence.coAttendanceCount && activeEvidence.coAttendanceCount > 0}
+                                <div>👥 同场活动：{activeEvidence.coAttendanceCount} 次</div>
+                            {/if}
+                        </div>
+                    {:else if activeEvidence.kind === "member"}
+                        <div class="ft__smaller ft__on-surface" style="margin: 6px 0;">
+                            {activeEvidence.sourceName} 属于组织【{activeEvidence.targetName}】（状态：{activeEvidence.memberStatus === "former" ? "历史成员/校友" : "在职成员"}）。
+                        </div>
+                    {:else if activeEvidence.kind === "co_occurrence"}
+                        <div class="ft__smaller ft__on-surface" style="margin: 6px 0;">
+                            基于多参与者同场活动推断出的弱联系（共同出席 {activeEvidence.coCount} 次）。
+                        </div>
+                        {#if establishRelationError}
+                            <div class="b3-label b3-label--error ft__smaller" style="margin-bottom: 6px;">{establishRelationError}</div>
+                        {/if}
+                        <button
+                            type="button"
+                            class="b3-button b3-button--text ft__smaller"
+                            disabled={establishingRelation}
+                            onclick={establishCoRelation}
+                        >
+                            {establishingRelation ? "正在建立…" : "升级为正式相关人"}
+                        </button>
+                    {:else if activeEvidence.kind === "ref"}
+                        <div class="ft__smaller ft__on-surface" style="margin: 6px 0;">
+                            由思源笔记正文中的块链接或反链所构成的原生文档引用。
+                        </div>
+                    {/if}
+
+                    <div style="display: flex; gap: 8px; margin-top: 6px;">
+                        {#if allPeopleByDocId.has(activeEvidence.sourceId)}
+                            <button
+                                type="button"
+                                class="b3-button b3-button--text ft__smaller"
+                                onclick={() => {
+                                    const p = allPeopleByDocId.get(activeEvidence!.sourceId);
+                                    if (p) openSnapshotPerson(p);
+                                }}
+                            >查看 {activeEvidence.sourceName}</button>
+                        {/if}
+                        {#if allPeopleByDocId.has(activeEvidence.targetId)}
+                            <button
+                                type="button"
+                                class="b3-button b3-button--text ft__smaller"
+                                onclick={() => {
+                                    const p = allPeopleByDocId.get(activeEvidence!.targetId);
+                                    if (p) openSnapshotPerson(p);
+                                }}
+                            >查看 {activeEvidence.targetName}</button>
+                        {/if}
+                        {#if allPeopleByDocId.has(activeEvidence.sourceId) && allPeopleByDocId.has(activeEvidence.targetId)}
+                            {@const p1 = allPeopleByDocId.get(activeEvidence.sourceId)}
+                            {@const p2 = allPeopleByDocId.get(activeEvidence.targetId)}
+                            {#if p1 && p2}
+                                <button
+                                    type="button"
+                                    class="b3-button b3-button--text ft__smaller"
+                                    onclick={() => {
+                                        onOpenPeople({ itemIds: [p1.itemId, p2.itemId], label: `关联核对 · ${activeEvidence?.sourceName} 与 ${activeEvidence?.targetName}` });
+                                    }}
+                                >{text("graphCompareInPeople", "在名册中比对二人")}</button>
+                            {/if}
+                        {/if}
+                        <button
+                            type="button"
+                            class="b3-button b3-button--text ft__smaller"
+                            onclick={() => { activeEvidence = null; }}
+                        >关闭</button>
+                    </div>
+                </div>
+            {:else if displayedOrg}
                 <div
                     class="lvct-graph-view__hover-card"
                     bind:this={hoverCard}
@@ -1386,6 +1670,7 @@
                         </div>
                     {/if}
                     <button class="b3-button b3-button--text" onclick={openHoveredPerson}>{text("graphOpenDetail", "查看人物详情")}</button>
+                    <button class="b3-button b3-button--text" onclick={() => { if (hoveredPerson) onOpenPeople({ itemIds: [hoveredPerson.itemId], label: `图谱定位 · ${hoveredPerson.name}` }); }}>{text("graphFocusInPeople", "在名册中定位")}</button>
                     {#if facade?.openDoc}<button class="b3-button b3-button--text" disabled={Boolean(sourceOpeningDocId)} aria-busy={sourceOpeningDocId === hoveredPerson.docId} onclick={() => { if (hoveredPerson) void openSourceDocument(hoveredPerson.docId); }}>{sourceOpeningDocId === hoveredPerson.docId ? "正在打开…" : "打开来源文档"}</button>{/if}
                 </div>
             {/if}
@@ -1506,7 +1791,7 @@
         <details class="lvct-graph-summary__details" open={snapshot.state === "unknown" || snapshot.state === "center_missing"}>
             <summary>{text("graphSummaryDetails", "来源与排除详情")}</summary>
             <p>登记 {snapshot.counts.registered ?? "未知"} · 来源节点 {snapshot.counts.sourceNodes ?? "未知"} / 边 {snapshot.counts.sourceEdges ?? "未知"} · 范围内 {snapshot.counts.rangeNodes} · 筛选后 {snapshot.counts.filteredNodes} · 范围排除 {snapshot.counts.rangeExcluded ?? "未知"} · 筛选排除 {snapshot.counts.filterExcluded}</p>
-            <p>{graphMode === "relations" ? `${graphEdgeLabel("related")}；${graphEdgeLabel("member", "active")}（虚线）、${graphEdgeLabel("member", "former")}（点线）、${graphEdgeLabel("member", "mixed")}（加粗虚线）。只有 related 参与关系查询。` : `${graphEdgeLabel("ref")}（含回链）；只读思源双链索引，只展示登记文档之间的引用，不是整库图，不修改思源图谱设置。`}</p>
+            <p>{graphMode === "relations" ? `${graphEdgeLabel("related")}；${graphEdgeLabel("co_occurrence")}（细虚线）；${graphEdgeLabel("member", "active")}（虚线）、${graphEdgeLabel("member", "former")}（点线）、${graphEdgeLabel("member", "mixed")}（加粗虚线）。只有 related 参与关系查询。` : `${graphEdgeLabel("ref")}（含回链）；只读思源双链索引，只展示登记文档之间的引用，不是整库图，不修改思源图谱设置。`}</p>
             {#if graphMode === "native"}<p>使用思源自己的图谱或反链：打开节点的来源文档，再从思源文档菜单进入关系图或反链。此处采用同一份双链索引独立绘制，不代替思源原生面板。</p>{/if}
             {#if graphMode === "native" && (groupFilter || isolatedOnly)}<p>已保留关系图分组/无关系筛选；这些条件不应用于文档引用图。</p>{/if}
             {#if snapshot.retainedByRange.length}<p>{text("graphRangeRetained", "范围外中心优先保留：{names}（不属于当前范围或组织成员集合，不新增关系事实）", { names: snapshot.retainedByRange.map(nodeName).join("、") })}</p>{/if}
