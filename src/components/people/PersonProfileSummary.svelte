@@ -28,7 +28,11 @@
 {#if profile}
     {#if compact}
         <span class="lvct-profile-summary lvct-profile-summary--compact" aria-label="组织成员与本人称谓资料">
-            {#each compactRows as row (row.label)}<span>{row.label}：{row.value}</span>{/each}
+            {#each compactRows as row (row.label)}
+                <span title={`${row.label}：${row.value}`}>
+                    <b>{row.label}：</b>{row.value}
+                </span>
+            {/each}
             {#if hideEmpty && compactRows.length === 0}<span>资料待补充</span>{/if}
         </span>
     {:else}
@@ -65,12 +69,13 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: 180px;
+        max-width: 100%;
         font-size: 11px;
         line-height: 1.4;
-        padding: 1px 6px;
-        border-radius: 4px;
+        padding: 1px 7px;
+        border-radius: var(--lvct-r-sm, 4px);
         background: color-mix(in srgb, var(--lvct-accent) 8%, var(--lvct-bg-app));
         color: var(--lvct-text-2);
+        box-sizing: border-box;
     }
 </style>

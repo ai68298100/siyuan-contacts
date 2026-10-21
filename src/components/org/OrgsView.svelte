@@ -137,9 +137,50 @@
     function markLogoFailed(docId: string, url: string) {
         failedLogoUrls = { ...failedLogoUrls, [docId]: url };
     }
+    const totalActiveMembers = $derived.by(() => {
+        let count = 0;
+        for (const org of orgs) {
+            count += activeCountOf(org);
+        }
+        return count;
+    });
+
+    const totalFormerMembers = $derived.by(() => {
+        let count = 0;
+        for (const org of orgs) {
+            count += formerCountOf(org);
+        }
+        return count;
+    });
 </script>
 
 <div class="lvct-orgs-view">
+    <!-- 顶部组织概览与人脉指标条 -->
+    {#if orgs.length > 0 && !errorText}
+        <div class="lvct-orgs-overview-bar fn__flex" role="region" aria-label="组织数据全貌">
+            <div class="lvct-orgs-overview-item">
+                <span class="lvct-orgs-overview-num">{orgs.filter(o => !o.archived).length}</span>
+                <span class="lvct-orgs-overview-label">活跃组织</span>
+            </div>
+            <div class="lvct-orgs-overview-divider"></div>
+            <div class="lvct-orgs-overview-item">
+                <span class="lvct-orgs-overview-num">{totalActiveMembers}</span>
+                <span class="lvct-orgs-overview-label">在职/在学人脉</span>
+            </div>
+            <div class="lvct-orgs-overview-divider"></div>
+            <div class="lvct-orgs-overview-item">
+                <span class="lvct-orgs-overview-num">{totalFormerMembers}</span>
+                <span class="lvct-orgs-overview-label">历史经历记录</span>
+            </div>
+            {#if orgs.some(o => o.archived)}
+                <div class="lvct-orgs-overview-divider"></div>
+                <div class="lvct-orgs-overview-item">
+                    <span class="lvct-orgs-overview-num">{orgs.filter(o => o.archived).length}</span>
+                    <span class="lvct-orgs-overview-label">已归档组织</span>
+                </div>
+            {/if}
+        </div>
+    {/if}
     <div class="lvct-people__toolbar lvct-people__control-surface fn__flex">
         <span class="ft__smaller ft__on-surface">
             {#if loading || errorText}
