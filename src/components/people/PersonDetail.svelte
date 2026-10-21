@@ -2720,6 +2720,119 @@ import StatusNotice from "../StatusNotice.svelte";
     </section>
     {/if}
 
+    {#if followUpSupported}
+    <section class="lvct-detail__section">
+        <h4>{text("fuSectionTitle", "跟进计划")}</h4>
+        {#if followUpActionError}
+            <div class="lvct-form__error" role="alert">{text("fuActionFail", "跟进操作失败：{msg}", { msg: followUpActionError })}</div>
+            {#if followUpFailedRequest}
+                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={retryFailedFollowUp}>
+                    使用原请求重试
+                </button>
+            {/if}
+        {/if}
+        {#if followUpRefreshWarning}
+            <StatusNotice error message={followUpRefreshWarning} actionLabel={text("commonRetry", "重试")} onAction={() => void loadFollowUps()} />
+        {/if}
+        {#if followUpError}
+            <!-- FUNC-01.12：读取失败显式报错并可重试，不与「没有跟进计划」空态同时呈现 -->
+            <ViewState compact error title={text("fuLoadFailTitle", "跟进计划加载失败")} description={followUpError}>
+                <button type="button" class="b3-button b3-button--outline" onclick={loadFollowUps}>{text("commonRetry", "重试")}</button>
+            </ViewState>
+        {:else if followUpsLoading}
+            <ViewState compact loading title={text("fuLoading", "正在加载跟进计划")} />
+        {:else}
+            {#if openFollowUps.length === 0}
+                <p class="ft__smaller ft__on-surface">{text("fuEmpty", "没有进行中的跟进计划。安排一个日期，到时来联系 TA。")}</p>
+            {:else}
+                <div class="lvct-detail__timeline">
+                    {#each openFollowUps as item (item.id)}
+                        <div class="lvct-detail__timeline-row">
+                            <span class="ft__on-surface">{item.dueDate}</span>
+                            <span class="lvct-detail__timeline-note">{item.title || text("fuKeepInTouch", "保持联系")}</span>
+                            {#if item.docMissing}<span class="lvct-chip lvct-bucket--stale">{text("fuDocMissing", "任务块已移除")}</span>{/if}
+                            <span class="lvct-chip {item.dueDate < todayKey ? "lvct-bucket--stale" : ""}">{dueLabel(item.dueDate, todayKey)}</span>
+                        </div>
+                        {#if snoozeForId === item.id}
+                            <div class="lvct-detail__snooze">
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "tomorrow")}>{text("fuSnoozeTomorrow", "明天")}</button>
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "threeDays")}>{text("fuSnoozeThreeDays", "三天后")}</button>
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "nextMonday")}>{text("fuSnoozeNextMonday", "下周一")}</button>
+                                <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => snooze(item, "nextMonth")}>{text("fuSnoozeNextMonth", "一个月后")}</button>
+                                <span class="lvct-detail__snooze-custom">
+                                    <input type="date" class="b3-text-field" aria-label={text("fuSnoozeDateLabel", "指定日期")} bind:value={snoozeCustomDate} />
+                                    <button type="button" class="b3-button b3-button--text" disabled={followUpBusy || !snoozeCustomDate} onclick={() => snooze(item, "custom")}>{text("fuSnoozeByDate", "按指定日期推迟")}</button>
+                                </span>
+                            </div>
+                        {/if}
+                        <div class="lvct-detail__followup-actions">
+                            <button type="button" class="b3-button b3-button--outline" disabled={followUpBusy} onclick={() => { snoozeForId = snoozeForId === item.id ? "" : item.id; snoozeCustomDate = ""; }} aria-expanded={snoozeForId === item.id}>{text("fuPostpone", "推迟")}</button>
+                            <button type="button" class="b3-button b3-button--text" aria-label="完成跟进" title="完成跟进；不会自动记录互动" disabled={followUpBusy} onclick={() => completeFollowUp(item)}>{text("fuComplete", "完成")}</button>
+                            <button type="button" class="b3-button b3-button--cancel" disabled={followUpBusy} onclick={() => cancelFollowUp(item)}>{text("fuCancelPlan", "取消计划")}</button>
+                        </div>
+                    {/each}
+                </div>
+            {/if}
+            {#if closedFollowUps.length > 0}
+                <p class="ft__smaller ft__on-surface">{text("fuRecentlyClosed", "最近关闭：")}{closedFollowUps.slice(0, 3).map((item) => `${item.title || text("fuKeepInTouch", "保持联系")}（${item.status === "done" ? "已完成" : "已取消"}）`).join("、")}</p>
+            {/if}
+            <div class="lvct-detail__record fn__flex">
+                <input
+                    class="b3-text-field fn__flex-1"
+                    type="text"
+                    placeholder={text("fuTitlePlaceholder", "这次想联系什么？（可选，如：问问面试结果）")}
+                    aria-label={text("fuTitleLabel", "跟进标题")}
+                    bind:value={followUpTitle}
+                    oninput={clearFailedFollowUpRequest}
+                    disabled={followUpBusy}
+                />
+                <input type="date" class="b3-text-field" aria-label={text("fuDateLabel", "计划日期")} bind:value={followUpDate} onchange={clearFailedFollowUpRequest} disabled={followUpBusy} />
+                <button class="b3-button b3-button--text" disabled={followUpBusy} onclick={createFollowUp}>
+                    {followUpBusy ? text("fuAdding", "添加中…") : followUpRecorded ? text("fuAddAnother", "再加一条") : text("fuAddPlan", "添加计划")}
+                </button>
+            </div>
+            {#if followUpFailedRequest && followUpFailedRequest.title === followUpTitle.trim() && followUpFailedRequest.dueDate === followUpDate}
+                <StatusNotice error message="该跟进请求尚未完全核实。使用原请求重试会先核对已有记录，避免重复创建。" actionLabel="用原请求重试" onAction={retryFailedFollowUp} actionDisabled={followUpBusy} />
+            {/if}
+            <p class="ft__smaller ft__on-surface">到期的计划会出现在首页待办；完成计划不会自动记为互动。需要更新最近联系日期时，请在上方“记一笔互动”中单独记录。</p>
+        {/if}
+    </section>
+    {/if}
+
+    {#if cadenceSupported}
+    <section class="lvct-detail__section">
+        <h4>{text("cadenceSectionTitle", "联系节奏")}</h4>
+        {#if cadenceLoadError}
+            <ViewState compact error title={text("cadenceLoadFailTitle", "联系节奏读取失败")} description={cadenceLoadError}>
+                <button type="button" class="b3-button b3-button--outline" onclick={loadCadence}>{text("commonRetry", "重试")}</button>
+            </ViewState>
+        {:else if !cadenceLoaded}
+            <ViewState compact loading title={text("cadenceLoading", "正在读取联系节奏")} />
+        {:else}
+            {#if cadenceError}<div class="lvct-form__error" role="alert">{cadenceError}</div>{/if}
+            <p class="ft__smaller ft__on-surface">
+                {text("cadenceLastLabel", "上次互动：")}{lastContactLabel || text("cadenceNoInteraction", "还没有互动记录")} · {text("cadenceCurrentLabel", "当前：")}
+                {cadenceMode === "paused" ? text("cadencePausedDesc", "已暂停提醒") : cadenceMode === "custom" ? text("cadenceCustomDesc", "自定义 {n} 天", { n: cadenceDays }) : text("cadenceGlobalDesc", "跟随全局阈值")}
+            </p>
+            <div class="lvct-detail__record fn__flex">
+                <select class="b3-select fn__flex-1" aria-label={text("cadenceModeLabel", "联系节奏模式")} bind:value={cadenceMode} disabled={cadenceSaving}>
+                    <option value="global">{text("cadenceOptionGlobal", "跟随全局阈值")}</option>
+                    <option value="custom">{text("cadenceOptionCustom", "自定义天数")}</option>
+                    <option value="paused">{text("cadenceOptionPaused", "暂停提醒")}</option>
+                </select>
+                {#if cadenceMode === "custom"}
+                    <input type="number" class="b3-text-field" min="1" max="365" aria-label="自定义天数" bind:value={cadenceDays} disabled={cadenceSaving} />
+                {/if}
+                <button class="b3-button b3-button--text" onclick={() => void saveCadence()} disabled={cadenceSaving}>
+                    {cadenceSaving ? text("cadenceSaving", "保存中…") : text("cadenceSave", "保存节奏")}
+                </button>
+            </div>
+            <StatusNotice message={cadenceMessage} onDismiss={() => (cadenceMessage = "")} />
+            <p class="ft__smaller ft__on-surface">{text("cadenceNote", "仅影响首页「久未联系」提醒，不写入联系人的数据库字段。")}</p>
+        {/if}
+    </section>
+    {/if}
+
     {#if (onLoadExchanges && onCreateExchange && onChangeExchangeStatus) || (onLoadAliases && onAddAlias && onRemoveAlias)}
         <details class="lvct-detail__advanced">
             <summary>

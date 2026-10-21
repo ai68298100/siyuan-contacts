@@ -135,16 +135,13 @@
                     {person.name.slice(0, 1)}
                 </span>
                 <span class="lvct-person-card__main">
-                    <span class="lvct-person-card__name-line">
-                        <strong class="lvct-person-card__name" title={person.name}>{person.name}</strong>
+                    <span class="lvct-person-card__name" title={person.name}>
+                        {person.name}
                         {#if person.isSelf}<span class="lvct-chip lvct-bucket--today">本人</span>{/if}
-                        {#if person.group}<span class="lvct-chip lvct-chip--group">{person.group}</span>{/if}
                     </span>
-                    {#if birthday}
-                        <span class="lvct-person-card__sub lvct-person-card__sub--bday">
-                            🎂 {formatBirthdayDisplay(person.birthday, person.isLunar)} · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil}天后`}
-                        </span>
-                    {/if}
+                    <span class="lvct-person-card__sub">
+                        {#if birthday}{formatBirthdayDisplay(person.birthday, person.isLunar)} · {birthday.daysUntil === 0 ? "今天" : `${birthday.daysUntil} 天后`}{:else}生日未填写{/if}
+                    </span>
                 </span>
             </button>
             {#if onOpenGraphPerson}<button type="button" class="lvct-person-card__open-doc" title={`在关系图谱中查看 ${person.name}`} aria-label={`在关系图谱中查看 ${person.name}`} onclick={(event) => { event.stopPropagation(); onOpenGraphPerson?.(person.docId); }}><Network size={16}/></button>{/if}
@@ -158,20 +155,19 @@
             {#if person.phone}<div><span aria-hidden="true"><Phone size={13}/></span><a class="lvct-person-card__meta-value" href={telHref(person.phone)} onclick={(event) => event.stopPropagation()}>{person.phone}</a></div>{/if}
             {#if person.wechat}<div><span aria-hidden="true"><MessageCircle size={13}/></span><span class="lvct-person-card__meta-value">{person.wechat}</span></div>{/if}
             {#if person.email}<div><span aria-hidden="true"><Mail size={13}/></span><a class="lvct-person-card__meta-value" href={mailHref(person.email)} onclick={(event) => event.stopPropagation()}>{person.email}</a></div>{/if}
-            {#if recent}
-                <div>
-                    <span aria-hidden="true"><Clock3 size={13}/></span>
-                    <span class="lvct-person-card__meta-value">{recentLabel}</span>
-                    {#if health.level !== "unknown"}
-                        <span class={`lvct-heat ${heatLevelColorClass(health.level)}`} style="font-size: 10px; padding: 1px 5px; margin-left: 4px;" title={`关系温度 ${health.score}%`}>
-                            {health.level === "hot" ? "温热" : health.level === "warm" ? "常温" : health.level === "cool" ? "微凉" : health.level === "cold" ? "渐冻" : "已暂停"}
-                        </span>
-                    {/if}
-                </div>
-            {/if}
+            <div>
+                <span aria-hidden="true"><Clock3 size={13}/></span>
+                <span class="lvct-person-card__meta-value">{recentLabel}</span>
+                {#if recent && health.level !== "unknown"}
+                    <span class={`lvct-heat ${heatLevelColorClass(health.level)}`} style="font-size: 10px; padding: 1px 5px; margin-left: 4px;" title={`关系温度 ${health.score}%`}>
+                        {health.level === "hot" ? "温热" : health.level === "warm" ? "常温" : health.level === "cool" ? "微凉" : health.level === "cold" ? "渐冻" : "已暂停"}
+                    </span>
+                {/if}
+            </div>
         </div>
-        {#if person.tags.length > 0}
+        {#if person.group || person.tags.length > 0}
             <div class="lvct-person-card__tags">
+                {#if person.group}<span class="lvct-chip lvct-chip--group">{person.group}</span>{/if}
                 {#each person.tags as tag (tag)}<span class="lvct-chip"># {tag}</span>{/each}
             </div>
         {/if}
