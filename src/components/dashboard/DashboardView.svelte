@@ -27,6 +27,7 @@
 import type { RelationshipHeatLevel } from "../../domain/cadence";
 import RegionExplorerDialog from "../people/RegionExplorerDialog.svelte";
 import { filterPeopleByRegion } from "../../domain/region";
+import { toLocalDateKey } from "../../domain/interactions";
 
     let {
         facade,
@@ -551,6 +552,35 @@ import { filterPeopleByRegion } from "../../domain/region";
         onOpenPeople({ itemIds: data.neverContactedItemIds, label: "从未互动" });
     }
 
+    let selectedGlanceOffset = $state<number | null>(null);
+
+    const weekGlanceDays = $derived.by(() => {
+        if (!data || data.ordinaryScopeUnknown) return [];
+        const days = [];
+        const base = new Date();
+        const dayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+        for (let offset = 0; offset < 7; offset++) {
+            const d = new Date(base.getTime() + offset * 86400000);
+            const dateKey = toLocalDateKey(d);
+            const bdays = (data.birthdays ?? []).filter((item) => item.projection.daysUntil === offset);
+            const fus = (data.followUps ?? []).filter((card) => card.item.dueDate === dateKey && card.item.status === "open");
+            days.push({
+                offset,
+                dateKey,
+                dayName: offset === 0 ? "今天" : dayNames[d.getDay()],
+                dayNum: d.getDate(),
+                birthdays: bdays,
+                followUps: fus,
+                totalEvents: bdays.length + fus.length,
+            });
+        }
+        return days;
+    });
+
+    const selectedGlanceDay = $derived(
+        selectedGlanceOffset !== null ? weekGlanceDays.find((d) => d.offset === selectedGlanceOffset) : null
+    );
+
     /**
      * FUNC-01.1：列表超过首屏时，「查看全部」要能把当前集合带到联系人页。
      * 保留本地展开状态作为无导航宿主（例如独立预览/隔离回归）的降级行为；
@@ -904,29 +934,62 @@ import { filterPeopleByRegion } from "../../domain/region";
                 onDismiss={() => void dismissOnboarding()}
             />
         {/if}
+        {#if data.people > 0 && !data.ordinaryScopeUnknown}
+            {@const activeCount = Math.max(0, data.people - data.neverContacted)}
+            {@const activeRate = data.people > 0 ? Math.round((activeCount / data.people) * 100) : 0}
+            <div class="lvct-dash__milestone-banner fn__flex" role="status" aria-label="人脉维护激励">
+                <div class="lvct-dash__milestone-left fn__flex">
+                    <span class="lvct-dash__milestone-emoji">🌟</span>
+                    <div class="lvct-dash__milestone-content">
+                        <b>{activeRate >= 80 ? "人脉连接状态极佳！" : activeRate >= 50 ? "人际网络稳步升温中！" : "开启温暖连接的新起点："}</b>
+                        <span>
+                            已建立连接 {activeCount} 人（覆盖率 {activeRate}%）
+                            {#if data.birthdaysThisWeek > 0} · 🎂 本周有 {data.birthdaysThisWeek} 位好友生日{/if}
+                            {#if overdueCount > 0} · ⚠️ 建议处理 {overdueCount} 条待办{/if}
+                        </span>
+                    </div>
+                </div>
+                <button type="button" class="b3-button b3-button--text b3-button--small lvct-dash__milestone-btn" onclick={() => onOpenPeople()}>
+                    浏览名册 &gt;
+                </button>
+            </div>
+        {/if}
+
         <div class="lvct-dash__stats">
-            <button class="lvct-dash__stat" onclick={() => onOpenPeople()}>
-                <span class="lvct-dash__stat-ic" aria-hidden="true"><Users size={14} /></span>
+            <button class="lvct-dash__stat lvct-dash__stat--people" onclick={() => onOpenPeople()}>
+                <div class="lvct-dash__stat-top">
+                    <span class="lvct-dash__stat-ic" aria-hidden="true"><Users size={14} /></span>
+                    <span class="lvct-dash__stat-tag">全库</span>
+                </div>
                 <b>{data.ordinaryScopeUnknown ? "—" : data.people}</b>
                 <span>{text("dashStatPeople", "联系人")}</span>
                 {#if data.relations > 0}<span class="lvct-dash__stat-ft">{text("dashStatPeopleFt", "其中 {n} 人从未互动", { n: data.neverContacted })}</span>{/if}
             </button>
-            <button class="lvct-dash__stat" onclick={onOpenGraph}>
-                <span class="lvct-dash__stat-ic" aria-hidden="true"><Share2 size={14} /></span>
+            <button class="lvct-dash__stat lvct-dash__stat--relations" onclick={onOpenGraph}>
+                <div class="lvct-dash__stat-top">
+                    <span class="lvct-dash__stat-ic" aria-hidden="true"><Share2 size={14} /></span>
+                    <span class="lvct-dash__stat-tag">互联</span>
+                </div>
                 <b>{data.ordinaryScopeUnknown ? "—" : data.relations}</b>
                 <span>{text("dashStatRelations", "关系")}</span>
                 {#if data.people > 0}<span class="lvct-dash__stat-ft">{text("dashStatRelationsFt", "人均 {n} 条", { n: (data.relations / data.people).toFixed(1) })}</span>{/if}
             </button>
-            <button class="lvct-dash__stat" onclick={openBirthdayPeople} disabled={data.ordinaryScopeUnknown}
+            <button class="lvct-dash__stat lvct-dash__stat--birthdays" onclick={openBirthdayPeople} disabled={data.ordinaryScopeUnknown}
                 title={data.ordinaryScopeUnknown ? text("dashStatDisabledSelfHint", "请先在设置中核实本人身份") : undefined}>
-                <span class="lvct-dash__stat-ic lvct-dash__stat-ic--hl" aria-hidden="true"><Cake size={14} /></span>
+                <div class="lvct-dash__stat-top">
+                    <span class="lvct-dash__stat-ic lvct-dash__stat-ic--hl" aria-hidden="true"><Cake size={14} /></span>
+                    <span class="lvct-dash__stat-tag lvct-dash__stat-tag--hl">本周</span>
+                </div>
                 <b>{data.ordinaryScopeUnknown ? "—" : data.birthdaysThisWeek}</b>
                 <span>{text("dashStatBirthdaysWeek", "本周生日")}</span>
                 {#if data.birthdays.length > data.birthdaysThisWeek}<span class="lvct-dash__stat-ft">{text("dashStatBirthdaysFt", "窗口内共 {n} 人", { n: data.birthdays.length })}</span>{/if}
             </button>
-            <button class="lvct-dash__stat" onclick={openNeverContactedPeople} disabled={data.ordinaryScopeUnknown}
+            <button class="lvct-dash__stat lvct-dash__stat--never" onclick={openNeverContactedPeople} disabled={data.ordinaryScopeUnknown}
                 title={data.ordinaryScopeUnknown ? text("dashStatDisabledSelfHint", "请先在设置中核实本人身份") : undefined}>
-                <span class="lvct-dash__stat-ic lvct-dash__stat-ic--warn" aria-hidden="true"><UserX size={14} /></span>
+                <div class="lvct-dash__stat-top">
+                    <span class="lvct-dash__stat-ic lvct-dash__stat-ic--warn" aria-hidden="true"><UserX size={14} /></span>
+                    <span class="lvct-dash__stat-tag lvct-dash__stat-tag--warn">待激活</span>
+                </div>
                 <b>{data.ordinaryScopeUnknown ? "—" : data.neverContacted}</b>
                 <span>{text("dashStatNever", "从未互动")}</span>
                 {#if data.staleTotal > data.neverContacted}<span class="lvct-dash__stat-ft">{text("dashStatNeverFt", "另有久未联系 {n} 人", { n: data.staleTotal })}</span>{/if}
@@ -1117,6 +1180,62 @@ import { filterPeopleByRegion } from "../../domain/region";
                     {/if}
                 </div>
             </div>
+
+            <!-- 周度 7 天时序滑轨（Weekly Glance Strip） -->
+            {#if weekGlanceDays.length > 0}
+                <div class="lvct-week-glance" role="region" aria-label="本周人脉日程滑轨">
+                    <div class="lvct-week-glance__header">
+                        <span class="lvct-week-glance__title">📅 本周日程视窗</span>
+                        {#if selectedGlanceOffset !== null}
+                            <button type="button" class="b3-button b3-button--text b3-button--small" onclick={() => (selectedGlanceOffset = null)}>
+                                查看全部行动
+                            </button>
+                        {/if}
+                    </div>
+                    <div class="lvct-week-glance__track">
+                        {#each weekGlanceDays as day (day.offset)}
+                            <button
+                                type="button"
+                                class="lvct-week-glance__pill"
+                                class:lvct-week-glance__pill--today={day.offset === 0}
+                                class:lvct-week-glance__pill--active={selectedGlanceOffset === day.offset}
+                                class:lvct-week-glance__pill--has-events={day.totalEvents > 0}
+                                onclick={() => {
+                                    selectedGlanceOffset = selectedGlanceOffset === day.offset ? null : day.offset;
+                                }}
+                                title={`${day.dayName} (${day.dateKey})：${day.birthdays.length} 个生日，${day.followUps.length} 条待办`}
+                            >
+                                <span class="lvct-week-glance__day">{day.dayName}</span>
+                                <span class="lvct-week-glance__num">{day.dayNum}</span>
+                                <div class="lvct-week-glance__dots">
+                                    {#if day.birthdays.length > 0}<span class="lvct-week-glance__dot lvct-week-glance__dot--bday" title="有生日">🎂</span>{/if}
+                                    {#if day.followUps.length > 0}<span class="lvct-week-glance__dot lvct-week-glance__dot--fu" title="有待办">📌</span>{/if}
+                                    {#if day.totalEvents === 0}<span class="lvct-week-glance__dot lvct-week-glance__dot--empty">·</span>{/if}
+                                </div>
+                            </button>
+                        {/each}
+                    </div>
+                    {#if selectedGlanceDay}
+                        <div class="lvct-week-glance__focus-bar fn__flex">
+                            <span class="lvct-week-glance__focus-label">
+                                <b>{selectedGlanceDay.dayName}（{selectedGlanceDay.dateKey}）安排：</b>
+                                {#if selectedGlanceDay.totalEvents === 0}
+                                    当天暂无生日或待办事项
+                                {:else}
+                                    {#if selectedGlanceDay.birthdays.length > 0}
+                                        🎂 生日：{selectedGlanceDay.birthdays.map((b) => b.person.name).join("、")}
+                                    {/if}
+                                    {#if selectedGlanceDay.birthdays.length > 0 && selectedGlanceDay.followUps.length > 0} · {/if}
+                                    {#if selectedGlanceDay.followUps.length > 0}
+                                        📌 待办：{selectedGlanceDay.followUps.map((f) => f.item.title || "跟进").join("、")}
+                                    {/if}
+                                {/if}
+                            </span>
+                        </div>
+                    {/if}
+                </div>
+            {/if}
+
             <StatusNotice message={alError ? text("dashOpFailed", "操作失败：{msg}", { msg: alError }) : ""} error />
             <StatusNotice message={alMessage} actionLabel={undoAction ? "撤销" : undefined} onAction={undoAction ? runUndo : undefined} onDismiss={() => { alMessage = ""; undoAction = null; }} />
             {#if data.ordinaryScopeUnknown}

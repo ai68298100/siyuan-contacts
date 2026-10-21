@@ -4313,6 +4313,38 @@ html[data-theme-mode="dark"] .lvct-doc-strip {
     gap: var(--lvct-sp-4);
 }
 
+.lvct-detail__header--starred {
+    background: linear-gradient(135deg, color-mix(in srgb, #f59e0b 10%, var(--lvct-bg-surface)), var(--lvct-bg-surface));
+    border: 1px solid color-mix(in srgb, #f59e0b 35%, var(--lvct-border-subtle));
+    padding: 12px 14px;
+    border-radius: var(--lvct-r-lg);
+    box-shadow: 0 2px 10px rgba(245, 158, 11, 0.08);
+}
+
+.lvct-badge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--lvct-r-pill, 9999px);
+
+    &--star {
+        background: color-mix(in srgb, #f59e0b 16%, transparent);
+        color: #d97706;
+        border: 1px solid color-mix(in srgb, #f59e0b 35%, transparent);
+    }
+}
+
+.lvct-detail__avatar-star {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    font-size: 12px;
+    line-height: 1;
+}
+
 .lvct-detail__header {
     display: grid;
     grid-template-columns: var(--lvct-avatar-lg) minmax(0, 1fr) auto;
@@ -4331,6 +4363,7 @@ html[data-theme-mode="dark"] .lvct-doc-strip {
 
 /* UX-01.6：详情头部 56px Squircle 柔光渐变大头像 */
 .lvct-detail__avatar {
+    position: relative;
     width: var(--lvct-avatar-lg);
     height: var(--lvct-avatar-lg);
     border-radius: 16px;
@@ -4776,29 +4809,31 @@ html[data-theme-mode="dark"] .lvct-doc-strip {
     align-items: center;
     flex-wrap: wrap;
     gap: 8px 12px;
-    padding: 7px 12px;
-    border-radius: 8px;
+    padding: 9px 14px;
+    border-radius: 12px;
     background: color-mix(in srgb, var(--lvct-bg-app) 60%, var(--lvct-bg-surface));
     border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 60%, transparent);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
     font-size: 12.5px;
-    transition: background var(--lvct-dur-fast) var(--lvct-ease), border-color var(--lvct-dur-fast) var(--lvct-ease);
+    transition: background var(--lvct-dur-fast) var(--lvct-ease), border-color var(--lvct-dur-fast) var(--lvct-ease), box-shadow var(--lvct-dur-fast) var(--lvct-ease);
 
     &::before {
         content: "";
         position: absolute;
         left: -19px;
-        top: 13px;
+        top: 15px;
         width: 8px;
         height: 8px;
         border-radius: 50%;
         background: var(--lvct-accent);
-        box-shadow: 0 0 0 3px var(--lvct-bg-surface);
+        box-shadow: 0 0 0 3px var(--lvct-bg-surface), 0 0 6px color-mix(in srgb, var(--lvct-accent) 40%, transparent);
         flex-shrink: 0;
     }
 
     &:hover {
-        background: var(--lvct-bg-hover);
-        border-color: color-mix(in srgb, var(--lvct-accent) 26%, var(--lvct-border-subtle));
+        background: var(--lvct-bg-surface);
+        border-color: color-mix(in srgb, var(--lvct-accent) 30%, var(--lvct-border-subtle));
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     }
 
     .b3-button { flex-shrink: 0; }
@@ -5093,10 +5128,106 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
     gap: var(--lvct-sp-4);
 }
 
+/* 正向关怀里程碑激励横幅 (Milestone Encouragement Banner) */
+.lvct-dash__milestone-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--lvct-sp-3);
+    padding: 10px 16px;
+    border-radius: var(--lvct-r-lg);
+    background: linear-gradient(135deg, color-mix(in srgb, #f59e0b 14%, var(--lvct-bg-surface)), color-mix(in srgb, #ec4899 8%, var(--lvct-bg-surface)));
+    border: 1px solid color-mix(in srgb, #f59e0b 28%, var(--lvct-border-subtle));
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.08);
+}
+
+.lvct-dash__milestone-left {
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.lvct-dash__milestone-emoji {
+    font-size: 20px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.lvct-dash__milestone-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12.5px;
+    color: var(--b3-theme-on-background);
+    line-height: 1.4;
+
+    b {
+        font-weight: 650;
+        color: var(--b3-theme-on-background);
+    }
+
+    span {
+        color: var(--b3-theme-on-surface);
+        font-size: 12px;
+    }
+}
+
+.lvct-dash__milestone-btn {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--lvct-accent, var(--b3-theme-primary));
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
 .lvct-dash__stats {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: var(--lvct-sp-4);
+}
+
+.lvct-dash__stat-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.lvct-dash__stat-tag {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--lvct-border-subtle) 60%, transparent);
+    color: var(--b3-theme-on-surface);
+    line-height: 1.4;
+
+    &--hl {
+        background: color-mix(in srgb, #f59e0b 18%, transparent);
+        color: #d97706;
+    }
+
+    &--warn {
+        background: color-mix(in srgb, #ef4444 14%, transparent);
+        color: #dc2626;
+    }
+}
+
+/* Bento 色调微背景 */
+.lvct-dash__stat--people {
+    background: linear-gradient(150deg, color-mix(in srgb, #0ea5e9 7%, var(--lvct-bg-surface)), var(--lvct-bg-surface));
+}
+
+.lvct-dash__stat--relations {
+    background: linear-gradient(150deg, color-mix(in srgb, #8b5cf6 7%, var(--lvct-bg-surface)), var(--lvct-bg-surface));
+}
+
+.lvct-dash__stat--birthdays {
+    background: linear-gradient(150deg, color-mix(in srgb, #f59e0b 8%, var(--lvct-bg-surface)), var(--lvct-bg-surface));
+}
+
+.lvct-dash__stat--never {
+    background: linear-gradient(150deg, color-mix(in srgb, #ec4899 7%, var(--lvct-bg-surface)), var(--lvct-bg-surface));
 }
 
 /* UX-02.3 统计卡：左对齐渐变大数字 + 图标章 + 悬停提升 + 顶部渐变发丝线 + 漫反射微光晕 */
@@ -7636,6 +7767,109 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
     border-color: color-mix(in srgb, var(--lvct-border-subtle) 78%, transparent);
     border-radius: var(--lvct-r-card);
     box-shadow: var(--lvct-shadow-1);
+}
+
+/* 周度 7 天时序滑轨（Weekly Glance Strip） */
+.lvct-week-glance {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 8px 0 12px;
+    padding: 10px 14px;
+    background: var(--lvct-bg-app);
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 75%, transparent);
+    border-radius: var(--lvct-r-lg);
+}
+
+.lvct-week-glance__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.lvct-week-glance__title {
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--b3-theme-on-background);
+}
+
+.lvct-week-glance__track {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    overflow-x: auto;
+}
+
+.lvct-week-glance__pill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 4px;
+    border-radius: var(--lvct-r-md);
+    background: var(--lvct-bg-surface);
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 60%, transparent);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-width: 0;
+
+    &:hover {
+        border-color: var(--b3-theme-primary);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    &--today {
+        border-color: var(--b3-theme-primary);
+        background: color-mix(in srgb, var(--b3-theme-primary) 10%, var(--lvct-bg-surface));
+        font-weight: 700;
+
+        .lvct-week-glance__day {
+            color: var(--b3-theme-primary);
+            font-weight: 700;
+        }
+    }
+
+    &--active {
+        background: var(--b3-theme-primary) !important;
+        color: #ffffff !important;
+        border-color: var(--b3-theme-primary) !important;
+
+        .lvct-week-glance__day,
+        .lvct-week-glance__num {
+            color: #ffffff !important;
+        }
+    }
+}
+
+.lvct-week-glance__day {
+    font-size: 11px;
+    color: var(--b3-theme-on-surface);
+    line-height: 1.2;
+}
+
+.lvct-week-glance__num {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--b3-theme-on-background);
+    margin: 2px 0;
+}
+
+.lvct-week-glance__dots {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 11px;
+    line-height: 1;
+    min-height: 14px;
+}
+
+.lvct-week-glance__focus-bar {
+    padding: 6px 10px;
+    background: color-mix(in srgb, var(--b3-theme-primary) 8%, var(--lvct-bg-surface));
+    border-radius: var(--lvct-r-sm);
+    font-size: 12px;
+    color: var(--b3-theme-on-background);
 }
 
 .lvct-home__card {
