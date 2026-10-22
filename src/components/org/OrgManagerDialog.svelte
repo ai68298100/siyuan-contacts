@@ -685,6 +685,8 @@
                 if (!alive || fromInitialProp && initialOrgDocId !== docId) return;
                 newOrgName = "";
                 addPersonId = "";
+                selectedMemberIds = [];
+                batchRemoveConfirm = false;
                 const selectedOrg = orgs.find((org) => org.docId === docId);
                 addAffiliationKind = selectedOrg?.name.trim() === "家庭" ? "family" : "unspecified";
                 addStatus = selectedOrg?.archived ? "former" : "active";

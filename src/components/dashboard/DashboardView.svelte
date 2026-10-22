@@ -1216,21 +1216,33 @@ import { toLocalDateKey } from "../../domain/interactions";
                         {/each}
                     </div>
                     {#if selectedGlanceDay}
-                        <div class="lvct-week-glance__focus-bar fn__flex">
+                        <div class="lvct-week-glance__focus-bar fn__flex" style="flex-wrap: wrap; align-items: center; gap: 6px;">
                             <span class="lvct-week-glance__focus-label">
                                 <b>{selectedGlanceDay.dayName}（{selectedGlanceDay.dateKey}）安排：</b>
                                 {#if selectedGlanceDay.totalEvents === 0}
                                     当天暂无生日或待办事项
-                                {:else}
-                                    {#if selectedGlanceDay.birthdays.length > 0}
-                                        🎂 生日：{selectedGlanceDay.birthdays.map((b) => b.person.name).join("、")}
-                                    {/if}
-                                    {#if selectedGlanceDay.birthdays.length > 0 && selectedGlanceDay.followUps.length > 0} · {/if}
-                                    {#if selectedGlanceDay.followUps.length > 0}
-                                        📌 待办：{selectedGlanceDay.followUps.map((f) => f.item.title || "跟进").join("、")}
-                                    {/if}
                                 {/if}
                             </span>
+                            {#if selectedGlanceDay.totalEvents > 0}
+                                {#each selectedGlanceDay.birthdays as b (b.person.itemId)}
+                                    <button
+                                        type="button"
+                                        class="b3-button b3-button--text b3-button--small"
+                                        style="padding: 2px 6px; font-size: 11.5px; border-radius: 4px; background: color-mix(in srgb, #f59e0b 14%, var(--lvct-bg-surface)); color: #d97706;"
+                                        title={`查看 ${b.person.name} 详情`}
+                                        onclick={() => onOpenDetail(b.person)}
+                                    >🎂 {b.person.name}</button>
+                                {/each}
+                                {#each selectedGlanceDay.followUps as f (f.item.id)}
+                                    <button
+                                        type="button"
+                                        class="b3-button b3-button--text b3-button--small"
+                                        style="padding: 2px 6px; font-size: 11.5px; border-radius: 4px; background: color-mix(in srgb, var(--lvct-accent) 12%, var(--lvct-bg-surface)); color: var(--lvct-accent);"
+                                        title={f.person ? `查看 ${f.person.name} 详情` : f.item.title || "跟进"}
+                                        onclick={() => { if (f.person) onOpenDetail(f.person); }}
+                                    >📌 {f.item.title || "保持联系"}{f.person ? `（${f.person.name}）` : ""}</button>
+                                {/each}
+                            {/if}
                         </div>
                     {/if}
                 </div>
