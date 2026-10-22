@@ -1770,7 +1770,7 @@
             <div class="fn__flex" style="width: 100%; align-items: center; gap: 8px;">
                 <input
                     class="b3-text-field fn__flex-1 lvct-people__mobile-search"
-                    type="text"
+                    type="search"
                     aria-label={text("peopleSearchPlaceholder", "搜索联系人")}
                     placeholder={text("peopleSearchPlaceholder", "搜索姓名/电话/微信/邮箱/标签…")}
                     value={searchInput}
@@ -1791,7 +1791,7 @@
             <input
                 bind:this={searchInputElement}
                 class="b3-text-field lvct-people__desktop-search"
-                type="text"
+                type="search"
                 aria-label={text("peopleSearchPlaceholder", "搜索联系人")}
                 placeholder={text("peopleSearchPlaceholder", "搜索姓名/拼音/电话/微信… (按 / 聚焦，Esc 清空)")}
                 value={searchInput}
