@@ -11,6 +11,7 @@
     } from "../../domain/region.ts";
     import { profileText } from "../../domain/people-profiles.ts";
     import { copyPlainText } from "../../shared/clipboard.ts";
+    import { onDestroy } from "svelte";
     import { MapPin, Search, Copy, Check, Filter, Compass, Briefcase, Phone } from "@lucide/svelte";
 
     let {
@@ -117,6 +118,10 @@
             copySuccess = false;
         }, 2000);
     }
+
+    onDestroy(() => {
+        if (copyTimer) clearTimeout(copyTimer);
+    });
 
     function handleApplyAndClose(city: string) {
         onApplyRegionFilter(city);

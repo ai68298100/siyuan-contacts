@@ -6993,6 +6993,23 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
     border: 1px solid var(--lvct-border-subtle);
 }
 
+.lvct-org-manager__member-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--lvct-sp-2);
+    margin: 8px 0;
+    width: 100%;
+    box-sizing: border-box;
+
+    input[type="search"] {
+        min-width: 140px;
+        flex: 1 1 180px;
+        height: 32px;
+        box-sizing: border-box;
+    }
+}
+
 .lvct-org-manager__select-all {
     display: inline-flex;
     align-items: center;
