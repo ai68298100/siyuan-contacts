@@ -215,15 +215,21 @@
 
     /* 下拉选择框：强制文字水平与垂直精确居中，修正与按钮等高 */
     .b3-select {
-        height: var(--lvct-control-h-compact, 32px);
-        min-height: var(--lvct-control-h-compact, 32px);
-        max-height: var(--lvct-control-h-compact, 32px);
-        line-height: calc(var(--lvct-control-h-compact, 32px) - 2px);
-        padding: 0 24px 0 12px;
+        height: var(--lvct-control-h-compact, 36px);
+        min-height: var(--lvct-control-h-compact, 36px);
+        max-height: var(--lvct-control-h-compact, 36px);
+        line-height: calc(var(--lvct-control-h-compact, 36px) - 2px);
+        padding: 0 16px;
         text-align: center;
         text-align-last: center;
+        -webkit-text-align-last: center;
+        -moz-text-align-last: center;
         vertical-align: middle;
         cursor: pointer;
+
+        option {
+            text-align: center;
+        }
     }
 
     /* Keep native input semantics while drawing checkbox/radio states from theme tokens. */
