@@ -1781,7 +1781,23 @@ import StatusNotice from "../StatusNotice.svelte";
 
     const personRegion = $derived(extractNormalizedRegion(current));
     const isStarred = $derived(preferences ? isPersonStarred(preferences, current.docId) : false);
+
+    function handleDetailGlobalKeydown(event: KeyboardEvent) {
+        if (event.altKey && (event.key === "ArrowLeft" || event.key === "Left")) {
+            if (previousPerson && !busy) {
+                event.preventDefault();
+                void navigate(previousPerson);
+            }
+        } else if (event.altKey && (event.key === "ArrowRight" || event.key === "Right")) {
+            if (nextPerson && !busy) {
+                event.preventDefault();
+                void navigate(nextPerson);
+            }
+        }
+    }
 </script>
+
+<svelte:window onkeydown={handleDetailGlobalKeydown} />
 
 <div class="lvct-detail">
     <div class="lvct-detail__header" class:lvct-detail__header--starred={isStarred}>
@@ -1856,8 +1872,8 @@ import StatusNotice from "../StatusNotice.svelte";
         </div>
         <div class="lvct-detail__header-actions">
             <button class="b3-button b3-button--outline" onclick={() => (editing = true)} disabled={busy || deleting}>{text("detailEdit", "编辑")}</button>
-            <button class="b3-button b3-button--outline" onclick={() => navigate(previousPerson)} disabled={!previousPerson || busy}>{text("detailPrevious", "上一位")}</button>
-            <button class="b3-button b3-button--outline" onclick={() => navigate(nextPerson)} disabled={!nextPerson || busy}>{text("detailNext", "下一位")}</button>
+            <button class="b3-button b3-button--outline" onclick={() => navigate(previousPerson)} disabled={!previousPerson || busy} title={previousPerson ? `上一位：${previousPerson.name} (Alt+←)` : undefined}>{text("detailPrevious", "上一位")}</button>
+            <button class="b3-button b3-button--outline" onclick={() => navigate(nextPerson)} disabled={!nextPerson || busy} title={nextPerson ? `下一位：${nextPerson.name} (Alt+→)` : undefined}>{text("detailNext", "下一位")}</button>
         </div>
     </div>
 

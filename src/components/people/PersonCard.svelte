@@ -6,6 +6,7 @@
     import { computeRelationshipHealth, heatLevelColorClass } from "../../domain/cadence";
     import { ExternalLink, Phone, MessageCircle, Mail, Clock3, Network, Star } from "@lucide/svelte";
     import PersonProfileSummary from "./PersonProfileSummary.svelte";
+    import { copyPlainText } from "../../shared/clipboard";
 
     let {
         person,
@@ -181,7 +182,27 @@
         {/if}
         <div class="lvct-person-card__meta">
             {#if person.phone}<div><span aria-hidden="true"><Phone size={13}/></span><a class="lvct-person-card__meta-value" href={telHref(person.phone)} onclick={(event) => event.stopPropagation()}>{person.phone}</a></div>{/if}
-            {#if person.wechat}<div><span aria-hidden="true"><MessageCircle size={13}/></span><span class="lvct-person-card__meta-value">{person.wechat}</span></div>{/if}
+            {#if person.wechat}
+                <div>
+                    <span aria-hidden="true"><MessageCircle size={13}/></span>
+                    <span
+                        class="lvct-person-card__meta-value"
+                        role="button"
+                        tabindex="0"
+                        title="点击复制微信号"
+                        onclick={(event) => {
+                            event.stopPropagation();
+                            void copyPlainText(person.wechat);
+                        }}
+                        onkeydown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                                event.stopPropagation();
+                                void copyPlainText(person.wechat);
+                            }
+                        }}
+                    >{person.wechat}</span>
+                </div>
+            {/if}
             {#if person.email}<div><span aria-hidden="true"><Mail size={13}/></span><a class="lvct-person-card__meta-value" href={mailHref(person.email)} onclick={(event) => event.stopPropagation()}>{person.email}</a></div>{/if}
             <div>
                 <span aria-hidden="true"><Clock3 size={13}/></span>
