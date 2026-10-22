@@ -3858,6 +3858,56 @@ html[data-theme-mode="dark"] .lvct-graph__fab {
         opacity: .42;
         transform: none;
     }
+
+    &--active {
+        background: color-mix(in srgb, var(--lvct-accent) 20%, transparent) !important;
+        color: var(--lvct-accent-text) !important;
+    }
+}
+
+.lvct-graph__layout-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 0;
+    min-width: 180px;
+    padding: 6px;
+    background: var(--lvct-bg-surface);
+    border: 1px solid var(--lvct-border-subtle);
+    border-radius: var(--lvct-r-md);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+
+    button {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        border: none;
+        border-radius: var(--lvct-r-sm);
+        background: transparent;
+        color: var(--b3-theme-on-background);
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        text-align: left;
+        white-space: nowrap;
+        transition: all var(--lvct-dur-fast) ease;
+
+        &:hover {
+            background: var(--b3-theme-surface-lighter);
+            color: var(--b3-theme-primary);
+        }
+
+        &.active {
+            background: color-mix(in srgb, var(--b3-theme-primary) 12%, transparent);
+            color: var(--b3-theme-primary);
+            font-weight: 600;
+        }
+    }
 }
 
 /* 移动端图谱操作按钮保留图标视觉，扩展为标准触控尺寸。 */
