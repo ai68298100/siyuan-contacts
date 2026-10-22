@@ -396,12 +396,14 @@
     let peopleFocusIds: string[] = $state([]);
     let peopleFocusLabel = $state("");
     let peopleFocusSort: "name" | "group" | "birthday" | "recent" | undefined = $state(undefined);
+    let detailInitialTab: "overview" | "activity" | "relations" = $state("overview");
     const currentMeta = $derived(viewMeta[current]);
 
-    async function openDetail(person: ContactSummary) {
+    async function openDetail(person: ContactSummary, initialTab: "overview" | "activity" | "relations" = "overview") {
         if (!lifecycleToken.isAlive()) return;
         if (detailPerson && !(await canLeave.requestClose())) return;
         if (!lifecycleToken.isAlive()) return;
+        detailInitialTab = initialTab;
         showDetail(person);
     }
 
@@ -853,6 +855,7 @@
             preferences={currentPreferences}
             onPreferencesChange={savePreferences}
             person={detailPerson}
+            initialTab={detailInitialTab}
             availableGroups={peopleGroups}
             revision={dataRevision}
             collapsedSections={currentPreferences.detailCollapsedSections}
