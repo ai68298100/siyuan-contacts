@@ -1761,7 +1761,7 @@
             {text("peopleCleanup", "整理")}{duplicatePairs.length > 0 ? ` ·${duplicatePairs.length}${duplicatePairsCapped ? "（上限）" : ""}` : ""}
         </button>
         <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); importing = true; }}><FolderInput size={16}/>{text("peopleImportDocs", "导入已有文档")}</button>
-        <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); vcarding = true; }}><ContactRound size={16}/>{text("peopleVcard", "vCard 导入/导出")}</button>
+        <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); vcarding = true; }}><ContactRound size={16}/>{text("peopleVcard", "批量导入/导出 (Excel/vCard)")}</button>
         <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); occasioning = true; }}><Calendar size={16}/>{text("peopleOccasion", "记录活动")}</button>
         <button class="b3-button b3-button--outline" onclick={() => { if (isMobile) closeMobileSheet(false); regionExploring = true; }}><Compass size={16}/>{text("peopleRegionExplorer", "城市与出差")}</button>
     {/snippet}
@@ -2312,7 +2312,7 @@
     {/if}
 
     {#if vcarding}
-        <LvctDialog title="vCard 通讯录导入/导出" wide onClose={() => (vcarding = false)}>
+        <LvctDialog title="通讯录批量导入/导出（Excel/CSV/vCard）" wide onClose={() => (vcarding = false)}>
             <VCardDialog
                 {settings}
                 {i18n}

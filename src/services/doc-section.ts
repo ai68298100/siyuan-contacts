@@ -10,10 +10,59 @@ import type { ContactSummary } from "../domain/person";
 import { escapeLinkLabel } from "../domain/format";
 import { loadInteractionStore } from "../data/interactions.ts";
 import type { InteractionEvent } from "../domain/interactions.ts";
+import { profileText } from "../domain/people-profiles.ts";
 import type { Plugin } from "siyuan";
 
 export const RELATED_SECTION_ATTR = "custom-lvct-related";
 export const INTERACTIONS_SECTION_ATTR = "custom-lvct-interactions";
+export const PROFILE_SECTION_ATTR = "custom-lvct-profile";
+
+export function profileSectionMarkdown(person: ContactSummary): string {
+    const lines = ["## 人脉基本档案", ""];
+    if (person.phone) lines.push(`- **电话**：${person.phone}`);
+    if (person.wechat) lines.push(`- **微信**：${person.wechat}`);
+    if (person.email) lines.push(`- **邮箱**：${person.email}`);
+    if (person.birthday) {
+        const bdayStr = person.isLunar ? `${person.birthday}（农历）` : person.birthday;
+        lines.push(`- **生日**：${bdayStr}`);
+    }
+    if (person.group) lines.push(`- **分组**：${person.group}`);
+    if (person.tags && person.tags.length > 0) lines.push(`- **标签**：${person.tags.map((t) => `#${t}`).join(" ")}`);
+    if (person.profile) {
+        const work = profileText(person.profile, "work");
+        const edu = profileText(person.profile, "education");
+        const fam = profileText(person.profile, "family");
+        const rel = profileText(person.profile, "relationship");
+        if (work && work !== "—") lines.push(`- **工作单位**：${work}`);
+        if (edu && edu !== "—") lines.push(`- **学校**：${edu}`);
+        if (fam && fam !== "—") lines.push(`- **家庭**：${fam}`);
+        if (rel && rel !== "—") lines.push(`- **与我的关系**：${rel}`);
+    }
+    if (lines.length <= 2) return "";
+    return lines.join("\n");
+}
+
+/** 同步某人物文档的正文基本资料档案区块（真实落盘到思源笔记正文） */
+export async function syncPersonProfileDocSection(person: ContactSummary): Promise<void> {
+    if (!person.docId) return;
+    const existing = await readMarkedBlocks(person.docId, PROFILE_SECTION_ATTR);
+    const markdown = profileSectionMarkdown(person);
+    if (existing.length === 0 && !markdown) return;
+    if (existing.length === 1 && contentWithoutIal(existing[0].markdown) === markdown) return;
+    try {
+        await upsertMarkedBlock(person.docId, PROFILE_SECTION_ATTR, markdown, existing[0]?.id);
+    } catch (err) {
+        console.warn("[lvct] 人脉基本档案同步到正文未完成", err);
+    }
+}
+
+/** 完整同步人脉档案与往来记录到思源独立文档正文 */
+export async function syncFullPersonDocument(plugin: Plugin, person: ContactSummary): Promise<void> {
+    await Promise.all([
+        syncPersonProfileDocSection(person),
+        syncInteractionDocSection(plugin, person.docId),
+    ]);
+}
 
 const INTERACTION_ICONS: Record<string, string> = {
     meet: "🤝 见面",
