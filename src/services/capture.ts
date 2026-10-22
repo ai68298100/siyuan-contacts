@@ -9,7 +9,7 @@ import type { ContactSummary } from "../domain/person";
 import { createDocWithMd, KernelResponseError, KernelPermissionError, newNodeId } from "../api/client";
 import { documentHPath, markdownHeading } from "../domain/format";
 import { bindDocsAsRows, mapBoundDocIds } from "../api/av";
-import { findBlockIdByCustomAttr, findOutgoingLinkRoots, getBlockContent, listNotebookDocs, readMarkedBlocks, upsertMarkedBlock } from "../api/blocks";
+import { findBlockIdByCustomAttr, findOutgoingLinkRoots, getBlockContent, listNotebookDocs, readMarkedBlocks, upsertMarkedBlock, fetchDocMarkdown } from "../api/blocks";
 import {
     buildOccasionMarkdown,
     normalizeOccasionPlace,
@@ -37,18 +37,30 @@ export interface CapturePreview {
     sourceStatus?: "available";
     /** 出链指向、且已在人脉库的联系人 */
     linked: ContactSummary[];
+    /** 正文中提及姓名但尚未建立双链的联系人（虚拟引用） */
+    mentioned?: ContactSummary[];
 }
 
 export async function previewCapture(settings: ContactsSettings, docId: string): Promise<CapturePreview> {
-    const [linkedDocIds, roster, docName] = await Promise.all([
+    const [linkedDocIds, roster, docName, docResult] = await Promise.all([
         findOutgoingLinkRoots(docId),
         getRoster(settings),
         getBlockContent(docId),
+        fetchDocMarkdown(docId).catch(() => ({ content: "", hPath: "" })),
     ]);
     const linkedSet = new Set(linkedDocIds);
     const linked = roster.filter((person) => linkedSet.has(person.docId));
     if (docName === null || docName === undefined) throw new Error("来源笔记不可达，未生成捕获预览");
-    return { docName, linked, sourceDocId: docId, sourceStatus: "available" };
+
+    // 虚拟引用嗅探：正文中出现名字但尚未建立显式双链的人脉
+    const content = docResult?.content || "";
+    const mentioned = content ? roster.filter((person) => {
+        if (linkedSet.has(person.docId)) return false;
+        const name = person.name.trim();
+        return name.length >= 2 && content.includes(name);
+    }) : [];
+
+    return { docName, linked, mentioned, sourceDocId: docId, sourceStatus: "available" };
 }
 
 export type RecognizeTargetResolution =

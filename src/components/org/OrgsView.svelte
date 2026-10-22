@@ -152,6 +152,48 @@
         }
         return count;
     });
+
+    let activeOrgDocId = $state<string>("");
+    let activeOrgMembers = $state<import("../../services/org").OrganizationMember[]>([]);
+    let activeOrgMembersLoading = $state(false);
+
+    $effect(() => {
+        if (!activeOrgDocId && filteredOrgs.length > 0) {
+            activeOrgDocId = filteredOrgs[0].docId;
+        } else if (activeOrgDocId && !filteredOrgs.some((o) => o.docId === activeOrgDocId) && filteredOrgs.length > 0) {
+            activeOrgDocId = filteredOrgs[0].docId;
+        }
+    });
+
+    $effect(() => {
+        const docId = activeOrgDocId;
+        if (!docId || typeof facade?.listOrganizationMembers !== "function") {
+            activeOrgMembers = [];
+            return;
+        }
+        let cancelled = false;
+        activeOrgMembersLoading = true;
+        facade.listOrganizationMembers(docId).then((members) => {
+            if (!cancelled) {
+                activeOrgMembers = members;
+                activeOrgMembersLoading = false;
+            }
+        }).catch(() => {
+            if (!cancelled) activeOrgMembersLoading = false;
+        });
+        return () => { cancelled = true; };
+    });
+
+    const activeSelectedOrg = $derived(filteredOrgs.find((o) => o.docId === activeOrgDocId) ?? null);
+    const departmentStats = $derived.by(() => {
+        if (!activeOrgMembers.length) return [];
+        const counts = new Map<string, number>();
+        for (const m of activeOrgMembers) {
+            const dept = m.department?.trim() || "未分部门";
+            counts.set(dept, (counts.get(dept) ?? 0) + 1);
+        }
+        return Array.from(counts.entries()).map(([name, count]) => ({ name, count }));
+    });
 </script>
 
 <div class="lvct-orgs-view">
@@ -261,7 +303,16 @@
     {:else if filteredOrgs.length > 0}
         <div class="lvct-orgs-view__grid">
             {#each filteredOrgs as org (org.docId)}
-                <div class="lvct-orgs-view__card" data-org-doc-id={org.docId} class:lvct-orgs-view__card--archived={org.archived}>
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                    class="lvct-orgs-view__card"
+                    class:lvct-orgs-view__card--selected={activeOrgDocId === org.docId}
+                    data-org-doc-id={org.docId}
+                    class:lvct-orgs-view__card--archived={org.archived}
+                    onclick={() => { activeOrgDocId = org.docId; }}
+                >
                     <div class="lvct-orgs-view__card-head">
                         {#if logoUrlOf(org) && failedLogoUrls[org.docId] !== logoUrlOf(org)}
                             <img class="lvct-orgs-view__card-logo" src={logoUrlOf(org)} alt="" width="40" height="40" loading="lazy" decoding="async" onerror={() => markLogoFailed(org.docId, logoUrlOf(org))} />
@@ -301,5 +352,71 @@
                 </div>
             {/each}
         </div>
+
+        <!-- 下半区：选定组织架构与成员全貌工作台看板，彻底消除空白大框 -->
+        {#if activeSelectedOrg}
+            <div class="lvct-home__card lvct-orgs-cockpit" role="region" aria-label="选定组织架构全景">
+                <div class="lvct-orgs-cockpit__header">
+                    <div class="lvct-orgs-cockpit__title-wrap">
+                        <span class="lvct-orgs-cockpit__tag">🏢 组织人脉全貌</span>
+                        <h4>{activeSelectedOrg.name}</h4>
+                        <span class="lvct-text-muted font-size-12">（共 {activeOrgMembers.length} 名成员）</span>
+                    </div>
+                    <div class="lvct-orgs-cockpit__actions">
+                        <button type="button" class="b3-button b3-button--text b3-button--small" onclick={() => onOpenOrgManager(activeSelectedOrg.docId)}>
+                            管理架构 &gt;
+                        </button>
+                        {#if onOpenPeople}
+                            <button
+                                type="button"
+                                class="b3-button b3-button--text b3-button--small"
+                                onclick={() => {
+                                    const memberDocIds = activeSelectedOrg.memberships.map((m) => m.personDocId);
+                                    onOpenPeople?.({ workQuery: activeSelectedOrg.name, memberDocIds, label: `组织 · ${activeSelectedOrg.name}` });
+                                }}
+                            >
+                                在名册中筛选 &gt;
+                            </button>
+                        {/if}
+                    </div>
+                </div>
+
+                <!-- 部门分布胶囊栏 -->
+                {#if departmentStats.length > 0}
+                    <div class="lvct-orgs-cockpit__depts">
+                        <span class="lvct-text-muted font-size-11">部门分布：</span>
+                        {#each departmentStats as dept}
+                            <span class="b3-chip font-size-11" style="cursor: default;">
+                                {dept.name} <b style="margin-left: 2px;">{dept.count}</b>
+                            </span>
+                        {/each}
+                    </div>
+                {/if}
+
+                <!-- 成员小网格 -->
+                {#if activeOrgMembersLoading}
+                    <div class="ft__smaller ft__on-surface">正在加载组织成员架构…</div>
+                {:else if activeOrgMembers.length > 0}
+                    <div class="lvct-orgs-cockpit__members">
+                        {#each activeOrgMembers as member (member.id)}
+                            <div class="lvct-orgs-cockpit__member-item" title={`${member.personName} · ${[member.department, member.title].filter(Boolean).join(" · ")}`}>
+                                <span class="lvct-orgs-cockpit__avatar">{member.personName.slice(0, 1)}</span>
+                                <div class="lvct-orgs-cockpit__member-info">
+                                    <b>{member.personName}</b>
+                                    <span class="lvct-text-muted font-size-11">
+                                        {[member.department, member.title].filter(Boolean).join(" · ") || (member.status === "active" ? "在职" : "曾任")}
+                                    </span>
+                                </div>
+                                <span class="lvct-orgs-cockpit__status" class:lvct-orgs-cockpit__status--active={member.status === "active"}>
+                                    {member.status === "active" ? "在职" : "已离开"}
+                                </span>
+                            </div>
+                        {/each}
+                    </div>
+                {:else}
+                    <p class="ft__smaller ft__on-surface">该组织暂无成员，点击上方「管理」即可添加联系人归属。</p>
+                {/if}
+            </div>
+        {/if}
     {/if}
 </div>
