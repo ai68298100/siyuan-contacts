@@ -458,14 +458,23 @@
         await selectView("people");
     }
 
-    async function openPeople(focus?: { itemIds?: readonly string[]; label?: string; sort?: "name" | "group" | "birthday" | "recent"; workQuery?: string }) {
+    async function openPeople(focus?: { itemIds?: readonly string[]; label?: string; sort?: "name" | "group" | "birthday" | "recent"; workQuery?: string; memberDocIds?: readonly string[] }) {
         if (!lifecycleToken.isAlive()) return;
         if (current !== "people" && !(await canLeave.requestClose())) return;
         if (!lifecycleToken.isAlive()) return;
         const previousView = current;
         current = "people";
         if (previousView !== "people") syncViewHistory("people", "push");
-        peopleFocusIds = focus?.itemIds ? [...focus.itemIds] : [];
+
+        let targetItemIds: string[] = [];
+        if (focus?.itemIds && focus.itemIds.length > 0) {
+            targetItemIds = [...focus.itemIds];
+        } else if (focus?.memberDocIds && focus.memberDocIds.length > 0 && peopleOrder.length > 0) {
+            const docIdSet = new Set(focus.memberDocIds);
+            targetItemIds = peopleOrder.filter((p) => docIdSet.has(p.docId)).map((p) => p.itemId);
+        }
+
+        peopleFocusIds = targetItemIds;
         peopleFocusLabel = focus?.label ?? "";
         peopleFocusSort = focus?.sort;
     }

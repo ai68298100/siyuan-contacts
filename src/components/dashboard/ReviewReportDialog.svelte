@@ -22,7 +22,7 @@
         buildReport?: (range: ReviewRange) => Promise<ReviewReport>;
         buildAuditReport?: (previous?: HealthAuditReport) => Promise<HealthAuditReport>;
         retryFailedAuditModules?: (report: HealthAuditReport) => Promise<HealthAuditReport>;
-        onOpenPeople?: (focus: { itemIds: readonly string[]; label: string }) => void;
+        onOpenPeople?: (focus: { itemIds?: readonly string[]; memberDocIds?: readonly string[]; label: string }) => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -315,7 +315,7 @@
                                 <button
                                     type="button"
                                     class="b3-button b3-button--text b3-button--small"
-                                    onclick={() => onOpenPeople?.({ itemIds: [], label: `最常联系 · ${item.name}` })}
+                                    onclick={() => onOpenPeople?.({ memberDocIds: [item.personDocId], label: `最常联系 · ${item.name}` })}
                                 >在名册中查看</button>
                             {/if}
                         </li>

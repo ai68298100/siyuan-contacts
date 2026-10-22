@@ -27,10 +27,24 @@ export function profileText(profile: PersonProfile | undefined, field: "family" 
 }
 
 export function matchesProfileFilters(profile: PersonProfile | undefined, filter: { workQuery?: string; educationQuery?: string; relationshipLabel?: string }): boolean {
-    for (const field of ["work", "education"] as const) {
-        const query = (field === "work" ? filter.workQuery : filter.educationQuery)?.trim().toLowerCase();
-        if (query && (profile?.affiliations.state !== "known" || !profile.affiliations.value[field].some((item) =>
-            [item.orgName, item.statusLabel ?? orgMembershipStatusLabel(item), item.department, item.title].filter(Boolean).join(" ").toLowerCase().includes(query)))) return false;
+    if (filter.workQuery?.trim()) {
+        const query = filter.workQuery.trim().toLowerCase();
+        if (profile?.affiliations.state !== "known") return false;
+        const affs = profile.affiliations.value;
+        const allWork = [...(affs.work ?? []), ...(affs.unspecified ?? [])];
+        if (!allWork.some((item) =>
+            [item.orgName, item.statusLabel ?? orgMembershipStatusLabel(item), item.department, item.title].filter(Boolean).join(" ").toLowerCase().includes(query))) {
+            return false;
+        }
+    }
+    if (filter.educationQuery?.trim()) {
+        const query = filter.educationQuery.trim().toLowerCase();
+        if (profile?.affiliations.state !== "known") return false;
+        const affs = profile.affiliations.value;
+        if (!affs.education.some((item) =>
+            [item.orgName, item.statusLabel ?? orgMembershipStatusLabel(item), item.department, item.title].filter(Boolean).join(" ").toLowerCase().includes(query))) {
+            return false;
+        }
     }
     const label = filter.relationshipLabel?.trim();
     return !label || profile?.relationship.state === "known" && profile.relationship.labels.includes(label);

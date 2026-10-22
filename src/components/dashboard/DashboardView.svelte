@@ -49,7 +49,7 @@ import { toLocalDateKey } from "../../domain/interactions";
         preferences: ViewPreferences;
         revision?: number;
         onOpenDetail: (person: ContactSummary) => void;
-        onOpenPeople: (focus?: { itemIds: readonly string[]; label: string; sort?: "name" | "group" | "birthday" | "recent" }) => void;
+        onOpenPeople: (focus?: { itemIds?: readonly string[]; memberDocIds?: readonly string[]; label?: string; sort?: "name" | "group" | "birthday" | "recent" }) => void;
         onOpenGraph: () => void;
         onCreate?: () => void;
         onImportVCard?: () => void;

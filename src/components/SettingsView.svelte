@@ -49,7 +49,7 @@ import type { ViewPreferences } from "../domain/preferences";
         onBack: () => void;
         onInteractionsUpdated?: () => void;
         /** C03：体检「查看」跳转联系人页（按人物 itemIds 聚焦筛选） */
-        onOpenPeople?: (focus: { itemIds: readonly string[]; label: string }) => void;
+        onOpenPeople?: (focus: { itemIds?: readonly string[]; memberDocIds?: readonly string[]; label: string }) => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string) => translateText(i18n, key, fallback));
 

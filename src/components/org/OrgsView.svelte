@@ -26,7 +26,7 @@
         onOpenOrgManager: (docId?: string) => void;
         onCreateOrganization?: () => void;
         onEditOrganization?: (docId: string) => void;
-        onOpenPeople?: (focus?: { itemIds?: readonly string[]; label?: string; workQuery?: string }) => void;
+        onOpenPeople?: (focus?: { itemIds?: readonly string[]; label?: string; workQuery?: string; memberDocIds?: readonly string[] }) => void;
         onOpenGraphOrg?: (orgDocId: string) => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
@@ -288,7 +288,10 @@
                             {text("orgsEditProfile", "编辑资料")}</button>{/if}
                         {#if onOpenPeople}<button type="button" class="b3-button b3-button--text" disabled={loading || !!errorText}
                             title="在名册中筛选属于该组织的成员"
-                            onclick={() => onOpenPeople?.({ workQuery: org.name, label: `组织 · ${org.name}` })}>
+                            onclick={() => {
+                                const memberDocIds = org.memberships.map((m) => m.personDocId);
+                                onOpenPeople?.({ workQuery: org.name, memberDocIds, label: `组织 · ${org.name}` });
+                            }}>
                             <Users size={13} /> {text("orgsViewMembers", "成员")}</button>{/if}
                         {#if onOpenGraphOrg}<button type="button" class="b3-button b3-button--text" disabled={loading || !!errorText}
                             title="在关系图谱中聚焦该组织的人脉网络"
