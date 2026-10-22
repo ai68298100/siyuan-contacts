@@ -194,7 +194,7 @@
     /* ---------- 13. 布局尺寸 ---------- */
     --lvct-sidebar-w: 192px;         /* 桌面端左侧栏导航；对齐原型与 R54 的紧凑工作台 */
     --lvct-dialog-w: 560px;          /* 标准模态（与 libs/dialog.ts 一致） */
-    --lvct-dialog-w-wide: 720px;     /* 宽版模态（导入/vCard） */
+    --lvct-dialog-w-wide: 920px;     /* 宽版模态（详情/导入/vCard/合并向导） */
     --lvct-touch-min: 40px;          /* 桌面交互目标下限 */
     --lvct-touch-min-mobile: 44px;   /* 移动端触控目标下限 */
     --lvct-graph-height: clamp(520px, 68dvh, 880px);

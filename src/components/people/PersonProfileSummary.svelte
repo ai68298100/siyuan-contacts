@@ -41,19 +41,26 @@
         <div><dt>工作单位</dt><dd>{profileText(profile, "work")}</dd></div>
         <div><dt>学校</dt><dd>{profileText(profile, "education")}</dd></div>
         <div><dt>与我的关系</dt><dd>{profileText(profile, "relationship")}</dd></div>
-            <div><dt>资料来源</dt><dd>组织成员分类；本人参照下的人工称谓。核对时间 {new Date(profile.readAt).toLocaleString()}</dd></div>
-            {#if profile.affiliations.state === "known"}
-                <div><dt>历史与待核对</dt><dd>历史/归档 {profile.affiliations.value.history.length} 条，组织不可达 {profile.affiliations.value.unresolved.length} 条；在组织归属中核对具体期间。</dd></div>
-            {/if}
     </dl>
     {/if}
 {/if}
 
 <style>
-    .lvct-profile-summary { margin: var(--lvct-sp-2) 0; color: var(--lvct-text-2); font-size: var(--lvct-fs-caption); }
-    .lvct-profile-summary div { display: flex; gap: 8px; margin: 4px 0; }
-    .lvct-profile-summary dt { flex: 0 0 84px; color: var(--lvct-text-3); }
-    .lvct-profile-summary dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+    .lvct-profile-summary {
+        margin: var(--lvct-sp-2) 0;
+        padding: 12px 14px;
+        background: var(--lvct-bg-surface);
+        border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 80%, transparent);
+        border-radius: var(--lvct-r-lg);
+        color: var(--lvct-text-2);
+        font-size: var(--lvct-fs-caption);
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+        gap: 8px 16px;
+    }
+    .lvct-profile-summary div { display: flex; gap: 8px; margin: 0; align-items: baseline; }
+    .lvct-profile-summary dt { flex: 0 0 70px; color: var(--lvct-text-3); font-weight: 500; }
+    .lvct-profile-summary dd { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--lvct-text-1); font-weight: 550; }
     .lvct-profile-summary--compact {
         display: inline-flex;
         align-items: center;

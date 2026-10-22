@@ -7327,6 +7327,11 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
         /* 归档状态由徽标说明；名称和操作保持正常对比度。 */
         &--archived { opacity: 1; }
 
+        &--selected {
+            border-color: var(--b3-theme-primary) !important;
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--b3-theme-primary) 20%, transparent), var(--lvct-shadow-2) !important;
+        }
+
         &:hover {
             border-color: var(--lvct-border-strong);
             box-shadow: var(--lvct-shadow-2);
@@ -7471,6 +7476,133 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
     width: 1px;
     height: 24px;
     background: var(--b3-theme-surface-lighter);
+}
+
+/* 组织架构与成员工作台看板（Master-Detail） */
+.lvct-orgs-cockpit {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lvct-sp-3);
+    padding: var(--lvct-sp-4);
+    background: var(--lvct-bg-surface);
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 85%, transparent);
+    border-radius: var(--lvct-r-lg);
+    box-shadow: var(--lvct-shadow-card);
+    margin-top: var(--lvct-sp-2);
+
+    &__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: var(--lvct-sp-2);
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--b3-theme-surface-lighter);
+    }
+
+    &__title-wrap {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+
+        h4 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--b3-theme-on-background);
+        }
+    }
+
+    &__tag {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: var(--lvct-r-pill);
+        background: color-mix(in srgb, var(--b3-theme-primary) 12%, transparent);
+        color: var(--b3-theme-primary);
+    }
+
+    &__actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    &__depts {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    &__members {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+        gap: 8px;
+        max-height: 280px;
+        overflow-y: auto;
+    }
+
+    &__member-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: var(--lvct-r-md);
+        background: color-mix(in srgb, var(--lvct-bg-app) 70%, var(--lvct-bg-surface));
+        border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 60%, transparent);
+        transition: all 0.15s ease;
+
+        &:hover {
+            border-color: var(--b3-theme-primary);
+            background: var(--lvct-bg-surface);
+        }
+    }
+
+    &__avatar {
+        width: 24px;
+        height: 24px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #ffffff;
+        display: grid;
+        place-items: center;
+        border-radius: 6px;
+        background: linear-gradient(135deg, color-mix(in srgb, var(--b3-theme-primary) 70%, #ffffff 30%), var(--b3-theme-primary));
+        flex-shrink: 0;
+    }
+
+    &__member-info {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-width: 0;
+        gap: 1px;
+
+        b {
+            font-size: 12.5px;
+            color: var(--b3-theme-on-background);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
+
+    &__status {
+        font-size: 10px;
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: var(--b3-theme-surface-lighter);
+        color: var(--b3-theme-on-surface);
+        flex-shrink: 0;
+
+        &--active {
+            background: color-mix(in srgb, #10b981 15%, transparent);
+            color: #059669;
+            font-weight: 600;
+        }
+    }
 }
 
 /* B13.6 共同背景 */

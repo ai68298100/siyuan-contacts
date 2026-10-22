@@ -95,17 +95,22 @@
 </script>
 
 <section class="lvct-detail__section lvct-relationship-labels">
-    <h4>与我的关系</h4>
-    <p class="ft__smaller">人工填写多个称谓，用顿号分隔。仅对当前本人档案生效；组织、分组和相关人不会自动生成称谓。清空后保存会保留明确空值。</p>
-    {#if loading}<p role="status">正在核实本人参照与称谓…</p>
-    {:else if readError}<p role="alert">{readError}</p>
-    {:else if !snapshot?.selfDocId}<p>请先在设置中设置本人档案。</p>
+    <div class="lvct-detail__section-head" style="margin-bottom: 8px;">
+        <div>
+            <h4 style="margin: 0;">与我的关系</h4>
+            <p class="ft__smaller ft__on-surface" style="margin: 2px 0 0;">人工填写称谓（如：同事、朋友、表哥，多个用顿号分隔），仅对当前本人档案生效。</p>
+        </div>
+        <button class="b3-button b3-button--text" disabled={busy || loading || dirty && !unknown} onclick={() => void load()}>重新读取核实称谓</button>
+    </div>
+    {#if loading}<p role="status" class="ft__smaller">正在核实本人参照与称谓…</p>
+    {:else if readError}<p role="alert" class="lvct-form__error">{readError}</p>
+    {:else if !snapshot?.selfDocId}<p class="ft__smaller">请先在设置中设置本人档案。</p>
     {:else}
-        <p class="ft__smaller">本人文档 {snapshot.selfDocId}；人物文档 {personDocId}</p>
-        <label class="lvct-form__item">关系称谓<input class="b3-text-field" type="text" bind:value={draft} disabled={busy || unknown} maxlength="1600" /></label>
-        <button class="b3-button b3-button--outline" onclick={() => void save()} disabled={busy || unknown || !dirty}>{busy ? "保存中…" : "保存称谓"}</button>
-        <button class="b3-button b3-button--cancel" disabled={busy} onclick={() => { message = ""; void load(false); }}>取消称谓草稿</button>
+        <div class="fn__flex" style="gap: 8px; align-items: center; flex-wrap: wrap;">
+            <input class="b3-text-field fn__flex-1" type="text" placeholder="填写与我的关系称谓，如：同事、朋友" bind:value={draft} disabled={busy || unknown} maxlength="1600" />
+            <button class="b3-button b3-button--outline" onclick={() => void save()} disabled={busy || unknown || !dirty}>{busy ? "保存中…" : "保存称谓"}</button>
+            <button class="b3-button b3-button--cancel" disabled={busy} onclick={() => { message = ""; void load(false); }}>取消称谓草稿</button>
+        </div>
     {/if}
-    <button class="b3-button b3-button--text" disabled={busy || loading || dirty && !unknown} onclick={() => void load()}>重新读取核实称谓</button>
-    {#if message}<p role="status" tabindex="-1" bind:this={resultElement}>{message}</p>{/if}
+    {#if message}<p role="status" tabindex="-1" class="ft__smaller" style="margin-top: 4px;" bind:this={resultElement}>{message}</p>{/if}
 </section>

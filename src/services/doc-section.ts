@@ -8,8 +8,50 @@ import { readMarkedBlocks, upsertMarkedBlock } from "../api/blocks";
 import { KernelPermissionError, KernelResponseError } from "../api/client";
 import type { ContactSummary } from "../domain/person";
 import { escapeLinkLabel } from "../domain/format";
+import { loadInteractionStore } from "../data/interactions.ts";
+import type { InteractionEvent } from "../domain/interactions.ts";
+import type { Plugin } from "siyuan";
 
 export const RELATED_SECTION_ATTR = "custom-lvct-related";
+export const INTERACTIONS_SECTION_ATTR = "custom-lvct-interactions";
+
+const INTERACTION_ICONS: Record<string, string> = {
+    meet: "🤝 见面",
+    call: "📞 电话",
+    message: "💬 消息",
+    meal: "🍽️ 聚餐",
+    mail: "✉️ 邮件",
+    other: "📝 互动",
+};
+
+export function interactionSectionMarkdown(events: readonly InteractionEvent[]): string {
+    if (events.length === 0) return "";
+    const lines = ["## 往来记录", ""];
+    for (const event of events) {
+        const typeStr = (event.type && INTERACTION_ICONS[event.type]) ? INTERACTION_ICONS[event.type] : "📝 互动";
+        const noteStr = event.note?.trim() ? `：${event.note.trim()}` : "";
+        lines.push(`- ${event.localDate} ${typeStr}${noteStr}`);
+    }
+    return lines.join("\n");
+}
+
+/** 同步某人物文档的正文往来记录区块（真实落盘到思源笔记正文） */
+export async function syncInteractionDocSection(plugin: Plugin, personDocId: string): Promise<void> {
+    const store = await loadInteractionStore(plugin);
+    const tombstones = new Set(store.tombstones);
+    const events = store.events
+        .filter((e) => e.personDocId === personDocId && !tombstones.has(e.id))
+        .sort((a, b) => b.occurredAt - a.occurredAt);
+    const existing = await readMarkedBlocks(personDocId, INTERACTIONS_SECTION_ATTR);
+    const markdown = interactionSectionMarkdown(events);
+    if (existing.length === 0 && !markdown) return;
+    if (existing.length === 1 && contentWithoutIal(existing[0].markdown) === markdown) return;
+    try {
+        await upsertMarkedBlock(personDocId, INTERACTIONS_SECTION_ATTR, markdown, existing[0]?.id);
+    } catch (err) {
+        console.warn("[lvct] 互动记录同步到正文未完成", err);
+    }
+}
 
 function sectionMarkdown(related: readonly ContactSummary[]): string {
     const links = related.map((item) => `[${escapeLinkLabel(item.name)}](siyuan://blocks/${item.docId})`);

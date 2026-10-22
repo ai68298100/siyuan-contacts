@@ -213,6 +213,19 @@
         }
     }
 
+    /* 下拉选择框：强制文字水平与垂直精确居中，修正与按钮等高 */
+    .b3-select {
+        height: var(--lvct-control-h-compact, 32px);
+        min-height: var(--lvct-control-h-compact, 32px);
+        max-height: var(--lvct-control-h-compact, 32px);
+        line-height: calc(var(--lvct-control-h-compact, 32px) - 2px);
+        padding: 0 24px 0 12px;
+        text-align: center;
+        text-align-last: center;
+        vertical-align: middle;
+        cursor: pointer;
+    }
+
     /* Keep native input semantics while drawing checkbox/radio states from theme tokens. */
     input[type="checkbox"]:not(.b3-switch):not(.lvct-switch input),
     input[type="radio"]:not(.b3-switch):not(.lvct-switch input) {

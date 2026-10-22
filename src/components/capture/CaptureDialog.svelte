@@ -38,6 +38,7 @@
     let preview: CapturePreview | null = $state(null);
     let checked: Record<string, boolean> = $state({});
     let linkedDocIds: string[] = $state([]);
+    let mentionedDocIds: string[] = $state([]);
     let newNamesText: string = $state("");
     let date: string = $state(toLocalDateKey());
     let place: string = $state("");
@@ -141,8 +142,10 @@
             preview = await facade.previewCapture(docId);
             const initial: Record<string, boolean> = {};
             for (const person of preview.linked) initial[person.docId] = true;
+            for (const person of preview.mentioned ?? []) initial[person.docId] = true;
             checked = initial;
             linkedDocIds = preview.linked.map((person) => person.docId);
+            mentionedDocIds = (preview.mentioned ?? []).map((person) => person.docId);
             aiMatchedIds = [];
             aiCandidates = [];
             /* V-19：初始勾选不算草稿——基线在此刻落定（重试重载同样复基线） */
@@ -389,6 +392,15 @@
             running = false;
         }
     }
+const allCandidates = $derived.by<ContactSummary[]>(() => {
+    if (!preview) return [];
+    const map = new Map<string, ContactSummary>();
+    for (const p of preview.linked) map.set(p.docId, p);
+    for (const p of preview.mentioned ?? []) {
+        if (!map.has(p.docId)) map.set(p.docId, p);
+    }
+    return Array.from(map.values());
+});
 </script>
 
 <div class="lvct-form">
@@ -511,23 +523,24 @@
         {#if step === 1}
         <div id="lvct-capture-panel-1" role="region" aria-labelledby="lvct-capture-step-1">
         <div class="lvct-form__item">
-            <span>{text("captureCandidateCount", "联系人候选（{n}，来源见各项标记）", { n: preview.linked.length })}</span>
-            {#if preview.linked.length === 0}
+            <span>{text("captureCandidateCount", "联系人候选（{n}，来源见各项标记）", { n: allCandidates.length })}</span>
+            {#if allCandidates.length === 0}
                 <p class="ft__smaller ft__on-surface">
                     {text("captureNoLinked", "本笔记没有链接到任何联系人。可先在笔记里用 [[姓名]] 链接联系人，或在下方直接输入新人名单。")}
                 </p>
             {:else}
                 <div class="lvct-capture__list">
-                    {#each preview.linked as person (person.docId)}
+                    {#each allCandidates as person (person.docId)}
                         <label class="lvct-import__row">
                             <input class="b3-switch" type="checkbox" bind:checked={checked[person.docId]} />
                             <span><b>{person.name}</b></span>
-                            {#if preview.linked.filter((candidate) => candidate.name === person.name).length > 1}
+                            {#if allCandidates.filter((candidate) => candidate.name === person.name).length > 1}
                                 <small>{person.phone || person.email || "—"} · {person.docId} · {person.itemId}</small>
                             {/if}
                             <span class="ft__smaller ft__on-surface">{person.group || text("captureUngrouped", "未分组")}</span>
                             {#if linkedDocIds.includes(person.docId)}<span class="lvct-capture__source-badge">{text("captureBadgeLink", "双链")}</span>{/if}
-                            {#if aiMatchedIds.includes(person.docId) || !linkedDocIds.includes(person.docId)}<span class="lvct-capture__source-badge lvct-capture__source-badge--ai">{text("captureBadgeAi", "AI 提名")}</span>{/if}
+                            {#if mentionedDocIds.includes(person.docId)}<span class="lvct-capture__source-badge lvct-capture__source-badge--ai" style="background: color-mix(in srgb, #f59e0b 16%, transparent); color: #d97706;">正文提及</span>{/if}
+                            {#if aiMatchedIds.includes(person.docId) || (!linkedDocIds.includes(person.docId) && !mentionedDocIds.includes(person.docId))}<span class="lvct-capture__source-badge lvct-capture__source-badge--ai">{text("captureBadgeAi", "AI 提名")}</span>{/if}
                         </label>
                     {/each}
                 </div>
