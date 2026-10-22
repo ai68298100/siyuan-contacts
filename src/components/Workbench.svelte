@@ -876,6 +876,7 @@
             onSavePersonNote={(docId, note, expected) => facade.savePersonNote(docId, note, expected)}
             onInspectLegacyPersonNote={facade.inspectLegacyPersonNote ? (docId) => facade.inspectLegacyPersonNote(docId) : undefined}
             onDetachLegacyPersonNote={facade.detachLegacyPersonNote ? (docId, expected) => facade.detachLegacyPersonNote(docId, expected) : undefined}
+            onSyncDocProfile={facade.syncPersonDocument ? (person) => facade.syncPersonDocument!(person) : undefined}
             onLoadPersonFields={facade.loadPersonFields ? (docId) => facade.loadPersonFields(docId) : undefined}
             onSavePersonFields={facade.savePersonFields ? (docId, snapshot, expected) => facade.savePersonFields(docId, snapshot, expected) : undefined}
             onLoadExchanges={(docId) => facade.listPersonExchanges(docId)}

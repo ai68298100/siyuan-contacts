@@ -1,4 +1,5 @@
 import type { ContactsSettings } from "./domain/model";
+import type { ContactSummary } from "./domain/person";
 import type { DashboardData, DashboardOptions } from "./services/dashboard";
 import type { CaptureOptions, CapturePreview, CaptureResult } from "./services/capture";
 import type { AiExtractOutcome, AiExtractionConfirmation } from "./services/ai-extract";
@@ -50,6 +51,7 @@ export interface ContactsPluginFacade {
     /** 人物独立备注：写入对应人物文档的 custom-lvct-person-note 标记块，不计入互动统计 */
     loadPersonNote(personDocId: string): Promise<string>;
     savePersonNote(personDocId: string, note: string, expected?: string): Promise<string>;
+    syncPersonDocument?(person: ContactSummary): Promise<void>;
     inspectLegacyPersonNote(personDocId: string): Promise<import("./domain/person-note").LegacyPersonNoteSnapshot>;
     detachLegacyPersonNote(personDocId: string, expected: import("./domain/person-note").LegacyPersonNoteSnapshot): Promise<void>;
     /** 原生人物文档中的可重复资料条目与两层分组；不投影主联系方式。 */

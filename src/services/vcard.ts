@@ -4,6 +4,7 @@
  * 绑行 200/批合并、绑定映射一次批量、单元格写入复用 contacts 的 writeDraftCells。
  */
 import { parseVcfForImport, serializeVcf } from "../domain/vcard.ts";
+import { parseCsvContacts } from "../domain/csv-contacts.ts";
 import type { VCardContact, VcfDocumentCheckpoint } from "../domain/vcard.ts";
 import { emptyDraft, validateDraft } from "../domain/person";
 import type { ContactDraft, ContactSummary } from "../domain/person";
@@ -77,15 +78,21 @@ export interface VcfImportReport {
 /** 解析 vCard 文本并对名册查重，产出可预览勾选的导入计划 */
 export async function buildVcfImportPlan(settings: ContactsSettings, text: string): Promise<VcfImportPlan[]> {
     let parsed: VCardContact[];
-    try {
-        parsed = parseVcfForImport(text);
-    } catch (error) {
-        // Issue #35 攻坚：若由于全文件缺少标准 FN/N 姓名导致严格导入失败，尝试以电话/邮箱智能暂代挽救
+    const trimmed = text.trim();
+    if (trimmed.startsWith("BEGIN:VCARD") || trimmed.includes("END:VCARD")) {
         try {
-            parsed = parseVcfForImport(text, { fallbackToPhoneOrEmail: true });
-        } catch {
-            throw error;
+            parsed = parseVcfForImport(text);
+        } catch (error) {
+            // Issue #35 攻坚：若由于全文件缺少标准 FN/N 姓名导致严格导入失败，尝试以电话/邮箱智能暂代挽救
+            try {
+                parsed = parseVcfForImport(text, { fallbackToPhoneOrEmail: true });
+            } catch {
+                throw error;
+            }
         }
+    } else {
+        // CSV / Excel 导出表格导入
+        parsed = parseCsvContacts(text);
     }
     invalidateRoster();
     const roster = await getRoster(settings);
@@ -98,6 +105,7 @@ export async function buildVcfImportPlan(settings: ContactsSettings, text: strin
         seenInBatch.add(contact.name);
         const draft: ContactDraft = {
             ...emptyDraft(), name: contact.name, phone: contact.phone, email: contact.email,
+            wechat: contact.wechat ?? "",
             website: contact.website, birthday: contact.birthday, isLunar: contact.isLunar, tags: [...contact.tags],
         };
         return {

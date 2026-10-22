@@ -2,7 +2,7 @@
     import { requestErrorMessage } from "../../shared/error-presenter";
     /** 人物详情窗口：档案字段、互动与关系列表（增删，内核自动维护双向回链） */
     import { onDestroy, tick, untrack } from "svelte";
-    import { CalendarDays, Copy, ExternalLink, ChevronDown, ChevronRight, Network, Check, Link, FileText, Star } from "@lucide/svelte";
+    import { CalendarDays, Copy, ExternalLink, ChevronDown, ChevronRight, Network, Check, Link, FileText, Star, RefreshCw } from "@lucide/svelte";
     import { isPersonStarred, togglePersonStarred, type ViewPreferences } from "../../domain/preferences";
     import { extractNormalizedRegion } from "../../domain/region.ts";
     import type { DetailSectionKey, DetailCollapsedSections } from "../../domain/preferences";
@@ -86,6 +86,7 @@ import StatusNotice from "../StatusNotice.svelte";
         onSavePersonNote,
         onInspectLegacyPersonNote,
         onDetachLegacyPersonNote,
+        onSyncDocProfile,
         onLoadPersonFields,
         onSavePersonFields,
         onOpenPersonDoc,
@@ -149,6 +150,7 @@ import StatusNotice from "../StatusNotice.svelte";
         onSavePersonNote?: (docId: string, note: string, expected?: string) => Promise<string>;
         onInspectLegacyPersonNote?: (docId: string) => Promise<LegacyPersonNoteSnapshot>;
         onDetachLegacyPersonNote?: (docId: string, expected: LegacyPersonNoteSnapshot) => Promise<void>;
+        onSyncDocProfile?: (person: ContactSummary) => Promise<void>;
         onLoadPersonFields?: (docId: string) => Promise<PersonFieldsState>;
         onSavePersonFields?: (docId: string, snapshot: PersonFieldsSnapshot, expected: PersonFieldsState) => Promise<PersonFieldsState>;
         /** B12：组织归属投影（可选：未接线时隐藏该区） */
@@ -742,6 +744,7 @@ import StatusNotice from "../StatusNotice.svelte";
     async function refreshAfterEdit() {
         await loadOthers();
         await loadInsights();
+        if (onSyncDocProfile) void onSyncDocProfile(current).catch(() => {});
         onChanged();
     }
 
@@ -1131,6 +1134,27 @@ import StatusNotice from "../StatusNotice.svelte";
     let siyuanUriCopied = $state(false);
     let siyuanUriTimer: ReturnType<typeof setTimeout> | null = null;
 
+    let docSynced = $state(false);
+    let docSyncTimer: ReturnType<typeof setTimeout> | null = null;
+    let docSyncing = $state(false);
+
+    async function handleSyncDocProfile() {
+        if (!onSyncDocProfile || !current?.docId || docSyncing) return;
+        docSyncing = true;
+        try {
+            await onSyncDocProfile(current);
+            docSynced = true;
+            if (docSyncTimer) clearTimeout(docSyncTimer);
+            docSyncTimer = setTimeout(() => {
+                docSynced = false;
+            }, 2000);
+        } catch (err) {
+            console.warn("[lvct] 同步档案到正文未完成", err);
+        } finally {
+            docSyncing = false;
+        }
+    }
+
     async function copySiyuanRef() {
         const refText = `((${current.docId} "${current.name}"))`;
         await copyPlainText(refText);
@@ -1165,6 +1189,7 @@ import StatusNotice from "../StatusNotice.svelte";
         if (briefingCopyTimer) clearTimeout(briefingCopyTimer);
         if (siyuanRefTimer) clearTimeout(siyuanRefTimer);
         if (siyuanUriTimer) clearTimeout(siyuanUriTimer);
+        if (docSyncTimer) clearTimeout(docSyncTimer);
         if (copiedTopicTimer) clearTimeout(copiedTopicTimer);
         if (copiedFieldTimer) clearTimeout(copiedFieldTimer);
         if (copyFieldErrorTimer) clearTimeout(copyFieldErrorTimer);
@@ -1942,6 +1967,21 @@ import StatusNotice from "../StatusNotice.svelte";
         >
             <FileText size={13} /> {text("detailOpenNoteDoc", "打开笔记文档")}
         </button>
+        {#if onSyncDocProfile}
+            <button
+                type="button"
+                class="b3-button b3-button--outline b3-button--small"
+                onclick={handleSyncDocProfile}
+                title="将该联系人的基本资料与往来互动，同步写入到思源独立笔记文档正文中，实现文档即档案"
+                disabled={docSyncing}
+            >
+                {#if docSynced}
+                    <Check size={13} class="lvct-text-success" /> 已同步到正文 ✓
+                {:else}
+                    <RefreshCw size={13} /> {docSyncing ? "同步中…" : "同步档案到正文"}
+                {/if}
+            </button>
+        {/if}
         {#if onOpenGraphPerson}
             <button
                 type="button"

@@ -12,6 +12,8 @@
     import type { VCardMethodPreview } from "../../domain/vcard";
     import { onDestroy } from "svelte";
     import { requestErrorMessage } from "../../shared/error-presenter";
+    import { generateCsvTemplate } from "../../domain/csv-contacts.ts";
+    import { Download } from "@lucide/svelte";
 
     let {
         settings,
@@ -113,6 +115,17 @@
             return stats;
         }, { cards: 0, mapped: 0, ignored: 0, review: 0 });
     });
+
+    function downloadCsvTemplate() {
+        const csv = generateCsvTemplate();
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "小驴人脉通讯录导入模板.csv";
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
 
     async function onFileChange(event: Event) {
         const input = event.currentTarget as HTMLInputElement;
@@ -432,19 +445,22 @@
     </div>
 
     <div class="lvct-vcard__section-title">{text("vcardImportTitle", "导入")}</div>
-    <div class="lvct-people__toolbar fn__flex">
-            <button class="b3-button b3-button--outline" onclick={() => guardedClose(() => fileInput?.click())} disabled={parsing || importing || exporting || retrying}>
-            {parsing ? text("vcardParsing", "解析中…") : text("vcardPickFile", "选择 .vcf 文件…")}
+    <div class="lvct-people__toolbar fn__flex" style="flex-wrap: wrap; gap: 8px; align-items: center;">
+        <button class="b3-button b3-button--outline" onclick={() => guardedClose(() => fileInput?.click())} disabled={parsing || importing || exporting || retrying}>
+            {parsing ? text("vcardParsing", "解析中…") : "选择 .vcf / .csv 文件…"}
+        </button>
+        <button type="button" class="b3-button b3-button--text" onclick={downloadCsvTemplate} title="下载带标准表头的 CSV/Excel 模版文件，填好后可直接在此导入">
+            <Download size={14} /> 下载 Excel/CSV 导入模板
         </button>
         <input
             bind:this={fileInput}
             class="lvct-vcard__file"
             type="file"
-            accept=".vcf,text/vcard,text/x-vcard"
+            accept=".vcf,.csv,text/vcard,text/x-vcard,text/csv"
             onchange={onFileChange}
         />
         <span class="ft__smaller ft__on-surface fn__flex-1 lvct-vcard__note">
-            {text("vcardFormatsNote", "支持通讯录应用导出的 vCard 2.1/3.0/4.0；读取 FN/N、TEL、EMAIL、URL、BDAY、CATEGORIES，其他字段会在预览中标出。")}
+            支持 vCard 2.1/3.0/4.0 或标准 CSV/Excel 表格；自动识别姓名、电话、微信、邮箱、生日、标签、公司与职位。
         </span>
     </div>
 

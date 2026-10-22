@@ -31,7 +31,7 @@ import type { AiExtractionConfirmation } from "./services/ai-extract";
 import { AiExtractionError } from "./domain/ai-preflight";
 import type { AiPreflightOptions } from "./domain/ai-preflight";
 import { loadPersonInsights } from "./services/insights";
-import { syncInteractionDocSection } from "./services/doc-section";
+import { syncInteractionDocSection, syncFullPersonDocument } from "./services/doc-section";
 import { detachLegacyPersonNote, inspectLegacyPersonNote, loadPersonNote, savePersonNote } from "./services/person-note";
 import type { LegacyPersonNoteSnapshot } from "./domain/person-note";
 import { loadPersonFields, savePersonFields } from "./services/person-fields";
@@ -904,6 +904,10 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     async deleteInteraction(personDocId: string, eventId: string): Promise<void> {
         await deleteInteraction(this, eventId, personDocId);
         void syncInteractionDocSection(this, personDocId).catch(() => {});
+    }
+
+    async syncPersonDocument(person: ContactSummary): Promise<void> {
+        await syncFullPersonDocument(this, person);
     }
 
     async listPersonExchanges(personDocId: string) {

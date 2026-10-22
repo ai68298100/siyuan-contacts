@@ -26,6 +26,7 @@ export interface VCardMethodExportEntry {
 
 export interface VCardContact {
     name: string;
+    wechat?: string;
     /** 多号码以 " / " 连接（电话是单值文本字段，保留数据优先） */
     phone: string;
     /** 解析阶段保留全部 TEL，供导入预览显示；不属于联系人持久化字段。 */
