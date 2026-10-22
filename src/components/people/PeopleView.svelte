@@ -100,7 +100,7 @@
         /** 首页快速开始入口请求打开 vCard 弹窗。 */
         vcardRequested?: number;
         onClearFocus?: () => void;
-        onOpenDetail: (person: ContactSummary) => void;
+        onOpenDetail: (person: ContactSummary, initialTab?: "overview" | "activity" | "relations") => void;
         activePersonId?: string;
         onOrderChange?: (people: ContactSummary[]) => void;
         /** 完整名册的分组候选；不随当前搜索结果缩小。 */
@@ -2202,6 +2202,7 @@
                     {onOpenPersonDoc}
                     onToggleSelected={(selected) => toggleSelected(person.itemId, selected)}
                     onOpen={onOpenDetail}
+                    onOpenActivity={(p) => onOpenDetail(p, "activity")}
                 />
             {/each}
             {#if virtualized}<div class="lvct-people__virtual-spacer" style={`height:${virtualBottomSpacer}px`} aria-hidden="true"></div>{/if}

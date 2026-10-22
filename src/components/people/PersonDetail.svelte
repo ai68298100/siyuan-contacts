@@ -66,6 +66,7 @@ import StatusNotice from "../StatusNotice.svelte";
         preferences,
         onPreferencesChange,
         person,
+        initialTab = "overview",
         availableGroups = [],
         /** FUNC-01.7-a：数据变化代际（Workbench 广播）；变化时原地重载洞察与跟进（写入/编辑中跳过） */
         revision = 0,
@@ -135,6 +136,7 @@ import StatusNotice from "../StatusNotice.svelte";
         preferences?: ViewPreferences;
         onPreferencesChange?: (preferences: ViewPreferences) => Promise<ViewPreferences>;
         person: ContactSummary;
+        initialTab?: "overview" | "activity" | "relations";
         /** 当前名册中已使用的分组，供详情编辑复用已有选项。 */
         availableGroups?: readonly string[];
         revision?: number;
@@ -486,6 +488,13 @@ import StatusNotice from "../StatusNotice.svelte";
     let editing = $state(false);
     let deleting = $state(false);
     let activeTab: "overview" | "activity" | "relations" = $state("overview");
+    $effect(() => {
+        if (initialTab) {
+            untrack(() => {
+                activeTab = initialTab;
+            });
+        }
+    });
     const tabIds = ["overview", "activity", "relations"] as const;
     async function selectTab(next: typeof activeTab): Promise<boolean> {
         if (next === activeTab) return true;
@@ -1119,6 +1128,8 @@ import StatusNotice from "../StatusNotice.svelte";
     let briefingCopyTimer: ReturnType<typeof setTimeout> | null = null;
     let siyuanRefCopied = $state(false);
     let siyuanRefTimer: ReturnType<typeof setTimeout> | null = null;
+    let siyuanUriCopied = $state(false);
+    let siyuanUriTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function copySiyuanRef() {
         const refText = `((${current.docId} "${current.name}"))`;
@@ -1127,6 +1138,16 @@ import StatusNotice from "../StatusNotice.svelte";
         if (siyuanRefTimer) clearTimeout(siyuanRefTimer);
         siyuanRefTimer = setTimeout(() => {
             siyuanRefCopied = false;
+        }, 2000);
+    }
+
+    async function copySiyuanUri() {
+        const uriText = `siyuan://blocks/${current.docId}`;
+        await copyPlainText(uriText);
+        siyuanUriCopied = true;
+        if (siyuanUriTimer) clearTimeout(siyuanUriTimer);
+        siyuanUriTimer = setTimeout(() => {
+            siyuanUriCopied = false;
         }, 2000);
     }
 
@@ -1143,6 +1164,7 @@ import StatusNotice from "../StatusNotice.svelte";
     onDestroy(() => {
         if (briefingCopyTimer) clearTimeout(briefingCopyTimer);
         if (siyuanRefTimer) clearTimeout(siyuanRefTimer);
+        if (siyuanUriTimer) clearTimeout(siyuanUriTimer);
         if (copiedTopicTimer) clearTimeout(copiedTopicTimer);
         if (copiedFieldTimer) clearTimeout(copiedFieldTimer);
         if (copyFieldErrorTimer) clearTimeout(copyFieldErrorTimer);
@@ -1898,6 +1920,18 @@ import StatusNotice from "../StatusNotice.svelte";
                 <Check size={13} class="lvct-text-success" /> {text("detailSiyuanRefCopied", "已复制双链引用 ✓")}
             {:else}
                 <Link size={13} /> {text("detailCopySiyuanRef", "复制双链引用")}
+            {/if}
+        </button>
+        <button
+            type="button"
+            class="b3-button b3-button--outline b3-button--small"
+            onclick={copySiyuanUri}
+            title="复制可在外部应用（如微信、飞书、邮件）中点击直接唤起思源打开该联系人文档的 siyuan:// 链接"
+        >
+            {#if siyuanUriCopied}
+                <Check size={13} class="lvct-text-success" /> 已复制深度链接 ✓
+            {:else}
+                <ExternalLink size={13} /> 复制深度链接
             {/if}
         </button>
         <button

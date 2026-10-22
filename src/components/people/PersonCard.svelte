@@ -4,7 +4,7 @@
     import { formatBirthdayDisplay, nextBirthday } from "../../domain/occasions";
     import { formatRelativeInteraction } from "../../domain/format";
     import { computeRelationshipHealth, heatLevelColorClass } from "../../domain/cadence";
-    import { ExternalLink, Phone, MessageCircle, Mail, Clock3, Network, Star } from "@lucide/svelte";
+    import { ExternalLink, Phone, MessageCircle, Mail, Clock3, Network, Star, MessageSquarePlus } from "@lucide/svelte";
     import PersonProfileSummary from "./PersonProfileSummary.svelte";
     import { copyPlainText } from "../../shared/clipboard";
 
@@ -16,6 +16,7 @@
         onToggleSelected,
         onOpenPersonDoc,
         onOpenGraphPerson,
+        onOpenActivity,
         starred = false,
         onToggleStarred,
         recent,
@@ -32,6 +33,7 @@
         onToggleSelected?: (selected: boolean) => void;
         onOpenPersonDoc?: (docId: string) => void;
         onOpenGraphPerson?: (docId: string) => void;
+        onOpenActivity?: (person: ContactSummary) => void;
         starred?: boolean;
         onToggleStarred?: (starred: boolean) => void;
         recent?: { occurredAt: number; localDate: string };
@@ -128,6 +130,9 @@
                         <Star size={14} fill={starred ? "#f59e0b" : "none"} color={starred ? "#f59e0b" : "currentColor"} />
                     </button>
                 {/if}
+                {#if onOpenActivity}
+                    <button type="button" class="lvct-person-card__open-doc" title={`为 ${person.name} 记一笔互动`} aria-label={`为 ${person.name} 记一笔互动`} onclick={() => onOpenActivity?.(person)}><MessageSquarePlus size={14}/></button>
+                {/if}
                 {#if onOpenGraphPerson}<button type="button" class="lvct-person-card__open-doc" title={`在关系图谱中查看 ${person.name}`} aria-label={`在关系图谱中查看 ${person.name}`} onclick={() => onOpenGraphPerson?.(person.docId)}><Network size={14}/></button>{/if}
                 {#if onOpenPersonDoc}<button type="button" class="lvct-person-card__open-doc" title={`打开 ${person.name} 的文档`} aria-label={`打开 ${person.name} 的文档`} onclick={() => onOpenPersonDoc(person.docId)}><ExternalLink size={14}/></button>{/if}
             </span>
@@ -172,6 +177,9 @@
                 >
                     <Star size={16} fill={starred ? "#f59e0b" : "none"} color={starred ? "#f59e0b" : "currentColor"} />
                 </button>
+            {/if}
+            {#if onOpenActivity}
+                <button type="button" class="lvct-person-card__open-doc" title={`为 ${person.name} 记一笔互动`} aria-label={`为 ${person.name} 记一笔互动`} onclick={(event) => { event.stopPropagation(); onOpenActivity?.(person); }}><MessageSquarePlus size={16}/></button>
             {/if}
             {#if onOpenGraphPerson}<button type="button" class="lvct-person-card__open-doc" title={`在关系图谱中查看 ${person.name}`} aria-label={`在关系图谱中查看 ${person.name}`} onclick={(event) => { event.stopPropagation(); onOpenGraphPerson?.(person.docId); }}><Network size={16}/></button>{/if}
             {#if onOpenPersonDoc}<button type="button" class="lvct-person-card__open-doc" title={`打开 ${person.name} 的文档`} aria-label={`打开 ${person.name} 的文档`} onclick={(event) => { event.stopPropagation(); onOpenPersonDoc(person.docId); }}><ExternalLink size={16}/></button>{/if}
