@@ -920,6 +920,8 @@
         onExternalSearchCleared?.();
         groupFilter = "";
         tagFilter = [];
+        activeLetterFilter = "";
+        filterStarredOnly = false;
         extraFilter = { ...EMPTY_PEOPLE_FILTER };
         sortMode = initialSort;
         currentViewId = "";
