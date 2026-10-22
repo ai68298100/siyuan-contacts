@@ -726,14 +726,19 @@ html[data-theme-mode="dark"] .lvct-wizard {
     display: flex;
     flex-direction: column;
     gap: var(--lvct-sp-3);
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .lvct-people__toolbar {
-    gap: var(--lvct-sp-2);
+    display: flex;
     align-items: center;
-    /* 拥挤时整钮换行（配合按钮 nowrap，防汉字竖排，见下） */
     flex-wrap: wrap;
+    gap: var(--lvct-sp-2);
     row-gap: var(--lvct-sp-2);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     > button { display: inline-flex; align-items: center; justify-content: center; gap: var(--lvct-sp-2); }
 
     /* 拥挤时整钮换行而非汉字竖排（导航竖排 UX-01.3 同款教训，覆盖桌面+移动） */
@@ -745,8 +750,11 @@ html[data-theme-mode="dark"] .lvct-wizard {
     order: -1;
     flex: 1 0 100%;
     width: 100%;
-    /* 保证独立使用的搜索入口不会被工具栏的固有宽度压成窄条。 */
+    /* 保证独立使用的搜索入口不会被工具栏的固有宽度压成窄条，并固定单行高度防拉伸。 */
     min-width: 260px;
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
     box-sizing: border-box;
     transition: border-color var(--lvct-dur-fast) var(--lvct-ease), box-shadow var(--lvct-dur-fast) var(--lvct-ease);
 
@@ -754,38 +762,6 @@ html[data-theme-mode="dark"] .lvct-wizard {
         border-color: var(--b3-theme-primary);
         box-shadow: 0 0 0 2px color-mix(in srgb, var(--b3-theme-primary) 20%, transparent);
     }
-}
-
-.lvct-people__row {
-    width: 100%;
-    align-items: center;
-    gap: var(--lvct-sp-2);
-
-    &--primary {
-        margin-bottom: var(--lvct-sp-2);
-        flex-wrap: wrap;
-    }
-
-    &--secondary {
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        row-gap: var(--lvct-sp-2);
-    }
-}
-
-.lvct-people__toolbar-subrow {
-    width: 100%;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: var(--lvct-sp-2);
-}
-
-.lvct-people__row-left, .lvct-people__row-right {
-    align-items: center;
-    gap: var(--lvct-sp-2);
-    flex-wrap: wrap;
 }
 
 .lvct-people__mobile-search {
@@ -2568,10 +2544,10 @@ html[data-theme-mode="dark"] .lvct-settings__nav-item--active {
 .lvct-people__alphabet-bar {
     display: flex;
     align-items: center;
-    gap: 3px;
-    padding: 4px 8px;
-    background: var(--b3-theme-surface);
-    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 80%, transparent);
+    gap: 2px;
+    padding: 3px 8px;
+    background: color-mix(in srgb, var(--lvct-bg-surface) 60%, var(--lvct-bg-app));
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 60%, transparent);
     border-radius: var(--lvct-r-md, 6px);
     margin-bottom: var(--lvct-sp-2);
     overflow-x: auto;
@@ -2607,8 +2583,13 @@ html[data-theme-mode="dark"] .lvct-settings__nav-item--active {
 
     &--active {
         background: var(--b3-theme-primary) !important;
-        color: var(--b3-theme-on-primary, #ffffff) !important;
+        color: #ffffff !important;
         font-weight: 700;
+    }
+
+    &--all {
+        font-weight: 600;
+        padding: 0 6px;
     }
 
     &:disabled {
@@ -2631,9 +2612,49 @@ html[data-theme-mode="dark"] .lvct-settings__nav-item--active {
     &::-webkit-scrollbar {
         display: none;
     }
+}
 
-    .b3-chip {
-        flex-shrink: 0;
+.lvct-people__group-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    border-radius: var(--lvct-r-pill, 9999px);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 80%, transparent);
+    background: var(--lvct-bg-surface);
+    color: var(--b3-theme-on-surface);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+
+    &:hover:not(&--active) {
+        background: var(--b3-theme-surface-lighter);
+        color: var(--b3-theme-on-background);
+        border-color: color-mix(in srgb, var(--b3-theme-primary) 40%, var(--lvct-border-subtle));
+    }
+
+    &--active {
+        background: color-mix(in srgb, var(--b3-theme-primary) 12%, var(--lvct-bg-surface));
+        color: var(--b3-theme-primary);
+        border-color: var(--b3-theme-primary);
+        font-weight: 600;
+        box-shadow: 0 1px 3px color-mix(in srgb, var(--b3-theme-primary) 15%, transparent);
+    }
+
+    &--starred {
+        color: #d97706;
+        border-color: rgba(245, 158, 11, 0.4);
+
+        &.lvct-people__group-tab--active {
+            background: #f59e0b;
+            color: #ffffff;
+            border-color: #f59e0b;
+            font-weight: 600;
+            box-shadow: 0 1px 4px rgba(245, 158, 11, 0.25);
+        }
     }
 }
 
