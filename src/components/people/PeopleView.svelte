@@ -43,6 +43,7 @@
     import { buildVirtualRows, estimateVirtualHeight, virtualRowAtOffset, virtualRowRange } from "../../domain/virtual-list";
     import { createDebouncer } from "../../domain/debounce";
     import { groupPeopleByAlphabet, getPersonNameInitial, ALPHABET_LETTERS } from "../../domain/pinyin.ts";
+    import { extractNormalizedRegion } from "../../domain/region";
 
     let {
         settings,
@@ -601,6 +602,8 @@
         const focus = new Set(focusIds);
         const isOrgFocus = focusLabel.startsWith("组织 · ");
         const orgFocusName = isOrgFocus ? focusLabel.slice(5).trim().toLowerCase() : "";
+        const isCityFocus = focusLabel.startsWith("城市 · ");
+        const targetCity = isCityFocus ? focusLabel.slice(5).trim().toLowerCase() : "";
         const isNameFocus = focusLabel.startsWith("最常联系 · ") || focusLabel.startsWith("图谱定位 · ");
         const targetName = isNameFocus ? focusLabel.slice(focusLabel.indexOf(" · ") + 3).trim().toLowerCase() : "";
         const result = filterContactSearch(people, searchText, groupFilter)
@@ -612,6 +615,14 @@
                     const affs = person.profile.affiliations.value;
                     const allAffs = [...(affs.family ?? []), ...(affs.work ?? []), ...(affs.education ?? []), ...(affs.unspecified ?? [])];
                     return allAffs.some((a) => (a.orgName || "").toLowerCase().includes(orgFocusName));
+                }
+                if (isCityFocus && targetCity) {
+                    const reg = extractNormalizedRegion(person);
+                    if (targetCity === "未填写" || targetCity === "未知") {
+                        return !reg.city || reg.city === "未知" || reg.city === "未填写";
+                    }
+                    return (reg.city && reg.city.toLowerCase().includes(targetCity)) ||
+                           (reg.province && reg.province.toLowerCase().includes(targetCity));
                 }
                 if (isNameFocus && targetName) {
                     return person.name.toLowerCase() === targetName;
