@@ -793,11 +793,13 @@ import StatusNotice from "../StatusNotice.svelte";
         }
     }
 
+    let copiedTopicTimer: ReturnType<typeof setTimeout> | null = null;
     async function handleCopyTopic(topic: import("../../domain/topics").PersonTopicItem) {
         try {
             await copyPlainText(topic.text);
             copiedTopicId = topic.id;
-            setTimeout(() => {
+            if (copiedTopicTimer) clearTimeout(copiedTopicTimer);
+            copiedTopicTimer = setTimeout(() => {
                 if (copiedTopicId === topic.id) copiedTopicId = "";
             }, 1500);
         } catch (err) {
@@ -824,6 +826,8 @@ import StatusNotice from "../StatusNotice.svelte";
 
     let copiedField = $state<string>("");
     let copyFieldError = $state<string>("");
+    let copiedFieldTimer: ReturnType<typeof setTimeout> | null = null;
+    let copyFieldErrorTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function handleCopyField(value: string, fieldKey: string) {
         if (!value) return;
@@ -831,12 +835,14 @@ import StatusNotice from "../StatusNotice.svelte";
             await copyPlainText(value);
             copiedField = fieldKey;
             copyFieldError = "";
-            setTimeout(() => {
+            if (copiedFieldTimer) clearTimeout(copiedFieldTimer);
+            copiedFieldTimer = setTimeout(() => {
                 if (copiedField === fieldKey) copiedField = "";
             }, 1800);
         } catch (err) {
             copyFieldError = requestErrorMessage(err);
-            setTimeout(() => {
+            if (copyFieldErrorTimer) clearTimeout(copyFieldErrorTimer);
+            copyFieldErrorTimer = setTimeout(() => {
                 copyFieldError = "";
             }, 2500);
         }
@@ -1137,6 +1143,9 @@ import StatusNotice from "../StatusNotice.svelte";
     onDestroy(() => {
         if (briefingCopyTimer) clearTimeout(briefingCopyTimer);
         if (siyuanRefTimer) clearTimeout(siyuanRefTimer);
+        if (copiedTopicTimer) clearTimeout(copiedTopicTimer);
+        if (copiedFieldTimer) clearTimeout(copiedFieldTimer);
+        if (copyFieldErrorTimer) clearTimeout(copyFieldErrorTimer);
     });
     function openBriefingExport() {
         const now = new Date();
