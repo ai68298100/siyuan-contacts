@@ -1564,11 +1564,13 @@ html[data-theme-mode="dark"] .lvct-people__batchbar {
     align-items: center;
     justify-content: space-between;
     gap: var(--lvct-sp-2);
-    padding: var(--lvct-sp-2) var(--lvct-sp-3);
+    padding: 8px 14px;
     border-radius: var(--lvct-r-md);
-    background: var(--lvct-bg-surface);
-    color: var(--lvct-text-2);
+    background: color-mix(in srgb, var(--lvct-accent) 8%, var(--lvct-bg-surface));
+    border: 1px solid color-mix(in srgb, var(--lvct-accent) 24%, var(--lvct-border-subtle));
+    color: var(--b3-theme-on-background);
     font-size: var(--lvct-fs-caption);
+    box-sizing: border-box;
 
     button {
         border: 0;
@@ -1576,6 +1578,12 @@ html[data-theme-mode="dark"] .lvct-people__batchbar {
         color: var(--lvct-accent);
         cursor: pointer;
         font-size: inherit;
+        font-weight: 500;
+        text-decoration: underline;
+
+        &:hover {
+            color: var(--lvct-accent-hover, var(--lvct-accent));
+        }
     }
 }
 
@@ -2957,6 +2965,43 @@ html[data-theme-mode="dark"] .lvct-notice {
     color: var(--lvct-accent);
 }
 
+/* 统一覆写与美化 b3-chip，消除宿主或三方主题下生硬黑线与方角割裂 */
+.b3-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: var(--lvct-r-pill, 9999px);
+    font-size: 11.5px;
+    font-weight: 500;
+    line-height: 1.4;
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 75%, transparent);
+    background: var(--lvct-bg-surface);
+    color: var(--b3-theme-on-surface);
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: all 0.15s ease;
+
+    &:hover:not(.b3-chip--primary) {
+        background: var(--b3-theme-surface-lighter);
+        color: var(--b3-theme-on-background);
+        border-color: color-mix(in srgb, var(--b3-theme-primary) 35%, var(--lvct-border-subtle));
+    }
+
+    &--primary {
+        background: color-mix(in srgb, var(--b3-theme-primary) 14%, var(--lvct-bg-surface)) !important;
+        color: var(--b3-theme-primary) !important;
+        border-color: var(--b3-theme-primary) !important;
+        font-weight: 600;
+        box-shadow: 0 1px 3px color-mix(in srgb, var(--b3-theme-primary) 15%, transparent);
+    }
+
+    &--dashed {
+        border-style: dashed;
+        color: var(--lvct-text-3);
+    }
+}
+
 .lvct-people__table-wrap {
     position: relative;
     overflow: auto;
@@ -3575,6 +3620,40 @@ html[data-theme-mode="dark"] .lvct-dialog-panel {
         align-items: stretch;
         gap: var(--lvct-sp-2);
         padding: var(--lvct-sp-1) 0;
+    }
+}
+
+.lvct-graph-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--lvct-sp-2);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+
+    &__primary {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--lvct-sp-2);
+        flex: 1 1 320px;
+        min-width: 0;
+
+        input[type="search"] {
+            min-width: 140px;
+            flex: 1 1 180px;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+    }
+
+    &__actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--lvct-sp-2);
     }
 }
 
