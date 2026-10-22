@@ -7,7 +7,7 @@
     import type { ContactsPluginFacade } from "../../types";
     import type { OrganizationWithMembers } from "../../services/org";
     import { filterOrganizations, type OrganizationStatusFilter } from "../../domain/organization-scan";
-    import { onDestroy } from "svelte";
+    import { onDestroy, untrack } from "svelte";
     import { requestErrorMessage } from "../../shared/error-presenter";
 
     let {
@@ -156,6 +156,19 @@
     let activeOrgDocId = $state<string>("");
     let activeOrgMembers = $state<import("../../services/org").OrganizationMember[]>([]);
     let activeOrgMembersLoading = $state(false);
+    let selectedDept = $state("");
+
+    $effect(() => {
+        activeOrgDocId;
+        untrack(() => { selectedDept = ""; });
+    });
+
+    const isLeaderRole = (title: string) => /(?:总|经理|主管|总监|主任|负责人|Leader|CEO|CTO|COO|CFO|合伙人|校长|院长|会长|部长)/i.test(title);
+
+    const displayedMembers = $derived.by(() => {
+        if (!selectedDept) return activeOrgMembers;
+        return activeOrgMembers.filter((m) => (m.department?.trim() || "未分部门") === selectedDept);
+    });
 
     $effect(() => {
         if (!activeOrgDocId && filteredOrgs.length > 0) {
@@ -381,14 +394,27 @@
                     </div>
                 </div>
 
-                <!-- 部门分布胶囊栏 -->
+                <!-- 部门分布胶囊栏（点击按部门筛选） -->
                 {#if departmentStats.length > 0}
                     <div class="lvct-orgs-cockpit__depts">
-                        <span class="lvct-text-muted font-size-11">部门分布：</span>
+                        <span class="lvct-text-muted font-size-11">部门导航：</span>
+                        <button
+                            type="button"
+                            class="b3-chip font-size-11"
+                            class:b3-chip--primary={selectedDept === ""}
+                            onclick={() => (selectedDept = "")}
+                        >
+                            全部 <b>{activeOrgMembers.length}</b>
+                        </button>
                         {#each departmentStats as dept}
-                            <span class="b3-chip font-size-11" style="cursor: default;">
+                            <button
+                                type="button"
+                                class="b3-chip font-size-11"
+                                class:b3-chip--primary={selectedDept === dept.name}
+                                onclick={() => (selectedDept = selectedDept === dept.name ? "" : dept.name)}
+                            >
                                 {dept.name} <b style="margin-left: 2px;">{dept.count}</b>
-                            </span>
+                            </button>
                         {/each}
                     </div>
                 {/if}
@@ -396,13 +422,21 @@
                 <!-- 成员小网格 -->
                 {#if activeOrgMembersLoading}
                     <div class="ft__smaller ft__on-surface">正在加载组织成员架构…</div>
-                {:else if activeOrgMembers.length > 0}
+                {:else if displayedMembers.length > 0}
                     <div class="lvct-orgs-cockpit__members">
-                        {#each activeOrgMembers as member (member.id)}
+                        {#each displayedMembers as member (member.id)}
+                            {@const leader = isLeaderRole(member.title)}
                             <div class="lvct-orgs-cockpit__member-item" title={`${member.personName} · ${[member.department, member.title].filter(Boolean).join(" · ")}`}>
-                                <span class="lvct-orgs-cockpit__avatar">{member.personName.slice(0, 1)}</span>
+                                <span class="lvct-orgs-cockpit__avatar">
+                                    {member.personName.slice(0, 1)}
+                                </span>
                                 <div class="lvct-orgs-cockpit__member-info">
-                                    <b>{member.personName}</b>
+                                    <div class="fn__flex" style="align-items: center; gap: 4px;">
+                                        <b>{member.personName}</b>
+                                        {#if leader}
+                                            <span class="lvct-chip font-size-10" style="padding: 0 4px; background: color-mix(in srgb, #f59e0b 16%, transparent); color: #d97706; font-weight: 600;">负责人</span>
+                                        {/if}
+                                    </div>
                                     <span class="lvct-text-muted font-size-11">
                                         {[member.department, member.title].filter(Boolean).join(" · ") || (member.status === "active" ? "在职" : "曾任")}
                                     </span>
@@ -414,7 +448,7 @@
                         {/each}
                     </div>
                 {:else}
-                    <p class="ft__smaller ft__on-surface">该组织暂无成员，点击上方「管理」即可添加联系人归属。</p>
+                    <p class="ft__smaller ft__on-surface">该部门暂无成员，点击上方「全部」查看其他成员。</p>
                 {/if}
             </div>
         {/if}

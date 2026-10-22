@@ -2,7 +2,7 @@
     /** 关系图谱：cytoscape 力导向布局，节点=联系人，边=related 关系，点击节点开文档 */
     import cytoscape from "cytoscape/dist/cytoscape.esm.min.mjs";
     import { onDestroy, onMount, tick, untrack } from "svelte";
-    import { Scan, ZoomIn, ZoomOut, Network, RefreshCw, Maximize2, Minimize2 } from "@lucide/svelte";
+    import { Scan, ZoomIn, ZoomOut, Network, RefreshCw, Maximize2, Minimize2, Target, GitFork, CircleDot } from "@lucide/svelte";
     import ViewState from "../ViewState.svelte";
     import StatusNotice from "../StatusNotice.svelte";
     import { loadGraphSources, loadGraphReferences } from "../../services/graph-query";
@@ -575,16 +575,57 @@
         if (alive) container?.scrollIntoView({ block: "nearest" });
     }
 
-    function relayout() {
+    type GraphLayoutType = "cose" | "concentric" | "breadthfirst" | "circle";
+    let activeLayout = $state<GraphLayoutType>("cose");
+    let layoutMenuOpen = $state(false);
+
+    const layoutLabels: Record<GraphLayoutType, string> = {
+        cose: "力导向聚类 (CoSE)",
+        concentric: "六度辐射圈 (六度人脉)",
+        breadthfirst: "层级展开 (族谱树)",
+        circle: "全局环形 (全景圈)",
+    };
+
+    function changeLayout(layoutName: GraphLayoutType) {
+        activeLayout = layoutName;
+        layoutMenuOpen = false;
         const instance = graphInstance;
         if (!instance) return;
-        instance.layout({
-            name: "cose",
-            // 与初始布局相同的同步策略，避免切视图/销毁时 COSE 的迟到帧访问已释放 renderer。
-            animate: false,
-            padding: 30,
-            nodeDimensionsIncludeLabels: true,
-        }).run();
+        if (layoutName === "concentric") {
+            instance.layout({
+                name: "concentric",
+                animate: false,
+                padding: 40,
+                concentric: (node: any) => node.degree(),
+                levelWidth: () => 2,
+            }).run();
+        } else if (layoutName === "breadthfirst") {
+            instance.layout({
+                name: "breadthfirst",
+                animate: false,
+                padding: 40,
+                directed: false,
+                circle: false,
+                spacingFactor: 1.3,
+            }).run();
+        } else if (layoutName === "circle") {
+            instance.layout({
+                name: "circle",
+                animate: false,
+                padding: 40,
+            }).run();
+        } else {
+            instance.layout({
+                name: "cose",
+                animate: false,
+                padding: 30,
+                nodeDimensionsIncludeLabels: true,
+            }).run();
+        }
+    }
+
+    function relayout() {
+        changeLayout(activeLayout);
     }
 
     function clearHover() {
@@ -1511,6 +1552,37 @@
             <div class="lvct-graph-view__canvas" bind:this={container} tabindex="-1" role="img" aria-label={`图谱画布，${snapshot.graph.nodes.length} 节点、${snapshot.graph.edges.length} 边。请切换文本视图用键盘阅读。${canvasFocusId ? `已定位 ${nodeName(canvasFocusId)}` : ""}`}></div>
             <!-- UX-02.13 视图操作收进画布右下角浮动簇（地图应用范式），工具栏只留筛选 -->
             <div class="lvct-graph__fab" role="toolbar" aria-label={text("graphViewTools", "图谱视图操作")}>
+                <div style="position: relative; display: inline-flex;">
+                    <button
+                        class="lvct-graph__fab-btn"
+                        class:lvct-graph__fab-btn--active={layoutMenuOpen}
+                        title={`当前布局：${layoutLabels[activeLayout]}，点击切换`}
+                        aria-label="切换图谱布局"
+                        disabled={!graphInstance}
+                        onclick={() => (layoutMenuOpen = !layoutMenuOpen)}
+                    >
+                        {#if activeLayout === "cose"}<Network size={15} />
+                        {:else if activeLayout === "concentric"}<Target size={15} />
+                        {:else if activeLayout === "breadthfirst"}<GitFork size={15} />
+                        {:else}<CircleDot size={15} />{/if}
+                    </button>
+                    {#if layoutMenuOpen}
+                        <div class="lvct-graph__layout-menu" role="menu">
+                            <button type="button" class:active={activeLayout === "cose"} onclick={() => changeLayout("cose")}>
+                                <Network size={14} /> 🌐 力导向聚类 (CoSE)
+                            </button>
+                            <button type="button" class:active={activeLayout === "concentric"} onclick={() => changeLayout("concentric")}>
+                                <Target size={14} /> 🎯 六度辐射圈 (六度人脉)
+                            </button>
+                            <button type="button" class:active={activeLayout === "breadthfirst"} onclick={() => changeLayout("breadthfirst")}>
+                                <GitFork size={14} /> 🌳 层级展开 (族谱树)
+                            </button>
+                            <button type="button" class:active={activeLayout === "circle"} onclick={() => changeLayout("circle")}>
+                                <CircleDot size={14} /> ⭕ 全局环形 (全景圈)
+                            </button>
+                        </div>
+                    {/if}
+                </div>
                 <button class="lvct-graph__fab-btn" title={graphInstance ? text("graphFit", "适应") : text("graphToolUnavailable", "画布尚未准备好")} aria-label={text("graphFit", "适应")} disabled={!graphInstance} onclick={() => graphInstance?.fit()}><Scan size={15} /></button>
                 <button class="lvct-graph__fab-btn" title={graphInstance ? text("graphZoomIn", "放大") : text("graphToolUnavailable", "画布尚未准备好")} aria-label={text("graphZoomIn", "放大")} disabled={!graphInstance} onclick={() => zoomBy(1.2)}><ZoomIn size={15} /></button>
                 <button class="lvct-graph__fab-btn" title={graphInstance ? text("graphZoomOut", "缩小") : text("graphToolUnavailable", "画布尚未准备好")} aria-label={text("graphZoomOut", "缩小")} disabled={!graphInstance} onclick={() => zoomBy(1 / 1.2)}><ZoomOut size={15} /></button>
