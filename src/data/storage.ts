@@ -9,9 +9,14 @@ import type { Plugin } from "siyuan";
 
 const localQueues = new Map<string, Promise<void>>();
 
-/** 写操作的前置读取：读取异常必须传递，不能按空库覆盖已有数据。 */
+/** 写操作的前置读取：读取异常必须传递，不能按空库覆盖已有数据。
+ *  依据思源官方 loadData 缓存契约：loadData 在失败时会回退兑现 plugin.data[key] 内存缓存；
+ *  为确保穿透磁盘与回读验证绝对真实，调用前显式清除该键缓存。 */
 export async function loadJsonStrict(plugin: Plugin, key: string): Promise<unknown | null> {
     try {
+        if (plugin && typeof (plugin as any).data === "object" && (plugin as any).data !== null && Object.prototype.hasOwnProperty.call((plugin as any).data, key)) {
+            delete (plugin as any).data[key];
+        }
         return (await plugin.loadData(key)) ?? null;
     } catch (cause) {
         throw new Error(`存储读取失败，操作已停止: ${key}`, { cause });
