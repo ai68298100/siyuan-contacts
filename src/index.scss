@@ -743,6 +743,26 @@ html[data-theme-mode="dark"] .lvct-wizard {
 
     /* 拥挤时整钮换行而非汉字竖排（导航竖排 UX-01.3 同款教训，覆盖桌面+移动） */
     .b3-button { white-space: nowrap; flex-shrink: 0; }
+
+    select.b3-select {
+        height: 38px;
+        min-height: 38px;
+        max-height: 38px;
+        line-height: 36px;
+        box-sizing: border-box;
+        padding: 0 16px;
+        text-align: center;
+        text-align-last: center;
+        -webkit-text-align-last: center;
+        -moz-text-align-last: center;
+        vertical-align: middle;
+        font-size: var(--lvct-fs-body);
+        border-radius: var(--lvct-r-control);
+
+        option {
+            text-align: center;
+        }
+    }
 }
 
 /* 搜索是联系人页的主要入口；给它稳定的最小宽度，工具项再按可用空间换行。 */

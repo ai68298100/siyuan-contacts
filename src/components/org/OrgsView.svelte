@@ -19,6 +19,7 @@
         onEditOrganization,
         onOpenPeople,
         onOpenGraphOrg,
+        onOpenPerson,
     }: {
         facade: ContactsPluginFacade;
         revision?: number;
@@ -28,6 +29,7 @@
         onEditOrganization?: (docId: string) => void;
         onOpenPeople?: (focus?: { itemIds?: readonly string[]; label?: string; workQuery?: string; memberDocIds?: readonly string[] }) => void;
         onOpenGraphOrg?: (orgDocId: string) => void;
+        onOpenPerson?: (docId: string) => void;
     } = $props();
     const text = $derived.by(() => (key: string, fallback: string, values?: Record<string, string | number>) =>
         translateText(i18n, key, fallback, values));
@@ -426,7 +428,16 @@
                     <div class="lvct-orgs-cockpit__members">
                         {#each displayedMembers as member (member.id)}
                             {@const leader = isLeaderRole(member.title)}
-                            <div class="lvct-orgs-cockpit__member-item" title={`${member.personName} · ${[member.department, member.title].filter(Boolean).join(" · ")}`}>
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <div
+                                class="lvct-orgs-cockpit__member-item"
+                                role="button"
+                                tabindex="0"
+                                onclick={() => onOpenPerson?.(member.personDocId)}
+                                onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") onOpenPerson?.(member.personDocId); }}
+                                style="cursor: pointer;"
+                                title={`点击查看 ${member.personName} 的人物详情`}
+                            >
                                 <span class="lvct-orgs-cockpit__avatar">
                                     {member.personName.slice(0, 1)}
                                 </span>

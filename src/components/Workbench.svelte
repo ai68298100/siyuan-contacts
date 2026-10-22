@@ -812,6 +812,7 @@
                     onEditOrganization={(docId) => void openEditOrganizationProfile(docId)}
                     onOpenPeople={(focus) => void openPeople(focus)}
                     onOpenGraphOrg={openGraphOrg}
+                    onOpenPerson={(docId) => void openPersonByDocId(docId, personReturnContext(current))}
                 />
             {:else if current === "settings"}
                 <SettingsView
