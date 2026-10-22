@@ -746,17 +746,18 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     /**
      * 覆写 onDataChanged：不覆写时宿主在同步 dataChange 后会整插件重载（打卡库 D-222）。
+     * 遵循思源 Petal Lifecycle 核心契约：接收 reason ("sync" | "overwrite")；
      * FUNC-01.7-a：先失效名册缓存（缓存可随时重建，不等 30s TTL），再防抖合并广播给
      * 本窗口工作台/档案条原地刷新（libs/data-events）；跨窗口投递依赖宿主对每个窗口
      * 实例的推送（Host pending）。
      */
-    onDataChanged() {
+    onDataChanged(reason?: "sync" | "overwrite") {
         const lifecycleToken = this.lifecycleToken;
         if (!this.isLifecycleActive(lifecycleToken) || !this.preferencesActive) return;
         const epoch = this.preferencesEpoch;
         const request = ++this.dataChangeRequest;
         this.preferenceRequests.invalidate();
-        console.debug("[lvct] storage data changed");
+        console.debug(`[lvct] storage data changed${reason ? ` (source: ${reason})` : ""}`);
         invalidateRoster();
         if (this.dataChangeTimer) window.clearTimeout(this.dataChangeTimer);
         this.dataChangeTimer = window.setTimeout(async () => {

@@ -1115,7 +1115,7 @@ import StatusNotice from "../StatusNotice.svelte";
     let siyuanRefTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function copySiyuanRef() {
-        const refText = `(( ${current.docId} "${current.name}" ))`;
+        const refText = `((${current.docId} "${current.name}"))`;
         await copyPlainText(refText);
         siyuanRefCopied = true;
         if (siyuanRefTimer) clearTimeout(siyuanRefTimer);
