@@ -173,3 +173,18 @@ test("anniversariesSectionMarkdown：生成纪念日记录", () => {
     assert.match(md, /- 结婚纪念日：05-20/);
     assert.match(md, /- 生日：1992-08-15（农历）/);
 });
+
+test("多行备注与标题防裂行转义：自动转为 <br /> 保证 Markdown 列表结构严谨", () => {
+    const events: InteractionEvent[] = [{
+        id: "ev-multi",
+        personDocId: "doc-1",
+        occurredAt: 1000,
+        localDate: "2026-10-23",
+        type: "meet",
+        note: "第一行内容\r\n第二行内容\n第三行内容",
+        source: "manual",
+    }];
+    const md = interactionSectionMarkdown(events);
+    assert.match(md, /第一行内容 <br \/> 第二行内容 <br \/> 第三行内容/);
+    assert.equal(md.split("\n").filter((l) => l.startsWith("- ")).length, 1, "多行备注不应被拆散成多个游离列表项");
+});

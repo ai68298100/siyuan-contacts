@@ -42,6 +42,11 @@ export function profileSectionMarkdown(person: ContactSummary): string {
     return lines.join("\n");
 }
 
+function cleanMarkdownLine(text: string | undefined): string {
+    if (!text) return "";
+    return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n+/g, " <br /> ").trim();
+}
+
 const INTERACTION_ICONS: Record<string, string> = {
     meet: "🤝 见面",
     call: "📞 电话",
@@ -56,7 +61,8 @@ export function interactionSectionMarkdown(events: readonly InteractionEvent[]):
     const lines = ["## 往来记录", ""];
     for (const event of events) {
         const typeStr = (event.type && INTERACTION_ICONS[event.type]) ? INTERACTION_ICONS[event.type] : "📝 互动";
-        const noteStr = event.note?.trim() ? `：${event.note.trim()}` : "";
+        const note = cleanMarkdownLine(event.note);
+        const noteStr = note ? `：${note}` : "";
         lines.push(`- ${event.localDate} ${typeStr}${noteStr}`);
     }
     return lines.join("\n");
@@ -68,7 +74,7 @@ export function followupsSectionMarkdown(items: readonly FollowUpItem[]): string
     const lines = ["## 待办跟进", ""];
     for (const item of valid) {
         const checked = item.status === "done" ? "[x]" : "[ ]";
-        const title = item.title?.trim() || "保持联系";
+        const title = cleanMarkdownLine(item.title) || "保持联系";
         lines.push(`- ${checked} 📅${item.dueDate} ${title}`);
     }
     return lines.join("\n");
@@ -93,7 +99,8 @@ export function exchangesSectionMarkdown(items: readonly ExchangeRecord[]): stri
         const amountStr = item.amount ? ` (${item.currency || "¥"}${item.amount})` : "";
         const statusStr = STATUS_LABELS[item.status] ? ` [${STATUS_LABELS[item.status]}]` : "";
         const dateStr = item.occurredOn || item.dueOn || "";
-        lines.push(`- ${dateStr} ${dir}：${item.description}${amountStr}${statusStr}`);
+        const desc = cleanMarkdownLine(item.description);
+        lines.push(`- ${dateStr} ${dir}：${desc}${amountStr}${statusStr}`);
     }
     return lines.join("\n");
 }

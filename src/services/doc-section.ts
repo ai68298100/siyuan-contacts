@@ -44,7 +44,7 @@ export class RelatedProjectionUnknownError extends Error {}
 
 function contentWithoutIal(markdown: string): string {
     return markdown.replace(/\r\n/g, "\n").trim()
-        .replace(/\n\s*\{:[^\n]*\}\s*$/, "").trim();
+        .replace(/\n\s*\{:[^}]*\}\s*$/g, "").trim();
 }
 
 /** 同步某人物文档的正文基本资料档案区块（真实落盘到思源笔记正文） */
