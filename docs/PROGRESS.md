@@ -1,3 +1,11 @@
+## 2026-10-23 v0.5.42 发布：生态中枢统领指令全面落实、跟进打卡自动化与 SQL 安全守卫
+
+- 本轮全面落实中枢指令要求并完成闭环：
+  1. 跟进打卡自动化：完成跟进任务自动联动小驴打卡，规范 `contacts:<personDocId>:<date>:<seq>` 幂等；
+  2. SQL 块 ID 强校验：新增 `assertSafeBlockId`（`/^\d{14}-[a-z0-9]{7}$/`）与 `escapeSqlString` 转义守卫；
+  3. 移动端键盘防遮挡：`LvctDialog` 挂载 `visualViewport` 监听动态抬升底边距；
+- 门禁验证：`pnpm check`（0/0）、全量 896 单测通过、Chrome桌面/390px/宿主样式 UI 各 483/483 完整通过、`pnpm build` 与 `pnpm check:release` 均通过。
+
 ## 2026-10-23 v0.5.41 发布：多行备注防裂行防御与 IAL 属性跨行解析加固
 
 - 本轮落地原生 Markdown 结构健壮性加固与属性比对排雷：

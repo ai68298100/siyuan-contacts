@@ -305,11 +305,26 @@ export interface DocRow {
     box?: string;
 }
 
+export const BLOCK_ID_REGEX = /^\d{14}-[a-z0-9]{7}$/;
+
+export function assertSafeBlockId(id: string, label = "块 ID"): void {
+    if (typeof id !== "string" || !BLOCK_ID_REGEX.test(id)) {
+        throw new Error(`${label}不是合法的思源块 ID: ${id}`);
+    }
+}
+
+export function escapeSqlString(value: string): string {
+    return String(value ?? "").replace(/'/g, "''");
+}
+
 /** 跑一条只读 SQL；思源索引异步刷新，写后立刻查可能短暂滞后 */
 export async function querySql<T = Record<string, unknown>>(
     stmt: string,
     options: Pick<KernelPostOptions<T[]>, "dedupe" | "signal" | "timeoutMs"> = {},
 ): Promise<T[]> {
+    if (!/^\s*SELECT\s/i.test(stmt)) {
+        throw new Error("仅允许只读 SELECT 语句");
+    }
     return kernelPost("/api/query/sql", { stmt }, {
         ...options,
         decode: (data) => decodeArray<T>("/api/query/sql", data),

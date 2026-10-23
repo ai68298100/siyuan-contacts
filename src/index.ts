@@ -29,6 +29,7 @@ import { configureCloseGuardI18n } from "./components/close-guard";
 import type { InitProgressStep, WorkspaceSnapshot } from "./services/init";
 import { loadDashboard, DEFAULT_DASHBOARD_OPTIONS } from "./services/dashboard";
 import { deleteInteraction, recordInteraction, loadInteractionStoreStrict } from "./data/interactions";
+import { toLocalDateKey } from "./domain/interactions";
 import { captureFromDoc, previewCapture, resolveRecognizeTarget } from "./services/capture";
 import { extractFromDoc, prepareAiExtraction } from "./services/ai-extract";
 import type { AiExtractionConfirmation } from "./services/ai-extract";
@@ -961,10 +962,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         await recordInteraction(this, { personDocId, note, type });
         void syncInteractionDocSection(this, personDocId).catch(() => {});
         if (this.settings?.checkinItemId) {
+            const date = toLocalDateKey();
             void logCheckinEventSafely({
                 itemId: this.settings.checkinItemId,
                 value: 1,
-                externalRef: `contacts:${personDocId}:${Date.now()}`,
+                externalRef: `contacts:${personDocId}:${date}:${Date.now()}`,
                 note: note ? `与联系人互动：${note}` : "与联系人互动跟进",
             }).catch(() => {});
         }
@@ -1449,6 +1451,15 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const token = this.lifecycleToken;
         const item = await setFollowUpStatus(this, id, status);
         emitDataChanged({ topics: ["people"], docIds: [item.personDocId] }, token);
+        if (status === "done" && this.settings?.checkinItemId) {
+            const date = toLocalDateKey();
+            void logCheckinEventSafely({
+                itemId: this.settings.checkinItemId,
+                value: 1,
+                externalRef: `contacts:${item.personDocId}:${date}:${Date.now()}`,
+                note: item.title ? `完成人脉跟进：${item.title}` : "完成人脉跟进任务",
+            }).catch(() => {});
+        }
     }
 
     async snoozeFollowUp(id: string, option: SnoozeOption, customDate?: string) {
