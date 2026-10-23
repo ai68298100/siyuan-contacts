@@ -49,14 +49,14 @@
     "sass": "^1.105.2",
     "siyuan": "1.2.7",
     "svelte": "^5.57.2",
-    "svelte-check": "^4.7.6",
+    "svelte-check": "^4.7.7",
     "typescript": "^6.0.3",
     "vite": "^8.3.4",
     "vite-plugin-static-copy": "^4.1.1",
     "vite-plugin-zip-pack": "^1.2.4"
   },
   "dependencies": {
-    "@lucide/svelte": "^1.57.0",
+    "@lucide/svelte": "^1.60.0",
     "cytoscape": "^3.34.4"
   }
 }
