@@ -23,6 +23,7 @@ export interface ContactsSettings {
     /** 字段稳定键 → 数据库字段 ID */
     readonly fieldMap: Readonly<Record<FieldKey, string>>;
     readonly initializedAt: string;
+    readonly checkinItemId?: string;
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -50,8 +51,9 @@ export function normalizeSettings(raw: unknown): ContactsSettings | null {
         if (!isNonEmptyString(value)) return null;
         fieldMap[key as FieldKey] = value;
     }
+    const checkinItemId = typeof record.checkinItemId === "string" && record.checkinItemId.length > 0 ? record.checkinItemId : undefined;
     return {
-        schemaVersion: SETTINGS_STORE_VERSION,
+        schemaVersion: 1,
         notebookId: record.notebookId as string,
         notebookName: record.notebookName as string,
         hostDocId: record.hostDocId as string,
@@ -59,5 +61,6 @@ export function normalizeSettings(raw: unknown): ContactsSettings | null {
         avId: record.avId as string,
         fieldMap,
         initializedAt: record.initializedAt as string,
+        ...(checkinItemId ? { checkinItemId } : {}),
     };
 }

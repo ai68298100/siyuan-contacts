@@ -52,7 +52,7 @@ export async function syncPersonProfileDocSection(person: ContactSummary): Promi
     try {
         await upsertMarkedBlock(person.docId, PROFILE_SECTION_ATTR, markdown, existing[0]?.id);
     } catch (err) {
-        console.warn("[lvct] 人脉基本档案同步到正文未完成", err);
+        console.warn("[LvContacts] 人脉基本档案同步到正文未完成", err);
     }
 }
 
@@ -98,7 +98,7 @@ export async function syncInteractionDocSection(plugin: Plugin, personDocId: str
     try {
         await upsertMarkedBlock(personDocId, INTERACTIONS_SECTION_ATTR, markdown, existing[0]?.id);
     } catch (err) {
-        console.warn("[lvct] 互动记录同步到正文未完成", err);
+        console.warn("[LvContacts] 互动记录同步到正文未完成", err);
     }
 }
 

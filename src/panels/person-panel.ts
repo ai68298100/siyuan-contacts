@@ -146,7 +146,7 @@ async function updateStrip(context: PanelContext, protyle: ProtyleLike, rootId: 
             protyle.element.prepend(strip);
         }
     } catch (error) {
-        console.warn("[lvct] 档案条渲染失败", error);
+        console.warn("[LvContacts] 档案条渲染失败", error);
     }
 }
 
@@ -190,7 +190,7 @@ function renderStripChip(context: PanelContext, item: StripChipItem): HTMLElemen
                 btn.classList.remove("lvct-strip__chip--copied");
             }, 1500);
         }).catch((err) => {
-            console.warn("[lvct] 复制联系方式失败", err);
+            console.warn("[LvContacts] 复制联系方式失败", err);
         });
     });
     return btn;

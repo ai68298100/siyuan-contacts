@@ -106,7 +106,32 @@
 
     onMount(() => {
         void tick().then(() => focusables()[0]?.focus());
-        return () => previousActive?.focus();
+
+        // 移动端虚拟键盘避让 (visualViewport)
+        const updateViewport = () => {
+            if (typeof window !== "undefined" && window.visualViewport && panel) {
+                const offset = window.innerHeight - window.visualViewport.height;
+                if (offset > 120) {
+                    panel.style.marginBottom = `${offset}px`;
+                    panel.style.maxHeight = `${window.visualViewport.height - 32}px`;
+                } else {
+                    panel.style.marginBottom = "";
+                    panel.style.maxHeight = "";
+                }
+            }
+        };
+        if (typeof window !== "undefined" && window.visualViewport) {
+            window.visualViewport.addEventListener("resize", updateViewport);
+            window.visualViewport.addEventListener("scroll", updateViewport);
+        }
+
+        return () => {
+            if (typeof window !== "undefined" && window.visualViewport) {
+                window.visualViewport.removeEventListener("resize", updateViewport);
+                window.visualViewport.removeEventListener("scroll", updateViewport);
+            }
+            previousActive?.focus();
+        };
     });
 </script>
 
@@ -134,7 +159,10 @@
         }}
     >
         <div class="lvct-dialog-panel__header">
-            <h2 id={titleId} class="lvct-dialog-panel__title">{title}</h2>
+            <div class="lv-dialog-title-wrap">
+                <span class="lv-dialog-title-badge" aria-hidden="true">驴</span>
+                <h2 id={titleId} class="lvct-dialog-panel__title">{title}</h2>
+            </div>
             <button class="lvct-dialog-panel__close" type="button" aria-label={closeLabel} title={closeLabel}
                 onmousedown={(event) => {
                     const active = document.activeElement;

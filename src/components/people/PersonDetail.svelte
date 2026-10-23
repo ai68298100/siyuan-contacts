@@ -302,7 +302,7 @@ import StatusNotice from "../StatusNotice.svelte";
                     onChanged();
                 }
             } catch (err) {
-                console.warn("[lvct] 互动记录后移除已转换谈资失败", err);
+                console.warn("[LvContacts] 互动记录后移除已转换谈资失败", err);
             }
         }
         noteText = "";
@@ -815,7 +815,7 @@ import StatusNotice from "../StatusNotice.svelte";
                 if (copiedTopicId === topic.id) copiedTopicId = "";
             }, 1500);
         } catch (err) {
-            console.warn("[lvct] 复制谈资备忘失败", err);
+            console.warn("[LvContacts] 复制谈资备忘失败", err);
         }
     }
 
@@ -1149,7 +1149,7 @@ import StatusNotice from "../StatusNotice.svelte";
                 docSynced = false;
             }, 2000);
         } catch (err) {
-            console.warn("[lvct] 同步档案到正文未完成", err);
+            console.warn("[LvContacts] 同步档案到正文未完成", err);
         } finally {
             docSyncing = false;
         }
