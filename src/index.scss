@@ -3482,6 +3482,7 @@ html[data-theme-mode="dark"] .lvct-dialog-panel {
 
 .lvct-dialog-panel--wide {
     width: min(var(--lvct-dialog-w-wide), 94vw);
+    max-height: min(92vh, 880px);
 }
 
 .lvct-dialog-panel__header {
@@ -4680,29 +4681,37 @@ html[data-theme-mode="dark"] .lvct-doc-strip {
 }
 
 .lvct-detail__fields {
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    margin: var(--lvct-sp-2) 0;
+    padding: 12px 14px;
+    background: var(--lvct-bg-surface);
+    border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 80%, transparent);
+    border-radius: var(--lvct-r-lg);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 8px 16px;
 
     div {
         display: flex;
-        align-items: baseline;
-        gap: var(--lvct-sp-3);
+        align-items: center;
+        gap: var(--lvct-sp-2);
         font-size: var(--lvct-fs-caption);
         line-height: 1.45;
     }
 
     dt {
-        width: 4.5em;
-        color: var(--lvct-text-2);
+        width: 3.8em;
+        color: var(--lvct-text-3);
         flex-shrink: 0;
         white-space: nowrap;
+        font-weight: 500;
     }
 
     dd {
         margin: 0;
-        word-break: break-all;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        color: var(--lvct-text-1);
+        font-weight: 550;
 
         a {
             color: var(--lvct-accent);
@@ -4754,10 +4763,17 @@ html[data-theme-mode="dark"] .lvct-doc-strip {
 
     > div {
         min-width: 0;
-        padding: var(--lvct-sp-2);
-        border: 1px solid var(--lvct-border-subtle);
-        border-radius: var(--lvct-r-md);
-        background: var(--lvct-bg-app);
+        padding: 10px 14px;
+        border: 1px solid color-mix(in srgb, var(--lvct-border-subtle) 80%, transparent);
+        border-radius: var(--lvct-r-lg);
+        background: var(--lvct-bg-surface);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+        transition: all 0.15s ease;
+
+        &:hover {
+            border-color: color-mix(in srgb, var(--b3-theme-primary) 35%, var(--lvct-border-subtle));
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        }
     }
 
     dt {
@@ -4766,6 +4782,7 @@ html[data-theme-mode="dark"] .lvct-doc-strip {
         font-size: var(--lvct-fs-caption);
         text-overflow: ellipsis;
         white-space: nowrap;
+        font-weight: 500;
     }
 
     dd {
@@ -4774,8 +4791,22 @@ html[data-theme-mode="dark"] .lvct-doc-strip {
         overflow-wrap: anywhere;
         color: var(--lvct-text-1);
         font-size: var(--lvct-fs-body);
+        font-weight: 600;
         line-height: 1.4;
     }
+}
+
+.lvct-detail__empty-contact-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
+    background: color-mix(in srgb, var(--b3-theme-primary) 6%, var(--lvct-bg-surface));
+    border: 1px dashed color-mix(in srgb, var(--b3-theme-primary) 30%, transparent);
+    border-radius: var(--lvct-r-lg);
+    margin: var(--lvct-sp-2) 0;
 }
 
 .lvct-detail__person-note {
