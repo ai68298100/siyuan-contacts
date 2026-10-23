@@ -7658,6 +7658,8 @@ html[data-theme-mode="dark"] .lvct-detail__timeline-row {
         &:hover {
             border-color: var(--b3-theme-primary);
             background: var(--lvct-bg-surface);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
     }
 

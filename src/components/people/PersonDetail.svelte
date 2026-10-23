@@ -3145,12 +3145,12 @@ import StatusNotice from "../StatusNotice.svelte";
                 <button type="button" class="b3-button b3-button--text" onclick={clearDateRange}>清除筛选</button>
             {/if}
         </div>
-        <div class="lvct-detail__type-filters" role="tablist" aria-label="按互动类型筛选" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
+        <div class="lvct-detail__type-filters" role="tablist" aria-label="按互动类型筛选" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
             <button
                 type="button"
                 role="tab"
-                class="b3-button b3-button--text"
-                style="padding: 2px 8px; font-size: 11px; border-radius: 12px; {activityType === 'all' ? 'background: var(--b3-theme-primary); color: #fff; font-weight: 600;' : 'opacity: 0.8;'}"
+                class="b3-chip font-size-11"
+                class:b3-chip--primary={activityType === "all"}
                 aria-selected={activityType === "all"}
                 onclick={() => { activityType = "all"; activityLimit = 20; }}
             >全部</button>
@@ -3158,8 +3158,8 @@ import StatusNotice from "../StatusNotice.svelte";
                 <button
                     type="button"
                     role="tab"
-                    class="b3-button b3-button--text"
-                    style="padding: 2px 8px; font-size: 11px; border-radius: 12px; {activityType === itype ? 'background: var(--b3-theme-primary); color: #fff; font-weight: 600;' : 'opacity: 0.8;'}"
+                    class="b3-chip font-size-11"
+                    class:b3-chip--primary={activityType === itype}
                     aria-selected={activityType === itype}
                     onclick={() => { activityType = itype; activityLimit = 20; }}
                 >
