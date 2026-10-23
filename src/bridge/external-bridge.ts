@@ -8,6 +8,7 @@ import type { LvContactsBridgeApi } from "../services/external-bridge.ts";
 import { recordInteractionWithResult, INTERACTION_STORAGE_KEY } from "../data/interactions";
 import { loadJsonStrict, saveJsonVerified, withStoreLock } from "../data/storage";
 import { defaultBridgeRef } from "../domain/interactions.ts";
+import { logCheckinEventSafely } from "../libs/ecosystem-bridge-kit";
 import {
     BRIDGE_STORAGE_KEY, BridgeError, BridgePersonAmbiguityError, bridgeEventEvidence, bridgePerson, normalizeBridgeRequestStore,
     resolveBridgePerson,
@@ -112,9 +113,21 @@ export function initExternalBridge(plugin: Plugin, getSettings: () => ContactsSe
         event: async (docId, ref) => {
             return bridgeEventEvidence(await loadJsonStrict(plugin, INTERACTION_STORAGE_KEY), docId, ref);
         },
-        record: (personDocId, externalRef, occurredAt, note) => recordInteractionWithResult(plugin, {
-            personDocId, source: "api", externalRef, occurredAt, ...(note ? { note } : {}),
-        }),
+        record: async (personDocId, externalRef, occurredAt, note) => {
+            const res = await recordInteractionWithResult(plugin, {
+                personDocId, source: "api", externalRef, occurredAt, ...(note ? { note } : {}),
+            });
+            const settings = getSettings();
+            if (settings?.checkinItemId && res.recorded) {
+                void logCheckinEventSafely({
+                    itemId: settings.checkinItemId,
+                    value: 1,
+                    externalRef: `contacts:${personDocId}:${occurredAt}:${Date.now()}`,
+                    note: note ? `与联系人互动：${note}` : "与联系人互动跟进",
+                }).catch(() => {});
+            }
+            return res;
+        },
         // 桥版本单一事实源：以运行时 manifest 为准，避免与发布版本漂移
         version: () => {
             const manifestVersion = (plugin as { manifest?: { version?: string } }).manifest?.version;

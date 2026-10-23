@@ -82,7 +82,7 @@ export async function createOccasion(
         try {
             await projectOccasionToDocument(occasion);
         } catch (error) {
-            console.warn("[lvct] 场合文档受控块投影失败:", error);
+            console.warn("[LvContacts] 场合文档受控块投影失败:", error);
         }
     }
 

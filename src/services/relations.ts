@@ -97,7 +97,7 @@ async function refreshSections(settings: ContactsSettings, docIds: readonly stri
         for (const docId of uniqueDocIds) {
             results.push({ docId, status: "unknown", retryKey: relationRetryKey(docId, []), message });
         }
-        console.warn("[lvct] 相关人物区块同步失败（名册读取）", error);
+        console.warn("[LvContacts] 相关人物区块同步失败（名册读取）", error);
         return results;
     }
     for (const docId of uniqueDocIds) {
@@ -126,7 +126,7 @@ async function refreshSections(settings: ContactsSettings, docIds: readonly stri
                 retryKey: relationRetryKey(docId, person.relatedItemIds),
                 message,
             });
-            console.warn(`[lvct] 相关人物区块同步失败（${docId}）——对该人物重新执行关系编辑可补同步`, error);
+            console.warn(`[LvContacts] 相关人物区块同步失败（${docId}）——对该人物重新执行关系编辑可补同步`, error);
         }
     }
     return results;

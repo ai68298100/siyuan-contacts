@@ -7,6 +7,10 @@ import { Plugin, getFrontend, openTab, showMessage, Dialog, getActiveEditor } fr
 import { mount, unmount } from "svelte";
 import "./index.scss";
 
+function notify(msg: string, timeout = 3000, type: "info" | "error" = "info"): void {
+    showMessage(`[小驴人脉] ${msg}`, timeout, type);
+}
+
 import CaptureDialog from "./components/capture/CaptureDialog.svelte";
 import OrgManagerDialog from "./components/org/OrgManagerDialog.svelte";
 import ContactOrganizationDialog from "./components/org/ContactOrganizationDialog.svelte";
@@ -43,6 +47,12 @@ import { reconcileFollowUpTasksFromDoc } from "./services/followup-sync";
 import { updateContactFields, applyContactCandidateFields, listContacts as listContactsService } from "./services/contacts";
 import { ensureSelfIdentity, designateSelfIdentity, previewSelfIdentityChange, applySelfIdentityChange } from "./services/self-identity";
 import { loadSelfIdentity } from "./data/self-identity";
+import {
+    ECOSYSTEM_EVENTS,
+    subscribeEcosystemEvent,
+    logCheckinEventSafely,
+    registerRaikiriModuleSafely,
+} from "./libs/ecosystem-bridge-kit";
 import {
     listOrganizationsWithMembers,
     listOrganizationsPage,
@@ -218,10 +228,11 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         lifecycleToken.onDispose(bindContactAliasStorage(this));
 
         this.addIcons(`<symbol id="iconLvContacts" viewBox="0 0 32 32">
-<path d="M12 4c3.314 0 6 2.686 6 6s-2.686 6-6 6-6-2.686-6-6 2.686-6 6-6zM12 6.4A3.6 3.6 0 1 0 12 13.6 3.6 3.6 0 0 0 12 6.4z"/>
-<path d="M22.4 8.8c2.651 0 4.8 2.149 4.8 4.8s-2.149 4.8-4.8 4.8-4.8-2.149-4.8-4.8 2.149-4.8 4.8-4.8zM22.4 11.2a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8z"/>
-<path d="M12 18c4.26 0 8.4 1.772 8.4 4.8V26H3.6v-3.2C3.6 19.772 7.74 18 12 18zm0 2.4c-3.42 0-6 1.276-6 2.4V23.6h12v-0.8c0-1.124-2.58-2.4-6-2.4z"/>
-<path d="M23.2 20.4c2.94 0 6 1.176 6 3.2V26h-6.133v-2.4h3.733v-0.16c-.46-.44-1.76-.8-3.4-.86a9.79 9.79 0 0 0-1.6-2.18h1.4z"/>
+  <circle cx="21" cy="11.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-opacity="0.45"/>
+  <path d="M17.5 24.5c.5-2.8 2-4 5.5-4s5 1.2 5.5 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-opacity="0.45"/>
+  <circle cx="11.5" cy="11" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/>
+  <path d="M5 25c0-4 2.8-6 6.5-6s6.5 2 6.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="23.5" cy="6.5" r="2.5" fill="currentColor"/>
 </symbol>`);
 
         configureCloseGuardI18n(this.i18n);
@@ -255,14 +266,14 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
             void ensureDefaultFamilyOrganization(this, settings).then((result) => {
                 if (result.created && this.isLifecycleActive(lifecycleToken)) emitDataChanged({ topics: ["organizations"] }, lifecycleToken);
             }).catch((error) => {
-                console.warn("[lvct] 默认组织“家庭”初始化待续做", error);
+                console.warn("[LvContacts] 默认组织“家庭”初始化待续做", error);
             });
         }
         try {
             await this.loadViewPreferences();
         } catch (error) {
             if (this.isLifecycleActive(lifecycleToken) && this.preferencesActive && preferencesEpoch === this.preferencesEpoch) {
-                showMessage(`偏好读取失败，当前值尚未核实：${error instanceof Error ? error.message : String(error)}`, 6000, "error");
+                notify(`偏好读取失败，当前值尚未核实：${error instanceof Error ? error.message : String(error)}`, 6000, "error");
             }
         }
         if (!this.isLifecycleActive(lifecycleToken) || !this.preferencesActive || preferencesEpoch !== this.preferencesEpoch) return;
@@ -343,25 +354,33 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         initExternalBridge(this, () => this.settings);
 
         // 跨插件生态联动事件监听（打卡、拾遗、闪卡、考试）
-        const ecosystemHandler = () => {
-            if (this.isLifecycleActive(lifecycleToken) && this.preferencesActive) {
-                this.onDataChanged();
-            }
-        };
-        if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
-            window.addEventListener("lv-checkin:item-recorded", ecosystemHandler);
-            window.addEventListener("lv-glean:data-changed", ecosystemHandler);
-            window.addEventListener("lv-cards:reviewed", ecosystemHandler);
-            window.addEventListener("lv-exam:stats", ecosystemHandler);
-        }
+        const unsubs = [
+            subscribeEcosystemEvent(ECOSYSTEM_EVENTS.CHECKIN_RECORDED, () => {
+                if (this.isLifecycleActive(lifecycleToken) && this.preferencesActive) {
+                    this.onDataChanged();
+                }
+            }),
+            subscribeEcosystemEvent(ECOSYSTEM_EVENTS.GLEAN_DATA_CHANGED, () => {
+                if (this.isLifecycleActive(lifecycleToken) && this.preferencesActive) {
+                    this.onDataChanged();
+                }
+            }),
+            subscribeEcosystemEvent(ECOSYSTEM_EVENTS.CARDS_REVIEWED, () => {
+                if (this.isLifecycleActive(lifecycleToken) && this.preferencesActive) {
+                    this.onDataChanged();
+                }
+            }),
+            subscribeEcosystemEvent(ECOSYSTEM_EVENTS.EXAM_STATS, () => {
+                if (this.isLifecycleActive(lifecycleToken) && this.preferencesActive) {
+                    this.onDataChanged();
+                }
+            }),
+        ];
         const prevCleanup = this.eventCleanup;
         this.eventCleanup = () => {
             prevCleanup?.();
-            if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
-                window.removeEventListener("lv-checkin:item-recorded", ecosystemHandler);
-                window.removeEventListener("lv-glean:data-changed", ecosystemHandler);
-                window.removeEventListener("lv-cards:reviewed", ecosystemHandler);
-                window.removeEventListener("lv-exam:stats", ecosystemHandler);
+            for (const unsub of unsubs) {
+                try { unsub(); } catch {}
             }
         };
     }
@@ -378,6 +397,48 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
             },
         });
         this.layoutReady = true;
+        // 注册小驴雷切工作台人脉动态小组件
+        const unregisterRaikiri = registerRaikiriModuleSafely({
+            moduleId: "contacts-upcoming",
+            title: "人脉动态",
+            icon: "iconLvContacts",
+            category: "人脉",
+            description: "近期生日与待跟进人脉",
+            source: { pluginId: "siyuan-contacts", name: "小驴人脉" },
+            read: async () => {
+                if (!this.settings) return { title: "人脉动态", items: [{ label: "工作空间未初始化" }] };
+                try {
+                    const data = await this.loadDashboard({ birthdayWindowDays: 7 });
+                    const items: Array<{ label: string; value?: string }> = [];
+                    const todayBdays = data.birthdays.filter((b) => b.bucket === "today");
+                    if (todayBdays.length > 0) {
+                        items.push({ label: `🎂 今日生日 (${todayBdays.length})`, value: todayBdays.map((b) => b.person.name).join("、") });
+                    }
+                    const weekBdays = data.birthdays.filter((b) => b.bucket === "week");
+                    if (weekBdays.length > 0) {
+                        items.push({ label: `🎉 本周生日 (${weekBdays.length})`, value: weekBdays.map((b) => b.person.name).join("、") });
+                    }
+                    const openFus = (data.followUps ?? []).filter((f) => f.item.status === "open");
+                    if (openFus.length > 0) {
+                        items.push({ label: `📌 待跟进人脉 (${openFus.length})`, value: openFus.slice(0, 3).map((f) => f.person?.name || f.item.title).join("、") });
+                    }
+                    if (items.length === 0) {
+                        items.push({ label: "近期无待办与生日提醒", value: "一切就绪" });
+                    }
+                    return { title: "人脉动态", items };
+                } catch {
+                    return { title: "人脉动态", items: [{ label: "暂无数据" }] };
+                }
+            },
+            open: () => {
+                this.openWorkbench();
+            },
+        });
+        const currentCleanup = this.eventCleanup;
+        this.eventCleanup = () => {
+            currentCleanup?.();
+            try { unregisterRaikiri?.(); } catch {}
+        };
         window.clearTimeout(this.startupTimer);
         if (this.preferencesVerified && this.viewPreferences.openOnStartup) {
             const epoch = this.preferencesEpoch;
@@ -475,7 +536,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const editor = getActiveEditor(true);
         const rootId = editor?.protyle?.block?.rootID || visibleEditorRootId();
         if (!rootId) {
-            showMessage("请先打开一篇笔记再捕获人员", 3000);
+            notify("请先打开一篇笔记再捕获人员", 3000);
             return;
         }
         this.openCaptureDialog(rootId);
@@ -484,7 +545,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     private openCaptureDialog(docId: string): void {
         if (!this.isLifecycleActive()) return;
         if (!this.settings) {
-            showMessage("请先完成人脉工作空间初始化", 3000);
+            notify("请先完成人脉工作空间初始化", 3000);
             return;
         }
         this.openOwnedDialog({
@@ -500,17 +561,17 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const lifecycleToken = this.lifecycleToken;
         if (!this.isLifecycleActive(lifecycleToken)) return;
         if (!this.settings) {
-            showMessage("请先完成人脉工作空间初始化", 3000);
+            notify("请先完成人脉工作空间初始化", 3000);
             return;
         }
         const text = rawText.trim();
         if (!text) {
-            showMessage("没有可识别的内容", 3000);
+            notify("没有可识别的内容", 3000);
             return;
         }
         const result = parseContactText(text);
         if (result.items.length === 0) {
-            showMessage("未识别到可填充的资料字段（原文已保留，未做任何写入）", 3000);
+            notify("未识别到可填充的资料字段（原文已保留，未做任何写入）", 3000);
             return;
         }
         /* FAST-01.3a：识别目标裁决——名册读取失败（自动重试一次仍失败）时整单取消：零写入、
@@ -518,7 +579,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const resolution = await resolveRecognizeTarget(this.settings, rootDocId);
         if (!this.isLifecycleActive(lifecycleToken)) return;
         if (resolution.status === "failed") {
-            showMessage("人脉名册读取失败，本次识别已取消（未做任何写入）；请稍后重新触发「识别资料」", 6000);
+            notify("人脉名册读取失败，本次识别已取消（未做任何写入）；请稍后重新触发「识别资料」", 6000);
             return;
         }
         const person = resolution.status === "bound" ? resolution.person : null;
@@ -758,7 +819,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         const epoch = this.preferencesEpoch;
         const request = ++this.dataChangeRequest;
         this.preferenceRequests.invalidate();
-        console.debug(`[lvct] storage data changed${reason ? ` (source: ${reason})` : ""}`);
+        console.debug(`[LvContacts] storage data changed${reason ? ` (source: ${reason})` : ""}`);
         invalidateRoster();
         if (this.dataChangeTimer) window.clearTimeout(this.dataChangeTimer);
         this.dataChangeTimer = window.setTimeout(async () => {
@@ -899,6 +960,14 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
     async recordInteraction(personDocId: string, note?: string, type?: import("./domain/interactions").InteractionType): Promise<void> {
         await recordInteraction(this, { personDocId, note, type });
         void syncInteractionDocSection(this, personDocId).catch(() => {});
+        if (this.settings?.checkinItemId) {
+            void logCheckinEventSafely({
+                itemId: this.settings.checkinItemId,
+                value: 1,
+                externalRef: `contacts:${personDocId}:${Date.now()}`,
+                note: note ? `与联系人互动：${note}` : "与联系人互动跟进",
+            }).catch(() => {});
+        }
     }
 
     async deleteInteraction(personDocId: string, eventId: string): Promise<void> {
@@ -1634,7 +1703,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
         // 按钮旧入口可能没有 await：旁路处理避免未处理拒绝，原 Promise 仍供图谱等调用方捕获。
         void opening.catch((error: unknown) => {
             if (!this.isLifecycleActive()) return;
-            showMessage(`打开文档失败，请重试：${error instanceof Error ? error.message : String(error)}`, 6000, "error");
+            notify(`打开文档失败，请重试：${error instanceof Error ? error.message : String(error)}`, 6000, "error");
         });
         return opening;
     }
@@ -1645,7 +1714,7 @@ export default class LvContactsPlugin extends Plugin implements ContactsPluginFa
 
     openSettings() {
         if (!this.settings) {
-            showMessage("请先完成人脉工作空间初始化", 3000);
+            notify("请先完成人脉工作空间初始化", 3000);
             return;
         }
         this.openWorkbench("settings");

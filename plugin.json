@@ -2,8 +2,9 @@
   "name": "siyuan-contacts",
   "author": "ai68298100",
   "url": "https://github.com/ai68298100/siyuan-contacts",
-  "version": "0.5.38",
-  "minAppVersion": "3.8.5",
+  "version": "0.5.39",
+  "minAppVersion": "3.8.4",
+  "settingsWindow": true,
   "disabledInPublish": false,
   "backends": [
     "all"
@@ -30,6 +31,10 @@
   "icon": "icon.png",
   "preview": "preview.png",
   "keywords": [
+    "小驴",
+    "小驴人脉",
+    "xiaolv",
+    "lv",
     "人脉",
     "联系人",
     "人际关系",
@@ -38,7 +43,6 @@
     "生日提醒",
     "关系图谱",
     "contacts",
-    "CRM",
     "people"
   ]
 }

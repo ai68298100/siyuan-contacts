@@ -102,7 +102,7 @@ async function readModule<T>(failures: string[], key: string, read: () => Promis
         return await read();
     } catch (error) {
         failures.push(key);
-        console.warn(`[lvct] 仪表盘模块读取失败，已显式降级: ${key}`, error);
+        console.warn(`[LvContacts] 仪表盘模块读取失败，已显式降级: ${key}`, error);
         return fallback;
     }
 }

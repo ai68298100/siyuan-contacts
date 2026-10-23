@@ -42,7 +42,16 @@
     --lvct-color-info: #3b91c7;
 
     /* ---------- 1. 品牌色（青色主色 + 珊瑚提醒色） ---------- */
-    /* 小驴人脉使用独立的青色体系，与小驴打卡区分；渐变只用于品牌标识。 */
+    /* Epoch 6 联邦规范：爱马仕暖干邑橙（#EA580C）＋ 绿松石天青灵珠（#0284C7） */
+    --lv-brand: #EA580C; /* 暖干邑橙 */
+    --lv-brand-soft: color-mix(in srgb, var(--lv-brand) 12%, transparent);
+    --lv-accent-cyan: #0284C7; /* 绿松石天青点缀 */
+    --lv-r-sm: 6px;
+    --lv-r-md: 12px;
+    --lv-r-lg: 20px;
+    --lv-r-pill: 9999px;
+
+    /* 小驴人脉青色体系与品牌标识渐变 */
     --lvct-brand-from: #0f9d98;
     --lvct-brand-to: #44c8bd;
     --lvct-brand-gradient: linear-gradient(135deg, var(--lvct-brand-from) 0%, var(--lvct-brand-to) 100%);

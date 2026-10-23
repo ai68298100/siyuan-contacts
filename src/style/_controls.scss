@@ -58,6 +58,11 @@
         cursor: not-allowed;
     }
 
+    /* 物理按压微触感（Epoch 6 标准） */
+    .b3-button:active:not(:disabled) {
+        transform: translateY(1.5px) scale(0.985);
+    }
+
     /* 主按钮（无修饰类的填充按钮）：现代微顶高光 + 自然投影 + 悬停微上浮 */
     .b3-button:not(.b3-button--outline):not(.b3-button--cancel):not(.b3-button--text) {
         background: var(--lvct-accent-fill);
