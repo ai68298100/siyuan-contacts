@@ -2,7 +2,7 @@
     import { requestErrorMessage } from "../../shared/error-presenter";
     /** 人物详情窗口：档案字段、互动与关系列表（增删，内核自动维护双向回链） */
     import { onDestroy, tick, untrack } from "svelte";
-    import { CalendarDays, Copy, ExternalLink, ChevronDown, ChevronRight, Network, Check, Link, FileText, Star, RefreshCw } from "@lucide/svelte";
+    import { CalendarDays, Copy, ExternalLink, ChevronDown, ChevronRight, Network, Check, Link, FileText, Star, RefreshCw, Phone } from "@lucide/svelte";
     import { isPersonStarred, togglePersonStarred, type ViewPreferences } from "../../domain/preferences";
     import { extractNormalizedRegion } from "../../domain/region.ts";
     import type { DetailSectionKey, DetailCollapsedSections } from "../../domain/preferences";
@@ -2072,9 +2072,13 @@ import StatusNotice from "../StatusNotice.svelte";
         </dl>
     </section>
     {#if !current.phone && !current.email && !current.wechat && !current.website && current.tags.length === 0}
-        <ViewState compact title="联系资料还未填写" description="补充电话、邮箱或标签，方便下次查找。">
-            <button class="b3-button b3-button--outline" onclick={() => (editing = true)}>编辑资料</button>
-        </ViewState>
+        <div class="lvct-detail__empty-contact-card" role="region" aria-label="联系资料未填写">
+            <div class="fn__flex" style="align-items: center; gap: 8px;">
+                <Phone size={14} class="lvct-text-muted" />
+                <span class="ft__smaller ft__on-surface"><b>联系资料还未填写</b> · 补充电话、微信、邮箱或标签，方便日常联络。</span>
+            </div>
+            <button class="b3-button b3-button--outline b3-button--small" onclick={() => (editing = true)}>+ 补充资料</button>
+        </div>
     {/if}
     <dl class="lvct-detail__fields">
         {#if current.phone}
