@@ -1,45 +1,50 @@
 /**
- * 人物文档"相关人物"区块：把关系边同步为文档内的双链段落。
- * 设计（ROADMAP 需求③）：让思源原生反链面板与关系图也能看到人脉边——图谱不只活在插件里。
- * 实现：单个带 custom-lvct-related 属性标记的段落块，幂等更新；关系清空则移除区块。
- * 防递归：只在 services 层关系写操作后调用（我们不监听 protyle 内容变化），不存在回环。
+ * 人物文档各原子区块同步服务：把人脉基本资料、往来记录、跟进事项、人情往来与纪念日同步为文档内的 Markdown 区块。
+ * 契约：各区块拥有独立 custom-lvct-* 属性标记，幂等更新，内容未变不触发写入。
  */
 import { readMarkedBlocks, upsertMarkedBlock } from "../api/blocks";
 import { KernelPermissionError, KernelResponseError } from "../api/client";
 import type { ContactSummary } from "../domain/person";
-import { escapeLinkLabel } from "../domain/format";
-import { loadInteractionStore } from "../data/interactions.ts";
-import type { InteractionEvent } from "../domain/interactions.ts";
-import { profileText } from "../domain/people-profiles.ts";
+import { loadInteractionStore } from "../data/interactions";
+import { loadFollowUpStore } from "../data/followups";
+import { loadExchangeStore } from "../data/exchanges";
+import { loadAnniversaryStore } from "../data/anniversaries";
 import type { Plugin } from "siyuan";
+import {
+    RELATED_SECTION_ATTR,
+    INTERACTIONS_SECTION_ATTR,
+    PROFILE_SECTION_ATTR,
+    FOLLOWUPS_SECTION_ATTR,
+    EXCHANGES_SECTION_ATTR,
+    ANNIVERSARIES_SECTION_ATTR,
+    profileSectionMarkdown,
+    interactionSectionMarkdown,
+    followupsSectionMarkdown,
+    exchangesSectionMarkdown,
+    anniversariesSectionMarkdown,
+    relatedSectionMarkdown,
+} from "../domain/doc-section.ts";
 
-export const RELATED_SECTION_ATTR = "custom-lvct-related";
-export const INTERACTIONS_SECTION_ATTR = "custom-lvct-interactions";
-export const PROFILE_SECTION_ATTR = "custom-lvct-profile";
+export {
+    RELATED_SECTION_ATTR,
+    INTERACTIONS_SECTION_ATTR,
+    PROFILE_SECTION_ATTR,
+    FOLLOWUPS_SECTION_ATTR,
+    EXCHANGES_SECTION_ATTR,
+    ANNIVERSARIES_SECTION_ATTR,
+    profileSectionMarkdown,
+    interactionSectionMarkdown,
+    followupsSectionMarkdown,
+    exchangesSectionMarkdown,
+    anniversariesSectionMarkdown,
+    relatedSectionMarkdown,
+};
 
-export function profileSectionMarkdown(person: ContactSummary): string {
-    const lines = ["## 人脉基本档案", ""];
-    if (person.phone) lines.push(`- **电话**：${person.phone}`);
-    if (person.wechat) lines.push(`- **微信**：${person.wechat}`);
-    if (person.email) lines.push(`- **邮箱**：${person.email}`);
-    if (person.birthday) {
-        const bdayStr = person.isLunar ? `${person.birthday}（农历）` : person.birthday;
-        lines.push(`- **生日**：${bdayStr}`);
-    }
-    if (person.group) lines.push(`- **分组**：${person.group}`);
-    if (person.tags && person.tags.length > 0) lines.push(`- **标签**：${person.tags.map((t) => `#${t}`).join(" ")}`);
-    if (person.profile) {
-        const work = profileText(person.profile, "work");
-        const edu = profileText(person.profile, "education");
-        const fam = profileText(person.profile, "family");
-        const rel = profileText(person.profile, "relationship");
-        if (work && work !== "—") lines.push(`- **工作单位**：${work}`);
-        if (edu && edu !== "—") lines.push(`- **学校**：${edu}`);
-        if (fam && fam !== "—") lines.push(`- **家庭**：${fam}`);
-        if (rel && rel !== "—") lines.push(`- **与我的关系**：${rel}`);
-    }
-    if (lines.length <= 2) return "";
-    return lines.join("\n");
+export class RelatedProjectionUnknownError extends Error {}
+
+function contentWithoutIal(markdown: string): string {
+    return markdown.replace(/\r\n/g, "\n").trim()
+        .replace(/\n\s*\{:[^\n]*\}\s*$/, "").trim();
 }
 
 /** 同步某人物文档的正文基本资料档案区块（真实落盘到思源笔记正文） */
@@ -54,34 +59,6 @@ export async function syncPersonProfileDocSection(person: ContactSummary): Promi
     } catch (err) {
         console.warn("[LvContacts] 人脉基本档案同步到正文未完成", err);
     }
-}
-
-/** 完整同步人脉档案与往来记录到思源独立文档正文 */
-export async function syncFullPersonDocument(plugin: Plugin, person: ContactSummary): Promise<void> {
-    await Promise.all([
-        syncPersonProfileDocSection(person),
-        syncInteractionDocSection(plugin, person.docId),
-    ]);
-}
-
-const INTERACTION_ICONS: Record<string, string> = {
-    meet: "🤝 见面",
-    call: "📞 电话",
-    message: "💬 消息",
-    meal: "🍽️ 聚餐",
-    mail: "✉️ 邮件",
-    other: "📝 互动",
-};
-
-export function interactionSectionMarkdown(events: readonly InteractionEvent[]): string {
-    if (events.length === 0) return "";
-    const lines = ["## 往来记录", ""];
-    for (const event of events) {
-        const typeStr = (event.type && INTERACTION_ICONS[event.type]) ? INTERACTION_ICONS[event.type] : "📝 互动";
-        const noteStr = event.note?.trim() ? `：${event.note.trim()}` : "";
-        lines.push(`- ${event.localDate} ${typeStr}${noteStr}`);
-    }
-    return lines.join("\n");
 }
 
 /** 同步某人物文档的正文往来记录区块（真实落盘到思源笔记正文） */
@@ -102,23 +79,68 @@ export async function syncInteractionDocSection(plugin: Plugin, personDocId: str
     }
 }
 
-function sectionMarkdown(related: readonly ContactSummary[]): string {
-    const links = related.map((item) => `[${escapeLinkLabel(item.name)}](siyuan://blocks/${item.docId})`);
-    return `**相关人物**：${links.join("、")}`;
+export async function syncFollowUpsDocSection(plugin: Plugin, personDocId: string): Promise<void> {
+    if (!personDocId) return;
+    try {
+        const store = await loadFollowUpStore(plugin);
+        const items = store.items.filter((item) => item.personDocId === personDocId);
+        const existing = await readMarkedBlocks(personDocId, FOLLOWUPS_SECTION_ATTR);
+        const markdown = followupsSectionMarkdown(items);
+        if (existing.length === 0 && !markdown) return;
+        if (existing.length === 1 && contentWithoutIal(existing[0].markdown) === markdown) return;
+        await upsertMarkedBlock(personDocId, FOLLOWUPS_SECTION_ATTR, markdown, existing[0]?.id);
+    } catch (err) {
+        console.warn("[LvContacts] 待办跟进同步到正文未完成", err);
+    }
 }
 
-export class RelatedProjectionUnknownError extends Error {}
+export async function syncExchangesDocSection(plugin: Plugin, personDocId: string): Promise<void> {
+    if (!personDocId) return;
+    try {
+        const store = await loadExchangeStore(plugin);
+        const items = store.records.filter((item) => item.personDocId === personDocId);
+        const existing = await readMarkedBlocks(personDocId, EXCHANGES_SECTION_ATTR);
+        const markdown = exchangesSectionMarkdown(items);
+        if (existing.length === 0 && !markdown) return;
+        if (existing.length === 1 && contentWithoutIal(existing[0].markdown) === markdown) return;
+        await upsertMarkedBlock(personDocId, EXCHANGES_SECTION_ATTR, markdown, existing[0]?.id);
+    } catch (err) {
+        console.warn("[LvContacts] 人情往来同步到正文未完成", err);
+    }
+}
 
-function contentWithoutIal(markdown: string): string {
-    return markdown.replace(/\r\n/g, "\n").trim()
-        .replace(/\n\s*\{:[^\n]*\}\s*$/, "").trim();
+export async function syncAnniversariesDocSection(plugin: Plugin, personDocId: string): Promise<void> {
+    if (!personDocId) return;
+    try {
+        const store = await loadAnniversaryStore(plugin);
+        const items = store.anniversaries[personDocId] ?? [];
+        const existing = await readMarkedBlocks(personDocId, ANNIVERSARIES_SECTION_ATTR);
+        const markdown = anniversariesSectionMarkdown(items);
+        if (existing.length === 0 && !markdown) return;
+        if (existing.length === 1 && contentWithoutIal(existing[0].markdown) === markdown) return;
+        await upsertMarkedBlock(personDocId, ANNIVERSARIES_SECTION_ATTR, markdown, existing[0]?.id);
+    } catch (err) {
+        console.warn("[LvContacts] 重要纪念日同步到正文未完成", err);
+    }
+}
+
+/** 完整同步人脉档案、往来记录、跟进计划、人情账目与纪念日到思源独立文档正文 */
+export async function syncFullPersonDocument(plugin: Plugin, person: ContactSummary): Promise<void> {
+    if (!person.docId) return;
+    await Promise.all([
+        syncPersonProfileDocSection(person),
+        syncInteractionDocSection(plugin, person.docId),
+        syncFollowUpsDocSection(plugin, person.docId),
+        syncExchangesDocSection(plugin, person.docId),
+        syncAnniversariesDocSection(plugin, person.docId),
+    ]);
 }
 
 /** 同步某人物文档的相关人物区块（related 为解析好姓名的对方联系人） */
 export async function syncRelatedSection(person: ContactSummary, related: readonly ContactSummary[]): Promise<void> {
     const existing = await readMarkedBlocks(person.docId, RELATED_SECTION_ATTR);
     if (existing.length > 1) throw new RelatedProjectionUnknownError("存在多个关系标记区块，未自动覆盖；请先核对文档");
-    const markdown = related.length > 0 ? sectionMarkdown(related) : "";
+    const markdown = related.length > 0 ? relatedSectionMarkdown(related) : "";
     if (existing.length === 0 && !markdown
         || existing.length === 1 && contentWithoutIal(existing[0].markdown) === markdown) return;
     try {

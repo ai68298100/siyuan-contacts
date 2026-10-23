@@ -1033,6 +1033,7 @@ import StatusNotice from "../StatusNotice.svelte";
                 anniversaries = list;
                 newAnnivTitle = "";
                 onChanged();
+                if (onSyncDocProfile) void onSyncDocProfile(current).catch(() => {});
             }
         } catch (error) {
             if (detailAlive) anniversariesError = requestErrorMessage(error);
@@ -1048,6 +1049,7 @@ import StatusNotice from "../StatusNotice.svelte";
             if (detailAlive) {
                 anniversaries = list;
                 onChanged();
+                if (onSyncDocProfile) void onSyncDocProfile(current).catch(() => {});
             }
         } catch (error) {
             if (detailAlive) anniversariesError = requestErrorMessage(error);
@@ -1342,6 +1344,7 @@ import StatusNotice from "../StatusNotice.svelte";
 
     async function refreshFollowUpsAfterMutation(): Promise<void> {
         const refreshed = await loadFollowUps();
+        if (onSyncDocProfile) void onSyncDocProfile(current).catch(() => {});
         if (!refreshed && detailAlive) {
             followUpRefreshWarning = text(
                 "fuSavedRefreshFail",
@@ -2979,7 +2982,7 @@ import StatusNotice from "../StatusNotice.svelte";
                     onLoad={onLoadExchanges}
                     onCreate={onCreateExchange}
                     onChangeStatus={onChangeExchangeStatus}
-                    onChanged={onChanged}
+                    onChanged={() => { onChanged(); if (onSyncDocProfile) void onSyncDocProfile(current).catch(() => {}); }}
                 />
             {/if}
             {#if onLoadAliases && onAddAlias && onRemoveAlias}
