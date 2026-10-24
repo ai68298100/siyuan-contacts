@@ -84,3 +84,15 @@ export function sanitizeFileName(name: string, fallback = "未命名", maxLength
     }
     return cleaned || fallback;
 }
+
+export const BLOCK_ID_REGEX = /^\d{14}-[a-z0-9]{7}$/;
+
+export function assertSafeBlockId(id: string, label = "块 ID"): void {
+    if (typeof id !== "string" || !BLOCK_ID_REGEX.test(id)) {
+        throw new Error(`${label}不是合法的思源块 ID: ${id}`);
+    }
+}
+
+export function escapeSqlString(value: string): string {
+    return String(value ?? "").replace(/'/g, "''");
+}

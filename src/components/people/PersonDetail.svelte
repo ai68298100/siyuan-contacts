@@ -1136,6 +1136,22 @@ import StatusNotice from "../StatusNotice.svelte";
     let siyuanUriCopied = $state(false);
     let siyuanUriTimer: ReturnType<typeof setTimeout> | null = null;
 
+    async function convertBacklinkToInteraction(item: import("../../services/insights").BacklinkMentionItem) {
+        if (!item || busy) return;
+        const note = item.content.trim() || `在文档《${item.docTitle}》中提及`;
+        busy = true;
+        try {
+            await onRecord(current.docId, note, "other");
+            await loadInsights();
+            onChanged();
+            if (onSyncDocProfile) void onSyncDocProfile(current).catch(() => {});
+        } catch (err) {
+            console.warn("[LvContacts] 反链转互动未完成", err);
+        } finally {
+            busy = false;
+        }
+    }
+
     let docSynced = $state(false);
     let docSyncTimer: ReturnType<typeof setTimeout> | null = null;
     let docSyncing = $state(false);
@@ -3219,6 +3235,48 @@ import StatusNotice from "../StatusNotice.svelte";
             <ViewState compact title="还没有互动记录" description="从一次聊天或见面开始，记录你们的往来。">
                 <button class="b3-button b3-button--text" onclick={() => void selectTab("overview")}>去记一笔</button>
             </ViewState>
+        {/if}
+
+        <!-- Issue #87：笔记与日志反向链接（Backlinks / 提及）视窗 -->
+        {#if insights && insights.backlinks && insights.backlinks.length > 0}
+            <div class="lvct-detail__section" style="margin-top: 14px; border-top: 1px dashed var(--b3-theme-surface-lighter); padding-top: 12px;">
+                <div class="lvct-detail__section-head" style="margin-bottom: 8px;">
+                    <div>
+                        <h4 style="margin: 0;">🔗 笔记与日志反链（{insights.backlinks.length}）</h4>
+                        <p class="ft__smaller ft__on-surface" style="margin: 2px 0 0;">
+                            在日记或随笔中使用双链 ((姓名)) 记录的事情，自动汇总在此。
+                        </p>
+                    </div>
+                </div>
+                <div class="lvct-detail__timeline">
+                    {#each insights.backlinks as bItem (bItem.blockId)}
+                        <div class="lvct-detail__timeline-row" style="background: color-mix(in srgb, var(--lvct-accent) 4%, var(--lvct-bg-surface));">
+                            <span class="ft__on-surface" style="font-weight: 600;">{bItem.date || "近期"}</span>
+                            <span class="lvct-detail__timeline-note">
+                                <span class="lvct-chip lvct-chip--group font-size-11" style="margin-right: 4px;">
+                                    📝 {bItem.docTitle}
+                                </span>
+                                {bItem.content}
+                            </span>
+                            <div class="fn__flex" style="gap: 4px; align-items: center;">
+                                <button
+                                    type="button"
+                                    class="b3-button b3-button--text b3-button--small"
+                                    title="在思源中打开该日志文档"
+                                    onclick={() => onOpenPersonDoc(bItem.rootId)}
+                                >打开原笔记</button>
+                                <button
+                                    type="button"
+                                    class="b3-button b3-button--outline b3-button--small"
+                                    title="一键将该日志记录转录为正式互动事件，更新最近联系时间"
+                                    disabled={busy}
+                                    onclick={() => convertBacklinkToInteraction(bItem)}
+                                >⚡ 转为互动</button>
+                            </div>
+                        </div>
+                    {/each}
+                </div>
+            </div>
         {/if}
     </section>
     </section>

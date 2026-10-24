@@ -5,6 +5,7 @@
  */
 import {
     assertKernelRecord,
+    assertSafeBlockId,
     decodeDocumentExport,
     decodeInsertBlockData,
     firstOperationId,
@@ -323,7 +324,7 @@ export async function upsertPersonNoteBlock(rootId: string, note: string, existi
  * 笔记里链接了谁（siyuan://blocks 双链/块引），refs 索引里就有谁。
  */
 export async function findOutgoingLinkRoots(rootId: string): Promise<string[]> {
-    if (!/^\d{14}-[0-9a-z]{7}$/.test(rootId)) throw new Error("rootId 不是合法的思源 ID");
+    assertSafeBlockId(rootId, "rootId");
     const rows = await querySql<unknown>(
         `SELECT DISTINCT def_block_root_id AS docId FROM refs WHERE root_id = '${rootId}' AND def_block_root_id != ''`,
     );
@@ -333,6 +334,51 @@ export async function findOutgoingLinkRoots(rootId: string): Promise<string[]> {
             throw new KernelProtocolError("/api/query/sql", "出链查询返回非法目标文档 ID");
         }
         return row.docId;
+    });
+}
+
+export interface BacklinkMentionItem {
+    blockId: string;
+    rootId: string;
+    content: string;
+    docTitle: string;
+    hpath: string;
+    updated: string;
+    date: string;
+}
+
+/**
+ * 检索某人物文档的外部反向链接（Backlinks，如在日记、工作随笔中对该联系人的双链引用）
+ * 严格经过 assertSafeBlockId 正则校验防御注入。
+ */
+export async function findPersonBacklinks(personDocId: string, limit = 50): Promise<BacklinkMentionItem[]> {
+    assertSafeBlockId(personDocId, "人物文档 ID");
+    const safeLimit = Math.max(1, Math.min(limit, 200));
+    const rows = await querySql<unknown>(
+        `SELECT r.block_id AS blockId, r.root_id AS rootId, r.content, b.hpath, b.updated ` +
+        `FROM refs r ` +
+        `LEFT JOIN blocks b ON r.block_id = b.id ` +
+        `WHERE r.def_block_root_id = '${personDocId}' AND r.root_id != '${personDocId}' ` +
+        `ORDER BY b.updated DESC LIMIT ${safeLimit}`,
+    );
+    return rows.map((raw) => {
+        const row = assertKernelRecord("/api/query/sql", raw);
+        const hpath = typeof row.hpath === "string" ? row.hpath : "";
+        const docTitle = hpath ? hpath.split("/").filter(Boolean).pop() || "未命名文档" : "未命名文档";
+        const updated = typeof row.updated === "string" ? row.updated : "";
+        let date = "";
+        if (updated.length >= 8) {
+            date = `${updated.slice(0, 4)}-${updated.slice(4, 6)}-${updated.slice(6, 8)}`;
+        }
+        return {
+            blockId: typeof row.blockId === "string" ? row.blockId : "",
+            rootId: typeof row.rootId === "string" ? row.rootId : "",
+            content: typeof row.content === "string" ? row.content : "",
+            docTitle,
+            hpath,
+            updated,
+            date,
+        };
     });
 }
 
