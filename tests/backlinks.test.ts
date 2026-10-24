@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assertSafeBlockId, escapeSqlString, BLOCK_ID_REGEX } from "../src/domain/format.ts";
+import { assertSafeBlockId, escapeSqlString, BLOCK_ID_REGEX, cleanBlockRefText } from "../src/domain/format.ts";
 import type { BacklinkMentionItem } from "../src/api/blocks.ts";
 import type { PersonInsights } from "../src/services/insights.ts";
 
@@ -34,10 +34,12 @@ test("BacklinkMentionItem 与 PersonInsights 类型契约完备", () => {
         hpath: "/日记/2026-10-23 工作日记",
         updated: "20261023153000",
         date: "2026-10-23",
+        kind: "link",
     };
     assert.equal(item.blockId, "20261023150000-blk0001");
     assert.equal(item.date, "2026-10-23");
     assert.equal(item.docTitle, "2026-10-23 工作日记");
+    assert.equal(item.kind, "link");
 
     const insights: PersonInsights = {
         timeline: [],
@@ -47,4 +49,36 @@ test("BacklinkMentionItem 与 PersonInsights 类型契约完备", () => {
     };
     assert.equal(insights.backlinks.length, 1);
     assert.equal(insights.backlinks[0].rootId, "20261023150000-doc0001");
+});
+
+test("cleanBlockRefText：清洗双链语法为流畅纯净文本", () => {
+    assert.equal(cleanBlockRefText("今天与 ((20261023150000-person1 '张三')) 开会"), "今天与 张三 开会");
+    assert.equal(cleanBlockRefText("无别名双链 ((20261023150000-doc0001)) 测试"), "无别名双链 链接 测试");
+    assert.equal(cleanBlockRefText("多行   空格\r\n测试"), "多行 空格 测试");
+    assert.equal(cleanBlockRefText(""), "");
+});
+
+test("BacklinkMentionItem 支持 link 与 mention 双模分类", () => {
+    const linkItem: BacklinkMentionItem = {
+        blockId: "blk-1",
+        rootId: "doc-1",
+        content: "双链内容",
+        docTitle: "日记",
+        hpath: "/日记",
+        updated: "20261024000000",
+        date: "2026-10-24",
+        kind: "link",
+    };
+    const mentionItem: BacklinkMentionItem = {
+        blockId: "blk-2",
+        rootId: "doc-2",
+        content: "正文提及内容",
+        docTitle: "工作总结",
+        hpath: "/总结",
+        updated: "20261024010000",
+        date: "2026-10-24",
+        kind: "mention",
+    };
+    assert.equal(linkItem.kind, "link");
+    assert.equal(mentionItem.kind, "mention");
 });

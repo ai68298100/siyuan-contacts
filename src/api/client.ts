@@ -305,9 +305,9 @@ export interface DocRow {
     box?: string;
 }
 
-import { assertSafeBlockId, BLOCK_ID_REGEX, escapeSqlString } from "../domain/format.ts";
+import { assertSafeBlockId, BLOCK_ID_REGEX, cleanBlockRefText, escapeSqlString } from "../domain/format.ts";
 
-export { assertSafeBlockId, BLOCK_ID_REGEX, escapeSqlString };
+export { assertSafeBlockId, BLOCK_ID_REGEX, cleanBlockRefText, escapeSqlString };
 
 /** 跑一条只读 SQL；思源索引异步刷新，写后立刻查可能短暂滞后 */
 export async function querySql<T = Record<string, unknown>>(

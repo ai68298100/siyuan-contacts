@@ -96,3 +96,13 @@ export function assertSafeBlockId(id: string, label = "块 ID"): void {
 export function escapeSqlString(value: string): string {
     return String(value ?? "").replace(/'/g, "''");
 }
+
+/**
+ * 清洗思源双链/块引语法 ((id "文本")) 为流畅纯净的可见文本
+ */
+export function cleanBlockRefText(text: string): string {
+    if (!text) return "";
+    return text.replace(/\(\(\d{14}-[a-z0-9]{7}(?:\s+["']([^"']+)["'])?\)\)/g, (_match, anchor) => anchor || "链接")
+        .replace(/\s+/g, " ")
+        .trim();
+}
