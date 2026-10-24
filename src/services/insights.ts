@@ -7,11 +7,15 @@ import { listContacts } from "./contacts";
 import { buildCoAttendance, buildTimeline } from "../domain/interactions";
 import type { CoAttendance, TimelineItem } from "../domain/interactions";
 import type { ContactsSettings } from "../domain/model";
+import { findPersonBacklinks, type BacklinkMentionItem } from "../api/blocks";
+
+export type { BacklinkMentionItem };
 
 export interface PersonInsights {
     timeline: TimelineItem[];
     coAttendance: Array<CoAttendance & { name: string }>;
     totalEvents: number;
+    backlinks: BacklinkMentionItem[];
 }
 
 export async function loadPersonInsights(
@@ -19,10 +23,11 @@ export async function loadPersonInsights(
     settings: ContactsSettings,
     docId: string,
 ): Promise<PersonInsights> {
-    const [store, roster] = await Promise.all([
+    const [store, roster, backlinks] = await Promise.all([
         /* FUNC-01.12：时间线不得把读取失败呈现为空历史，抛错交由详情页错误态重试 */
         loadInteractionStoreStrict(plugin),
         listContacts(settings),
+        findPersonBacklinks(docId).catch(() => [] as BacklinkMentionItem[]),
     ]);
     const nameByDoc = new Map(roster.map((person) => [person.docId, person.name]));
     const coAttendance = buildCoAttendance(store.events, docId)
@@ -32,5 +37,6 @@ export async function loadPersonInsights(
         timeline: buildTimeline(store.events, docId),
         coAttendance,
         totalEvents: store.events.filter((event) => event.personDocId === docId).length,
+        backlinks,
     };
 }
