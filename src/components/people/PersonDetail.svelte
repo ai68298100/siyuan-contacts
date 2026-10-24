@@ -1943,6 +1943,17 @@ import StatusNotice from "../StatusNotice.svelte";
                         {/if}
                     </span>
                 {/if}
+                {#if insights && insights.backlinks && insights.backlinks.length > 0}
+                    <button
+                        type="button"
+                        class="lvct-chip lvct-chip--group font-size-11"
+                        style="cursor: pointer; padding: 2px 8px;"
+                        title="点击查看全库笔记与日记对该人物的反链与提及"
+                        onclick={() => void selectTab("activity")}
+                    >
+                        🔗 {insights.backlinks.length} 条反链引用
+                    </button>
+                {/if}
             </div>
         </div>
         <div class="lvct-detail__header-actions">
@@ -3256,6 +3267,11 @@ import StatusNotice from "../StatusNotice.svelte";
                                 <span class="lvct-chip lvct-chip--group font-size-11" style="margin-right: 4px;">
                                     📝 {bItem.docTitle}
                                 </span>
+                                {#if bItem.kind === "link"}
+                                    <span class="lvct-chip font-size-10" style="margin-right: 4px; background: color-mix(in srgb, #0284c7 14%, transparent); color: #0284c7; font-weight: 600;">🔗 双链</span>
+                                {:else}
+                                    <span class="lvct-chip font-size-10" style="margin-right: 4px; background: color-mix(in srgb, #ea580c 14%, transparent); color: #ea580c; font-weight: 600;">💡 提及</span>
+                                {/if}
                                 {bItem.content}
                             </span>
                             <div class="fn__flex" style="gap: 4px; align-items: center;">

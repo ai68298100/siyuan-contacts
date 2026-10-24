@@ -23,13 +23,14 @@ export async function loadPersonInsights(
     settings: ContactsSettings,
     docId: string,
 ): Promise<PersonInsights> {
-    const [store, roster, backlinks] = await Promise.all([
+    const [store, roster] = await Promise.all([
         /* FUNC-01.12：时间线不得把读取失败呈现为空历史，抛错交由详情页错误态重试 */
         loadInteractionStoreStrict(plugin),
         listContacts(settings),
-        findPersonBacklinks(docId).catch(() => [] as BacklinkMentionItem[]),
     ]);
     const nameByDoc = new Map(roster.map((person) => [person.docId, person.name]));
+    const currentName = nameByDoc.get(docId) || "";
+    const backlinks = await findPersonBacklinks(docId, currentName).catch(() => [] as BacklinkMentionItem[]);
     const coAttendance = buildCoAttendance(store.events, docId)
         .map((item) => ({ ...item, name: nameByDoc.get(item.otherDocId) ?? "" }))
         .filter((item) => item.name.length > 0);

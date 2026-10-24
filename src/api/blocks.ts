@@ -6,6 +6,8 @@
 import {
     assertKernelRecord,
     assertSafeBlockId,
+    cleanBlockRefText,
+    escapeSqlString,
     decodeDocumentExport,
     decodeInsertBlockData,
     firstOperationId,
@@ -345,23 +347,25 @@ export interface BacklinkMentionItem {
     hpath: string;
     updated: string;
     date: string;
+    kind: "link" | "mention";
 }
 
 /**
- * 检索某人物文档的外部反向链接（Backlinks，如在日记、工作随笔中对该联系人的双链引用）
+ * 检索某人物文档的外部反向链接（Backlinks，双链引用及正文提及）
  * 严格经过 assertSafeBlockId 正则校验防御注入。
  */
-export async function findPersonBacklinks(personDocId: string, limit = 50): Promise<BacklinkMentionItem[]> {
+export async function findPersonBacklinks(personDocId: string, personName?: string, limit = 50): Promise<BacklinkMentionItem[]> {
     assertSafeBlockId(personDocId, "人物文档 ID");
     const safeLimit = Math.max(1, Math.min(limit, 200));
-    const rows = await querySql<unknown>(
+    // 1. 显式双链引用 (kind: "link")
+    const linkRows = await querySql<unknown>(
         `SELECT r.block_id AS blockId, r.root_id AS rootId, r.content, b.hpath, b.updated ` +
         `FROM refs r ` +
         `LEFT JOIN blocks b ON r.block_id = b.id ` +
         `WHERE r.def_block_root_id = '${personDocId}' AND r.root_id != '${personDocId}' ` +
         `ORDER BY b.updated DESC LIMIT ${safeLimit}`,
     );
-    return rows.map((raw) => {
+    const linkItems: BacklinkMentionItem[] = linkRows.map((raw) => {
         const row = assertKernelRecord("/api/query/sql", raw);
         const hpath = typeof row.hpath === "string" ? row.hpath : "";
         const docTitle = hpath ? hpath.split("/").filter(Boolean).pop() || "未命名文档" : "未命名文档";
@@ -370,16 +374,66 @@ export async function findPersonBacklinks(personDocId: string, limit = 50): Prom
         if (updated.length >= 8) {
             date = `${updated.slice(0, 4)}-${updated.slice(4, 6)}-${updated.slice(6, 8)}`;
         }
+        const rawContent = typeof row.content === "string" ? row.content : "";
         return {
             blockId: typeof row.blockId === "string" ? row.blockId : "",
             rootId: typeof row.rootId === "string" ? row.rootId : "",
-            content: typeof row.content === "string" ? row.content : "",
+            content: cleanBlockRefText(rawContent),
             docTitle,
             hpath,
             updated,
             date,
+            kind: "link",
         };
     });
+
+    const seenBlockIds = new Set(linkItems.map((item) => item.blockId));
+
+    // 2. 正文提及嗅探 (kind: "mention")：仅在姓名合法且字符数 >= 2 时检索
+    let mentionItems: BacklinkMentionItem[] = [];
+    const name = personName?.trim();
+    if (name && name.length >= 2) {
+        const safeName = escapeSqlString(name);
+        try {
+            const mentionRows = await querySql<unknown>(
+                `SELECT id AS blockId, root_id AS rootId, content, hpath, updated ` +
+                `FROM blocks ` +
+                `WHERE type IN ('p', 'i', 'h') ` +
+                `  AND content LIKE '%${safeName}%' ` +
+                `  AND root_id != '${personDocId}' ` +
+                `ORDER BY updated DESC LIMIT ${safeLimit}`,
+            );
+            mentionItems = mentionRows.map((raw) => {
+                const row = assertKernelRecord("/api/query/sql", raw);
+                const blockId = typeof row.blockId === "string" ? row.blockId : "";
+                const hpath = typeof row.hpath === "string" ? row.hpath : "";
+                const docTitle = hpath ? hpath.split("/").filter(Boolean).pop() || "未命名文档" : "未命名文档";
+                const updated = typeof row.updated === "string" ? row.updated : "";
+                let date = "";
+                if (updated.length >= 8) {
+                    date = `${updated.slice(0, 4)}-${updated.slice(4, 6)}-${updated.slice(6, 8)}`;
+                }
+                const rawContent = typeof row.content === "string" ? row.content : "";
+                return {
+                    blockId,
+                    rootId: typeof row.rootId === "string" ? row.rootId : "",
+                    content: cleanBlockRefText(rawContent),
+                    docTitle,
+                    hpath,
+                    updated,
+                    date,
+                    kind: "mention" as const,
+                };
+            }).filter((item) => !seenBlockIds.has(item.blockId));
+        } catch {
+            // 提及查询失败静默降级，不阻断双链反链
+        }
+    }
+
+    // 3. 合并并按更新时间倒序
+    const all = [...linkItems, ...mentionItems];
+    all.sort((a, b) => b.updated.localeCompare(a.updated));
+    return all.slice(0, safeLimit);
 }
 
 export const NOTEBOOK_DOC_PAGE_SIZE = 500;
